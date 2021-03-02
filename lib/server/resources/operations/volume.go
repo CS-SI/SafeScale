@@ -57,6 +57,8 @@ const (
 // Volume links Object Storage folder and getVolumes
 type volume struct {
 	*core
+
+	lock concurrency.TaskedLock
 }
 
 // nullVolume returns an instance of share corresponding to its null value.
@@ -75,7 +77,12 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 	if err != nil {
 		return nullVolume(), err
 	}
-	return &volume{core: coreInstance}, nil
+
+	instance := &volume{
+		core: coreInstance,
+		lock: concurrency.NewTaskedLock(),
+	}
+	return instance, nil
 }
 
 // LoadVolume loads the metadata of a subnet
@@ -145,7 +152,7 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (rv resourc
 
 // IsNull tells if the instance is a null value
 func (rv *volume) IsNull() bool {
-	return rv == nil || rv.core.IsNull()
+	return rv == nil || rv.lock == nil || rv.core.IsNull()
 }
 
 // Carry overloads rv.core.Carry() to add Volume to service cache
@@ -155,6 +162,9 @@ func (rv *volume) Carry(task concurrency.Task, clonable data.Clonable) (xerr fai
 	if rv.IsNull() {
 		return fail.InvalidInstanceError()
 	}
+
+	rv.lock.SafeLock(task)
+	defer rv.lock.SafeUnlock(task)
 
 	// Note: do not validate parameters, this call will do it
 	if xerr := rv.core.Carry(task, clonable); xerr != nil {
@@ -192,6 +202,9 @@ func (rv volume) GetSpeed(task concurrency.Task) (_ volumespeed.Enum, xerr fail.
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rv.lock.SafeRLock(task)
+	defer rv.lock.SafeRUnlock(task)
 
 	var speed volumespeed.Enum
 	xerr = rv.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -233,6 +246,9 @@ func (rv volume) GetSize(task concurrency.Task) (_ int, xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rv.lock.SafeRLock(task)
+	defer rv.lock.SafeRUnlock(task)
+
 	var size int
 	xerr = rv.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
@@ -273,6 +289,9 @@ func (rv volume) GetAttachments(task concurrency.Task) (_ *propertiesv1.VolumeAt
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rv.lock.SafeRLock(task)
+	defer rv.lock.SafeRUnlock(task)
+
 	var vaV1 *propertiesv1.VolumeAttachments
 	xerr = rv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
@@ -312,6 +331,9 @@ func (rv volume) Browse(task concurrency.Task, callback func(*abstract.Volume) f
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rv.lock.SafeRLock(task)
+	defer rv.lock.SafeRUnlock(task)
+
 	return rv.core.BrowseFolder(task, func(buf []byte) fail.Error {
 		av := abstract.NewVolume()
 		xerr := av.Deserialize(buf)
@@ -340,8 +362,8 @@ func (rv *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rv.SafeLock(task)
-	defer rv.SafeUnlock(task)
+	rv.lock.SafeLock(task)
+	defer rv.lock.SafeUnlock(task)
 
 	xerr = rv.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// check if volume can be deleted (must not be attached)
@@ -418,6 +440,9 @@ func (rv *volume) Create(task concurrency.Task, req abstract.VolumeRequest) (xer
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rv.lock.SafeLock(task)
+	defer rv.lock.SafeUnlock(task)
+
 	// Check if Volume exists and is managed by SafeScale
 	svc := rv.GetService()
 	if vol, xerr := LoadVolume(task, svc, req.Name); xerr == nil {
@@ -487,6 +512,9 @@ func (rv *volume) Attach(task concurrency.Task, host resources.Host, path, forma
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s', %s, %s, %v)", host.GetName(), path, format, doNotFormat).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rv.lock.SafeLock(task)
+	defer rv.lock.SafeUnlock(task)
 
 	var (
 		volumeID, volumeName, deviceName, volumeUUID, mountPoint, vaID string
@@ -851,6 +879,9 @@ func (rv *volume) Detach(task concurrency.Task, host resources.Host) (xerr fail.
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rv.lock.SafeLock(task)
+	defer rv.lock.SafeUnlock(task)
+
 	var (
 		volumeID, volumeName string
 		mountPath            string
@@ -1057,6 +1088,9 @@ func (rv volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspectRespo
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rv.lock.SafeRLock(task)
+	defer rv.lock.SafeRUnlock(task)
 
 	volumeID := rv.GetID()
 	volumeName := rv.GetName()

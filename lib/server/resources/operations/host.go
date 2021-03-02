@@ -68,6 +68,7 @@ const (
 type host struct {
 	*core
 
+	lock                          concurrency.TaskedLock
 	installMethods                map[uint8]installmethod.Enum
 	privateIP, publicIP, accessIP string
 	sshProfile                    *system.SSHConfig
@@ -86,7 +87,11 @@ func NewHost(svc iaas.Service) (_ *host, xerr fail.Error) { //nolint
 		return nil, xerr
 	}
 
-	return &host{core: coreInstance}, nil
+	instance := &host{
+		core: coreInstance,
+		lock: concurrency.NewTaskedLock(),
+	}
+	return instance, nil
 }
 
 // nullHost returns a *host corresponding to NullValue
@@ -169,11 +174,10 @@ func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (rh resources
 
 // upgradeIfNeeded upgrades IPAddress properties if needed
 func (rh *host) upgradeIfNeeded(task concurrency.Task) fail.Error {
-	rh.SafeLock(task)
-	defer rh.SafeUnlock(task)
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-
 		// upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2
 		if !props.Lookup(hostproperty.NetworkV2) {
 			xerr := props.Alter(task, hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
@@ -216,8 +220,8 @@ func (rh *host) upgradeIfNeeded(task concurrency.Task) fail.Error {
 func (rh *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 	svc := rh.GetService()
 
-	rh.SafeLock(task)
-	defer rh.SafeUnlock(task)
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	return rh.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var primaryGatewayConfig, secondaryGatewayConfig *system.SSHConfig
@@ -368,6 +372,15 @@ func (rh *host) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.
 	if rh.IsNull() {
 		return fail.InvalidInstanceError()
 	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if clonable == nil {
+		return fail.InvalidParameterCannotBeNilError("clonable")
+	}
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	// Note: do not validate parameters, this call will do it
 	if xerr := rh.core.Carry(task, clonable); xerr != nil {
@@ -409,6 +422,9 @@ func (rh host) Browse(task concurrency.Task, callback func(*abstract.HostCore) f
 	defer tracer.Exiting()
 	// defer fail.OnExitTraceError(&xerr, "failed to create host")
 
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
+
 	return rh.core.BrowseFolder(task, func(buf []byte) (innerXErr fail.Error) {
 		ahc := abstract.NewHostCore()
 		if innerXErr = ahc.Deserialize(buf); innerXErr != nil {
@@ -437,6 +453,9 @@ func (rh *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, xerr
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitTraceError(&xerr, "failed to create host")
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	// if xerr = rh.Reload(task); xerr != nil {
 	// 	return state, xerr
@@ -473,6 +492,9 @@ func (rh *host) Reload(task concurrency.Task) (xerr fail.Error) {
 	hostName := rh.GetName()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	if xerr = rh.core.Reload(task); xerr != nil {
 		switch xerr.(type) { //nolint
@@ -554,6 +576,9 @@ func (rh host) GetState(task concurrency.Task) (state hoststate.Enum) {
 		return state
 	}
 
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
+
 	_ = rh.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
@@ -590,6 +615,9 @@ func (rh *host) Create(task concurrency.Task, hostReq abstract.HostRequest, host
 	// defer fail.OnExitTraceError(&xerr, "failed to create host")
 
 	svc := rh.GetService()
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	// Check if host exists and is managed bySafeScale
 	if _, xerr = LoadHost(task, svc, hostReq.ResourceName); xerr != nil {
@@ -1452,6 +1480,9 @@ func (rh *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (_ st
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
+
 	return rh.waitInstallPhase(task, userdata.PHASE5_FINAL, timeout)
 }
 
@@ -1563,8 +1594,8 @@ func (rh *host) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh.SafeLock(task)
-	defer rh.SafeUnlock(task)
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	xerr = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Don't remove a host that is a gateway
@@ -1600,8 +1631,8 @@ func (rh *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	rh.SafeLock(task)
-	defer rh.SafeUnlock(task)
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	svc := rh.GetService()
 
@@ -1904,8 +1935,8 @@ func (rh host) GetSSHConfig(task concurrency.Task) (_ *system.SSHConfig, xerr fa
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	rh.SafeRLock(task)
-	defer rh.SafeRUnlock(task)
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	return rh.sshProfile, nil
 }
@@ -1935,6 +1966,9 @@ func (rh host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connect
 		stdOut, stdErr string
 		retCode        int
 	)
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	// retrieve ssh config to perform some commands
 	ssh, xerr := rh.GetSSHConfig(task)
@@ -2047,6 +2081,9 @@ func (rh host) Pull(task concurrency.Task, target, source string, timeout time.D
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
+
 	// retrieve ssh config to perform some commands
 	ssh, xerr := rh.GetSSHConfig(task)
 	if xerr != nil {
@@ -2097,6 +2134,9 @@ func (rh host) Push(task concurrency.Task, source, target, owner, mode string, t
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner, mode).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	// retrieve ssh config to perform some commands
 	ssh, xerr := rh.GetSSHConfig(task)
@@ -2171,6 +2211,9 @@ func (rh host) GetShare(task concurrency.Task, shareRef string) (_ *propertiesv1
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
+
 	var (
 		hostShare *propertiesv1.HostShare
 		// ok        bool
@@ -2217,6 +2260,9 @@ func (rh host) GetVolumes(task concurrency.Task) (_ *propertiesv1.HostVolumes, x
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
+
 	var hvV1 *propertiesv1.HostVolumes
 	err := rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
@@ -2257,6 +2303,9 @@ func (rh host) Start(task concurrency.Task) (xerr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	hostName := rh.GetName()
 	hostID := rh.GetID()
@@ -2309,6 +2358,9 @@ func (rh host) Stop(task concurrency.Task) (xerr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	hostName := rh.GetName()
 	hostID := rh.GetID()
@@ -2363,6 +2415,9 @@ func (rh host) Reboot(task concurrency.Task) (xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
+
 	if xerr := rh.Stop(task); xerr != nil {
 		return xerr
 	}
@@ -2416,8 +2471,8 @@ func (rh host) getPublicIP(task concurrency.Task) string {
 		return ""
 	}
 
-	rh.SafeRLock(task)
-	defer rh.SafeRUnlock(task)
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	return rh.publicIP
 }
@@ -2451,8 +2506,8 @@ func (rh host) getPrivateIP(task concurrency.Task) string {
 		return ""
 	}
 
-	rh.SafeRLock(task)
-	defer rh.SafeRUnlock(task)
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	return rh.privateIP
 }
@@ -2478,6 +2533,9 @@ func (rh host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", subnetID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(hostproperty.NetworkV2) {
@@ -2535,8 +2593,8 @@ func (rh host) getAccessIP(task concurrency.Task) string {
 		return ""
 	}
 
-	rh.SafeRLock(task)
-	defer rh.SafeRUnlock(task)
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	return rh.accessIP
 }
@@ -2559,6 +2617,9 @@ func (rh host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -2591,6 +2652,9 @@ func (rh host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -2632,6 +2696,9 @@ func (rh host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Error
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
+
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.ClusterMembershipV1, func(clonable data.Clonable) fail.Error {
 			hostClusterMembershipV1, ok := clonable.(*propertiesv1.HostClusterMembership)
@@ -2656,6 +2723,9 @@ func (rh host) IsGateway(task concurrency.Task) (_ bool, xerr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	var state bool
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2706,6 +2776,9 @@ func (rh host) PushStringToFileWithOwnership(task concurrency.Task, content stri
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	hostName := rh.GetName()
 	f, xerr := system.CreateTempFileFromString(content, 0600)
@@ -2822,6 +2895,9 @@ func (rh host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subnet, xer
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
+
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
 			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
@@ -2871,6 +2947,9 @@ func (rh host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.E
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	var (
 		ahc           *abstract.HostCore
@@ -2949,6 +3028,9 @@ func (rh *host) BindSecurityGroup(task concurrency.Task, rsg resources.SecurityG
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
+
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -3006,6 +3088,9 @@ func (rh *host) UnbindSecurityGroup(task concurrency.Task, sg resources.Security
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
@@ -3068,6 +3153,9 @@ func (rh host) ListSecurityGroups(task concurrency.Task, state securitygroupstat
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
+
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -3105,6 +3193,9 @@ func (rh *host) EnableSecurityGroup(task concurrency.Task, sg resources.Security
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	svc := rh.GetService()
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -3186,6 +3277,9 @@ func (rh *host) DisableSecurityGroup(task concurrency.Task, rsg resources.Securi
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	svc := rh.GetService()
 	return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {

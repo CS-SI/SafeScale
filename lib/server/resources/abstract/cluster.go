@@ -80,7 +80,7 @@ func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
 
 	src := p.(*ClusterIdentity)
 	*i = *src
-	i.Keypair = &KeyPair{}
+	i.Keypair = nil
 	if src.Keypair != nil {
 		i.Keypair = &KeyPair{}
 		*i.Keypair = *src.Keypair

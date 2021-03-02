@@ -58,6 +58,9 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
+
 	feat, xerr := NewFeature(task, rh.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
@@ -111,6 +114,9 @@ func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, s
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
 
 	feat, xerr := NewFeature(task, rh.GetService(), name)
 	if xerr != nil {
@@ -212,13 +218,14 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 		logrus.Error(fail.InvalidParameterCannotBeNilError("task").Error())
 		return map[uint8]installmethod.Enum{}
 	}
+
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
+
 	if task.Aborted() {
 		logrus.Error(fail.AbortedError(nil, "aborted").Error())
 		return map[uint8]installmethod.Enum{}
 	}
-
-	rh.SafeLock(task)
-	defer rh.SafeUnlock(task)
 
 	if rh.installMethods == nil {
 		rh.installMethods = map[uint8]installmethod.Enum{}
@@ -280,6 +287,9 @@ func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, r
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
 
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
+
 	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
@@ -323,6 +333,9 @@ func (rh *host) UnregisterFeature(task concurrency.Task, feat string) (xerr fail
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
+	rh.lock.SafeLock(task)
+	defer rh.lock.SafeUnlock(task)
+
 	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
@@ -363,6 +376,9 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 	if v == nil {
 		return fail.InvalidParameterCannotBeNilError("v")
 	}
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	v["ShortHostname"] = rh.GetName()
 	domain := ""
@@ -446,6 +462,9 @@ func (rh *host) IsFeatureInstalled(task concurrency.Task, name string) (found bo
 	if name = strings.TrimSpace(name); name == "" {
 		return false, fail.InvalidParameterError("name", "cannot be empty string")
 	}
+
+	rh.lock.SafeRLock(task)
+	defer rh.lock.SafeRUnlock(task)
 
 	return found, rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
