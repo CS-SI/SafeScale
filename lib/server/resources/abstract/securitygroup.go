@@ -308,7 +308,9 @@ func (sg *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 
 // NewSecurityGroup ...
 func NewSecurityGroup() *SecurityGroup {
-	return &SecurityGroup{}
+	return &SecurityGroup{
+		Rules: SecurityGroupRules{},
+	}
 }
 
 // Clone does a deep-copy of the IPAddress

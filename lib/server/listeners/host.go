@@ -323,12 +323,14 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		if xerr != nil {
 			return nil, xerr
 		}
-		err = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+
+		err = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			subnets = []*abstract.Subnet{as}
+
+			subnets = []*abstract.Subnet{as.Clone().(*abstract.Subnet)}
 			return nil
 		})
 	} else {
@@ -337,12 +339,14 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 			if xerr != nil {
 				return nil, xerr
 			}
-			xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+
+			xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
 					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				subnets = append(subnets, as)
+
+				subnets = append(subnets, as.Clone().(*abstract.Subnet))
 				return nil
 			})
 			if xerr != nil {
@@ -353,11 +357,12 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 
 	domain := in.Domain
 	if domain == "" {
-		xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			domain = as.Domain
 			return nil
 		})
