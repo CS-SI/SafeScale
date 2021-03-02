@@ -49,6 +49,8 @@ const (
 // bucket describes a bucket and satisfies interface resources.ObjectStorageBucket
 type bucket struct {
 	*core
+
+	lock concurrency.TaskedLock
 }
 
 // NewBucket intanciates bucket struct
@@ -62,7 +64,11 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 		return nil, xerr
 	}
 
-	return &bucket{core: coreInstance}, nil
+	instance := &bucket{
+		core: coreInstance,
+		lock: concurrency.NewTaskedLock(),
+	}
+	return instance, nil
 }
 
 // LoadBucket instanciates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
@@ -124,7 +130,7 @@ func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (b resourc
 
 // IsNull tells if the instance corresponds to null value
 func (b *bucket) IsNull() bool {
-	return b == nil || b.core.IsNull()
+	return b == nil || b.lock == nil || b.core.IsNull()
 }
 
 // Carry overloads rv.core.Carry() to add Volume to service cache
@@ -132,6 +138,9 @@ func (b *bucket) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail
 	if b.IsNull() {
 		return fail.InvalidInstanceError()
 	}
+
+	b.lock.SafeLock(task)
+	defer b.lock.SafeUnlock(task)
 
 	// Note: do not validate parameters, this call will do it
 	if xerr := b.core.Carry(task, clonable); xerr != nil {
@@ -161,6 +170,9 @@ func (b *bucket) GetHost(task concurrency.Task) (string, fail.Error) {
 	if task.Aborted() {
 		return "", fail.AbortedError(nil, "aborted")
 	}
+
+	b.lock.SafeRLock(task)
+	defer b.lock.SafeRUnlock(task)
 
 	var res string
 	xerr := b.core.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -194,8 +206,11 @@ func (b *bucket) GetMountPoint(task concurrency.Task) (string, fail.Error) {
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
+	b.lock.SafeRLock(task)
+	defer b.lock.SafeRUnlock(task)
+
 	var res string
-	xerr := b.core.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := b.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -238,16 +253,19 @@ func (b *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
+	b.lock.SafeLock(task)
+	defer b.lock.SafeUnlock(task)
+
 	ab, xerr := b.GetService().InspectBucket(name)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
 	}
-	if //goland:noinspection GoNilness
-	!ab.IsNull() {
+	if !ab.IsNull() {
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
+
 	if ab, xerr = b.GetService().CreateBucket(name); xerr != nil {
 		return xerr
 	}
@@ -265,6 +283,9 @@ func (b *bucket) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
+	b.lock.SafeLock(task)
+	defer b.lock.SafeUnlock(task)
+
 	return b.GetService().DeleteBucket(b.GetName())
 }
 
@@ -277,6 +298,9 @@ func (b *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
+
+	b.lock.SafeLock(task)
+	defer b.lock.SafeUnlock(task)
 
 	// Get Host data
 	rh, xerr := LoadHost(task, b.GetService(), hostName)
@@ -347,6 +371,9 @@ func (b *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Erro
 			xerr = fail.Wrap(xerr, "failed to unmount bucket '%s' from Host '%s'", b.GetName(), hostName)
 		}
 	}()
+
+	b.lock.SafeLock(task)
+	defer b.lock.SafeUnlock(task)
 
 	// Check bucket existence
 	if _, xerr = b.GetService().InspectBucket(b.GetName()); xerr != nil {

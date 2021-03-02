@@ -312,6 +312,7 @@ func (tm *taskedLock) IsLocked(task Task) (bool, fail.Error) {
 	return ok, nil
 }
 
+// GetReadLockCount ...
 func (tm *taskedLock) GetReadLockCount(task Task) (uint64, fail.Error) {
 	if tm == nil {
 		return 0, fail.InvalidInstanceError()
@@ -334,6 +335,7 @@ func (tm *taskedLock) GetReadLockCount(task Task) (uint64, fail.Error) {
 	return 0, nil
 }
 
+// GetWriteLockCount ...
 func (tm *taskedLock) GetWriteLockCount(task Task) (uint64, fail.Error) {
 	if tm == nil {
 		return 0, fail.InvalidInstanceError()

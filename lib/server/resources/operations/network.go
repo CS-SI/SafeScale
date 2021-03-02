@@ -49,6 +49,8 @@ const (
 // network links Object Storage folder and Networking
 type network struct {
 	*core
+
+	lock concurrency.TaskedLock
 }
 
 func nullNetwork() resources.Network {
@@ -66,7 +68,11 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 		return nullNetwork(), xerr
 	}
 
-	return &network{core: coreInstance}, nil
+	instance := &network{
+		core: coreInstance,
+		lock: concurrency.NewTaskedLock(),
+	}
+	return instance, nil
 }
 
 // LoadNetwork loads the metadata of a subnet
@@ -168,7 +174,7 @@ func (rn *network) upgradeNetworkPropertyIfNeeded(task concurrency.Task) fail.Er
 
 // IsNull tells if the instance corresponds to subnet Null Value
 func (rn *network) IsNull() bool {
-	return rn == nil || rn.core.IsNull()
+	return rn == nil || rn.lock == nil || rn.core.IsNull()
 }
 
 // Create creates a network
@@ -186,13 +192,12 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task,
-		true,
-		"('%s', '%s')", req.Name, req.CIDR,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	rn.lock.SafeLock(task)
+	defer rn.lock.SafeUnlock(task)
 
 	// Check if subnet already exists and is managed by SafeScale
 	svc := rn.GetService()
@@ -261,6 +266,15 @@ func (rn *network) Carry(task concurrency.Task, clonable data.Clonable) (xerr fa
 	if rn == nil {
 		return fail.InvalidInstanceError()
 	}
+	if task == nil {
+		return fail.InvalidParameterCannotBeNilError("task")
+	}
+	if clonable == nil {
+		return fail.InvalidParameterCannotBeNilError("clonable")
+	}
+
+	rn.lock.SafeLock(task)
+	defer rn.lock.SafeUnlock(task)
 
 	// Note: do not validate parameters, this call will do it
 	if xerr := rn.core.Carry(task, clonable); xerr != nil {
@@ -299,6 +313,9 @@ func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network)
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
+	rn.lock.SafeRLock(task)
+	defer rn.lock.SafeRUnlock(task)
+
 	return rn.core.BrowseFolder(task, func(buf []byte) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
@@ -331,8 +348,8 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	rn.SafeLock(task)
-	defer rn.SafeUnlock(task)
+	rn.lock.SafeLock(task)
+	defer rn.lock.SafeUnlock(task)
 
 	xerr = rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
@@ -451,6 +468,9 @@ func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) 
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
+	rn.lock.SafeRLock(task)
+	defer rn.lock.SafeRUnlock(task)
+
 	cidr = ""
 	xerr = rn.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
@@ -480,6 +500,9 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
+
+	rn.lock.SafeRLock(task)
+	defer rn.lock.SafeRUnlock(task)
 
 	var pn *protocol.Network
 	xerr = rn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -530,6 +553,9 @@ func (rn network) InspectSubnet(task concurrency.Task, ref string) (_ resources.
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
+
+	rn.lock.SafeRLock(task)
+	defer rn.lock.SafeRUnlock(task)
 
 	return LoadSubnet(task, rn.GetService(), rn.GetID(), ref)
 }
