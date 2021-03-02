@@ -16,8 +16,8 @@ type ObjectStorageBucket struct {
 }
 
 // NewObjectStorageBucket ...
-func NewObjectStorageBucket() ObjectStorageBucket {
-	return ObjectStorageBucket{}
+func NewObjectStorageBucket() *ObjectStorageBucket {
+	return &ObjectStorageBucket{}
 }
 
 // IsConsistent tells if host struct is consistent
@@ -42,7 +42,7 @@ func (osb ObjectStorageBucket) OK() bool {
 // satisfies interface data.Clonable
 func (osb ObjectStorageBucket) Clone() data.Clonable {
 	newB := NewObjectStorageBucket()
-	return (&newB).Replace(&osb)
+	return newB.Replace(&osb)
 }
 
 // Replace ...

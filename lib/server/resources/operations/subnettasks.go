@@ -117,10 +117,21 @@ func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.Ta
 	}()
 
 	// Binds gateway to VIP if needed
-	if as := hostReq.Subnets[0]; as != nil && as.VIP != nil {
-		if xerr = svc.BindHostToVIP(as.VIP, rgw.GetID()); xerr != nil {
-			return nil, xerr
+	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
+		if as != nil && as.VIP != nil {
+			if xerr = svc.BindHostToVIP(as.VIP, rgw.GetID()); xerr != nil {
+				return xerr
+			}
+		}
+		return nil
+	})
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	r := data.Map{

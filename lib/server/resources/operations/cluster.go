@@ -72,6 +72,7 @@ type cluster struct {
 	*core
 	// abstract.ClusterIdentity
 
+	lock                concurrency.TaskedLock
 	installMethods      map[uint8]installmethod.Enum
 	lastStateCollection time.Time
 	makers              flavors.Makers
@@ -95,12 +96,16 @@ func NewCluster(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, x
 		return nullCluster(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	c, xerr := newCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
+	coreInstance, xerr := newCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
 
-	return &cluster{core: c}, nil
+	instance := &cluster{
+		core: coreInstance,
+		lock: concurrency.NewTaskedLock(),
+	}
+	return instance, nil
 }
 
 // LoadCluster ...
@@ -445,34 +450,37 @@ func convertDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, def
 
 // IsNull tells if the instance should be considered as a null value
 func (c *cluster) IsNull() bool {
-	return c == nil || c.core.IsNull()
+	return c == nil || c.lock == nil || c.core.IsNull()
 }
 
-// GetName returns the name of the cluster
-// Satisfies interface data.Identifiable
-func (c cluster) GetName() string {
-	if c.IsNull() {
-		return ""
-	}
-
-	return c.core.GetName()
-}
-
-// GetID returns the name of the cluster
-// Satisfies interface data.Identifiable
-func (c cluster) GetID() string {
-	if c.IsNull() {
-		return ""
-	}
-
-	return c.core.GetName()
-}
+//// GetName returns the name of the cluster
+//// Satisfies interface data.Identifiable
+//func (c cluster) GetName() string {
+//	if c.IsNull() {
+//		return ""
+//	}
+//
+//	return c.core.GetName()
+//}
+//
+//// GetID returns the name of the cluster
+//// Satisfies interface data.Identifiable
+//func (c cluster) GetID() string {
+//	if c.IsNull() {
+//		return ""
+//	}
+//
+//	return c.core.GetName()
+//}
 
 // Carry overloads rv.core.Carry() to add Volume to service cache
 func (c *cluster) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
 	if c.IsNull() {
 		return fail.InvalidInstanceError()
 	}
+
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	// Note: do not validate parameters, this call will do it
 	if xerr := c.core.Carry(task, clonable); xerr != nil {
@@ -515,6 +523,9 @@ func (c *cluster) Create(task concurrency.Task, req abstract.ClusterRequest) (xe
 		fmt.Sprintf("Ending creation of infrastructure of cluster '%s'", req.Name),
 	)()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage("failed to create cluster infrastructure:"))
+
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	// Check if cluster exists in metadata; if yes, error
 	if _, xerr = LoadCluster(task, c.GetService(), req.Name); xerr == nil {
@@ -767,7 +778,7 @@ func (c *cluster) firstLight(task concurrency.Task, req abstract.ClusterRequest)
 		aci.AdminPassword = cladmPassword
 
 		// Links maker based on Flavor
-		return c.Bootstrap(task, aci.Flavor)
+		return c.bootstrap(task, aci.Flavor)
 	})
 }
 
@@ -1459,8 +1470,8 @@ func (c *cluster) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	c.SafeRLock(task)
-	defer c.SafeRUnlock(task)
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	r, err := json.Marshal(c) // nolint
 	return r, fail.ConvertError(err)
@@ -1484,15 +1495,15 @@ func (c *cluster) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Erro
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	err := json.Unmarshal(buf, c) // nolint
 	return fail.ConvertError(err)
 }
 
-// Bootstrap (re)connects controller with the appropriate Makers
-func (c *cluster) Bootstrap(task concurrency.Task, flavor clusterflavor.Enum) (xerr fail.Error) {
+// bootstrap (re)connects controller with the appropriate Makers
+func (c *cluster) bootstrap(task concurrency.Task, flavor clusterflavor.Enum) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if c.IsNull() {
@@ -1504,9 +1515,6 @@ func (c *cluster) Bootstrap(task concurrency.Task, flavor clusterflavor.Enum) (x
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
-
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
 
 	switch flavor {
 	case clusterflavor.BOH:
@@ -1538,6 +1546,9 @@ func (c cluster) Browse(task concurrency.Task, callback func(*abstract.ClusterId
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
+
 	return c.core.BrowseFolder(task, func(buf []byte) fail.Error {
 		aci := abstract.NewClusterIdentity()
 		if xerr := aci.Deserialize(buf); xerr != nil {
@@ -1565,6 +1576,9 @@ func (c cluster) GetIdentity(task concurrency.Task) (clusterIdentity abstract.Cl
 	if task.Aborted() {
 		return abstract.ClusterIdentity{}, fail.AbortedError(nil, "aborted")
 	}
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	xerr = c.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		aci, ok := clonable.(*abstract.ClusterIdentity)
@@ -1690,6 +1704,9 @@ func (c *cluster) GetNetworkConfig(task concurrency.Task) (config *propertiesv3.
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
+
 	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
 			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
@@ -1719,6 +1736,9 @@ func (c *cluster) Start(task concurrency.Task) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
+
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	// If the cluster is in state Stopping or Stopped, do nothing
 	var prevState clusterstate.Enum
@@ -1897,6 +1917,9 @@ func (c *cluster) Stop(task concurrency.Task) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
+
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	// If the cluster is stopped, do nothing
 	var prevState clusterstate.Enum
@@ -2078,6 +2101,9 @@ func (c *cluster) GetState(task concurrency.Task) (state clusterstate.Enum, xerr
 		return clusterstate.Unknown, fail.AbortedError(nil, "aborted by cancellation")
 	}
 
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
+
 	if c.makers.GetState != nil {
 		state, xerr = c.makers.GetState(task, c)
 		if xerr != nil {
@@ -2130,6 +2156,9 @@ func (c *cluster) AddNode(task concurrency.Task, def abstract.HostSizingRequirem
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
+
 	nodes, xerr := c.AddNodes(task, 1, def)
 	if xerr != nil {
 		return nullHost(), xerr
@@ -2157,6 +2186,9 @@ func (c *cluster) AddNodes(task concurrency.Task, count uint, def abstract.HostS
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", count)
 	defer tracer.Entering().Exiting()
+
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2322,6 +2354,9 @@ func (c *cluster) DeleteLastNode(task concurrency.Task) (node *propertiesv3.Clus
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
+
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
 		return nil, xerr
@@ -2391,6 +2426,9 @@ func (c *cluster) DeleteSpecificNode(task concurrency.Task, hostID string, selec
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
+
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
 		return xerr
@@ -2440,6 +2478,9 @@ func (c cluster) ListMasters(task concurrency.Task) (list resources.IndexedListO
 		return nil, fail.NotAvailableError("cluster is being removed")
 	}
 
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
+
 	xerr = c.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -2478,9 +2519,13 @@ func (c cluster) ListMasterNames(task concurrency.Task) (list data.IndexedListOf
 	if task == nil {
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2527,9 +2572,13 @@ func (c cluster) ListMasterIDs(task concurrency.Task) (list data.IndexedListOfSt
 	if task == nil {
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2576,9 +2625,13 @@ func (c *cluster) ListMasterIPs(task concurrency.Task) (list data.IndexedListOfS
 	if task == nil {
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2632,6 +2685,9 @@ func (c cluster) FindAvailableMaster(task concurrency.Task) (master resources.Ho
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
+
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
 		return nil, xerr
@@ -2680,9 +2736,13 @@ func (c cluster) ListNodes(task concurrency.Task) (list resources.IndexedListOfC
 	if task == nil {
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2690,10 +2750,6 @@ func (c cluster) ListNodes(task concurrency.Task) (list resources.IndexedListOfC
 	}
 	if state == clusterstate.Removed {
 		return nil, fail.NotAvailableError("cluster is being removed")
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -2741,6 +2797,9 @@ func (c cluster) ListNodeNames(task concurrency.Task) (list data.IndexedListOfSt
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
 
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
+
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
 		return nil, xerr
@@ -2786,9 +2845,13 @@ func (c cluster) ListNodeIDs(task concurrency.Task) (list data.IndexedListOfStri
 	if task == nil {
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2836,9 +2899,13 @@ func (c cluster) ListNodeIPs(task concurrency.Task) (list data.IndexedListOfStri
 	if task == nil {
 		return emptyList, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2883,6 +2950,7 @@ func (c cluster) FindAvailableNode(task concurrency.Task) (node resources.Host, 
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -2890,6 +2958,9 @@ func (c cluster) FindAvailableNode(task concurrency.Task) (node resources.Host, 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -2946,6 +3017,9 @@ func (c cluster) LookupNode(task concurrency.Task, ref string) (found bool, xerr
 		return false, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
+
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
 		return false, xerr
@@ -2986,6 +3060,9 @@ func (c cluster) CountNodes(task concurrency.Task) (count uint, xerr fail.Error)
 	if task.Aborted() {
 		return 0, fail.AbortedError(nil, "aborted")
 	}
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -3032,6 +3109,9 @@ func (c cluster) GetNodeByID(task concurrency.Task, hostID string) (host resourc
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%s)", hostID)
 	defer tracer.Entering().Exiting()
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	var state clusterstate.Enum
 	if state, xerr = c.GetState(task); xerr != nil {
@@ -3261,9 +3341,13 @@ func (c *cluster) Delete(task concurrency.Task) (xerr fail.Error) {
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
+
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	var cleaningErrors []error
 
@@ -3855,6 +3939,9 @@ func (c cluster) ToProtocol(task concurrency.Task) (_ *protocol.ClusterResponse,
 		return nil, fail.NotAvailableError("cluster is being removed")
 	}
 
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
+
 	out := &protocol.ClusterResponse{}
 	xerr = c.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ci, ok := clonable.(*abstract.ClusterIdentity)
@@ -3995,6 +4082,9 @@ func (c *cluster) Shrink(task concurrency.Task, count uint) (_ []*propertiesv3.C
 		return nil, fail.NotAvailableError("cluster is being removed")
 	}
 
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
+
 	tg, xerr := concurrency.NewTaskGroup(task)
 	if xerr != nil {
 		return nil, xerr
@@ -4092,6 +4182,9 @@ func (c cluster) IsFeatureInstalled(task concurrency.Task, name string) (found b
 	if name = strings.TrimSpace(name); name == "" {
 		return false, fail.InvalidParameterError("name", "cannot be empty string")
 	}
+
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	return found, c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {

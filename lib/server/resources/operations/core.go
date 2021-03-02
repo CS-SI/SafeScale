@@ -47,7 +47,7 @@ type core struct {
 	name atomic.Value
 	id   atomic.Value
 
-	concurrency.TaskedLock `json:"-"`
+	lock concurrency.TaskedLock
 
 	kind       string
 	shielded   *concurrency.Shielded
@@ -90,7 +90,7 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		kind:       kind,
 		folder:     fld,
 		properties: props,
-		TaskedLock: concurrency.NewTaskedLock(),
+		lock:       concurrency.NewTaskedLock(),
 		shielded:   concurrency.NewShielded(instance),
 		observers:  map[string]observer.Observer{},
 	}
@@ -210,8 +210,8 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	if c.shielded == nil {
 		return fail.InvalidInstanceContentError("c.shielded", "cannot be nil")
@@ -273,8 +273,8 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.E
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	if c.shielded == nil {
 		return fail.InvalidInstanceContentError("c.shielded", "cannot be nil")
@@ -339,8 +339,8 @@ func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	if c.loaded {
 		return fail.NotAvailableError("metadata is already carrying a value")
@@ -395,8 +395,8 @@ func (c *core) ReadByID(task concurrency.Task, id string) (xerr fail.Error) {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	if c.loaded {
 		return fail.NotAvailableError("metadata is already carrying a value")
@@ -550,8 +550,8 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	if c.loaded && !c.committed {
 		return fail.InconsistentError("cannot reload a not committed data")
@@ -632,8 +632,8 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	var idFound, nameFound bool
 	id := c.GetID()
@@ -716,8 +716,8 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 		propsMapped    = map[string]string{}
 	)
 
-	c.SafeRLock(task)
-	defer c.SafeRUnlock(task)
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	shieldedJSONed, xerr = c.shielded.Serialize(task)
 	if xerr != nil {
@@ -766,8 +766,8 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	if c.properties == nil {
 		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
@@ -822,8 +822,8 @@ func (c *core) Released(task concurrency.Task) {
 		return
 	}
 
-	c.SafeRLock(task)
-	defer c.SafeRUnlock(task)
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	for _, v := range c.observers {
 		v.MarkAsFreed(task, c.GetID())
@@ -838,8 +838,8 @@ func (c *core) Destroyed(task concurrency.Task) {
 		return
 	}
 
-	c.SafeRLock(task)
-	defer c.SafeRUnlock(task)
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	for _, v := range c.observers {
 		v.MarkAsDeleted(task, c.GetID())
@@ -861,8 +861,8 @@ func (c *core) AddObserver(task concurrency.Task, o observer.Observer) error {
 		return fail.InvalidParameterError("o", "cannot be nil")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	id := o.GetID()
 	if pre, ok := c.observers[id]; ok {
@@ -887,8 +887,8 @@ func (c *core) NotifyObservers(task concurrency.Task) error {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	c.SafeRLock(task)
-	defer c.SafeRUnlock(task)
+	c.lock.SafeRLock(task)
+	defer c.lock.SafeRUnlock(task)
 
 	id := c.GetID()
 	for _, v := range c.observers {
@@ -912,8 +912,8 @@ func (c *core) RemoveObserver(task concurrency.Task, name string) error {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.SafeLock(task)
+	defer c.lock.SafeUnlock(task)
 
 	delete(c.observers, name)
 	return nil
