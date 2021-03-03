@@ -439,7 +439,7 @@ func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
 	}
 	end := time.Since(begin)
 
-	if end >= (time.Millisecond * 15) {
+	if end >= (time.Millisecond * 20) {
 		t.Errorf("It should have finished near 15 ms but it didn't, it was (%s) !!", end)
 	}
 }
