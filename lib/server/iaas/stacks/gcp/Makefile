@@ -7,13 +7,13 @@ all:	#generate
 vet:
 	@$(GO) vet ./...
 
-#generate: clean
-#	@$(GO) generate
+generate: clean
+	@$(GO) generate
 
 test:
-	@$(GO) test
+	@$(GO) test -race -v ./...
 
-#clean:
-#	@$(RM) rice-box.go || true
+clean:
+	@$(RM) rice-box.go || true
 
 

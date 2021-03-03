@@ -5,5 +5,5 @@ vet:
 	@$(GO) vet ./...
 
 test:
-	@$(GO) test
+	@$(GO) test -race -v ./...
 
