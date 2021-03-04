@@ -62,6 +62,21 @@ message TenantCleanupRequest {
 	bool force = 2;
 }
 
+message TenantScanRequest {
+	string name = 1;
+	bool dry_run = 2;
+	repeated string templates = 3;
+}
+
+message ScanResult {
+	string template_name = 1;
+	bool scan_success = 2;
+}
+
+message ScanResultList {
+	repeated ScanResult results = 1;
+}
+
 message TenantInspectRequest {
 	string name = 1;
 	string user_id = 2;
@@ -114,7 +129,7 @@ message TenantMetadata {
 }
 
 message TenantInspectResponse {
-	string name = 1;
+	string tenant_name = 1;
 	string provider = 2;
 	TenantIdentity identity = 3;
 	TenantCompute compute = 4;
@@ -127,7 +142,7 @@ service TenantService{
 	rpc Get (google.protobuf.Empty) returns (TenantName){}
 	rpc Inspect (TenantName) returns (TenantInspectResponse){}
 	rpc List (google.protobuf.Empty) returns (TenantList){}
-	rpc Scan (google.protobuf.Empty) returns (google.protobuf.Empty){}
+	rpc Scan (TenantScanRequest) returns (ScanResultList){}
 	rpc Set (TenantName) returns (google.protobuf.Empty){}
 }
 
@@ -410,6 +425,42 @@ message HostTemplate {
 	int32 disk = 5;
 	int32 gpu_count = 6;
 	string gpu_type = 7;
+	ScannedInfo scanned = 8;
+}
+
+message ScannedInfo{
+	string tenant_name = 1;
+	string template_id = 2;
+	string template_name = 3;
+	string image_id = 4;
+	string image_name = 5;
+	string last_updated = 6;
+	int64 number_of_cpu = 7;
+	int64 number_of_core = 8;
+	int64 number_of_socket = 9;
+	double cpu_frequency_Ghz = 10;
+	string cpu_arch = 11;
+	string hypervisor = 12;
+	string cpu_model = 13;
+	double ram_size_Gb = 14;
+	double ram_freq = 15;
+	int64 gpu = 16;
+	string gpu_model = 17;
+	int64 disk_size_Gb = 18;
+	string main_disk_type = 19;
+	double main_disk_speed_MBps = 20;
+	double sample_net_speed_KBps = 21;
+	int64 eph_disk_size_Gb = 22;
+	double price_in_dollars_second = 23;
+	double price_in_dollars_hour = 24;
+	repeated PriceInfo prices = 25;
+}
+
+message PriceInfo{
+	string currency = 1;
+	string duration_label = 2;
+	uint32 duration = 3;
+	double price = 4;
 }
 
 // --- templates ---
@@ -428,9 +479,16 @@ message TemplateMatchRequest {
 	string sizing = 2;
 }
 
+message TemplateInspectRequest {
+	bool all = 1;
+	string tenant_id = 2;
+	bool only_scanned = 3;
+}
+
 service TemplateService {
 	rpc List(TemplateListRequest) returns (TemplateList){}
 	rpc Match(TemplateMatchRequest) returns (TemplateList){}
+	rpc Inspect(TemplateInspectRequest) returns (TemplateList){}
 }
 
 // safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
