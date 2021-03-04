@@ -77,13 +77,21 @@ message ScanResultList {
 	repeated ScanResult results = 1;
 }
 
+message TenantInspectRequest {
+	string name = 1;
+	string user_id = 2;
+	string group_id = 3;
+}
+
 message KeyValue {
 	string key = 1;
 	string value = 2;
 }
 
 message TenantIdentity {
-	repeated KeyValue key_values = 1;
+	KeyValue user = 1;
+	KeyValue app_key = 2;
+	KeyValue domain = 3;      // some providers need a domain (name or id)
 }
 
 message TenantCompute {
@@ -96,7 +104,7 @@ message TenantCompute {
 	string blacklist_template_regex = 7;
 	string default_image = 8;
 	string default_volume_speed = 9;
-	string dns_list = 10;
+	repeated string dns_list = 10;
 	string operator_username = 11;
 }
 
@@ -120,49 +128,13 @@ message TenantMetadata {
 	bool crypt = 3;
 }
 
-message PriceInfo{
-	string currency = 1;
-	string duration_label = 2;
-	uint32 duration = 3;
-	double price = 4;
-}
-
-// TODO: optimize field numbers according to most used ones
-message ScannedInfo{
-	string tenant_name = 1;
-	string template_id = 2;
-	string template_name = 3;
-	string image_id = 4;
-	string image_name = 5;
-	string last_updated = 6;
-	int64 number_of_cpu = 7;
-	int64 number_of_core = 8;
-	int64 number_of_socket = 9;
-	double cpu_frequency_Ghz = 10;
-	string cpu_arch = 11;
-	string hypervisor = 12;
-	string cpu_model = 13;
-	double ram_size_Gb = 14;
-	double ram_freq = 15;
-	int64 gpu = 16;
-	string gpu_model = 17;
-	int64 disk_size_Gb = 18;
-	string main_disk_type = 19;
-	double main_disk_speed_MBps = 20;
-	double sample_net_speed_KBps = 21;
-	int64 eph_disk_size_Gb = 22;
-	double price_in_dollars_second = 23;
-	double price_in_dollars_hour = 24;
-	repeated PriceInfo prices = 25;
-}
-
 message TenantInspectResponse {
 	string tenant_name = 1;
 	string provider = 2;
 	TenantIdentity identity = 3;
 	TenantCompute compute = 4;
-	TenantMetadata metadata = 5;
-	repeated HostTemplate templates = 6;
+	TenantObjectStorage object_storage = 5;
+	TenantMetadata metadata = 6;
 }
 
 service TenantService{
@@ -456,6 +428,41 @@ message HostTemplate {
 	ScannedInfo scanned = 8;
 }
 
+message ScannedInfo{
+	string tenant_name = 1;
+	string template_id = 2;
+	string template_name = 3;
+	string image_id = 4;
+	string image_name = 5;
+	string last_updated = 6;
+	int64 number_of_cpu = 7;
+	int64 number_of_core = 8;
+	int64 number_of_socket = 9;
+	double cpu_frequency_Ghz = 10;
+	string cpu_arch = 11;
+	string hypervisor = 12;
+	string cpu_model = 13;
+	double ram_size_Gb = 14;
+	double ram_freq = 15;
+	int64 gpu = 16;
+	string gpu_model = 17;
+	int64 disk_size_Gb = 18;
+	string main_disk_type = 19;
+	double main_disk_speed_MBps = 20;
+	double sample_net_speed_KBps = 21;
+	int64 eph_disk_size_Gb = 22;
+	double price_in_dollars_second = 23;
+	double price_in_dollars_hour = 24;
+	repeated PriceInfo prices = 25;
+}
+
+message PriceInfo{
+	string currency = 1;
+	string duration_label = 2;
+	uint32 duration = 3;
+	double price = 4;
+}
+
 message TemplateList {
 	repeated HostTemplate templates = 1;
 }
@@ -465,8 +472,15 @@ message TemplateListRequest {
 	string tenant_id = 2;
 }
 
+message TemplateInspectRequest {
+	bool all = 1;
+	string tenant_id = 2;
+	bool only_scanned = 3;
+}
+
 service TemplateService {
 	rpc List(TemplateListRequest) returns (TemplateList){}
+	rpc Inspect(TemplateInspectRequest) returns (TemplateList){}
 }
 
 // safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
