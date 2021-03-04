@@ -41,6 +41,7 @@ var TenantCommand = &cli.Command{
 		tenantSet,
 		tenantInspect,
 		tenantCleanup,
+		tenantScan,
 	},
 }
 
@@ -159,5 +160,34 @@ var tenantCleanup = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
 		}
 		return clitools.SuccessResponse(nil)
+	},
+}
+
+var tenantScan = &cli.Command{
+	Name:  "scan",
+	Usage: "Scan tenant's templates [--dry-run] [--template <template name>]",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{Name: "dry-run", Aliases: []string{"n"}},
+		&cli.StringSliceFlag{Name: "template", Aliases: []string{"t"}},
+	},
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+		}
+
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		results, err := clientSession.Tenant.Scan(c.Args().First(), c.Bool("dry-run"), c.StringSlice("template"), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
+		}
+		return clitools.SuccessResponse(results.GetResults())
 	},
 }

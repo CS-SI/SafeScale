@@ -210,38 +210,34 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 }
 
 // Scan proceeds a scan of host corresponding to each template to gather real data(metadata in particular)
-func (s *TenantListener) Scan(ctx context.Context, in *googleprotobuf.Empty) (empty *googleprotobuf.Empty, err error) {
+func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanRequest) (_ *protocol.ScanResultList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot scan tenant")
 
-	empty = &googleprotobuf.Empty{}
-	if s == nil {
-		return empty, fail.InvalidInstanceError()
-	}
 	if ctx == nil {
-		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	job, xerr := PrepareJob(ctx, "", "tenant scan")
+	name := in.GetName()
+
+	job, xerr := PrepareJob(ctx, name, "tenant scan")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	getCurrentTenant()
-	if currentTenant == nil {
-		return nil, fail.NotFoundError("no tenant set")
-	}
-
-	name := currentTenant.name
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewScannerHandler(job)
+	handler := handlers.NewTenantHandler(job)
+	var resultList *protocol.ScanResultList
+	resultList, err = handler.Scan(name, in.GetDryRun(), in.GetTemplates())
 
-	xerr = handler.Scan()
-	return empty, xerr
+	return resultList, err
 }
 
 // Inspect returns information about a tenant

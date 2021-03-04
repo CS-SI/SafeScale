@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -75,6 +76,7 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	return rv, nil
 }
 
+<<<<<<< HEAD
 // Match lists templates that match the sizing
 func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatchRequest) (tl *protocol.TemplateList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
@@ -92,10 +94,12 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "template match")
+
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
+
 	task := job.GetTask()
 
 	sizing := in.GetSizing()
@@ -119,4 +123,39 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 	}
 	rv := &protocol.TemplateList{Templates: pbTemplates}
 	return rv, nil
+}
+
+// Inspect returns information about a tenant
+func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateInspectRequest) (_ *protocol.TemplateList, xerr error) {
+	defer fail.OnExitConvertToGRPCStatus(&xerr)
+	defer fail.OnExitWrapError(&xerr, "cannot inspect tenant")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	job, xerr := PrepareJob(ctx, "", "template inspect")
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.template"), "('%s')", job.GetService().GetName()).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	handler := handlers.NewTemplateHandler(job)
+
+	return handler.Inspect(in.GetAll(), in.GetOnlyScanned())
 }
