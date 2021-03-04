@@ -36,6 +36,7 @@ var TemplateCommand = &cli.Command{
 	Usage: "template COMMAND",
 	Subcommands: []*cli.Command{
 		templateList,
+		templateInspect,
 	},
 }
 
@@ -60,6 +61,38 @@ var templateList = &cli.Command{
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
+		}
+		return clitools.SuccessResponse(templates.GetTemplates())
+	},
+}
+
+var templateInspect = &cli.Command{
+	Name:    "inspect",
+	Aliases: []string{"show"},
+	Usage:   "Display available template information (including scanned information)",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "all",
+			Usage: "Display all available template (without any filter) ",
+		},
+		&cli.BoolFlag{
+			Name:    "only-scanned",
+			Aliases: []string{"o"},
+			Usage:   "Display only templates with scanned information",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", templateCmdName, c.Command.Name, c.Args())
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		templates, err := clientSession.Template.Inspect(c.Bool("all"), c.Bool("only-scanned"), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of template information", false).Error())))
 		}
 		return clitools.SuccessResponse(templates.GetTemplates())
 	},
