@@ -234,7 +234,6 @@ The following actions are proposed:
 | `safescale tenant get` | Display the current tenant used for action commands. |
 | `safescale tenant set <tenant_name>` | Set the tenant to use by the next commands |
 | `safescale tenant scan <tenant_name>` | Scan the given tenant's templates. (See [scanner doc.](SCANNER.md)) |
-| `safescale tenant inspect <tenant_name>` | Display tenant's information, including templates and scanned data if available. |
 <br>
 
 ##### safescale tenant list
@@ -265,6 +264,28 @@ response on failure:
 ```
 
 <br>
+---
+#### template
+
+A tenant must be set before using any other command as it indicates to SafeScale which tenant the command must be executed on. _Note that if only one tenant is defined in the `tenants.toml`, it will be automatically selected while invoking any other command.<br>
+<!-- A storage tenant represents the credentials needed to connect an object storage they are used to select one or several object storage for [data](#safecale_data) commands<br> -->
+The following actions are proposed:
+
+| <div style="width:350px">actions</div> | description |
+| --- | --- |
+| `safescale template list` | List available templates |
+| `safescale template inspect` | Display templates with scanned information |
+| `safescale template match <sizing>` | List templates that match the given sizing |
+<br>
+
+##### safescale tenant list
+List available templates from the current tenant.<br><br>example:<br><br>`$ safescale template list`<br>
+```json
+{"result": [{"cores": 16, "disk": 400, "id": "0526e13e-dad5-473f-ad61-2f15e0db2a15", "ram": 240}],"status": "success"}
+```
+<br>
+
+
 --- 
 #### network
 
