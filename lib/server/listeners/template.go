@@ -23,6 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
@@ -76,7 +77,6 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	return rv, nil
 }
 
-<<<<<<< HEAD
 // Match lists templates that match the sizing
 func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatchRequest) (tl *protocol.TemplateList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)

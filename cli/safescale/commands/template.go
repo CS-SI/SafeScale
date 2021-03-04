@@ -69,7 +69,6 @@ var templateList = &cli.Command{
 	},
 }
 
-<<<<<<< HEAD
 var templateMatch = &cli.Command{
 	Name:      "match",
 	Usage:     "List templates that match the SIZING",
@@ -88,7 +87,8 @@ var templateMatch = &cli.Command{
 		templates, err := clientSession.Template.Match(sizingAsString, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))		}
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
+		}
 		return clitools.SuccessResponse(templates.GetTemplates())
 	},
 }

@@ -94,7 +94,7 @@ func (handler *templateHandler) Inspect(all bool, onlyScanned bool) (templateLis
 
 	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 	if err != nil {
-		return nil, fail.ToError(err)
+		return nil, fail.ConvertError(err)
 	}
 
 	var scannedTemplateList []*protocol.HostTemplate

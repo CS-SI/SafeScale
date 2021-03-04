@@ -367,13 +367,13 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 	daOut, err := json.MarshalIndent(daCPU, "", "\t")
 	if err != nil {
 		logrus.Warnf("tenant '%s', template '%s' : Problem marshaling json data: %v", tenantName, template.Name, err)
-		return fail.ToError(err)
+		return fail.ConvertError(err)
 	}
 
 	nerr := ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json"), daOut, 0666)
 	if nerr != nil {
 		logrus.Warnf("tenant '%s', template '%s' : Error writing file: %v", tenantName, template.Name, nerr)
-		return fail.ToError(nerr)
+		return fail.ConvertError(nerr)
 	}
 	logrus.Infof("tenant '%s', template '%s': Stored in file: %s", tenantName, template.Name, "$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json")
 
