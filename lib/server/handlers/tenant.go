@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -146,7 +145,6 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {
 	Scan(string, bool, []string) (_ *protocol.ScanResultList, xerr fail.Error)
-	Inspect(string) (_ *protocol.TenantInspectResponse, xerr fail.Error)
 }
 
 // tenantHandler service
@@ -188,9 +186,8 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, fail.ForbiddenError("tenant is not scannable")
 	}
 
-	// TODO: make dry run use cli-given templates
 	if isDryRun {
-		return handler.dryRun()
+		return handler.dryRun(templateNamesToScan)
 	}
 
 	var templatesToScan []abstract.HostTemplate
@@ -234,14 +231,27 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not get/create the scan network")
 	}
-	//defer network.Delete(task)
+
+	defer func() {
+		derr := network.Delete(task)
+		if derr != nil {
+			logrus.Warnf("Error deleting network '%s'", network.GetID())
+		}
+		_ = xerr.AddConsequence(derr)
+	}()
 
 	logrus.Infof("Creating scan subnet: %q", scanSubnetName)
 	subnet, xerr := handler.getScanSubnet(network.GetID())
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not get/create the scan subnet")
 	}
-	//defer subnet.Delete(task)
+	defer func() {
+		derr := subnet.Delete(task)
+		if derr != nil {
+			logrus.Warnf("Error deleting subnet '%s'", subnet.GetID())
+		}
+		_ = xerr.AddConsequence(derr)
+	}()
 
 	xerr = subnet.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		handler.abstractSubnet = clonable.(*abstract.Subnet)
@@ -370,7 +380,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 	return nil
 }
 
-func (handler *tenantHandler) dryRun() (_ *protocol.ScanResultList, xerr fail.Error) {
+func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.ScanResultList, xerr fail.Error) {
 	svc := handler.job.GetService()
 
 	var resultList []*protocol.ScanResult
@@ -379,7 +389,18 @@ func (handler *tenantHandler) dryRun() (_ *protocol.ScanResultList, xerr fail.Er
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	for _, template := range templates {
+		if templateNamesToScan != nil {
+			for _, givenName := range templateNamesToScan {
+				if givenName == template.Name {
+					resultList = append(resultList, &protocol.ScanResult{
+						TemplateName: template.Name,
+						ScanSuccess:  false,
+					})
+				}
+			}
+		}
 		resultList = append(resultList, &protocol.ScanResult{
 			TemplateName: template.Name,
 			ScanSuccess:  false,
@@ -654,176 +675,11 @@ func (handler *tenantHandler) collect() (xerr fail.Error) {
 				return fail.ToError(err)
 			}
 		}
-		// Don't remove for testing
-		//if !file.IsDir() {
-		//	if err = os.Remove(theFile); err != nil {
-		//		logrus.Infof("Error Supressing %s : %s", file.Name(), err.Error())
-		//	}
-		//}
+		if !file.IsDir() {
+			if err = os.Remove(theFile); err != nil {
+				logrus.Infof("Error Supressing %s : %s", file.Name(), err.Error())
+			}
+		}
 	}
 	return nil
-}
-
-func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInspectResponse, xerr fail.Error) {
-	if handler == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if handler.job == nil {
-		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
-	}
-	if tenantName == "" {
-		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
-	}
-
-	tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-
-	svc := handler.job.GetService()
-
-	authOpts, xerr := svc.GetAuthenticationOptions()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	tenantParams := svc.GetTenantParameters()
-
-	objectParams, _ := tenantParams["objectstorage"].(map[string]interface{})
-
-	computeParams, ok1 := tenantParams["compute"].(map[string]interface{})
-	_, ok2 := computeParams["CryptKey"].(string)
-
-	var tenantMetadataCrypted bool
-	if ok1 && ok2 {
-		tenantMetadataCrypted = true
-	}
-
-	tenantCompute := protocol.TenantCompute{
-		Region:           fmt.Sprint(computeParams["Region"]),
-		SubRegion:        fmt.Sprint(computeParams["SubRegion"]),
-		AvailabilityZone: fmt.Sprint(computeParams["AvailabilityZone"]),
-		// TODO: add Context & ApiKey
-		WhitelistTemplateRegex: fmt.Sprint(computeParams["WhitelistTemplateRegexp"]),
-		BlacklistTemplateRegex: fmt.Sprint(computeParams["BlacklistTemplateRegexp"]),
-		DefaultImage:           fmt.Sprint(computeParams["DefaultImage"]),
-		DefaultVolumeSpeed:     fmt.Sprint(computeParams["DefaultVolumeSpeed"]),
-		DnsList:                fmt.Sprint(computeParams["DnsList"]),
-		OperatorUsername:       fmt.Sprint(computeParams["OperatorUsername"]),
-	}
-
-	tenantMetadata := protocol.TenantMetadata{
-		Storage: &protocol.TenantObjectStorage{
-			Type:      fmt.Sprint(objectParams["Type"]),
-			Endpoint:  fmt.Sprint(objectParams["Endpoint"]),
-			AuthUrl:   fmt.Sprint(objectParams["AuthURL"]),
-			AccessKey: fmt.Sprint(objectParams["AccessKey"]),
-			Region:    fmt.Sprint(objectParams["Region"]),
-		},
-		BucketName: svc.GetMetadataBucket().Name,
-		Crypt:      tenantMetadataCrypted,
-	}
-
-	identParams, _ := tenantParams["identity"].(map[string]interface{})
-	var idKeyValues []*protocol.KeyValue
-	for key, value := range identParams {
-		if isSecret, _ := regexp.MatchString(`(.*Password.*)|(.*Private.*)|(.*Secret.*)`, key); isSecret {
-			continue
-		}
-		idKeyValues = append(idKeyValues, &protocol.KeyValue{
-			Key:   key,
-			Value: fmt.Sprint(value),
-		})
-	}
-	tenantIdentity := protocol.TenantIdentity{
-		KeyValues: idKeyValues,
-	}
-
-	region, ok := authOpts.Get("Region")
-	if !ok {
-		return nil, fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
-	}
-	folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
-
-	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
-	if err != nil {
-		return nil, fail.ToError(err)
-	}
-
-	templates, xerr := svc.ListTemplates(true)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var scannedTemplateList []*protocol.HostTemplate
-
-	for _, template := range templates {
-		acpu := StoredCPUInfo{}
-		if err := db.Read(folder, template.Name, &acpu); err != nil {
-			scannedTemplateList = append(scannedTemplateList, &protocol.HostTemplate{
-				Id:       template.ID,
-				Name:     template.Name,
-				Cores:    int32(template.Cores),
-				Ram:      int32(template.RAMSize),
-				Disk:     int32(template.DiskSize),
-				GpuCount: int32(template.GPUNumber),
-				GpuType:  template.GPUType,
-			})
-		} else {
-			scannedTemplateList = append(scannedTemplateList, &protocol.HostTemplate{
-				Id:       template.ID,
-				Name:     template.Name,
-				Cores:    int32(template.Cores),
-				Ram:      int32(template.RAMSize),
-				Disk:     int32(template.DiskSize),
-				GpuCount: int32(template.GPUNumber),
-				GpuType:  template.GPUType,
-				Scanned: &protocol.ScannedInfo{
-					TenantName:           acpu.TenantName,
-					TemplateId:           acpu.ID,
-					TemplateName:         acpu.TemplateName,
-					ImageId:              acpu.ImageID,
-					ImageName:            acpu.ImageName,
-					LastUpdated:          acpu.LastUpdated,
-					NumberOfCpu:          int64(acpu.NumberOfCPU),
-					NumberOfCore:         int64(acpu.NumberOfCore),
-					NumberOfSocket:       int64(acpu.NumberOfSocket),
-					CpuFrequency_Ghz:     acpu.CPUFrequency,
-					CpuArch:              acpu.CPUArch,
-					Hypervisor:           acpu.Hypervisor,
-					CpuModel:             acpu.CPUModel,
-					RamSize_Gb:           acpu.RAMSize,
-					RamFreq:              acpu.RAMFreq,
-					Gpu:                  int64(acpu.GPU),
-					GpuModel:             acpu.GPUModel,
-					DiskSize_Gb:          acpu.DiskSize,
-					MainDiskType:         acpu.MainDiskType,
-					MainDiskSpeed_MBps:   acpu.MainDiskSpeed,
-					SampleNetSpeed_KBps:  acpu.SampleNetSpeed,
-					EphDiskSize_Gb:       acpu.EphDiskSize,
-					PriceInDollarsSecond: acpu.PricePerSecond,
-					PriceInDollarsHour:   acpu.PricePerHour,
-					Prices: []*protocol.PriceInfo{{
-						Currency:      "euro-fake",
-						DurationLabel: "perMonth",
-						Duration:      1,
-						Price:         30,
-					}},
-				},
-			})
-		}
-	}
-
-	//TODO: complete with TenantIdentity and more details
-
-	response := protocol.TenantInspectResponse{
-		TenantName: tenantName,
-		Provider:   svc.GetName(),
-		Identity:   &tenantIdentity,
-		Compute:    &tenantCompute,
-		Metadata:   &tenantMetadata,
-		Templates:  scannedTemplateList,
-	}
-
-	return &response, nil
-
 }
