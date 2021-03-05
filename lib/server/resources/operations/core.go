@@ -548,9 +548,6 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 	c.SafeLock(task)
 	defer c.SafeUnlock(task)
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
-
 	if c.loaded && !c.committed {
 		return fail.InconsistentError("cannot reload a not committed data")
 	}
