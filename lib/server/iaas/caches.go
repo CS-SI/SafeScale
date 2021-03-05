@@ -131,6 +131,10 @@ func (rc *ResourceCache) ReserveEntry(task concurrency.Task, key string) fail.Er
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
+	// FIXME: Missing SafeLock / SafeUnlock ?
+	// rc.lock.SafeLock(task)
+	// defer rc.lock.SafeUnlock(task)
+
 	return rc.byID.ReserveEntry(task, key)
 }
 
