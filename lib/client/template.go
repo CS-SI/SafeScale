@@ -57,7 +57,6 @@ func (t template) Match(sizing string, timeout time.Duration) (*protocol.Templat
 	return service.Match(ctx, &protocol.TemplateMatchRequest{Sizing: sizing})
 }
 
-
 // Inspect return the list of available template information on the current tenant
 func (t template) Inspect(all bool, onlyScanned bool, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
