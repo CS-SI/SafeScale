@@ -63,7 +63,7 @@ endif
 endif
 
 ifeq ($(OS),Windows_NT)
-MAKE=mingw32-make.exe
+MAKE=make
 endif
 
 GOPATH?=$(HOME)/go
