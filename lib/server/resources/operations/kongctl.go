@@ -155,7 +155,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		}
 		if as.VIP != nil {
 			// VPL: for now, no public IP on VIP, so uses the IP of the first getGateway
-			// (*values)["EndpointIP"] = as.VIP.getPublicIP
+			// (*values)["EndpointIP"] = as.VIP.unsafeGetPublicIP
 			(*values)["EndpointIP"] = k.gatewayPublicIP
 			(*values)["DefaultRouteIP"] = as.VIP.PrivateIP
 		} else {

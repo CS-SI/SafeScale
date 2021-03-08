@@ -79,16 +79,14 @@ func getTemplateBox() (*rice.Box, error) {
 // TargetType returns the type of the target
 //
 // satisfies resources.Targetable interface
-func (c *cluster) TargetType() featuretargettype.Enum {
+func (instance *cluster) TargetType() featuretargettype.Enum {
 	return featuretargettype.CLUSTER
 }
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies resources.Targetable interface
-func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
-	// FIXME: Return error
-
-	if c == nil {
+func (instance *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
+	if instance.isNull() {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return nil
 	}
@@ -101,27 +99,27 @@ func (c *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.
 		return nil
 	}
 
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	if c.installMethods == nil {
-		c.installMethods = map[uint8]installmethod.Enum{}
+	if instance.installMethods == nil {
+		instance.installMethods = map[uint8]installmethod.Enum{}
 		var index uint8
-		flavor, err := c.GetFlavor(task)
+		flavor, err := instance.unsafeGetFlavor(task)
 		if err == nil && flavor == clusterflavor.K8S {
 			index++
-			c.installMethods[index] = installmethod.Helm
+			instance.installMethods[index] = installmethod.Helm
 		}
 		index++
-		c.installMethods[index] = installmethod.Bash
+		instance.installMethods[index] = installmethod.Bash
 		index++
-		c.installMethods[index] = installmethod.None
+		instance.installMethods[index] = installmethod.None
 	}
-	return c.installMethods
+	return instance.installMethods
 }
 
 // InstalledFeatures returns a list of installed features
-func (c *cluster) InstalledFeatures(task concurrency.Task) []string {
+func (instance *cluster) InstalledFeatures(task concurrency.Task) []string {
 	var list []string
 	return list
 }
@@ -129,39 +127,40 @@ func (c *cluster) InstalledFeatures(task concurrency.Task) []string {
 // ComplementFeatureParameters FIXME: include the cluster part of setImplicitParameters() from feature
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
-func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error {
-	if c == nil {
+func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error {
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	complexity, xerr := c.GetComplexity(task)
+	complexity, xerr := instance.GetComplexity(task)
 	if xerr != nil {
 		return xerr
 	}
 
 	v["ClusterComplexity"] = strings.ToLower(complexity.String())
-	clusterFlavor, xerr := c.GetFlavor(task)
+	clusterFlavor, xerr := instance.GetFlavor(task)
 	if xerr != nil {
 		return xerr
 	}
 
 	v["ClusterFlavor"] = strings.ToLower(clusterFlavor.String())
-	v["ClusterName"] = c.GetName()
+	v["ClusterName"] = instance.GetName()
 	v["ClusterAdminUsername"] = "cladm"
-	if v["ClusterAdminPassword"], xerr = c.GetAdminPassword(task); xerr != nil {
+	if v["ClusterAdminPassword"], xerr = instance.GetAdminPassword(task); xerr != nil {
 		return xerr
 	}
 
 	if _, ok := v["Username"]; !ok {
 		v["Username"] = abstract.DefaultUser
 	}
-	networkCfg, xerr := c.GetNetworkConfig(task)
+	networkCfg, xerr := instance.GetNetworkConfig(task)
 	if xerr != nil {
 		return xerr
 	}
@@ -183,7 +182,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 	v["CIDR"] = networkCfg.CIDR
 
 	var controlPlaneV1 *propertiesv1.ClusterControlplane
-	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			controlPlaneV1, ok = clonable.(*propertiesv1.ClusterControlplane)
@@ -202,7 +201,7 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
-		master, xerr := c.FindAvailableMaster(task)
+		master, xerr := instance.FindAvailableMaster(task)
 		if xerr != nil {
 			return xerr
 		}
@@ -213,35 +212,35 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	if v["ClusterMasters"], xerr = c.ListMasters(task); xerr != nil {
+	if v["ClusterMasters"], xerr = instance.ListMasters(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterMasterNames"], xerr = c.ListMasterNames(task); xerr != nil {
+	if v["ClusterMasterNames"], xerr = instance.ListMasterNames(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterMasterIDs"], xerr = c.ListMasterIDs(task); xerr != nil {
+	if v["ClusterMasterIDs"], xerr = instance.ListMasterIDs(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterMasterIPs"], xerr = c.ListMasterIPs(task); xerr != nil {
+	if v["ClusterMasterIPs"], xerr = instance.ListMasterIPs(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterNodes"], xerr = c.ListNodes(task); xerr != nil {
+	if v["ClusterNodes"], xerr = instance.ListNodes(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterNodeNames"], xerr = c.ListNodeNames(task); xerr != nil {
+	if v["ClusterNodeNames"], xerr = instance.ListNodeNames(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterNodeIDs"], xerr = c.ListNodeIDs(task); xerr != nil {
+	if v["ClusterNodeIDs"], xerr = instance.ListNodeIDs(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterNodeIPs"], xerr = c.ListNodeIPs(task); xerr != nil {
+	if v["ClusterNodeIPs"], xerr = instance.ListNodeIPs(task); xerr != nil {
 		return xerr
 	}
 
@@ -251,23 +250,27 @@ func (c *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map)
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
+func (instance *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if feat == nil {
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
 
-	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	return instance.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -280,11 +283,12 @@ func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature,
 				if innerXErr != nil {
 					return innerXErr
 				}
+
 				item = propertiesv1.NewClusterInstalledFeature()
 				item.Requires = requirements
 				featuresV1.Installed[feat.GetName()] = item
 			}
-			if rf, ok := requiredBy.(*feature); ok && !rf.IsNull() {
+			if rf, ok := requiredBy.(*feature); ok && !rf.isNull() {
 				item.RequiredBy[rf.GetName()] = struct{}{}
 			}
 			return nil
@@ -294,23 +298,27 @@ func (c *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature,
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
 // satisfies interface resources.Targetable
-func (c *cluster) UnregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
+func (instance *cluster) UnregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	return c.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	return instance.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -327,20 +335,24 @@ func (c *cluster) UnregisterFeature(task concurrency.Task, feat string) (xerr fa
 }
 
 // ListInstalledFeatures returns a slice of installed features
-func (c cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, fail.Error) {
+func (instance *cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, fail.Error) {
 	var emptySlice []resources.Feature
-	if c.IsNull() {
+	if instance.isNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return emptySlice, fail.AbortedError(nil, "aborted")
 	}
 
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
 	var list map[string]*propertiesv1.ClusterInstalledFeature
-	xerr := c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -357,101 +369,107 @@ func (c cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Featu
 
 	out := make([]resources.Feature, 0, len(list))
 	for k := range list {
-		item, xerr := NewFeature(task, c.GetService(), k)
+		item, xerr := NewFeature(task, instance.GetService(), k)
 		if xerr != nil {
 			return emptySlice, xerr
 		}
+
 		out = append(out, item)
 	}
 	return out, nil
 }
 
 // AddFeature installs a feature on the cluster
-func (c *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if c.IsNull() {
+func (instance *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(task, c.GetService(), name)
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	feat, xerr := NewFeature(task, instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return feat.Add(c, vars, settings)
+
+	return feat.Add(instance, vars, settings)
 }
 
 // CheckFeature tells if a feature is installed on the cluster
-func (c *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if c.IsNull() {
+func (instance *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(task, c.GetService(), name)
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	feat, xerr := NewFeature(task, instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return feat.Check(c, vars, settings)
+	return feat.Check(instance, vars, settings)
 }
 
 // RemoveFeature uninstalls a feature from the cluster
-func (c *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if c.IsNull() {
+func (instance *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(task, c.GetService(), name)
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	feat, xerr := NewFeature(task, instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return feat.Remove(c, vars, settings)
+	return feat.Remove(instance, vars, settings)
 }
 
-// ExecuteScript executes the script template with the parameters on target IPAddress
-func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
+// ExecuteScript executes the script template with the parameters on target Host
+func (instance *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return -1, "", "", fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return -1, "", "", fail.AbortedError(nil, "aborted")
 	}
 	if tmplName == "" {
 		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
 	}
 	if host == nil {
 		return -1, "", "", fail.InvalidParameterCannotBeNilError("host")
+	}
+
+	if task.Aborted() {
+		return -1, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
@@ -506,29 +524,29 @@ func (c *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map
 	// executes remote file
 	var cmd string
 	if hidesOutput {
-		//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -c \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";retcode=${PIPESTATUS};cat /tmp/captured; sudo rm /tmp/captured;exit ${retcode}", path, path)
-		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
+		//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -instance \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";retcode=${PIPESTATUS};cat /tmp/captured; sudo rm /tmp/captured;exit ${retcode}", path, path)
+		cmd = fmt.Sprintf("sudo -- bash -instance 'chmod u+rx %s; captf=$(mktemp); bash -instance \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
 	} else {
 		//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", path, path)
-		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
+		cmd = fmt.Sprintf("sudo -- bash -instance 'chmod u+rx %s; bash -instance %s; exit ${PIPESTATUS}'", path, path)
 	}
 	return host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 }
 
 // installNodeRequirements ...
-func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *cluster) installNodeRequirements(task concurrency.Task, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
 	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	// defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	netCfg, xerr := c.GetNetworkConfig(task)
+	netCfg, xerr := instance.GetNetworkConfig(task)
 	if xerr != nil {
 		return xerr
 	}
 
 	params := data.Map{}
 	if nodeType == clusternodetype.Master {
-		tp := c.GetService().GetTenantParameters()
+		tp := instance.GetService().GetTenantParameters()
 		content := map[string]interface{}{
 			"tenants": []map[string]interface{}{tp},
 		}
@@ -619,18 +637,18 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	}
 
 	var dnsServers []string
-	cfg, xerr := c.GetService().GetConfigurationOptions()
+	cfg, xerr := instance.GetService().GetConfigurationOptions()
 	if xerr == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
-	identity, xerr := c.GetIdentity(task)
+	identity, xerr := instance.unsafeGetIdentity(task)
 	if xerr != nil {
 		return xerr
 	}
 
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	if params["MasterIPs"], xerr = c.ListMasterIPs(task); xerr != nil {
+	if params["MasterIPs"], xerr = instance.unsafeListMasterIPs(task); xerr != nil {
 		return xerr
 	}
 
@@ -642,7 +660,7 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 	params["SSHPublicKey"] = identity.Keypair.PublicKey
 	params["SSHPrivateKey"] = identity.Keypair.PrivateKey
 
-	if _, _, _, xerr = c.ExecuteScript(task, "node_install_requirements.sh", params, host); xerr != nil {
+	if _, _, _, xerr = instance.ExecuteScript(task, "node_install_requirements.sh", params, host); xerr != nil {
 		return fail.Wrap(xerr, "[%s] system requirements installation failed", hostLabel)
 	}
 
@@ -651,10 +669,10 @@ func (c *cluster) installNodeRequirements(task concurrency.Task, nodeType cluste
 }
 
 // Installs reverseproxy
-func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
+func (instance *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	identity, xerr := c.GetIdentity(task)
+	identity, xerr := instance.unsafeGetIdentity(task)
 	if xerr != nil {
 		return xerr
 	}
@@ -665,7 +683,7 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
-	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -681,14 +699,16 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 
 	if !disabled {
 		logrus.Debugf("[cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
-		feat, xerr := NewFeature(task, c.GetService(), "edgeproxy4subnet")
+		feat, xerr := NewFeature(task, instance.GetService(), "edgeproxy4subnet")
 		if xerr != nil {
 			return xerr
 		}
-		results, xerr := feat.Add(c, data.Map{}, resources.FeatureSettings{})
+
+		results, xerr := feat.Add(instance, data.Map{}, resources.FeatureSettings{})
 		if xerr != nil {
 			return xerr
 		}
+
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
 			return fail.NewError("[cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)
@@ -702,21 +722,22 @@ func (c *cluster) installReverseProxy(task concurrency.Task) (xerr fail.Error) {
 }
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the cluster
-func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) {
+func (instance *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	identity, xerr := c.GetIdentity(task)
+	identity, xerr := instance.unsafeGetIdentity(task)
 	if xerr != nil {
 		return xerr
 	}
-	clusterName := identity.Name
+
+	// clusterName := identity.Name
 
 	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	// defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
-	xerr = c.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -731,11 +752,9 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 	}
 
 	if !disabled {
-		logrus.Debugf("[cluster %s] adding feature 'remotedesktop'", clusterName)
+		logrus.Debugf("[cluster %s] adding feature 'remotedesktop'", identity.Name)
 
-		adminPassword := identity.AdminPassword
-
-		feat, xerr := NewFeature(task, c.GetService(), "remotedesktop")
+		feat, xerr := NewFeature(task, instance.GetService(), "remotedesktop")
 		if xerr != nil {
 			return xerr
 		}
@@ -743,24 +762,24 @@ func (c *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.Error) 
 		// Adds remotedesktop feature on cluster (ie masters)
 		vars := data.Map{
 			"Username": "cladm",
-			"Password": adminPassword,
+			"Password": identity.AdminPassword,
 		}
-		r, xerr := feat.Add(c, vars, resources.FeatureSettings{})
+		r, xerr := feat.Add(instance, vars, resources.FeatureSettings{})
 		if xerr != nil {
 			return xerr
 		}
 
 		if !r.Successful() {
 			msg := r.AllErrorMessages()
-			return fail.NewError("[cluster %s] failed to add 'remotedesktop' failed: %s", clusterName, msg)
+			return fail.NewError("[cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
 		}
-		logrus.Debugf("[cluster %s] feature 'remotedesktop' added successfully", clusterName)
+		logrus.Debugf("[cluster %s] feature 'remotedesktop' added successfully", identity.Name)
 	}
 	return nil
 }
 
 // install proxycache-client feature if not disabled
-func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *cluster) installProxyCacheClient(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if host == nil {
@@ -775,7 +794,7 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
-	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -789,7 +808,7 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 		return xerr
 	}
 	if !disabled {
-		feat, xerr := NewFeature(task, c.GetService(), "proxycache-client")
+		feat, xerr := NewFeature(task, instance.GetService(), "proxycache-client")
 		if xerr != nil {
 			return xerr
 		}
@@ -808,7 +827,7 @@ func (c *cluster) installProxyCacheClient(task concurrency.Task, host resources.
 }
 
 // install proxycache-server feature if not disabled
-func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *cluster) installProxyCacheServer(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if host == nil {
@@ -823,7 +842,7 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
-	xerr = c.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
@@ -838,7 +857,7 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 	}
 
 	if !disabled {
-		feat, xerr := NewFeature(task, c.GetService(), "proxycache-server")
+		feat, xerr := NewFeature(task, instance.GetService(), "proxycache-server")
 		if xerr != nil {
 			return xerr
 		}
@@ -857,7 +876,7 @@ func (c *cluster) installProxyCacheServer(task concurrency.Task, host resources.
 }
 
 // intallDocker installs docker and docker-compose
-func (c *cluster) installDocker(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *cluster) installDocker(task concurrency.Task, host resources.Host, hostLabel string) (xerr fail.Error) {
 	// if host == nil {
 	// 	return fail.InvalidParameterCannotBeNilError("host")
 	// }
@@ -870,7 +889,7 @@ func (c *cluster) installDocker(task concurrency.Task, host resources.Host, host
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// uses NewFeature() to let a chance to the user to use it's own docker feature
-	feat, xerr := NewFeature(task, c.GetService(), "docker")
+	feat, xerr := NewFeature(task, instance.GetService(), "docker")
 	if xerr != nil {
 		return xerr
 	}

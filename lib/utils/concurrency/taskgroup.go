@@ -211,6 +211,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 			switch v.Key() {
 			case "normalizeError":
 				newChild.normalizeError = v.Value().(func(error) error)
+			default:
 			}
 		}
 	}

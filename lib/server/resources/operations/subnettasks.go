@@ -39,12 +39,13 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -59,7 +60,7 @@ func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.Ta
 	hostSizing := params.(taskCreateGatewayParameters).sizing
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
-	svc := rs.GetService()
+	svc := instance.GetService()
 	hostReq.PublicIP = true
 	hostReq.IsGateway = true
 
@@ -70,7 +71,7 @@ func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.Ta
 	userData, cerr := rgw.Create(task, hostReq, hostSizing) // cerr is tested later
 
 	// Set link to Subnet before testing if Host has been successfully created; in case of failure, we need to have registered the gateway ID in Subnet
-	xerr = rs.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -117,7 +118,7 @@ func (rs *subnet) taskCreateGateway(task concurrency.Task, params concurrency.Ta
 	}()
 
 	// Binds gateway to VIP if needed
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -146,7 +147,7 @@ type taskFinalizeGatewayConfigurationParameters struct {
 	userdata *userdata.Content
 }
 
-func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -157,7 +158,7 @@ func (rs *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params
 	}
 
 	objgw := params.(taskFinalizeGatewayConfigurationParameters).host
-	if objgw.IsNull() {
+	if objgw.isNull() {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
 	}
 	userData := params.(taskFinalizeGatewayConfigurationParameters).userdata

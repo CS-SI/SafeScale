@@ -91,10 +91,10 @@ func (tm *taskedLock) RLock(task Task) fail.Error {
 
 	// logrus.Warnf("Calling rlock from %d, with tid %s", goid(), tid)
 	tm.mu.Lock()
-	access := false
+	acquired := false
 	defer func() {
 		tm.mu.Unlock()
-		if access {
+		if acquired {
 			tm.rwmutex.RLock()
 		}
 	}()
@@ -106,7 +106,7 @@ func (tm *taskedLock) RLock(task Task) fail.Error {
 	tm.readLocks[tid] = 1
 	if _, ok := tm.writeLocks[tid]; !ok {
 		traceR.trace("really RLocking...")
-		access = true
+		acquired = true
 		return nil
 	}
 	traceR.trace("using running write lock...")
@@ -142,10 +142,10 @@ func (tm *taskedLock) RUnlock(task Task) (xerr fail.Error) {
 
 	// logrus.Warnf("Calling runlock from %d, with tid %s", goid(), tid)
 	tm.mu.Lock()
-	access := false
+	released := false
 	defer func() {
 		tm.mu.Unlock()
-		if access {
+		if released {
 			tm.rwmutex.RUnlock()
 		}
 	}()
@@ -161,7 +161,7 @@ func (tm *taskedLock) RUnlock(task Task) (xerr fail.Error) {
 			traceR.trace("in running write mu, doing nothing")
 		} else {
 			traceR.trace("really RUnlocking...")
-			access = true
+			released = true
 		}
 	}
 
@@ -192,10 +192,10 @@ func (tm *taskedLock) Lock(task Task) fail.Error {
 
 	// logrus.Warnf("Calling mu from %d, with tid %s", goid(), tid)
 	tm.mu.Lock()
-	access := false
+	acquired := false
 	defer func() {
 		tm.mu.Unlock()
-		if access {
+		if acquired {
 			tm.rwmutex.Lock()
 		}
 	}()
@@ -213,7 +213,7 @@ func (tm *taskedLock) Lock(task Task) fail.Error {
 	}
 	// registers mu for read for the task and actively mu the RWMutex
 	tm.writeLocks[tid] = 1
-	access = true
+	acquired = true
 	return nil
 }
 
@@ -241,10 +241,10 @@ func (tm *taskedLock) Unlock(task Task) fail.Error {
 
 	// logrus.Warnf("Calling unlock from %d, with tid %s", goid(), tid)
 	tm.mu.Lock()
-	access := false
+	released := false
 	defer func() {
 		tm.mu.Unlock()
-		if access {
+		if released {
 			tm.rwmutex.Unlock()
 		}
 	}()
@@ -260,7 +260,7 @@ func (tm *taskedLock) Unlock(task Task) fail.Error {
 	tm.writeLocks[tid]--
 	if tm.writeLocks[tid] == 0 {
 		delete(tm.writeLocks, tid)
-		access = true
+		released = true
 	}
 	return nil
 }
