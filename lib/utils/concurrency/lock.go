@@ -30,10 +30,10 @@ import (
 
 // TaskedLockHelpers ...
 type TaskedLockHelpers interface {
-	SafeLock(Task)    // To be used when instance and parameter are notoriously not nil
-	SafeUnlock(Task)  // To be used when instance and parameter are notoriously not nil
-	SafeRLock(Task)   // To be used when instance and parameter are notoriously not nil
-	SafeRUnlock(Task) // To be used when instance and parameter are notoriously not nil
+	SafeLock(Task)
+	SafeUnlock(Task)
+	SafeRLock(Task)
+	SafeRUnlock(Task)
 }
 
 // TaskedLock ...
@@ -116,8 +116,18 @@ func (tm *taskedLock) RLock(task Task) fail.Error {
 // SafeRLock ...
 func (tm *taskedLock) SafeRLock(task Task) {
 	err := tm.RLock(task)
-	if err != nil {
-		logrus.Errorf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeRLock() when obviously it's not safe", "", 0)).Error())
+	for {
+		if err != nil {
+			if _, ok := err.(*fail.ErrInvalidInstance); ok {
+				logrus.Fatalf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeRLock() when obviously it's not safe", "", 0)).Error())
+			}
+			if _, ok := err.(*fail.ErrInvalidParameter); ok {
+				logrus.Fatalf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeRLock() when obviously it's not safe", "", 0)).Error())
+			}
+			err = tm.RLock(task)
+		} else {
+			break
+		}
 	}
 }
 
@@ -171,8 +181,18 @@ func (tm *taskedLock) RUnlock(task Task) (xerr fail.Error) {
 // SafeRUnlock ...
 func (tm *taskedLock) SafeRUnlock(task Task) {
 	err := tm.RUnlock(task)
-	if err != nil {
-		logrus.Errorf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeRUnLock() when obviously it's not safe", "", 0)).Error())
+	for {
+		if err != nil {
+			if _, ok := err.(*fail.ErrInvalidInstance); ok {
+				logrus.Fatalf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeRUnlock() when obviously it's not safe", "", 0)).Error())
+			}
+			if _, ok := err.(*fail.ErrInvalidParameter); ok {
+				logrus.Fatalf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeRUnlock() when obviously it's not safe", "", 0)).Error())
+			}
+			err = tm.RUnlock(task)
+		} else {
+			break
+		}
 	}
 }
 
@@ -220,8 +240,18 @@ func (tm *taskedLock) Lock(task Task) fail.Error {
 // SafeLock ...
 func (tm *taskedLock) SafeLock(task Task) {
 	err := tm.Lock(task)
-	if err != nil {
-		logrus.Errorf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeLock() when obviously it's not safe", "", 0)).Error())
+	for {
+		if err != nil {
+			if _, ok := err.(*fail.ErrInvalidInstance); ok {
+				logrus.Fatalf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeLock() when obviously it's not safe", "", 0)).Error())
+			}
+			if _, ok := err.(*fail.ErrInvalidParameter); ok {
+				logrus.Fatalf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeLock() when obviously it's not safe", "", 0)).Error())
+			}
+			err = tm.Lock(task)
+		} else {
+			break
+		}
 	}
 }
 
@@ -268,8 +298,18 @@ func (tm *taskedLock) Unlock(task Task) fail.Error {
 // SafeUnlock unlocks a previously lock without possible failure, but will log if something is wrong
 func (tm *taskedLock) SafeUnlock(task Task) {
 	err := tm.Unlock(task)
-	if err != nil {
-		logrus.Errorf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeUnlock() when obviously it's not safe", "", 0)).Error())
+	for {
+		if err != nil {
+			if _, ok := err.(*fail.ErrInvalidInstance); ok {
+				logrus.Fatalf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeUnlock() when obviously it's not safe", "", 0)).Error())
+			}
+			if _, ok := err.(*fail.ErrInvalidParameter); ok {
+				logrus.Fatalf(fail.Wrap(err, callstack.DecorateWith("", "cannot use SafeUnlock() when obviously it's not safe", "", 0)).Error())
+			}
+			err = tm.Unlock(task)
+		} else {
+			break
+		}
 	}
 }
 
