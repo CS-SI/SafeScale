@@ -27,9 +27,6 @@ import (
 	"sync"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -60,6 +57,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -152,6 +151,8 @@ func LoadCluster(task concurrency.Task, svc iaas.Service, name string) (rc resou
 			if xerr = rc.(*cluster).updateClusterDefaultsPropertyIfNeeded(task); xerr != nil {
 				return nullCluster(), xerr
 			}
+
+			rc.(*cluster).updateCachedInformation(task)
 
 			return rc, nil
 		}),
@@ -419,6 +420,21 @@ func (instance *cluster) updateClusterDefaultsPropertyIfNeeded(task concurrency.
 	})
 }
 
+// updateCachedInformation updates information cached in the instance
+func (instance *cluster) updateCachedInformation(task concurrency.Task) {
+	instance.installMethods = map[uint8]installmethod.Enum{}
+	var index uint8
+	flavor, err := instance.unsafeGetFlavor(task)
+	if err == nil && flavor == clusterflavor.K8S {
+		index++
+		instance.installMethods[index] = installmethod.Helm
+	}
+	index++
+	instance.installMethods[index] = installmethod.Bash
+	index++
+	instance.installMethods[index] = installmethod.None
+}
+
 // convertDefaultsV1ToDefaultsV2 converts propertiesv1.ClusterDefaults to propertiesv2.ClusterDefaults
 func convertDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, defaultsV2 *propertiesv2.ClusterDefaults) {
 	defaultsV2.Image = defaultsV1.Image
@@ -497,6 +513,7 @@ func (instance *cluster) carry(task concurrency.Task, clonable data.Clonable) (x
 	}
 
 	cacheEntry.LockContent()
+	instance.updateCachedInformation(task)
 
 	return nil
 }
@@ -647,11 +664,7 @@ func (instance *cluster) Create(task concurrency.Task, req abstract.ClusterReque
 					_ = xerr.AddConsequence(derr)
 				} else {
 					for _, v := range list {
-						rh, derr := LoadHost(task, instance.GetService(), v.ID)
-						if derr != nil {
-							_ = xerr.AddConsequence(derr)
-						}
-						if _, derr = tg.StartInSubtask(instance.taskDeleteHostOnFailure, taskDeleteHostOnFailureParameters{host: rh.(*host)}); derr != nil {
+						if _, derr = tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
 							_ = xerr.AddConsequence(derr)
 						}
 					}
@@ -1315,7 +1328,7 @@ func (instance *cluster) createHostResources(
 					_ = xerr.AddConsequence(tgerr)
 				} else {
 					for _, v := range list {
-						if _, derr := tg.StartInSubtask(instance.taskDeleteHostOnFailure, taskDeleteHostOnFailureParameters{host: v.(*host)}); derr != nil {
+						if _, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
 							_ = xerr.AddConsequence(derr)
 						}
 					}
@@ -1389,7 +1402,7 @@ func (instance *cluster) createHostResources(
 					_ = xerr.AddConsequence(tgerr)
 				} else {
 					for _, v := range list {
-						if _, derr := tg.StartInSubtask(instance.taskDeleteHostOnFailure, taskDeleteHostOnFailureParameters{host: v.(*host)}); derr != nil {
+						if _, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
 							_ = xerr.AddConsequence(derr)
 						}
 					}
@@ -2389,12 +2402,7 @@ func (instance *cluster) DeleteLastNode(task concurrency.Task) (node *properties
 		return nil, xerr
 	}
 
-	rh, xerr := LoadHost(task, instance.GetService(), node.ID)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if xerr = instance.deleteNode(task, rh, selectedMaster.(*host)); xerr != nil {
+	if xerr = instance.deleteNode(task, node, selectedMaster.(*host)); xerr != nil {
 		return nil, xerr
 	}
 
@@ -2440,12 +2448,30 @@ func (instance *cluster) DeleteSpecificNode(task concurrency.Task, hostID string
 		return xerr
 	}
 
-	rh, xerr := LoadHost(task, instance.GetService(), hostID)
+	var node *propertiesv3.ClusterNode
+	xerr = instance.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			numericalID, ok := nodesV3.PrivateNodeByID[hostID]
+			if !ok {
+				return fail.NotFoundError("failed to find a node identified by %s", hostID)
+			}
+			node, ok = nodesV3.ByNumericalID[numericalID]
+			if !ok {
+				return fail.NotFoundError("failed to find a node identified by %s", hostID)
+			}
+			return nil
+		})
+	})
 	if xerr != nil {
 		return xerr
 	}
 
-	return instance.deleteNode(task, rh, selectedMaster.(*host))
+	return instance.deleteNode(task, node, selectedMaster.(*host))
 }
 
 // ListMasters lists the node instances corresponding to masters (if there is such masters in the flavor...)
@@ -2783,33 +2809,7 @@ func (instance *cluster) ListNodeIPs(task concurrency.Task) (list data.IndexedLi
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	if xerr = instance.beingRemoved(task); xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			list = make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
-			for _, v := range nodesV3.PrivateNodes {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
-				if node, found := nodesV3.ByNumericalID[v]; found {
-					list[node.NumericalID] = node.PrivateIP
-				}
-			}
-			return nil
-		})
-	})
-	if xerr != nil {
-		return emptyList, xerr
-	}
-	return list, nil
+	return instance.unsafeListNodeIPs(task)
 }
 
 // FindAvailableNode returns node instance of the first node available to execute order
@@ -2844,13 +2844,23 @@ func (instance *cluster) FindAvailableNode(task concurrency.Task) (node resource
 		return nil, xerr
 	}
 
+	svc := instance.GetService()
+	node = nil
 	found := false
 	for _, v := range list {
 		if task.Aborted() {
 			return nil, fail.AbortedError(nil, "aborted")
 		}
 
-		if _, xerr = v.WaitSSHReady(task, temporal.GetConnectSSHTimeout()); xerr != nil {
+		node, xerr = LoadHost(task, svc, v.ID)
+		if xerr != nil {
+			return nil, xerr
+		}
+		defer func(hostInstance resources.Host) {
+			hostInstance.Released(task)
+		}(node)
+
+		if _, xerr = node.WaitSSHReady(task, temporal.GetConnectSSHTimeout()); xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrTimeout:
 				continue
@@ -2859,7 +2869,6 @@ func (instance *cluster) FindAvailableNode(task concurrency.Task) (node resource
 			}
 		}
 		found = true
-		node = v
 		break
 	}
 	if !found {
@@ -3090,14 +3099,14 @@ func (instance *cluster) deleteMaster(task concurrency.Task, host resources.Host
 }
 
 // deleteNode deletes a node identified by its ID
-func (instance *cluster) deleteNode(task concurrency.Task, host resources.Host, master *host) (xerr fail.Error) {
+func (instance *cluster) deleteNode(task concurrency.Task, node *propertiesv3.ClusterNode, master *host) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if host == nil {
+	if node == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
@@ -3110,21 +3119,20 @@ func (instance *cluster) deleteNode(task concurrency.Task, host resources.Host, 
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Identify the node to delete and remove it preventive from metadata
-	var node *propertiesv3.ClusterNode
 	xerr = instance.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			numericalID, ok := nodesV3.PrivateNodeByID[host.GetID()]
-			if !ok {
-				return fail.NotFoundError("failed to find node '%s' in cluster", host.GetName())
-			}
-			node = nodesV3.ByNumericalID[numericalID]
-			delete(nodesV3.ByNumericalID, numericalID)
+			// numericalID, ok := nodesV3.PrivateNodeByID[node.ID]
+			// if !ok {
+			// 	return fail.NotFoundError("failed to find node '%s' in cluster", node.Name)
+			// }
+			// node = nodesV3.ByNumericalID[numericalID]
+			delete(nodesV3.ByNumericalID, node.NumericalID)
 
-			if found, indexInSlice := containsClusterNode(nodesV3.PrivateNodes, numericalID); found {
+			if found, indexInSlice := containsClusterNode(nodesV3.PrivateNodes, node.NumericalID); found {
 				length := len(nodesV3.PrivateNodes)
 				if indexInSlice < length-1 {
 					nodesV3.PrivateNodes = append(nodesV3.PrivateNodes[:indexInSlice], nodesV3.PrivateNodes[indexInSlice+1:]...)
@@ -3169,20 +3177,26 @@ func (instance *cluster) deleteNode(task concurrency.Task, host resources.Host, 
 
 	// Deletes node
 	return instance.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+
+		hostInstance, xerr := LoadHost(task, instance.GetService(), node.ID)
+		if xerr != nil {
+			return xerr
+		}
+
 		// Leave node from cluster, if master is not null
 		if !master.isNull() {
-			if innerXErr := instance.leaveNodesFromList(task, []resources.Host{host}, master); innerXErr != nil {
+			if innerXErr := instance.leaveNodesFromList(task, []resources.Host{hostInstance}, master); innerXErr != nil {
 				return innerXErr
 			}
 			if instance.makers.UnconfigureNode != nil {
-				if innerXErr := instance.makers.UnconfigureNode(task, instance, host, master); innerXErr != nil {
+				if innerXErr := instance.makers.UnconfigureNode(task, instance, hostInstance, master); innerXErr != nil {
 					return innerXErr
 				}
 			}
 		}
 
 		// Finally delete host
-		if innerXErr := host.Delete(task); innerXErr != nil {
+		if innerXErr := hostInstance.Delete(task); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// host seems already deleted, so it's a success

@@ -156,10 +156,7 @@ func (instance *cluster) unsafeListMasters(task concurrency.Task) (list resource
 
 			for _, v := range nodesV3.Masters {
 				if node, found := nodesV3.ByNumericalID[v]; found {
-					list[node.NumericalID], innerXErr = LoadHost(task, instance.GetService(), node.ID)
-					if innerXErr != nil {
-						return innerXErr
-					}
+					list[node.NumericalID] = node
 				}
 			}
 			return nil
@@ -210,6 +207,44 @@ func (instance *cluster) unsafeListMasterIPs(task concurrency.Task) (list data.I
 	return list, nil
 }
 
+// unsafeListNodeIPs lists the IPs of the nodes in the cluster
+func (instance *cluster) unsafeListNodeIPs(task concurrency.Task) (list data.IndexedListOfStrings, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	emptyList := data.IndexedListOfStrings{}
+	if task.Aborted() {
+		return emptyList, fail.AbortedError(nil, "aborted")
+	}
+
+	if xerr = instance.beingRemoved(task); xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			list = make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
+			for _, v := range nodesV3.PrivateNodes {
+				if task.Aborted() {
+					return fail.AbortedError(nil, "aborted")
+				}
+
+				if node, found := nodesV3.ByNumericalID[v]; found {
+					list[node.NumericalID] = node.PrivateIP
+				}
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return emptyList, xerr
+	}
+	return list, nil
+}
+
 // unsafeFindAvailableMaster is the not go-routine-safe version of FindAvailableMaster, that does the real work
 // Must be used with wisdom
 func (instance *cluster) unsafeFindAvailableMaster(task concurrency.Task) (master resources.Host, xerr fail.Error) {
@@ -229,7 +264,16 @@ func (instance *cluster) unsafeFindAvailableMaster(task concurrency.Task) (maste
 	lastError = fail.NotFoundError("no master found")
 	master = nil
 	for _, v := range masters {
-		if _, xerr = v.WaitSSHReady(task, temporal.GetConnectSSHTimeout()); xerr != nil {
+		if v.ID == "" {
+			continue
+		}
+
+		master, xerr := LoadHost(task, instance.GetService(), v.ID)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if _, xerr = master.WaitSSHReady(task, temporal.GetConnectSSHTimeout()); xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrTimeout:
 				lastError = xerr
@@ -238,7 +282,6 @@ func (instance *cluster) unsafeFindAvailableMaster(task concurrency.Task) (maste
 				return nil, xerr
 			}
 		}
-		master = v
 		break
 	}
 	if master == nil {
@@ -272,11 +315,7 @@ func (instance *cluster) unsafeListNodes(task concurrency.Task) (list resources.
 						return fail.AbortedError(nil, "aborted")
 					}
 
-					host, innerErr := LoadHost(task, instance.GetService(), node.ID)
-					if innerErr != nil {
-						return innerErr
-					}
-					list[node.NumericalID] = host
+					list[node.NumericalID] = node
 				}
 			}
 			return nil

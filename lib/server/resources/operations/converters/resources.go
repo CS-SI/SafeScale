@@ -125,9 +125,9 @@ func IndexedListOfClusterNodesFromResourceToProtocol(task concurrency.Task, in r
 	}
 	out.Nodes = make([]*protocol.Host, 0, len(in))
 	for _, v := range in {
-		item, xerr := v.ToProtocol(task)
-		if xerr != nil {
-			return &protocol.ClusterNodeListResponse{}, xerr
+		item := &protocol.Host{
+			Id:   v.ID,
+			Name: v.Name,
 		}
 		out.Nodes = append(out.Nodes, item)
 	}

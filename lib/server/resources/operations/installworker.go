@@ -27,8 +27,6 @@ import (
 	txttmpl "text/template"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -51,6 +49,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -185,12 +184,11 @@ func (w *worker) CanProceed(s resources.FeatureSettings) fail.Error {
 
 // identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
-func (w *worker) identifyAvailableMaster() (resources.Host, fail.Error) {
+func (w *worker) identifyAvailableMaster() (_ resources.Host, xerr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		var xerr fail.Error
 		w.availableMaster, xerr = w.cluster.FindAvailableMaster(w.feature.task)
 		if xerr != nil {
 			return nil, xerr
@@ -200,12 +198,11 @@ func (w *worker) identifyAvailableMaster() (resources.Host, fail.Error) {
 }
 
 // identifyAvailableNode finds a node available and will use this one during all the install session
-func (w *worker) identifyAvailableNode() (resources.Host, fail.Error) {
+func (w *worker) identifyAvailableNode() (_ resources.Host, xerr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		var xerr fail.Error
 		w.availableNode, xerr = w.cluster.FindAvailableNode(w.feature.task)
 		if xerr != nil {
 			return nil, xerr

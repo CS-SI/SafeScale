@@ -30,7 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-type IndexedListOfClusterNodes map[uint]Host
+// IndexedListOfClusterNodes ...
+type IndexedListOfClusterNodes map[uint]*propertiesv3.ClusterNode
 
 // Cluster is the interface of all cluster object instances
 type Cluster interface {
