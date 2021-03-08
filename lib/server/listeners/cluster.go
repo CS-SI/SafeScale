@@ -517,11 +517,11 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	out := &protocol.ClusterNodeListResponse{}
 	out.Nodes = make([]*protocol.Host, 0, len(list))
 	for _, v := range list {
-		h, xerr := v.ToProtocol(task)
-		if xerr != nil {
-			return nil, xerr
+		item := &protocol.Host{
+			Id: v.ID,
+			Name: v.Name,
 		}
-		out.Nodes = append(out.Nodes, h)
+		out.Nodes = append(out.Nodes, item)
 	}
 	return out, nil
 }
