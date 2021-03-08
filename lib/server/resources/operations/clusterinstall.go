@@ -21,19 +21,14 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	rice "github.com/GeertJohan/go.rice"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
@@ -50,6 +45,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -99,22 +96,6 @@ func (instance *cluster) InstallMethods(task concurrency.Task) map[uint8]install
 		return nil
 	}
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
-
-	if instance.installMethods == nil {
-		instance.installMethods = map[uint8]installmethod.Enum{}
-		var index uint8
-		flavor, err := instance.unsafeGetFlavor(task)
-		if err == nil && flavor == clusterflavor.K8S {
-			index++
-			instance.installMethods[index] = installmethod.Helm
-		}
-		index++
-		instance.installMethods[index] = installmethod.Bash
-		index++
-		instance.installMethods[index] = installmethod.None
-	}
 	return instance.installMethods
 }
 
@@ -139,18 +120,13 @@ func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v da
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	complexity, xerr := instance.GetComplexity(task)
+	identity, xerr := instance.unsafeGetIdentity(task)
 	if xerr != nil {
 		return xerr
 	}
 
-	v["ClusterComplexity"] = strings.ToLower(complexity.String())
-	clusterFlavor, xerr := instance.GetFlavor(task)
-	if xerr != nil {
-		return xerr
-	}
-
-	v["ClusterFlavor"] = strings.ToLower(clusterFlavor.String())
+	v["ClusterComplexity"] = strings.ToLower(identity.Complexity.String())
+	v["ClusterFlavor"] = strings.ToLower(identity.Flavor.String())
 	v["ClusterName"] = instance.GetName()
 	v["ClusterAdminUsername"] = "cladm"
 	if v["ClusterAdminPassword"], xerr = instance.GetAdminPassword(task); xerr != nil {
@@ -201,7 +177,7 @@ func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v da
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
-		master, xerr := instance.FindAvailableMaster(task)
+		master, xerr := instance.unsafeFindAvailableMaster(task)
 		if xerr != nil {
 			return xerr
 		}
@@ -212,35 +188,43 @@ func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v da
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	if v["ClusterMasters"], xerr = instance.ListMasters(task); xerr != nil {
+	if v["ClusterMasters"], xerr = instance.unsafeListMasters(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterMasterNames"], xerr = instance.ListMasterNames(task); xerr != nil {
+	list := make([]string, 0, len(v["ClusterMasters"].(resources.IndexedListOfClusterNodes)))
+	for _, v := range v["ClusterMasters"].(resources.IndexedListOfClusterNodes) {
+		list = append(list, v.Name)
+	}
+	v["ClusterMasterNames"] = list
+
+	list = make([]string, 0, len(v["ClusterMasters"].(resources.IndexedListOfClusterNodes)))
+	for _, v := range v["ClusterMasters"].(resources.IndexedListOfClusterNodes) {
+		list = append(list, v.ID)
+	}
+	v["ClusterMasterIDs"] = list
+
+	if v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterMasterIDs"], xerr = instance.ListMasterIDs(task); xerr != nil {
+	if v["ClusterNodes"], xerr = instance.unsafeListNodes(task); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterMasterIPs"], xerr = instance.ListMasterIPs(task); xerr != nil {
-		return xerr
+	list = make([]string, 0, len(v["ClusterNodes"].(resources.IndexedListOfClusterNodes)))
+	for _, v := range v["ClusterNodes"].(resources.IndexedListOfClusterNodes) {
+		list = append(list, v.Name)
 	}
+	v["ClusterNodeNames"] = list
 
-	if v["ClusterNodes"], xerr = instance.ListNodes(task); xerr != nil {
-		return xerr
+	list = make([]string, 0, len(v["ClusterNodes"].(resources.IndexedListOfClusterNodes)))
+	for _, v := range v["ClusterNodes"].(resources.IndexedListOfClusterNodes) {
+		list = append(list, v.ID)
 	}
+	v["ClusterNodeIDs"] = list
 
-	if v["ClusterNodeNames"], xerr = instance.ListNodeNames(task); xerr != nil {
-		return xerr
-	}
-
-	if v["ClusterNodeIDs"], xerr = instance.ListNodeIDs(task); xerr != nil {
-		return xerr
-	}
-
-	if v["ClusterNodeIPs"], xerr = instance.ListNodeIPs(task); xerr != nil {
+	if v["ClusterNodeIPs"], xerr = instance.unsafeListNodeIPs(task); xerr != nil {
 		return xerr
 	}
 
@@ -558,15 +542,16 @@ func (instance *cluster) installNodeRequirements(task concurrency.Task, nodeType
 
 		// Finds the folder where the current binary resides
 		var (
-			exe       string
 			binaryDir string
 			path      string
 		)
-		exe, _ = os.Executable()
+		exe, _ := os.Executable()
 		if exe != "" {
 			binaryDir = filepath.Dir(exe)
 		}
 
+		_, _ = binaryDir, path
+		/* VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote)
 		// Uploads safescale binary
 		if binaryDir != "" {
 			path = binaryDir + "/safescale"
@@ -615,6 +600,7 @@ func (instance *cluster) installNodeRequirements(task concurrency.Task, nodeType
 			}
 			return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
 		}
+		*/
 		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
 		if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"

@@ -22,8 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
@@ -37,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 func (instance *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
@@ -489,8 +488,8 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	logrus.Debugf("[cluster %s] Configuring masters...", instance.GetName())
 	started := time.Now()
 
-	var subtasks []concurrency.Task
-	masters, xerr := instance.ListMasters(task)
+	// var subtasks []concurrency.Task
+	masters, xerr := instance.unsafeListMasters(task)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -498,33 +497,48 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 		return nil, nil
 	}
 
-	var errors []error
+	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	if xerr != nil {
+		return nil, xerr
+	}
 
+	var errors []error
 	for i, master := range masters {
-		host, xerr := LoadHost(task, instance.GetService(), master.GetID())
+		if master.ID == "" {
+			continue
+		}
+
+		host, xerr := LoadHost(task, instance.GetService(), master.ID)
 		if xerr != nil {
 			logrus.Warnf("failed to get metadata of Host: %s", xerr.Error())
 			errors = append(errors, xerr)
 			continue
 		}
-		subtask, xerr := task.StartInSubtask(instance.taskConfigureMaster, taskConfigureMasterParameters{
+		defer func(hostInstance resources.Host) {
+			hostInstance.Released(task)
+		}(host)
+
+		_, xerr = tg.Start(instance.taskConfigureMaster, taskConfigureMasterParameters{
 			Index: i + 1,
 			Host:  host,
 		})
 		if xerr != nil {
 			errors = append(errors, xerr)
 		}
-		subtasks = append(subtasks, subtask)
+		// subtasks = append(subtasks, subtask)
 	}
 
-	for _, s := range subtasks {
-		_, state := s.Wait()
-		if state != nil {
-			errors = append(errors, state)
-		}
-	}
-	if len(errors) > 0 {
-		return nil, fail.NewErrorList(errors)
+	// for _, s := range subtasks {
+	// 	_, state := s.Wait()
+	// 	if state != nil {
+	// 		errors = append(errors, state)
+	// 	}
+	// }
+	// if len(errors) > 0 {
+	// 	return nil, fail.NewErrorList(errors)
+	// }
+	if _, xerr = tg.Wait(); xerr != nil {
+		return nil, xerr
 	}
 
 	logrus.Debugf("[cluster %s] Masters configuration successful in [%s].", instance.GetName(), temporal.FormatDuration(time.Since(started)))
@@ -654,8 +668,7 @@ func (instance *cluster) taskCreateNodes(task concurrency.Task, params concurren
 
 	var errs []error
 	for _, s := range subtasks {
-		_, state := s.Wait()
-		if state != nil {
+		if _, state := s.Wait(); state != nil {
 			errs = append(errs, state)
 		}
 	}
@@ -908,7 +921,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	list, err := instance.ListNodeIDs(task)
+	list, err := instance.unsafeListNodes(task)
 	if err != nil {
 		return nil, err
 	}
@@ -920,38 +933,53 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 	logrus.Debugf("[cluster %s] configuring nodes...", clusterName)
 
 	var (
-		host   resources.Host
-		i      uint
-		hostID string
-		errs   []error
+		// i    uint
+		errs []error
 	)
 
 	svc := instance.GetService()
-	var subtasks []concurrency.Task
-	for _, hostID = range list {
-		i++
-		if host, xerr = LoadHost(task, svc, hostID); xerr != nil {
-			errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", hostID))
+	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// var subtasks []concurrency.Task
+	for i, node := range list {
+		if node.ID == "" {
 			continue
 		}
-		subtask, xerr := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
-			Index: i,
+
+		host, xerr := LoadHost(task, svc, node.ID)
+		if xerr != nil {
+			errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", node.Name))
+			continue
+		}
+		defer func(hostInstance resources.Host) {
+			hostInstance.Released(task)
+		}(host)
+
+		// subtask, xerr := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
+		_, xerr = task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
+			Index: i + 1,
 			Host:  host,
 		})
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		subtasks = append(subtasks, subtask)
+		// subtasks = append(subtasks, subtask)
 	}
 
-	for _, s := range subtasks {
-		if _, xerr := s.Wait(); xerr != nil {
-			errs = append(errs, xerr)
-		}
-	}
+	// for _, s := range subtasks {
+	// 	if _, xerr := s.Wait(); xerr != nil {
+	// 		errs = append(errs, xerr)
+	// 	}
+	// }
 	if len(errs) > 0 {
 		return nil, fail.NewErrorList(errs)
+	}
+	if _, xerr = tg.Wait(); xerr != nil {
+		return nil, xerr
 	}
 
 	logrus.Debugf("[cluster %s] nodes configuration successful.", clusterName)
@@ -1014,12 +1042,12 @@ func (instance *cluster) taskConfigureNode(task concurrency.Task, params concurr
 	return nil, nil
 }
 
-type taskDeleteHostOnFailureParameters struct {
-	host *host
+type taskDeleteNodeOnFailureParameters struct {
+	node *propertiesv3.ClusterNode
 }
 
-// taskDeleteHostOnFailure deletes a host
-func (instance *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+// taskDeleteNodeOnFailure deletes a host
+func (instance *cluster) taskDeleteNodeOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1033,14 +1061,20 @@ func (instance *cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 	}
 
 	// Convert and validate params
-	rh := params.(taskDeleteHostOnFailureParameters).host
-	if rh.isNull() {
-		return nil, fail.InvalidParameterError("params", "must be a valid '*host'")
-	}
+	node := params.(taskDeleteNodeOnFailureParameters).node
+	// if rh.isNull() {
+	// 	return nil, fail.InvalidParameterError("params", "must be a valid '*host'")
+	// }
 
 	prefix := "Cleaning up on failure, "
-	hostName := rh.GetName()
+	hostName := node.Name
 	logrus.Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
+
+	rh, xerr := LoadHost(task, instance.GetService(), node.ID)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if xerr := rh.Delete(task); xerr != nil {
 		logrus.Errorf(prefix + fmt.Sprintf("failed to delete Host '%s'", hostName))
 		return nil, xerr
@@ -1084,19 +1118,7 @@ func (instance *cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}()
 
 	logrus.Debugf("Deleting Node '%s'", p.node.Name)
-	var host resources.Host
-	if p.node.ID != "" { //nolint
-		host, xerr = LoadHost(task, instance.GetService(), p.node.ID)
-	} else if p.node.Name != "" {
-		host, xerr = LoadHost(task, instance.GetService(), p.node.Name)
-	} else {
-		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
-	}
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if xerr := instance.deleteNode(task, host, p.master); xerr != nil {
+	if xerr := instance.deleteNode(task, p.node, p.master); xerr != nil {
 		return nil, xerr
 	}
 
@@ -1145,5 +1167,42 @@ func (instance *cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	}
 
 	logrus.Debugf("Successfully deleted Master '%s'", p.node.Name)
+	return nil, nil
+}
+
+type taskDeleteHostOnFailureParameters struct {
+	host resources.Host
+}
+
+// taskDeleteHostOnFailure deletes a host
+func (instance *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if instance.isNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	// Convert and validate params
+	hostInstance := params.(taskDeleteHostOnFailureParameters).host
+	// if rh.isNull() {
+	// 	return nil, fail.InvalidParameterError("params", "must be a valid '*host'")
+	// }
+
+	prefix := "Cleaning up on failure, "
+	hostName := hostInstance.GetName()
+	logrus.Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
+
+	if xerr := hostInstance.Delete(task); xerr != nil {
+		logrus.Errorf(prefix + fmt.Sprintf("failed to delete Host '%s'", hostName))
+		return nil, xerr
+	}
+
+	logrus.Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
 	return nil, nil
 }

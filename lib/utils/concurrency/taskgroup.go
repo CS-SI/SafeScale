@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -261,7 +260,7 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		return nil, err
 	}
 
-	errs := make(map[string]string)
+	errs := make(map[string]error)
 	results := make(map[string]TaskResult)
 
 	if taskStatus == DONE {
@@ -327,10 +326,10 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 				if err != nil {
 					if s.normalizeError != nil {
 						if normalizedError := s.normalizeError(err); normalizedError != nil {
-							errs[sid] = normalizedError.Error()
+							errs[sid] = normalizedError
 						}
 					} else {
-						errs[sid] = err.Error()
+						errs[sid] = err
 					}
 				}
 
@@ -347,9 +346,9 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		time.Sleep(1 * time.Millisecond)
 	}
 
-	var errors []string
+	var errors []error
 	for i, e := range errs {
-		errors = append(errors, fmt.Sprintf("%s: %s", i, e))
+		errors = append(errors, fail.Wrap(e, "%s", i))
 	}
 
 	tg.task.mu.Lock()
@@ -357,7 +356,7 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 
 	tg.task.result = results
 	if len(errors) > 0 {
-		tg.task.err = fail.NewError(strings.Join(errors, "\n"))
+		tg.task.err = fail.NewErrorList(errors)
 	} else {
 		tg.task.err = nil
 	}
