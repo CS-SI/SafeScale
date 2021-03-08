@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -42,20 +43,20 @@ const (
 
 // core contains the core functions of a persistent object
 type core struct {
-	// Note: these 2 fields MUST appear at the beginning of the struct, to be sure to have them 64-bit aligned, a necessary condition
-	//       to use of native atomic instructions
-	name atomic.Value
 	id   atomic.Value
+	name atomic.Value
 
-	lock concurrency.TaskedLock
+	//	concurrency.TaskedLock `json:"-"`
 
-	kind       string
+	lock       sync.RWMutex
 	shielded   *concurrency.Shielded
 	properties *serialize.JSONProperties
-	folder     folder
-	loaded     bool
-	committed  bool
 	observers  map[string]observer.Observer
+
+	kind      string
+	folder    folder
+	loaded    bool
+	committed bool
 }
 
 func nullCore() *core {
@@ -90,56 +91,60 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		kind:       kind,
 		folder:     fld,
 		properties: props,
-		lock:       concurrency.NewTaskedLock(),
-		shielded:   concurrency.NewShielded(instance),
-		observers:  map[string]observer.Observer{},
+		//TaskedLock: concurrency.NewTaskedLock(),
+		shielded:  concurrency.NewShielded(instance),
+		observers: map[string]observer.Observer{},
 	}
 	return &c, nil
 }
 
-// IsNull returns true if the core instance represents the null value for core
-func (c *core) IsNull() bool {
+// isNull returns true if the core instance represents the null value for core
+func (c *core) isNull() bool {
 	return c == nil || c.kind == "" || c.kind == "nil" || c.folder.IsNull()
 }
 
 // GetService returns the iaas.GetService used to create/load the persistent object
-func (c core) GetService() iaas.Service {
-	if !c.IsNull() {
-		return c.folder.GetService()
+func (c *core) GetService() iaas.Service {
+	if c.isNull() {
+		return nil
 	}
-	return nil
+
+	return c.folder.GetService()
 }
 
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
-func (c core) GetID() string {
-	if c.IsNull() {
+func (c *core) GetID() string {
+	if c.isNull() {
 		return "<NullCore>"
 	}
-	if id, ok := c.id.Load().(string); ok {
-		return id
+
+	id, ok := c.id.Load().(string)
+	if !ok {
+		return ""
 	}
-	return ""
+	return id
 }
 
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
-func (c core) GetName() string {
-	if c.IsNull() {
+func (c *core) GetName() string {
+	if c.isNull() {
 		return "<NullCore>"
 	}
 
-	if name, ok := c.name.Load().(string); ok {
-		return name
+	name, ok := c.name.Load().(string)
+	if !ok {
+		return ""
 	}
-	return ""
+	return name
 }
 
 // Inspect protects the data for shared read
 func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -156,8 +161,11 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 		return fail.AbortedError(nil, "aborted")
 	}
 
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	// Reload reloads data from Object Storage to be sure to have the last revision
-	if xerr = c.Reload(task); xerr != nil {
+	if xerr = c.reload(task); xerr != nil {
 		return fail.Wrap(xerr, "failed to reload metadata")
 	}
 
@@ -172,14 +180,11 @@ func (c *core) Inspect(task concurrency.Task, callback resources.Callback) (xerr
 func (c *core) Review(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
@@ -188,45 +193,67 @@ func (c *core) Review(task concurrency.Task, callback resources.Callback) (xerr 
 		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	return c.shielded.Inspect(task, func(clonable data.Clonable) fail.Error {
 		return callback(clonable, c.properties)
 	})
 }
 
 // Alter protects the data for exclusive write
-func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr fail.Error) {
+// Valid keyvalues for options are :
+// - "Reload": bool = allow to disable reloading from Object Storage if set to false (default is true)
+func (c *core) Alter(task concurrency.Task, callback resources.Callback, options ...data.ImmutableKeyValue) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
-
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
-
 	if c.shielded == nil {
 		return fail.InvalidInstanceContentError("c.shielded", "cannot be nil")
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	// Make sure c.properties is populated
 	if c.properties == nil {
 		if c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind); xerr != nil {
+			c.lock.Unlock()
 			return xerr
 		}
 	}
 
+	doReload := true
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case "Reload":
+				doReload = v.Value().(bool)
+			default:
+			}
+		}
+	}
 	// Reload reloads data from objectstorage to be sure to have the last revision
-	if xerr = c.Reload(task); xerr != nil {
-		return fail.Wrap(xerr, "failed to reload metadata")
+	if doReload {
+		if xerr = c.reload(task); xerr != nil {
+			return fail.Wrap(xerr, "failed to reload metadata")
+		}
 	}
 
 	xerr = c.shielded.Alter(task, func(clonable data.Clonable) fail.Error {
@@ -242,12 +269,13 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 	}
 
 	c.committed = false
+
 	if xerr = c.write(task); xerr != nil {
 		return xerr
 	}
 
 	// notify observers there has been changed in the instance
-	return fail.ConvertError(c.NotifyObservers(task))
+	return fail.ConvertError(c.notifyObservers(task))
 }
 
 // Carry links metadata with real data
@@ -260,22 +288,15 @@ func (c *core) Alter(task concurrency.Task, callback resources.Callback) (xerr f
 func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
-
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
-
 	if c.shielded == nil {
 		return fail.InvalidInstanceContentError("c.shielded", "cannot be nil")
 	}
@@ -283,16 +304,26 @@ func (c *core) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.E
 		return fail.NotAvailableError("already carrying a value")
 	}
 
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	c.shielded = concurrency.NewShielded(clonable)
 	c.loaded = true
+
 	if xerr = c.updateIdentity(task); xerr != nil {
 		return xerr
 	}
 
 	c.committed = false
+
 	return c.write(task)
 }
 
+// updateIdentity updates instance cached identity
 func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -315,7 +346,7 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 	c.id.Store("")
 
 	// notify observers there has been changed in the instance
-	if err := c.NotifyObservers(task); err != nil {
+	if err := c.notifyObservers(task); err != nil {
 		return fail.ConvertError(err)
 	}
 
@@ -326,55 +357,33 @@ func (c *core) updateIdentity(task concurrency.Task) fail.Error {
 func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if ref = strings.TrimSpace(ref); ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
-
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
-
 	if c.loaded {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
 
-	// VPL: because of read-after-write check, no need to retry read
-	// xerr := retry.WhileUnsuccessfulDelay1Second(
-	// 	func() error {
-	// 		if innerErr := c.readByReference(task, ref); innerErr != nil {
-	// 			switch innerErr.(type) {
-	// 			case *fail.ErrNotFound: // If not found, stop immediately
-	// 				return retry.StopRetryError(innerErr)
-	// 			default:
-	// 				return innerErr
-	// 			}
-	// 		}
-	// 		return nil
-	// 	},
-	// 	temporal.GetMinDelay(),
-	// )
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	if xerr = c.readByReference(task, ref); xerr != nil {
-		// switch xerr.(type) {
-		// case *retry.ErrTimeout:
-		// 	return fail.NotFoundError("failed to load metadata of %s '%s'", c.kind, ref)
-		// case *retry.ErrStopRetry:
-		// 	// If stopped immediately, the cause contains the reason which should be a *fail.ErrNotFound
-		// 	return fail.ConvertError(xerr.Cause())
-		// default:
 		return xerr
-		// }
 	}
 
 	c.loaded = true
 	c.committed = true
+
 	return c.updateIdentity(task)
 }
 
@@ -382,25 +391,25 @@ func (c *core) Read(task concurrency.Task, ref string) (xerr fail.Error) {
 func (c *core) ReadByID(task concurrency.Task, id string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
-
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
-
 	if c.loaded {
 		return fail.NotAvailableError("metadata is already carrying a value")
 	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
@@ -429,6 +438,7 @@ func (c *core) ReadByID(task concurrency.Task, id string) (xerr fail.Error) {
 
 	c.loaded = true
 	c.committed = true
+
 	return c.updateIdentity(task)
 }
 
@@ -439,7 +449,7 @@ func (c *core) readByID(task concurrency.Task, id string) fail.Error {
 	}
 
 	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
-		if innerXErr := c.Deserialize(task, buf); innerXErr != nil {
+		if innerXErr := c.deserialize(task, buf); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrSyntax:
 				return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
@@ -502,7 +512,7 @@ func (c *core) readByName(task concurrency.Task, name string) fail.Error {
 	}
 
 	return c.folder.Read(byNameFolderName, name, func(buf []byte) fail.Error {
-		if innerXErr := c.Deserialize(task, buf); innerXErr != nil {
+		if innerXErr := c.deserialize(task, buf); innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
 		}
 		return nil
@@ -516,16 +526,16 @@ func (c *core) write(task concurrency.Task) fail.Error {
 	}
 
 	if !c.committed {
-		jsoned, xerr := c.Serialize(task)
+		jsoned, xerr := c.serialize(task)
 		if xerr != nil {
 			return xerr
 		}
 
-		if xerr = c.folder.Write(byNameFolderName, c.GetName(), jsoned); xerr != nil {
+		if xerr = c.folder.Write(byNameFolderName, c.name.Load().(string), jsoned); xerr != nil {
 			return xerr
 		}
 
-		if xerr = c.folder.Write(byIDFolderName, c.GetID(), jsoned); xerr != nil {
+		if xerr = c.folder.Write(byIDFolderName, c.id.Load().(string), jsoned); xerr != nil {
 			return xerr
 		}
 
@@ -537,9 +547,7 @@ func (c *core) write(task concurrency.Task) fail.Error {
 
 // Reload reloads the content from the Object Storage
 func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -550,21 +558,28 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
-	if c.loaded && !c.committed {
-		return fail.InconsistentError("cannot reload a not committed data")
-	}
+	return c.reload(task)
+}
+
+// reload reloads the content from the Object Storage
+// Note: must be called after locking the instance
+func (c *core) reload(task concurrency.Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	id := c.GetID()
+	if c.loaded && !c.committed {
+		return fail.InconsistentError("cannot reload a not committed data")
+	}
+
 	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			if innerXErr := c.readByID(task, id); innerXErr != nil {
+			if innerXErr := c.readByID(task, c.id.Load().(string)); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound: // If not found, stop immediately
 					return retry.StopRetryError(innerXErr)
@@ -579,35 +594,40 @@ func (c *core) Reload(task concurrency.Task) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, c.id)
 		case *retry.ErrStopRetry:
-			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, c.id)
 		default:
-			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, c.id)
 		}
 	}
 
 	c.loaded = true
 	c.committed = true
-	return fail.ConvertError(c.NotifyObservers(task))
+
+	return fail.ConvertError(c.notifyObservers(task))
 }
 
 // BrowseFolder walks through folder and executes a callback for each entries
-func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) (xerr fail.Error) {
+func (c *core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterError("task", "cannot be nil")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "cannot be nil")
 	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	return c.folder.Browse(byIDFolderName, func(buf []byte) fail.Error {
 		if task.Aborted() {
@@ -622,26 +642,27 @@ func (c core) BrowseFolder(task concurrency.Task, callback func(buf []byte) fail
 func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
-	var idFound, nameFound bool
-	id := c.GetID()
-	name := c.GetName()
+	var (
+		idFound, nameFound bool
+		errors             []error
+	)
 
-	var errors []error
 	// Checks entries exist in Object Storage
-	if xerr = c.folder.Lookup(byIDFolderName, id); xerr != nil {
+	if xerr = c.folder.Lookup(byIDFolderName, c.id.Load().(string)); xerr != nil {
 		// If not found, consider it not an error
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -657,7 +678,7 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if xerr = c.folder.Lookup(byNameFolderName, name); xerr != nil {
+	if xerr = c.folder.Lookup(byNameFolderName, c.name.Load().(string)); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If entry not found, consider it not an error
@@ -674,12 +695,12 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 
 	// Deletes entries found
 	if idFound {
-		if xerr = c.folder.Delete(byIDFolderName, id); xerr != nil {
+		if xerr = c.folder.Delete(byIDFolderName, c.id.Load().(string)); xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
 	if nameFound {
-		if xerr = c.folder.Delete(byNameFolderName, name); xerr != nil {
+		if xerr = c.folder.Delete(byNameFolderName, c.name.Load().(string)); xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
@@ -691,21 +712,36 @@ func (c *core) Delete(task concurrency.Task) (xerr fail.Error) {
 		return fail.NewErrorList(errors)
 	}
 
-	c.Destroyed(task) // notifies cache that the instance has been deleted
+	c.destroyed(task) // notifies cache that the instance has been deleted
 	return nil
 }
 
 // Serialize serializes instance into bytes (output json code)
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if c.IsNull() {
+func (c *core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
+	if c.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.serialize(task)
+}
+
+// serialize serializes instance into bytes (output json code)
+// Note: doesn't follow interface data.Serializable (task parameter not used in it)
+// Note: must be called after locking the instance
+func (c *core) serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -715,9 +751,6 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 		shieldedMapped = map[string]interface{}{}
 		propsMapped    = map[string]string{}
 	)
-
-	c.lock.SafeRLock(task)
-	defer c.lock.SafeRUnlock(task)
 
 	shieldedJSONed, xerr = c.shielded.Serialize(task)
 	if xerr != nil {
@@ -756,7 +789,7 @@ func (c core) Serialize(task concurrency.Task) (_ []byte, xerr fail.Error) {
 func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -766,8 +799,19 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.deserialize(task, buf)
+}
+
+// deserialize reads json code and reinstantiates
+// Note: doesn't follow interface data.Serializable (task parameter not used in the interface and needed here)
+// Note: must be called after locking the instance
+func (c *core) deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	if c.properties == nil {
 		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
@@ -818,15 +862,22 @@ func (c *core) Deserialize(task concurrency.Task, buf []byte) (xerr fail.Error) 
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
 func (c *core) Released(task concurrency.Task) {
-	if c.IsNull() || task == nil {
+	if c.isNull() || task == nil {
 		return
 	}
 
-	c.lock.SafeRLock(task)
-	defer c.lock.SafeRUnlock(task)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
+	c.released(task)
+}
+
+// released is used to tell cache that the instance has been used and will not be anymore.
+// Helps the cache handler to know when a cached item can be removed from cache (if needed)
+// Note: must be called after locking the instance
+func (c *core) released(task concurrency.Task) {
 	for _, v := range c.observers {
-		v.MarkAsFreed(task, c.GetID())
+		v.MarkAsFreed(task, c.id.Load().(string))
 	}
 }
 
@@ -834,21 +885,29 @@ func (c *core) Released(task concurrency.Task) {
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
 func (c *core) Destroyed(task concurrency.Task) {
-	if c.IsNull() || task == nil {
+	if c.isNull() || task == nil {
 		return
 	}
 
-	c.lock.SafeRLock(task)
-	defer c.lock.SafeRUnlock(task)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
+	c.destroyed(task)
+}
+
+// destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
+// Note: Does nothing for now, prepared for future use
+// Note: must be called after locking the instance
+func (c *core) destroyed(task concurrency.Task) {
 	for _, v := range c.observers {
-		v.MarkAsDeleted(task, c.GetID())
+		v.MarkAsDeleted(task, c.id.Load().(string))
 	}
 }
 
 // AddObserver ...
+// satisfies interface data.Observable
 func (c *core) AddObserver(task concurrency.Task, o observer.Observer) error {
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -861,59 +920,66 @@ func (c *core) AddObserver(task concurrency.Task, o observer.Observer) error {
 		return fail.InvalidParameterError("o", "cannot be nil")
 	}
 
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
-	id := o.GetID()
-	if pre, ok := c.observers[id]; ok {
+	if pre, ok := c.observers[c.id.Load().(string)]; ok {
 		if pre == o {
 			return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
 		}
 		return nil
 	}
-	c.observers[id] = o
+	c.observers[c.id.Load().(string)] = o
 	return nil
 }
 
-// NotifyObservers ...
+// NotifyObservers sends a signal to all registered Observers to notify change
+// Satisfies interface data.Observable
 func (c *core) NotifyObservers(task concurrency.Task) error {
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	c.lock.SafeRLock(task)
-	defer c.lock.SafeRUnlock(task)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
-	id := c.GetID()
+	return c.notifyObservers(task)
+}
+
+// notifyObservers sends a signal to all registered Observers to notify change
+// Note: must be called after locking the instance
+func (c *core) notifyObservers(task concurrency.Task) error {
 	for _, v := range c.observers {
-		v.SignalChange(task, id)
+		v.SignalChange(task, c.id.Load().(string))
 	}
 	return nil
 }
 
 // RemoveObserver ...
 func (c *core) RemoveObserver(task concurrency.Task, name string) error {
-	if c.IsNull() {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if name == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	c.lock.SafeLock(task)
-	defer c.lock.SafeUnlock(task)
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	delete(c.observers, name)
 	return nil

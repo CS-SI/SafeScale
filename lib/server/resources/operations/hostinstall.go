@@ -39,35 +39,34 @@ import (
 )
 
 // AddFeature handles 'safescale host feature add <host name or id> <feature name>'
-func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
+func (instance *host) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rh.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	rh.lock.SafeLock(task)
-	defer rh.lock.SafeUnlock(task)
-
-	feat, xerr := NewFeature(task, rh.GetService(), name)
+	feat, xerr := NewFeature(task, instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
-	xerr = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+
+	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var innerXErr fail.Error
-		outcomes, innerXErr = feat.Add(rh, vars, settings)
+		outcomes, innerXErr = feat.Add(instance, vars, settings)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -78,10 +77,12 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 			if !ok {
 				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))
 			}
+
 			requires, innerXErr := feat.GetRequirements()
 			if innerXErr != nil {
 				return innerXErr
 			}
+
 			hostFeaturesV1.Installed[name] = &propertiesv1.HostInstalledFeature{
 				HostContext: true,
 				Requires:    requires,
@@ -96,29 +97,27 @@ func (rh *host) AddFeature(task concurrency.Task, name string, vars data.Map, se
 }
 
 // CheckFeature ...
-func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *host) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rh.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	rh.lock.SafeLock(task)
-	defer rh.lock.SafeUnlock(task)
-
-	feat, xerr := NewFeature(task, rh.GetService(), name)
+	feat, xerr := NewFeature(task, instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -133,30 +132,31 @@ func (rh host) CheckFeature(task concurrency.Task, name string, vars data.Map, s
 	// 	return srvutils.ThrowErr(err)
 	// }
 
-	return feat.Check(&rh, vars, settings)
+	return feat.Check(instance, vars, settings)
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
-func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *host) DeleteFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rh.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("featureName", "cannot be empty string")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, false /*Trace.IPAddress, */, "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(task, rh.GetService(), name)
+	feat, xerr := NewFeature(task, instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -171,14 +171,14 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 	// 	return srvutils.ThrowErr(err)
 	// }
 
-	xerr = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		outcomes, innerXErr := feat.Remove(rh, vars, settings)
+	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		outcomes, innerXErr := feat.Remove(instance, vars, settings)
 		if innerXErr != nil {
-			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, rh.GetName())
+			return fail.NewError(innerXErr, nil, "error uninstalling feature '%s' on '%s'", name, instance.GetName())
 		}
 
 		if !outcomes.Successful() {
-			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, rh.GetName())
+			msg := fmt.Sprintf("failed to delete feature '%s' from host '%s'", name, instance.GetName())
 			tracer.Trace(strprocess.Capitalize(msg) + ":\n" + outcomes.AllErrorMessages())
 			return fail.NewError(msg)
 		}
@@ -199,18 +199,19 @@ func (rh *host) DeleteFeature(task concurrency.Task, name string, vars data.Map,
 
 // TargetType returns the type of the target.
 // satisfies install.Targetable interface.
-func (rh host) TargetType() featuretargettype.Enum {
-	if rh.IsNull() {
+func (instance *host) TargetType() featuretargettype.Enum {
+	if instance.isNull() {
 		return featuretargettype.UNKNOWN
 	}
+
 	return featuretargettype.HOST
 }
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
-func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
+func (instance *host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
 	// FIXME: Return error
-	if rh.IsNull() {
+	if instance.isNull() {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return map[uint8]installmethod.Enum{}
 	}
@@ -219,19 +220,16 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 		return map[uint8]installmethod.Enum{}
 	}
 
-	rh.lock.SafeLock(task)
-	defer rh.lock.SafeUnlock(task)
-
 	if task.Aborted() {
 		logrus.Error(fail.AbortedError(nil, "aborted").Error())
 		return map[uint8]installmethod.Enum{}
 	}
 
-	if rh.installMethods == nil {
-		rh.installMethods = map[uint8]installmethod.Enum{}
+	if instance.installMethods == nil {
+		instance.installMethods = map[uint8]installmethod.Enum{}
 
-		_ = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			// props, inErr := rh.properties(task)
+		_ = instance.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			// props, inErr := instance.properties(task)
 			// if inErr != nil {
 			// 	return inErr
 			// }
@@ -247,50 +245,48 @@ func (rh host) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enu
 					switch systemV1.Flavor {
 					case "centos", "redhat":
 						index++
-						rh.installMethods[index] = installmethod.Yum
+						instance.installMethods[index] = installmethod.Yum
 					case "debian":
 						fallthrough
 					case "ubuntu":
 						index++
-						rh.installMethods[index] = installmethod.Apt
+						instance.installMethods[index] = installmethod.Apt
 					case "fedora", "rhel":
 						index++
-						rh.installMethods[index] = installmethod.Dnf
+						instance.installMethods[index] = installmethod.Dnf
 					}
 				}
 				return nil
 			})
 			index++
-			rh.installMethods[index] = installmethod.Bash
+			instance.installMethods[index] = installmethod.Bash
 			index++
-			rh.installMethods[index] = installmethod.None
+			instance.installMethods[index] = installmethod.None
 			return nil
 		})
 	}
-	return rh.installMethods
+	return instance.installMethods
 }
 
 // RegisterFeature registers an installed Feature in metadata of Host
-func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
+func (instance *host) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rh.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if feat == nil {
 		return fail.InvalidParameterCannotBeNilError("feat")
 	}
 
-	rh.lock.SafeLock(task)
-	defer rh.lock.SafeUnlock(task)
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
-	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
@@ -308,7 +304,7 @@ func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, r
 				item.HostContext = !clusterContext
 				featuresV1.Installed[feat.GetName()] = item
 			}
-			if rf, ok := requiredBy.(*feature); ok && !rf.IsNull() {
+			if rf, ok := requiredBy.(*feature); ok && !rf.isNull() {
 				item.RequiredBy[rf.GetName()] = struct{}{}
 			}
 			return nil
@@ -317,26 +313,24 @@ func (rh *host) RegisterFeature(task concurrency.Task, feat resources.Feature, r
 }
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
-func (rh *host) UnregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
+func (instance *host) UnregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rh.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	rh.lock.SafeLock(task)
-	defer rh.lock.SafeUnlock(task)
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
-	return rh.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
@@ -354,35 +348,33 @@ func (rh *host) UnregisterFeature(task concurrency.Task, feat string) (xerr fail
 
 // InstalledFeatures returns a list of installed features
 // satisfies interface install.Targetable
-func (rh host) InstalledFeatures(task concurrency.Task) []string {
+func (instance *host) InstalledFeatures(task concurrency.Task) []string {
 	var list []string
 	return list
 }
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target
 // satisfies interface install.Targetable
-func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (xerr fail.Error) {
+func (instance *host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rh.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if v == nil {
 		return fail.InvalidParameterCannotBeNilError("v")
 	}
 
-	rh.lock.SafeRLock(task)
-	defer rh.lock.SafeRUnlock(task)
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
-	v["ShortHostname"] = rh.GetName()
+	v["ShortHostname"] = instance.GetName()
 	domain := ""
-	xerr = rh.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
@@ -400,16 +392,21 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 		return xerr
 	}
 
-	v["Hostname"] = rh.GetName() + domain
+	v["Hostname"] = instance.GetName() + domain
 
-	v["HostIP"] = rh.getPrivateIP(task)
-	v["PublicIP"] = rh.getPublicIP(task)
+	if v["HostIP"], xerr = instance.GetPrivateIP(task); xerr != nil {
+		return xerr
+	}
+
+	if v["PublicIP"], xerr = instance.GetPublicIP(task); xerr != nil {
+		return xerr
+	}
 
 	if _, ok := v["Username"]; !ok {
 		v["Username"] = abstract.DefaultUser
 	}
 
-	rs, xerr := rh.GetDefaultSubnet(task)
+	rs, xerr := instance.GetDefaultSubnet(task)
 	if xerr != nil {
 		return xerr
 	}
@@ -421,9 +418,15 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 	defer rgw.Released(task)
 
 	rgwi := rgw.(*host)
-	v["PrimaryGatewayIP"] = rgwi.getPrivateIP(task)
+	if v["PrimaryGatewayIP"], xerr = rgwi.GetPrivateIP(task); xerr != nil {
+		return xerr
+	}
+
 	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
-	v["PrimaryPublicIP"] = rgwi.getPublicIP(task)
+	if v["PrimaryPublicIP"], xerr = rgwi.GetPublicIP(task); xerr != nil {
+		return xerr
+	}
+
 	if rgw, xerr = rs.InspectGateway(task, false); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -435,8 +438,8 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 		defer rgw.Released(task)
 
 		rgwi = rgw.(*host)
-		v["SecondaryGatewayIP"] = rgwi.getPrivateIP(task)
-		v["SecondaryPublicIP"] = rgwi.getPublicIP(task)
+		v["SecondaryGatewayIP"] = rgwi.unsafeGetPrivateIP()
+		v["SecondaryPublicIP"] = rgwi.unsafeGetPublicIP()
 	}
 
 	if v["EndpointIP"], xerr = rs.GetEndpointIP(task); xerr != nil {
@@ -452,21 +455,18 @@ func (rh host) ComplementFeatureParameters(task concurrency.Task, v data.Map) (x
 }
 
 // IsFeatureInstalled ...
-func (rh *host) IsFeatureInstalled(task concurrency.Task, name string) (found bool, xerr fail.Error) {
+func (instance *host) IsFeatureInstalled(task concurrency.Task, name string) (found bool, xerr fail.Error) {
 	found = false
 	defer fail.OnPanic(&xerr)
 
-	if rh.IsNull() {
+	if instance.isNull() {
 		return false, fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {
 		return false, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	rh.lock.SafeRLock(task)
-	defer rh.lock.SafeRUnlock(task)
-
-	return found, rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return found, instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {

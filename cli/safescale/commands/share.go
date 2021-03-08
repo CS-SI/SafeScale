@@ -20,7 +20,6 @@ import (
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
-
 	"github.com/urfave/cli/v2"
 
 	"github.com/CS-SI/SafeScale/lib/client"

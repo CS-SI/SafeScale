@@ -127,6 +127,10 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, xerr
 	}
 
+	if xerr = rn.AdoptSubnet(task, rs); xerr != nil {
+		return nil, xerr
+	}
+
 	tracer.Trace("Subnet '%s' successfully created.", req.Name)
 	return rs.ToProtocol(task)
 }
@@ -288,9 +292,16 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	var rs resources.Subnet
+	var (
+		rn       resources.Network
+		rs       resources.Subnet
+		subnetID string
+	)
 	if rs, xerr = subnetfactory.Load(task, svc, networkRef, subnetRef); xerr == nil {
-		xerr = rs.Delete(task)
+		subnetID = rs.GetID()
+		if rn, xerr = rs.InspectNetwork(task); xerr == nil {
+			xerr = rs.Delete(task)
+		}
 	}
 	if xerr != nil {
 		switch xerr.(type) {
@@ -298,6 +309,12 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 			// consider a Subnet not found as a successful deletion
 		default:
 			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
+		}
+	}
+
+	if rn != nil {
+		if xerr = rn.AbandonSubnet(task, subnetID); xerr != nil {
+			return empty, xerr
 		}
 	}
 

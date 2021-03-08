@@ -160,7 +160,7 @@ func (i Image) OK() bool {
 type HostRequest struct {
 	ResourceName     string              // ResourceName contains the name of the compute resource
 	HostName         string              // HostName contains the hostname on the system (if empty, will use ResourceName)
-	Subnets          []*Subnet           // Subnets lists the networks the host must be connected to
+	Subnets          []*Subnet           // lists the Subnets the host must be connected to
 	DefaultRouteIP   string              // DefaultRouteIP is the IP used as default route
 	PublicIP         bool                // PublicIP a flag telling if the host must have a public IP
 	TemplateID       string              // TemplateID is the UUID of the template used to size the host (see SelectTemplates)
