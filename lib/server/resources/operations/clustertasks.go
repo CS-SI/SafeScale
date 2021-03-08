@@ -39,15 +39,16 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -57,7 +58,7 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	if xerr = c.GetService().StartHost(id); xerr != nil {
+	if xerr = instance.GetService().StartHost(id); xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already started is considered as a successful run
 			return nil, nil
@@ -66,10 +67,10 @@ func (c *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskPa
 	return nil, xerr
 }
 
-func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -84,7 +85,7 @@ func (c *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskPar
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	if xerr = c.GetService().StopHost(id); xerr != nil {
+	if xerr = instance.GetService().StopHost(id); xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already stopped is considered as a successful run
 			return nil, nil
@@ -99,10 +100,10 @@ type taskInstallGatewayParameters struct {
 
 // taskInstallGateway installs necessary components on one gateway
 // This function is intended to be call as a goroutine
-func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskInstallGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -132,17 +133,17 @@ func (c *cluster) taskInstallGateway(task concurrency.Task, params concurrency.T
 	}
 
 	// Installs docker and docker-compose on gateway
-	if xerr = c.installDocker(task, p.Host, hostLabel); xerr != nil {
+	if xerr = instance.installDocker(task, p.Host, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
 	// Installs proxycache server on gateway (if not disabled)
-	if xerr = c.installProxyCacheServer(task, p.Host, hostLabel); xerr != nil {
+	if xerr = instance.installProxyCacheServer(task, p.Host, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
 	// Installs requirements as defined by cluster Flavor (if it exists)
-	if xerr = c.installNodeRequirements(task, clusternodetype.Gateway, p.Host, hostLabel); xerr != nil {
+	if xerr = instance.installNodeRequirements(task, clusternodetype.Gateway, p.Host, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
@@ -156,10 +157,10 @@ type taskConfigureGatewayParameters struct {
 
 // taskConfigureGateway prepares one gateway
 // This function is intended to be call as a goroutine
-func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskConfigureGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -184,8 +185,8 @@ func (c cluster) taskConfigureGateway(task concurrency.Task, params concurrency.
 
 	logrus.Debugf("[%s] starting configuration...", p.Host.GetName())
 
-	if c.makers.ConfigureGateway != nil {
-		if xerr = c.makers.ConfigureGateway(task, &c); xerr != nil {
+	if instance.makers.ConfigureGateway != nil {
+		if xerr = instance.makers.ConfigureGateway(task, instance); xerr != nil {
 			return nil, xerr
 		}
 	}
@@ -202,10 +203,10 @@ type taskCreateMastersParameters struct {
 
 // taskCreateMasters creates masters
 // This function is intended to be call as a goroutine
-func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskCreateMasters(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -227,7 +228,7 @@ func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.Tas
 		return nil, fail.InvalidParameterError("params.count", "cannot be an integer less than 1")
 	}
 
-	clusterName := c.GetName()
+	clusterName := instance.GetName()
 
 	if p.count == 0 {
 		logrus.Debugf("[cluster %s] no masters to create.", clusterName)
@@ -240,7 +241,7 @@ func (c cluster) taskCreateMasters(task concurrency.Task, params concurrency.Tas
 	timeout := temporal.GetContextTimeout() + time.Duration(p.count)*time.Minute
 	var i uint
 	for ; i < p.count; i++ {
-		subtask, xerr := task.StartInSubtask(c.taskCreateMaster, taskCreateMasterParameters{
+		subtask, xerr := task.StartInSubtask(instance.taskCreateMaster, taskCreateMasterParameters{
 			index:         i + 1,
 			masterDef:     p.mastersDef,
 			timeout:       timeout,
@@ -276,10 +277,10 @@ type taskCreateMasterParameters struct {
 
 // taskCreateMaster creates one master
 // This function is intended to be call as a goroutine
-func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -307,14 +308,14 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	logrus.Debugf("[%s] starting master Host creation...", hostLabel)
 
 	hostReq := abstract.HostRequest{}
-	hostReq.ResourceName, xerr = c.buildHostname(task, "master", clusternodetype.Master)
+	hostReq.ResourceName, xerr = instance.buildHostname(task, "master", clusternodetype.Master)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// First creates master in metadata, to keep track of its tried creation, in case of failure
 	var nodeIdx uint
-	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -341,7 +342,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 			// Disable abort signal during the clean up
 			defer task.DisarmAbortSignal()()
 
-			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
@@ -362,12 +363,12 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	netCfg, xerr := c.GetNetworkConfig(task)
+	netCfg, xerr := instance.GetNetworkConfig(task)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	subnet, xerr := LoadSubnet(task, c.GetService(), "", netCfg.SubnetID)
+	subnet, xerr := LoadSubnet(task, instance.GetService(), "", netCfg.SubnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -393,7 +394,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 	hostReq.PublicIP = false
 	hostReq.KeepOnFailure = p.keepOnFailure
 
-	rh, xerr := NewHost(c.GetService())
+	rh, xerr := NewHost(instance.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -413,7 +414,7 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 		}
 	}()
 
-	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -454,11 +455,11 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 
 	hostLabel = fmt.Sprintf("master #%d (%s)", p.index, rh.GetName())
 
-	if xerr = c.installProxyCacheClient(task, rh, hostLabel); xerr != nil {
+	if xerr = instance.installProxyCacheClient(task, rh, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
-	if xerr = c.installNodeRequirements(task, clusternodetype.Master, rh, hostLabel); xerr != nil {
+	if xerr = instance.installNodeRequirements(task, clusternodetype.Master, rh, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
@@ -468,10 +469,10 @@ func (c *cluster) taskCreateMaster(task concurrency.Task, params concurrency.Tas
 
 // taskConfigureMasters configure masters
 // This function is intended to be call as a goroutine
-func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -485,11 +486,11 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	logrus.Debugf("[cluster %s] Configuring masters...", c.GetName())
+	logrus.Debugf("[cluster %s] Configuring masters...", instance.GetName())
 	started := time.Now()
 
 	var subtasks []concurrency.Task
-	masters, xerr := c.ListMasters(task)
+	masters, xerr := instance.ListMasters(task)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -500,13 +501,13 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 	var errors []error
 
 	for i, master := range masters {
-		host, xerr := LoadHost(task, c.GetService(), master.GetID())
+		host, xerr := LoadHost(task, instance.GetService(), master.GetID())
 		if xerr != nil {
 			logrus.Warnf("failed to get metadata of Host: %s", xerr.Error())
 			errors = append(errors, xerr)
 			continue
 		}
-		subtask, xerr := task.StartInSubtask(c.taskConfigureMaster, taskConfigureMasterParameters{
+		subtask, xerr := task.StartInSubtask(instance.taskConfigureMaster, taskConfigureMasterParameters{
 			Index: i + 1,
 			Host:  host,
 		})
@@ -526,7 +527,7 @@ func (c *cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.Task
 		return nil, fail.NewErrorList(errors)
 	}
 
-	logrus.Debugf("[cluster %s] Masters configuration successful in [%s].", c.GetName(), temporal.FormatDuration(time.Since(started)))
+	logrus.Debugf("[cluster %s] Masters configuration successful in [%s].", instance.GetName(), temporal.FormatDuration(time.Since(started)))
 	return nil, nil
 }
 
@@ -537,10 +538,10 @@ type taskConfigureMasterParameters struct {
 
 // taskConfigureMaster configures one master
 // This function is intended to be call as a goroutine
-func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -573,13 +574,13 @@ func (c *cluster) taskConfigureMaster(task concurrency.Task, params concurrency.
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
 	// install docker feature (including docker-compose)
-	if xerr = c.installDocker(task, p.Host, hostLabel); xerr != nil {
+	if xerr = instance.installDocker(task, p.Host, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
 	// Configure master for flavour
-	if c.makers.ConfigureNode != nil {
-		if xerr = c.makers.ConfigureMaster(task, c, p.Index, p.Host); xerr != nil {
+	if instance.makers.ConfigureNode != nil {
+		if xerr = instance.makers.ConfigureMaster(task, instance, p.Index, p.Host); xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to configure master '%s'", p.Host.GetName())
 		}
 
@@ -600,10 +601,10 @@ type taskCreateNodesParameters struct {
 
 // taskCreateNodes creates nodes
 // This function is intended to be call as a goroutine
-func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskCreateNodes(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -627,7 +628,7 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	clusterName := c.GetName()
+	clusterName := instance.GetName()
 
 	if p.count == 0 {
 		logrus.Debugf("[cluster %s] no nodes to create.", clusterName)
@@ -638,7 +639,7 @@ func (c *cluster) taskCreateNodes(task concurrency.Task, params concurrency.Task
 	timeout := temporal.GetContextTimeout() + time.Duration(p.count)*time.Minute
 	var subtasks []concurrency.Task
 	for i := uint(1); i <= p.count; i++ {
-		subtask, xerr := task.StartInSubtask(c.taskCreateNode, taskCreateNodeParameters{
+		subtask, xerr := task.StartInSubtask(instance.taskCreateNode, taskCreateNodeParameters{
 			index:         i,
 			nodeDef:       p.nodesDef,
 			timeout:       timeout,
@@ -675,10 +676,10 @@ type taskCreateNodeParameters struct {
 
 // taskCreateNode creates a node in the Cluster
 // This function is intended to be call as a goroutine
-func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -706,14 +707,14 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	logrus.Debugf("[%s] starting Host creation...", hostLabel)
 
 	hostReq := abstract.HostRequest{}
-	hostReq.ResourceName, xerr = c.buildHostname(task, "node", clusternodetype.Node)
+	hostReq.ResourceName, xerr = instance.buildHostname(task, "node", clusternodetype.Node)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// First creates node in metadata, to keep track of its tried creation, in case of failure
 	var nodeIdx uint
-	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -740,7 +741,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 			// Disable abort signal during the clean up
 			defer task.DisarmAbortSignal()()
 
-			derr := c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
@@ -757,12 +758,12 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		}
 	}()
 
-	netCfg, xerr := c.GetNetworkConfig(task)
+	netCfg, xerr := instance.GetNetworkConfig(task)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	subnet, xerr := LoadSubnet(task, c.GetService(), "", netCfg.SubnetID)
+	subnet, xerr := LoadSubnet(task, instance.GetService(), "", netCfg.SubnetID)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -788,7 +789,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 	hostReq.PublicIP = false
 	hostReq.KeepOnFailure = p.keepOnFailure
 
-	rh, xerr := NewHost(c.GetService())
+	rh, xerr := NewHost(instance.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -808,7 +809,7 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 		}
 	}()
 
-	xerr = c.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -874,11 +875,11 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 
 	hostLabel = fmt.Sprintf("node #%d (%s)", p.index, rh.GetName())
 
-	if xerr = c.installProxyCacheClient(task, rh, hostLabel); xerr != nil {
+	if xerr = instance.installProxyCacheClient(task, rh, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
-	if xerr = c.installNodeRequirements(task, clusternodetype.Node, rh, hostLabel); xerr != nil {
+	if xerr = instance.installNodeRequirements(task, clusternodetype.Node, rh, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
@@ -888,10 +889,10 @@ func (c *cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskP
 
 // taskConfigureNodes configures nodes
 // This function is intended to be call as a goroutine
-func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -901,13 +902,13 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskPa
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	clusterName := c.GetName()
+	clusterName := instance.GetName()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	list, err := c.ListNodeIDs(task)
+	list, err := instance.ListNodeIDs(task)
 	if err != nil {
 		return nil, err
 	}
@@ -925,7 +926,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskPa
 		errs   []error
 	)
 
-	svc := c.GetService()
+	svc := instance.GetService()
 	var subtasks []concurrency.Task
 	for _, hostID = range list {
 		i++
@@ -933,7 +934,7 @@ func (c *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskPa
 			errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", hostID))
 			continue
 		}
-		subtask, xerr := task.StartInSubtask(c.taskConfigureNode, taskConfigureNodeParameters{
+		subtask, xerr := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
 			Index: i,
 			Host:  host,
 		})
@@ -964,10 +965,10 @@ type taskConfigureNodeParameters struct {
 
 // taskConfigureNode configure one node
 // This function is intended to be call as a goroutine
-func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskConfigureNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -997,15 +998,15 @@ func (c *cluster) taskConfigureNode(task concurrency.Task, params concurrency.Ta
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
 	// Docker and docker-compose installation is mandatory on all nodes
-	if xerr = c.installDocker(task, p.Host, hostLabel); xerr != nil {
+	if xerr = instance.installDocker(task, p.Host, hostLabel); xerr != nil {
 		return nil, xerr
 	}
 
 	// Now configures node specifically for cluster flavor
-	if c.makers.ConfigureNode == nil {
+	if instance.makers.ConfigureNode == nil {
 		return nil, nil
 	}
-	if xerr = c.makers.ConfigureNode(task, c, p.Index, p.Host); xerr != nil {
+	if xerr = instance.makers.ConfigureNode(task, instance, p.Index, p.Host); xerr != nil {
 		logrus.Error(xerr.Error())
 		return nil, xerr
 	}
@@ -1018,10 +1019,10 @@ type taskDeleteHostOnFailureParameters struct {
 }
 
 // taskDeleteHostOnFailure deletes a host
-func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1033,7 +1034,7 @@ func (c *cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurre
 
 	// Convert and validate params
 	rh := params.(taskDeleteHostOnFailureParameters).host
-	if rh.IsNull() {
+	if rh.isNull() {
 		return nil, fail.InvalidParameterError("params", "must be a valid '*host'")
 	}
 
@@ -1054,10 +1055,10 @@ type taskDeleteNodeParameters struct {
 	master *host
 }
 
-func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1085,9 +1086,9 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 	logrus.Debugf("Deleting Node '%s'", p.node.Name)
 	var host resources.Host
 	if p.node.ID != "" { //nolint
-		host, xerr = LoadHost(task, c.GetService(), p.node.ID)
+		host, xerr = LoadHost(task, instance.GetService(), p.node.ID)
 	} else if p.node.Name != "" {
-		host, xerr = LoadHost(task, c.GetService(), p.node.Name)
+		host, xerr = LoadHost(task, instance.GetService(), p.node.Name)
 	} else {
 		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
 	}
@@ -1095,7 +1096,7 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 		return nil, xerr
 	}
 
-	if xerr := c.deleteNode(task, host, p.master); xerr != nil {
+	if xerr := instance.deleteNode(task, host, p.master); xerr != nil {
 		return nil, xerr
 	}
 
@@ -1103,10 +1104,10 @@ func (c *cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskP
 	return nil, nil
 }
 
-func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if task == nil {
@@ -1127,9 +1128,9 @@ func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.Tas
 
 	var host resources.Host
 	if p.node.ID != "" { //nolint
-		host, xerr = LoadHost(task, c.GetService(), p.node.ID)
+		host, xerr = LoadHost(task, instance.GetService(), p.node.ID)
 	} else if p.node.Name != "" {
-		host, xerr = LoadHost(task, c.GetService(), p.node.Name)
+		host, xerr = LoadHost(task, instance.GetService(), p.node.Name)
 	} else {
 		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
 	}
@@ -1138,7 +1139,7 @@ func (c *cluster) taskDeleteMaster(task concurrency.Task, params concurrency.Tas
 	}
 
 	logrus.Debugf("Deleting Master '%s'", p.node.Name)
-	if xerr := c.deleteMaster(task, host); xerr != nil {
+	if xerr := instance.deleteMaster(task, host); xerr != nil {
 		logrus.Errorf("Failed to delete Master '%s'", p.node.Name)
 		return nil, xerr
 	}

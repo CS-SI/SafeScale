@@ -50,7 +50,7 @@ var (
 	}
 )
 
-func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error) {
+func minimumRequiredServers(task concurrency.Task, clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) {
 	var (
 		privateNodeCount uint
 		masterNodeCount  uint
@@ -60,11 +60,7 @@ func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, u
 		return 0, 0, 0, fail.AbortedError(nil, "aborted")
 	}
 
-	complexity, xerr := c.GetComplexity(task)
-	if xerr != nil {
-		return 0, 0, 0, xerr
-	}
-	switch complexity {
+	switch clusterIdentity.Complexity {
 	case clustercomplexity.Small:
 		privateNodeCount = 1
 		masterNodeCount = 1

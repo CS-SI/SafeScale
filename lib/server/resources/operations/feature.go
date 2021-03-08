@@ -59,11 +59,12 @@ func ListFeatures(task concurrency.Task, svc iaas.Service, suitableFor string) (
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	var (
@@ -222,16 +223,16 @@ func NewEmbeddedFeature(task concurrency.Task, svc iaas.Service, name string) (_
 	return casted, nil
 }
 
-// IsNull tells if the instance represents a null value
-func (f *feature) IsNull() bool {
+// isNull tells if the instance represents a null value
+func (f *feature) isNull() bool {
 	return f == nil || f.displayName == ""
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (f feature) Clone() data.Clonable {
+func (f *feature) Clone() data.Clonable {
 	res := &feature{}
-	return res.Replace(&f)
+	return res.Replace(f)
 }
 
 // Replace ...
@@ -252,37 +253,38 @@ func (f *feature) Replace(p data.Clonable) data.Clonable {
 }
 
 // GetName returns the display name of the feature, with error handling
-func (f feature) GetName() string {
-	if f.IsNull() {
+func (f *feature) GetName() string {
+	if f.isNull() {
 		return ""
 	}
 	return f.displayName
 }
 
 // GetID ...
-func (f feature) GetID() string {
+func (f *feature) GetID() string {
 	return f.GetName()
 }
 
 // GetFilename returns the filename of the feature definition, with error handling
-func (f feature) GetFilename() string {
-	if f.IsNull() {
+func (f *feature) GetFilename() string {
+	if f.isNull() {
 		return ""
 	}
+
 	return f.fileName
 }
 
 // GetDisplayFilename returns the filename of the feature definition, beautifulled, with error handling
-func (f feature) GetDisplayFilename() string {
-	if f.IsNull() {
+func (f *feature) GetDisplayFilename() string {
+	if f.isNull() {
 		return ""
 	}
 	return f.displayFileName
 }
 
 // installerOfMethod instanciates the right installer corresponding to the method
-func (f feature) installerOfMethod(m installmethod.Enum) Installer {
-	if f.IsNull() {
+func (f *feature) installerOfMethod(m installmethod.Enum) Installer {
+	if f.isNull() {
 		return nil
 	}
 	var installer Installer
@@ -302,8 +304,8 @@ func (f feature) installerOfMethod(m installmethod.Enum) Installer {
 }
 
 // Specs returns a copy of the spec file (we don't want external use to modify Feature.specs)
-func (f feature) Specs() *viper.Viper {
-	if f.IsNull() {
+func (f *feature) Specs() *viper.Viper {
+	if f.isNull() {
 		return &viper.Viper{}
 	}
 	roSpecs := *f.specs
@@ -312,7 +314,7 @@ func (f feature) Specs() *viper.Viper {
 
 // Applyable tells if the feature is installable on the target
 func (f *feature) Applyable(t resources.Targetable) bool {
-	if f.IsNull() {
+	if f.isNull() {
 		return false
 	}
 	methods := t.InstallMethods(f.task)
@@ -327,8 +329,8 @@ func (f *feature) Applyable(t resources.Targetable) bool {
 
 // Check if feature is installed on target
 // Check is ok if error is nil and Results.Successful() is true
-func (f feature) Check(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	if f.IsNull() {
+func (f *feature) Check(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+	if f.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if target == nil {
@@ -368,11 +370,11 @@ func (f feature) Check(target resources.Targetable, v data.Map, s resources.Feat
 	}
 
 	// Checks required parameters have their values
-	if xerr = checkParameters(f, myV); xerr != nil {
+	if xerr = checkParameters(*f, myV); xerr != nil {
 		return nil, xerr
 	}
 
-	r, xerr := installer.Check(&f, target, myV, s)
+	r, xerr := installer.Check(f, target, myV, s)
 
 	// FIXME: restore feature check using iaas.ResourceCache
 	// _ = checkCache.ForceSet(cacheKey, results)
@@ -380,7 +382,7 @@ func (f feature) Check(target resources.Targetable, v data.Map, s resources.Feat
 }
 
 // findInstallerForTarget isolates the available installer to use for target (one that is define in the file and applicable on target)
-func (f feature) findInstallerForTarget(task concurrency.Task, target resources.Targetable, action string) (installer Installer, xerr fail.Error) {
+func (f *feature) findInstallerForTarget(task concurrency.Task, target resources.Targetable, action string) (installer Installer, xerr fail.Error) {
 	methods := target.InstallMethods(f.task)
 	w := f.specs.GetStringMap("feature.install")
 	for i := uint8(1); i <= uint8(len(methods)); i++ {
@@ -419,7 +421,7 @@ func checkParameters(f feature, v data.Map) fail.Error {
 func (f *feature) Add(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if f.IsNull() {
+	if f.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if target == nil {
@@ -491,7 +493,7 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 
 // Remove uninstalls the feature from the target
 func (f *feature) Remove(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	if f.IsNull() {
+	if f.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if target == nil {
@@ -571,7 +573,7 @@ const yamlKey = "feature.requirements.features"
 // GetRequirements returns a list of features needed as requirements
 func (f *feature) GetRequirements() (map[string]struct{}, fail.Error) {
 	emptyMap := map[string]struct{}{}
-	if f.IsNull() {
+	if f.isNull() {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
