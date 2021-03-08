@@ -31,8 +31,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -43,6 +41,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 // VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=/tmp/safescale-%C -oControlPersist=5m
@@ -981,7 +980,7 @@ func (sconf *SSHConfig) copy(task concurrency.Task,
 		return 0, "", "", fail.Wrap(err, "error parsing Command template")
 	}
 
-	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error"
+	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error -v"
 	var copyCommand bytes.Buffer
 	err = cmdTemplate.Execute(&copyCommand, struct {
 		IdentityFile string

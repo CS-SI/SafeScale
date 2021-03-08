@@ -31,7 +31,7 @@ import (
 
 // taskUnbindFromHost unbinds a host from the security group
 // params is intended to receive a '*host'
-func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *securityGroup) taskUnbindFromHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -46,10 +46,10 @@ func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concur
 		return nil, fail.InvalidParameterError("params", "must be a '*host' and cannot be nil")
 	}
 
-	sgID := sg.GetID()
+	sgID := instance.GetID()
 
 	// Unbind Security Group from Host on provider side
-	xerr = sg.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID())
+	xerr = instance.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -67,7 +67,7 @@ func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concur
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			delete(hsgV1.ByID, sgID)
-			delete(hsgV1.ByName, sg.GetName())
+			delete(hsgV1.ByName, instance.GetName())
 			return nil
 		})
 	})
@@ -76,7 +76,7 @@ func (sg *securityGroup) taskUnbindFromHost(task concurrency.Task, params concur
 
 // taskUnbindFromHostsAttachedToSubnet unbinds security group from hosts attached to a network
 // 'params" expects to be a '*network'
-func (sg *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -91,9 +91,9 @@ func (sg *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Ta
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
 	}
 
-	sgID := sg.GetID()
-	sgName := sg.GetName()
-	svc := sg.GetService()
+	sgID := instance.GetID()
+	sgName := instance.GetName()
+	svc := instance.GetService()
 
 	rs, xerr := LoadNetwork(task, svc, subnetID)
 	if xerr != nil {
@@ -114,10 +114,10 @@ func (sg *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Ta
 			}
 			tg, innerXErr := concurrency.NewTaskGroup(task)
 			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", sg.GetName(), rs.GetName())
+				return fail.Wrap(innerXErr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", instance.GetName(), rs.GetName())
 			}
 			for _, v := range nsgV1.ByName {
-				_, innerXErr = tg.Start(sg.taskUnbindFromHost, v)
+				_, innerXErr = tg.Start(instance.taskUnbindFromHost, v)
 				if innerXErr != nil {
 					break
 				}
@@ -144,7 +144,7 @@ func (sg *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Ta
 
 // taskEnableOnHost applies rules of security group on host
 // params is intended to receive a non-empty string corresponding to host ID
-func (sg *securityGroup) taskEnableOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *securityGroup) taskEnableOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -159,7 +159,7 @@ func (sg *securityGroup) taskEnableOnHost(task concurrency.Task, params concurre
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
 	}
 
-	rh, innerXErr := LoadHost(task, sg.GetService(), hostID)
+	rh, innerXErr := LoadHost(task, instance.GetService(), hostID)
 	if innerXErr != nil {
 		switch innerXErr.(type) {
 		case *fail.ErrNotFound:
@@ -170,14 +170,14 @@ func (sg *securityGroup) taskEnableOnHost(task concurrency.Task, params concurre
 	}
 
 	if rh != nil {
-		return nil, rh.EnableSecurityGroup(task, sg)
+		return nil, rh.EnableSecurityGroup(task, instance)
 	}
 	return nil, nil
 }
 
 // taskDisableOnHost removes rules of security group from host
 // params is intended to receive a non-empty string corresponding to host ID
-func (sg *securityGroup) taskDisableOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *securityGroup) taskDisableOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -192,7 +192,7 @@ func (sg *securityGroup) taskDisableOnHost(task concurrency.Task, params concurr
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
 	}
 
-	svc := sg.GetService()
+	svc := instance.GetService()
 	rh, innerXErr := LoadHost(task, svc, hostID)
 	if innerXErr != nil {
 		switch innerXErr.(type) {
@@ -204,7 +204,7 @@ func (sg *securityGroup) taskDisableOnHost(task concurrency.Task, params concurr
 	}
 
 	if rh != nil {
-		return nil, rh.DisableSecurityGroup(task, sg)
+		return nil, rh.DisableSecurityGroup(task, instance)
 	}
 	return nil, nil
 }

@@ -36,11 +36,11 @@ var (
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers func(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error)  // returns masterCount, privateNodeCount, publicNodeCount
-	DefaultGatewaySizing   func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // sizing of gateway(s)
-	DefaultMasterSizing    func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of master(s)
-	DefaultNodeSizing      func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of node(s)
-	DefaultImage           func(task concurrency.Task, c resources.Cluster) string                          // default image of server(s)
+	MinimumRequiredServers func(task concurrency.Task, clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) // returns masterCount, privateNodeCount, publicNodeCount
+	DefaultGatewaySizing   func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements                     // sizing of gateway(s)
+	DefaultMasterSizing    func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements                     // default sizing of master(s)
+	DefaultNodeSizing      func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements                     // default sizing of node(s)
+	DefaultImage           func(task concurrency.Task, c resources.Cluster) string                                              // default image of server(s)
 	// GetNodeInstallationScript func(task concurrency.Task, c resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map)
 	// GetGlobalSystemRequirements func(task concurrency.Task, c resources.Cluster) (string, fail.Error)
 	// GetTemplateBox         func() (*rice.Box, fail.Error)

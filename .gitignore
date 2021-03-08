@@ -114,3 +114,5 @@ lib/server/resources/operations/iaas/.DS_Store
 lib/server/iaas/userdata/version.go
 
 .run/
+
+.DS_Store
