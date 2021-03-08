@@ -21,8 +21,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
@@ -36,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/sirupsen/logrus"
 )
 
 // AddFeature handles 'safescale host feature add <host name or id> <feature name>'
@@ -399,7 +398,12 @@ func (instance *host) ComplementFeatureParameters(task concurrency.Task, v data.
 	}
 
 	if v["PublicIP"], xerr = instance.GetPublicIP(task); xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// a Host may not have public IP, so do not fail
+		default:
+			return xerr
+		}
 	}
 
 	if _, ok := v["Username"]; !ok {
