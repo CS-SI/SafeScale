@@ -373,7 +373,7 @@ func (instance *host) ComplementFeatureParameters(task concurrency.Task, v data.
 
 	v["ShortHostname"] = instance.GetName()
 	domain := ""
-	xerr = instance.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 			if !ok {
@@ -393,24 +393,14 @@ func (instance *host) ComplementFeatureParameters(task concurrency.Task, v data.
 
 	v["Hostname"] = instance.GetName() + domain
 
-	if v["HostIP"], xerr = instance.GetPrivateIP(task); xerr != nil {
-		return xerr
-	}
-
-	if v["PublicIP"], xerr = instance.GetPublicIP(task); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// a Host may not have public IP, so do not fail
-		default:
-			return xerr
-		}
-	}
+	v["HostIP"] = instance.privateIP
+	v["PublicIP"] = instance.publicIP
 
 	if _, ok := v["Username"]; !ok {
 		v["Username"] = abstract.DefaultUser
 	}
 
-	rs, xerr := instance.GetDefaultSubnet(task)
+	rs, xerr := instance.unsafeGetDefaultSubnet(task)
 	if xerr != nil {
 		return xerr
 	}
@@ -421,15 +411,9 @@ func (instance *host) ComplementFeatureParameters(task concurrency.Task, v data.
 	}
 	defer rgw.Released(task)
 
-	rgwi := rgw.(*host)
-	if v["PrimaryGatewayIP"], xerr = rgwi.GetPrivateIP(task); xerr != nil {
-		return xerr
-	}
-
+	v["PrimaryGatewayIP"] = rgw.(*host).privateIP
 	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
-	if v["PrimaryPublicIP"], xerr = rgwi.GetPublicIP(task); xerr != nil {
-		return xerr
-	}
+	v["PrimaryPublicIP"] = rgw.(*host).publicIP
 
 	if rgw, xerr = rs.InspectGateway(task, false); xerr != nil {
 		switch xerr.(type) {
@@ -441,9 +425,8 @@ func (instance *host) ComplementFeatureParameters(task concurrency.Task, v data.
 	} else {
 		defer rgw.Released(task)
 
-		rgwi = rgw.(*host)
-		v["SecondaryGatewayIP"] = rgwi.unsafeGetPrivateIP()
-		v["SecondaryPublicIP"] = rgwi.unsafeGetPublicIP()
+		v["SecondaryGatewayIP"] = rgw.(*host).privateIP
+		v["SecondaryPublicIP"] = rgw.(*host).publicIP
 	}
 
 	if v["EndpointIP"], xerr = rs.GetEndpointIP(task); xerr != nil {
