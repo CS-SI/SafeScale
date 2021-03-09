@@ -17,7 +17,8 @@
 package iaas
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"sync"
+
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -27,8 +28,7 @@ import (
 type ResourceCache struct {
 	byID   cache.Cache
 	byName map[string]string
-
-	lock concurrency.TaskedLock
+	lock sync.Mutex
 }
 
 // NewResourceCache initializes a new instance of ResourceCache
@@ -41,42 +41,39 @@ func NewResourceCache(name string) (*ResourceCache, fail.Error) {
 	if xerr != nil {
 		return &ResourceCache{}, nil
 	}
+
 	rc := &ResourceCache{
 		byID:   cacheInstance,
 		byName: map[string]string{},
-		lock:   concurrency.NewTaskedLock(),
 	}
 	return rc, nil
 }
 
-// IsNull tells if rc is a null value of *ResourceCache
-func (rc *ResourceCache) IsNull() bool {
-	return rc == nil || rc.byID == nil || rc.byName == nil || rc.lock == nil
+// isNull tells if rc is a null value of *ResourceCache
+func (rc *ResourceCache) isNull() bool {
+	return rc == nil || rc.byID == nil || rc.byName == nil
 }
 
 // Get returns the content associated with key
-func (rc *ResourceCache) Get(task concurrency.Task, key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) {
-	if rc.IsNull() {
+func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) {
+	if rc.isNull() {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
+	rc.lock.Lock()
+	defer rc.lock.Unlock()
+
 	// Search in the cache by ID
-	if ce, xerr = rc.byID.GetEntry(task, key); xerr == nil {
+	if ce, xerr = rc.byID.GetEntry(key); xerr == nil {
 		return ce, nil
 	}
 
 	// Not found, search an entry in the cache by name to get id and search again by id
 	if id, ok := rc.byName[key]; ok {
-		if ce, xerr = rc.byID.GetEntry(task, id); xerr == nil {
+		if ce, xerr = rc.byID.GetEntry(id); xerr == nil {
 			return ce, nil
 		}
 	}
@@ -93,18 +90,15 @@ func (rc *ResourceCache) Get(task concurrency.Task, key string, options ...data.
 		}
 
 		if onMissFunc != nil {
-			rc.lock.SafeLock(task)
-			defer rc.lock.SafeUnlock(task)
-
-			if xerr := rc.ReserveEntry(task, key); xerr != nil {
+			if xerr := rc.ReserveEntry(key); xerr != nil {
 				return nil, xerr
 			}
 			var content cache.Cacheable
 			if content, xerr = onMissFunc(); xerr == nil {
-				ce, xerr = rc.CommitEntry(task, key, content)
+				ce, xerr = rc.CommitEntry(key, content)
 			}
 			if xerr != nil {
-				if derr := rc.FreeEntry(task, key); derr != nil {
+				if derr := rc.FreeEntry(key); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
 				}
 				return nil, xerr
@@ -117,46 +111,33 @@ func (rc *ResourceCache) Get(task concurrency.Task, key string, options ...data.
 }
 
 // ReserveEntry sets a cache entry to reserve the key and returns the Entry associated
-func (rc *ResourceCache) ReserveEntry(task concurrency.Task, key string) fail.Error {
-	if rc.IsNull() {
+func (rc *ResourceCache) ReserveEntry(key string) fail.Error {
+	if rc.isNull() {
 		return fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	// FIXME: Missing SafeLock / SafeUnlock ?
-	// rc.lock.SafeLock(task)
-	// defer rc.lock.SafeUnlock(task)
+	rc.lock.Lock()
+	defer rc.lock.Unlock()
 
-	return rc.byID.ReserveEntry(task, key)
+	return rc.byID.ReserveEntry(key)
 }
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter
-func (rc *ResourceCache) CommitEntry(task concurrency.Task, key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if rc.IsNull() {
+func (rc *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
+	if rc.isNull() {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	rc.lock.SafeLock(task)
-	defer rc.lock.SafeUnlock(task)
+	rc.lock.Lock()
+	defer rc.lock.Unlock()
 
-	if ce, xerr = rc.byID.CommitEntry(task, key, content); xerr != nil {
+	if ce, xerr = rc.byID.CommitEntry(key, content); xerr != nil {
 		return nil, xerr
 	}
 
@@ -165,42 +146,30 @@ func (rc *ResourceCache) CommitEntry(task concurrency.Task, key string, content 
 }
 
 // FreeEntry removes the reservation in cache
-func (rc *ResourceCache) FreeEntry(task concurrency.Task, key string) fail.Error {
-	if rc.IsNull() {
+func (rc *ResourceCache) FreeEntry(key string) fail.Error {
+	if rc.isNull() {
 		return fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	rc.lock.SafeLock(task)
-	defer rc.lock.SafeUnlock(task)
+	rc.lock.Lock()
+	defer rc.lock.Unlock()
 
-	return rc.byID.FreeEntry(task, key)
+	return rc.byID.FreeEntry(key)
 }
 
 // AddEntry ...
-func (rc *ResourceCache) AddEntry(task concurrency.Task, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if rc == nil {
+func (rc *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
+	if rc.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 
-	rc.lock.SafeLock(task)
-	defer rc.lock.SafeUnlock(task)
+	rc.lock.Lock()
+	defer rc.lock.Unlock()
 
-	if ce, xerr = rc.byID.AddEntry(task, content); xerr != nil {
+	if ce, xerr = rc.byID.AddEntry(content); xerr != nil {
 		return nil, xerr
 	}
 

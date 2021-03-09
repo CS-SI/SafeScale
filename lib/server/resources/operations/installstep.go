@@ -243,7 +243,7 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			cloneV["ShortHostname"] = h.GetName()
 			domain := ""
 			xerr = h.Inspect(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(is.Worker.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+				return props.Inspect(/*is.Worker.feature.task, */hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -300,7 +300,7 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			cloneV["ShortHostname"] = h.GetName()
 			domain := ""
 			xerr = h.Review(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(is.Worker.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+				return props.Inspect(/*is.Worker.feature.task, */hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())

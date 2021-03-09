@@ -72,7 +72,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 }
 
 // LoadBucket instanciates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (b resources.Bucket, xerr fail.Error) {
+func LoadBucket(/*ctx context.Context, */svc iaas.Service, name string) (b resources.Bucket, xerr fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -104,13 +104,13 @@ func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (b resourc
 			}
 
 			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = b.Read(task, name); innerXErr != nil {
+			if innerXErr = b.Read(name); innerXErr != nil {
 				return nil, innerXErr
 			}
 			return b, nil
 		}),
 	}
-	cacheEntry, xerr := bucketCache.Get(task, name, options...)
+	cacheEntry, xerr := bucketCache.Get(name, options...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -129,13 +129,13 @@ func LoadBucket(task concurrency.Task, svc iaas.Service, name string) (b resourc
 	return b, nil
 }
 
-// IsNull tells if the instance corresponds to null value
-func (instance *bucket) IsNull() bool {
+// isNull tells if the instance corresponds to null value
+func (instance *bucket) isNull() bool {
 	return instance == nil || instance.core.isNull()
 }
 
 // carry ...
-func (instance *bucket) carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
+func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
@@ -149,12 +149,12 @@ func (instance *bucket) carry(task concurrency.Task, clonable data.Clonable) (xe
 		return xerr
 	}
 
-	if xerr := kindCache.ReserveEntry(task, identifiable.GetID()); xerr != nil {
+	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
 		return xerr
 	}
 	defer func() {
 		if xerr != nil {
-			if derr := kindCache.FreeEntry(task, identifiable.GetID()); derr != nil {
+			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
 			}
 
@@ -162,11 +162,11 @@ func (instance *bucket) carry(task concurrency.Task, clonable data.Clonable) (xe
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	if xerr := instance.core.Carry(task, clonable); xerr != nil {
+	if xerr := instance.core.Carry(clonable); xerr != nil {
 		return xerr
 	}
 
-	cacheEntry, xerr := kindCache.CommitEntry(task, identifiable.GetID(), instance)
+	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
 	if xerr != nil {
 		return xerr
 	}
@@ -177,7 +177,7 @@ func (instance *bucket) carry(task concurrency.Task, clonable data.Clonable) (xe
 }
 
 // GetHost ...
-func (instance *bucket) GetHost(task concurrency.Task) (string, fail.Error) {
+func (instance *bucket) GetHost(/* ctx context.Context */) (string, fail.Error) {
 	if instance.isNull() {
 		return "", fail.InvalidInstanceError()
 	}
@@ -190,7 +190,7 @@ func (instance *bucket) GetHost(task concurrency.Task) (string, fail.Error) {
 	defer instance.lock.RLock()
 
 	var res string
-	xerr := instance.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(/*task, */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -206,14 +206,14 @@ func (instance *bucket) GetHost(task concurrency.Task) (string, fail.Error) {
 
 // VPL: not used
 // // Host ...
-// func (instance *bucket) Host(task concurrency.Task) string {
+// func (instance *bucket) Host(/* ctx context.Context */) string {
 // 	// FIXME: Ignored error without warning
 // 	res, _ := instance.GetHost(task)
 // 	return res
 // }
 
 // GetMountPoint ...
-func (instance *bucket) GetMountPoint(task concurrency.Task) (string, fail.Error) {
+func (instance *bucket) GetMountPoint(/* ctx context.Context */) (string, fail.Error) {
 	if instance.isNull() {
 		return "", fail.InvalidInstanceError()
 	}
@@ -226,7 +226,7 @@ func (instance *bucket) GetMountPoint(task concurrency.Task) (string, fail.Error
 	defer instance.lock.RUnlock()
 
 	var res string
-	xerr := instance.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(/*task, */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -242,14 +242,14 @@ func (instance *bucket) GetMountPoint(task concurrency.Task) (string, fail.Error
 
 // VPL: not used
 // // MountPoint ...
-// func (instance *bucket) MountPoint(task concurrency.Task) string {
+// func (instance *bucket) MountPoint(/* ctx context.Context */) string {
 // 	// FIXME: Ignored error without warning
 // 	res, _ := instance.GetMountPoint(task)
 // 	return res
 // }
 
 // Create a bucket
-func (instance *bucket) Create(task concurrency.Task, name string) (xerr fail.Error) {
+func (instance *bucket) Create(/*ctx context.Context, */name string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -287,23 +287,16 @@ func (instance *bucket) Create(task concurrency.Task, name string) (xerr fail.Er
 		return xerr
 	}
 
-	return instance.carry(task, &ab)
+	return instance.carry(&ab)
 }
 
 // Delete a bucket
-func (instance *bucket) Delete(task concurrency.Task) (xerr fail.Error) {
+func (instance *bucket) Delete() (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task")
-	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 

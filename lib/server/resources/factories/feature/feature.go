@@ -67,7 +67,7 @@ import (
 
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
-func New(task concurrency.Task, svc iaas.Service, name string) (resources.Feature, fail.Error) {
+func New(/* ctx context.Context, */svc iaas.Service, name string) (resources.Feature, fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -100,7 +100,7 @@ func New(task concurrency.Task, svc iaas.Service, name string) (resources.Featur
 
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
-func NewEmbedded(task concurrency.Task, svc iaas.Service, name string) (resources.Feature, error) {
+func NewEmbedded(/* ctx context.Context, */svc iaas.Service, name string) (resources.Feature, error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}

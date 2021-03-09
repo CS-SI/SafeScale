@@ -132,7 +132,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		sshConfig.PrivateKey = ahc.PrivateKey
 
 		if props.Lookup(hostproperty.NetworkV2) {
-			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			return props.Inspect(/*task, */hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -145,7 +145,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 				return nil
 			})
 		}
-		return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())

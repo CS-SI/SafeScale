@@ -35,12 +35,12 @@ type Volume interface {
 	observer.Observable
 	cache.Cacheable
 
-	Attach(task concurrency.Task, host Host, path, format string, doNotFormat bool) fail.Error // attaches a volume to an host
-	Browse(task concurrency.Task, callback func(*abstract.Volume) fail.Error) fail.Error       // walks through all the metadata objects in network
-	Create(task concurrency.Task, req abstract.VolumeRequest) fail.Error                       // creates a volume
-	Detach(task concurrency.Task, host Host) fail.Error                                        // detaches the volume identified by ref, ref can be the name or the id
-	GetAttachments(task concurrency.Task) (*propertiesv1.VolumeAttachments, fail.Error)        // returns the property containing where the volume is attached
-	GetSize(task concurrency.Task) (int, fail.Error)                                           // returns the size of volume in GB
-	GetSpeed(task concurrency.Task) (volumespeed.Enum, fail.Error)                             // returns the speed of the volume (more or less the type of hardware)
-	ToProtocol(task concurrency.Task) (*protocol.VolumeInspectResponse, fail.Error)            // converts volume to equivalent protocol message
+	Attach(/* ctx context.Context, */host Host, path, format string, doNotFormat bool) fail.Error // attaches a volume to an host
+	Browse(/* ctx context.Context, */callback func(*abstract.Volume) fail.Error) fail.Error       // walks through all the metadata objects in network
+	Create(/* ctx context.Context, */req abstract.VolumeRequest) fail.Error                       // creates a volume
+	Detach(/* ctx context.Context, */host Host) fail.Error                                        // detaches the volume identified by ref, ref can be the name or the id
+	GetAttachments(/* ctx context.Context */) (*propertiesv1.VolumeAttachments, fail.Error)        // returns the property containing where the volume is attached
+	GetSize(/* ctx context.Context */) (int, fail.Error)                                           // returns the size of volume in GB
+	GetSpeed(/* ctx context.Context */) (volumespeed.Enum, fail.Error)                             // returns the speed of the volume (more or less the type of hardware)
+	ToProtocol(/* ctx context.Context */) (*protocol.VolumeInspectResponse, fail.Error)            // converts volume to equivalent protocol message
 }

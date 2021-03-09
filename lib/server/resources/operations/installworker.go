@@ -451,7 +451,7 @@ func (w *worker) identifyAllGateways() (_ []resources.Host, xerr fail.Error) {
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer rs.Released(w.feature.task) // mark the instance as released at the end of the function, for cache considerations
+	defer rs.Released() // mark the instance as released at the end of the function, for cache considerations
 
 	gw, xerr := rs.InspectGateway(w.feature.task, true)
 	if xerr == nil {
@@ -579,7 +579,7 @@ type taskLaunchStepParameters struct {
 }
 
 // taskLaunchStep starts the step
-func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (w *worker) taskLaunchStep(/*ctx context.Context, */params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if w == nil {
@@ -666,7 +666,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	// Marks hosts instances as released after use
 	defer func() {
 		for _, v := range hostsList {
-			v.Released(task)
+			v.Released()
 		}
 	}()
 
@@ -943,7 +943,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer subnet.Released(task) // mark instance as released at the end of the function, for cache considerations
+	defer subnet.Released() // mark instance as released at the end of the function, for cache considerations
 
 	primaryKongController, xerr := NewKongController(svc, subnet, true)
 	if xerr != nil {
@@ -974,7 +974,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 
 		defer func(list []resources.Host) {
 			for _, v := range list {
-				v.Released(task)
+				v.Released()
 			}
 		}(hosts)
 
@@ -986,7 +986,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 			primaryGatewayVariables["ShortHostname"] = h.GetName()
 			domain := ""
 			xerr = h.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+				return props.Inspect(/*task, */hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1022,7 +1022,7 @@ func (w *worker) setReverseProxy() (xerr fail.Error) {
 				secondaryGatewayVariables["ShortHostname"] = h.GetName()
 				domain = ""
 				xerr = h.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Inspect(task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+					return props.Inspect(/*task, */hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 						hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 						if !ok {
 							return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1070,7 +1070,7 @@ type taskApplyProxyRuleParameters struct {
 	variables  *data.Map
 }
 
-func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, xerr fail.Error) {
+func taskApplyProxyRule(/*ctx context.Context, */params concurrency.TaskParameters) (tr concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -1261,7 +1261,7 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	defer rs.Released(task) // mark instance as released at the end of the function, for cache considerations
+	defer rs.Released() // mark instance as released at the end of the function, for cache considerations
 
 	forFeature := " for feature '" + w.feature.GetName() + "'"
 
@@ -1285,7 +1285,7 @@ func (w *worker) setNetworkingSecurity() (xerr fail.Error) {
 			if xerr != nil {
 				return xerr
 			}
-			defer gwSG.Released(task)
+			defer gwSG.Released()
 
 			sgRule := abstract.NewSecurityGroupRule()
 			sgRule.Direction = securitygroupruledirection.INGRESS // Implicit for gateways
@@ -1475,32 +1475,31 @@ func (w worker) interpretRuleTargets(rule map[interface{}]interface{}) stepTarge
 
 // Terminate cleans up resources
 func (w *worker) Terminate() {
-	task := w.feature.task
 	for _, v := range w.allGateways {
-		v.Released(task)
+		v.Released()
 	}
 	for _, v := range w.allMasters {
-		v.Released(task)
+		v.Released()
 	}
 	for _, v := range w.allNodes {
-		v.Released(task)
+		v.Released()
 	}
 	for _, v := range w.concernedGateways {
-		v.Released(task)
+		v.Released()
 	}
 	for _, v := range w.concernedMasters {
-		v.Released(task)
+		v.Released()
 	}
 	for _, v := range w.concernedNodes {
-		v.Released(task)
+		v.Released()
 	}
 	if w.availableGateway != nil {
-		w.availableGateway.Released(task)
+		w.availableGateway.Released()
 	}
 	if w.availableMaster != nil {
-		w.availableMaster.Released(task)
+		w.availableMaster.Released()
 	}
 	if w.availableNode != nil {
-		w.availableNode.Released(task)
+		w.availableNode.Released()
 	}
 }

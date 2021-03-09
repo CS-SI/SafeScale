@@ -443,7 +443,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 
 	reduce := false
 	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
 			nhs, ok := clonable.(*propertiesv1.HostSizing)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())

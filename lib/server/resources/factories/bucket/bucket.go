@@ -30,7 +30,7 @@ func New(svc iaas.Service) (resources.Bucket, fail.Error) {
 }
 
 // Load initializes the bucket with metadata from provider
-func Load(task concurrency.Task, svc iaas.Service, name string) (resources.Bucket, fail.Error) {
+func Load(/* ctx context.Context, */svc iaas.Service, name string) (resources.Bucket, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}

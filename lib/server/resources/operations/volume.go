@@ -127,7 +127,7 @@ func LoadVolume(task concurrency.Task, svc iaas.Service, ref string) (rv resourc
 			return rv, nil
 		}),
 	}
-	cacheEntry, xerr := volumeCache.Get(task, ref, options...)
+	cacheEntry, xerr := volumeCache.Get(ref, options...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -171,12 +171,12 @@ func (instance *volume) carry(task concurrency.Task, clonable data.Clonable) (xe
 		return xerr
 	}
 
-	if xerr := kindCache.ReserveEntry(task, identifiable.GetID()); xerr != nil {
+	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
 		return xerr
 	}
 	defer func() {
 		if xerr != nil {
-			if derr := kindCache.FreeEntry(task, identifiable.GetID()); derr != nil {
+			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
 			}
 		}
@@ -187,7 +187,7 @@ func (instance *volume) carry(task concurrency.Task, clonable data.Clonable) (xe
 		return xerr
 	}
 
-	cacheEntry, xerr := kindCache.CommitEntry(task, identifiable.GetID(), instance)
+	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
 	if xerr != nil {
 		return xerr
 	}
@@ -309,8 +309,8 @@ func (instance *volume) GetAttachments(task concurrency.Task) (_ *propertiesv1.V
 	defer instance.lock.RUnlock()
 
 	var vaV1 *propertiesv1.VolumeAttachments
-	xerr = instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect(/*task, */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(/*task, */volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			vaV1, ok = clonable.(*propertiesv1.VolumeAttachments)
 
@@ -384,9 +384,9 @@ func (instance *volume) Delete(task concurrency.Task) (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	xerr = instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(/*task, */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// check if volume can be deleted (must not be attached)
-		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachmentsV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' received", reflect.TypeOf(clonable).String())
@@ -476,7 +476,7 @@ func (instance *volume) Create(task concurrency.Task, req abstract.VolumeRequest
 			return fail.Wrap(xerr, "failed to check if Volume '%s' already exists", req.Name)
 		}
 	} else {
-		existing.Released(task)
+		existing.Released()
 		return fail.DuplicateError("there is already a Volume named '%s'", req.Name)
 	}
 
@@ -515,7 +515,7 @@ func (instance *volume) Create(task concurrency.Task, req abstract.VolumeRequest
 	}
 
 	// Sets err to possibly trigger defer calls
-	return instance.carry(task, av)
+	return instance.Carry(/*task, */av)
 }
 
 // Attach a volume to an host
@@ -559,7 +559,7 @@ func (instance *volume) Attach(task concurrency.Task, host resources.Host, path,
 	targetName := host.GetName()
 
 	// -- proceed some checks on volume --
-	xerr = instance.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(/*task, */func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		av, ok := clonable.(*abstract.Volume)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Volume' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -568,7 +568,7 @@ func (instance *volume) Attach(task concurrency.Task, host resources.Host, path,
 		volumeID = av.ID
 		volumeName = av.Name
 
-		return props.Inspect(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -605,12 +605,12 @@ func (instance *volume) Attach(task concurrency.Task, host resources.Host, path,
 
 	// -- proceed some checks on target server --
 	xerr = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			return props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			return props.Inspect(/*task, */hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 				hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -725,7 +725,7 @@ func (instance *volume) Attach(task concurrency.Task, host resources.Host, path,
 
 	// -- updates target properties --
 	xerr = host.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		innerXErr := props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Alter(/*task, */hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -794,7 +794,7 @@ func (instance *volume) Attach(task concurrency.Task, host resources.Host, path,
 			}
 		}()
 
-		return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(/*task, */hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -824,7 +824,7 @@ func (instance *volume) Attach(task concurrency.Task, host resources.Host, path,
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", actionFromError(xerr), volumeName, targetName))
 			}
 			derr := host.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				innerXErr := props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+				innerXErr := props.Alter(/*task, */hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 					hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -838,7 +838,7 @@ func (instance *volume) Attach(task concurrency.Task, host resources.Host, path,
 				if innerXErr != nil {
 					logrus.Warnf("Failed to set host '%s' metadata about volumes", volumeName)
 				}
-				return props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+				return props.Alter(/*task, */hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 					hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -862,8 +862,8 @@ func (instance *volume) Attach(task concurrency.Task, host resources.Host, path,
 	defer task.DisarmAbortSignal()()
 
 	// Updates volume properties
-	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(/*task, */volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 			volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -976,7 +976,7 @@ func (instance *volume) Detach(task concurrency.Task, host resources.Host) (xerr
 			mount      *propertiesv1.HostLocalMount
 		)
 
-		innerXErr := props.Inspect(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Inspect(/*task, */hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1000,7 +1000,7 @@ func (instance *volume) Detach(task concurrency.Task, host resources.Host) (xerr
 		}
 
 		// Obtain mounts information
-		innerXErr = props.Inspect(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Inspect(/*task, */hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1046,7 +1046,7 @@ func (instance *volume) Detach(task concurrency.Task, host resources.Host) (xerr
 		}
 
 		// Check if volume (or a subdir in volume) is shared
-		innerXErr = props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Inspect(/*task, */hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1101,7 +1101,7 @@ func (instance *volume) Detach(task concurrency.Task, host resources.Host) (xerr
 		}
 
 		// ... then update host property propertiesv1.VolumesV1...
-		innerXErr = props.Alter(task, hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter(/*task, */hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1118,7 +1118,7 @@ func (instance *volume) Detach(task concurrency.Task, host resources.Host) (xerr
 		}
 
 		// ... update host property propertiesv1.MountsV1 ...
-		innerXErr = props.Alter(task, hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter(/*task, */hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1133,8 +1133,8 @@ func (instance *volume) Detach(task concurrency.Task, host resources.Host) (xerr
 		}
 
 		// ... and finish with update of volume property propertiesv1.VolumeAttachments
-		return instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(task, volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
+		return instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(/*task, */volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 				volumeAttachedV1, ok := clonable.(*propertiesv1.VolumeAttachments)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1189,7 +1189,7 @@ func (instance *volume) ToProtocol(task concurrency.Task) (*protocol.VolumeInspe
 			return nil, xerr
 		}
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released(task)
+			hostInstance.Released()
 		}(rh)
 
 		vols, _ := rh.(*host).unsafeGetVolumes(task)

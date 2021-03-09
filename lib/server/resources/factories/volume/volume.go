@@ -33,7 +33,7 @@ func New(svc iaas.Service) (resources.Volume, fail.Error) {
 }
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
-func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
+func Load(/* ctx context.Context, */svc iaas.Service, ref string) (resources.Volume, fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}

@@ -133,19 +133,23 @@ func ListFeatures(task concurrency.Task, svc iaas.Service, suitableFor string) (
 // error contains :
 //    - fail.ErrNotFound if no feature is found by its name
 //    - fail.ErrSyntax if feature found contains syntax error
-func NewFeature(task concurrency.Task, svc iaas.Service, name string) (_ resources.Feature, xerr fail.Error) {
-	if task == nil {
-		return nullFeature(), fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nullFeature(), fail.AbortedError(nil, "aborted")
-	}
+func NewFeature(/*ctx context.Context, */svc iaas.Service, name string) (_ resources.Feature, xerr fail.Error) {
+	// if ctx == nil {
+	// 	return nullFeature(), fail.InvalidParameterCannotBeNilError("ctx")
+	// }
 	if svc == nil {
 		return nullFeature(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name == "" {
 		return nullFeature(), fail.InvalidParameterError("name", "cannot be empty string")
 	}
+
+	// task := ctx.Value("task).(concurrency.Task)
+	var task concurrency.Task = nil
+
+	// if task.Aborted() {
+	// 	return nullFeature(), fail.AbortedError(nil, "aborted")
+	// }
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features")).WithStopwatch().Entering()
 	defer tracer.Exiting()

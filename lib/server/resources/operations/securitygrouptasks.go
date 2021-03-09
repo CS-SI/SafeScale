@@ -61,7 +61,7 @@ func (instance *securityGroup) taskUnbindFromHost(task concurrency.Task, params 
 
 	// Updates host metadata regarding Security Groups
 	xerr = rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(/*task, */hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -107,7 +107,7 @@ func (instance *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 
 	// Unbinds security group from hosts attached to subnet
 	xerr = rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		innerXErr := props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Alter(/*task, */subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.SubnetHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -129,7 +129,7 @@ func (instance *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 			return innerXErr
 		}
 
-		return props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(/*task, */subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())

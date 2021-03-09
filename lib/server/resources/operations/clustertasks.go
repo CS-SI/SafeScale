@@ -314,8 +314,8 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	// First creates master in metadata, to keep track of its tried creation, in case of failure
 	var nodeIdx uint
-	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -341,8 +341,8 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 			// Disable abort signal during the clean up
 			defer task.DisarmAbortSignal()()
 
-			derr := instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			derr := instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -413,8 +413,8 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 		}
 	}()
 
-	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+	xerr = instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -515,7 +515,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 			continue
 		}
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released(task)
+			hostInstance.Released()
 		}(host)
 
 		_, xerr = tg.Start(instance.taskConfigureMaster, taskConfigureMasterParameters{
@@ -727,8 +727,8 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	// First creates node in metadata, to keep track of its tried creation, in case of failure
 	var nodeIdx uint
-	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -754,8 +754,8 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			// Disable abort signal during the clean up
 			defer task.DisarmAbortSignal()()
 
-			derr := instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			derr := instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -822,8 +822,8 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		}
 	}()
 
-	xerr = instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+	xerr = instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -955,7 +955,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 			continue
 		}
 		defer func(hostInstance resources.Host) {
-			hostInstance.Released(task)
+			hostInstance.Released()
 		}(host)
 
 		// subtask, xerr := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
