@@ -34,10 +34,10 @@ import (
 )
 
 // delete effectively remove a Security Group
-func (instance *securityGroup) unsafeDelete(task concurrency.Task, force bool) fail.Error {
+func (instance *securityGroup) unsafeDelete(force bool) fail.Error {
 	svc := instance.GetService()
 
-	xerr := instance.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -45,7 +45,7 @@ func (instance *securityGroup) unsafeDelete(task concurrency.Task, force bool) f
 
 		if !force {
 			// check bonds to hosts
-			innerXErr := props.Inspect(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			innerXErr := props.Inspect(/*task, */securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 				hostsV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -56,10 +56,6 @@ func (instance *securityGroup) unsafeDelete(task concurrency.Task, force bool) f
 				if hostCount > 0 {
 					keys := make([]string, 0, hostCount)
 					for k := range hostsV1.ByName {
-						if task.Aborted() {
-							return fail.AbortedError(nil, "aborted")
-						}
-
 						keys = append(keys, k)
 					}
 					return fail.NotAvailableError("security group '%s' is currently bound to %d host%s: %s", instance.GetName(), hostCount, strprocess.Plural(uint(hostCount)), strings.Join(keys, ","))
@@ -88,7 +84,7 @@ func (instance *securityGroup) unsafeDelete(task concurrency.Task, force bool) f
 			}
 
 			// check bonds to subnets
-			innerXErr = props.Inspect(task, securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			innerXErr = props.Inspect(/*task, */securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 				subnetsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -120,7 +116,7 @@ func (instance *securityGroup) unsafeDelete(task concurrency.Task, force bool) f
 							return xerr
 						}
 					} else {
-						subnetInstance.Released(task)
+						subnetInstance.Released()
 					}
 				}
 				return nil
@@ -138,7 +134,7 @@ func (instance *securityGroup) unsafeDelete(task concurrency.Task, force bool) f
 		defer task.DisarmAbortSignal()()
 
 		// First unbind from subnets (which will unbind from hosts attached to these subnets...)
-		innerXErr := props.Alter(task, securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Alter(/*task, */securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgnV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -150,7 +146,7 @@ func (instance *securityGroup) unsafeDelete(task concurrency.Task, force bool) f
 		}
 
 		// Second, unbind from the hosts if there are remaining ones
-		innerXErr = props.Alter(task, securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter(/*task, */securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -216,7 +212,7 @@ func (instance *securityGroup) unsafeDelete(task concurrency.Task, force bool) f
 // unsafeClear is the non goroutine-safe implementation for Clear, that does the real work faster (no locking, less if no parameter validations)
 // Note: must be used wisely
 func (instance *securityGroup) unsafeClear(task concurrency.Task) fail.Error {
-	return instance.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(/*task,  */func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -234,7 +230,7 @@ func (instance *securityGroup) unsafeAddRule(task concurrency.Task, rule abstrac
 		return fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
 
-	return instance.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	return instance.Alter(/*task,  */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())

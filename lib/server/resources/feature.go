@@ -29,11 +29,11 @@ import (
 type Targetable interface {
 	data.Identifiable
 
-	ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error                             // adds parameters corresponding to the Target in preparation of feature installation
-	UnregisterFeature(task concurrency.Task, f string) fail.Error                                         // unregisters a Feature from Target in metadata
-	InstalledFeatures(task concurrency.Task) []string                                                     // returns a list of installed features
-	InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum                                    // returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-	RegisterFeature(task concurrency.Task, f Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
+	ComplementFeatureParameters(/* ctx context.Context, */v data.Map) fail.Error                             // adds parameters corresponding to the Target in preparation of feature installation
+	UnregisterFeature(/* ctx context.Context, */f string) fail.Error                                         // unregisters a Feature from Target in metadata
+	InstalledFeatures(/* ctx context.Context */) []string                                                     // returns a list of installed features
+	InstallMethods(/* ctx context.Context */) map[uint8]installmethod.Enum                                    // returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+	RegisterFeature(/* ctx context.Context, */f Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
 	TargetType() featuretargettype.Enum                                                                   // returns the type of the target
 }
 

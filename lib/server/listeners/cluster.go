@@ -880,7 +880,7 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 
 	var masterID string
 	xerr = rc.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())

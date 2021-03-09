@@ -27,7 +27,7 @@ import (
 )
 
 // List returns a list of available subnets
-func List(task concurrency.Task, svc iaas.Service, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
+func List(/* ctx context.Context, */svc iaas.Service, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -51,7 +51,7 @@ func New(svc iaas.Service) (resources.Subnet, fail.Error) {
 }
 
 // Load loads the metadata of a subnet and returns an instance of resources.Subnet
-func Load(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
+func Load(/* ctx context.Context, */svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}

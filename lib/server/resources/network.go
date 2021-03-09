@@ -34,10 +34,10 @@ type Network interface {
 	observer.Observable
 	cache.Cacheable
 
-	AbandonSubnet(task concurrency.Task, subnetID string) fail.Error                      // used to detach a Subnet from the Network
-	AdoptSubnet(task concurrency.Task, subnet Subnet) fail.Error                          // used to attach a Subnet to the Network
-	Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) fail.Error // call the callback for each entry of the metadata folder of Networks
-	Create(task concurrency.Task, req abstract.NetworkRequest) fail.Error                 // creates a Network
-	InspectSubnet(task concurrency.Task, subnetRef string) (Subnet, fail.Error)           // returns the Subnet instance corresponding to Subnet reference (ID or name) provided (if Subnet is attached to the Network)
-	ToProtocol(task concurrency.Task) (*protocol.Network, fail.Error)                     // converts the network to protobuf message
+	AbandonSubnet(/* ctx context.Context, */subnetID string) fail.Error                      // used to detach a Subnet from the Network
+	AdoptSubnet(/* ctx context.Context, */subnet Subnet) fail.Error                          // used to attach a Subnet to the Network
+	Browse(/* ctx context.Context, */callback func(*abstract.Network) fail.Error) fail.Error // call the callback for each entry of the metadata folder of Networks
+	Create(/* ctx context.Context, */req abstract.NetworkRequest) fail.Error                 // creates a Network
+	InspectSubnet(/* ctx context.Context, */subnetRef string) (Subnet, fail.Error)           // returns the Subnet instance corresponding to Subnet reference (ID or name) provided (if Subnet is attached to the Network)
+	ToProtocol(/* ctx context.Context */) (*protocol.Network, fail.Error)                     // converts the network to protobuf message
 }

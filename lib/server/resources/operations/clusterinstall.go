@@ -82,17 +82,9 @@ func (instance *cluster) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies resources.Targetable interface
-func (instance *cluster) InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum {
+func (instance *cluster) InstallMethods(/* ctx context.Context */) map[uint8]installmethod.Enum {
 	if instance.isNull() {
 		logrus.Error(fail.InvalidInstanceError().Error())
-		return nil
-	}
-	if task == nil {
-		logrus.Errorf(fail.InvalidParameterCannotBeNilError("task").Error())
-		return nil
-	}
-	if task.Aborted() {
-		logrus.Error(fail.AbortedError(nil, "aborted").Error())
 		return nil
 	}
 
@@ -100,7 +92,7 @@ func (instance *cluster) InstallMethods(task concurrency.Task) map[uint8]install
 }
 
 // InstalledFeatures returns a list of installed features
-func (instance *cluster) InstalledFeatures(task concurrency.Task) []string {
+func (instance *cluster) InstalledFeatures(/* ctx context.Context */) []string {
 	var list []string
 	return list
 }
@@ -108,35 +100,25 @@ func (instance *cluster) InstalledFeatures(task concurrency.Task) []string {
 // ComplementFeatureParameters FIXME: include the cluster part of setImplicitParameters() from feature
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
-func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error {
+func (instance *cluster) ComplementFeatureParameters(/* ctx context.Context, */v data.Map) fail.Error {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	identity, xerr := instance.unsafeGetIdentity(task)
+	identity, xerr := instance.unsafeGetIdentity()
 	if xerr != nil {
 		return xerr
 	}
 
 	v["ClusterComplexity"] = strings.ToLower(identity.Complexity.String())
 	v["ClusterFlavor"] = strings.ToLower(identity.Flavor.String())
-	v["ClusterName"] = instance.GetName()
+	v["ClusterName"] = identity.Name
 	v["ClusterAdminUsername"] = "cladm"
-	if v["ClusterAdminPassword"], xerr = instance.GetAdminPassword(task); xerr != nil {
-		return xerr
-	}
-
+	v["ClusterAdminPassword"] = identity.AdminPassword
 	if _, ok := v["Username"]; !ok {
 		v["Username"] = abstract.DefaultUser
 	}
-	networkCfg, xerr := instance.GetNetworkConfig(task)
+	networkCfg, xerr := instance.GetNetworkConfig()
 	if xerr != nil {
 		return xerr
 	}
@@ -158,8 +140,8 @@ func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v da
 	v["CIDR"] = networkCfg.CIDR
 
 	var controlPlaneV1 *propertiesv1.ClusterControlplane
-	xerr = instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect(/*task, */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			controlPlaneV1, ok = clonable.(*propertiesv1.ClusterControlplane)
 			if !ok {
@@ -177,18 +159,18 @@ func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v da
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
-		master, xerr := instance.unsafeFindAvailableMaster(task)
+		master, xerr := instance.unsafeFindAvailableMaster()
 		if xerr != nil {
 			return xerr
 		}
 
-		if v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP(task); xerr != nil {
+		if v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP(); xerr != nil {
 			return xerr
 		}
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	if v["ClusterMasters"], xerr = instance.unsafeListMasters(task); xerr != nil {
+	if v["ClusterMasters"], xerr = instance.unsafeListMasters(); xerr != nil {
 		return xerr
 	}
 
@@ -204,11 +186,11 @@ func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v da
 	}
 	v["ClusterMasterIDs"] = list
 
-	if v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs(task); xerr != nil {
+	if v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs(); xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterNodes"], xerr = instance.unsafeListNodes(task); xerr != nil {
+	if v["ClusterNodes"], xerr = instance.unsafeListNodes(); xerr != nil {
 		return xerr
 	}
 
@@ -224,7 +206,7 @@ func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v da
 	}
 	v["ClusterNodeIDs"] = list
 
-	if v["ClusterNodeIPs"], xerr = instance.unsafeListNodeIPs(task); xerr != nil {
+	if v["ClusterNodeIPs"], xerr = instance.unsafeListNodeIPs(); xerr != nil {
 		return xerr
 	}
 
@@ -234,18 +216,30 @@ func (instance *cluster) ComplementFeatureParameters(task concurrency.Task, v da
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (instance *cluster) RegisterFeature(task concurrency.Task, feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
+func (instance *cluster) RegisterFeature(/* ctx context.Context, */feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
 	if feat == nil {
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
+
+	// task := ctx.Value("task").(concurrency.Task)
+	// if task == nil {
+	// 	if task, xerr = concurrency.VoidTask(); xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
+	task, xerr := concurrency.VoidTask()
+	if xerr != nil {
+		return xerr
+	}
+	// if task.Aborted() {
+	// 	return emptyList, fail.AbortedError(nil, "aborted")
+	// }
+
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -254,8 +248,8 @@ func (instance *cluster) RegisterFeature(task concurrency.Task, feat resources.F
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -282,28 +276,31 @@ func (instance *cluster) RegisterFeature(task concurrency.Task, feat resources.F
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
 // satisfies interface resources.Targetable
-func (instance *cluster) UnregisterFeature(task concurrency.Task, feat string) (xerr fail.Error) {
+func (instance *cluster) UnregisterFeature(/* ctx context.Context, */ feat string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+	// task := ctx.Value("task").(concurrency.Task)
+	// if task == nil {
+	// 	if task, xerr = concurrency.VoidTask(); xerr != nil {
+	// 		return xerr
+	// 	}
+	// }
+	// if task.Aborted() {
+	// 	return emptyList, fail.AbortedError(nil, "aborted")
+	// }
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -319,25 +316,28 @@ func (instance *cluster) UnregisterFeature(task concurrency.Task, feat string) (
 }
 
 // ListInstalledFeatures returns a slice of installed features
-func (instance *cluster) ListInstalledFeatures(task concurrency.Task) ([]resources.Feature, fail.Error) {
+func (instance *cluster) ListInstalledFeatures(/* ctx context.Context */) (_ []resources.Feature, xerr fail.Error) {
 	var emptySlice []resources.Feature
 	if instance.isNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
-	}
 
-	if task.Aborted() {
-		return emptySlice, fail.AbortedError(nil, "aborted")
-	}
+	// task := ctx.Value("task").(concurrency.Task)
+	// if task == nil {
+	// 	if task, xerr = concurrency.VoidTask(); xerr != nil {
+	// 		return nil, xerr
+	// 	}
+	// }
+	// if task.Aborted() {
+	// 	return emptyList, fail.AbortedError(nil, "aborted")
+	// }
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
 	var list map[string]*propertiesv1.ClusterInstalledFeature
-	xerr := instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -353,7 +353,7 @@ func (instance *cluster) ListInstalledFeatures(task concurrency.Task) ([]resourc
 
 	out := make([]resources.Feature, 0, len(list))
 	for k := range list {
-		item, xerr := NewFeature(task, instance.GetService(), k)
+		item, xerr := NewFeature(/*ctx, */instance.GetService(), k)
 		if xerr != nil {
 			return emptySlice, xerr
 		}
@@ -364,22 +364,22 @@ func (instance *cluster) ListInstalledFeatures(task concurrency.Task) ([]resourc
 }
 
 // AddFeature installs a feature on the cluster
-func (instance *cluster) AddFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *cluster) AddFeature(/* ctx context.Context, */ name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
+	// if ctx == nil {
+	// 	return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	// }
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
+	// if task.Aborted() {
+	// 	return nil, fail.AbortedError(nil, "aborted")
+	// }
 
-	feat, xerr := NewFeature(task, instance.GetService(), name)
+	feat, xerr := NewFeature(/*ctx , */ instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -388,22 +388,15 @@ func (instance *cluster) AddFeature(task concurrency.Task, name string, vars dat
 }
 
 // CheckFeature tells if a feature is installed on the cluster
-func (instance *cluster) CheckFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *cluster) CheckFeature(/* ctx context.Context, */ name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	feat, xerr := NewFeature(task, instance.GetService(), name)
+	feat, xerr := NewFeature(/*ctx, */instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -412,38 +405,28 @@ func (instance *cluster) CheckFeature(task concurrency.Task, name string, vars d
 }
 
 // RemoveFeature uninstalls a feature from the cluster
-func (instance *cluster) RemoveFeature(task concurrency.Task, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *cluster) RemoveFeature(/* ctx context.Context, */ name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	feat, xerr := NewFeature(task, instance.GetService(), name)
+	feat, xerr := NewFeature(/*ctx context.Context, */ instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return feat.Remove(instance, vars, settings)
+	return feat.Remove(/*ctx, */instance, vars, settings)
 }
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *cluster) ExecuteScript(task concurrency.Task, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *cluster) ExecuteScript(/* ctx context.Context, */ tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
 		return -1, "", "", fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return -1, "", "", fail.InvalidParameterCannotBeNilError("task")
 	}
 	if tmplName == "" {
 		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
@@ -452,9 +435,19 @@ func (instance *cluster) ExecuteScript(task concurrency.Task, tmplName string, d
 		return -1, "", "", fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	if task.Aborted() {
-		return -1, "", "", fail.AbortedError(nil, "aborted")
+	// task := ctx.Value("task").(concurrency.Task)
+	// if task == nil {
+	// 	if task, xerr = concurrency.VoidTask(); xerr != nil {
+	//      return -1, "", "", xerr
+	// 	}
+	// }
+	task, xerr := concurrency.VoidTask()
+	if xerr != nil {
+		return -1, "", "", xerr
 	}
+	// if task.Aborted() {
+	// 	return emptyList, fail.AbortedError(nil, "aborted")
+	// }
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
 	defer tracer.Exiting()
@@ -670,7 +663,7 @@ func (instance *cluster) installReverseProxy(task concurrency.Task) (xerr fail.E
 
 	disabled := false
 	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -723,8 +716,8 @@ func (instance *cluster) installRemoteDesktop(task concurrency.Task) (xerr fail.
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	disabled := false
-	xerr = instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect(/*task, */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -781,7 +774,7 @@ func (instance *cluster) installProxyCacheClient(task concurrency.Task, host res
 
 	disabled := false
 	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -829,7 +822,7 @@ func (instance *cluster) installProxyCacheServer(task concurrency.Task, host res
 
 	disabled := false
 	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())

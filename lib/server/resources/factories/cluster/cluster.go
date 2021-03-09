@@ -26,7 +26,7 @@ import (
 )
 
 // List returns a list of available hosts
-func List(task concurrency.Task, svc iaas.Service) (list []abstract.ClusterIdentity, xerr fail.Error) {
+func List(/* ctx context.Context, */svc iaas.Service) (list []abstract.ClusterIdentity, xerr fail.Error) {
 	var nullList []abstract.ClusterIdentity
 
 	if task == nil {
@@ -52,7 +52,7 @@ func List(task concurrency.Task, svc iaas.Service) (list []abstract.ClusterIdent
 }
 
 // New creates a new instance of resources.Cluster
-func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
+func New(/* ctx context.Context, */svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -67,7 +67,7 @@ func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fai
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
-func Load(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
+func Load(/* ctx context.Context, */svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}

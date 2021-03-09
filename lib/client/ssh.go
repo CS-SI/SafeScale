@@ -408,7 +408,7 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 }
 
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
-func (s ssh) WaitReady(task concurrency.Task, hostName string, timeout time.Duration) error {
+func (s ssh) WaitReady(/* ctx context.Context, */hostName string, timeout time.Duration) error {
 	if timeout < temporal.GetHostTimeout() {
 		timeout = temporal.GetHostTimeout()
 	}

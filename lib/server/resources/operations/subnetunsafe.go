@@ -114,7 +114,7 @@ func (instance *subnet) unsafeGetDefaultRouteIP(task concurrency.Task) (ip strin
 			if innerErr != nil {
 				return innerErr
 			}
-			defer rh.Released(task)
+			defer rh.Released()
 
 			ip = rh.(*host).privateIP
 			return nil
@@ -188,7 +188,7 @@ func (instance *subnet) unsafeGetState(task concurrency.Task) (state subnetstate
 // unsafeAbandonHost is the non goroutine-safe version of UnbindHost, without paramter validation, that does the real work
 // Note: must be used wisely
 func (instance *subnet) unsafeAbandonHost(task concurrency.Task, props *serialize.JSONProperties, hostID string) fail.Error {
-	return props.Alter(task, subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+	return props.Alter(/*task, */subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 		shV1, ok := clonable.(*propertiesv1.SubnetHosts)
 		if !ok {
 			return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())

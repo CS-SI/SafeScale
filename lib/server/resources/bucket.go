@@ -15,9 +15,9 @@ type Bucket interface {
 	cache.Cacheable
 	observer.Observable
 
-	GetHost(task concurrency.Task) (string, fail.Error)
-	GetMountPoint(task concurrency.Task) (string, fail.Error)
-	Create(task concurrency.Task, name string) fail.Error
-	Mount(task concurrency.Task, hostname string, path string) fail.Error
-	Unmount(task concurrency.Task, hostname string) fail.Error
+	GetHost(/* ctx context.Context */) (string, fail.Error)
+	GetMountPoint(/* ctx context.Context */) (string, fail.Error)
+	Create(/* ctx context.Context, */name string) fail.Error
+	Mount(/* ctx context.Context, */hostname string, path string) fail.Error
+	Unmount(/* ctx context.Context, */hostname string) fail.Error
 }

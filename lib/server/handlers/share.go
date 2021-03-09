@@ -173,7 +173,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		}
 
 		xerr = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+			return props.Inspect(/*task, */hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 				hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())

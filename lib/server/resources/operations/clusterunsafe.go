@@ -37,14 +37,10 @@ import (
 )
 
 // unsafeGetIdentity returns the identity of the cluster
-func (instance *cluster) unsafeGetIdentity(task concurrency.Task) (clusterIdentity abstract.ClusterIdentity, xerr fail.Error) {
+func (instance *cluster) unsafeGetIdentity() (clusterIdentity abstract.ClusterIdentity, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task.Aborted() {
-		return abstract.ClusterIdentity{}, fail.AbortedError(nil, "aborted")
-	}
-
-	xerr = instance.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		aci, ok := clonable.(*abstract.ClusterIdentity)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -56,14 +52,10 @@ func (instance *cluster) unsafeGetIdentity(task concurrency.Task) (clusterIdenti
 }
 
 // unsafeGetFlavor returns the flavor of the cluster
-func (instance *cluster) unsafeGetFlavor(task concurrency.Task) (flavor clusterflavor.Enum, xerr fail.Error) {
+func (instance *cluster) unsafeGetFlavor() (flavor clusterflavor.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task.Aborted() {
-		return 0, fail.AbortedError(nil, "aborted")
-	}
-
-	aci, xerr := instance.unsafeGetIdentity(task)
+	aci, xerr := instance.unsafeGetIdentity()
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -72,38 +64,31 @@ func (instance *cluster) unsafeGetFlavor(task concurrency.Task) (flavor clusterf
 }
 
 // unsafeGetComplexity returns the complexity of the cluster
-func (instance *cluster) unsafeGetComplexity(task concurrency.Task) (_ clustercomplexity.Enum, xerr fail.Error) {
+func (instance *cluster) unsafeGetComplexity() (_ clustercomplexity.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task.Aborted() {
-		return 0, fail.AbortedError(nil, "aborted")
-	}
-
-	aci, xerr := instance.unsafeGetIdentity(task)
+	aci, xerr := instance.unsafeGetIdentity()
 	if xerr != nil {
 		return 0, xerr
 	}
+
 	return aci.Complexity, nil
 }
 
 // unsafeGetState returns the current state of the Cluster
 // Uses the "maker" ForceGetState
-func (instance *cluster) unsafeGetState(task concurrency.Task) (state clusterstate.Enum, xerr fail.Error) {
+func (instance *cluster) unsafeGetState() (state clusterstate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-
-	if task.Aborted() {
-		return clusterstate.Unknown, fail.AbortedError(nil, "aborted by cancellation")
-	}
 
 	state = clusterstate.Unknown
 	if instance.makers.GetState != nil {
-		state, xerr = instance.makers.GetState(task, instance)
+		state, xerr = instance.makers.GetState(instance)
 		if xerr != nil {
 			return clusterstate.Unknown, xerr
 		}
 
-		return state, instance.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+		return state, instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(/*task, */clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 				stateV1, ok := clonable.(*propertiesv1.ClusterState)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -115,8 +100,8 @@ func (instance *cluster) unsafeGetState(task concurrency.Task) (state clustersta
 		})
 	}
 
-	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -133,20 +118,15 @@ func (instance *cluster) unsafeGetState(task concurrency.Task) (state clustersta
 
 // unsafeListMasters is the not goroutine-safe equivalent of ListMasters, that does the real work
 // Note: must be used with wisdom
-func (instance *cluster) unsafeListMasters(task concurrency.Task) (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
+func (instance *cluster) unsafeListMasters() (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := resources.IndexedListOfClusterNodes{}
-	if task.Aborted() {
-		return emptyList, fail.AbortedError(nil, "aborted")
-	}
 
-	if xerr = instance.beingRemoved(task); xerr != nil {
-		return emptyList, xerr
-	}
 
-	xerr = instance.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -183,7 +163,7 @@ func (instance *cluster) unsafeListMasterIPs(task concurrency.Task) (list data.I
 	}
 
 	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
-		return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -208,20 +188,12 @@ func (instance *cluster) unsafeListMasterIPs(task concurrency.Task) (list data.I
 }
 
 // unsafeListNodeIPs lists the IPs of the nodes in the cluster
-func (instance *cluster) unsafeListNodeIPs(task concurrency.Task) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *cluster) unsafeListNodeIPs() (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if task.Aborted() {
-		return emptyList, fail.AbortedError(nil, "aborted")
-	}
-
-	if xerr = instance.beingRemoved(task); xerr != nil {
-		return nil, xerr
-	}
-
 	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -303,7 +275,7 @@ func (instance *cluster) unsafeListNodes(task concurrency.Task) (list resources.
 	}
 
 	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
