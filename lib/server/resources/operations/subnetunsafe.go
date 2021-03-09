@@ -114,8 +114,9 @@ func (instance *subnet) unsafeGetDefaultRouteIP(task concurrency.Task) (ip strin
 			if innerErr != nil {
 				return innerErr
 			}
+			defer rh.Released(task)
 
-			ip = rh.(*host).unsafeGetPrivateIP()
+			ip = rh.(*host).privateIP
 			return nil
 		}
 

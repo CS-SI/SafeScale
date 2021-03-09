@@ -265,7 +265,7 @@ func (instance *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
-					ip := rgw.(*host).unsafeGetAccessIP()
+					ip := rgw.(*host).accessIP
 					opUser, opUserErr := getOperatorUsernameFromCfg(svc)
 					if opUserErr != nil {
 						return opUserErr
@@ -306,7 +306,7 @@ func (instance *host) cacheAccessInformation(task concurrency.Task) fail.Error {
 						secondaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
 							Port:       int(gwahc.SSHPort),
-							IPAddress:  rgw.(*host).unsafeGetAccessIP(),
+							IPAddress:  rgw.(*host).accessIP,
 							Hostname:   rgw.GetName(),
 							User:       opUser,
 						}
@@ -2338,7 +2338,10 @@ func (instance *host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.E
 		return ip, fail.AbortedError(nil, "aborted")
 	}
 
-	if ip = instance.unsafeGetPublicIP(); ip == "" {
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	if ip = instance.publicIP; ip == "" {
 		return ip, fail.NotFoundError("no public IP associated with Host '%s'", instance.GetName())
 	}
 	return ip, nil
@@ -2359,7 +2362,10 @@ func (instance *host) GetPrivateIP(task concurrency.Task) (_ string, xerr fail.E
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
-	return instance.unsafeGetPrivateIP(), nil
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	return instance.privateIP, nil
 }
 
 // GetPrivateIPOnSubnet returns the private IP of the host on its default Subnet
@@ -2389,18 +2395,6 @@ func (instance *host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID strin
 	defer instance.lock.RUnlock()
 
 	xerr = instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		if props.Lookup(hostproperty.NetworkV2) {
-			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-				hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				if ip, ok = hostNetworkV2.IPv4Addresses[subnetID]; !ok {
-					return fail.InvalidRequestError("host '%s' does not have an IP address on subnet '%s'", instance.GetName(), subnetID)
-				}
-				return nil
-			})
-		}
 		return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -2434,7 +2428,7 @@ func (instance *host) GetAccessIP(task concurrency.Task) (ip string, xerr fail.E
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.unsafeGetAccessIP(), nil
+	return instance.accessIP, nil
 }
 
 // GetShares returns the information about the shares hosted by the host
@@ -2632,37 +2626,7 @@ func (instance *host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subn
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
-		if props.Lookup(hostproperty.NetworkV2) {
-			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-				networkV2, ok := clonable.(*propertiesv2.HostNetworking)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				rs, innerXErr = LoadSubnet(task, instance.GetService(), "", networkV2.DefaultSubnetID)
-				if innerXErr != nil {
-					return innerXErr
-				}
-				return nil
-			})
-		}
-		return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			rs, innerXErr = LoadSubnet(task, instance.GetService(), "", hostNetworkV2.DefaultSubnetID)
-			if innerXErr != nil {
-				return innerXErr
-			}
-			return nil
-		})
-	})
-	if xerr != nil {
-		return nullSubnet(), xerr
-	}
-
-	return rs, nil
+	return instance.unsafeGetDefaultSubnet(task)
 }
 
 // ToProtocol convert an resources.Host to protocol.Host
@@ -2693,8 +2657,8 @@ func (instance *host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr
 		volumes       []string
 	)
 
-	publicIP := instance.unsafeGetPublicIP()
-	privateIP := instance.unsafeGetPrivateIP()
+	publicIP := instance.publicIP
+	privateIP := instance.privateIP
 
 	xerr = instance.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool
