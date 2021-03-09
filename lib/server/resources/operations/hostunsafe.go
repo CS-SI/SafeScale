@@ -18,6 +18,8 @@ package operations
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"os"
 	"reflect"
 	"strings"
@@ -230,24 +232,6 @@ func (instance *host) unsafeGetVolumes(task concurrency.Task) (*propertiesv1.Hos
 	return hvV1, nil
 }
 
-// unsafeGetPublicIP returns the public IP address of the host
-// To be used when rh is notoriously not null value
-func (instance *host) unsafeGetPublicIP() string {
-	return instance.publicIP
-}
-
-// unsafeGetPrivateIP returns the private IP of the host on its default Networking
-// Note: must be used with wisdom (lock mayt be necessary before...)
-func (instance *host) unsafeGetPrivateIP() string {
-	return instance.privateIP
-}
-
-// unsafeGetAccessIP returns the IP to reach the host
-// Note: must be used with wisdom
-func (instance *host) unsafeGetAccessIP() string {
-	return instance.accessIP
-}
-
 // unsafeGetMounts returns the information about the mounts of the host
 // Intended to be used when objh is notoriously not nil (because previously checked)
 func (instance *host) unsafeGetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts, xerr fail.Error) {
@@ -382,4 +366,45 @@ func (instance *host) unsafePushStringToFileWithOwnership(task concurrency.Task,
 		}
 	}
 	return nil
+}
+
+// unsafeGetDefaultSubnet returns the Networking instance corresponding to host default subnet
+func (instance *host) unsafeGetDefaultSubnet(task concurrency.Task) (rs resources.Subnet, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if task.Aborted() {
+		return nullSubnet(), fail.AbortedError(nil, "aborted")
+	}
+
+	xerr = instance.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+		if props.Lookup(hostproperty.NetworkV2) {
+			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+				networkV2, ok := clonable.(*propertiesv2.HostNetworking)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				rs, innerXErr = LoadSubnet(task, instance.GetService(), "", networkV2.DefaultSubnetID)
+				if innerXErr != nil {
+					return innerXErr
+				}
+				return nil
+			})
+		}
+		return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			rs, innerXErr = LoadSubnet(task, instance.GetService(), "", hostNetworkV2.DefaultSubnetID)
+			if innerXErr != nil {
+				return innerXErr
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return nullSubnet(), xerr
+	}
+
+	return rs, nil
 }

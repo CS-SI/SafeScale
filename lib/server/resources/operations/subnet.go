@@ -879,15 +879,23 @@ func (instance *subnet) Create(task concurrency.Task, req abstract.SubnetRequest
 	}
 
 	// Update userdata of gateway(s)
-	xerr = instance.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		// Updates userdatas to use later
-		primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.unsafeGetPrivateIP()
-		primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.unsafeGetPublicIP()
+		primaryUserdata.PrimaryGatewayPrivateIP, innerXErr = primaryGateway.GetPrivateIP(task)
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		primaryUserdata.PrimaryGatewayPublicIP, innerXErr = primaryGateway.GetPublicIP(task)
+		if innerXErr != nil {
+			return innerXErr
+		}
+
 		primaryUserdata.IsPrimaryGateway = true
 		if as.VIP != nil {
 			primaryUserdata.DefaultRouteIP = as.VIP.PrivateIP
@@ -898,10 +906,17 @@ func (instance *subnet) Create(task concurrency.Task, req abstract.SubnetRequest
 		}
 		if secondaryGateway != nil {
 			// as.SecondaryGatewayID = secondaryGateway.GetID()
-			primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.unsafeGetPrivateIP()
+			primaryUserdata.SecondaryGatewayPrivateIP, innerXErr = secondaryGateway.GetPrivateIP(task)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
 			secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
 			secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
-			primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.unsafeGetPublicIP()
+			primaryUserdata.SecondaryGatewayPublicIP, innerXErr = secondaryGateway.GetPublicIP(task)
+			if innerXErr != nil {
+				return innerXErr
+			}
 			secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
 			secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
 			secondaryUserdata.IsPrimaryGateway = false
@@ -2000,13 +2015,13 @@ func (instance *subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fa
 		if as.VIP != nil && as.VIP.PublicIP != "" {
 			ip = as.VIP.PublicIP
 		} else {
-			objpgw, inErr := LoadHost(task, instance.GetService(), as.GatewayIDs[0])
-			if inErr != nil {
-				return inErr
+			objpgw, innerXErr := LoadHost(task, instance.GetService(), as.GatewayIDs[0])
+			if innerXErr != nil {
+				return innerXErr
 			}
 
-			ip = objpgw.(*host).unsafeGetPublicIP()
-			return nil
+			ip, innerXErr = objpgw.(*host).GetPublicIP(task)
+			return innerXErr
 		}
 		return nil
 	})

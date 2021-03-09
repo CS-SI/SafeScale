@@ -580,7 +580,7 @@ func (instance *share) Mount(task concurrency.Task, target resources.Host, path 
 
 	// serverID = rhServer.GetID()
 	// serverName = rhServer.GetName()
-	serverPrivateIP := rhServer.(*host).unsafeGetPrivateIP()
+	serverPrivateIP := rhServer.(*host).privateIP
 	//serverAccessIP := rhServer.(*host).unsafeGetAccessIP(task)
 
 	xerr = rhServer.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -833,7 +833,10 @@ func (instance *share) Unmount(task concurrency.Task, target resources.Host) (xe
 	}
 
 	serverName := rhServer.GetName()
-	serverPrivateIP := rhServer.(*host).unsafeGetPrivateIP()
+	serverPrivateIP, xerr := rhServer.GetPrivateIP(task)
+	if xerr != nil {
+		return xerr
+	}
 
 	xerr = rhServer.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(task, hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
