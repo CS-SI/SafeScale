@@ -21,9 +21,9 @@ package cache
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
@@ -32,18 +32,19 @@ import (
 
 // Cache interface describing what a struct must implement to be considered as a Cache
 type Cache interface {
-	concurrency.TaskedLock
+	// concurrency.TaskedLock
 	observer.Observer
 
-	GetEntry(task concurrency.Task, key string) (*Entry, fail.Error)                       // returns a cache entry from its key
-	ReserveEntry(task concurrency.Task, key string) fail.Error                             // locks an entry identified by key for update
-	CommitEntry(task concurrency.Task, key string, content Cacheable) (*Entry, fail.Error) // fills a previously reserved entry with content
-	FreeEntry(task concurrency.Task, key string) fail.Error                                // frees a cache entry (removing the reservation from cache)
-	AddEntry(task concurrency.Task, content Cacheable) (*Entry, fail.Error)                // AddEntry adds a content in cache
+	GetEntry(key string) (*Entry, fail.Error)                       // returns a cache entry from its key
+	ReserveEntry(key string) fail.Error                             // locks an entry identified by key for update
+	CommitEntry(key string, content Cacheable) (*Entry, fail.Error) // fills a previously reserved entry with content
+	FreeEntry(key string) fail.Error                                // frees a cache entry (removing the reservation from cache)
+	AddEntry(content Cacheable) (*Entry, fail.Error)                // adds a content in cache (doing ReserverEntry+CommitEntry in a whole)
 }
 
 type cache struct {
-	concurrency.TaskedLock
+	// concurrency.TaskedLock
+	lock sync.RWMutex
 
 	name  string
 	cache map[string]*Entry
@@ -56,44 +57,44 @@ func NewCache(name string) (Cache, fail.Error) {
 	}
 
 	c := cache{
-		name:       name,
-		cache:      map[string]*Entry{},
-		TaskedLock: concurrency.NewTaskedLock(),
+		name:  name,
+		cache: map[string]*Entry{},
+		// TaskedLock: concurrency.NewTaskedLock(),
 	}
 	return &c, nil
 }
 
-func (c *cache) IsNull() bool {
+func (c *cache) isNull() bool {
 	return c == nil || c.name == "" || c.cache == nil
 }
 
 // GetID satisfies interface data.Identifiable
 func (c cache) GetID() string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	return c.name
 }
 
 // GetName satisfies interface data.Identifiable
 func (c cache) GetName() string {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
 	return c.name
 }
 
 // GetEntry returns a cache entry from its key
-func (c *cache) GetEntry(task concurrency.Task, key string) (*Entry, fail.Error) {
-	if c.IsNull() {
+func (c *cache) GetEntry(key string) (*Entry, fail.Error) {
+	if c.isNull() {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	c.SafeRLock(task)
-	defer c.SafeRUnlock(task)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	if ce, ok := c.cache[key]; ok {
 		return ce, nil
@@ -104,22 +105,16 @@ func (c *cache) GetEntry(task concurrency.Task, key string) (*Entry, fail.Error)
 
 // ReserveEntry locks an entry identified by key for update
 // if entry does not exist, create an empty one
-func (c *cache) ReserveEntry(task concurrency.Task, key string) (xerr fail.Error) {
-	if c.IsNull() {
+func (c *cache) ReserveEntry(key string) (xerr fail.Error) {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("trask")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	if _, ok := c.cache[key]; !ok {
 		ce := newEntry(&reservation{key: key})
@@ -132,22 +127,16 @@ func (c *cache) ReserveEntry(task concurrency.Task, key string) (xerr fail.Error
 }
 
 // CommitEntry fills a previously reserved entry with content
-func (c *cache) CommitEntry(task concurrency.Task, key string, content Cacheable) (ce *Entry, xerr fail.Error) {
-	if c.IsNull() {
+func (c *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
+	if c.isNull() {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	var ok bool
 	if ce, ok = c.cache[key]; ok {
@@ -156,29 +145,23 @@ func (c *cache) CommitEntry(task concurrency.Task, key string, content Cacheable
 		delete(c.cache, key)
 		c.cache[content.GetID()] = ce
 		ce.unlock()
-		return ce, fail.ConvertError(content.AddObserver(task, c))
+		return ce, fail.ConvertError(content.AddObserver(c))
 	}
 
 	return nil, fail.NotFoundError("failed to find cache entry identified by '%s'", key)
 }
 
 // FreeEntry unlocks the cache entry and removes the reservation
-func (c *cache) FreeEntry(task concurrency.Task, key string) (xerr fail.Error) {
-	if c.IsNull() {
+func (c *cache) FreeEntry(key string) (xerr fail.Error) {
+	if c.isNull() {
 		return fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	var (
 		ce *Entry
@@ -193,28 +176,22 @@ func (c *cache) FreeEntry(task concurrency.Task, key string) (xerr fail.Error) {
 }
 
 // AddEntry adds a content in cache
-func (c *cache) AddEntry(task concurrency.Task, content Cacheable) (*Entry, fail.Error) {
+func (c *cache) AddEntry(content Cacheable) (*Entry, fail.Error) {
 	if c == nil {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 	if content == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("content")
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	id := content.GetID()
-	if xerr := c.ReserveEntry(task, id); xerr != nil {
+	if xerr := c.ReserveEntry(id); xerr != nil {
 		return nil, xerr
 	}
-	cacheEntry, xerr := c.CommitEntry(task, id, content)
+	cacheEntry, xerr := c.CommitEntry(id, content)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -222,13 +199,13 @@ func (c *cache) AddEntry(task concurrency.Task, content Cacheable) (*Entry, fail
 }
 
 // SignalChange tells the cache entry something has been changed in the content
-func (c cache) SignalChange(task concurrency.Task, key string) {
-	if task == nil {
+func (c cache) SignalChange(key string) {
+	if key == "" {
 		return
 	}
 
-	c.SafeRLock(task)
-	defer c.SafeRUnlock(task)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	if ce, ok := c.cache[key]; ok {
 		ce.lock()
@@ -239,13 +216,13 @@ func (c cache) SignalChange(task concurrency.Task, key string) {
 }
 
 // MarkAsFreed tells the cache to unlock content (decrementing the counter of uses)
-func (c cache) MarkAsFreed(task concurrency.Task, id string) {
-	if task == nil {
+func (c cache) MarkAsFreed(id string) {
+	if id == "" {
 		return
 	}
 
-	c.SafeRLock(task)
-	defer c.SafeRUnlock(task)
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	if ce, ok := c.cache[id]; ok {
 		ce.UnlockContent()
@@ -253,13 +230,13 @@ func (c cache) MarkAsFreed(task concurrency.Task, id string) {
 }
 
 // MarkAsDeleted tells the cache entry to be considered as deleted
-func (c cache) MarkAsDeleted(task concurrency.Task, key string) {
-	if task == nil {
+func (c cache) MarkAsDeleted(key string) {
+	if key == "" {
 		return
 	}
 
-	c.SafeLock(task)
-	defer c.SafeUnlock(task)
+	c.lock.Lock()
+	defer c.lock.Unlock()
 
 	delete(c.cache, key)
 }

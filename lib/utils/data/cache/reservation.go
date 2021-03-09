@@ -17,7 +17,6 @@
 package cache
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 )
 
@@ -34,20 +33,20 @@ func (rc reservation) GetName() string {
 	return rc.key
 }
 
-func (rc reservation) AddObserver(task concurrency.Task, o observer.Observer) error {
+func (rc reservation) AddObserver(_ observer.Observer) error {
 	return nil
 }
 
-func (rc reservation) NotifyObservers(task concurrency.Task) error {
+func (rc reservation) NotifyObservers() error {
 	return nil
 }
 
-func (rc reservation) RemoveObserver(task concurrency.Task, name string) error {
+func (rc reservation) RemoveObserver(name string) error {
 	return nil
 }
 
-func (rc reservation) Released(task concurrency.Task) {
+func (rc reservation) Released() {
 }
 
-func (rc reservation) Destroyed(task concurrency.Task) {
+func (rc reservation) Destroyed() {
 }
