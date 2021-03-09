@@ -1,7 +1,8 @@
 package resources
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"context"
+
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
@@ -15,9 +16,9 @@ type Bucket interface {
 	cache.Cacheable
 	observer.Observable
 
-	GetHost(/* ctx context.Context */) (string, fail.Error)
-	GetMountPoint(/* ctx context.Context */) (string, fail.Error)
-	Create(/* ctx context.Context, */name string) fail.Error
-	Mount(/* ctx context.Context, */hostname string, path string) fail.Error
-	Unmount(/* ctx context.Context, */hostname string) fail.Error
+	GetHost(ctx context.Context) (string, fail.Error)
+	GetMountPoint(ctx context.Context) (string, fail.Error)
+	Create(ctx context.Context, name string) fail.Error
+	Mount(ctx context.Context, hostname string, path string) fail.Error
+	Unmount(ctx context.Context, hostname string) fail.Error
 }

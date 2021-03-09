@@ -133,7 +133,7 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
-func LoadShare(/* ctx context.Context, */svc iaas.Service, ref string) (rs resources.Share, xerr fail.Error) {
+func LoadShare(ctx context.Context, svc iaas.Service, ref string) (rs resources.Share, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -242,7 +242,7 @@ func (instance *share) carry(/* ctx context.Context, */clonable data.Clonable) (
 }
 
 // Browse walks through shares folder and executes a callback for each entry
-func (instance *share) Browse(/* ctx context.Context, */callback func(string, string) fail.Error) (xerr fail.Error) {
+func (instance *share) Browse(ctx context.Context, callback func(string, string) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate instance
@@ -486,7 +486,7 @@ func (instance *share) Create(
 
 // GetServer returns the Host acting as share server, with error handling
 // Note: do not forget to call .Released() on returned host when you do not use it anymore
-func (instance *share) GetServer(/* ctx context.Context */) (_ resources.Host, xerr fail.Error) {
+func (instance *share) GetServer(ctx context.Context) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -531,7 +531,7 @@ func (instance *share) GetServer(/* ctx context.Context */) (_ resources.Host, x
 
 // Mount mounts a share on a local directory of an host
 // returns a clone of the propertiesv1.HostRemoteMount created on success
-func (instance *share) Mount(/* ctx context.Context, */target resources.Host, path string, withCache bool) (_ *propertiesv1.HostRemoteMount, xerr fail.Error) {
+func (instance *share) Mount(ctx context.Context, target resources.Host, path string, withCache bool) (_ *propertiesv1.HostRemoteMount, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -788,7 +788,7 @@ func (instance *share) Mount(/* ctx context.Context, */target resources.Host, pa
 }
 
 // Unmount unmounts a share from local directory of an host
-func (instance *share) Unmount(/* ctx context.Context, */target resources.Host) (xerr fail.Error) {
+func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -922,7 +922,7 @@ func (instance *share) Unmount(/* ctx context.Context, */target resources.Host) 
 }
 
 // Delete deletes a share from server
-func (instance *share) Delete(/* ctx context.Context */) (xerr fail.Error) {
+func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1032,7 +1032,7 @@ func sanitize(in string) (string, fail.Error) {
 	return sanitized, nil
 }
 
-func (instance *share) ToProtocol(/* ctx context.Context */) (_ *protocol.ShareMountList, xerr fail.Error) {
+func (instance *share) ToProtocol(ctx context.Context) (_ *protocol.ShareMountList, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {

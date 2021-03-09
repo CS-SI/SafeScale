@@ -84,7 +84,7 @@ func nullSubnet() *subnet {
 }
 
 // ListSubnets returns a list of available subnets
-func ListSubnets(/* ctx context.Context, */svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, xerr fail.Error) {
+func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -422,18 +422,17 @@ func (instance *subnet) carry(clonable data.Clonable) (xerr fail.Error) {
 
 // Create creates a subnet
 // FIXME: split up this function for readability
-func (instance *subnet) Create(/*ctx context.Context, */req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
+func (instance *subnet) Create(ctx context.Context,req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: do not use .IsNull() here
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	// if ctx == nil {
-	// 	return fail.InvalidParameterCannotBeNilError("ctx")
-	// }
-	// task := ctx.Value("task").(concurrency.Task)
-	var /* ctx context.Context */ = nil
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	task := ctx.Value("task").(concurrency.Task)
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
@@ -1321,7 +1320,7 @@ func (instance *subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resource
 }
 
 // Browse walks through all the metadata objects in subnet
-func (instance *subnet) Browse(/* ctx context.Context, */callback func(*abstract.Subnet) fail.Error) (xerr fail.Error) {
+func (instance *subnet) Browse(ctx context.Context, callback func(*abstract.Subnet) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate rs
@@ -1353,7 +1352,7 @@ func (instance *subnet) Browse(/* ctx context.Context, */callback func(*abstract
 }
 
 // AdoptHost links host ID to the Subnet
-func (instance *subnet) AdoptHost(/* ctx context.Context, */host resources.Host) (xerr fail.Error) {
+func (instance *subnet) AdoptHost(ctx context.Context, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1420,7 +1419,7 @@ func (instance *subnet) AdoptHost(/* ctx context.Context, */host resources.Host)
 }
 
 // AbandonHost unlinks host ID from Subnet
-func (instance *subnet) AbandonHost(/* ctx context.Context, */hostID string) (xerr fail.Error) {
+func (instance *subnet) AbandonHost(ctx context.Context, hostID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1450,7 +1449,7 @@ func (instance *subnet) AbandonHost(/* ctx context.Context, */hostID string) (xe
 }
 
 // ListHosts returns the list of Hosts attached to the subnet (excluding gateway)
-func (instance *subnet) ListHosts(/* ctx context.Context */) (_ []resources.Host, xerr fail.Error) {
+func (instance *subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1491,7 +1490,7 @@ func (instance *subnet) ListHosts(/* ctx context.Context */) (_ []resources.Host
 }
 
 // InspectGateway returns the gateway related to subnet
-func (instance *subnet) InspectGateway(/* ctx context.Context, */primary bool) (_ resources.Host, xerr fail.Error) {
+func (instance *subnet) InspectGateway(ctx context.Context, primary bool) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1520,7 +1519,7 @@ func (instance *subnet) InspectGateway(/* ctx context.Context, */primary bool) (
 }
 
 // GetGatewayPublicIP returns the Public IP of a particular gateway
-func (instance *subnet) GetGatewayPublicIP(/* ctx context.Context, */primary bool) (_ string, xerr fail.Error) {
+func (instance *subnet) GetGatewayPublicIP(ctx context.Context, primary bool) (_ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1582,7 +1581,7 @@ func (instance *subnet) GetGatewayPublicIP(/* ctx context.Context, */primary boo
 }
 
 // GetGatewayPublicIPs returns a slice of public IP of gateways
-func (instance *subnet) GetGatewayPublicIPs(/* ctx context.Context */) (_ []string, xerr fail.Error) {
+func (instance *subnet) GetGatewayPublicIPs(ctx context.Context) (_ []string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	var emptySlice []string
@@ -1640,7 +1639,7 @@ func (instance *subnet) GetGatewayPublicIPs(/* ctx context.Context */) (_ []stri
 }
 
 // Delete deletes a Subnet
-func (instance *subnet) Delete(/* ctx context.Context */) (xerr fail.Error) {
+func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1844,7 +1843,7 @@ func (instance *subnet) Released() {
 }
 
 // InspectNetwork returns the Network instance owning the Subnet
-func (instance *subnet) InspectNetwork(/* ctx context.Context */) (rn resources.Network, xerr fail.Error) {
+func (instance *subnet) InspectNetwork(ctx context.Context) (rn resources.Network, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1945,7 +1944,7 @@ func (instance *subnet) unbindSecurityGroups(/*ctx context.Context, */sgs *prope
 }
 
 // GetDefaultRouteIP returns the IP of the LAN default route
-func (instance *subnet) GetDefaultRouteIP(task concurrency.Task) (ip string, xerr fail.Error) {
+func (instance *subnet) GetDefaultRouteIP(ctx context.Context) (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1970,7 +1969,7 @@ func (instance *subnet) GetDefaultRouteIP(task concurrency.Task) (ip string, xer
 }
 
 // GetEndpointIP returns the internet (public) IP to reach the subnet
-func (instance *subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.Error) {
+func (instance *subnet) GetEndpointIP(ctx context.Context) (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	ip = ""
@@ -2015,7 +2014,7 @@ func (instance *subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fa
 }
 
 // HasVirtualIP tells if the subnet uses a VIP a default route
-func (instance *subnet) HasVirtualIP(task concurrency.Task) (bool, fail.Error) {
+func (instance *subnet) HasVirtualIP(ctx context.Context) (bool, fail.Error) {
 	if instance.isNull() {
 		return false, fail.InvalidInstanceError()
 	}
@@ -2048,7 +2047,7 @@ func (instance *subnet) HasVirtualIP(task concurrency.Task) (bool, fail.Error) {
 }
 
 // GetVirtualIP returns an abstract.VirtualIP used by gateway HA
-func (instance *subnet) GetVirtualIP(task concurrency.Task) (vip *abstract.VirtualIP, xerr fail.Error) {
+func (instance *subnet) GetVirtualIP(ctx context.Context) (vip *abstract.VirtualIP, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2073,7 +2072,7 @@ func (instance *subnet) GetVirtualIP(task concurrency.Task) (vip *abstract.Virtu
 }
 
 // GetCIDR returns the CIDR of the subnet
-func (instance *subnet) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
+func (instance *subnet) GetCIDR(ctx context.Context) (cidr string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2098,7 +2097,7 @@ func (instance *subnet) GetCIDR(task concurrency.Task) (cidr string, xerr fail.E
 }
 
 // GetState returns the current state of the subnet
-func (instance *subnet) GetState(task concurrency.Task) (state subnetstate.Enum, xerr fail.Error) {
+func (instance *subnet) GetState(ctx context.Context) (state subnetstate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2123,7 +2122,7 @@ func (instance *subnet) GetState(task concurrency.Task) (state subnetstate.Enum,
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (instance *subnet) ToProtocol(task concurrency.Task) (_ *protocol.Subnet, xerr fail.Error) {
+func (instance *subnet) ToProtocol(ctx context.Context) (_ *protocol.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2191,7 +2190,7 @@ func (instance *subnet) ToProtocol(task concurrency.Task) (_ *protocol.Subnet, x
 }
 
 // BindSecurityGroup binds a security group to the subnet; if enabled is true, apply it immediately
-func (instance *subnet) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGroup, enabled resources.SecurityGroupActivation) (xerr fail.Error) {
+func (instance *subnet) BindSecurityGroup(ctx context.Context, sg resources.SecurityGroup, enabled resources.SecurityGroupActivation) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2243,7 +2242,7 @@ func (instance *subnet) BindSecurityGroup(task concurrency.Task, sg resources.Se
 }
 
 // UnbindSecurityGroup unbinds a security group from the host
-func (instance *subnet) UnbindSecurityGroup(task concurrency.Task, sg resources.SecurityGroup) (xerr fail.Error) {
+func (instance *subnet) UnbindSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2303,7 +2302,7 @@ func (instance *subnet) UnbindSecurityGroup(task concurrency.Task, sg resources.
 }
 
 // ListSecurityGroups returns a slice of security groups bound to subnet
-func (instance *subnet) ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
+func (instance *subnet) ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	var nullList []*propertiesv1.SecurityGroupBond
@@ -2339,7 +2338,7 @@ func (instance *subnet) ListSecurityGroups(task concurrency.Task, state security
 }
 
 // EnableSecurityGroup enables a binded security group to subnet
-func (instance *subnet) EnableSecurityGroup(task concurrency.Task, rsg resources.SecurityGroup) (xerr fail.Error) {
+func (instance *subnet) EnableSecurityGroup(ctx context.Context, rsg resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2423,7 +2422,7 @@ func (instance *subnet) EnableSecurityGroup(task concurrency.Task, rsg resources
 }
 
 // DisableSecurityGroup disables an already binded security group on subnet
-func (instance *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.SecurityGroup) (xerr fail.Error) {
+func (instance *subnet) DisableSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2497,7 +2496,7 @@ func (instance *subnet) DisableSecurityGroup(task concurrency.Task, sg resources
 }
 
 // InspectGatewaySecurityGroup returns the instance of SecurityGroup in Subnet related to external access on gateways
-func (instance *subnet) InspectGatewaySecurityGroup(task concurrency.Task) (rsg resources.SecurityGroup, xerr fail.Error) {
+func (instance *subnet) InspectGatewaySecurityGroup(ctx context.Context) (rsg resources.SecurityGroup, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	rsg = nullSecurityGroup()
@@ -2532,7 +2531,7 @@ func (instance *subnet) InspectGatewaySecurityGroup(task concurrency.Task) (rsg 
 }
 
 // InspectInternalSecurityGroup returns the instance of SecurityGroup for internal security inside the Subnet
-func (instance *subnet) InspectInternalSecurityGroup(task concurrency.Task) (sg resources.SecurityGroup, xerr fail.Error) {
+func (instance *subnet) InspectInternalSecurityGroup(ctx context.Context) (sg resources.SecurityGroup, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	sg = nullSecurityGroup()
@@ -2567,7 +2566,7 @@ func (instance *subnet) InspectInternalSecurityGroup(task concurrency.Task) (sg 
 }
 
 // InspectPublicIPSecurityGroup returns the instance of SecurityGroup in Subnet for Hosts with Public IP (which does not apply on gateways)
-func (instance *subnet) InspectPublicIPSecurityGroup(task concurrency.Task) (sg resources.SecurityGroup, xerr fail.Error) {
+func (instance *subnet) InspectPublicIPSecurityGroup(ctx context.Context) (sg resources.SecurityGroup, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	sg = nullSecurityGroup()

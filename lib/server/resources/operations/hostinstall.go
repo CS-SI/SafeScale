@@ -38,7 +38,7 @@ import (
 )
 
 // AddFeature handles 'safescale host feature add <host name or id> <feature name>'
-func (instance *host) AddFeature(/* ctx context.Context, */name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
+func (instance *host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -96,7 +96,7 @@ func (instance *host) AddFeature(/* ctx context.Context, */name string, vars dat
 }
 
 // CheckFeature ...
-func (instance *host) CheckFeature(/* ctx context.Context, */name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -135,7 +135,7 @@ func (instance *host) CheckFeature(/* ctx context.Context, */name string, vars d
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
-func (instance *host) DeleteFeature(/* ctx context.Context, */name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -208,7 +208,7 @@ func (instance *host) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
-func (instance *host) InstallMethods(/* ctx context.Context */) map[uint8]installmethod.Enum {
+func (instance *host) InstallMethods(ctx context.Context) map[uint8]installmethod.Enum {
 	// FIXME: Return error
 	if instance.isNull() {
 		logrus.Error(fail.InvalidInstanceError().Error())
@@ -268,7 +268,7 @@ func (instance *host) InstallMethods(/* ctx context.Context */) map[uint8]instal
 }
 
 // RegisterFeature registers an installed Feature in metadata of Host
-func (instance *host) RegisterFeature(/* ctx context.Context, */feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
+func (instance *host) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -312,7 +312,7 @@ func (instance *host) RegisterFeature(/* ctx context.Context, */feat resources.F
 }
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
-func (instance *host) UnregisterFeature(/* ctx context.Context, */feat string) (xerr fail.Error) {
+func (instance *host) UnregisterFeature(ctx context.Context, feat string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -347,14 +347,14 @@ func (instance *host) UnregisterFeature(/* ctx context.Context, */feat string) (
 
 // InstalledFeatures returns a list of installed features
 // satisfies interface install.Targetable
-func (instance *host) InstalledFeatures(/* ctx context.Context */) []string {
+func (instance *host) InstalledFeatures(ctx context.Context) []string {
 	var list []string
 	return list
 }
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target
 // satisfies interface install.Targetable
-func (instance *host) ComplementFeatureParameters(/* ctx context.Context, */v data.Map) (xerr fail.Error) {
+func (instance *host) ComplementFeatureParameters(ctx context.Context, v data.Map) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -442,7 +442,7 @@ func (instance *host) ComplementFeatureParameters(/* ctx context.Context, */v da
 }
 
 // IsFeatureInstalled ...
-func (instance *host) IsFeatureInstalled(/* ctx context.Context, */name string) (found bool, xerr fail.Error) {
+func (instance *host) IsFeatureInstalled(ctx context.Context, name string) (found bool, xerr fail.Error) {
 	found = false
 	defer fail.OnPanic(&xerr)
 
