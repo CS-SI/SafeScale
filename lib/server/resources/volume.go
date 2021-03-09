@@ -17,11 +17,12 @@
 package resources
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
@@ -35,12 +36,12 @@ type Volume interface {
 	observer.Observable
 	cache.Cacheable
 
-	Attach(/* ctx context.Context, */host Host, path, format string, doNotFormat bool) fail.Error // attaches a volume to an host
-	Browse(/* ctx context.Context, */callback func(*abstract.Volume) fail.Error) fail.Error       // walks through all the metadata objects in network
-	Create(/* ctx context.Context, */req abstract.VolumeRequest) fail.Error                       // creates a volume
-	Detach(/* ctx context.Context, */host Host) fail.Error                                        // detaches the volume identified by ref, ref can be the name or the id
-	GetAttachments(/* ctx context.Context */) (*propertiesv1.VolumeAttachments, fail.Error)        // returns the property containing where the volume is attached
-	GetSize(/* ctx context.Context */) (int, fail.Error)                                           // returns the size of volume in GB
-	GetSpeed(/* ctx context.Context */) (volumespeed.Enum, fail.Error)                             // returns the speed of the volume (more or less the type of hardware)
-	ToProtocol(/* ctx context.Context */) (*protocol.VolumeInspectResponse, fail.Error)            // converts volume to equivalent protocol message
+	Attach(ctx context.Context, host Host, path, format string, doNotFormat bool) fail.Error // attaches a volume to an host
+	Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) fail.Error       // walks through all the metadata objects in network
+	Create(ctx context.Context, req abstract.VolumeRequest) fail.Error                       // creates a volume
+	Detach(ctx context.Context, host Host) fail.Error                                        // detaches the volume identified by ref, ref can be the name or the id
+	GetAttachments(ctx context.Context) (*propertiesv1.VolumeAttachments, fail.Error)        // returns the property containing where the volume is attached
+	GetSize(ctx context.Context) (int, fail.Error)                                           // returns the size of volume in GB
+	GetSpeed(ctx context.Context) (volumespeed.Enum, fail.Error)                             // returns the speed of the volume (more or less the type of hardware)
+	ToProtocol(ctx context.Context) (*protocol.VolumeInspectResponse, fail.Error)            // converts volume to equivalent protocol message
 }

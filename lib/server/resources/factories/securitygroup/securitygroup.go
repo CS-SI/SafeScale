@@ -26,7 +26,7 @@ import (
 )
 
 // List returns a list of available security groups
-func List(/* ctx context.Context, */svc iaas.Service, all bool) ([]*abstract.SecurityGroup, fail.Error) {
+func List(ctx context.Context, svc iaas.Service, all bool) ([]*abstract.SecurityGroup, fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -67,7 +67,7 @@ func New(svc iaas.Service) (_ resources.SecurityGroup, xerr fail.Error) {
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
-func Load(/* ctx context.Context, */svc iaas.Service, ref string) (_ resources.SecurityGroup, xerr fail.Error) {
+func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.SecurityGroup, xerr fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}

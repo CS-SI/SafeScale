@@ -101,7 +101,7 @@ func nullHost() *host {
 }
 
 // LoadHost ...
-func LoadHost(task concurrency.Task, svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error) {
+func LoadHost(ctx context.Context, svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// if task == nil {
@@ -410,7 +410,7 @@ func (instance *host) carry(task concurrency.Task, clonable data.Clonable) (xerr
 }
 
 // Browse walks through host folder and executes a callback for each entries
-func (instance *host) Browse(task concurrency.Task, callback func(*abstract.HostCore) fail.Error) (xerr fail.Error) {
+func (instance *host) Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -445,7 +445,7 @@ func (instance *host) Browse(task concurrency.Task, callback func(*abstract.Host
 }
 
 // ForceGetState returns the current state of the provider host after reloading metadata
-func (instance *host) ForceGetState(task concurrency.Task) (state hoststate.Enum, xerr fail.Error) {
+func (instance *host) ForceGetState(ctx context.Context) (state hoststate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	state = hoststate.UNKNOWN
@@ -478,7 +478,7 @@ func (instance *host) ForceGetState(task concurrency.Task) (state hoststate.Enum
 }
 
 // Reload reloads host from metadata and current host state on provider state
-func (instance *host) Reload(task concurrency.Task) (xerr fail.Error) {
+func (instance *host) Reload(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -573,7 +573,7 @@ func (instance *host) Reload(task concurrency.Task) (xerr fail.Error) {
 }
 
 // GetState returns the last known state of the host, without forced inspect
-func (instance *host) GetState(task concurrency.Task) (state hoststate.Enum) {
+func (instance *host) GetState(ctx context.Context) (state hoststate.Enum) {
 	state = hoststate.UNKNOWN
 	if instance.isNull() || task == nil {
 		return state
@@ -595,7 +595,7 @@ func (instance *host) GetState(task concurrency.Task) (state hoststate.Enum) {
 
 // Create creates a new host and its metadata
 // If the metadata is already carrying a host, returns fail.ErrNotAvailable
-func (instance *host) Create(task concurrency.Task, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (_ *userdata.Content, xerr fail.Error) {
+func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (_ *userdata.Content, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1509,7 +1509,7 @@ func (instance *host) finalizeProvisioning(task concurrency.Task, userdataConten
 }
 
 // WaitSSHReady waits until SSH responds successfully
-func (instance *host) WaitSSHReady(task concurrency.Task, timeout time.Duration) (_ string, xerr fail.Error) {
+func (instance *host) WaitSSHReady(ctx context.Context, timeout time.Duration) (_ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1623,7 +1623,7 @@ func getOrCreateDefaultSubnet(task concurrency.Task, svc iaas.Service) (rs resou
 }
 
 // Delete deletes a host with its metadata and updates subnet links
-func (instance *host) Delete(task concurrency.Task) (xerr fail.Error) {
+func (instance *host) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1954,7 +1954,7 @@ func (instance *host) relaxedDeleteHost(task concurrency.Task) (xerr fail.Error)
 // GetSSHConfig loads SSH configuration for host from metadata
 //
 // FIXME: verify that system.SSHConfig carries data about secondary getGateway
-func (instance *host) GetSSHConfig(task concurrency.Task) (_ *system.SSHConfig, xerr fail.Error) {
+func (instance *host) GetSSHConfig(ctx context.Context) (_ *system.SSHConfig, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task.Aborted() {
@@ -1979,7 +1979,7 @@ func (instance *host) GetSSHConfig(task concurrency.Task) (_ *system.SSHConfig, 
 }
 
 // Run tries to execute command 'cmd' on the host
-func (instance *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *host) Run(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2007,7 +2007,7 @@ func (instance *host) Run(task concurrency.Task, cmd string, outs outputs.Enum, 
 }
 
 // Pull downloads a file from Host
-func (instance *host) Pull(task concurrency.Task, target, source string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *host) Pull(ctx context.Context, target, source string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2068,7 +2068,7 @@ func (instance *host) Pull(task concurrency.Task, target, source string, timeout
 }
 
 // Push uploads a file to host
-func (instance *host) Push(task concurrency.Task, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *host) Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2093,7 +2093,7 @@ func (instance *host) Push(task concurrency.Task, source, target, owner, mode st
 }
 
 // GetShare returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
-func (instance *host) GetShare(task concurrency.Task, shareRef string) (_ *propertiesv1.HostShare, xerr fail.Error) {
+func (instance *host) GetShare(ctx context.Context, shareRef string) (_ *propertiesv1.HostShare, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2146,7 +2146,7 @@ func (instance *host) GetShare(task concurrency.Task, shareRef string) (_ *prope
 }
 
 // GetVolumes returns information about volumes attached to the host
-func (instance *host) GetVolumes(task concurrency.Task) (_ *propertiesv1.HostVolumes, xerr fail.Error) {
+func (instance *host) GetVolumes(ctx context.Context) (_ *propertiesv1.HostVolumes, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2171,7 +2171,7 @@ func (instance *host) GetVolumes(task concurrency.Task) (_ *propertiesv1.HostVol
 }
 
 // Start starts the host
-func (instance *host) Start(task concurrency.Task) (xerr fail.Error) {
+func (instance *host) Start(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2227,7 +2227,7 @@ func (instance *host) Start(task concurrency.Task) (xerr fail.Error) {
 }
 
 // Stop stops the host
-func (instance *host) Stop(task concurrency.Task) (xerr fail.Error) {
+func (instance *host) Stop(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2284,7 +2284,7 @@ func (instance *host) Stop(task concurrency.Task) (xerr fail.Error) {
 }
 
 // Reboot reboots the host
-func (instance *host) Reboot(task concurrency.Task) (xerr fail.Error) {
+func (instance *host) Reboot(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2310,7 +2310,7 @@ func (instance *host) Reboot(task concurrency.Task) (xerr fail.Error) {
 
 // Resize ...
 // not yet implemented
-func (instance *host) Resize(task concurrency.Task, hostSize abstract.HostSizingRequirements) (xerr fail.Error) {
+func (instance *host) Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2325,7 +2325,7 @@ func (instance *host) Resize(task concurrency.Task, hostSize abstract.HostSizing
 }
 
 // GetPublicIP returns the public IP address of the host
-func (instance *host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.Error) {
+func (instance *host) GetPublicIP(ctx context.Context) (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	ip = ""
@@ -2349,7 +2349,7 @@ func (instance *host) GetPublicIP(task concurrency.Task) (ip string, xerr fail.E
 }
 
 // GetPrivateIP returns the private IP of the host on its default Networking
-func (instance *host) GetPrivateIP(task concurrency.Task) (_ string, xerr fail.Error) {
+func (instance *host) GetPrivateIP(ctx context.Context) (_ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2370,7 +2370,7 @@ func (instance *host) GetPrivateIP(task concurrency.Task) (_ string, xerr fail.E
 }
 
 // GetPrivateIPOnSubnet returns the private IP of the host on its default Subnet
-func (instance *host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID string) (ip string, xerr fail.Error) {
+func (instance *host) GetPrivateIPOnSubnet(ctx context.Context, subnetID string) (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	ip = ""
@@ -2411,7 +2411,7 @@ func (instance *host) GetPrivateIPOnSubnet(task concurrency.Task, subnetID strin
 }
 
 // GetAccessIP returns the IP to reach the host
-func (instance *host) GetAccessIP(task concurrency.Task) (ip string, xerr fail.Error) {
+func (instance *host) GetAccessIP(ctx context.Context) (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	ip = ""
@@ -2433,7 +2433,7 @@ func (instance *host) GetAccessIP(task concurrency.Task) (ip string, xerr fail.E
 }
 
 // GetShares returns the information about the shares hosted by the host
-func (instance *host) GetShares(task concurrency.Task) (shares *propertiesv1.HostShares, xerr fail.Error) {
+func (instance *host) GetShares(ctx context.Context) (shares *propertiesv1.HostShares, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	shares = &propertiesv1.HostShares{}
@@ -2469,7 +2469,7 @@ func (instance *host) GetShares(task concurrency.Task) (shares *propertiesv1.Hos
 }
 
 // GetMounts returns the information abouts the mounts of the host
-func (instance *host) GetMounts(task concurrency.Task) (mounts *propertiesv1.HostMounts, xerr fail.Error) {
+func (instance *host) GetMounts(ctx context.Context) (mounts *propertiesv1.HostMounts, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	mounts = nil
@@ -2495,7 +2495,7 @@ func (instance *host) GetMounts(task concurrency.Task) (mounts *propertiesv1.Hos
 }
 
 // IsClusterMember returns true if the host is member of a cluster
-func (instance *host) IsClusterMember(task concurrency.Task) (yes bool, xerr fail.Error) {
+func (instance *host) IsClusterMember(ctx context.Context) (yes bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	yes = false
@@ -2531,7 +2531,7 @@ func (instance *host) IsClusterMember(task concurrency.Task) (yes bool, xerr fai
 }
 
 // IsGateway tells if the host acts as a gateway for a Subnet
-func (instance *host) IsGateway(task concurrency.Task) (_ bool, xerr fail.Error) {
+func (instance *host) IsGateway(ctx context.Context) (_ bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2570,12 +2570,12 @@ func (instance *host) IsGateway(task concurrency.Task) (_ bool, xerr fail.Error)
 }
 
 // PushStringToFile creates a file 'filename' on remote 'host' with the content 'content'
-func (instance *host) PushStringToFile(task concurrency.Task, content string, filename string) (xerr fail.Error) {
+func (instance *host) PushStringToFile(ctx context.Context, content string, filename string) (xerr fail.Error) {
 	return instance.PushStringToFileWithOwnership(task, content, filename, "", "")
 }
 
 // PushStringToFileWithOwnership creates a file 'filename' on remote 'host' with the content 'content', and apply ownership
-func (instance *host) PushStringToFileWithOwnership(task concurrency.Task, content string, filename string, owner, mode string) (xerr fail.Error) {
+func (instance *host) PushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2606,7 +2606,7 @@ func (instance *host) PushStringToFileWithOwnership(task concurrency.Task, conte
 }
 
 // GetDefaultSubnet returns the Networking instance corresponding to host default subnet
-func (instance *host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subnet, xerr fail.Error) {
+func (instance *host) GetDefaultSubnet(ctx context.Context) (rs resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2631,7 +2631,7 @@ func (instance *host) GetDefaultSubnet(task concurrency.Task) (rs resources.Subn
 }
 
 // ToProtocol convert an resources.Host to protocol.Host
-func (instance *host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr fail.Error) {
+func (instance *host) ToProtocol(ctx context.Context) (ph *protocol.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2708,7 +2708,7 @@ func (instance *host) ToProtocol(task concurrency.Task) (ph *protocol.Host, xerr
 }
 
 // BindSecurityGroup binds a security group to the host; if enabled is true, apply it immediately
-func (instance *host) BindSecurityGroup(task concurrency.Task, rsg resources.SecurityGroup, enable resources.SecurityGroupActivation) (xerr fail.Error) {
+func (instance *host) BindSecurityGroup(ctx context.Context, rsg resources.SecurityGroup, enable resources.SecurityGroupActivation) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {

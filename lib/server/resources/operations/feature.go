@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"strings"
@@ -55,14 +56,20 @@ func nullFeature() *feature {
 }
 
 // ListFeatures lists all features suitable for hosts or clusters
-func ListFeatures(task concurrency.Task, svc iaas.Service, suitableFor string) ([]interface{}, fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+func ListFeatures(ctx context.Context, svc iaas.Service, suitableFor string) (_ []interface{}, xerr fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("nil")
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
+	task := ctx.Value("task").(concurrency.Task)
+	if task == nil {
+		if task, xerr = concurrency.VoidTask(); xerr != nil {
+			return nil, xerr
+		}
+	}
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -81,7 +88,7 @@ func ListFeatures(task concurrency.Task, svc iaas.Service, suitableFor string) (
 		if err == nil {
 			for _, f := range files {
 				if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
-					feat, xerr := NewFeature(task, svc, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+					feat, xerr := NewFeature(ctx, svc, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
 					if xerr != nil {
 						logrus.Error(xerr) // FIXME: Don't hide errors
 						continue
@@ -133,10 +140,10 @@ func ListFeatures(task concurrency.Task, svc iaas.Service, suitableFor string) (
 // error contains :
 //    - fail.ErrNotFound if no feature is found by its name
 //    - fail.ErrSyntax if feature found contains syntax error
-func NewFeature(/*ctx context.Context, */svc iaas.Service, name string) (_ resources.Feature, xerr fail.Error) {
-	// if ctx == nil {
-	// 	return nullFeature(), fail.InvalidParameterCannotBeNilError("ctx")
-	// }
+func NewFeature(ctx context.Context,svc iaas.Service, name string) (_ resources.Feature, xerr fail.Error) {
+	if ctx == nil {
+		return nullFeature(), fail.InvalidParameterCannotBeNilError("ctx")
+	}
 	if svc == nil {
 		return nullFeature(), fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -144,12 +151,16 @@ func NewFeature(/*ctx context.Context, */svc iaas.Service, name string) (_ resou
 		return nullFeature(), fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	// task := ctx.Value("task).(concurrency.Task)
-	var task concurrency.Task = nil
+	task := ctx.Value("task").(concurrency.Task)
+	if task == nil {
+		if task, xerr = concurrency.VoidTask(); xerr != nil {
+			return nil, xerr
+		}
+	}
 
-	// if task.Aborted() {
-	// 	return nullFeature(), fail.AbortedError(nil, "aborted")
-	// }
+	if task.Aborted() {
+		return nullFeature(), fail.AbortedError(nil, "aborted")
+	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features")).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -198,7 +209,7 @@ func NewFeature(/*ctx context.Context, */svc iaas.Service, name string) (_ resou
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
 // with its content
-func NewEmbeddedFeature(task concurrency.Task, svc iaas.Service, name string) (_ resources.Feature, xerr fail.Error) {
+func NewEmbeddedFeature(ctx context.Context, svc iaas.Service, name string) (_ resources.Feature, xerr fail.Error) {
 	if task == nil {
 		return nullFeature(), fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -422,11 +433,14 @@ func checkParameters(f feature, v data.Map) fail.Error {
 
 // Add installs the feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (f *feature) Add(target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (f *feature) Add(ctx, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if f.isNull() {
 		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if target == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("target")
@@ -453,7 +467,7 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 	myV := v.Clone()
 
 	// Inits target parameters
-	if xerr = target.ComplementFeatureParameters(f.task, myV); xerr != nil {
+	if xerr = target.ComplementFeatureParameters(ctx, myV); xerr != nil {
 		return nil, xerr
 	}
 
@@ -475,7 +489,7 @@ func (f *feature) Add(target resources.Targetable, v data.Map, s resources.Featu
 	}
 
 	if !s.SkipFeatureRequirements {
-		if xerr = f.installRequirements(target, v, s); xerr != nil {
+		if xerr = f.installRequirements(ctx, target, v, s); xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to install requirements")
 		}
 	}
@@ -589,7 +603,7 @@ func (f *feature) GetRequirements() (map[string]struct{}, fail.Error) {
 }
 
 // installRequirements walks through requirements and installs them if needed
-func (f *feature) installRequirements(t resources.Targetable, v data.Map, s resources.FeatureSettings) fail.Error {
+func (f *feature) installRequirements(ctx context.Context, t resources.Targetable, v data.Map, s resources.FeatureSettings) fail.Error {
 	if f.specs.IsSet(yamlKey) {
 		{
 			msgHead := fmt.Sprintf("Checking requirements of feature '%s'", f.GetName())
@@ -609,7 +623,7 @@ func (f *feature) installRequirements(t resources.Targetable, v data.Map, s reso
 
 		// clone FeatureSettings to set DoNotUpdateHostMetadataInClusterContext
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
-			needed, xerr := NewFeature(f.task, f.svc, requirement)
+			needed, xerr := NewFeature(ctx, f.svc, requirement)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to find required feature '%s'", requirement)
 			}
@@ -630,7 +644,7 @@ func (f *feature) installRequirements(t resources.Targetable, v data.Map, s reso
 				}
 
 				// Register the needed feature as a requirement for f
-				if xerr = t.RegisterFeature(f.task, needed, f, targetIsCluster); xerr != nil {
+				if xerr = t.RegisterFeature(ctx, needed, f, targetIsCluster); xerr != nil {
 					return xerr
 				}
 			}

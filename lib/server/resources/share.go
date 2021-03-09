@@ -17,9 +17,10 @@
 package resources
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
@@ -33,10 +34,10 @@ type Share interface {
 	observer.Observable
 	cache.Cacheable
 
-	Browse(/* ctx context.Context, */callback func(hostName string, shareID string) fail.Error) fail.Error
-	Create(/* ctx context.Context, */shareName string, host Host, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error // creates a share on host
-	GetServer(/* ctx context.Context */) (Host, fail.Error)                                                                                                                                                       // returns the *Host acting as share server, with error handling
-	Mount(/* ctx context.Context, */host Host, path string, withCache bool) (*propertiesv1.HostRemoteMount, fail.Error)                                                                                          // mounts a share on a local directory of an host
-	Unmount(/* ctx context.Context, */host Host) fail.Error                                                                                                                                                      // unmounts a share from local directory of an host
-	ToProtocol(/* ctx context.Context */) (*protocol.ShareMountList, fail.Error)
+	Browse(ctx context.Context, callback func(hostName string, shareID string) fail.Error) fail.Error
+	Create(ctx context.Context, shareName string, host Host, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error // creates a share on host
+	GetServer(ctx context.Context) (Host, fail.Error)                                                                                                                                                       // returns the *Host acting as share server, with error handling
+	Mount(ctx context.Context, host Host, path string, withCache bool) (*propertiesv1.HostRemoteMount, fail.Error)                                                                                          // mounts a share on a local directory of an host
+	Unmount(ctx context.Context, host Host) fail.Error                                                                                                                                                      // unmounts a share from local directory of an host
+	ToProtocol(ctx context.Context) (*protocol.ShareMountList, fail.Error)
 }

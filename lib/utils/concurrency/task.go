@@ -143,6 +143,20 @@ func VoidTask() (Task, fail.Error) {
 	return NewTask()
 }
 
+// TaskFromContext extracts the task instance from context
+func TaskFromContext(ctx context.Context) (Task, fail.Error) {
+	if ctx != nil {
+		if ctxValue := ctx.Value("task"); ctxValue != nil {
+			if task, ok := ctxValue.(Task); ok {
+				return task, nil
+			}
+			return nil, fail.InconsistentError("context value for 'task' is not a 'concurrency.Task'")
+		}
+	}
+
+	return VoidTask()
+}
+
 // NewTask ...
 func NewTask() (Task, fail.Error) {
 	return newTask(context.Background(), nil)

@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"sync"
@@ -115,18 +116,23 @@ func lookupSecurityGroup(/*ctx context.Context, */svc iaas.Service, ref string) 
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(/*ctx context.Context, */svc iaas.Service, ref string) (rsg resources.SecurityGroup, xerr fail.Error) {
+func LoadSecurityGroup(ctx context.Context,svc iaas.Service, ref string) (rsg resources.SecurityGroup, xerr fail.Error) {
 	// Note: do not log error from here; caller has the responsibility to log if needed
 	defer fail.OnPanic(&xerr)
 
-	if task == nil {
-		return nullSecurityGroup(), fail.InvalidParameterError("task", "cannot be nil")
+	if ctx == nil {
+		return nullSecurityGroup(), fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if svc == nil {
 		return nullSecurityGroup(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
 		return nullSecurityGroup(), fail.InvalidParameterError("ref", "cannot be empty string")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nullSecurityGroup(), xerr
 	}
 
 	if task.Aborted() {
@@ -239,7 +245,7 @@ func (instance *securityGroup) carry(/*ctx context.Context, */clonable data.Clon
 }
 
 // Browse walks through securityGroup folder and executes a callback for each entries
-func (instance *securityGroup) Browse(/*ctx context.Context, */callback func(*abstract.SecurityGroup) fail.Error) (xerr fail.Error) {
+func (instance *securityGroup) Browse(ctx context.Context,callback func(*abstract.SecurityGroup) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate instance
@@ -277,7 +283,7 @@ func (instance *securityGroup) Browse(/*ctx context.Context, */callback func(*ab
 // Create creates a new securityGroup and its metadata.
 // If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a securityGroup, returns fail.ErrNotAvailable
-func (instance *securityGroup) Create(/*ctx context.Context, */networkID, name, description string, rules []abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *securityGroup) Create(ctx context.Context,networkID, name, description string, rules []abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -381,7 +387,7 @@ func (instance *securityGroup) Create(/*ctx context.Context, */networkID, name, 
 }
 
 // ForceDelete deletes a Security Group unconditionally
-func (instance *securityGroup) ForceDelete(/* ctx context.Context */) (xerr fail.Error) {
+func (instance *securityGroup) ForceDelete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -495,7 +501,7 @@ func (instance *securityGroup) unbindFromSubnets(task concurrency.Task, in *prop
 }
 
 // Clear removes all rules from a security group
-func (instance *securityGroup) Clear(task concurrency.Task) (xerr fail.Error) {
+func (instance *securityGroup) Clear(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -516,7 +522,7 @@ func (instance *securityGroup) Clear(task concurrency.Task) (xerr fail.Error) {
 }
 
 // Reset clears a security group and re-adds associated rules as stored in metadata
-func (instance *securityGroup) Reset(task concurrency.Task) (xerr fail.Error) {
+func (instance *securityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -562,7 +568,7 @@ func (instance *securityGroup) Reset(task concurrency.Task) (xerr fail.Error) {
 }
 
 // AddRule adds a rule to a security group
-func (instance *securityGroup) AddRule(task concurrency.Task, rule abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *securityGroup) AddRule(ctx context.Context, rule abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -580,7 +586,7 @@ func (instance *securityGroup) AddRule(task concurrency.Task, rule abstract.Secu
 }
 
 // AddRules adds rules to a Security Group
-func (instance *securityGroup) AddRules(task concurrency.Task, rules abstract.SecurityGroupRules) (xerr fail.Error) {
+func (instance *securityGroup) AddRules(ctx context.Context, rules abstract.SecurityGroupRules) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -623,7 +629,7 @@ func (instance *securityGroup) AddRules(task concurrency.Task, rules abstract.Se
 
 // DeleteRule deletes a rule identified by its ID from a security group
 // If rule is not in the security group, returns *fail.ErrNotFound
-func (instance *securityGroup) DeleteRule(task concurrency.Task, rule abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *securityGroup) DeleteRule(ctx context.Context, rule abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -660,7 +666,7 @@ func (instance *securityGroup) DeleteRule(task concurrency.Task, rule abstract.S
 }
 
 // GetBoundHosts returns the list of ID of hosts bound to the security group
-func (instance *securityGroup) GetBoundHosts(task concurrency.Task) (_ []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
+func (instance *securityGroup) GetBoundHosts(ctx context.Context) (_ []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -700,7 +706,7 @@ func (instance *securityGroup) GetBoundHosts(task concurrency.Task) (_ []*proper
 }
 
 // GetBoundSubnets returns the subnet bound to the security group
-func (instance *securityGroup) GetBoundSubnets(task concurrency.Task) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
+func (instance *securityGroup) GetBoundSubnets(ctx context.Context) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -744,7 +750,7 @@ func (instance *securityGroup) CheckConsistency(_ concurrency.Task) fail.Error {
 }
 
 // ToProtocol converts a Security Group to protobuf message
-func (instance *securityGroup) ToProtocol(task concurrency.Task) (_ *protocol.SecurityGroupResponse, xerr fail.Error) {
+func (instance *securityGroup) ToProtocol(ctx context.Context) (_ *protocol.SecurityGroupResponse, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -778,7 +784,7 @@ func (instance *securityGroup) ToProtocol(task concurrency.Task) (_ *protocol.Se
 
 // BindToHost binds the security group to a IPAddress.
 // If 'ip' is not empty, applies the Security Group only on the interface hosting this IP address.
-func (instance *securityGroup) BindToHost(task concurrency.Task, rh resources.Host /*ip string,*/, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
+func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host /*ip string,*/, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -862,7 +868,7 @@ func (instance *securityGroup) BindToHost(task concurrency.Task, rh resources.Ho
 }
 
 // UnbindFromHost unbinds the security group from an host
-func (instance *securityGroup) UnbindFromHost(task concurrency.Task, rh resources.Host) (xerr fail.Error) {
+func (instance *securityGroup) UnbindFromHost(ctx context.Context, rh resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -909,7 +915,7 @@ func (instance *securityGroup) UnbindFromHost(task concurrency.Task, rh resource
 }
 
 // UnbindFromHostByReference unbinds the security group from an host identified by reference (id or name)
-func (instance *securityGroup) UnbindFromHostByReference(task concurrency.Task, hostRef string) (xerr fail.Error) {
+func (instance *securityGroup) UnbindFromHostByReference(ctx context.Context, hostRef string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -967,7 +973,7 @@ func (instance *securityGroup) UnbindFromHostByReference(task concurrency.Task, 
 }
 
 // BindToSubnet binds the security group to a host
-func (instance *securityGroup) BindToSubnet(task concurrency.Task, rs resources.Subnet, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
+func (instance *securityGroup) BindToSubnet(ctx context.Context, rs resources.Subnet, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1088,7 +1094,7 @@ func (instance *securityGroup) disableOnHostsAttachedToSubnet(task concurrency.T
 }
 
 // UnbindFromSubnet unbinds the security group from a subnet
-func (instance *securityGroup) UnbindFromSubnet(task concurrency.Task, rs resources.Subnet) (xerr fail.Error) {
+func (instance *securityGroup) UnbindFromSubnet(ctx context.Context, rs resources.Subnet) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1134,7 +1140,7 @@ func (instance *securityGroup) UnbindFromSubnet(task concurrency.Task, rs resour
 }
 
 // UnbindFromSubnetByReference unbinds the security group from a subnet
-func (instance *securityGroup) UnbindFromSubnetByReference(task concurrency.Task, subnetRef string) (xerr fail.Error) {
+func (instance *securityGroup) UnbindFromSubnetByReference(ctx context.Context, subnetRef string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {

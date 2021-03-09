@@ -169,7 +169,7 @@ func (instance *network) isNull() bool {
 }
 
 // Create creates a network
-func (instance *network) Create(/*ctx context.Context, */req abstract.NetworkRequest) (xerr fail.Error) {
+func (instance *network) Create(ctx context.Context,req abstract.NetworkRequest) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -302,7 +302,7 @@ func (instance *network) carry(/*ctx context.Context, */clonable data.Clonable) 
 }
 
 // Browse walks through all the metadata objects in subnet
-func (instance *network) Browse(/*ctx context.Context, */callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
+func (instance *network) Browse(ctx context.Context,callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value of network, so do not validate rn
@@ -338,7 +338,7 @@ func (instance *network) Browse(/*ctx context.Context, */callback func(*abstract
 }
 
 // Delete deletes subnet
-func (instance *network) Delete(/* ctx context.Context */) (xerr fail.Error) {
+func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -463,7 +463,7 @@ func (instance *network) Delete(/* ctx context.Context */) (xerr fail.Error) {
 }
 
 // GetCIDR returns the CIDR of the subnet
-func (instance *network) GetCIDR(/* ctx context.Context */) (cidr string, xerr fail.Error) {
+func (instance *network) GetCIDR(ctx context.Context) (cidr string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -494,7 +494,7 @@ func (instance *network) GetCIDR(/* ctx context.Context */) (cidr string, xerr f
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (instance *network) ToProtocol(/* ctx context.Context */) (_ *protocol.Network, xerr fail.Error) {
+func (instance *network) ToProtocol(ctx context.Context) (_ *protocol.Network, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -552,7 +552,7 @@ func (instance *network) ToProtocol(/* ctx context.Context */) (_ *protocol.Netw
 
 // InspectSubnet returns the instance of resources.Subnet corresponding to the subnet referenced by 'ref' attached to
 // the subnet
-func (instance *network) InspectSubnet(/*ctx context.Context, */ref string) (_ resources.Subnet, xerr fail.Error) {
+func (instance *network) InspectSubnet(ctx context.Context,ref string) (_ resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -570,7 +570,7 @@ func (instance *network) InspectSubnet(/*ctx context.Context, */ref string) (_ r
 }
 
 // AdoptSubnet registers a Subnet to the Network metadata
-func (instance *network) AdoptSubnet(/*ctx context.Context, */subnet resources.Subnet) (xerr fail.Error) {
+func (instance *network) AdoptSubnet(ctx context.Context,subnet resources.Subnet) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -615,7 +615,7 @@ func (instance *network) AdoptSubnet(/*ctx context.Context, */subnet resources.S
 }
 
 // AbandonSubnet unregisters a Subnet from the Network (does not imply the Subnet is deleted)
-func (instance *network) AbandonSubnet(/*ctx context.Context, */subnetID string) (xerr fail.Error) {
+func (instance *network) AbandonSubnet(ctx context.Context,subnetID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {

@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -82,7 +83,7 @@ func nullCluster() *cluster {
 }
 
 // NewCluster ...
-func NewCluster(/* ctx context.Context, */ svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
+func NewCluster(ctx context.Context,  svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// if ctx == nil {
@@ -107,7 +108,7 @@ func NewCluster(/* ctx context.Context, */ svc iaas.Service) (_ resources.Cluste
 }
 
 // LoadCluster ...
-func LoadCluster(/* ctx context.Context, */svc iaas.Service, name string) (rc resources.Cluster, xerr fail.Error) {
+func LoadCluster(ctx context.Context, svc iaas.Service, name string) (rc resources.Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// if ctx == nil {
@@ -435,7 +436,7 @@ func (instance *cluster) updateClusterDefaultsPropertyIfNeeded(/* ctx context.Co
 func (instance *cluster) updateCachedInformation(task concurrency.Task) {
 	instance.installMethods = map[uint8]installmethod.Enum{}
 	var index uint8
-	flavor, err := instance.unsafeGetFlavor(task)
+	flavor, err := instance.unsafeGetFlavor()
 	if err == nil && flavor == clusterflavor.K8S {
 		index++
 		instance.installMethods[index] = installmethod.Helm
@@ -527,7 +528,7 @@ func (instance *cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 }
 
 // Create creates the necessary infrastructure of the Cluster
-func (instance *cluster) Create(/* ctx context.Context, */ req abstract.ClusterRequest) (xerr fail.Error) {
+func (instance *cluster) Create(ctx context.Context,  req abstract.ClusterRequest) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -1871,7 +1872,7 @@ func (instance *cluster) Start(/* ctx context.Context*/) (xerr fail.Error) {
 }
 
 // Stop stops the cluster
-func (instance *cluster) Stop(/*ctx context.Context*/) (xerr fail.Error) {
+func (instance *cluster) Stop(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2065,7 +2066,7 @@ func (instance *cluster) Stop(/*ctx context.Context*/) (xerr fail.Error) {
 
 // GetState returns the current state of the Cluster
 // Uses the "maker" ForceGetState
-func (instance *cluster) GetState(/*ctx context.Context*/) (state clusterstate.Enum, xerr fail.Error) {
+func (instance *cluster) GetState(ctx context.Context) (state clusterstate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	state = clusterstate.Unknown
@@ -2101,7 +2102,7 @@ func (instance *cluster) GetState(/*ctx context.Context*/) (state clusterstate.E
 }
 
 // AddNode adds a node
-func (instance *cluster) AddNode(/*ctx context.Context, */def abstract.HostSizingRequirements) (_ resources.Host, xerr fail.Error) {
+func (instance *cluster) AddNode(ctx context.Context,def abstract.HostSizingRequirements) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2127,7 +2128,7 @@ func (instance *cluster) AddNode(/*ctx context.Context, */def abstract.HostSizin
 }
 
 // AddNodes adds several nodes
-func (instance *cluster) AddNodes(/*ctx context.Context, */count uint, def abstract.HostSizingRequirements) (_ []resources.Host, xerr fail.Error) {
+func (instance *cluster) AddNodes(ctx context.Context,count uint, def abstract.HostSizingRequirements) (_ []resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2306,7 +2307,7 @@ func complementHostDefinition(req abstract.HostSizingRequirements, def propertie
 }
 
 // DeleteLastNode deletes the last added node and returns its name
-func (instance *cluster) DeleteLastNode(/*ctx context.Context*/) (node *propertiesv3.ClusterNode, xerr fail.Error) {
+func (instance *cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3.ClusterNode, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2377,7 +2378,7 @@ func (instance *cluster) DeleteLastNode(/*ctx context.Context*/) (node *properti
 }
 
 // DeleteSpecificNode deletes a node identified by its ID
-func (instance *cluster) DeleteSpecificNode(/*ctx context.Context, */ hostID string, selectedMasterID string) (xerr fail.Error) {
+func (instance *cluster) DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2455,7 +2456,7 @@ func (instance *cluster) DeleteSpecificNode(/*ctx context.Context, */ hostID str
 }
 
 // ListMasters lists the node instances corresponding to masters (if there is such masters in the flavor...)
-func (instance *cluster) ListMasters(/*ctx context.Context*/) (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
+func (instance *cluster) ListMasters(ctx context.Context) (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
 	emptyList := resources.IndexedListOfClusterNodes{}
 	if instance.isNull() {
 		return emptyList, fail.InvalidInstanceError()
@@ -2490,7 +2491,7 @@ func (instance *cluster) ListMasters(/*ctx context.Context*/) (list resources.In
 }
 
 // ListMasterNames lists the names of the master nodes in the Cluster
-func (instance *cluster) ListMasterNames(/*ctx context.Context*/) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *cluster) ListMasterNames(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
@@ -2550,7 +2551,7 @@ func (instance *cluster) ListMasterNames(/*ctx context.Context*/) (list data.Ind
 }
 
 // ListMasterIDs lists the IDs of masters (if there is such masters in the flavor...)
-func (instance *cluster) ListMasterIDs(/*ctx context.Context*/) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *cluster) ListMasterIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
@@ -2611,7 +2612,7 @@ func (instance *cluster) ListMasterIDs(/*ctx context.Context*/) (list data.Index
 }
 
 // ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
-func (instance *cluster) ListMasterIPs(/*ctx context.Context*/) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *cluster) ListMasterIPs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
@@ -2645,7 +2646,7 @@ func (instance *cluster) ListMasterIPs(/*ctx context.Context*/) (list data.Index
 
 // FindAvailableMaster returns ID of the first master available to execute order
 // satisfies interface cluster.cluster.Controller
-func (instance *cluster) FindAvailableMaster(/*ctx context.Context*/) (master resources.Host, xerr fail.Error) {
+func (instance *cluster) FindAvailableMaster(ctx context.Context) (master resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	master = nil
@@ -2686,7 +2687,7 @@ func (instance *cluster) FindAvailableMaster(/*ctx context.Context*/) (master re
 
 // ListNodes lists node instances corresponding to the nodes in the cluster
 // satisfies interface cluster.Controller
-func (instance *cluster) ListNodes(/*ctx context.Context*/) (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
+func (instance *cluster) ListNodes(ctx context.Context) (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := resources.IndexedListOfClusterNodes{}
@@ -2737,7 +2738,7 @@ func (instance *cluster) beingRemoved(task concurrency.Task) fail.Error {
 }
 
 // ListNodeNames lists the names of the nodes in the Cluster
-func (instance *cluster) ListNodeNames(/*ctx context.Context*/) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *cluster) ListNodeNames(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
@@ -2798,7 +2799,7 @@ func (instance *cluster) ListNodeNames(/*ctx context.Context*/) (list data.Index
 }
 
 // ListNodeIDs lists IDs of the nodes in the cluster
-func (instance *cluster) ListNodeIDs(/*ctx context.Context*/) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *cluster) ListNodeIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
@@ -2859,7 +2860,7 @@ func (instance *cluster) ListNodeIDs(/*ctx context.Context*/) (list data.Indexed
 }
 
 // ListNodeIPs lists the IPs of the nodes in the cluster
-func (instance *cluster) ListNodeIPs(/*ctx context.Context*/) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *cluster) ListNodeIPs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
@@ -2897,7 +2898,7 @@ func (instance *cluster) ListNodeIPs(/*ctx context.Context*/) (list data.Indexed
 }
 
 // FindAvailableNode returns node instance of the first node available to execute order
-func (instance *cluster) FindAvailableNode(/*ctx context.Context*/) (node resources.Host, xerr fail.Error) {
+func (instance *cluster) FindAvailableNode(ctx context.Context) (node resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -3029,7 +3030,7 @@ func (instance *cluster) LookupNode(/* ctx context.Context, */ ref string) (foun
 }
 
 // CountNodes counts the nodes of the cluster
-func (instance *cluster) CountNodes(/*ctx context.Context*/) (count uint, xerr fail.Error) {
+func (instance *cluster) CountNodes(ctx context.Context) (count uint, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -3076,7 +3077,7 @@ func (instance *cluster) CountNodes(/*ctx context.Context*/) (count uint, xerr f
 }
 
 // GetNodeByID returns a node based on its ID
-func (instance *cluster) GetNodeByID(/*ctx context.Context, */hostID string) (host resources.Host, xerr fail.Error) {
+func (instance *cluster) GetNodeByID(ctx context.Context,hostID string) (host resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -3331,7 +3332,7 @@ func (instance *cluster) deleteNode(task concurrency.Task, node *propertiesv3.Cl
 }
 
 // Delete allows to destroy infrastructure of cluster
-func (instance *cluster) Delete(/*ctx context.Content*/) (xerr fail.Error) {
+func (instance *cluster) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -3363,7 +3364,7 @@ func (instance *cluster) Delete(/*ctx context.Content*/) (xerr fail.Error) {
 }
 
 // Delete allows to destroy infrastructure of cluster
-func (instance *cluster) ForceDelete(/*ctx context.Context*/) (xerr fail.Error) {
+func (instance *cluster) ForceDelete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -3986,7 +3987,7 @@ func (instance *cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 }
 
 // ToProtocol converts instance to protocol.ClusterResponse message
-func (instance *cluster) ToProtocol(/*ctx context.Context*/) (_ *protocol.ClusterResponse, xerr fail.Error) {
+func (instance *cluster) ToProtocol(ctx context.Context) (_ *protocol.ClusterResponse, xerr fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -4135,7 +4136,7 @@ func (instance *cluster) ToProtocol(/*ctx context.Context*/) (_ *protocol.Cluste
 	return out, nil
 }
 
-func (instance *cluster) Shrink(/*ctx context.Context,*/ count uint) (_ []*propertiesv3.ClusterNode, xerr fail.Error) {
+func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertiesv3.ClusterNode, xerr fail.Error) {
 	emptySlice := make([]*propertiesv3.ClusterNode, 0)
 	if instance.isNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -4251,7 +4252,7 @@ func (instance *cluster) Shrink(/*ctx context.Context,*/ count uint) (_ []*prope
 }
 
 // IsFeatureInstalled tells if a Feature identified by name is installed on Cluster, using only metadata
-func (instance *cluster) IsFeatureInstalled(/*ctx context.Context, */name string) (found bool, xerr fail.Error) {
+func (instance *cluster) IsFeatureInstalled(ctx context.Context,name string) (found bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	found = false

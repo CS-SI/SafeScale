@@ -27,7 +27,7 @@ import (
 )
 
 // List returns a slice of *abstract.Network corresponding to managed networks
-func List(/* ctx context.Context, */svc iaas.Service) ([]*abstract.Network, fail.Error) {
+func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Error) {
 	// FIXME: Check inputs
 
 	rn, xerr := New(svc)
@@ -75,7 +75,7 @@ func New(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // Load loads the metadata of a network and returns an instance of resources.Network
-func Load(/* ctx context.Context, */svc iaas.Service, ref string) (resources.Network, fail.Error) {
+func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Network, fail.Error) {
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}

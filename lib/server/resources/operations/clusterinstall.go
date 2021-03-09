@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -82,7 +83,7 @@ func (instance *cluster) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies resources.Targetable interface
-func (instance *cluster) InstallMethods(/* ctx context.Context */) map[uint8]installmethod.Enum {
+func (instance *cluster) InstallMethods(ctx context.Context) map[uint8]installmethod.Enum {
 	if instance.isNull() {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return nil
@@ -92,7 +93,7 @@ func (instance *cluster) InstallMethods(/* ctx context.Context */) map[uint8]ins
 }
 
 // InstalledFeatures returns a list of installed features
-func (instance *cluster) InstalledFeatures(/* ctx context.Context */) []string {
+func (instance *cluster) InstalledFeatures(ctx context.Context) []string {
 	var list []string
 	return list
 }
@@ -100,7 +101,7 @@ func (instance *cluster) InstalledFeatures(/* ctx context.Context */) []string {
 // ComplementFeatureParameters FIXME: include the cluster part of setImplicitParameters() from feature
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
-func (instance *cluster) ComplementFeatureParameters(/* ctx context.Context, */v data.Map) fail.Error {
+func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -216,7 +217,7 @@ func (instance *cluster) ComplementFeatureParameters(/* ctx context.Context, */v
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (instance *cluster) RegisterFeature(/* ctx context.Context, */feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
+func (instance *cluster) RegisterFeature(ctx context.Context, feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -276,7 +277,7 @@ func (instance *cluster) RegisterFeature(/* ctx context.Context, */feat resource
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
 // satisfies interface resources.Targetable
-func (instance *cluster) UnregisterFeature(/* ctx context.Context, */ feat string) (xerr fail.Error) {
+func (instance *cluster) UnregisterFeature(ctx context.Context,  feat string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -316,7 +317,7 @@ func (instance *cluster) UnregisterFeature(/* ctx context.Context, */ feat strin
 }
 
 // ListInstalledFeatures returns a slice of installed features
-func (instance *cluster) ListInstalledFeatures(/* ctx context.Context */) (_ []resources.Feature, xerr fail.Error) {
+func (instance *cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, xerr fail.Error) {
 	var emptySlice []resources.Feature
 	if instance.isNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -364,7 +365,7 @@ func (instance *cluster) ListInstalledFeatures(/* ctx context.Context */) (_ []r
 }
 
 // AddFeature installs a feature on the cluster
-func (instance *cluster) AddFeature(/* ctx context.Context, */ name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *cluster) AddFeature(ctx context.Context,  name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -388,7 +389,7 @@ func (instance *cluster) AddFeature(/* ctx context.Context, */ name string, vars
 }
 
 // CheckFeature tells if a feature is installed on the cluster
-func (instance *cluster) CheckFeature(/* ctx context.Context, */ name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *cluster) CheckFeature(ctx context.Context,  name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -405,7 +406,7 @@ func (instance *cluster) CheckFeature(/* ctx context.Context, */ name string, va
 }
 
 // RemoveFeature uninstalls a feature from the cluster
-func (instance *cluster) RemoveFeature(/* ctx context.Context, */ name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *cluster) RemoveFeature(ctx context.Context,  name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -413,7 +414,7 @@ func (instance *cluster) RemoveFeature(/* ctx context.Context, */ name string, v
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	feat, xerr := NewFeature(/*ctx context.Context, */ instance.GetService(), name)
+	feat, xerr := NewFeature(ctx context.Context, instance.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -422,7 +423,7 @@ func (instance *cluster) RemoveFeature(/* ctx context.Context, */ name string, v
 }
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *cluster) ExecuteScript(/* ctx context.Context, */ tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *cluster) ExecuteScript(ctx context.Context,  tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {

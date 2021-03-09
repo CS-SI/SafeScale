@@ -20,6 +20,7 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"reflect"
 	"regexp"
 	"sync"
@@ -72,15 +73,20 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 }
 
 // LoadBucket instanciates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(/*ctx context.Context, */svc iaas.Service, name string) (b resources.Bucket, xerr fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+func LoadBucket(ctx context.Context,svc iaas.Service, name string) (b resources.Bucket, xerr fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -177,9 +183,17 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 }
 
 // GetHost ...
-func (instance *bucket) GetHost(/* ctx context.Context */) (string, fail.Error) {
+func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error) {
 	if instance.isNull() {
 		return "", fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -190,32 +204,42 @@ func (instance *bucket) GetHost(/* ctx context.Context */) (string, fail.Error) 
 	defer instance.lock.RLock()
 
 	var res string
-	xerr := instance.Inspect(/*task, */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		res = ab.Host
 		return nil
 	})
 	if xerr != nil {
 		return res, xerr
 	}
+
 	return res, nil
 }
 
 // VPL: not used
 // // Host ...
-// func (instance *bucket) Host(/* ctx context.Context */) string {
+// func (instance *bucket) Host(ctx context.Context) string {
 // 	// FIXME: Ignored error without warning
 // 	res, _ := instance.GetHost(task)
 // 	return res
 // }
 
 // GetMountPoint ...
-func (instance *bucket) GetMountPoint(/* ctx context.Context */) (string, fail.Error) {
+func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) {
 	if instance.isNull() {
 		return "", fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return "", fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -226,7 +250,7 @@ func (instance *bucket) GetMountPoint(/* ctx context.Context */) (string, fail.E
 	defer instance.lock.RUnlock()
 
 	var res string
-	xerr := instance.Inspect(/*task, */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(/*task, */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -242,24 +266,29 @@ func (instance *bucket) GetMountPoint(/* ctx context.Context */) (string, fail.E
 
 // VPL: not used
 // // MountPoint ...
-// func (instance *bucket) MountPoint(/* ctx context.Context */) string {
+// func (instance *bucket) MountPoint(ctx context.Context) string {
 // 	// FIXME: Ignored error without warning
 // 	res, _ := instance.GetMountPoint(task)
 // 	return res
 // }
 
 // Create a bucket
-func (instance *bucket) Create(/*ctx context.Context, */name string) (xerr fail.Error) {
+func (instance *bucket) Create(ctx context.Context,name string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -307,18 +336,23 @@ func (instance *bucket) Delete() (xerr fail.Error) {
 }
 
 // Mount a bucket on an host on the given mount point
-func (instance *bucket) Mount(task concurrency.Task, hostName, path string) (xerr fail.Error) {
+func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if hostName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("hostName")
 	}
 	if path == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("path")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -333,7 +367,7 @@ func (instance *bucket) Mount(task concurrency.Task, hostName, path string) (xer
 	defer instance.lock.Unlock()
 
 	// Get Host data
-	rh, xerr := LoadHost(task, instance.GetService(), hostName)
+	rh, xerr := LoadHost(ctx, instance.GetService(), hostName)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
 	}
@@ -382,20 +416,25 @@ func (instance *bucket) Mount(task concurrency.Task, hostName, path string) (xer
 		Protocol:   objStorageProtocol,
 	}
 
-	err := instance.exec(task, rh, "mount_object_storage.sh", d)
+	err := instance.exec(ctx, rh, "mount_object_storage.sh", d)
 	return fail.ConvertError(err)
 }
 
 // Unmount a bucket
-func (instance *bucket) Unmount(task concurrency.Task, hostName string) (xerr fail.Error) {
+func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if hostName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("hostName")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -415,7 +454,7 @@ func (instance *bucket) Unmount(task concurrency.Task, hostName string) (xerr fa
 	}
 
 	// Get Host
-	rh, xerr := LoadHost(task, instance.GetService(), hostName)
+	rh, xerr := LoadHost(ctx, instance.GetService(), hostName)
 	if xerr != nil {
 		return xerr
 	}
@@ -426,22 +465,18 @@ func (instance *bucket) Unmount(task concurrency.Task, hostName string) (xerr fa
 		Bucket: instance.GetName(),
 	}
 
-	err := instance.exec(task, rh, "umount_object_storage.sh", dataBu)
+	err := instance.exec(ctx, rh, "umount_object_storage.sh", dataBu)
 	return fail.ConvertError(err)
 }
 
 // Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
-func (instance *bucket) exec(task concurrency.Task, host resources.Host, script string, data interface{}) fail.Error {
+func (instance *bucket) exec(ctx context.Context, host resources.Host, script string, data interface{}) fail.Error {
 	scriptCmd, xerr := getBoxContent(script, data)
 	if xerr != nil {
 		return xerr
 	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	_, _, _, xerr = host.Run(task, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	_, _, _, xerr = host.Run(ctx, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	return xerr
 }
 
