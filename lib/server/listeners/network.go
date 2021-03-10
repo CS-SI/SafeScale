@@ -21,11 +21,6 @@ import (
 	"fmt"
 	"net"
 
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
-
-	"github.com/asaskevich/govalidator"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
@@ -35,6 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
+	"github.com/asaskevich/govalidator"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -99,7 +97,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		return nil, xerr
 	}
 
-	if xerr = rn.Create(task.GetContext(), req); xerr != nil {
+	if xerr = rn.Create(job.GetContext(), req); xerr != nil {
 		return nil, xerr
 	}
 
@@ -107,7 +105,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		if err != nil && !in.GetKeepOnFailure() {
 			defer task.DisarmAbortSignal()()
 
-			if derr := rn.Delete(task.GetContext()); derr != nil {
+			if derr := rn.Delete(job.GetContext()); derr != nil {
 				_ = fail.ConvertError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
 			}
 		}
@@ -149,7 +147,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			KeepOnFailure:  in.GetKeepOnFailure(),
 			DefaultSSHPort: in.GetGateway().GetSshPort(),
 		}
-		xerr = rs.Create(task.GetContext(), req, in.GetGateway().GetName(), sizing)
+		xerr = rs.Create(job.GetContext(), req, in.GetGateway().GetName(), sizing)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
 		}
@@ -197,7 +195,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	if in.GetAll() {
 		list, xerr = svc.ListNetworks()
 	} else {
-		list, xerr = networkfactory.List(task.GetContext(), svc)
+		list, xerr = networkfactory.List(job.GetContext(), svc)
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -329,7 +327,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 			return empty, xerr
 		}
 	}
-	if xerr = rn.Delete(task.GetContext()); xerr != nil {
+	if xerr = rn.Delete(job.GetContext()); xerr != nil {
 		return empty, xerr
 	}
 

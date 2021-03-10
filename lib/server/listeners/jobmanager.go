@@ -19,16 +19,15 @@ package listeners
 import (
 	"context"
 
-	"github.com/asaskevich/govalidator"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/asaskevich/govalidator"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
 )
 
 // PrepareJob creates a new job

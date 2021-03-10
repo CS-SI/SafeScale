@@ -24,8 +24,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -53,6 +51,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -427,7 +426,7 @@ func (instance *subnet) carry(clonable data.Clonable) (xerr fail.Error) {
 
 // Create creates a subnet
 // FIXME: split up this function for readability
-func (instance *subnet) Create(ctx context.Context,req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
+func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: do not use .isNull() here
@@ -437,7 +436,11 @@ func (instance *subnet) Create(ctx context.Context,req abstract.SubnetRequest, g
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	task := ctx.Value("task").(concurrency.Task)
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,

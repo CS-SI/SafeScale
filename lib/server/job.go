@@ -22,19 +22,19 @@ import (
 	"sync"
 	"time"
 
-	uuidpkg "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/metadata"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	uuidpkg "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/metadata"
 )
 
 // Job is the interface of a daemon job
 type Job interface {
 	GetID() string
 	GetName() string
+	GetContext() context.Context
 	GetTask() concurrency.Task
 	GetService() iaas.Service
 	GetDuration() time.Duration
@@ -49,6 +49,7 @@ type job struct {
 	description string
 	uuid        string
 	tenant      string
+	ctx         context.Context
 	task        concurrency.Task
 	cancel      context.CancelFunc
 	service     iaas.Service
@@ -112,6 +113,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	nj := job{
 		description: description,
 		uuid:        id,
+		ctx:         task.GetContext(),
 		task:        task,
 		cancel:      cancel,
 		service:     svc,
@@ -146,6 +148,15 @@ func (j job) GetName() string {
 	}
 
 	return j.uuid
+}
+
+// GetContext returns the context of the job (should be the same than the one of the task)
+func (j job) GetContext() context.Context {
+	if j.isNull() {
+		return nil
+	}
+
+	return j.ctx
 }
 
 // GetTask returns the task instance

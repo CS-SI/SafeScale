@@ -28,7 +28,7 @@ import (
 type ResourceCache struct {
 	byID   cache.Cache
 	byName map[string]string
-	lock sync.Mutex
+	lock   sync.Mutex
 }
 
 // NewResourceCache initializes a new instance of ResourceCache
@@ -90,16 +90,16 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 		}
 
 		if onMissFunc != nil {
-			if xerr := rc.ReserveEntry(key); xerr != nil {
+			if xerr := rc.unsafeReserveEntry(key); xerr != nil {
 				return nil, xerr
 			}
 
 			var content cache.Cacheable
 			if content, xerr = onMissFunc(); xerr == nil {
-				ce, xerr = rc.CommitEntry(key, content)
+				ce, xerr = rc.unsafeCommitEntry(key, content)
 			}
 			if xerr != nil {
-				if derr := rc.FreeEntry(key); derr != nil {
+				if derr := rc.unsafeFreeEntry(key); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
 				}
 				return nil, xerr
@@ -123,6 +123,11 @@ func (rc *ResourceCache) ReserveEntry(key string) fail.Error {
 	rc.lock.Lock()
 	defer rc.lock.Unlock()
 
+	return rc.unsafeReserveEntry(key)
+}
+
+// unsafeReserveEntry sets a cache entry to reserve the key and returns the Entry associated
+func (rc *ResourceCache) unsafeReserveEntry(key string) fail.Error {
 	return rc.byID.ReserveEntry(key)
 }
 
@@ -138,6 +143,11 @@ func (rc *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *c
 	rc.lock.Lock()
 	defer rc.lock.Unlock()
 
+	return rc.unsafeCommitEntry(key, content)
+}
+
+// unsafeCommitEntry confirms the entry in the cache with the content passed as parameter
+func (rc *ResourceCache) unsafeCommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
 	if ce, xerr = rc.byID.CommitEntry(key, content); xerr != nil {
 		return nil, xerr
 	}
@@ -158,6 +168,11 @@ func (rc *ResourceCache) FreeEntry(key string) fail.Error {
 	rc.lock.Lock()
 	defer rc.lock.Unlock()
 
+	return rc.unsafeFreeEntry(key)
+}
+
+// unsafeFreeEntry removes the reservation in cache
+func (rc *ResourceCache) unsafeFreeEntry(key string) fail.Error {
 	return rc.byID.FreeEntry(key)
 }
 

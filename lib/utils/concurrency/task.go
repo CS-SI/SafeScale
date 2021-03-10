@@ -23,12 +23,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 )
 
 // TaskStatus ...
@@ -143,11 +142,16 @@ func VoidTask() (Task, fail.Error) {
 	return NewTask()
 }
 
+// user-defined type to use as key in context.WithValue()
+type taskContextKey string
+
+const keyForTaskInContext taskContextKey = "task"
+
 // TaskFromContext extracts the task instance from context
 func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	if ctx != nil {
-		if ctxValue := ctx.Value("task"); ctxValue != nil {
-			if task, ok := ctxValue.(Task); ok {
+		if ctxValue := ctx.Value(keyForTaskInContext); ctxValue != nil {
+			if task, ok := ctxValue.(*task); ok {
 				return task, nil
 			}
 			return nil, fail.InconsistentError("context value for 'task' is not a 'concurrency.Task'")
@@ -183,12 +187,12 @@ func NewTaskWithParent(parentTask Task) (Task, fail.Error) {
 }
 
 // NewTaskWithContext ...
-func NewTaskWithContext(ctx context.Context/*, parentTask Task*/) (Task, fail.Error) {
+func NewTaskWithContext(ctx context.Context /*, parentTask Task*/) (Task, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	return newTask(ctx, nil/*parentTask*/)
+	return newTask(ctx, nil /*parentTask*/)
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
@@ -227,8 +231,7 @@ func newTask(ctx context.Context, parentTask Task) (*task, fail.Error) {
 	}
 
 	t.id = u.String()
-
-	t.ctx = context.WithValue(childContext, "task", t)
+	t.ctx = context.WithValue(childContext, keyForTaskInContext, &t)
 
 	return &t, nil
 }
