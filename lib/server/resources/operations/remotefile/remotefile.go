@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/system"
@@ -39,15 +40,14 @@ type Item struct {
 	RemoteRights string
 }
 
+// FIXME: validate parameters everywhere
+
 // Upload transfers the local file to the hostname
-func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Error) {
+func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
@@ -60,13 +60,22 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Er
 
 	}
 
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := host.Push(task, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, temporal.GetExecutionTimeout())
+			retcode, _, _, err := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, temporal.GetExecutionTimeout())
 			if err != nil {
 				return err
 			}
@@ -74,7 +83,7 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Er
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = host.Run(task, fmt.Sprintf("sudo rm -f %s", rfc.Remote), outputs.COLLECT, temporal.GetLongOperationTimeout(), temporal.GetExecutionTimeout())
+					_, _, _, err = host.Run(ctx, fmt.Sprintf("sudo rm -f %s", rfc.Remote), outputs.COLLECT, temporal.GetLongOperationTimeout(), temporal.GetExecutionTimeout())
 					if err == nil {
 						return fail.NewError("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
@@ -106,37 +115,39 @@ func (rfc Item) Upload(task concurrency.Task, host resources.Host) (xerr fail.Er
 }
 
 // UploadString transfers the local file to the hostname
-func (rfc Item) UploadString(task concurrency.Task, content string, host resources.Host) fail.Error {
+func (rfc Item) UploadString(ctx context.Context, content string, host resources.Host) fail.Error {
 	if rfc.Remote == "" {
 		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
 
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
 	f, xerr := system.CreateTempFileFromString(content, 0600)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")
 	}
 	rfc.Local = f.Name()
-	return rfc.Upload(task, host)
+	return rfc.Upload(ctx, host)
 }
 
 // RemoveRemote deletes the remote file from host
-func (rfc Item) RemoveRemote(task concurrency.Task, host resources.Host) fail.Error {
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+func (rfc Item) RemoveRemote(ctx context.Context, host resources.Host) fail.Error {
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
 	cmd := "rm -rf " + rfc.Remote
-	retcode, _, _, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil || retcode != 0 {
 		return fail.NewError("failed to remove file '%s:%s'", host.GetName(), rfc.Remote)
 	}
+
 	return nil
 }
 
@@ -157,13 +168,13 @@ func (rfh *RemoteFilesHandler) Count() uint {
 
 // Upload executes the copy of files
 // TODO: allow to upload to many hosts
-func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, host resources.Host) fail.Error {
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+func (rfh *RemoteFilesHandler) Upload(ctx context.Context, host resources.Host) fail.Error {
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
 	for _, v := range rfh.items {
-		xerr := v.Upload(task, host)
+		xerr := v.Upload(ctx, host)
 		if xerr != nil {
 			return xerr
 		}
@@ -174,13 +185,13 @@ func (rfh *RemoteFilesHandler) Upload(task concurrency.Task, host resources.Host
 // Cleanup executes the removal of remote files.
 // NOTE: Removal of local files is the responsability of the caller, not the RemoteFilesHandler.
 // TODO: allow to cleanup on many hosts
-func (rfh *RemoteFilesHandler) Cleanup(task concurrency.Task, host resources.Host) fail.Error {
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+func (rfh *RemoteFilesHandler) Cleanup(ctx context.Context, host resources.Host) fail.Error {
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
 	for _, v := range rfh.items {
-		xerr := v.RemoveRemote(task, host)
+		xerr := v.RemoveRemote(ctx, host)
 		if xerr != nil {
 			logrus.Warnf(xerr.Error())
 		}

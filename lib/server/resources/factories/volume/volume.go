@@ -20,35 +20,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // New creates an instance of resources.Volume
 func New(svc iaas.Service) (resources.Volume, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
 	return operations.NewVolume(svc)
 }
 
 // Load loads the metadata of a volume and returns an instance of resources.Volume
-func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Volume, fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if ref == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-	}
-
-	// FIXME: tracer...
-	// defer fail.OnPanic(&err)
-
-	return operations.LoadVolume(task, svc, ref)
+func Load(svc iaas.Service, ref string) (resources.Volume, fail.Error) {
+	return operations.LoadVolume(svc, ref)
 }

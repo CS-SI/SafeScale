@@ -17,6 +17,7 @@
 package cache
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -86,6 +87,88 @@ func TestParallelLockContent(t *testing.T) {
 	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
 }
 
-// FIXME: test Entry.lock() and Entry.unlock() in a multiple go routines situation
-func TestEntryLock(t *testing.T) {
+func makeDeadlockHappy(mdh *Cache) {
+	// doing some stuff that ends up calling....
+	anotherRead, err := (*mdh).GetEntry("What")
+	if err != nil {
+		panic(err)
+	}
+
+	theReadCt := anotherRead.Content() // Deadlock
+	fmt.Printf("The deadlocked content : %v\n", theReadCt)
 }
+
+// FIXME: test Entry.lock() and Entry.unlock() in a multiple go routines situation
+func TestDeadlock(t *testing.T) {
+	content := &reservation{key: "content"}
+
+	nukaCola , _ := NewCache("nuka")
+	err := nukaCola.ReserveEntry("What")
+	if err != nil {
+		panic(err)
+	}
+
+	// between reserve and commit, someone with a reference to our cache just checks its content
+	makeDeadlockHappy(&nukaCola)
+
+	/*
+	// doing some stuff that ends up calling....
+	anotherRead, err := nukaCola.GetEntry("What")
+	if err != nil {
+		panic(err)
+	}
+	theReadCt := anotherRead.Content() // Deadlock
+	fmt.Printf("The deadlocked content : %v\n", theReadCt)
+	 */
+
+	time.Sleep(1*time.Second)
+	_, xerr := nukaCola.CommitEntry("What", content)
+	if xerr != nil {
+		panic(xerr)
+	}
+
+	theX, err := nukaCola.GetEntry("What")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(theX)
+}
+
+func TestLostCache(t *testing.T) {
+	content := &reservation{key: "content"}
+
+	nukaCola , err := NewCache("nuka")
+	if err != nil {
+		panic(err)
+	}
+
+	err = nukaCola.ReserveEntry("What")
+	if err != nil {
+		panic(err)
+	}
+
+	time.Sleep(100*time.Millisecond)
+
+	compilerHappy, fe := nukaCola.CommitEntry("What", content)
+	if fe != nil {
+		panic(fe)
+	}
+
+	_ = compilerHappy
+
+	time.Sleep(1 * time.Second)
+
+	theX, err := nukaCola.GetEntry(content.GetID())
+	if err != nil {
+		panic(err)
+	}
+
+	theX, err = nukaCola.GetEntry("What")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(theX)
+
+}
+

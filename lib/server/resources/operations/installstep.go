@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
@@ -222,10 +223,18 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, xerr fail.Error) {
+func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, xerr fail.Error) {
 	outcomes = &unitResults{}
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return outcomes, xerr
+	}
 
-	tracer := debug.NewTracer(is.Worker.feature.task, true, "").Entering()
+	if task.Aborted() {
+		return outcomes, fail.AbortedError(nil, "aborted")
+	}
+
+	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -236,18 +245,19 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
-			if cloneV["HostIP"], xerr = h.GetPrivateIP(is.Worker.feature.task); xerr != nil {
+			if cloneV["HostIP"], xerr = h.GetPrivateIP(); xerr != nil {
 				return nil, xerr
 			}
 
 			cloneV["ShortHostname"] = h.GetName()
 			domain := ""
-			xerr = h.Inspect(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(/*is.Worker.feature.task, */hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+			xerr = h.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
+
 					domain = hostDescriptionV1.Domain
 					if domain != "" {
 						domain = "." + domain
@@ -260,10 +270,11 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
 				return nil, xerr
 			}
-			subtask, err := concurrency.NewTaskWithParent(is.Worker.feature.task)
+			subtask, err := concurrency.NewTaskWithParent(task)
 			if err != nil {
 				return nil, err
 			}
+
 			outcome, xerr := subtask.Run(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
 			if xerr != nil {
 				return nil, xerr
@@ -294,17 +305,19 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
-			if cloneV["HostIP"], xerr = h.GetPrivateIP(is.Worker.feature.task); xerr != nil {
+			if cloneV["HostIP"], xerr = h.GetPrivateIP(); xerr != nil {
 				return nil, xerr
 			}
+
 			cloneV["ShortHostname"] = h.GetName()
 			domain := ""
-			xerr = h.Review(is.Worker.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = h.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(/*is.Worker.feature.task, */hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
+
 					domain = hostDescriptionV1.Domain
 					if domain != "" {
 						domain = "." + domain
@@ -320,7 +333,8 @@ func (is *step) Run(hosts []resources.Host, v data.Map, s resources.FeatureSetti
 			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
 				return nil, xerr
 			}
-			subtask, xerr := concurrency.NewTaskWithParent(is.Worker.feature.task)
+
+			subtask, xerr := concurrency.NewTaskWithParent(task)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -383,6 +397,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -400,7 +415,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
 			RemoteRights: "ug+rw-x,o-rwx",
 		}
-		xerr = rfcItem.UploadString(task, is.OptionsFileContent, p.Host)
+		xerr = rfcItem.UploadString(task.GetContext(), is.OptionsFileContent, p.Host)
 		_ = os.Remove(rfcItem.Local)
 		if xerr != nil {
 			return stepResult{err: xerr}, nil
@@ -420,7 +435,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	rfcItem := remotefile.Item{
 		Remote: filename,
 	}
-	xerr = rfcItem.UploadString(task, command, p.Host)
+	xerr = rfcItem.UploadString(task.GetContext(), command, p.Host)
 	_ = os.Remove(rfcItem.Local)
 	if xerr != nil {
 		return stepResult{err: xerr}, nil
@@ -433,7 +448,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	// Executes the script on the remote host
-	retcode, outrun, _, xerr := p.Host.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+	retcode, outrun, _, xerr := p.Host.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", outrun)
 		return stepResult{err: xerr, retcode: retcode, output: outrun}, nil

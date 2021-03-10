@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -30,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -69,17 +69,12 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 	}
 
 	// Check if 'edgeproxy4subnet' feature is installed on host
-	voidtask, xerr := concurrency.NewTask()
+	rp, xerr := NewFeature(svc, "edgeproxy4subnet")
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	rp, xerr := NewFeature(voidtask, svc, "edgeproxy4subnet")
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	addressedGateway, xerr := subnet.InspectGateway(voidtask, addressPrimaryGateway)
+	addressedGateway, xerr := subnet.InspectGateway(addressPrimaryGateway)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -89,7 +84,7 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 		present = anon.(bool)
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(subnet.GetName(), func() (interface{}, fail.Error) {
-			results, xerr := rp.Check(addressedGateway, data.Map{}, resources.FeatureSettings{})
+			results, xerr := rp.Check(nil, addressedGateway, data.Map{}, resources.FeatureSettings{})
 			if xerr != nil {
 				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
 			}
@@ -112,10 +107,10 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 		subnet:  subnet,
 		gateway: addressedGateway,
 	}
-	if ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(voidtask); xerr != nil {
+	if ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(); xerr != nil {
 		return nil, xerr
 	}
-	if ctrl.gatewayPublicIP, xerr = addressedGateway.GetPublicIP(voidtask); xerr != nil {
+	if ctrl.gatewayPublicIP, xerr = addressedGateway.GetPublicIP(); xerr != nil {
 		return nil, xerr
 	}
 
@@ -144,15 +139,12 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	var sourceControl map[string]interface{}
 
 	// Sets the values usable in all cases
-	voidtask, xerr := concurrency.NewTask()
-	if xerr != nil {
-		return "", xerr
-	}
-	xerr = k.subnet.Inspect(voidtask, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = k.subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		if as.VIP != nil {
 			// VPL: for now, no public IP on VIP, so uses the IP of the first getGateway
 			// (*values)["EndpointIP"] = as.VIP.unsafeGetPublicIP
@@ -351,12 +343,7 @@ func (k *KongController) addSourceControl(
 
 func (k *KongController) get(name, url string) (map[string]interface{}, string, fail.Error) {
 	cmd := fmt.Sprintf(curlGet, url)
-	task, xerr := concurrency.NewTask()
-	if xerr != nil {
-		return nil, "", xerr
-	}
-
-	retcode, stdout, _, xerr := k.gateway.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, _, xerr := k.gateway.Run(context.TODO(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -375,13 +362,8 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 
 // post creates a rule
 func (k *KongController) post(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
-	task, xerr := concurrency.NewTask()
-	if xerr != nil {
-		return nil, "", xerr
-	}
-
 	cmd := fmt.Sprintf(curlPost, url, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := k.gateway.Run(context.TODO(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -405,13 +387,8 @@ func (k *KongController) post(name, url, data string, v *data.Map, propagate boo
 
 // put updates or creates a rule
 func (k *KongController) put(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
-	task, xerr := concurrency.NewTask()
-	if xerr != nil {
-		return nil, "", xerr
-	}
-
 	cmd := fmt.Sprintf(curlPut, url, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := k.gateway.Run(context.TODO(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -435,13 +412,8 @@ func (k *KongController) put(name, url, data string, v *data.Map, propagate bool
 
 // patch updates an existing rule
 func (k *KongController) patch(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
-	task, xerr := concurrency.NewTask()
-	if xerr != nil {
-		return nil, "", xerr
-	}
-
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
-	retcode, stdout, stderr, xerr := k.gateway.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := k.gateway.Run(context.TODO(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return nil, "", xerr
 	}

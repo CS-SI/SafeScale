@@ -18,52 +18,26 @@
 package subnet
 
 import (
+	"golang.org/x/net/context"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // List returns a list of available subnets
 func List(ctx context.Context, svc iaas.Service, networkID string, all bool) ([]*abstract.Subnet, fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
-	return operations.ListSubnets(task, svc, networkID, all)
+	return operations.ListSubnets(ctx, svc, networkID, all)
 }
 
 // New creates an instance of resources.Subnet
 func New(svc iaas.Service) (resources.Subnet, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
 	return operations.NewSubnet(svc)
 }
 
 // Load loads the metadata of a subnet and returns an instance of resources.Subnet
-func Load(ctx context.Context, svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if subnetRef == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetRef")
-	}
-
-	return operations.LoadSubnet(task, svc, networkRef, subnetRef)
+func Load(svc iaas.Service, networkRef, subnetRef string) (resources.Subnet, fail.Error) {
+	return operations.LoadSubnet(svc, networkRef, subnetRef)
 }

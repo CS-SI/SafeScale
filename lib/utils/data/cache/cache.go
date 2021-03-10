@@ -39,15 +39,15 @@ type Cache interface {
 	ReserveEntry(key string) fail.Error                             // locks an entry identified by key for update
 	CommitEntry(key string, content Cacheable) (*Entry, fail.Error) // fills a previously reserved entry with content
 	FreeEntry(key string) fail.Error                                // frees a cache entry (removing the reservation from cache)
-	AddEntry(content Cacheable) (*Entry, fail.Error)                // adds a content in cache (doing ReserverEntry+CommitEntry in a whole)
+	AddEntry(content Cacheable) (*Entry, fail.Error)                // adds a content in cache (doing ReserverEntry+CommitEntry i a whole)
 }
 
 type cache struct {
-	// concurrency.TaskedLock
 	lock sync.RWMutex
 
 	name  string
 	cache map[string]*Entry
+	reserved map[string]struct{}
 }
 
 // NewCache creates a new cache
@@ -59,7 +59,7 @@ func NewCache(name string) (Cache, fail.Error) {
 	c := cache{
 		name:  name,
 		cache: map[string]*Entry{},
-		// TaskedLock: concurrency.NewTaskedLock(),
+		reserved: map[string]struct{}{},
 	}
 	return &c, nil
 }
@@ -96,6 +96,9 @@ func (c *cache) GetEntry(key string) (*Entry, fail.Error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
+	if _, ok := c.reserved[key]; ok {
+		return nil, fail.NotAvailableError("cache entry '%s' is reserved and cannot be use until freed or committed")
+	}
 	if ce, ok := c.cache[key]; ok {
 		return ce, nil
 	}
@@ -116,14 +119,18 @@ func (c *cache) ReserveEntry(key string) (xerr fail.Error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if _, ok := c.cache[key]; !ok {
-		ce := newEntry(&reservation{key: key})
-		ce.lock()
-		c.cache[key] = &ce
-		return nil
+	if _, ok := c.reserved[key]; ok {
+		return fail.NotAvailableError("the cache entry '%s' is already reserved", key)
+	}
+	if _, ok := c.cache[key]; ok {
+		return fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry in the cache with key '%s'", key), 0))
 	}
 
-	return fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry in the cache with id %s", key), 0))
+	ce := newEntry(&reservation{key: key})
+	ce.lock()
+	c.cache[key] = &ce
+	c.reserved[key] = struct{}{}
+	return nil
 }
 
 // CommitEntry fills a previously reserved entry with content
@@ -138,11 +145,24 @@ func (c *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xerr fail
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	if _, ok := c.reserved[key]; !ok {
+		return nil, fail.NotAvailableError("the cache entry '%s' is not reserved", key)
+	}
+
+	// content may bring new key, based on content.GetID(), than the key reserved; we have to check if this new key has not been reserved by someone else...
+	if content.GetID() != key {
+		if _, ok := c.reserved[content.GetID()]; ok {
+			return nil, fail.InconsistentError("the cache entry '%s' corresponding to the ID of the content is reserved; content cannot be committed", content.GetID())
+		}
+	}
+
+	// Everything seems ok, we can update
 	var ok bool
 	if ce, ok = c.cache[key]; ok {
 		ce.content = data.NewImmutableKeyValue(content.GetID(), content)
 		// reserved key may have to change accordingly with the ID of content
 		delete(c.cache, key)
+		delete(c.reserved, key)
 		c.cache[content.GetID()] = ce
 		ce.unlock()
 		return ce, fail.ConvertError(content.AddObserver(c))
@@ -163,12 +183,17 @@ func (c *cache) FreeEntry(key string) (xerr fail.Error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	if _, ok := c.reserved[key]; !ok {
+		return fail.NotAvailableError("the cache entry '%s' is not reserved", key)
+	}
+
 	var (
 		ce *Entry
 		ok bool
 	)
 	if ce, ok = c.cache[key]; ok {
 		delete(c.cache, key)
+		delete(c.reserved, key)
 		ce.unlock()
 	}
 

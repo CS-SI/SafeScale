@@ -85,13 +85,7 @@ func nullSecurityGroup() *securityGroup {
 }
 
 // lookupSecurityGroup returns true if security group exists, false otherwise
-func lookupSecurityGroup(/*ctx context.Context, */svc iaas.Service, ref string) (bool, fail.Error) {
-	if task == nil {
-		return false, fail.InvalidParameterError("task", "cannot be nil")
-	}
-	if task.Aborted() {
-		return false, fail.AbortedError(nil, "aborted")
-	}
+func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 	if svc == nil {
 		return false, fail.InvalidParameterError("svc", "cannot be nil")
 	}
@@ -116,27 +110,15 @@ func lookupSecurityGroup(/*ctx context.Context, */svc iaas.Service, ref string) 
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(ctx context.Context,svc iaas.Service, ref string) (rsg resources.SecurityGroup, xerr fail.Error) {
+func LoadSecurityGroup(svc iaas.Service, ref string) (rsg resources.SecurityGroup, xerr fail.Error) {
 	// Note: do not log error from here; caller has the responsibility to log if needed
 	defer fail.OnPanic(&xerr)
 
-	if ctx == nil {
-		return nullSecurityGroup(), fail.InvalidParameterCannotBeNilError("ctx")
-	}
 	if svc == nil {
 		return nullSecurityGroup(), fail.InvalidParameterError("svc", "cannot be nil")
 	}
 	if ref == "" {
 		return nullSecurityGroup(), fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-
-	task, xerr := concurrency.TaskFromContext(ctx)
-	if xerr != nil {
-		return nullSecurityGroup(), xerr
-	}
-
-	if task.Aborted() {
-		return nullSecurityGroup(), fail.AbortedError(nil, "aborted")
 	}
 
 	sgCache, xerr := svc.GetCache(securityGroupKind)
@@ -194,12 +176,9 @@ func (instance *securityGroup) isNull() bool {
 }
 
 // Carry overloads rv.core.Carry() to add Volume to service cache
-func (instance *securityGroup) carry(/*ctx context.Context, */clonable data.Clonable) (xerr fail.Error) {
+func (instance *securityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -230,7 +209,7 @@ func (instance *securityGroup) carry(/*ctx context.Context, */clonable data.Clon
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	if xerr := instance.core.Carry(clonable); xerr != nil {
+	if xerr := instance.core.carry(clonable); xerr != nil {
 		return xerr
 	}
 
@@ -252,11 +231,16 @@ func (instance *securityGroup) Browse(ctx context.Context,callback func(*abstrac
 	// if instance.isNull() {
 	// 	return fail.InvalidInstanceError()
 	// }
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if callback == nil {
-		return fail.InvalidParameterError("callback", "cannot be nil")
+		return fail.InvalidParameterCannotBeNilError("callback")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -289,8 +273,8 @@ func (instance *securityGroup) Create(ctx context.Context,networkID, name, descr
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if networkID == "" {
 		return fail.InvalidParameterError("networkID", "cannot be empty string")
@@ -300,6 +284,11 @@ func (instance *securityGroup) Create(ctx context.Context,networkID, name, descr
 	}
 	if strings.HasPrefix(name, "instance") {
 		return fail.InvalidParameterError("name", "cannot start with 'instance'")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -317,7 +306,7 @@ func (instance *securityGroup) Create(ctx context.Context,networkID, name, descr
 	// Check if securityGroup exists and is managed by SafeScale
 	svc := instance.GetService()
 	var found bool
-	if found, xerr = lookupSecurityGroup(task, svc, name); xerr != nil {
+	if found, xerr = lookupSecurityGroup(svc, name); xerr != nil {
 		// switch xerr.(type) {
 		// case *fail.ErrNotFound:
 		// 	// not found, good, continue
@@ -361,7 +350,7 @@ func (instance *securityGroup) Create(ctx context.Context,networkID, name, descr
 	}()
 
 	// Creates metadata
-	if xerr = instance.Carry(/*task, */asg); xerr != nil {
+	if xerr = instance.carry(asg); xerr != nil {
 		return xerr
 	}
 
@@ -370,7 +359,7 @@ func (instance *securityGroup) Create(ctx context.Context,networkID, name, descr
 			// Disable abort signal during clean up
 			defer task.DisarmAbortSignal()()
 
-			if derr := instance.core.Delete(); derr != nil {
+			if derr := instance.core.delete(); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", actionFromError(xerr)))
 			}
 		}
@@ -386,16 +375,19 @@ func (instance *securityGroup) Create(ctx context.Context,networkID, name, descr
 	return nil
 }
 
-// ForceDelete deletes a Security Group unconditionally
-func (instance *securityGroup) ForceDelete(ctx context.Context) (xerr fail.Error) {
+// Delete deletes a Security Group
+func (instance *securityGroup) Delete(ctx context.Context, force bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -403,25 +395,16 @@ func (instance *securityGroup) ForceDelete(ctx context.Context) (xerr fail.Error
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.unsafeDelete(true)
-}
-
-// Delete deletes a Security Group
-func (instance *securityGroup) Delete() (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if instance.isNull() {
-		return fail.InvalidInstanceError()
-	}
-
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
-
-	return instance.unsafeDelete(false)
+	return instance.unsafeDelete(ctx, force)
 }
 
 // unbindFromHosts unbinds security group from all the hosts bound to it and update the host metadata accordingly
-func (instance *securityGroup) unbindFromHosts(/*ctx context.Context, */in *propertiesv1.SecurityGroupHosts) fail.Error {
+func (instance *securityGroup) unbindFromHosts(ctx context.Context, in *propertiesv1.SecurityGroupHosts) fail.Error {
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	tg, xerr := concurrency.NewTaskGroup(task)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from hosts", instance.GetName())
@@ -433,7 +416,7 @@ func (instance *securityGroup) unbindFromHosts(/*ctx context.Context, */in *prop
 		if v.FromSubnet {
 			return fail.InvalidRequestError("cannot unbind from host a security group applied from subnet; use disable instead or remove from bound subnet")
 		}
-		rh, xerr := LoadHost(task, svc, v.ID)
+		rh, xerr := LoadHost(svc, v.ID)
 		if xerr != nil {
 			break
 		}
@@ -467,7 +450,12 @@ func (instance *securityGroup) unbindFromHosts(/*ctx context.Context, */in *prop
 }
 
 // unbindFromSubnets unbinds security group from all the subnets bound to it and update the Subnet metadata accordingly
-func (instance *securityGroup) unbindFromSubnets(task concurrency.Task, in *propertiesv1.SecurityGroupSubnets) fail.Error {
+func (instance *securityGroup) unbindFromSubnets(ctx context.Context, in *propertiesv1.SecurityGroupSubnets) fail.Error {
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	tg, xerr := concurrency.NewTaskGroup(task)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from subnets", instance.GetName())
@@ -507,10 +495,14 @@ func (instance *securityGroup) Clear(ctx context.Context) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be nil")
+	if ctx == nil {
+		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -528,8 +520,13 @@ func (instance *securityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterError("task", "cannot be null value of '*concurrency.Task'")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -540,7 +537,7 @@ func (instance *securityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 	defer instance.lock.Unlock()
 
 	var rules []abstract.SecurityGroupRule
-	xerr = instance.Inspect(/*task, */func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -574,8 +571,13 @@ func (instance *securityGroup) AddRule(ctx context.Context, rule abstract.Securi
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -592,11 +594,16 @@ func (instance *securityGroup) AddRules(ctx context.Context, rules abstract.Secu
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if len(rules) == 0 {
 		return fail.InvalidParameterError("rules", "cannot be empty slice")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -635,11 +642,16 @@ func (instance *securityGroup) DeleteRule(ctx context.Context, rule abstract.Sec
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if rule.IsNull() {
 		return fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -649,7 +661,7 @@ func (instance *securityGroup) DeleteRule(ctx context.Context, rule abstract.Sec
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(/*task,  */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -672,10 +684,15 @@ func (instance *securityGroup) GetBoundHosts(ctx context.Context) (_ []*properti
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+	
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -684,8 +701,8 @@ func (instance *securityGroup) GetBoundHosts(ctx context.Context) (_ []*properti
 	defer instance.lock.RUnlock()
 
 	var list []*propertiesv1.SecurityGroupBond
-	xerr = instance.Inspect(/*task, */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(/*task, */securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -712,8 +729,13 @@ func (instance *securityGroup) GetBoundSubnets(ctx context.Context) (list []*pro
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -723,8 +745,8 @@ func (instance *securityGroup) GetBoundSubnets(ctx context.Context) (list []*pro
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	xerr = instance.Inspect(/*task, */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(/*task, */securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgnV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -745,30 +767,23 @@ func (instance *securityGroup) GetBoundSubnets(ctx context.Context) (list []*pro
 }
 
 // CheckConsistency checks the rules in the security group on provider side are identical to the ones registered in metadata
-func (instance *securityGroup) CheckConsistency(_ concurrency.Task) fail.Error {
+func (instance *securityGroup) CheckConsistency(_ context.Context) fail.Error {
 	return fail.NotImplementedError()
 }
 
 // ToProtocol converts a Security Group to protobuf message
-func (instance *securityGroup) ToProtocol(ctx context.Context) (_ *protocol.SecurityGroupResponse, xerr fail.Error) {
+func (instance *securityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
 	out := &protocol.SecurityGroupResponse{}
-	return out, instance.Inspect(/*task, */func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return out, instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -793,10 +808,15 @@ func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host
 	if rh == nil {
 		return fail.InvalidParameterError("rh", "cannot be nil")
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+	
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -804,7 +824,7 @@ func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(/*task,  */func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if mark == resources.MarkSecurityGroupAsDefault {
 			asg, ok := clonable.(*abstract.SecurityGroup)
 			if !ok {
@@ -818,7 +838,7 @@ func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host
 			asg.DefaultForHost = rh.GetID()
 		}
 
-		return props.Alter(/*task, */securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -874,11 +894,16 @@ func (instance *securityGroup) UnbindFromHost(ctx context.Context, rh resources.
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if rh == nil {
 		return fail.InvalidParameterError("rh", "cannot be nil")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -888,8 +913,8 @@ func (instance *securityGroup) UnbindFromHost(ctx context.Context, rh resources.
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(/*task, */securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sgphV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
 				return fail.InconsistentError("'*securitygroupproperty.HostsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -921,11 +946,16 @@ func (instance *securityGroup) UnbindFromHostByReference(ctx context.Context, ho
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if hostRef == "" {
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -935,8 +965,8 @@ func (instance *securityGroup) UnbindFromHostByReference(ctx context.Context, ho
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(/*task, */securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sgphV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
 				return fail.InconsistentError("'*securitygroupproperty.HostsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -979,11 +1009,16 @@ func (instance *securityGroup) BindToSubnet(ctx context.Context, rs resources.Su
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if rs == nil {
 		return fail.InvalidParameterCannotBeNilError("rh")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -1003,7 +1038,7 @@ func (instance *securityGroup) BindToSubnet(ctx context.Context, rs resources.Su
 		return xerr
 	}
 
-	return instance.Alter(/*task,  */func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if mark == resources.MarkSecurityGroupAsDefault {
 			asg, ok := clonable.(*abstract.SecurityGroup)
 			if !ok {
@@ -1017,7 +1052,7 @@ func (instance *securityGroup) BindToSubnet(ctx context.Context, rs resources.Su
 			asg.DefaultForSubnet = rs.GetID()
 		}
 
-		return props.Alter(/*task, */securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1059,7 +1094,6 @@ func (instance *securityGroup) enableOnHostsAttachedToSubnet(task concurrency.Ta
 
 			for _, v := range shV1.ByID {
 				if _, innerXErr := tg.Start(instance.taskEnableOnHost, v); innerXErr != nil {
-
 					break
 				}
 			}
@@ -1082,6 +1116,7 @@ func (instance *securityGroup) disableOnHostsAttachedToSubnet(task concurrency.T
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			for _, v := range shV1.ByID {
 				if _, innerXErr := tg.Start(instance.taskDisableOnHost, v); innerXErr != nil {
 					break
@@ -1100,11 +1135,16 @@ func (instance *securityGroup) UnbindFromSubnet(ctx context.Context, rs resource
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if rs == nil {
 		return fail.InvalidParameterCannotBeNilError("rs")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -1114,8 +1154,8 @@ func (instance *securityGroup) UnbindFromSubnet(ctx context.Context, rs resource
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(/*task, */securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
 				return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1146,11 +1186,16 @@ func (instance *securityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if subnetRef == "" {
 		return fail.InvalidParameterError("rs", "cannot be empty string")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
@@ -1160,8 +1205,8 @@ func (instance *securityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(/*task, */securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
 				return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())

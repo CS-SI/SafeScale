@@ -17,14 +17,13 @@
 package host
 
 import (
-	"strings"
+	"context"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -32,13 +31,10 @@ import (
 func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, fail.Error) {
 	var nullList abstract.HostList
 	if svc == nil {
-		return nullList, fail.InvalidParameterCannotBeNilError("svc")
+		return nullList, fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	if task != nil {
-		if task.Aborted() {
-			return nil, fail.AbortedError(nil, "aborted")
-		}
+	if svc == nil {
+		return nullList, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	if all {
@@ -49,8 +45,9 @@ func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, f
 	if xerr != nil {
 		return nullList, xerr
 	}
+
 	hosts := nullList
-	xerr = rh.Browse(task, func(hc *abstract.HostCore) fail.Error {
+	xerr = rh.Browse(ctx, func(hc *abstract.HostCore) fail.Error {
 		hf := converters.HostCoreToHostFull(*hc)
 		hosts = append(hosts, hf)
 		return nil
@@ -60,33 +57,10 @@ func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, f
 
 // New creates an instance of resources.Host
 func New(svc iaas.Service) (_ resources.Host, err fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	host, xerr := operations.NewHost(svc)
-	if xerr != nil {
-		return nil, xerr
-	}
-	return host, nil
+	return operations.NewHost(svc)
 }
 
 // Load loads the metadata of host and returns an instance of resources.Host
-func Load(ctx context.Context, svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if ref = strings.TrimSpace(ref); ref == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-	}
-
-	// FIXME: tracer...
-
-	return operations.LoadHost(task, svc, ref)
+func Load( svc iaas.Service, ref string) (_ resources.Host, err fail.Error) {
+	return operations.LoadHost(svc, ref)
 }

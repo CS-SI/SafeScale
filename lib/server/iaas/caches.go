@@ -93,6 +93,7 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 			if xerr := rc.ReserveEntry(key); xerr != nil {
 				return nil, xerr
 			}
+
 			var content cache.Cacheable
 			if content, xerr = onMissFunc(); xerr == nil {
 				ce, xerr = rc.CommitEntry(key, content)

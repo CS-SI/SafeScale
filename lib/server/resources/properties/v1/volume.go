@@ -52,7 +52,7 @@ func (vd VolumeDescription) Clone() data.Clonable {
 
 // Replace ...
 func (vd *VolumeDescription) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if vd == nil || p == nil {
 		return vd
 	}
@@ -96,7 +96,7 @@ func (va VolumeAttachments) Clone() data.Clonable {
 
 // Replace ... (data.Clonable interface)
 func (va *VolumeAttachments) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if va == nil || p == nil {
 		return va
 	}

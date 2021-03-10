@@ -68,7 +68,7 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	list, xerr := securitygroupfactory.List(task, job.GetService(), all)
+	list, xerr := securitygroupfactory.List(task.GetContext(), job.GetService(), all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -114,7 +114,7 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	networkRef, _ := srvutils.GetReference(in.GetNetwork())
-	rn, xerr := networkfactory.Load(task, svc, networkRef)
+	rn, xerr := networkfactory.Load(svc, networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -129,12 +129,12 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		return nil, xerr
 	}
 
-	xerr = rsg.Create(task, rn.GetID(), name, in.Description, rules)
+	xerr = rsg.Create(task.GetContext(), rn.GetID(), name, in.Description, rules)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return rsg.ToProtocol(task)
+	return rsg.ToProtocol()
 }
 
 // Clear calls the clear method to remove all rules from a security group
@@ -180,7 +180,8 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 	if xerr != nil {
 		return empty, xerr
 	}
-	xerr = rsg.Clear(task)
+
+	xerr = rsg.Clear(task.GetContext())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -228,11 +229,12 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
-	xerr = rsg.Reset(task)
+
+	xerr = rsg.Reset(task.GetContext())
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -279,11 +281,12 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return rsg.ToProtocol(task)
+
+	return rsg.ToProtocol()
 }
 
 // Delete an host
@@ -325,16 +328,12 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
-	switch in.GetForce() {
-	case true:
-		xerr = rsg.ForceDelete(task)
-	case false:
-		xerr = rsg.Delete(task)
-	}
+
+	xerr = rsg.Delete(task.GetContext(), in.GetForce())
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -386,17 +385,18 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = rsg.AddRule(task, rule)
+	xerr = rsg.AddRule(task.GetContext(), rule)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	tracer.Trace("Rule successfully added to security group %s", refLabel)
-	return rsg.ToProtocol(task)
+	return rsg.ToProtocol()
 }
 
 // DeleteRule deletes a rule identified by id from a security group
@@ -442,17 +442,17 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = rsg.DeleteRule(task, rule)
+	xerr = rsg.DeleteRule(task.GetContext(), rule)
 	if xerr != nil {
 		return nil, xerr
 	}
 	tracer.Trace("Rule successfully added to security group %s", refLabel)
-	return rsg.ToProtocol(task)
+	return rsg.ToProtocol()
 }
 
 // Sanitize checks if provider-side rules are coherent with registered ones in metadata
@@ -488,23 +488,24 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
+	// task := job.GetTask()
 
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = rsg.CheckConsistency(task)
-	if xerr != nil {
-		return nil, xerr
-	}
-	tracer.Trace("Security Group %s is in sync with metadata %s")
-	return empty, nil
+	return empty, fail.NotImplementedError("not yet implemented")
+	// rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// xerr = rsg.CheckConsistency(task.GetContext())
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	// tracer.Trace("Security Group %s is in sync with metadata %s")
+	// return empty, nil
 }
 
 // Bonds lists the resources bound to the Security Group
@@ -554,7 +555,7 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(task, job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -562,18 +563,20 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	out := &protocol.SecurityGroupBondsResponse{}
 	switch loweredKind {
 	case "all", "host", "hosts":
-		bonds, xerr := rsg.GetBoundHosts(task)
+		bonds, xerr := rsg.GetBoundHosts(task.GetContext())
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		out.Hosts = converters.SliceOfSecurityGroupBondFromPropertyToProtocol(bonds)
 	}
 	switch loweredKind {
 	case "all", "subnet", "subnets", "network", "networks":
-		bonds, xerr := rsg.GetBoundSubnets(task)
+		bonds, xerr := rsg.GetBoundSubnets(task.GetContext())
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		out.Subnets = converters.SliceOfSecurityGroupBondFromPropertyToProtocol(bonds)
 	}
 

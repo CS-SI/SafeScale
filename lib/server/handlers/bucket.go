@@ -80,7 +80,7 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	svc := handler.job.GetService()
-	rb, xerr := bucketfactory.Load(task, svc, name)
+	rb, xerr := bucketfactory.Load(svc, name)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
@@ -94,7 +94,7 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	return rb.Create(task, name)
+	return rb.Create(task.GetContext(), name)
 }
 
 // Delete a bucket
@@ -111,11 +111,11 @@ func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	rb, xerr := bucketfactory.Load(task, handler.job.GetService(), name)
+	rb, xerr := bucketfactory.Load(handler.job.GetService(), name)
 	if xerr != nil {
 		return xerr
 	}
-	return rb.Delete(task)
+	return rb.Delete(task.GetContext())
 }
 
 // Inspect a bucket
@@ -132,7 +132,7 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fa
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	rb, xerr = bucketfactory.Load(task, handler.job.GetService(), name)
+	rb, xerr = bucketfactory.Load(handler.job.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -163,12 +163,12 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (xerr fai
 	}()
 
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(task, handler.job.GetService(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.GetService(), bucketName)
 	if xerr != nil {
 		return xerr
 	}
 
-	return rb.Mount(task, hostName, path)
+	return rb.Mount(task.GetContext(), hostName, path)
 }
 
 // Unmount a bucket
@@ -195,10 +195,10 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (xerr fail.Er
 	}()
 
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(task, handler.job.GetService(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.GetService(), bucketName)
 	if xerr != nil {
 		return xerr
 	}
 
-	return rb.Unmount(task, hostName)
+	return rb.Unmount(task.GetContext(), hostName)
 }

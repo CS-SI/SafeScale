@@ -37,7 +37,7 @@ func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentit
 		return emptyList, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	objc, xerr := New(ctx, svc)
+	objc, xerr := New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -51,25 +51,11 @@ func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentit
 }
 
 // New creates a new instance of resources.Cluster
-func New(ctx context.Context, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
-	// if ctx == nil {
-	// 	return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	// }
-	// if svc == nil {
-	// 	return nil, fail.InvalidParameterCannotBeNilError("svc")
-	// }
-	//
-	return operations.NewCluster(ctx, svc)
+func New(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
+	return operations.NewCluster(svc)
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
-func Load(ctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
-	// if ctx == nil {
-	// 	return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	// }
-	// if svc == nil {
-	// 	return nil, fail.InvalidParameterCannotBeNilError("svc")
-	// }
-
-	return operations.LoadCluster(ctx, svc, name)
+func Load( svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
+	return operations.LoadCluster(svc, name)
 }

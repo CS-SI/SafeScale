@@ -89,10 +89,11 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	// Map resources.Volume to protocol.Volume
 	var pbvolumes []*protocol.VolumeInspectResponse
 	for _, v := range volumes {
-		pbVolume, xerr := v.ToProtocol(task)
+		pbVolume, xerr := v.ToProtocol()
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		pbvolumes = append(pbvolumes, pbVolume)
 	}
 	rv := &protocol.VolumeListResponse{Volumes: pbvolumes}
@@ -139,7 +140,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 	}
 
 	tracer.Trace("Volume '%s' created", name)
-	return rv.ToProtocol(task)
+	return rv.ToProtocol()
 }
 
 // Attach a volume to an host and create a mount point
@@ -335,5 +336,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, xerr
 	}
 
-	return rv.ToProtocol(task)
+	return rv.ToProtocol()
 }

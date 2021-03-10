@@ -19,6 +19,7 @@ type Bucket interface {
 	GetHost(ctx context.Context) (string, fail.Error)
 	GetMountPoint(ctx context.Context) (string, fail.Error)
 	Create(ctx context.Context, name string) fail.Error
+	Delete(ctx context.Context) fail.Error
 	Mount(ctx context.Context, hostname string, path string) fail.Error
 	Unmount(ctx context.Context, hostname string) fail.Error
 }

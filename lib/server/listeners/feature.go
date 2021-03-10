@@ -84,17 +84,17 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		rc, xerr := clusterfactory.Load(task, svc, targetRef)
+		rc, xerr := clusterfactory.Load(svc, targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
 
-		list, xerr := rc.ListInstalledFeatures(task)
+		list, xerr := rc.ListInstalledFeatures(task.GetContext())
 		if xerr != nil {
 			return empty, xerr
 		}
 
-		return converters.FeatureSliceFromResourceToProtocol(task, list), nil
+		return converters.FeatureSliceFromResourceToProtocol(list), nil
 	}
 
 	// Should not reach this
@@ -151,19 +151,19 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		}
 	}()
 
-	feat, xerr := featurefactory.New(task, svc, featureName)
+	feat, xerr := featurefactory.New(svc, featureName)
 	if xerr != nil {
 		return empty, xerr
 	}
 
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
-		rh, xerr := hostfactory.Load(task, svc, targetRef)
+		rh, xerr := hostfactory.Load(svc, targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
 
-		results, xerr := feat.Check(rh, featureVariables, featureSettings)
+		results, xerr := feat.Check(task.GetContext(), rh, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot check feature")
 		}
@@ -172,12 +172,12 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		}
 		return empty, fail.NotFoundError("feature '%s' not found on Host '%s'", featureName, rh.GetName())
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		rc, xerr := clusterfactory.Load(task, svc, targetRef)
+		rc, xerr := clusterfactory.Load(svc, targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
 
-		results, xerr := feat.Check(rc, featureVariables, featureSettings)
+		results, xerr := feat.Check(task.GetContext(), rc, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot check feature")
 		}
@@ -244,19 +244,19 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(task, svc, featureName)
+	feat, xerr := featurefactory.New(svc, featureName)
 	if xerr != nil {
 		return empty, xerr
 	}
 
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
-		rh, xerr := hostfactory.Load(task, svc, targetRef)
+		rh, xerr := hostfactory.Load(svc, targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
 
-		results, xerr := feat.Add(rh, featureVariables, featureSettings)
+		results, xerr := feat.Add(task.GetContext(), rh, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -265,12 +265,12 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 		}
 		return empty, fail.ExecutionError(nil, "failed to add feature '%s' to Host '%s' (%s)", featureName, targetRefLabel, results.AllErrorMessages())
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		rc, xerr := clusterfactory.Load(task, svc, targetRef)
+		rc, xerr := clusterfactory.Load(svc, targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
 
-		results, xerr := feat.Add(rc, featureVariables, featureSettings)
+		results, xerr := feat.Add(task.GetContext(), rc, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -322,19 +322,19 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	feat, xerr := featurefactory.New(task, svc, featureName)
+	feat, xerr := featurefactory.New(svc, featureName)
 	if xerr != nil {
 		return empty, xerr
 	}
 
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
-		rh, xerr := hostfactory.Load(task, svc, targetRef)
+		rh, xerr := hostfactory.Load(svc, targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
 
-		results, xerr := feat.Remove(rh, featureVariables, featureSettings)
+		results, xerr := feat.Remove(task.GetContext(), rh, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot remove feature")
 		}
@@ -343,12 +343,12 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 		}
 		return empty, fail.ExecutionError(nil, "failed to remove feature '%s' from Host '%s' (%s)", featureName, targetRefLabel, results.AllErrorMessages())
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		rc, xerr := clusterfactory.Load(task, svc, targetRef)
+		rc, xerr := clusterfactory.Load(svc, targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
 
-		results, xerr := feat.Remove(rc, featureVariables, featureSettings)
+		results, xerr := feat.Remove(task.GetContext(), rc, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot remove feature")
 		}

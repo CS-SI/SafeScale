@@ -50,7 +50,7 @@ func (hlm HostLocalMount) Clone() data.Clonable {
 
 // Replace ...
 func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if hlm == nil || p == nil {
 		return hlm
 	}
@@ -89,7 +89,7 @@ func (hrm HostRemoteMount) Clone() data.Clonable {
 
 // Replace ...
 func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if hrm == nil || p == nil {
 		return hrm
 	}
@@ -145,7 +145,7 @@ func (hm HostMounts) Clone() data.Clonable {
 
 // Replace ...  (data.Clonable interface)
 func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if hm == nil || p == nil {
 		return hm
 	}

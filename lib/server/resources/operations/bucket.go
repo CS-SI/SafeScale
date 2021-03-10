@@ -73,29 +73,13 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 }
 
 // LoadBucket instanciates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
-func LoadBucket(ctx context.Context,svc iaas.Service, name string) (b resources.Bucket, xerr fail.Error) {
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
+func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
-
-	task, xerr := concurrency.TaskFromContext(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, true, "('"+name+"')").WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	bucketCache, xerr := svc.GetCache(bucketKind)
 	if xerr != nil {
@@ -168,7 +152,7 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	if xerr := instance.core.Carry(clonable); xerr != nil {
+	if xerr := instance.core.carry(clonable); xerr != nil {
 		return xerr
 	}
 
@@ -320,12 +304,17 @@ func (instance *bucket) Create(ctx context.Context,name string) (xerr fail.Error
 }
 
 // Delete a bucket
-func (instance *bucket) Delete() (xerr fail.Error) {
+func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -367,7 +356,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 	defer instance.lock.Unlock()
 
 	// Get Host data
-	rh, xerr := LoadHost(ctx, instance.GetService(), hostName)
+	rh, xerr := LoadHost(instance.GetService(), hostName)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
 	}
@@ -454,7 +443,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 	}
 
 	// Get Host
-	rh, xerr := LoadHost(ctx, instance.GetService(), hostName)
+	rh, xerr := LoadHost(instance.GetService(), hostName)
 	if xerr != nil {
 		return xerr
 	}

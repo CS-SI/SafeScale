@@ -17,8 +17,9 @@
 package nfs
 
 import (
+	"golang.org/x/net/context"
+
 	"github.com/CS-SI/SafeScale/lib/system"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -38,12 +39,12 @@ func NewNFSClient(sshconfig *system.SSHConfig) (*Client, fail.Error) {
 }
 
 // Install installs NFS client on remote host
-func (c *Client) Install(task concurrency.Task) fail.Error {
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+func (c *Client) Install(ctx context.Context) fail.Error {
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
-	stdout, xerr := executeScript(task, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
+	stdout, xerr := executeScript(ctx, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install NFS client on remote host")
@@ -52,17 +53,17 @@ func (c *Client) Install(task concurrency.Task) fail.Error {
 }
 
 // Mount defines a mount of a remote share and mount it
-func (c *Client) Mount(task concurrency.Task, export string, mountPoint string, withCache bool) fail.Error {
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+func (c *Client) Mount(ctx context.Context, export string, mountPoint string, withCache bool) fail.Error {
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
 	data := map[string]interface{}{
 		"Export":      export,
 		"MountPoint":  mountPoint,
 		"cacheOption": map[bool]string{true: "ac", false: "noac"}[withCache],
 	}
-	stdout, xerr := executeScript(task, *c.SSHConfig, "nfs_client_share_mount.sh", data)
+	stdout, xerr := executeScript(ctx, *c.SSHConfig, "nfs_client_share_mount.sh", data)
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to mount remote NFS share")
@@ -71,13 +72,13 @@ func (c *Client) Mount(task concurrency.Task, export string, mountPoint string, 
 }
 
 // Unmount a nfs share from NFS server
-func (c *Client) Unmount(task concurrency.Task, export string) fail.Error {
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+func (c *Client) Unmount(ctx context.Context, export string) fail.Error {
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
 	data := map[string]interface{}{"Export": export}
-	stdout, xerr := executeScript(task, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
+	stdout, xerr := executeScript(ctx, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unmount remote NFS share")

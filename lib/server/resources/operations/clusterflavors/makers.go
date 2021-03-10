@@ -21,6 +21,7 @@ import (
 	"sync/atomic"
 
 	rice "github.com/GeertJohan/go.rice"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -50,7 +51,7 @@ type Makers struct {
 	CreateNode             func(c resources.Cluster, index uint, host resources.Host) fail.Error
 	ConfigureNode          func(c resources.Cluster, index uint, host resources.Host) fail.Error
 	UnconfigureNode        func(c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
-	ConfigureCluster       func(c resources.Cluster) fail.Error
+	ConfigureCluster       func(ctx context.Context, c resources.Cluster) fail.Error
 	UnconfigureCluster     func(c resources.Cluster) fail.Error
 	JoinMasterToCluster    func(c resources.Cluster, host resources.Host) fail.Error
 	JoinNodeToCluster      func(c resources.Cluster, host resources.Host) fail.Error

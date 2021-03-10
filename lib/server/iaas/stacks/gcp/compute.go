@@ -290,7 +290,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		func() error {
 			var innerXErr fail.Error
 			if ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1), request.IsGateway, request.SecurityGroupIDs); innerXErr != nil {
-				// if !server.IsNull() {
+				// if !server.isNull() {
 				// 	// try deleting server
 				// 	if derr := s.DeleteHost(server.ID); derr != nil {
 				// 		_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete instance"))

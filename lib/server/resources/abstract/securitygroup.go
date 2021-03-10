@@ -324,7 +324,7 @@ func (sg SecurityGroup) Clone() data.Clonable {
 //
 // satisfies interface data.Clonable
 func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value
+	// Do not test with isNull(), it's allowed to clone a null value
 	if sg == nil || p == nil {
 		return sg
 	}

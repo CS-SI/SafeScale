@@ -97,12 +97,12 @@ func (handler *shareHandler) Create(
 		return nil, xerr
 	}
 
-	objh, xerr := hostfactory.Load(task, handler.job.GetService(), hostName)
+	objh, xerr := hostfactory.Load(handler.job.GetService(), hostName)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return objs, objs.Create(task, shareName, objh, path, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
+	return objs, objs.Create(task.GetContext(), shareName, objh, path, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
 }
 
 // Delete a share from host
@@ -123,11 +123,11 @@ func (handler *shareHandler) Delete(name string) (xerr fail.Error) {
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 	defer fail.OnPanic(&xerr)
 
-	objs, xerr := sharefactory.Load(task, handler.job.GetService(), name)
+	objs, xerr := sharefactory.Load(handler.job.GetService(), name)
 	if xerr != nil {
 		return xerr
 	}
-	return objs.Delete(task)
+	return objs.Delete(task.GetContext())
 }
 
 // List return the list of all shares from all servers
@@ -152,7 +152,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		return nil, xerr
 	}
 	var servers []string
-	xerr = objs.Browse(task, func(hostName string, shareID string) fail.Error {
+	xerr = objs.Browse(task.GetContext(), func(hostName string, shareID string) fail.Error {
 		servers = append(servers, hostName)
 		return nil
 	})
@@ -167,13 +167,13 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	}
 
 	for _, serverID := range servers {
-		host, xerr := hostfactory.Load(task, svc, serverID)
+		host, xerr := hostfactory.Load(svc, serverID)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		xerr = host.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(/*task, */hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+		xerr = host.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 				hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -216,17 +216,17 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 
 	// Retrieve info about the share
 	svc := handler.job.GetService()
-	rs, xerr := sharefactory.Load(task, svc, shareName)
+	shareInstance, xerr := sharefactory.Load(svc, shareName)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	target, xerr := hostfactory.Load(task, svc, hostRef)
+	target, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return rs.Mount(task, target, path, withCache)
+	return shareInstance.Mount(task.GetContext(), target, path, withCache)
 }
 
 // Unmount a share from local directory of an host
@@ -252,17 +252,17 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	svc := handler.job.GetService()
-	objs, xerr := sharefactory.Load(task, svc, shareRef)
+	objs, xerr := sharefactory.Load(svc, shareRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	target, xerr := hostfactory.Load(task, svc, hostRef)
+	target, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	return objs.Unmount(task, target)
+	return objs.Unmount(task.GetContext(), target)
 }
 
 // Inspect returns the host and share corresponding to 'shareName'
@@ -285,5 +285,5 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, xe
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	return sharefactory.Load(task, handler.job.GetService(), shareRef)
+	return sharefactory.Load(handler.job.GetService(), shareRef)
 }

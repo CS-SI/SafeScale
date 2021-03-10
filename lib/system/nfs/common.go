@@ -24,6 +24,7 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -56,7 +57,12 @@ func getTemplateBox() (*rice.Box, fail.Error) {
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 // func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
-func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (string, fail.Error) {
+func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string, data map[string]interface{}) (string, fail.Error) {
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return "", xerr
+	}
+
 	if task.Aborted() {
 		return "", fail.AbortedError(nil, "aborted")
 	}
@@ -141,7 +147,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			retcode, stdout, stderr, innerXErr := sshconfig.Copy(task, filename, f.Name(), true)
+			retcode, stdout, stderr, innerXErr := sshconfig.Copy(ctx, filename, f.Name(), true)
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
@@ -165,7 +171,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		return "", xerr
 	}
 
-	sshcmd, xerr := sshconfig.NewSudoCommand(task, "which scp")
+	sshcmd, xerr := sshconfig.NewSudoCommand(ctx, "which scp")
 	if xerr != nil {
 		return "", xerr
 	}
@@ -173,7 +179,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			var innerXErr fail.Error
-			_, _, _, innerXErr = sshcmd.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay())
+			_, _, _, innerXErr = sshcmd.RunWithTimeout(ctx, outputs.COLLECT, temporal.GetBigDelay())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
@@ -205,7 +211,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		cmd = fmt.Sprintf("chmod u+rwx %s; captf=$(mktemp); export BASH_XTRACEFD=7; bash -c %s 7>$captf 2>&1; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}", filename, filename)
 	}
 
-	sshCmd, xerr := sshconfig.NewSudoCommand(task, cmd)
+	sshCmd, xerr := sshconfig.NewSudoCommand(ctx, cmd)
 	if xerr != nil {
 		return "", fail.ExecutionError(xerr)
 	}
@@ -214,7 +220,7 @@ func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name strin
 		func() error {
 			var innerXErr fail.Error
 
-			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(task, outputs.COLLECT, temporal.GetBigDelay()); innerXErr != nil {
+			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, temporal.GetBigDelay()); innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 

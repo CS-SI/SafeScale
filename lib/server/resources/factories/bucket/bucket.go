@@ -1,8 +1,6 @@
 package bucket
 
 import (
-	"context"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -16,33 +14,15 @@ func List(svc iaas.Service) ([]string, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	// tracer := debug.NewTracer(task, "", false).Entering()
-	// defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	return svc.ListBuckets(objectstorage.RootPath)
 }
 
 // New instanciates a new bucket instance
 func New(svc iaas.Service) (resources.Bucket, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
 	return operations.NewBucket(svc)
 }
 
 // Load initializes the bucket with metadata from provider
-func Load(ctx context.Context, svc iaas.Service, name string) (resources.Bucket, fail.Error) {
-	// if ctx == nil {
-	// 	return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	// }
-	// if svc == nil {
-	// 	return nil, fail.InvalidParameterCannotBeNilError("svc")
-	// }
-	// if name == "" {
-	// 	return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
-	// }
-	//
-
-	return operations.LoadBucket(ctx, svc, name)
+func Load(svc iaas.Service, name string) (resources.Bucket, fail.Error) {
+	return operations.LoadBucket(svc, name)
 }

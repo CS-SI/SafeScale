@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"strings"
 
+	"golang.org/x/net/context"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
@@ -34,10 +36,18 @@ import (
 )
 
 // delete effectively remove a Security Group
-func (instance *securityGroup) unsafeDelete(force bool) fail.Error {
-	svc := instance.GetService()
+func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fail.Error {
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
 
-	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	svc := instance.GetService()
+	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -63,7 +73,7 @@ func (instance *securityGroup) unsafeDelete(force bool) fail.Error {
 
 				// Do not remove a Security Group marked as default for a host
 				if hostsV1.DefaultFor != "" {
-					if _, xerr := LoadHost(task, svc, hostsV1.DefaultFor); xerr != nil {
+					if _, xerr := LoadHost(svc, hostsV1.DefaultFor); xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
 							hostsV1.DefaultFor = ""
@@ -106,7 +116,7 @@ func (instance *securityGroup) unsafeDelete(force bool) fail.Error {
 
 				// Do not remove a Security Group marked as default for a subnet
 				if subnetsV1.DefaultFor != "" {
-					subnetInstance, xerr := LoadSubnet(task, svc, "", subnetsV1.DefaultFor)
+					subnetInstance, xerr := LoadSubnet(svc, "", subnetsV1.DefaultFor)
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
@@ -131,7 +141,7 @@ func (instance *securityGroup) unsafeDelete(force bool) fail.Error {
 		}
 
 		// FIXME: how to restore bindings in case of failure or abortion ? This would prevent the use of DisarmAbortSignal here...
-		defer task.DisarmAbortSignal()()
+		// defer task.DisarmAbortSignal()()
 
 		// First unbind from subnets (which will unbind from hosts attached to these subnets...)
 		innerXErr := props.Alter(/*task, */securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -139,7 +149,7 @@ func (instance *securityGroup) unsafeDelete(force bool) fail.Error {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			return instance.unbindFromSubnets(task, sgnV1)
+			return instance.unbindFromSubnets(ctx, sgnV1)
 		})
 		if innerXErr != nil {
 			return innerXErr
@@ -151,7 +161,7 @@ func (instance *securityGroup) unsafeDelete(force bool) fail.Error {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			return instance.unbindFromHosts(task, sghV1)
+			return instance.unbindFromHosts(ctx, sghV1)
 		})
 		if innerXErr != nil {
 			return innerXErr
@@ -190,11 +200,11 @@ func (instance *securityGroup) unsafeDelete(force bool) fail.Error {
 		}
 	}
 
-	// Again, if we arrive here, we want the deletion of metadata not to be interrupted by abort, it's too late
-	defer task.DisarmAbortSignal()()
+	// // Again, if we arrive here, we want the deletion of metadata not to be interrupted by abort, it's too late
+	// defer task.DisarmAbortSignal()()
 
 	// Deletes metadata from Object Storage
-	if xerr = instance.core.Delete(task); xerr != nil {
+	if xerr = instance.core.delete(); xerr != nil {
 		// If entry not found, considered as success
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -212,11 +222,12 @@ func (instance *securityGroup) unsafeDelete(force bool) fail.Error {
 // unsafeClear is the non goroutine-safe implementation for Clear, that does the real work faster (no locking, less if no parameter validations)
 // Note: must be used wisely
 func (instance *securityGroup) unsafeClear(task concurrency.Task) fail.Error {
-	return instance.Alter(/*task,  */func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		_, innerXErr := instance.GetService().ClearSecurityGroup(asg)
 		return innerXErr
 	})
@@ -230,15 +241,17 @@ func (instance *securityGroup) unsafeAddRule(task concurrency.Task, rule abstrac
 		return fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
 
-	return instance.Alter(/*task,  */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		newAsg, innerXErr := instance.GetService().AddRuleToSecurityGroup(asg, rule)
 		if innerXErr != nil {
 			return innerXErr
 		}
+
 		asg.Replace(newAsg)
 		return nil
 	})
