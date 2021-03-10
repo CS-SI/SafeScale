@@ -22,8 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -41,6 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -188,9 +187,6 @@ func (instance *securityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
-
 	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
 	if xerr != nil {
 		return xerr
@@ -224,7 +220,7 @@ func (instance *securityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 }
 
 // Browse walks through securityGroup folder and executes a callback for each entries
-func (instance *securityGroup) Browse(ctx context.Context,callback func(*abstract.SecurityGroup) fail.Error) (xerr fail.Error) {
+func (instance *securityGroup) Browse(ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate instance
@@ -267,7 +263,7 @@ func (instance *securityGroup) Browse(ctx context.Context,callback func(*abstrac
 // Create creates a new securityGroup and its metadata.
 // If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a securityGroup, returns fail.ErrNotAvailable
-func (instance *securityGroup) Create(ctx context.Context,networkID, name, description string, rules []abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *securityGroup) Create(ctx context.Context, networkID, name, description string, rules []abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -692,7 +688,7 @@ func (instance *securityGroup) GetBoundHosts(ctx context.Context) (_ []*properti
 	if xerr != nil {
 		return nil, xerr
 	}
-	
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -816,7 +812,7 @@ func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host
 	if xerr != nil {
 		return xerr
 	}
-	
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}

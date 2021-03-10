@@ -300,7 +300,7 @@ func (instance *cluster) updateClusterNetworkPropertyIfNeeded() fail.Error {
 
 		if props.Lookup(clusterproperty.NetworkV2) {
 			// Having a clusterproperty.NetworkV2, need to update instance with clusterproperty.NetworkV3
-			innerXErr = props.Inspect(/*task, */clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			innerXErr = props.Inspect( /*task, */ clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -384,7 +384,7 @@ func (instance *cluster) updateClusterDefaultsPropertyIfNeeded() fail.Error {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			return props.Alter(/*task, */clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
+			return props.Alter( /*task, */ clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
 				defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -456,12 +456,6 @@ func (instance *cluster) isNull() bool {
 
 // carry ...
 func (instance *cluster) carry(clonable data.Clonable) (xerr fail.Error) {
-	// if instance.isNull() {
-	// 	return fail.InvalidInstanceError()
-	// }
-	// if clonable == nil {
-	// 	return fail.InvalidParameterCannotBeNilError("clonable")
-	// }
 	identifiable, ok := clonable.(data.Identifiable)
 	if !ok {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
@@ -501,7 +495,7 @@ func (instance *cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 }
 
 // Create creates the necessary infrastructure of the Cluster
-func (instance *cluster) Create(ctx context.Context,  req abstract.ClusterRequest) (xerr fail.Error) {
+func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -735,12 +729,12 @@ func (instance *cluster) firstLight(req abstract.ClusterRequest) fail.Error {
 		}
 
 		// sets default sizing from req
-		innerXErr = props.Alter(/*task, */clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter( /*task, */ clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			
+
 			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(req.GatewaysDef)
 			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(req.MastersDef)
 			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(req.NodesDef)
@@ -2056,7 +2050,7 @@ func (instance *cluster) GetState() (state clusterstate.Enum, xerr fail.Error) {
 }
 
 // AddNode adds a node
-func (instance *cluster) AddNode(ctx context.Context,def abstract.HostSizingRequirements) (_ resources.Host, xerr fail.Error) {
+func (instance *cluster) AddNode(ctx context.Context, def abstract.HostSizingRequirements) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2078,7 +2072,7 @@ func (instance *cluster) AddNode(ctx context.Context,def abstract.HostSizingRequ
 	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	// defer tracer.Exiting()
 
-	nodes, xerr := instance.AddNodes(ctx,1, def)
+	nodes, xerr := instance.AddNodes(ctx, 1, def)
 	if xerr != nil {
 		return nullHost(), xerr
 	}
@@ -2087,7 +2081,7 @@ func (instance *cluster) AddNode(ctx context.Context,def abstract.HostSizingRequ
 }
 
 // AddNodes adds several nodes
-func (instance *cluster) AddNodes(ctx context.Context,count uint, def abstract.HostSizingRequirements) (_ []resources.Host, xerr fail.Error) {
+func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements) (_ []resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -2342,8 +2336,8 @@ func (instance *cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	if xerr != nil {
-			return xerr
-		}
+		return xerr
+	}
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -2411,8 +2405,8 @@ func (instance *cluster) ListMasters(ctx context.Context) (list resources.Indexe
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	if xerr != nil {
-			return emptyList, xerr
-		}
+		return emptyList, xerr
+	}
 
 	if task.Aborted() {
 		return emptyList, fail.AbortedError(nil, "aborted")
@@ -2789,7 +2783,6 @@ func (instance *cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-
 	if xerr = instance.beingRemoved(); xerr != nil {
 		return nil, xerr
 	}
@@ -2966,7 +2959,7 @@ func (instance *cluster) CountNodes(ctx context.Context) (count uint, xerr fail.
 }
 
 // GetNodeByID returns a node based on its ID
-func (instance *cluster) GetNodeByID(ctx context.Context,hostID string) (host resources.Host, xerr fail.Error) {
+func (instance *cluster) GetNodeByID(ctx context.Context, hostID string) (host resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -3297,7 +3290,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			
+
 			stateV1.State = clusterstate.Removed
 			return nil
 		})
@@ -3400,7 +3393,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			
+
 			all = nodesV3.ByNumericalID
 			return nil
 		})
@@ -3555,7 +3548,7 @@ func (instance *cluster) extractNetworkingInfo(ctx context.Context) (network res
 			}
 
 			if networkV3.SubnetID != "" {
-				if subnet, innerXErr = LoadSubnet(/*ctx,*/ instance.GetService(), networkV3.NetworkID, networkV3.SubnetID); innerXErr != nil {
+				if subnet, innerXErr = LoadSubnet( /*ctx,*/ instance.GetService(), networkV3.NetworkID, networkV3.SubnetID); innerXErr != nil {
 					return innerXErr
 				}
 			}
@@ -3966,7 +3959,7 @@ func (instance *cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 			return innerXErr
 		}
 
-		return props.Inspect(/*task, */clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect( /*task, */ clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -4094,7 +4087,7 @@ func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 }
 
 // IsFeatureInstalled tells if a Feature identified by name is installed on Cluster, using only metadata
-func (instance *cluster) IsFeatureInstalled(ctx context.Context,name string) (found bool, xerr fail.Error) {
+func (instance *cluster) IsFeatureInstalled(ctx context.Context, name string) (found bool, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	found = false

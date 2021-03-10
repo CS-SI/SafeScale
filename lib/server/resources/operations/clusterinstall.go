@@ -141,8 +141,8 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 	v["CIDR"] = networkCfg.CIDR
 
 	var controlPlaneV1 *propertiesv1.ClusterControlplane
-	xerr = instance.Inspect(/*task, */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(/*task, */clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect( /*task, */ func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect( /*task, */ clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			controlPlaneV1, ok = clonable.(*propertiesv1.ClusterControlplane)
 			if !ok {
@@ -294,16 +294,6 @@ func (instance *cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	// task := ctx.Value("task").(concurrency.Task)
-	// if task == nil {
-	// 	if task, xerr = concurrency.VoidTask(); xerr != nil {
-	// 		return nil, xerr
-	// 	}
-	// }
-	// if task.Aborted() {
-	// 	return emptyList, fail.AbortedError(nil, "aborted")
-	// }
-
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
@@ -325,7 +315,7 @@ func (instance *cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 
 	out := make([]resources.Feature, 0, len(list))
 	for k := range list {
-		item, xerr := NewFeature(/*ctx, */instance.GetService(), k)
+		item, xerr := NewFeature( /*ctx, */ instance.GetService(), k)
 		if xerr != nil {
 			return emptySlice, xerr
 		}
@@ -336,7 +326,7 @@ func (instance *cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 }
 
 // AddFeature installs a feature on the cluster
-func (instance *cluster) AddFeature(ctx context.Context,  name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *cluster) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -356,7 +346,7 @@ func (instance *cluster) AddFeature(ctx context.Context,  name string, vars data
 }
 
 // CheckFeature tells if a feature is installed on the cluster
-func (instance *cluster) CheckFeature(ctx context.Context,  name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *cluster) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -376,7 +366,7 @@ func (instance *cluster) CheckFeature(ctx context.Context,  name string, vars da
 }
 
 // RemoveFeature uninstalls a feature from the cluster
-func (instance *cluster) RemoveFeature(ctx context.Context,  name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+func (instance *cluster) RemoveFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -396,7 +386,7 @@ func (instance *cluster) RemoveFeature(ctx context.Context,  name string, vars d
 }
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *cluster) ExecuteScript(ctx context.Context,  tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -409,19 +399,10 @@ func (instance *cluster) ExecuteScript(ctx context.Context,  tmplName string, da
 		return -1, "", "", fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	// task := ctx.Value("task").(concurrency.Task)
-	// if task == nil {
-	// 	if task, xerr = concurrency.VoidTask(); xerr != nil {
-	//      return -1, "", "", xerr
-	// 	}
-	// }
-	task, xerr := concurrency.VoidTask()
+	task, xerr := concurrency.TaskFromContext(ctx)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
-	// if task.Aborted() {
-	// 	return emptyList, fail.AbortedError(nil, "aborted")
-	// }
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
 	defer tracer.Exiting()
@@ -429,7 +410,7 @@ func (instance *cluster) ExecuteScript(ctx context.Context,  tmplName string, da
 
 	box, err := getTemplateBox()
 	if err != nil {
-		return 0, "", "", fail.ConvertError(err)
+		return -1, "", "", fail.ConvertError(err)
 	}
 
 	// Configures reserved_BashLibrary template var
@@ -633,7 +614,7 @@ func (instance *cluster) installReverseProxy(ctx context.Context) (xerr fail.Err
 	clusterName := identity.Name
 	disabled := false
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(/*task, */clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect( /*task, */ clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -680,8 +661,8 @@ func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 	}
 
 	disabled := false
-	xerr = instance.Inspect(/*task, */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(/*task, */clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect( /*task, */ func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect( /*task, */ clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -778,7 +759,7 @@ func (instance *cluster) installProxyCacheServer(ctx context.Context, host resou
 
 	disabled := false
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(/*task, */clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect( /*task, */ clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
