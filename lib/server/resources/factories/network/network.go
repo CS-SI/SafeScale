@@ -18,27 +18,28 @@
 package network
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // List returns a slice of *abstract.Network corresponding to managed networks
 func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Error) {
 	// FIXME: Check inputs
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if svc == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	}
 
 	rn, xerr := New(svc)
 	if xerr != nil {
 		return nil, xerr
-	}
-
-	if task != nil {
-		if task.Aborted() {
-			return nil, fail.AbortedError(nil, "aborted")
-		}
 	}
 
 	var list []*abstract.Network
@@ -53,7 +54,7 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 	}
 
 	// Recovers the list with metadata and add them to the list
-	xerr = rn.Browse(task, func(an *abstract.Network) fail.Error {
+	xerr = rn.Browse(ctx, func(an *abstract.Network) fail.Error {
 		list = append(list, an)
 		return nil
 	})
@@ -67,27 +68,10 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 
 // New creates an instance of resources.Network
 func New(svc iaas.Service) (resources.Network, fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
 	return operations.NewNetwork(svc)
 }
 
 // Load loads the metadata of a network and returns an instance of resources.Network
-func Load(ctx context.Context, svc iaas.Service, ref string) (resources.Network, fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if ref == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-	}
-
-	return operations.LoadNetwork(task, svc, ref)
+func Load(svc iaas.Service, ref string) (resources.Network, fail.Error) {
+	return operations.LoadNetwork(svc, ref)
 }

@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"time"
 
+	"golang.org/x/net/context"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
@@ -28,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -87,12 +88,13 @@ func (instance *cluster) unsafeGetState() (state clusterstate.Enum, xerr fail.Er
 			return clusterstate.Unknown, xerr
 		}
 
-		return state, instance.Alter(/*task,  */func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(/*task, */clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+		return state, instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 				stateV1, ok := clonable.(*propertiesv1.ClusterState)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
+
 				stateV1.State = state
 				instance.lastStateCollection = time.Now()
 				return nil
@@ -106,6 +108,7 @@ func (instance *cluster) unsafeGetState() (state clusterstate.Enum, xerr fail.Er
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			state = stateV1.State
 			return nil
 		})
@@ -113,6 +116,7 @@ func (instance *cluster) unsafeGetState() (state clusterstate.Enum, xerr fail.Er
 	if xerr != nil {
 		return clusterstate.Unknown, xerr
 	}
+
 	return state, nil
 }
 
@@ -123,10 +127,8 @@ func (instance *cluster) unsafeListMasters() (list resources.IndexedListOfCluste
 
 	emptyList := resources.IndexedListOfClusterNodes{}
 
-
-
 	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -150,30 +152,23 @@ func (instance *cluster) unsafeListMasters() (list resources.IndexedListOfCluste
 }
 
 // unsafeListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
-func (instance *cluster) unsafeListMasterIPs(task concurrency.Task) (list data.IndexedListOfStrings, xerr fail.Error) {
+func (instance *cluster) unsafeListMasterIPs() (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if task.Aborted() {
-		return emptyList, fail.AbortedError(nil, "aborted")
-	}
-
-	if xerr = instance.beingRemoved(task); xerr != nil {
+	if xerr = instance.beingRemoved(); xerr != nil {
 		return emptyList, xerr
 	}
 
-	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
-		return props.Inspect(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			list = make(data.IndexedListOfStrings, len(nodesV3.Masters))
 			for _, v := range nodesV3.Masters {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if node, found := nodesV3.ByNumericalID[v]; found {
 					list[node.NumericalID] = node.PrivateIP
 				}
@@ -192,18 +187,14 @@ func (instance *cluster) unsafeListNodeIPs() (list data.IndexedListOfStrings, xe
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			list = make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
 			for _, v := range nodesV3.PrivateNodes {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				if node, found := nodesV3.ByNumericalID[v]; found {
 					list[node.NumericalID] = node.PrivateIP
 				}
@@ -219,15 +210,11 @@ func (instance *cluster) unsafeListNodeIPs() (list data.IndexedListOfStrings, xe
 
 // unsafeFindAvailableMaster is the not go-routine-safe version of FindAvailableMaster, that does the real work
 // Must be used with wisdom
-func (instance *cluster) unsafeFindAvailableMaster(task concurrency.Task) (master resources.Host, xerr fail.Error) {
+func (instance *cluster) unsafeFindAvailableMaster(ctx context.Context) (master resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	master = nil
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	masters, xerr := instance.unsafeListMasters(task)
+	masters, xerr := instance.unsafeListMasters()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -240,12 +227,12 @@ func (instance *cluster) unsafeFindAvailableMaster(task concurrency.Task) (maste
 			continue
 		}
 
-		master, xerr := LoadHost(task, instance.GetService(), v.ID)
+		master, xerr := LoadHost(instance.GetService(), v.ID)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		if _, xerr = master.WaitSSHReady(task, temporal.GetConnectSSHTimeout()); xerr != nil {
+		if _, xerr = master.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout()); xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrTimeout:
 				lastError = xerr
@@ -265,17 +252,12 @@ func (instance *cluster) unsafeFindAvailableMaster(task concurrency.Task) (maste
 
 // unsafeListNodes is the not goroutine-safe version of ListNodes and no parameter validation, that does the real work
 // Note: must be used with wisdom
-func (instance *cluster) unsafeListNodes(task concurrency.Task) (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
+func (instance *cluster) unsafeListNodes() (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	emptyList := resources.IndexedListOfClusterNodes{}
-
-	if task.Aborted() {
-		return emptyList, fail.AbortedError(nil, "aborted")
-	}
-
-	xerr = instance.Review(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(/*task, */clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -283,10 +265,6 @@ func (instance *cluster) unsafeListNodes(task concurrency.Task) (list resources.
 			list = make(resources.IndexedListOfClusterNodes, len(nodesV3.PrivateNodes))
 			for _, v := range nodesV3.PrivateNodes {
 				if node, found := nodesV3.ByNumericalID[v]; found {
-					if task.Aborted() {
-						return fail.AbortedError(nil, "aborted")
-					}
-
 					list[node.NumericalID] = node
 				}
 			}

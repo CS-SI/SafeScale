@@ -876,10 +876,10 @@ func SimilarityScore(ref string, s string) float64 {
 
 // // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
 // func InitializeBucket(svc service, location objectstorage.Location) fail.Error {
-// 	if svc.IsNull() {
+// 	if svc.isNull() {
 // 		return fail.InvalidParameterError("svc", "cannot be null value")
 // 	}
-// 	if location.IsNull() {
+// 	if location.isNull() {
 // 		return fail.InvalidParameterError("location", "cannot be nil")
 // 	}
 //

@@ -91,7 +91,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, xerr := concurrency.NewTaskWithContext(ctx, nil)
+	task, xerr := concurrency.NewTaskWithContext(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -141,7 +141,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	task, xerr := concurrency.NewTaskWithContext(ctx, nil)
+	task, xerr := concurrency.NewTaskWithContext(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

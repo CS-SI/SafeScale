@@ -87,6 +87,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		if err != nil {
 			return nil, fail.Wrap(err, "failed to generate uuid for job")
 		}
+
 		id = uuid.String()
 	} else {
 		u := md.Get("uuid")
@@ -99,7 +100,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		}
 	}
 
-	task, xerr := concurrency.NewTaskWithContext(ctx, nil)
+	task, xerr := concurrency.NewTaskWithContext(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -124,14 +125,14 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	return &nj, nil
 }
 
-// IsNull tells if the instance represents a null value
-func (j *job) IsNull() bool {
+// isNull tells if the instance represents a null value
+func (j *job) isNull() bool {
 	return j == nil || j.uuid == ""
 }
 
 // GetID returns the id of the job (ie the uuid of gRPC message)
 func (j job) GetID() string {
-	if j.IsNull() {
+	if j.isNull() {
 		return ""
 	}
 
@@ -140,7 +141,7 @@ func (j job) GetID() string {
 
 // GetName returns the name (== id) of the job
 func (j job) GetName() string {
-	if j.IsNull() {
+	if j.isNull() {
 		return ""
 	}
 
@@ -149,7 +150,7 @@ func (j job) GetName() string {
 
 // GetTask returns the task instance
 func (j job) GetTask() concurrency.Task {
-	if j.IsNull() {
+	if j.isNull() {
 		return nil
 	}
 
@@ -158,7 +159,7 @@ func (j job) GetTask() concurrency.Task {
 
 // GetService returns the service instance
 func (j job) GetService() iaas.Service {
-	if j.IsNull() {
+	if j.isNull() {
 		return iaas.NullService()
 	}
 
@@ -167,7 +168,7 @@ func (j job) GetService() iaas.Service {
 
 // GetDuration returns the duration of the job
 func (j job) GetDuration() time.Duration {
-	if j.IsNull() {
+	if j.isNull() {
 		return 0
 	}
 
@@ -178,7 +179,7 @@ func (j job) GetDuration() time.Duration {
 func (j *job) Abort() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if j.IsNull() {
+	if j.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if j.cancel == nil {
@@ -192,7 +193,7 @@ func (j *job) Abort() (xerr fail.Error) {
 
 // Aborted tells if the job has been aborted
 func (j job) Aborted() bool {
-	if j.IsNull() {
+	if j.isNull() {
 		return false
 	}
 
@@ -202,7 +203,7 @@ func (j job) Aborted() bool {
 
 // Close tells the job to wait for end of operation; this ensure everything is cleaned up correctly
 func (j *job) Close() {
-	if j.IsNull() {
+	if j.isNull() {
 		return
 	}
 
@@ -214,7 +215,7 @@ func (j *job) Close() {
 
 // String returns a string representation of job information
 func (j job) String() string {
-	if j.IsNull() {
+	if j.isNull() {
 		return ""
 	}
 	return fmt.Sprintf("Job: %s (started at %s)", j.description, j.startTime.String())

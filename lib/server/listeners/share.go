@@ -86,7 +86,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(in.Options)
 	}
 	svc := job.GetService()
-	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	rh, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -96,17 +96,12 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, xerr
 	}
 
-	xerr = rs.Create(
-		task,
-		shareName,
-		rh, sharePath,
-		in.OptionsAsString,
-	)
+	xerr = rs.Create(task.GetContext(), shareName, rh, sharePath, in.OptionsAsString)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	psml, xerr := rs.ToProtocol(task)
+	psml, xerr := rs.ToProtocol()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -147,12 +142,12 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := sharefactory.Load(task, job.GetService(), shareName)
+	rs, xerr := sharefactory.Load(job.GetService(), shareName)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rs.Delete(task); xerr != nil {
+	if xerr = rs.Delete(task.GetContext()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -241,6 +236,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return converters.ShareMountFromPropertyToProtocol(in.GetShare().GetName(), in.GetHost().GetName(), mount), nil
 }
 
@@ -328,5 +324,5 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
 
-	return rh.ToProtocol(task)
+	return rh.ToProtocol()
 }

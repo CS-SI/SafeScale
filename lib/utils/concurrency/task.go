@@ -84,7 +84,7 @@ type TaskCore interface {
 	GetID() (string, fail.Error)
 	GetSignature() string
 	GetStatus() (TaskStatus, fail.Error)
-	GetContext() (context.Context, fail.Error)
+	GetContext() context.Context
 	GetLastError() (error, fail.Error)
 
 	Run(TaskAction, TaskParameters) (TaskResult, fail.Error)
@@ -183,12 +183,12 @@ func NewTaskWithParent(parentTask Task) (Task, fail.Error) {
 }
 
 // NewTaskWithContext ...
-func NewTaskWithContext(ctx context.Context, parentTask Task) (Task, fail.Error) {
+func NewTaskWithContext(ctx context.Context/*, parentTask Task*/) (Task, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	return newTask(ctx, parentTask)
+	return newTask(ctx, nil/*parentTask*/)
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
@@ -212,7 +212,7 @@ func newTask(ctx context.Context, parentTask Task) (*task, fail.Error) {
 		childContext, cancel = context.WithCancel(parentTask.(*task).ctx)
 	}
 	t := task{
-		ctx:      childContext,
+		// ctx:      childContext,
 		cancel:   cancel,
 		status:   READY,
 		abortCh:  make(chan bool, 1),
@@ -227,6 +227,8 @@ func newTask(ctx context.Context, parentTask Task) (*task, fail.Error) {
 	}
 
 	t.id = u.String()
+
+	t.ctx = context.WithValue(childContext, "task", t)
 
 	return &t, nil
 }
@@ -263,7 +265,7 @@ func (t *task) GetID() (string, fail.Error) {
 // // MustGetSignature builds the "signature" of the task passed as parameter,
 // // ie a string representation of the task ID in the format "{task <id>}".
 // func (t *task) MustGetSignature() (string, fail.Error) {
-// 	if t.IsNull() {
+// 	if t.isNull() {
 // 		return "", fail.InvalidInstanceError()
 // 	}
 //
@@ -308,19 +310,15 @@ func (t *task) GetStatus() (TaskStatus, fail.Error) {
 }
 
 // GetContext returns the context associated to the task
-func (t *task) GetContext() (context.Context, fail.Error) {
+func (t *task) GetContext() context.Context {
 	if t.IsNull() {
-		return nil, fail.InvalidInstanceError()
+		return context.TODO()
 	}
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.status == ABORTED {
-		return t.ctx, fail.AbortedError(nil, "aborted")
-	}
-
-	return t.ctx, nil
+	return t.ctx
 }
 
 // SetID allows to specify task ID. The uniqueness of the ID through all the tasks
@@ -784,7 +782,7 @@ func (t *task) Abortable() (bool, fail.Error) {
 // // call with task as parameter may abort before the end.
 // // By design, this function panics if t is null value. fail.OnPanic() may be used to catch this panic if needed.
 // func (t *task) IgnoreAbortSignal(ignore bool) {
-// 	if t.IsNull() {
+// 	if t.isNull() {
 // 		panic("task.IgnoreAbortSignal() called from null value of task; ignored.")
 // 	}
 //

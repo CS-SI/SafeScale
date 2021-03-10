@@ -18,6 +18,7 @@ package operations
 
 import (
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
@@ -30,7 +31,7 @@ import (
 type noneInstaller struct{}
 
 // Check checks if the feature is installed
-func (i *noneInstaller) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&xerr)
 
@@ -55,10 +56,13 @@ func (i *noneInstaller) Check(f resources.Feature, t resources.Targetable, v dat
 
 // Add installs the feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
-func (i *noneInstaller) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&xerr)
 
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
 	if f == nil {
 		return nil, fail.InvalidParameterError("f", "cannot be null value of 'resources.Feature'")
 	}
@@ -72,12 +76,12 @@ func (i *noneInstaller) Add(f resources.Feature, t resources.Targetable, v data.
 	}
 	defer w.Terminate()
 
-	if xerr = w.CanProceed(s); xerr != nil {
+	if xerr = w.CanProceed(ctx, s); xerr != nil {
 		logrus.Error(xerr.Error())
 		return nil, xerr
 	}
 
-	if r, xerr = w.Proceed(v, s); xerr != nil {
+	if r, xerr = w.Proceed(ctx, v, s); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 
@@ -94,7 +98,7 @@ func (i *noneInstaller) Add(f resources.Feature, t resources.Targetable, v data.
 }
 
 // Remove uninstalls the feature
-func (i *noneInstaller) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&xerr)
 
@@ -111,12 +115,12 @@ func (i *noneInstaller) Remove(f resources.Feature, t resources.Targetable, v da
 	}
 	defer w.Terminate()
 
-	if xerr = w.CanProceed(s); xerr != nil {
+	if xerr = w.CanProceed(ctx, s); xerr != nil {
 		logrus.Error(xerr.Error())
 		return nil, xerr
 	}
 
-	if r, xerr = w.Proceed(v, s); xerr != nil {
+	if r, xerr = w.Proceed(ctx, v, s); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 

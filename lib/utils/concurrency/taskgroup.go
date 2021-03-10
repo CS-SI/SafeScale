@@ -89,7 +89,7 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err fail
 		if ctx == nil {
 			t, err = NewTask()
 		} else {
-			t, err = NewTaskWithContext(ctx, nil)
+			t, err = NewTaskWithContext(ctx)
 		}
 	} else {
 		if parentTask.Aborted() {
@@ -152,9 +152,9 @@ func (tg *taskGroup) GetStatus() (TaskStatus, fail.Error) {
 }
 
 // GetContext returns the current task status
-func (tg *taskGroup) GetContext() (context.Context, fail.Error) {
+func (tg *taskGroup) GetContext() context.Context {
 	if tg.IsNull() {
-		return nil, fail.InvalidInstanceError()
+		return context.TODO()
 	}
 
 	return tg.task.GetContext()

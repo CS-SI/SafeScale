@@ -33,8 +33,8 @@ type Metadata interface {
 
 	Alter(callback Callback, options ...data.ImmutableKeyValue) fail.Error // protects the data for exclusive write
 	BrowseFolder(callback func(buf []byte) fail.Error) fail.Error          // walks through host folder and executes a callback for each entries
-	Carry(clonable data.Clonable) fail.Error                               // links metadata with real data
-	Delete() fail.Error                                                    // deletes the metadata
+	// Carry(clonable data.Clonable) fail.Error                               // links metadata with real data
+	// Delete() fail.Error                                                    // deletes the metadata
 	Deserialize(buf []byte) fail.Error                                     // Transforms a slice of bytes in struct
 	GetService() iaas.Service                                              // returns the iaas.Service used
 	Inspect(callback Callback) fail.Error                                  // protects the data for shared read with first reloading data from Object Storage

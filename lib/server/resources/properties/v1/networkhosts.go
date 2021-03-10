@@ -56,7 +56,7 @@ func (nh NetworkHosts) Clone() data.Clonable {
 
 // Replace ... (data.Clonable interface)
 func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if nh == nil || p == nil {
 		return nh
 	}

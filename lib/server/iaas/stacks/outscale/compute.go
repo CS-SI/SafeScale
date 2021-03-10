@@ -1021,7 +1021,7 @@ func (s stack) deleteHost(id string) fail.Error {
 // FIXME: check if anything is needed (does nothing for now)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
-	// if s.IsNull() {
+	// if s.isNull() {
 	// 	return fail.InvalidInstanceError()
 	// }
 	// ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1149,7 +1149,7 @@ func (s stack) complementHost(ahf *abstract.HostFull, vm osc.Vm) fail.Error {
 // // InspectHostByName returns the host identified by name
 // func (s stack) InspectHostByName(name string) (ahf *abstract.HostFull, xerr fail.Error) {
 // 	nullAHF := abstract.NewHostFull()
-// 	if s.IsNull() {
+// 	if s.isNull() {
 // 		return nullAHF, fail.InvalidInstanceError()
 // 	}
 //

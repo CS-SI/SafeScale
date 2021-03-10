@@ -170,7 +170,7 @@ type taskReadParameters struct {
 }
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func taskRead(/* ctx context.Context, */p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task.Aborted() {
@@ -255,7 +255,7 @@ type taskDisplayParameters struct {
 	ch <-chan outputItem
 }
 
-func taskDisplay(/* ctx context.Context, */params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func taskDisplay(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {

@@ -37,7 +37,7 @@ type stack struct {
 	AuthOptions *stacks.AuthenticationOptions
 }
 
-// IsNull tells if the instance corresponds to null value
+// isNull tells if the instance corresponds to null value
 func (s *stack) IsNull() bool {
 	return s == nil || s.EbrcService == nil
 }

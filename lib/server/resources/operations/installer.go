@@ -17,6 +17,8 @@
 package operations
 
 import (
+	"golang.org/x/net/context"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -26,7 +28,7 @@ import (
 
 // Installer defines the API of an Installer
 type Installer interface {
-	Check(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)  // checks if a Feature is installed
-	Add(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)    // executes installation of Feature
-	Remove(resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error) // executes deletion of Feature
+	Check(context.Context, resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)  // checks if a Feature is installed
+	Add(context.Context, resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error)    // executes installation of Feature
+	Remove(context.Context, resources.Feature, resources.Targetable, data.Map, resources.FeatureSettings) (resources.Results, fail.Error) // executes deletion of Feature
 }

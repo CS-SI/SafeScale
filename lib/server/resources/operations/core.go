@@ -258,14 +258,14 @@ func (c *core) Alter(callback resources.Callback, options ...data.ImmutableKeyVa
 	return fail.ConvertError(c.notifyObservers())
 }
 
-// Carry links metadata with real data
+// carry links metadata with real data
 // If c is already carrying a shielded data, returns fail.NotAvailableError
 //
 // errors returned :
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
 // - fail.ErrNotAvailable if the core instance already carries a data
-func (c *core) Carry(clonable data.Clonable) (xerr fail.Error) {
+func (c *core) carry(clonable data.Clonable) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if c.isNull() {
@@ -555,8 +555,8 @@ func (c *core) BrowseFolder(callback func(buf []byte) fail.Error) (xerr fail.Err
 	})
 }
 
-// Delete deletes the metadata
-func (c *core) Delete() (xerr fail.Error) {
+// delete deletes the metadata
+func (c *core) delete() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if c.isNull() {

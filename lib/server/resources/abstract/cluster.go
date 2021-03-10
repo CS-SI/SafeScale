@@ -73,7 +73,7 @@ func (i ClusterIdentity) Clone() data.Clonable {
 // Replace replaces the content of the instance with the content of the parameter
 // satisfies interface data.Clonable
 func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if i == nil || p == nil {
 		return i
 	}

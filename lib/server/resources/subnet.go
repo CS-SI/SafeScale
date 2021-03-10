@@ -43,21 +43,22 @@ type Subnet interface {
 	BindSecurityGroup(ctx context.Context, _ SecurityGroup, _ SecurityGroupActivation) fail.Error                                // binds a Security Group to the Subnet
 	Browse(ctx context.Context, callback func(*abstract.Subnet) fail.Error) fail.Error                                           // ...
 	Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) fail.Error // creates a Subnet
+	Delete(ctx context.Context) fail.Error
 	DisableSecurityGroup(ctx context.Context, _ SecurityGroup) fail.Error                                                        // disables a binded Security Group on Subnet
 	EnableSecurityGroup(ctx context.Context, _ SecurityGroup) fail.Error                                                         // enables a binded Security Group on Subnet
-	GetGatewayPublicIP(ctx context.Context, primary bool) (string, fail.Error)                                                   // returns the gateway related to Subnet
-	GetGatewayPublicIPs(ctx context.Context) ([]string, fail.Error)                                                              // returns the gateway IPs of the Subnet
-	GetDefaultRouteIP(ctx context.Context) (string, fail.Error)                                                                  // returns the private IP of the default route of the Subnet
-	GetEndpointIP(ctx context.Context) (string, fail.Error)                                                                      // returns the public IP to reach the Subnet from Internet
-	GetState(ctx context.Context) (subnetstate.Enum, fail.Error)                                                                 // gives the current state of the Subnet
-	HasVirtualIP(ctx context.Context) (bool, fail.Error)                                                                         // tells if the Subnet is using a VIP as default route
-	InspectGateway(ctx context.Context, primary bool) (Host, fail.Error)                                                         // returns the gateway related to Subnet
-	InspectGatewaySecurityGroup(ctx context.Context) (SecurityGroup, fail.Error)                                                 // returns the SecurityGroup responsible of network security on Gateway
-	InspectInternalSecurityGroup(ctx context.Context) (SecurityGroup, fail.Error)                                                // returns the SecurityGroup responsible of internal network security
-	InspectPublicIPSecurityGroup(ctx context.Context) (SecurityGroup, fail.Error)                                                // returns the SecurityGroup responsible of Hosts with Public IP (excluding gateways)
-	InspectNetwork(ctx context.Context) (Network, fail.Error)                                                                    // returns the instance of the parent Network of the Subnet
+	GetGatewayPublicIP(primary bool) (string, fail.Error)                                                   // returns the gateway related to Subnet
+	GetGatewayPublicIPs() ([]string, fail.Error)                                                              // returns the gateway IPs of the Subnet
+	GetDefaultRouteIP() (string, fail.Error)                                                                  // returns the private IP of the default route of the Subnet
+	GetEndpointIP() (string, fail.Error)                                                                      // returns the public IP to reach the Subnet from Internet
+	GetState() (subnetstate.Enum, fail.Error)                                                                 // gives the current state of the Subnet
+	HasVirtualIP() (bool, fail.Error)                                                                         // tells if the Subnet is using a VIP as default route
+	InspectGateway(primary bool) (Host, fail.Error)                                                         // returns the gateway related to Subnet
+	InspectGatewaySecurityGroup() (SecurityGroup, fail.Error)                                                 // returns the SecurityGroup responsible of network security on Gateway
+	InspectInternalSecurityGroup() (SecurityGroup, fail.Error)                                                // returns the SecurityGroup responsible of internal network security
+	InspectPublicIPSecurityGroup() (SecurityGroup, fail.Error)                                                // returns the SecurityGroup responsible of Hosts with Public IP (excluding gateways)
+	InspectNetwork() (Network, fail.Error)                                                                    // returns the instance of the parent Network of the Subnet
 	ListHosts(ctx context.Context) ([]Host, fail.Error)                                                                          // returns the list of Host attached to the subnet (excluding gateway)
 	ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)       // lists the security groups bound to the subnet
-	ToProtocol(ctx context.Context) (*protocol.Subnet, fail.Error)                                                               // converts the subnet to protobuf message
+	ToProtocol() (*protocol.Subnet, fail.Error)                                                               // converts the subnet to protobuf message
 	UnbindSecurityGroup(ctx context.Context, _ SecurityGroup) fail.Error                                                         // unbinds a security group from the subnet
 }

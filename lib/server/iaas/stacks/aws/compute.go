@@ -753,7 +753,7 @@ func (s stack) buildAwsMachine(
 // FIXME: see if anything is needed (does nothing for now)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
-	// if s.IsNull() {
+	// if s.isNull() {
 	// 	return fail.InvalidInstanceError()
 	// }
 	// ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)

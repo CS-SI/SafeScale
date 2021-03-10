@@ -68,7 +68,7 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 	if xerr != nil {
 		return nil, xerr
 	}
-	userData, cerr := rgw.Create(task, hostReq, hostSizing) // cerr is tested later
+	userData, cerr := rgw.Create(task.GetContext(), hostReq, hostSizing) // cerr is tested later
 
 	// Set link to Subnet before testing if Host has been successfully created; in case of failure, we need to have registered the gateway ID in Subnet
 	xerr = instance.Alter(/*task,  */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -98,7 +98,7 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 			defer task.DisarmAbortSignal()()
 
 			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
-			derr := rgw.Delete(task)
+			derr := rgw.Delete(task.GetContext())
 			if derr != nil {
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
@@ -118,7 +118,7 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 	}()
 
 	// Binds gateway to VIP if needed
-	xerr = instance.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -173,18 +173,18 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
-	if xerr = objgw.runInstallPhase(task, userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData); xerr != nil {
+	if xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData); xerr != nil {
 		return nil, xerr
 	}
 
-	if xerr = objgw.runInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, userData); xerr != nil {
+	if xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, userData); xerr != nil {
 		return nil, xerr
 	}
 
 	// intermediate gateway reboot
 	logrus.Debugf("Rebooting gateway '%s'", gwname)
 	command := "sudo systemctl reboot"
-	retcode, _, _, xerr := objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, _, xerr := objgw.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -192,26 +192,26 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
 	}
 
-	if _, xerr := objgw.waitInstallPhase(task, userdata.PHASE4_SYSTEM_FIXES, 0); xerr != nil {
+	if _, xerr := objgw.waitInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, 0); xerr != nil {
 		return nil, xerr
 	}
 
 	// final phase...
-	if xerr = objgw.runInstallPhase(task, userdata.PHASE5_FINAL, userData); xerr != nil {
+	if xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, userData); xerr != nil {
 		return nil, xerr
 	}
 
 	// Final gatewqay reboot
 	logrus.Debugf("Rebooting gateway '%s'", gwname)
 	command = "sudo systemctl reboot"
-	if retcode, _, _, xerr = objgw.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout()); xerr != nil {
+	if retcode, _, _, xerr = objgw.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout()); xerr != nil {
 		return nil, xerr
 	}
 	if retcode != 0 {
 		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
 	}
 
-	if _, xerr = objgw.waitInstallPhase(task, userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
+	if _, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
 		return nil, xerr
 	}
 
