@@ -23,9 +23,9 @@ fi
 
 stamp=`date +"%s"`
 
-#BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD) GOVERSION=1.13.5 envsubst <Dockerfile > Dockerfile.$stamp
+#BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD) GOVERSION=1.15.9 envsubst <Dockerfile > Dockerfile.$stamp
 [ -z "$BRANCH_NAME" ] && BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-[ -z "$GOVERSION" ] && GOVERSION=1.13.5
+[ -z "$GOVERSION" ] && GOVERSION=1.15.9
 echo docker build --rm --network host --build-arg BRANCH_NAME=$BRANCH_NAME --build-arg GOVERSION=$GOVERSION -f ${WRKDIR}/Dockerfile -t "safescale:${BRANCH_NAME/\//_}" $WRKDIR
 docker build --rm --network host --build-arg BRANCH_NAME=$BRANCH_NAME --build-arg GOVERSION=$GOVERSION -f ${WRKDIR}/Dockerfile -t "safescale:${BRANCH_NAME/\//_}" $WRKDIR
 [ $? -ne 0 ] && echo "Docker build failed !!" && rm -f ./marker && exit 1
