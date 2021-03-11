@@ -74,46 +74,46 @@ func getTemplateBox() (*rice.Box, fail.Error) {
 	return anon.(*rice.Box), nil
 }
 
-func GetGlobalSystemRequirements(c resources.Cluster) (string, fail.Error) {
-	// find the rice.Box
-	box, xerr := getTemplateBox()
-	if xerr != nil {
-		return "", xerr
-	}
+// func GetGlobalSystemRequirements(c resources.Cluster) (string, fail.Error) {
+// 	// find the rice.Box
+// 	box, xerr := getTemplateBox()
+// 	if xerr != nil {
+// 		return "", xerr
+// 	}
 
-	// We will need information from cluster network
-	netCfg, xerr := c.GetNetworkConfig()
-	if xerr != nil {
-		return "", xerr
-	}
+// 	// We will need information from cluster network
+// 	netCfg, xerr := c.GetNetworkConfig()
+// 	if xerr != nil {
+// 		return "", xerr
+// 	}
 
-	identity, xerr := c.GetIdentity()
-	if xerr != nil {
-		return "", xerr
-	}
+// 	identity, xerr := c.GetIdentity()
+// 	if xerr != nil {
+// 		return "", xerr
+// 	}
 
-	// get file contents as string
-	tmplString, err := box.String("node_install_requirements.sh")
-	if err != nil {
-		return "", fail.Wrap(err, "error loading script template")
-	}
+// 	// get file contents as string
+// 	tmplString, err := box.String("node_install_requirements.sh")
+// 	if err != nil {
+// 		return "", fail.Wrap(err, "error loading script template")
+// 	}
 
-	// parse then execute the template
-	tmplPrepared, err := template.Parse("node_install_requirements", tmplString)
-	if err != nil {
-		return "", fail.Wrap(err, "error parsing script template")
-	}
-	dataBuffer := bytes.NewBufferString("")
-	err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-		"IPRanges":             netCfg.CIDR,
-		"ClusterAdminUsername": "cladm",
-		"ClusterAdminPassword": identity.AdminPassword,
-		"SSHPublicKey":         identity.Keypair.PublicKey,
-		"SSHPrivateKey":        identity.Keypair.PrivateKey,
-	})
-	if err != nil {
-		return "", fail.Wrap(err, "error realizing script template")
-	}
+// 	// parse then execute the template
+// 	tmplPrepared, err := template.Parse("node_install_requirements", tmplString)
+// 	if err != nil {
+// 		return "", fail.Wrap(err, "error parsing script template")
+// 	}
+// 	dataBuffer := bytes.NewBufferString("")
+// 	err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
+// 		"IPRanges":             netCfg.CIDR,
+// 		"ClusterAdminUsername": "cladm",
+// 		"ClusterAdminPassword": identity.AdminPassword,
+// 		"SSHPublicKey":         identity.Keypair.PublicKey,
+// 		"SSHPrivateKey":        identity.Keypair.PrivateKey,
+// 	})
+// 	if err != nil {
+// 		return "", fail.Wrap(err, "error realizing script template")
+// 	}
 
-	return dataBuffer.String(), nil
-}
+// 	return dataBuffer.String(), nil
+// }

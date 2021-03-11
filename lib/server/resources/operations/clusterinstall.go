@@ -227,9 +227,6 @@ func (instance *cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 		return fail.InvalidParameterError("feat", "cannot be null value of 'resources.Feature'")
 	}
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
-
 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
@@ -267,9 +264,6 @@ func (instance *cluster) UnregisterFeature(feat string) (xerr fail.Error) {
 	if feat == "" {
 		return fail.InvalidParameterError("feat", "cannot be empty string")
 	}
-
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
 
 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -499,7 +493,8 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 		}
 
 		_, _ = binaryDir, path
-		/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote)
+		/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote),
+		               probaly a feature safescale-binaries to build SafeScale from source...
 		// Uploads safescale binary
 		if binaryDir != "" {
 			path = binaryDir + "/safescale"
@@ -661,12 +656,13 @@ func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 	}
 
 	disabled := false
-	xerr = instance.Inspect( /*task, */ func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect( /*task, */ clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			_, disabled = featuresV1.Disabled["remotedesktop"]
 			return nil
 		})

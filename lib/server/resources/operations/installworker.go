@@ -958,14 +958,14 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 	}
 	defer subnet.Released() // mark instance as released at the end of the function, for cache considerations
 
-	primaryKongController, xerr := NewKongController(svc, subnet, true)
+	primaryKongController, xerr := NewKongController(ctx, svc, subnet, true)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 	}
 
 	var secondaryKongController *KongController
 	if ok, _ := subnet.HasVirtualIP(); ok {
-		if secondaryKongController, xerr = NewKongController(svc, subnet, false); xerr != nil {
+		if secondaryKongController, xerr = NewKongController(ctx, svc, subnet, false); xerr != nil {
 			return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 		}
 	}

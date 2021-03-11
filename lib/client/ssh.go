@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/common/log"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -32,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
@@ -64,11 +62,10 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
-	task, xerr := s.session.GetTask()
+	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
-	ctx := task.GetContext()
 
 	// Create the command
 	sshCmd, xerr := sshCfg.NewCommand(ctx, command)
@@ -279,16 +276,10 @@ func (s ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHConf
 	s.session.Connect()
 	defer s.session.Disconnect()
 
-	// ctx, xerr := utils.GetContext(true)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-
-	task, xerr := s.session.GetTask()
+	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
 	}
-	ctx := task.GetContext()
 
 	service := protocol.NewHostServiceClient(s.session.connection)
 	sshConfig, err := service.SSH(ctx, &protocol.Reference{Name: name})

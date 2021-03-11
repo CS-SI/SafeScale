@@ -40,6 +40,7 @@ func (c cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, fai
 
 	c.session.Connect()
 	defer c.session.Disconnect()
+
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
@@ -50,6 +51,7 @@ func (c cluster) List(timeout time.Duration) (*protocol.ClusterListResponse, fai
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
+
 	return result, nil
 }
 
