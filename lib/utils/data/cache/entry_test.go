@@ -18,6 +18,7 @@ package cache
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -87,71 +88,89 @@ func TestParallelLockContent(t *testing.T) {
 	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
 }
 
-func makeDeadlockHappy(mdh *Cache) {
+func makeDeadlockHappy(mdh *Cache) error {
 	// doing some stuff that ends up calling....
 	anotherRead, err := (*mdh).GetEntry("What")
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	theReadCt := anotherRead.Content() // Deadlock
 	fmt.Printf("The deadlocked content : %v\n", theReadCt)
+	return nil
 }
 
-// FIXME: test Entry.lock() and Entry.unlock() in a multiple go routines situation
+// waitTimeout waits for the waitgroup for the specified max timeout.
+// Returns true if waiting timed out.
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+}
+
 func TestDeadlock(t *testing.T) {
-	content := &reservation{key: "content"}
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 
-	nukaCola , _ := NewCache("nuka")
-	err := nukaCola.ReserveEntry("What")
-	if err != nil {
-		panic(err)
+	go func() {
+		defer wg.Done()
+		content := &reservation{key: "content"}
+
+		nukaCola, _ := NewCache("nuka")
+		err := nukaCola.ReserveEntry("What")
+		if err != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+
+		// between reserve and commit, someone with a reference to our cache just checks its content
+		_ = makeDeadlockHappy(&nukaCola)
+
+		time.Sleep(1 * time.Second)
+		_, _ = nukaCola.CommitEntry("What", content)
+
+		theX, err := nukaCola.GetEntry("What")
+		if err == nil {
+			fmt.Println(theX)
+		}
+	}()
+
+	failed := waitTimeout(&wg, 3*time.Second)
+	if failed {
+		t.Error("We have a deadlock in TestDeadlock")
+		t.FailNow()
 	}
-
-	// between reserve and commit, someone with a reference to our cache just checks its content
-	makeDeadlockHappy(&nukaCola)
-
-	/*
-	// doing some stuff that ends up calling....
-	anotherRead, err := nukaCola.GetEntry("What")
-	if err != nil {
-		panic(err)
-	}
-	theReadCt := anotherRead.Content() // Deadlock
-	fmt.Printf("The deadlocked content : %v\n", theReadCt)
-	 */
-
-	time.Sleep(1*time.Second)
-	_, xerr := nukaCola.CommitEntry("What", content)
-	if xerr != nil {
-		panic(xerr)
-	}
-
-	theX, err := nukaCola.GetEntry("What")
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(theX)
 }
 
-func TestLostCache(t *testing.T) {
+func TestReserveCommitGet(t *testing.T) {
 	content := &reservation{key: "content"}
 
-	nukaCola , err := NewCache("nuka")
+	nukaCola, err := NewCache("nuka")
 	if err != nil {
-		panic(err)
+		t.Error(err)
+		t.FailNow()
 	}
 
-	err = nukaCola.ReserveEntry("What")
+	err = nukaCola.ReserveEntry(content.GetID())
 	if err != nil {
-		panic(err)
+		t.Error(err)
+		t.FailNow()
 	}
 
-	time.Sleep(100*time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 
-	compilerHappy, fe := nukaCola.CommitEntry("What", content)
+	compilerHappy, fe := nukaCola.CommitEntry(content.GetID(), content)
 	if fe != nil {
-		panic(fe)
+		t.Error(err)
+		t.FailNow()
 	}
 
 	_ = compilerHappy
@@ -160,15 +179,161 @@ func TestLostCache(t *testing.T) {
 
 	theX, err := nukaCola.GetEntry(content.GetID())
 	if err != nil {
-		panic(err)
+		t.Error(err)
+		t.FailNow()
 	}
 
-	theX, err = nukaCola.GetEntry("What")
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(theX)
-
+	_ = theX
 }
 
+func TestSurprisingBehaviour(t *testing.T) {
+	content := &reservation{key: "content"}
+
+	nukaCola, err := NewCache("nuka")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	err = nukaCola.ReserveEntry("What")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	time.Sleep(100 * time.Millisecond)
+
+	compilerHappy, fe := nukaCola.CommitEntry("What", content) // problem here ?, a mismatch and no complaining ?
+	if fe != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	_ = compilerHappy
+
+	time.Sleep(1 * time.Second)
+
+	// that is highly unexpected from an user point of view, we reserved a entry with key "What" and successfully commited also with key "What"
+	// after that, the GetEntry with the same key, FAILS
+	theX, err := nukaCola.GetEntry("What")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	_ = theX
+}
+
+func TestDeadlockAddingEntry(t *testing.T) {
+	content := &reservation{key: "content"}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		nukaCola, err := NewCache("nuka")
+		if err != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+
+		_, err = nukaCola.AddEntry(content) // reentrant locks strike back
+		if err != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+	}()
+
+	failed := waitTimeout(&wg, 3*time.Second)
+	if failed {
+		t.Error("We have a deadlock in TestDeadlockAddingEntry")
+		t.FailNow()
+	}
+}
+
+func TestSignalChangeEntry(t *testing.T) {
+	content := &reservation{key: "content"}
+	_ = content
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+		nukaCola, err := NewCache("nuka")
+		if err != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+
+		err = nukaCola.ReserveEntry(content.GetName())
+		if err != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+
+		_, err = nukaCola.CommitEntry(content.GetName(), content)
+		if err != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+
+		nukaCola.SignalChange(content.GetName())
+	}()
+
+	failed := waitTimeout(&wg, 3*time.Second)
+	if failed {
+		t.Error("We have a deadlock in TestSignalChangeEntry")
+		t.FailNow()
+	}
+}
+
+func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
+	rc, err := NewCache("nuka")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+
+	previous := &reservation{key: "previous"}
+	_ = previous
+	content := &reservation{key: "cola"}
+	_ = content
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		_ = rc.ReserveEntry("previous")
+		// _ , _ = rc.CommitEntry("previous", previous)
+
+		key := "cola"
+		if xerr := rc.ReserveEntry(key); xerr != nil {
+			t.Error(xerr)
+			t.FailNow()
+		}
+
+		_, xerr := rc.CommitEntry("previous", content)
+		if xerr != nil {
+			nerr := rc.FreeEntry("previous")
+			if nerr != nil {
+				t.Error(nerr)
+				t.FailNow()
+			}
+		} else {
+			t.Error("The commit should have failed")
+			t.FailNow()
+		}
+		return
+	}()
+
+	failed := waitTimeout(&wg, 3*time.Second)
+	if failed {
+		t.Error("We have a deadlock in TestSignalChangeEntry")
+		t.FailNow()
+	}
+
+}
