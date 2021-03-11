@@ -240,7 +240,7 @@ func TestDeadlockAddingEntry(t *testing.T) {
 			return
 		}
 
-		_, err = nukaCola.AddEntry(content) // reentrant locks strike back
+		_, err = nukaCola.AddEntry(content)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
