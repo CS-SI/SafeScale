@@ -103,9 +103,9 @@ type worker struct {
 	settings  resources.FeatureSettings
 	startTime time.Time
 
-	host resources.Host
+	host *host
 	// node    bool
-	cluster resources.Cluster
+	cluster *cluster
 
 	availableMaster  resources.Host
 	availableNode    resources.Host
@@ -137,12 +137,12 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 	}
 	switch t.TargetType() {
 	case featuretargettype.CLUSTER:
-		w.cluster = t.(resources.Cluster)
+		w.cluster = t.(*cluster)
 	// case featuretargettype.NODE:
 	// 	w.node = true
 	// 	fallthrough
 	case featuretargettype.HOST:
-		w.host = t.(resources.Host)
+		w.host = t.(*host)
 	}
 
 	if m != installmethod.None {
@@ -190,7 +190,7 @@ func (w *worker) identifyAvailableMaster() (_ resources.Host, xerr fail.Error) {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		w.availableMaster, xerr = w.cluster.FindAvailableMaster(context.TODO())
+		w.availableMaster, xerr = w.cluster.unsafeFindAvailableMaster(context.TODO())
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -204,7 +204,7 @@ func (w *worker) identifyAvailableNode() (_ resources.Host, xerr fail.Error) {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		w.availableNode, xerr = w.cluster.FindAvailableNode(context.TODO())
+		w.availableNode, xerr = w.cluster.unsafeFindAvailableNode(context.TODO())
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -283,7 +283,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 	}
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []resources.Host{}
-		masters, xerr := w.cluster.ListMasterIDs(ctx)
+		masters, xerr := w.cluster.unsafeListMasterIDs(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -331,7 +331,7 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 
 	if w.allNodes == nil {
 		var allHosts []resources.Host
-		list, xerr := w.cluster.ListNodeIDs(ctx)
+		list, xerr := w.cluster.unsafeListNodeIDs(ctx)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -812,7 +812,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 // 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommended)
 func (w *worker) validateContextForCluster() fail.Error {
-	clusterFlavor, xerr := w.cluster.GetFlavor()
+	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
 	if xerr != nil {
 		return xerr
 	}
@@ -852,7 +852,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 }
 
 func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
-	clusterFlavor, xerr := w.cluster.GetFlavor()
+	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
 	if xerr != nil {
 		return xerr
 	}

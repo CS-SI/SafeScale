@@ -47,15 +47,6 @@ type ssh struct {
 
 // Run executes the command
 func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
-	// if s == nil {
-	//     return -1, "", "", fail.InvalidInstanceError()
-	// }
-
-	task, xerr := s.session.GetTask()
-	if xerr != nil {
-		return -1, "", "", xerr
-	}
-
 	var (
 		retcode        int
 		stdout, stderr string
@@ -73,17 +64,18 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
-	// _, cancel, err := utils.GetTimeoutContext(executionTimeout)
-	// if err != nil {
-	// 	return -1, "", "", err
-	// }
-	// defer cancel()
-
-	// Create the command
-	sshCmd, xerr := sshCfg.NewCommand(task, command)
+	task, xerr := s.session.GetTask()
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
+	ctx := task.GetContext()
+
+	// Create the command
+	sshCmd, xerr := sshCfg.NewCommand(ctx, command)
+	if xerr != nil {
+		return -1, "", "", xerr
+	}
+
 	defer func() { _ = sshCmd.Close() }()
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
@@ -92,7 +84,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 				innerXErr fail.Error
 				// ready     bool
 			)
-			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(task, outs, executionTimeout)
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, executionTimeout)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -108,7 +100,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 			}
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 /*|| !ready*/ {
-				log.Warnf("Remote SSH server on Host '%s' is not available, retrying", sshCfg.Hostname)
+				logrus.Warnf("Remote SSH server on Host '%s' is not available, retrying", sshCfg.Hostname)
 				return fail.NotAvailableError("failed to connect")
 			}
 			return nil
@@ -188,11 +180,6 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
 
-	task, xerr := s.session.GetTask()
-	if xerr != nil {
-		return -1, "", "", xerr
-	}
-
 	hostName := ""
 	var upload bool
 	var localPath, remotePath string
@@ -250,11 +237,11 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 		connectionTimeout = executionTimeout
 	}
 
-	// _, cancel, err := utils.GetTimeoutContext(executionTimeout)
-	// if err != nil {
-	// 	return -1, "", "", err
-	// }
-	// defer cancel()
+	task, xerr := s.session.GetTask()
+	if xerr != nil {
+		return -1, "", "", xerr
+	}
+	ctx := task.GetContext()
 
 	var (
 		retcode        int
@@ -262,7 +249,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 	)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, xerr = sshCfg.CopyWithTimeout(task, remotePath, localPath, upload, executionTimeout)
+			retcode, stdout, stderr, xerr = sshCfg.CopyWithTimeout(ctx, remotePath, localPath, upload, executionTimeout)
 			// If an error occurred, stop the loop and propagates this error
 			if xerr != nil {
 				retcode = -1
@@ -291,10 +278,17 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 func (s ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHConfig, fail.Error) {
 	s.session.Connect()
 	defer s.session.Disconnect()
-	ctx, xerr := utils.GetContext(true)
+
+	// ctx, xerr := utils.GetContext(true)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+
+	task, xerr := s.session.GetTask()
 	if xerr != nil {
 		return nil, xerr
 	}
+	ctx := task.GetContext()
 
 	service := protocol.NewHostServiceClient(s.session.connection)
 	sshConfig, err := service.SSH(ctx, &protocol.Reference{Name: name})
@@ -349,8 +343,7 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 			tunnels, _, err := sshCfg.CreateTunneling()
 			if err != nil {
 				for _, t := range tunnels {
-					nerr := t.Close()
-					if nerr != nil {
+					if nerr := t.Close(); nerr != nil {
 						logrus.Errorf("error closing ssh tunnel: %v", nerr)
 					}
 				}
@@ -408,7 +401,21 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 }
 
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
-func (s ssh) WaitReady(/* ctx context.Context, */hostName string, timeout time.Duration) error {
+func (s ssh) WaitReady( /*ctx context.Context, */ hostName string, timeout time.Duration) error {
+	// if ctx == nil {
+	// 	return fail.InvalidParameterCannotBeNilError("ctx")
+	// }
+
+	task, xerr := s.session.GetTask()
+	if xerr != nil {
+		return xerr
+	}
+	ctx := task.GetContext()
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
 	if timeout < temporal.GetHostTimeout() {
 		timeout = temporal.GetHostTimeout()
 	}
@@ -417,12 +424,6 @@ func (s ssh) WaitReady(/* ctx context.Context, */hostName string, timeout time.D
 		return err
 	}
 
-	if task != nil {
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
-	}
-
-	_, xerr := sshCfg.WaitServerReady(task, "ready", timeout)
+	_, xerr = sshCfg.WaitServerReady(ctx, "ready", timeout)
 	return xerr
 }

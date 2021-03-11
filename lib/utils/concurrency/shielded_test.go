@@ -42,7 +42,7 @@ func TestTakiTaki(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(2)
 	go func() { // simulate a goroutine that also can access this armored value and tries to change it
-		inerr := armored.Alter(nagasaki, func(clonable data.Clonable) fail.Error {
+		inerr := armored.Alter(func(clonable data.Clonable) fail.Error {
 			defer wg.Done()
 
 			take := clonable.(*datatests.StructWithoutPointers)
@@ -54,7 +54,7 @@ func TestTakiTaki(t *testing.T) {
 			t.Errorf("Ouch: %s", inerr)
 		}
 	}()
-	err = armored.Alter(takitaki, func(clonable data.Clonable) fail.Error {
+	err = armored.Alter(func(clonable data.Clonable) fail.Error {
 		defer wg.Done()
 
 		time.Sleep(80 * time.Millisecond)
@@ -68,7 +68,7 @@ func TestTakiTaki(t *testing.T) {
 
 	wg.Wait()
 
-	err = armored.Inspect(takitaki, func(clonable data.Clonable) fail.Error {
+	err = armored.Inspect(func(clonable data.Clonable) fail.Error {
 		assert.Equal(t, 11, clonable.(*datatests.StructWithoutPointers).Rumba)
 		return nil
 	})
@@ -108,7 +108,7 @@ func TestCriminal(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(3) // 2 readers 1 writer
 	go func() {
-		inerr := armored.Inspect(estilo, func(clonable data.Clonable) fail.Error {
+		inerr := armored.Inspect(func(clonable data.Clonable) fail.Error {
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond)
 			take := clonable.(*datatests.StructWithoutPointers)
@@ -120,7 +120,7 @@ func TestCriminal(t *testing.T) {
 		}
 	}()
 	go func() {
-		inerr := armored.Inspect(estilo, func(clonable data.Clonable) fail.Error {
+		inerr := armored.Inspect(func(clonable data.Clonable) fail.Error {
 			defer wg.Done()
 			time.Sleep(10 * time.Millisecond)
 			take := clonable.(*datatests.StructWithoutPointers)
@@ -131,7 +131,7 @@ func TestCriminal(t *testing.T) {
 			t.Errorf("Ouch: %s", inerr)
 		}
 	}()
-	err = armored.Alter(criminal, func(clonable data.Clonable) fail.Error {
+	err = armored.Alter(func(clonable data.Clonable) fail.Error {
 		defer wg.Done()
 		time.Sleep(5 * time.Millisecond)
 		take := clonable.(*datatests.StructWithoutPointers)
@@ -146,7 +146,7 @@ func TestCriminal(t *testing.T) {
 	wg.Wait()
 
 	// fmt.Println(a.Rumba)
-	err = armored.Inspect(criminal, func(clonable data.Clonable) fail.Error {
+	err = armored.Inspect(func(clonable data.Clonable) fail.Error {
 		assert.Equal(t, 10, clonable.(*datatests.StructWithoutPointers).Rumba)
 		return nil
 	})
