@@ -1115,8 +1115,10 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *abstract.Netwo
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case fail.ErrInvalidRequest, fail.ErrNotFound, fail.ErrTimeout:
+		case fail.ErrInvalidRequest, fail.ErrTimeout:
 			return nil, retryErr
+		case fail.ErrNotFound:
+			// We have to create the network...
 		default:
 			return nil, retryErr
 		}
