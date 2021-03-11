@@ -2491,6 +2491,15 @@ func (instance *cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	// make sure no other parallel actions interferes
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	return instance.unsafeListMasterIDs(ctx)
+}
+
+func (instance *cluster) unsafeListMasterIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
+	emptyList := data.IndexedListOfStrings{}
 	task, xerr := concurrency.TaskFromContext(ctx)
 	if xerr != nil {
 		return emptyList, xerr
@@ -2499,10 +2508,6 @@ func (instance *cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 	if task.Aborted() {
 		return emptyList, fail.AbortedError(nil, "aborted")
 	}
-
-	// make sure no other parallel actions interferes
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
 
 	if xerr = instance.beingRemoved(); xerr != nil {
 		return emptyList, xerr
@@ -2727,35 +2732,7 @@ func (instance *cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	if xerr = instance.beingRemoved(); xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			list = make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
-			for _, v := range nodesV3.PrivateNodes {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
-				if node, found := nodesV3.ByNumericalID[v]; found {
-					list[node.NumericalID] = node.ID
-				}
-			}
-			return nil
-		})
-	})
-	if xerr != nil {
-		return emptyList, xerr
-	}
-
-	return list, nil
+	return instance.unsafeListNodeIDs(ctx)
 }
 
 // ListNodeIPs lists the IPs of the nodes in the cluster
@@ -2818,47 +2795,7 @@ func (instance *cluster) FindAvailableNode(ctx context.Context) (node resources.
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	if xerr = instance.beingRemoved(); xerr != nil {
-		return nil, xerr
-	}
-
-	list, xerr := instance.unsafeListNodes()
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	svc := instance.GetService()
-	node = nil
-	found := false
-	for _, v := range list {
-		if task.Aborted() {
-			return nil, fail.AbortedError(nil, "aborted")
-		}
-
-		node, xerr = LoadHost(svc, v.ID)
-		if xerr != nil {
-			return nil, xerr
-		}
-		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
-		}(node)
-
-		if _, xerr = node.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout()); xerr != nil {
-			switch xerr.(type) {
-			case *retry.ErrTimeout:
-				continue
-			default:
-				return nil, xerr
-			}
-		}
-		found = true
-		break
-	}
-	if !found {
-		return nil, fail.NotAvailableError("failed to find available node")
-	}
-
-	return node, nil
+	return instance.unsafeFindAvailableNode(ctx)
 }
 
 // LookupNode tells if the ID of the master passed as parameter is a node

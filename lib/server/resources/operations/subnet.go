@@ -1688,6 +1688,7 @@ func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			
 			hostsLen := uint(len(shV1.ByName))
 			if hostsLen > 0 {
 				list := make([]string, 0, hostsLen)

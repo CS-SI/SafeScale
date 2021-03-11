@@ -364,7 +364,7 @@ func (instance *host) updateCachedInformation() fail.Error {
 		if innerXErr != nil {
 			return innerXErr
 		}
-		
+
 		index++
 		instance.installMethods[index] = installmethod.Bash
 		index++
@@ -1709,7 +1709,7 @@ func (instance *host) Delete(ctx context.Context) (xerr fail.Error) {
 	defer instance.lock.Unlock()
 
 	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// Don't remove a host that is a gateway
+		// Do not remove a host that is a gateway
 		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
@@ -1745,7 +1745,7 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 	svc := instance.GetService()
 	var shares map[string]*propertiesv1.HostShare
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// Don't remove a host having shares that are currently remotely mounted
+		// Do not remove a host having shares that are currently remotely mounted
 		innerXErr := props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			sharesV1, ok := clonable.(*propertiesv1.HostShares)
 			if !ok {
@@ -1804,22 +1804,23 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					return fail.AbortedError(nil, "aborted")
 				}
 
-				// Retrieve item data
-				rshare, loopErr := LoadShare(svc, i.ShareID)
-				if loopErr != nil {
-					return loopErr
-				}
-				defer func(shareInstance resources.Share) {
-					shareInstance.Released()
-				}(rshare)
-
-				// Retrieve data about the server serving the item
-				rhServer, loopErr := rshare.GetServer()
+				// Retrieve v data
+				shareInstance, loopErr := LoadShare(svc, i.ShareID)
 				if loopErr != nil {
 					return loopErr
 				}
 
-				// Retrieve data about item from its server
+				defer func(item resources.Share) {
+					item.Released()
+				}(shareInstance)
+
+				// Retrieve data about the server serving the v
+				rhServer, loopErr := shareInstance.GetServer()
+				if loopErr != nil {
+					return loopErr
+				}
+
+				// Retrieve data about v from its server
 				item, loopErr := rhServer.GetShare(i.ShareID)
 				if loopErr != nil {
 					return loopErr
@@ -1836,20 +1837,21 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		// Unmounts tier shares mounted on host (done outside the previous host.properties.Reading() section, because
 		// Unmount() have to lock for write, and won't succeed while host.properties.Reading() is running,
 		// leading to a deadlock)
-		for _, item := range mounts {
+		for _, v := range mounts {
 			if task.Aborted() {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			rs, loopErr := LoadShare(svc, item.ID)
+			shareInstance, loopErr := LoadShare(svc, v.ID)
 			if loopErr != nil {
 				return loopErr
 			}
-			defer func(shareInstance resources.Share) {
-				shareInstance.Released()
-			}(rs)
 
-			loopErr = rs.Unmount(ctx, instance)
+			defer func(item resources.Share) {
+				item.Released()
+			}(shareInstance)
+
+			loopErr = shareInstance.Unmount(ctx, instance)
 			if loopErr != nil {
 				return loopErr
 			}
@@ -1861,12 +1863,12 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			rs, loopErr := LoadShare(svc, v.Name)
+			shareInstance, loopErr := LoadShare(svc, v.Name)
 			if loopErr != nil {
 				return loopErr
 			}
 
-			loopErr = rs.Delete(task.GetContext())
+			loopErr = shareInstance.Delete(ctx)
 			if loopErr != nil {
 				return loopErr
 			}
@@ -1883,21 +1885,21 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 
 			var errors []error
 			for k := range hostNetworkV2.SubnetsByID {
-				if !hostNetworkV2.IsGateway && k != hostNetworkV2.DefaultSubnetID {
-					rs, loopErr := LoadSubnet(svc, "", k)
+				if !hostNetworkV2.IsGateway || k != hostNetworkV2.DefaultSubnetID {
+					subnetInstance, loopErr := LoadSubnet(svc, "", k)
 					if loopErr == nil {
-						defer func(subnetInstance resources.Subnet) {
-							subnetInstance.Released()
-						}(rs)
+						defer func(item resources.Subnet) {
+							item.Released()
+						}(subnetInstance)
 
-						loopErr = rs.AbandonHost(ctx, hostID)
+						loopErr = subnetInstance.AbandonHost(ctx, hostID)
 					}
 					if loopErr != nil {
 						logrus.Errorf(loopErr.Error())
 						errors = append(errors, loopErr)
 						continue
 					}
-					// loopErr = rs.Alter(task, func(_ data.Clonable, netprops *serialize.JSONProperties) fail.Error {
+					// loopErr = subnetInstance.Alter(task, func(_ data.Clonable, netprops *serialize.JSONProperties) fail.Error {
 					// 	return netprops.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 					// 		subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
 					// 		if !ok {

@@ -20,8 +20,6 @@ import (
 	"reflect"
 	"time"
 
-	"golang.org/x/net/context"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
@@ -30,11 +28,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"golang.org/x/net/context"
 )
 
 // unsafeGetIdentity returns the identity of the cluster
@@ -227,7 +227,7 @@ func (instance *cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 			continue
 		}
 
-		master, xerr := LoadHost(instance.GetService(), v.ID)
+		master, xerr = LoadHost(instance.GetService(), v.ID)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -251,7 +251,7 @@ func (instance *cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 }
 
 // unsafeListNodes is the not goroutine-safe version of ListNodes and no parameter validation, that does the real work
-// Note: must be used with wisdom
+// Note: must be used wisely
 func (instance *cluster) unsafeListNodes() (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -276,4 +276,104 @@ func (instance *cluster) unsafeListNodes() (list resources.IndexedListOfClusterN
 	}
 
 	return list, nil
+}
+
+// unsafeListNodeIDs is the not goroutine-safe version of ListNodeIDs and no parameter validation, that does the real work
+// Note: must be used wisely
+func (instance *cluster) unsafeListNodeIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
+	emptyList := data.IndexedListOfStrings{}
+
+	if xerr = instance.beingRemoved(); xerr != nil {
+		return emptyList, xerr
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return emptyList, xerr
+	}
+
+	if task.Aborted() {
+		return emptyList, fail.AbortedError(nil, "aborted")
+	}
+
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			list = make(data.IndexedListOfStrings, len(nodesV3.PrivateNodes))
+			for _, v := range nodesV3.PrivateNodes {
+				if task.Aborted() {
+					return fail.AbortedError(nil, "aborted")
+				}
+
+				if node, found := nodesV3.ByNumericalID[v]; found {
+					list[node.NumericalID] = node.ID
+				}
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return emptyList, xerr
+	}
+
+	return list, nil
+}
+
+// unsafeFindAvailableNode is the package restricted, not goroutine-safe, no parameter validation version of FindAvailableNode, that does the real work
+// Note: must be used wisely
+func (instance *cluster) unsafeFindAvailableNode(ctx context.Context) (node resources.Host, xerr fail.Error) {
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	if xerr = instance.beingRemoved(); xerr != nil {
+		return nil, xerr
+	}
+
+	list, xerr := instance.unsafeListNodes()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	svc := instance.GetService()
+	node = nil
+	found := false
+	for _, v := range list {
+		if task.Aborted() {
+			return nil, fail.AbortedError(nil, "aborted")
+		}
+
+		node, xerr = LoadHost(svc, v.ID)
+		if xerr != nil {
+			return nil, xerr
+		}
+		defer func(hostInstance resources.Host) {
+			hostInstance.Released()
+		}(node)
+
+		if _, xerr = node.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout()); xerr != nil {
+			switch xerr.(type) {
+			case *retry.ErrTimeout:
+				continue
+			default:
+				return nil, xerr
+			}
+		}
+		found = true
+		break
+	}
+	if !found {
+		return nil, fail.NotAvailableError("failed to find available node")
+	}
+
+	return node, nil
 }

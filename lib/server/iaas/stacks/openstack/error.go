@@ -50,10 +50,8 @@ func NormalizeError(err error) fail.Error {
 		return fail.NotAuthenticatedError(string(e.Body))
 	case gophercloud.ErrDefault403: // forbidden
 		return reduceOpenstackError("Forbidden", e.Body)
-		// return fail.ForbiddenError(string(e.Body))
 	case *gophercloud.ErrDefault403: // forbidden
 		return reduceOpenstackError("Forbidden", e.Body)
-		// return fail.ForbiddenError(string(e.Body))
 	case gophercloud.ErrDefault404: // not found
 		return reduceOpenstackError("NotFound", e.Body)
 	case *gophercloud.ErrDefault404: // not found
@@ -65,16 +63,15 @@ func NormalizeError(err error) fail.Error {
 	case gophercloud.ErrDefault409: // conflict
 		return reduceOpenstackError("Duplicate", e.Body)
 	case *gophercloud.ErrDefault409: // conflict
-		// It may be a NeutronError, to be parsed
 		return reduceOpenstackError("Duplicate", e.Body)
 	case gophercloud.ErrDefault429: // too many requests
 		return fail.OverloadError(string(e.Body))
 	case *gophercloud.ErrDefault429: // too many requests
 		return fail.OverloadError(string(e.Body))
 	case gophercloud.ErrDefault500: // internal server error
-		return fail.ExecutionError(nil, string(e.Body))
+		return reduceOpenstackError("Execution", e.Body)
 	case *gophercloud.ErrDefault500: // internal server error
-		return fail.ExecutionError(nil, string(e.Body))
+		return reduceOpenstackError("Execution", e.Body)
 	case gophercloud.ErrDefault503: // service unavailable
 		return fail.NotAvailableError(string(e.Body))
 	case *gophercloud.ErrDefault503: // service unavailable
@@ -144,14 +141,16 @@ var errorFuncMap = map[string]func(string) fail.Error{
 	"BadRequest": func(msg string) fail.Error { return fail.InvalidRequestError(msg) },
 	"Duplicate":  func(msg string) fail.Error { return fail.DuplicateError(msg) },
 	"Forbidden":  func(msg string) fail.Error { return fail.ForbiddenError(msg) },
+	"Execution":  func(msg string) fail.Error { return fail.ExecutionError(nil, msg) },
 }
 
 // reduceOpenstackError ...
 func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 	defer func() {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
 		case *fail.ErrRuntimePanic:
 			xerr = fail.InvalidRequestError(string(in))
+		default:
 		}
 	}()
 	defer fail.OnPanic(&xerr)
@@ -166,6 +165,10 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 	unjsonedErr := json.Unmarshal(in, &body)
 	if unjsonedErr == nil {
 		if lvl1, ok := body["badRequest"].(map[string]interface{}); ok {
+			if lvl2, ok := lvl1["message"].(string); ok {
+				msg = lvl2
+			}
+		} else if lvl1, ok := body["computeFault"].(map[string]interface{}); ok {
 			if lvl2, ok := lvl1["message"].(string); ok {
 				msg = lvl2
 			}
