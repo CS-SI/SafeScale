@@ -119,6 +119,11 @@ func (c *cache) ReserveEntry(key string) (xerr fail.Error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	return c.unsafeReserveEntry(key)
+}
+
+// unsafeReserveEntry is the workforce of ReserveEntry, without locking
+func (c *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
 	if _, ok := c.reserved[key]; ok {
 		return fail.NotAvailableError("the cache entry '%s' is already reserved", key)
 	}
@@ -145,6 +150,11 @@ func (c *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xerr fail
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	return c.unsafeCommitEntry(key, content)
+}
+
+// unsafeCommitEntry is the workforce of CommitEntry, without locking
+func (c *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
 	if _, ok := c.reserved[key]; !ok {
 		return nil, fail.NotAvailableError("the cache entry '%s' is not reserved", key)
 	}
@@ -183,6 +193,11 @@ func (c *cache) FreeEntry(key string) (xerr fail.Error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	return c.unsafeFreeEntry(key)
+}
+
+// unsafeFreeEntry is the workforce of FreeEntry, without locking
+func (c *cache) unsafeFreeEntry(key string) fail.Error {
 	if _, ok := c.reserved[key]; !ok {
 		return fail.NotAvailableError("the cache entry '%s' is not reserved", key)
 	}
@@ -213,10 +228,10 @@ func (c *cache) AddEntry(content Cacheable) (*Entry, fail.Error) {
 	defer c.lock.Unlock()
 
 	id := content.GetID()
-	if xerr := c.ReserveEntry(id); xerr != nil {
+	if xerr := c.unsafeReserveEntry(id); xerr != nil {
 		return nil, xerr
 	}
-	cacheEntry, xerr := c.CommitEntry(id, content)
+	cacheEntry, xerr := c.unsafeCommitEntry(id, content)
 	if xerr != nil {
 		return nil, xerr
 	}
