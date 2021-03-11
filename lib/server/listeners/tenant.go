@@ -18,7 +18,6 @@ package listeners
 
 import (
 	"context"
-	"expvar"
 	"fmt"
 	"math"
 	"time"
@@ -250,9 +249,6 @@ func (s *TenantListener) Set(ctx context.Context, in *pb.TenantName) (empty *goo
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	setted := expvar.Get("tenant.setted").(*expvar.Int)
-	setted.Add(1)
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	// FIXME: handle error
