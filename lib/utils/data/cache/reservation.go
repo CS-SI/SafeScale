@@ -18,11 +18,13 @@ package cache
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // reservation is a struct to simulate a content of a Entry to "reserve" a key
 type reservation struct {
-	key string
+	key       string
+	observers map[string]observer.Observer
 }
 
 func (rc reservation) GetID() string {
@@ -33,7 +35,10 @@ func (rc reservation) GetName() string {
 	return rc.key
 }
 
-func (rc reservation) AddObserver(_ observer.Observer) error {
+func (rc reservation) AddObserver(o observer.Observer) error {
+	if _, ok := rc.observers[o.GetID()]; ok {
+		return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
+	}
 	return nil
 }
 
