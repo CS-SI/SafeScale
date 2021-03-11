@@ -212,13 +212,15 @@ func TestSurprisingBehaviour(t *testing.T) {
 		nukaCola, err := NewCache("nuka")
 		if err != nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		err = nukaCola.ReserveEntry("What")
 		if err != nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		time.Sleep(100 * time.Millisecond)
@@ -226,7 +228,8 @@ func TestSurprisingBehaviour(t *testing.T) {
 		compilerHappy, fe := nukaCola.CommitEntry("What", content) // problem here ?, a mismatch and no complaining ?
 		if fe != nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		_ = compilerHappy
@@ -237,7 +240,8 @@ func TestSurprisingBehaviour(t *testing.T) {
 		theX, err := nukaCola.GetEntry("What")
 		if err == nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		_ = theX
