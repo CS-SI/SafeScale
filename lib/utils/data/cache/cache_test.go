@@ -152,77 +152,102 @@ func TestDeadlock(t *testing.T) {
 }
 
 func TestReserveCommitGet(t *testing.T) {
-	content := &reservation{key: "content"}
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		content := &reservation{key: "content"}
 
-	nukaCola, err := NewCache("nuka")
-	if err != nil {
-		t.Error(err)
+		nukaCola, err := NewCache("nuka")
+		if err != nil {
+			t.Error(err)
+			t.Fail()
+			return
+		}
+
+		err = nukaCola.ReserveEntry(content.GetID())
+		if err != nil {
+			t.Error(err)
+			t.Fail()
+			return
+		}
+
+		time.Sleep(100 * time.Millisecond)
+
+		compilerHappy, fe := nukaCola.CommitEntry(content.GetID(), content)
+		if fe != nil {
+			t.Error(err)
+			t.Fail()
+			return
+		}
+
+		_ = compilerHappy
+
+		time.Sleep(1 * time.Second)
+
+		theX, err := nukaCola.GetEntry(content.GetID())
+		if err != nil {
+			t.Error(err)
+			t.Fail()
+			return
+		}
+
+		_ = theX
+	}()
+
+	failed := waitTimeout(&wg, 3*time.Second)
+	if failed {
+		t.Error("We have a deadlock in TestReserveCommitGet")
 		t.FailNow()
 	}
-
-	err = nukaCola.ReserveEntry(content.GetID())
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	time.Sleep(100 * time.Millisecond)
-
-	compilerHappy, fe := nukaCola.CommitEntry(content.GetID(), content)
-	if fe != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	_ = compilerHappy
-
-	time.Sleep(1 * time.Second)
-
-	theX, err := nukaCola.GetEntry(content.GetID())
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	_ = theX
 }
 
 func TestSurprisingBehaviour(t *testing.T) {
-	content := &reservation{key: "content"}
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		content := &reservation{key: "content"}
 
-	nukaCola, err := NewCache("nuka")
-	if err != nil {
-		t.Error(err)
+		nukaCola, err := NewCache("nuka")
+		if err != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+
+		err = nukaCola.ReserveEntry("What")
+		if err != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+
+		time.Sleep(100 * time.Millisecond)
+
+		compilerHappy, fe := nukaCola.CommitEntry("What", content) // problem here ?, a mismatch and no complaining ?
+		if fe != nil {
+			t.Error(err)
+			t.FailNow()
+		}
+
+		_ = compilerHappy
+
+		time.Sleep(1 * time.Second)
+
+		// that is highly unexpected from an user point of view, but now it's explained in th docs
+		theX, err := nukaCola.GetEntry("What")
+		if err == nil {
+			t.Error(err)
+			t.FailNow()
+		}
+
+		_ = theX
+	}()
+
+	failed := waitTimeout(&wg, 3*time.Second)
+	if failed {
+		t.Error("We have a deadlock in TestSurprisingBehaviour")
 		t.FailNow()
 	}
-
-	err = nukaCola.ReserveEntry("What")
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	time.Sleep(100 * time.Millisecond)
-
-	compilerHappy, fe := nukaCola.CommitEntry("What", content) // problem here ?, a mismatch and no complaining ?
-	if fe != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	_ = compilerHappy
-
-	time.Sleep(1 * time.Second)
-
-	// that is highly unexpected from an user point of view, we reserved a entry with key "What" and successfully commited also with key "What"
-	// after that, the GetEntry with the same key, FAILS
-	theX, err := nukaCola.GetEntry("What")
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	_ = theX
 }
 
 func TestDeadlockAddingEntry(t *testing.T) {
