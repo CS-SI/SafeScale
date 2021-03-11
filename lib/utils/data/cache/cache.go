@@ -35,7 +35,7 @@ type Cache interface {
 	// concurrency.TaskedLock
 	observer.Observer
 
-	GetEntry(key string) (*Entry, fail.Error)                       // returns a cache entry from its key
+	GetEntry(key string) (*Entry, fail.Error) // returns a cache entry from its key
 
 	// ReserveEntry locks an entry identified by key for update
 	// if entry does not exist, create an empty one
@@ -46,15 +46,15 @@ type Cache interface {
 	// because content.GetID() has to be the final key.
 	CommitEntry(key string, content Cacheable) (*Entry, fail.Error)
 
-	FreeEntry(key string) fail.Error                                // frees a cache entry (removing the reservation from cache)
-	AddEntry(content Cacheable) (*Entry, fail.Error)                // adds a content in cache (doing ReserverEntry+CommitEntry i a whole)
+	FreeEntry(key string) fail.Error                 // frees a cache entry (removing the reservation from cache)
+	AddEntry(content Cacheable) (*Entry, fail.Error) // adds a content in cache (doing ReserveEntry+CommitEntry in a whole)
 }
 
 type cache struct {
 	lock sync.RWMutex
 
-	name  string
-	cache map[string]*Entry
+	name     string
+	cache    map[string]*Entry
 	reserved map[string]struct{}
 }
 
@@ -65,8 +65,8 @@ func NewCache(name string) (Cache, fail.Error) {
 	}
 
 	c := cache{
-		name:  name,
-		cache: map[string]*Entry{},
+		name:     name,
+		cache:    map[string]*Entry{},
 		reserved: map[string]struct{}{},
 	}
 	return &c, nil
@@ -105,7 +105,7 @@ func (c *cache) GetEntry(key string) (*Entry, fail.Error) {
 	defer c.lock.RUnlock()
 
 	if _, ok := c.reserved[key]; ok {
-		return nil, fail.NotAvailableError("cache entry '%s' is reserved and cannot be use until freed or committed")
+		return nil, fail.NotAvailableError("cache entry '%s' is reserved and cannot be use until freed or committed", key)
 	}
 	if ce, ok := c.cache[key]; ok {
 		return ce, nil
