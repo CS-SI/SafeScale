@@ -36,8 +36,16 @@ type Cache interface {
 	observer.Observer
 
 	GetEntry(key string) (*Entry, fail.Error)                       // returns a cache entry from its key
-	ReserveEntry(key string) fail.Error                             // locks an entry identified by key for update
-	CommitEntry(key string, content Cacheable) (*Entry, fail.Error) // fills a previously reserved entry with content
+
+	// ReserveEntry locks an entry identified by key for update
+	// if entry does not exist, create an empty one
+	ReserveEntry(key string) fail.Error
+
+	// CommitEntry fills a previously reserved entry by 'key' with 'content'
+	// The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry),
+	// because content.GetID() has to be the final key.
+	CommitEntry(key string, content Cacheable) (*Entry, fail.Error)
+
 	FreeEntry(key string) fail.Error                                // frees a cache entry (removing the reservation from cache)
 	AddEntry(content Cacheable) (*Entry, fail.Error)                // adds a content in cache (doing ReserverEntry+CommitEntry i a whole)
 }
@@ -69,7 +77,7 @@ func (c *cache) isNull() bool {
 }
 
 // GetID satisfies interface data.Identifiable
-func (c cache) GetID() string {
+func (c *cache) GetID() string {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -77,7 +85,7 @@ func (c cache) GetID() string {
 }
 
 // GetName satisfies interface data.Identifiable
-func (c cache) GetName() string {
+func (c *cache) GetName() string {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -139,6 +147,7 @@ func (c *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
 }
 
 // CommitEntry fills a previously reserved entry with content
+// The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.GetID() has to be the final key.
 func (c *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
 	if c.isNull() {
 		return nil, fail.InvalidInstanceError()
@@ -154,6 +163,7 @@ func (c *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xerr fail
 }
 
 // unsafeCommitEntry is the workforce of CommitEntry, without locking
+// The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.GetID() has to be the final key.
 func (c *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
 	if _, ok := c.reserved[key]; !ok {
 		return nil, fail.NotAvailableError("the cache entry '%s' is not reserved", key)
@@ -239,7 +249,11 @@ func (c *cache) AddEntry(content Cacheable) (*Entry, fail.Error) {
 }
 
 // SignalChange tells the cache entry something has been changed in the content
-func (c cache) SignalChange(key string) {
+func (c *cache) SignalChange(key string) {
+	if c == nil {
+		return
+	}
+
 	if key == "" {
 		return
 	}
@@ -256,7 +270,11 @@ func (c cache) SignalChange(key string) {
 }
 
 // MarkAsFreed tells the cache to unlock content (decrementing the counter of uses)
-func (c cache) MarkAsFreed(id string) {
+func (c *cache) MarkAsFreed(id string) {
+	if c == nil {
+		return
+	}
+
 	if id == "" {
 		return
 	}
@@ -270,7 +288,11 @@ func (c cache) MarkAsFreed(id string) {
 }
 
 // MarkAsDeleted tells the cache entry to be considered as deleted
-func (c cache) MarkAsDeleted(key string) {
+func (c *cache) MarkAsDeleted(key string) {
+	if c == nil {
+		return
+	}
+
 	if key == "" {
 		return
 	}
