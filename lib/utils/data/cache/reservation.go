@@ -17,6 +17,8 @@
 package cache
 
 import (
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -39,19 +41,35 @@ func (rc reservation) AddObserver(o observer.Observer) error {
 	if _, ok := rc.observers[o.GetID()]; ok {
 		return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
 	}
+
+	rc.observers[o.GetID()] = o
+
 	return nil
 }
 
 func (rc reservation) NotifyObservers() error {
+	for _, ob := range rc.observers {
+		ob.SignalChange(rc.key)
+	}
 	return nil
 }
 
 func (rc reservation) RemoveObserver(name string) error {
+	if _, ok := rc.observers[name]; !ok {
+		return fmt.Errorf("not there")
+	}
+	delete(rc.observers, name)
 	return nil
 }
 
 func (rc reservation) Released() {
+	for _, ob := range rc.observers {
+		ob.MarkAsFreed(rc.key)
+	}
 }
 
 func (rc reservation) Destroyed() {
+	for _, ob := range rc.observers {
+		ob.MarkAsFreed(rc.key)
+	}
 }
