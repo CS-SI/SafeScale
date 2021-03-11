@@ -60,7 +60,10 @@ type KongController struct {
 }
 
 // NewKongController ...
-func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimaryGateway bool) (*KongController, fail.Error) {
+func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.Subnet, addressPrimaryGateway bool) (*KongController, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -84,7 +87,7 @@ func NewKongController(svc iaas.Service, subnet resources.Subnet, addressPrimary
 		present = anon.(bool)
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(subnet.GetName(), func() (interface{}, fail.Error) {
-			results, xerr := rp.Check(nil, addressedGateway, data.Map{}, resources.FeatureSettings{})
+			results, xerr := rp.Check(ctx, addressedGateway, data.Map{}, resources.FeatureSettings{})
 			if xerr != nil {
 				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
 			}
