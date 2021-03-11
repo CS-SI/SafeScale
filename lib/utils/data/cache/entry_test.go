@@ -128,7 +128,8 @@ func TestDeadlock(t *testing.T) {
 		err := nukaCola.ReserveEntry("What")
 		if err != nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		// between reserve and commit, someone with a reference to our cache just checks its content
@@ -235,13 +236,15 @@ func TestDeadlockAddingEntry(t *testing.T) {
 		nukaCola, err := NewCache("nuka")
 		if err != nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		_, err = nukaCola.AddEntry(content) // reentrant locks strike back
 		if err != nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 	}()
 
@@ -264,19 +267,22 @@ func TestSignalChangeEntry(t *testing.T) {
 		nukaCola, err := NewCache("nuka")
 		if err != nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		err = nukaCola.ReserveEntry(content.GetName())
 		if err != nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		_, err = nukaCola.CommitEntry(content.GetName(), content)
 		if err != nil {
 			t.Error(err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		nukaCola.SignalChange(content.GetName())
@@ -313,7 +319,8 @@ func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
 		key := "cola"
 		if xerr := rc.ReserveEntry(key); xerr != nil {
 			t.Error(xerr)
-			t.FailNow()
+			t.Fail()
+			return
 		}
 
 		_, xerr := rc.CommitEntry("previous", content)
@@ -321,11 +328,13 @@ func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
 			nerr := rc.FreeEntry("previous")
 			if nerr != nil {
 				t.Error(nerr)
-				t.FailNow()
+				t.Fail()
+				return
 			}
 		} else {
 			t.Error("The commit should have failed")
-			t.FailNow()
+			t.Fail()
+			return
 		}
 		return
 	}()
