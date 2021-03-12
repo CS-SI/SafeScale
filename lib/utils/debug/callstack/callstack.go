@@ -28,7 +28,7 @@ import (
 
 // DecorateWith adds call trace to the message "prefix what: why"
 // 'ignoreCount' indicates the number of call that have to be ignored at the beginning of the stack trace
-func DecorateWith(prefix, what, why string, ignoreCount int) string {
+func DecorateWith(prefix, what, why string, ignoreCount uint) string {
 	const missingPrefixMessage = "uncategorized error occurred:"
 
 	msg := prefix
@@ -44,7 +44,7 @@ func DecorateWith(prefix, what, why string, ignoreCount int) string {
 		ignoreCount = 2
 	}
 
-	if pc, file, line, ok := runtime.Caller(ignoreCount); ok {
+	if pc, file, line, ok := runtime.Caller(int(ignoreCount)); ok {
 		if f := runtime.FuncForPC(pc); f != nil {
 			filename := strings.Replace(file, sourceFilePrefixToRemove(), "", 1)
 			if what == "" {
