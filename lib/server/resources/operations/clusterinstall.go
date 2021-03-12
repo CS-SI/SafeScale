@@ -400,7 +400,7 @@ func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	box, err := getTemplateBox()
 	if err != nil {
@@ -450,11 +450,9 @@ func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	// executes remote file
 	var cmd string
 	if hidesOutput {
-		//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash -instance \"BASH_XTRACEFD=7 %s 7>/tmp/captured 2>&7\";retcode=${PIPESTATUS};cat /tmp/captured; sudo rm /tmp/captured;exit ${retcode}", path, path)
-		cmd = fmt.Sprintf("sudo -- bash -instance 'chmod u+rx %s; captf=$(mktemp); bash -instance \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
+		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
 	} else {
-		//		cmd = fmt.Sprintf("sudo chmod u+rx %s;sudo bash %s;exit ${PIPESTATUS}", path, path)
-		cmd = fmt.Sprintf("sudo -- bash -instance 'chmod u+rx %s; bash -instance %s; exit ${PIPESTATUS}'", path, path)
+		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
 	}
 	return host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 }
@@ -589,8 +587,14 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 	params["SSHPublicKey"] = identity.Keypair.PublicKey
 	params["SSHPrivateKey"] = identity.Keypair.PrivateKey
 
-	if _, _, _, xerr = instance.ExecuteScript(ctx, "node_install_requirements.sh", params, host); xerr != nil {
+	retcode, stdout, stderr, xerr := instance.ExecuteScript(ctx, "node_install_requirements.sh", params, host)
+	if xerr != nil {
 		return fail.Wrap(xerr, "[%s] system requirements installation failed", hostLabel)
+	}
+	if retcode != 0 {
+		xerr = fail.ExecutionError(nil, "failed to install common node requirements")
+		_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+		return xerr
 	}
 
 	logrus.Debugf("[%s] system requirements installation successful.", hostLabel)
