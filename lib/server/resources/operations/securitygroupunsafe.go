@@ -55,7 +55,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 		if !force {
 			// check bonds to hosts
-			innerXErr := props.Inspect(/*task, */securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			innerXErr := props.Inspect( /*task, */ securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 				hostsV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -94,7 +94,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 			}
 
 			// check bonds to subnets
-			innerXErr = props.Inspect(/*task, */securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			innerXErr = props.Inspect( /*task, */ securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 				subnetsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -144,7 +144,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		// defer task.DisarmAbortSignal()()
 
 		// First unbind from subnets (which will unbind from hosts attached to these subnets...)
-		innerXErr := props.Alter(/*task, */securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Alter( /*task, */ securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgnV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -156,7 +156,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		}
 
 		// Second, unbind from the hosts if there are remaining ones
-		innerXErr = props.Alter(/*task, */securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter( /*task, */ securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -234,7 +234,7 @@ func (instance *securityGroup) unsafeClear(task concurrency.Task) fail.Error {
 }
 
 // unsafeAddRule adds a rule to a security group
-func (instance *securityGroup) unsafeAddRule(task concurrency.Task, rule abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *securityGroup) unsafeAddRule(task concurrency.Task, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if rule.IsNull() {

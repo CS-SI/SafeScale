@@ -139,7 +139,7 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 				}
 			}
 
-			return rh, nil
+			return rh, rh.(*host).updateCachedInformation()
 		}),
 	}
 
@@ -164,48 +164,48 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 		}
 	}()
 
-	// cache access information only if there was no error
-	return rh, rh.(*host).updateCachedInformation()
+	return rh, nil
 }
 
-// upgradeIfNeeded upgrades IPAddress properties if needed
+// upgradeIfNeeded upgrades Host properties if needed
 func (instance *host) upgradeIfNeeded() fail.Error {
 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if !props.Lookup(hostproperty.NetworkV2) {
 			// upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2
-			xerr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-				hnV1, ok := clonable.(*propertiesv1.HostNetwork)
+			var hnV1 *propertiesv1.HostNetwork
+			innerXErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
+				var ok bool
+				hnV1, ok = clonable.(*propertiesv1.HostNetwork)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-
-				innerXErr := props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-					hnV2, ok := clonable.(*propertiesv2.HostNetworking)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
-
-					hnV2.DefaultSubnetID = hnV1.DefaultNetworkID
-					hnV2.IPv4Addresses = hnV1.IPv4Addresses
-					hnV2.IPv6Addresses = hnV1.IPv6Addresses
-					hnV2.IsGateway = hnV1.IsGateway
-					hnV2.PublicIPv4 = hnV1.PublicIPv4
-					hnV2.PublicIPv6 = hnV1.PublicIPv6
-					hnV2.SubnetsByID = hnV1.NetworksByID
-					hnV2.SubnetsByName = hnV1.NetworksByName
-					return nil
-				})
-				if innerXErr != nil {
-					return innerXErr
-				}
-
-				// FIXME: clean old property or leave it ? will differ from v2 through time if Subnets are added for example
-				// hnV1 = &propertiesv1.HostNetworking{}
 				return nil
 			})
-			if xerr != nil {
-				return xerr
+			if innerXErr != nil {
+				return innerXErr
 			}
+
+			innerXErr = props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				hnV2.DefaultSubnetID = hnV1.DefaultNetworkID
+				hnV2.IPv4Addresses = hnV1.IPv4Addresses
+				hnV2.IPv6Addresses = hnV1.IPv6Addresses
+				hnV2.IsGateway = hnV1.IsGateway
+				hnV2.PublicIPv4 = hnV1.PublicIPv4
+				hnV2.PublicIPv6 = hnV1.PublicIPv6
+				hnV2.SubnetsByID = hnV1.NetworksByID
+				hnV2.SubnetsByName = hnV1.NetworksByName
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			// FIXME: clean old property or leave it ? will differ from v2 through time if Subnets are added for example
 		}
 
 		return fail.AlteredNothingError()
@@ -248,12 +248,12 @@ func (instance *host) updateCachedInformation() fail.Error {
 			}
 
 			if !hnV2.IsGateway {
-				rs, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
+				subnetInstance, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
 				if xerr != nil {
 					return xerr
 				}
 
-				rgw, xerr := rs.InspectGateway(true)
+				rgw, xerr := subnetInstance.(*subnet).unsafeInspectGateway(true)
 				if xerr != nil {
 					return xerr
 				}
@@ -284,7 +284,7 @@ func (instance *host) updateCachedInformation() fail.Error {
 				}
 
 				// Secondary gateway may not exist...
-				rgw, xerr = rs.InspectGateway(false)
+				rgw, xerr = subnetInstance.InspectGateway(false)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
@@ -866,7 +866,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 
 		// Updates host property propertiesv2.HostNetworking
-		innerXErr = props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+		return props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -882,14 +882,16 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			hnV2.IPv6Addresses = ahf.Networking.IPv6Addresses
 			return nil
 		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		// Updates properties in metadata
-		return instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
 	})
 	if xerr != nil {
+		return nil, xerr
+	}
+
+	if xerr = instance.updateCachedInformation(); xerr != nil {
+		return nil, xerr
+	}
+
+	if xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet); xerr != nil {
 		return nil, xerr
 	}
 	defer func() {
@@ -898,10 +900,6 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 		instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
 	}()
-
-	if xerr = instance.updateCachedInformation(); xerr != nil {
-		return nil, xerr
-	}
 
 	logrus.Infof("Compute resource created: '%s'", instance.GetName())
 
@@ -932,6 +930,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			parts := strings.Split(status, ",")
 			systemV1.Type = parts[1]
 			systemV1.Flavor = parts[2]
@@ -948,8 +947,8 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, xerr
 	}
 	defer func() {
-		// Disable abort signal during the clean up
-		defer task.DisarmAbortSignal()()
+		// // Disable abort signal during the clean up
+		// defer task.DisarmAbortSignal()()
 
 		instance.undoUpdateSubnets(hostReq, &xerr)
 	}()
@@ -976,14 +975,18 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 		isolatedHost := !req.IsGateway && req.PublicIP && (subnetCount == 0 || (subnetCount == 1 && defaultSubnet.GetName() == abstract.SingleHostNetworkName))
 
 		// get default Subnet core data
-		var as *abstract.Subnet
-		innerXErr = defaultSubnet.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		var (
+			as              *abstract.Subnet
+			defaultSubnetID string
+		)
+		innerXErr = defaultSubnet.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			var ok bool
 			as, ok = clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
+			defaultSubnetID = as.ID
 			return nil
 		})
 		if innerXErr != nil {
@@ -1056,7 +1059,7 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 			hsgV1.ByName[item.Name] = item.ID
 		}
 
-		// Apply internal Security Group of each subnets
+		// Apply internal Security Group of each other subnets
 		if req.IsGateway || !isolatedHost {
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
@@ -1069,6 +1072,10 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 						errors []error
 					)
 					for _, v := range req.Subnets {
+						if v.ID == defaultSubnetID {
+							continue
+						}
+
 						subnetInstance, deeperXErr := LoadSubnet(svc, "", v.ID)
 						if deeperXErr != nil {
 							_ = innerXErr.AddConsequence(deeperXErr)
@@ -1105,6 +1112,10 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 			}()
 
 			for _, v := range req.Subnets {
+				if v.ID == defaultSubnetID {
+					continue
+				}
+
 				subnetInstance, xerr := LoadSubnet(svc, "", v.ID)
 				if xerr != nil {
 					return xerr
@@ -1113,7 +1124,7 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					subnetInstance.Released()
 				}(subnetInstance)
 
-				xerr = subnetInstance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					as, ok := clonable.(*abstract.Subnet)
 					if !ok {
 						return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1148,8 +1159,12 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 		// Create and bind a dedicated Security Group to the host (with no rules by default)
 		var an *abstract.Network
-		rn, _ := defaultSubnet.(*subnet).unsafeInspectNetwork()
-		innerXErr = rn.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		rn, xerr := defaultSubnet.(*subnet).unsafeInspectNetwork()
+		if xerr != nil {
+			return xerr
+		}
+
+		innerXErr = rn.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			var ok bool
 			an, ok = clonable.(*abstract.Network)
 			if !ok {

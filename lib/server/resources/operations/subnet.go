@@ -328,7 +328,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Su
 					return nil, innerXErr
 				}
 
-				return rs, nil
+				return rs, rs.(*subnet).updateCachedInformation()
 			}),
 		}
 		cacheEntry, xerr := subnetCache.Get(subnetID, options...)
@@ -354,28 +354,57 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Su
 		}
 		return nullSubnet(), fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
 	}
+	return rs, nil
+}
 
-	// -- cache parent network in instance --
-	if rs.(*subnet).parentNetwork == nil {
-		if rn == nil {
-			xerr = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
-				as, ok := clonable.(*abstract.Subnet)
-				if !ok {
-					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				rn, innerXErr = LoadNetwork(svc, as.Network)
-				return innerXErr
-			})
-			if xerr != nil {
-				return nil, xerr
-			}
+// updateCachedInformation updates the information cached in instance because will be frequently used and will not changed over time
+func (instance *subnet) updateCachedInformation() fail.Error {
+	var networkID, primaryGatewayID, secondaryGatewayID string
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		rs.(*subnet).parentNetwork = rn.(*network)
+		networkID = as.Network
+		if len(as.GatewayIDs) > 0 {
+			primaryGatewayID = as.GatewayIDs[0]
+		}
+		if len(as.GatewayIDs) > 1 {
+			secondaryGatewayID = as.GatewayIDs[1]
+		}
+		return nil
+	})
+	if xerr != nil {
+		return xerr
 	}
 
-	return rs, nil
+	if primaryGatewayID != "" {
+		hostInstance, xerr := LoadHost(instance.GetService(), primaryGatewayID)
+		if xerr != nil {
+			return xerr
+		}
+
+		instance.gateways[0] = hostInstance.(*host)
+	}
+	if secondaryGatewayID != "" {
+		hostInstance, xerr := LoadHost(instance.GetService(), secondaryGatewayID)
+		if xerr != nil {
+			return xerr
+		}
+
+		instance.gateways[1] = hostInstance.(*host)
+	}
+
+	if instance.parentNetwork == nil {
+		networkInstance, xerr := LoadNetwork(instance.GetService(), networkID)
+		if xerr != nil {
+			return xerr
+		}
+		instance.parentNetwork = networkInstance.(*network)
+	}
+
+	return nil
 }
 
 // isNull tells if the instance corresponds to subnet Null Value
@@ -421,7 +450,7 @@ func (instance *subnet) carry(clonable data.Clonable) (xerr fail.Error) {
 
 	cacheEntry.LockContent()
 
-	return nil
+	return instance.updateCachedInformation()
 }
 
 // Create creates a subnet
@@ -529,10 +558,10 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
+			// // Disable abort signal during clean up
+			// defer task.DisarmAbortSignal()()
 
-			if derr := subnetGWSG.UnbindFromSubnet(ctx, instance); derr != nil {
+			if derr := subnetGWSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateway from subnet", actionFromError(xerr)))
 			}
 		}
@@ -962,7 +991,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	// --- Updates subnet state in metadata ---
-	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -971,6 +1000,11 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		as.State = subnetstate.READY
 		return nil
 	})
+	if xerr != nil {
+		return xerr
+	}
+
+	return instance.updateCachedInformation()
 }
 
 // validateCIDR tests if CIDR requested is valid, or select one if no CIDR is provided

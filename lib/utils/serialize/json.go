@@ -111,7 +111,7 @@ func (x *JSONProperties) Count() uint {
 
 // Inspect allows to consult the content of the property 'key' inside 'inspector' function
 // Changes in the property won't be kept
-func (x *JSONProperties) Inspect(/*task concurrency.Task, */key string, inspector func(clonable data.Clonable) fail.Error) fail.Error {
+func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonable) fail.Error) fail.Error {
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -121,12 +121,6 @@ func (x *JSONProperties) Inspect(/*task concurrency.Task, */key string, inspecto
 	if x.module == "" {
 		return fail.InvalidInstanceContentError("x.module", "can't be empty string")
 	}
-	// if task == nil {
-	// 	return fail.InvalidParameterCannotBeNilError("task")
-	// }
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
@@ -155,7 +149,7 @@ func (x *JSONProperties) Inspect(/*task concurrency.Task, */key string, inspecto
 	clone := item.Clone()
 	x.RUnlock()
 
-	return clone.(*jsonProperty).Shielded.Inspect(/*task, */inspector)
+	return clone.(*jsonProperty).Shielded.Inspect(inspector)
 }
 
 // Alter is used to lock an extension for write
@@ -164,7 +158,7 @@ func (x *JSONProperties) Inspect(/*task concurrency.Task, */key string, inspecto
 // can't fail because a key doesn't exist).
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
-func (x *JSONProperties) Alter(/*task concurrency.Task, */key string, alterer func(data.Clonable) fail.Error) fail.Error {
+func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Error) fail.Error {
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -174,22 +168,12 @@ func (x *JSONProperties) Alter(/*task concurrency.Task, */key string, alterer fu
 	if x.module == "" {
 		return fail.InvalidInstanceContentError("x.module", "cannot be empty string")
 	}
-	// if task == nil {
-	// 	return fail.InvalidParameterCannotBeNilError("task")
-	// }
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 	if alterer == nil {
 		return fail.InvalidParameterCannotBeNilError("alterer")
 	}
-
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
 
 	x.Lock()
 	defer x.Unlock()
@@ -210,7 +194,7 @@ func (x *JSONProperties) Alter(/*task concurrency.Task, */key string, alterer fu
 	}
 
 	clone := item.Clone()
-	if xerr := clone.(*jsonProperty).Alter(/*task, */alterer); xerr != nil {
+	if xerr := clone.(*jsonProperty).Alter(alterer); xerr != nil {
 		return xerr
 	}
 
@@ -238,26 +222,20 @@ func (x *JSONProperties) SetModule(module string) fail.Error {
 
 // Serialize ...
 // satisfies interface data.Serializable
-func (x *JSONProperties) Serialize(/*task concurrency.Task*/) ([]byte, fail.Error) {
+func (x *JSONProperties) Serialize() ([]byte, fail.Error) {
 	if x == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 	if x.Properties == nil {
 		return nil, fail.InvalidParameterError("x.properties", "can't be nil")
 	}
-	// if task == nil {
-	// 	return nil, fail.InvalidParameterCannotBeNilError("task")
-	// }
-	// if task.Aborted() {
-	// 	return nil, fail.AbortedError(nil, "aborted")
-	// }
 
 	x.RLock()
 	defer x.RUnlock()
 
 	var mapped = map[string]string{}
 	for k, v := range x.Properties {
-		ser, err := v.(*jsonProperty).Serialize(/*task*/)
+		ser, err := v.(*jsonProperty).Serialize()
 		if err != nil {
 			return nil, err
 		}
@@ -273,16 +251,10 @@ func (x *JSONProperties) Serialize(/*task concurrency.Task*/) ([]byte, fail.Erro
 // Deserialize ...
 // Returns fail.SyntaxError if an JSON syntax error happens
 // satisfies interface data.Serializable
-func (x *JSONProperties) Deserialize(/*task concurrency.Task, */buf []byte) (xerr fail.Error) {
+func (x *JSONProperties) Deserialize( /*task concurrency.Task, */ buf []byte) (xerr fail.Error) {
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
-	// if task == nil {
-	// 	return fail.InvalidParameterCannotBeNilError("task")
-	// }
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
 
 	defer fail.OnPanic(&xerr) // json.Unmarshal may panic
 
@@ -316,7 +288,7 @@ func (x *JSONProperties) Deserialize(/*task concurrency.Task, */buf []byte) (xer
 			x.Properties[k] = item
 			prop = item
 		}
-		err := prop.Shielded.Deserialize(/*task, */[]byte(v))
+		err := prop.Shielded.Deserialize([]byte(v))
 		if err != nil {
 			return err
 		}

@@ -196,8 +196,8 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 }
 
 // SecurityGroupRuleFromProtocolToAbstract does what the name says
-func SecurityGroupRuleFromProtocolToAbstract(in *protocol.SecurityGroupRule) (abstract.SecurityGroupRule, fail.Error) {
-	var out abstract.SecurityGroupRule
+func SecurityGroupRuleFromProtocolToAbstract(in *protocol.SecurityGroupRule) (*abstract.SecurityGroupRule, fail.Error) {
+	out := abstract.NewSecurityGroupRule()
 	if in == nil {
 		return out, fail.InvalidParameterCannotBeNilError("in")
 	}
@@ -213,8 +213,8 @@ func SecurityGroupRuleFromProtocolToAbstract(in *protocol.SecurityGroupRule) (ab
 }
 
 // SecurityGroupRulesFromProtocolToAbstract does what the name says
-func SecurityGroupRulesFromProtocolToAbstract(in []*protocol.SecurityGroupRule) ([]abstract.SecurityGroupRule, fail.Error) {
-	out := make([]abstract.SecurityGroupRule, 0, len(in))
+func SecurityGroupRulesFromProtocolToAbstract(in []*protocol.SecurityGroupRule) (abstract.SecurityGroupRules, fail.Error) {
+	out := make(abstract.SecurityGroupRules, 0, len(in))
 	for _, v := range in {
 		rule, xerr := SecurityGroupRuleFromProtocolToAbstract(v)
 		if xerr != nil {
@@ -226,17 +226,17 @@ func SecurityGroupRulesFromProtocolToAbstract(in []*protocol.SecurityGroupRule) 
 }
 
 // SecurityGroupFromProtocolToAbstract ...
-func SecurityGroupFromProtocolToAbstract(in *protocol.SecurityGroupResponse) (abstract.SecurityGroup, fail.Error) {
+func SecurityGroupFromProtocolToAbstract(in *protocol.SecurityGroupResponse) (*abstract.SecurityGroup, fail.Error) {
 	if in == nil {
-		return abstract.SecurityGroup{}, fail.InvalidParameterCannotBeNilError("in")
+		return &abstract.SecurityGroup{}, fail.InvalidParameterCannotBeNilError("in")
 	}
 
 	rules, xerr := SecurityGroupRulesFromProtocolToAbstract(in.Rules)
 	if xerr != nil {
-		return abstract.SecurityGroup{}, xerr
+		return &abstract.SecurityGroup{}, xerr
 	}
 
-	out := abstract.SecurityGroup{
+	out := &abstract.SecurityGroup{
 		ID:          in.GetId(),
 		Name:        in.GetName(),
 		Description: in.GetDescription(),

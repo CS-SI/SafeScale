@@ -67,7 +67,7 @@ func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 // Parameter 'networkRef' is not used in Openstack, Security Groups are tenant-wide.
 // Returns nil, *fail.ErrDuplicate if already 1 security group exists with that name
 // Returns nil, *fail.ErrDuplicate(with a cause *fail.ErrDuplicate) if more than 1 security group exist with that name
-func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -131,7 +131,7 @@ func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	}
 
 	// now adds security rules
-	asg.Rules = make([]abstract.SecurityGroupRule, 0, len(rules))
+	asg.Rules = make(abstract.SecurityGroupRules, 0, len(rules))
 	for _, v := range rules {
 		if asg, xerr = s.AddRuleToSecurityGroup(asg, v); xerr != nil {
 			return nullASG, xerr
@@ -271,13 +271,13 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 			}
 		}
 	}
-	asg.Rules = []abstract.SecurityGroupRule{}
+	asg.Rules = abstract.SecurityGroupRules{}
 	return asg, nil
 }
 
 // toAbstractSecurityGroupRules
-func toAbstractSecurityGroupRules(in []secrules.SecGroupRule) ([]abstract.SecurityGroupRule, fail.Error) {
-	out := make([]abstract.SecurityGroupRule, 0, len(in))
+func toAbstractSecurityGroupRules(in []secrules.SecGroupRule) (abstract.SecurityGroupRules, fail.Error) {
+	out := make(abstract.SecurityGroupRules, 0, len(in))
 	for k, v := range in {
 		direction := convertDirectionToAbstract(v.Direction)
 		if direction == securitygroupruledirection.UNKNOWN {
@@ -288,7 +288,7 @@ func toAbstractSecurityGroupRules(in []secrules.SecGroupRule) ([]abstract.Securi
 			return nil, fail.InvalidRequestError("invalid value '%s' to 'EtherType' field in rule #%d", v.EtherType, k+1)
 		}
 
-		r := abstract.SecurityGroupRule{
+		r := &abstract.SecurityGroupRule{
 			IDs:         []string{v.ID},
 			EtherType:   etherType,
 			Description: v.Description,
@@ -364,7 +364,7 @@ func convertEtherTypeFromAbstract(in ipversion.Enum) secrules.RuleEtherType {
 
 // AddRuleToSecurityGroup adds a rule to a security group
 // On success, return Security Group with added rule
-func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
+func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -489,7 +489,7 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
+func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -503,6 +503,9 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		if xerr != nil {
 			return asg, xerr
 		}
+	}
+	if rule == nil {
+		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
 	index, xerr := asg.Rules.IndexOfEquivalentRule(rule)

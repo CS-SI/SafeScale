@@ -431,7 +431,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				traceR.trace("receiving signal from context, aborting t...")
+				traceR.trace("receiving signal from context, aborting task...")
 				t.mu.Lock()
 				t.status = ABORTED
 				t.err = fail.AbortedError(t.err)
@@ -473,7 +473,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				traceR.trace("receiving signal from context, aborting t...")
+				traceR.trace("receiving signal from context, aborting task...")
 				t.mu.Lock()
 				t.status = ABORTED
 				t.err = fail.AbortedError(t.err)

@@ -154,9 +154,8 @@ func (c *core) Inspect(callback resources.Callback) (xerr fail.Error) {
 		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
 	}
 
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	// Reload reloads data from Object Storage to be sure to have the last revision
 	if xerr = c.reload(); xerr != nil {
@@ -757,7 +756,7 @@ func (c *core) Released() {
 // Note: must be called after locking the instance
 func (c *core) released() {
 	for _, v := range c.observers {
-		v.MarkAsFreed( c.id.Load().(string))
+		v.MarkAsFreed(c.id.Load().(string))
 	}
 }
 
@@ -765,7 +764,7 @@ func (c *core) released() {
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
 func (c *core) Destroyed() {
-	if c.isNull(){
+	if c.isNull() {
 		return
 	}
 
