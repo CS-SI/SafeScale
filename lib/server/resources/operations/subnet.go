@@ -1688,19 +1688,25 @@ func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			
+
 			hostsLen := uint(len(shV1.ByName))
+			hostList := make([]string, 0, hostsLen)
 			if hostsLen > 0 {
-				list := make([]string, 0, hostsLen)
 				for k := range shV1.ByName {
-					list = append(list, k)
+					// Check if Host still has metadata and count it if yes
+					if hostInstance, innerXErr := LoadHost(svc, k); innerXErr == nil {
+						hostInstance.Released()
+						hostList = append(hostList, k)
+					}
 				}
+			}
+			if len(hostList) > 0 {
 				verb := "are"
 				if hostsLen == 1 {
 					verb = "is"
 				}
 				errorMsg = fmt.Sprintf("cannot delete subnet '%s': %d host%s %s still attached to it: %s",
-					as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(list, ", "))
+					as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
 				return fail.NotAvailableError(errorMsg)
 			}
 			return nil

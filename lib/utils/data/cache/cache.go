@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -51,9 +52,9 @@ type Cache interface {
 }
 
 type cache struct {
-	lock sync.RWMutex
+	name atomic.Value
 
-	name     string
+	lock     sync.RWMutex
 	cache    map[string]*Entry
 	reserved map[string]struct{}
 }
@@ -64,50 +65,44 @@ func NewCache(name string) (Cache, fail.Error) {
 		return &cache{}, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	c := cache{
-		name:     name,
+	cacheInstance := &cache{
 		cache:    map[string]*Entry{},
 		reserved: map[string]struct{}{},
 	}
-	return &c, nil
+	cacheInstance.name.Store(name)
+	return cacheInstance, nil
 }
 
-func (c *cache) isNull() bool {
-	return c == nil || c.name == "" || c.cache == nil
+func (instance *cache) isNull() bool {
+	return instance == nil || instance.name.Load().(string) == "" || instance.cache == nil
 }
 
 // GetID satisfies interface data.Identifiable
-func (c *cache) GetID() string {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	return c.name
+func (instance *cache) GetID() string {
+	return instance.name.Load().(string)
 }
 
 // GetName satisfies interface data.Identifiable
-func (c *cache) GetName() string {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	return c.name
+func (instance *cache) GetName() string {
+	return instance.name.Load().(string)
 }
 
 // GetEntry returns a cache entry from its key
-func (c *cache) GetEntry(key string) (*Entry, fail.Error) {
-	if c.isNull() {
+func (instance *cache) GetEntry(key string) (*Entry, fail.Error) {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	if _, ok := c.reserved[key]; ok {
+	if _, ok := instance.reserved[key]; ok {
 		return nil, fail.NotAvailableError("cache entry '%s' is reserved and cannot be use until freed or committed", key)
 	}
-	if ce, ok := c.cache[key]; ok {
+	if ce, ok := instance.cache[key]; ok {
 		return ce, nil
 	}
 
@@ -116,50 +111,50 @@ func (c *cache) GetEntry(key string) (*Entry, fail.Error) {
 
 // ReserveEntry locks an entry identified by key for update
 // if entry does not exist, create an empty one
-func (c *cache) ReserveEntry(key string) (xerr fail.Error) {
-	if c.isNull() {
+func (instance *cache) ReserveEntry(key string) (xerr fail.Error) {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	return c.unsafeReserveEntry(key)
+	return instance.unsafeReserveEntry(key)
 }
 
 // unsafeReserveEntry is the workforce of ReserveEntry, without locking
-func (c *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
-	if _, ok := c.reserved[key]; ok {
+func (instance *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
+	if _, ok := instance.reserved[key]; ok {
 		return fail.NotAvailableError("the cache entry '%s' is already reserved", key)
 	}
-	if _, ok := c.cache[key]; ok {
+	if _, ok := instance.cache[key]; ok {
 		return fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry in the cache with key '%s'", key), 0))
 	}
 
 	ce := newEntry(&reservation{key: key})
 	ce.lock()
-	c.cache[key] = &ce
-	c.reserved[key] = struct{}{}
+	instance.cache[key] = &ce
+	instance.reserved[key] = struct{}{}
 	return nil
 }
 
 // CommitEntry fills a previously reserved entry with content
 // The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.GetID() has to be the final key.
-func (c *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
-	if c.isNull() {
+func (instance *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	return c.unsafeCommitEntry(key, content)
+	return instance.unsafeCommitEntry(key, content)
 }
 
 // unsafeCommitEntry is the workforce of CommitEntry, without locking
@@ -192,23 +187,23 @@ func (c *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Entry, xer
 }
 
 // FreeEntry unlocks the cache entry and removes the reservation
-func (c *cache) FreeEntry(key string) (xerr fail.Error) {
-	if c.isNull() {
+func (instance *cache) FreeEntry(key string) (xerr fail.Error) {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if key = strings.TrimSpace(key); key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	return c.unsafeFreeEntry(key)
+	return instance.unsafeFreeEntry(key)
 }
 
 // unsafeFreeEntry is the workforce of FreeEntry, without locking
-func (c *cache) unsafeFreeEntry(key string) fail.Error {
-	if _, ok := c.reserved[key]; !ok {
+func (instance *cache) unsafeFreeEntry(key string) fail.Error {
+	if _, ok := instance.reserved[key]; !ok {
 		return fail.NotAvailableError("the cache entry '%s' is not reserved", key)
 	}
 
@@ -216,9 +211,9 @@ func (c *cache) unsafeFreeEntry(key string) fail.Error {
 		ce *Entry
 		ok bool
 	)
-	if ce, ok = c.cache[key]; ok {
-		delete(c.cache, key)
-		delete(c.reserved, key)
+	if ce, ok = instance.cache[key]; ok {
+		delete(instance.cache, key)
+		delete(instance.reserved, key)
 		ce.unlock()
 	}
 
@@ -226,31 +221,40 @@ func (c *cache) unsafeFreeEntry(key string) fail.Error {
 }
 
 // AddEntry adds a content in cache
-func (c *cache) AddEntry(content Cacheable) (*Entry, fail.Error) {
-	if c == nil {
+func (instance *cache) AddEntry(content Cacheable) (_ *Entry, xerr fail.Error) {
+	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 	if content == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("content")
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
 	id := content.GetID()
-	if xerr := c.unsafeReserveEntry(id); xerr != nil {
+	if xerr := instance.unsafeReserveEntry(id); xerr != nil {
 		return nil, xerr
 	}
-	cacheEntry, xerr := c.unsafeCommitEntry(id, content)
+	defer func() {
+		if xerr != nil {
+			if derr := instance.unsafeFreeEntry(id); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry '%s'", id))
+			}
+		}
+	}()
+
+	cacheEntry, xerr := instance.unsafeCommitEntry(id, content)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return cacheEntry, nil
 }
 
 // SignalChange tells the cache entry something has been changed in the content
-func (c *cache) SignalChange(key string) {
-	if c == nil {
+func (instance *cache) SignalChange(key string) {
+	if instance == nil {
 		return
 	}
 
@@ -258,10 +262,10 @@ func (c *cache) SignalChange(key string) {
 		return
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	if ce, ok := c.cache[key]; ok {
+	if ce, ok := instance.cache[key]; ok {
 		ce.lock()
 		defer ce.unlock()
 
@@ -270,8 +274,8 @@ func (c *cache) SignalChange(key string) {
 }
 
 // MarkAsFreed tells the cache to unlock content (decrementing the counter of uses)
-func (c *cache) MarkAsFreed(id string) {
-	if c == nil {
+func (instance *cache) MarkAsFreed(id string) {
+	if instance == nil {
 		return
 	}
 
@@ -279,17 +283,17 @@ func (c *cache) MarkAsFreed(id string) {
 		return
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	if ce, ok := c.cache[id]; ok {
+	if ce, ok := instance.cache[id]; ok {
 		ce.UnlockContent()
 	}
 }
 
 // MarkAsDeleted tells the cache entry to be considered as deleted
-func (c *cache) MarkAsDeleted(key string) {
-	if c == nil {
+func (instance *cache) MarkAsDeleted(key string) {
+	if instance == nil {
 		return
 	}
 
@@ -297,8 +301,8 @@ func (c *cache) MarkAsDeleted(key string) {
 		return
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	delete(c.cache, key)
+	delete(instance.cache, key)
 }

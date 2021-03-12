@@ -22,10 +22,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLockContent(t *testing.T) {
