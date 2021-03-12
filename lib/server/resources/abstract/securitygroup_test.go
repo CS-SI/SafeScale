@@ -41,11 +41,11 @@ func TestSecurityGroup_Clone(t *testing.T) {
 		t.Fail()
 	}
 
-	sg.Rules = append(sg.Rules, SecurityGroupRule{
+	sg.Rules = append(sg.Rules, &SecurityGroupRule{
 		Description: "run for cover",
 	})
 
-	sg.Rules = append(sg.Rules, SecurityGroupRule{
+	sg.Rules = append(sg.Rules, &SecurityGroupRule{
 		Description: "the road is long",
 	})
 

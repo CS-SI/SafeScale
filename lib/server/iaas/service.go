@@ -73,7 +73,7 @@ type Service interface {
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
 
-	LookupRuleInSecurityGroup(*abstract.SecurityGroup, abstract.SecurityGroupRule) (bool, fail.Error)
+	LookupRuleInSecurityGroup(*abstract.SecurityGroup, *abstract.SecurityGroupRule) (bool, fail.Error)
 
 	// Location --- from interface objectstorage.Location ---
 	objectstorage.Location
@@ -899,7 +899,7 @@ func SimilarityScore(ref string, s string) float64 {
 // }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
-func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule abstract.SecurityGroupRule) (bool, fail.Error) {
+func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule) (bool, fail.Error) {
 	if asg.IsNull() {
 		return false, fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}

@@ -66,11 +66,11 @@ func (sg securityGroup) Inspect(ref string, timeout time.Duration) (*protocol.Se
 }
 
 // Create creates a new security group
-func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, timeout time.Duration) (abstract.SecurityGroup, error) {
+func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, timeout time.Duration) (*abstract.SecurityGroup, error) {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
-	nullSg := abstract.SecurityGroup{}
+	nullSg := abstract.NewSecurityGroup()
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {

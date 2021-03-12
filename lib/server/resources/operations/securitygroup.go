@@ -263,7 +263,7 @@ func (instance *securityGroup) Browse(ctx context.Context, callback func(*abstra
 // Create creates a new securityGroup and its metadata.
 // If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a securityGroup, returns fail.ErrNotAvailable
-func (instance *securityGroup) Create(ctx context.Context, networkID, name, description string, rules []abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *securityGroup) Create(ctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -532,7 +532,7 @@ func (instance *securityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	var rules []abstract.SecurityGroupRule
+	var rules abstract.SecurityGroupRules
 	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
@@ -561,7 +561,7 @@ func (instance *securityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 }
 
 // AddRule adds a rule to a security group
-func (instance *securityGroup) AddRule(ctx context.Context, rule abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *securityGroup) AddRule(ctx context.Context, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -632,7 +632,7 @@ func (instance *securityGroup) AddRules(ctx context.Context, rules abstract.Secu
 
 // DeleteRule deletes a rule identified by its ID from a security group
 // If rule is not in the security group, returns *fail.ErrNotFound
-func (instance *securityGroup) DeleteRule(ctx context.Context, rule abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *securityGroup) DeleteRule(ctx context.Context, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {

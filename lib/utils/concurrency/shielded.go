@@ -45,7 +45,7 @@ func (instance *Shielded) Clone() *Shielded {
 }
 
 // Inspect is used to lock a clonable for read
-func (instance *Shielded) Inspect(/*task Task, */inspector func(clonable data.Clonable) fail.Error) (xerr fail.Error) {
+func (instance *Shielded) Inspect( /*task Task, */ inspector func(clonable data.Clonable) fail.Error) (xerr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -85,7 +85,7 @@ func (instance *Shielded) Inspect(/*task Task, */inspector func(clonable data.Cl
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
 // The caller of the Alter() method will then be able to known, when an error occurs, if it's because there was no change.
-func (instance *Shielded) Alter(/*task Task, */alterer func(data.Clonable) fail.Error) (xerr fail.Error) {
+func (instance *Shielded) Alter( /*task Task, */ alterer func(data.Clonable) fail.Error) (xerr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -129,7 +129,7 @@ func (instance *Shielded) Alter(/*task Task, */alterer func(data.Clonable) fail.
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded) Serialize(/*task Task*/) ([]byte, fail.Error) {
+func (instance *Shielded) Serialize( /*task Task*/ ) ([]byte, fail.Error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -141,7 +141,7 @@ func (instance *Shielded) Serialize(/*task Task*/) ([]byte, fail.Error) {
 	// }
 
 	var jsoned []byte
-	xerr := instance.Inspect(/*task, */func(clonable data.Clonable) fail.Error {
+	xerr := instance.Inspect( /*task, */ func(clonable data.Clonable) fail.Error {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(clonable)
 		if innerErr != nil {
@@ -158,22 +158,15 @@ func (instance *Shielded) Serialize(/*task Task*/) ([]byte, fail.Error) {
 
 // Deserialize transforms serialization data to valid content of Shielded instance
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded) Deserialize(/*task Task, */buf []byte) fail.Error {
+func (instance *Shielded) Deserialize(buf []byte) fail.Error {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	// if task == nil {
-	// 	return fail.InvalidParameterCannotBeNilError("task")
-	// }
 	if len(buf) == 0 {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")
 	}
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
-	return instance.Alter(/*task, */func(clonable data.Clonable) fail.Error {
+	return instance.Alter(func(clonable data.Clonable) fail.Error {
 		if innerErr := json.Unmarshal(buf, clonable); innerErr != nil {
 			return fail.SyntaxError("failed to unmarshal: %s", innerErr.Error())
 		}

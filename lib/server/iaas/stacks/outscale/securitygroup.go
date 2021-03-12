@@ -58,7 +58,7 @@ func toAbstractSecurityGroup(in osc.SecurityGroup) *abstract.SecurityGroup {
 	out.Name = in.SecurityGroupName
 	out.ID = in.SecurityGroupId
 	out.Description = in.Description
-	out.Rules = make([]abstract.SecurityGroupRule, 0, len(in.InboundRules)+len(in.OutboundRules))
+	out.Rules = make(abstract.SecurityGroupRules, 0, len(in.InboundRules)+len(in.OutboundRules))
 	for _, v := range in.InboundRules {
 		out.Rules = append(out.Rules, toAbstractSecurityGroupRule(v, securitygroupruledirection.INGRESS))
 	}
@@ -68,8 +68,8 @@ func toAbstractSecurityGroup(in osc.SecurityGroup) *abstract.SecurityGroup {
 	return out
 }
 
-func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygroupruledirection.Enum) abstract.SecurityGroupRule {
-	out := abstract.SecurityGroupRule{
+func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygroupruledirection.Enum) *abstract.SecurityGroupRule {
+	out := &abstract.SecurityGroupRule{
 		Direction: direction,
 		Protocol:  in.IpProtocol,
 		PortFrom:  int32(in.FromPortRange),
@@ -80,7 +80,7 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 }
 
 // CreateSecurityGroup creates a security group
-func (s stack) CreateSecurityGroup(networkID, name, description string, rules []abstract.SecurityGroupRule) (asg *abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) CreateSecurityGroup(networkID, name, description string, rules abstract.SecurityGroupRules) (asg *abstract.SecurityGroup, xerr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -221,7 +221,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -256,8 +256,12 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	return s.InspectSecurityGroup(asg.ID)
 }
 
-func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (_ string, _ osc.SecurityGroupRule, xerr fail.Error) {
+func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ osc.SecurityGroupRule, xerr fail.Error) {
 	rule := osc.SecurityGroupRule{}
+	if in == nil {
+		return "", rule, fail.InvalidParameterCannotBeNilError("in")
+	}
+
 	if in.EtherType == ipversion.IPv6 {
 		// No IPv6 at Outscale (?)
 		return "", rule, fail.InvalidRequestError("IPv6 is not supported")
@@ -323,7 +327,7 @@ func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (_ string, _ o
 
 // DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 // Checks first if the rule ID is present in the rules of the security group. If not found, returns (*abstract.SecurityGroup, *fail.ErrNotFound)
-func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()

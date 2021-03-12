@@ -34,49 +34,11 @@ import (
 func (instance *subnet) unsafeInspectGateway(primary bool) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	primaryStr := "primary"
 	gwIdx := 0
 	if !primary {
-		primaryStr = "secondary"
 		gwIdx = 1
 	}
 
-	if instance.gateways[gwIdx] == nil {
-		var gatewayID string
-		xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			if primary {
-				if len(as.GatewayIDs) < 1 {
-					return fail.NotFoundError("no gateway registered")
-				}
-				gatewayID = as.GatewayIDs[0]
-			} else {
-				if len(as.GatewayIDs) < 2 {
-					return fail.NotFoundError("no secondary gateway registered")
-				}
-				gatewayID = as.GatewayIDs[1]
-			}
-			return nil
-		})
-		if xerr != nil {
-			return nullHost(), xerr
-		}
-
-		if gatewayID == "" {
-			return nullHost(), fail.NotFoundError("no %s gateway ID found in subnet properties", primaryStr)
-		}
-
-		rh, xerr := LoadHost(instance.GetService(), gatewayID)
-		if xerr != nil {
-			return nullHost(), xerr
-		}
-
-		instance.gateways[gwIdx] = rh.(*host)
-	}
 	return instance.gateways[gwIdx], nil
 }
 
@@ -204,4 +166,3 @@ func (instance *subnet) unsafeHasVirtualIP() (bool, fail.Error) {
 	})
 	return found, xerr
 }
-
