@@ -3068,6 +3068,11 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
+	nodeRef := node.ID
+	if nodeRef == "" {
+		nodeRef = node.Name
+	}
+
 	// Identify the node to delete and remove it preventive from metadata
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -3075,6 +3080,7 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			// numericalID, ok := nodesV3.PrivateNodeByID[node.ID]
 			// if !ok {
 			// 	return fail.NotFoundError("failed to find node '%s' in cluster", node.Name)
@@ -3113,8 +3119,12 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 					}
 
 					nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, node.NumericalID)
-					nodesV3.PrivateNodeByName[node.Name] = node.NumericalID
-					nodesV3.PrivateNodeByID[node.ID] = node.NumericalID
+					if node.Name != "" {
+						nodesV3.PrivateNodeByName[node.Name] = node.NumericalID
+					}
+					if node.ID != "" {
+						nodesV3.PrivateNodeByID[node.ID] = node.NumericalID
+					}
 					nodesV3.ByNumericalID[node.NumericalID] = node
 					return nil
 				})
@@ -3128,7 +3138,7 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 
 	// Deletes node
 	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		hostInstance, xerr := LoadHost(instance.GetService(), node.ID)
+		hostInstance, xerr := LoadHost(instance.GetService(), nodeRef)
 		if xerr != nil {
 			return xerr
 		}

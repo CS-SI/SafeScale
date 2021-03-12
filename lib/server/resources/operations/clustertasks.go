@@ -1116,7 +1116,13 @@ func (instance *cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
 	}
 	if p.node == nil {
-		return nil, fail.InvalidParameterError("params.node", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("params.node")
+	}
+	if p.node.NumericalID == 0 {
+		return nil, fail.InvalidParameterError("params.node.NumericalID", "cannot be 0")
+	}
+	if p.node.ID == "" && p.node.Name == "" {
+		return nil, fail.InvalidParameterError("params.node.ID|params.node.Name", "ID or Name must be set")
 	}
 
 	defer func() {
@@ -1125,12 +1131,16 @@ func (instance *cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 		}
 	}()
 
-	logrus.Debugf("Deleting Node '%s'", p.node.Name)
+	nodeName := p.node.Name
+	if nodeName == "" {
+		nodeName = p.node.ID
+	}
+	logrus.Debugf("Deleting Node '%s'", nodeName)
 	if xerr := instance.deleteNode(task.GetContext(), p.node, p.master); xerr != nil {
 		return nil, xerr
 	}
 
-	logrus.Debugf("Successfully deleted Node '%s'", p.node.Name)
+	logrus.Debugf("Successfully deleted Node '%s'", nodeName)
 	return nil, nil
 }
 
