@@ -42,6 +42,9 @@ func (rc reservation) AddObserver(o observer.Observer) error {
 		return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
 	}
 
+	if len(rc.observers) == 0 {
+		rc.observers = map[string]observer.Observer{}
+	}
 	rc.observers[o.GetID()] = o
 
 	return nil

@@ -17,7 +17,6 @@
 package flavors
 
 import (
-	"bytes"
 	"sync/atomic"
 
 	rice "github.com/GeertJohan/go.rice"
@@ -27,7 +26,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 var (
