@@ -40,4 +40,29 @@ func TestSecurityGroup_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+
+	sg.Rules = append(sg.Rules, SecurityGroupRule{
+		Description: "run for cover",
+	})
+
+	sg.Rules = append(sg.Rules, SecurityGroupRule{
+		Description: "the road is long",
+	})
+
+	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "don't")
+	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "look")
+	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "back")
+
+	sgc, ok = sg.Clone().(*SecurityGroup)
+	if !ok {
+		t.Fail()
+	}
+
+	sg.Rules[0].Sources[0] = "do"
+
+	areEqual = reflect.DeepEqual(*sg, *sgc)
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
 }
