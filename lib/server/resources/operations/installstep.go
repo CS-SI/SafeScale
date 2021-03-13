@@ -312,7 +312,7 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 			cloneV["ShortHostname"] = h.GetName()
 			domain := ""
 			xerr = h.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(/*is.Worker.feature.task, */hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+				return props.Inspect( /*is.Worker.feature.task, */ hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())

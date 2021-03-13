@@ -56,6 +56,6 @@ func New(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
-func Load( svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
+func Load(svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
 	return operations.LoadCluster(svc, name)
 }

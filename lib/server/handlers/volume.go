@@ -327,7 +327,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// )
 	//
 	// xerr = rv.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 	return props.Alter(/*task, */volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
+	// 	return props.Alter(volumeproperty.AttachedV1, func(clonable data.Clonable) fail.Error {
 	// 		volumeAttachedV1 := clonable.(*propertiesv1.VolumeAttachments)
 	//
 	// 		mountPoint = path
@@ -347,12 +347,12 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 	// 		}
 	//
 	// 		return rh.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 			return props.Alter(/*task, */hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+	// 			return props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 	// 				hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 	// 				if !ok {
 	// 					return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 	// 				}
-	// 				return props.Alter(/*task, */hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+	// 				return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 	// 					hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 	// 					if !ok {
 	// 						return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())

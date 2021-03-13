@@ -234,7 +234,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 	defer instance.lock.RUnlock()
 
 	var res string
-	xerr = instance.Inspect(/*task, */func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ab, ok := clonable.(*abstract.ObjectStorageBucket)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ObjectStorageBucket' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -257,7 +257,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 // }
 
 // Create a bucket
-func (instance *bucket) Create(ctx context.Context,name string) (xerr fail.Error) {
+func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {

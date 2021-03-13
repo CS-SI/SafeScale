@@ -214,7 +214,6 @@ func (instance *volume) GetSize() (_ int, xerr fail.Error) {
 	return instance.unsafeGetSize()
 }
 
-
 // GetAttachments returns where the Volume is attached
 func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -556,7 +555,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			return props.Inspect(/*task, */hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 				hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())

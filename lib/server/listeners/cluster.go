@@ -520,7 +520,7 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	out.Nodes = make([]*protocol.Host, 0, len(list))
 	for _, v := range list {
 		item := &protocol.Host{
-			Id: v.ID,
+			Id:   v.ID,
 			Name: v.Name,
 		}
 		out.Nodes = append(out.Nodes, item)
@@ -914,6 +914,6 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	if xerr != nil {
 		return nil, xerr
 	}
-	
+
 	return out, nil
 }

@@ -55,7 +55,7 @@ type subTask struct {
 
 type subTasks struct {
 	// lock  TaskedLock
-	lock sync.Mutex
+	lock  sync.Mutex
 	tasks []subTask
 }
 
@@ -108,7 +108,7 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err fail
 		}
 	}
 	tg = &taskGroup{
-		task: t.(*task),
+		task:     t.(*task),
 		children: subTasks{
 			// lock: NewTaskedLock(),
 		},
