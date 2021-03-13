@@ -300,7 +300,7 @@ func (instance *cluster) updateClusterNetworkPropertyIfNeeded() fail.Error {
 
 		if props.Lookup(clusterproperty.NetworkV2) {
 			// Having a clusterproperty.NetworkV2, need to update instance with clusterproperty.NetworkV3
-			innerXErr = props.Inspect( /*task, */ clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			innerXErr = props.Inspect(clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -384,7 +384,7 @@ func (instance *cluster) updateClusterDefaultsPropertyIfNeeded() fail.Error {
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			return props.Alter( /*task, */ clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
+			return props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
 				defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -729,7 +729,7 @@ func (instance *cluster) firstLight(req abstract.ClusterRequest) fail.Error {
 		}
 
 		// sets default sizing from req
-		innerXErr = props.Alter( /*task, */ clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
 			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -3898,7 +3898,7 @@ func (instance *cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 			return innerXErr
 		}
 
-		return props.Inspect( /*task, */ clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())

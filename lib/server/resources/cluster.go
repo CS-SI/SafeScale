@@ -50,16 +50,16 @@ type Cluster interface {
 	Create(ctx context.Context, req abstract.ClusterRequest) fail.Error                                            // creates a new cluster and save its metadata
 	DeleteLastNode(ctx context.Context) (*propertiesv3.ClusterNode, fail.Error)                                    // deletes the last added node and returns its name
 	DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) fail.Error                     // deletes a node identified by its ID
-	Delete(ctx context.Context, force bool) fail.Error                                                                        // deletes the cluster (Delete is not used to not collision with metadata)
+	Delete(ctx context.Context, force bool) fail.Error                                                             // deletes the cluster (Delete is not used to not collision with metadata)
 	FindAvailableMaster(ctx context.Context) (Host, fail.Error)                                                    // returns ID of the first master available to execute order
 	FindAvailableNode(ctx context.Context) (Host, fail.Error)                                                      // returns node instance of the first node available to execute order
-	GetIdentity() (abstract.ClusterIdentity, fail.Error)                                        // returns Cluster Identity
-	GetFlavor() (clusterflavor.Enum, fail.Error)                                                // returns the flavor of the cluster
-	GetComplexity() (clustercomplexity.Enum, fail.Error)                                        // returns the complexity of the cluster
-	GetAdminPassword() (string, fail.Error)                                                     // returns the password of the cluster admin account
-	GetKeyPair() (abstract.KeyPair, fail.Error)                                                 // returns the key pair used in the cluster
-	GetNetworkConfig() (*propertiesv3.ClusterNetwork, fail.Error)                               // returns network configuration of the cluster
-	GetState() (clusterstate.Enum, fail.Error)                                                  // returns the current state of the cluster
+	GetIdentity() (abstract.ClusterIdentity, fail.Error)                                                           // returns Cluster Identity
+	GetFlavor() (clusterflavor.Enum, fail.Error)                                                                   // returns the flavor of the cluster
+	GetComplexity() (clustercomplexity.Enum, fail.Error)                                                           // returns the complexity of the cluster
+	GetAdminPassword() (string, fail.Error)                                                                        // returns the password of the cluster admin account
+	GetKeyPair() (abstract.KeyPair, fail.Error)                                                                    // returns the key pair used in the cluster
+	GetNetworkConfig() (*propertiesv3.ClusterNetwork, fail.Error)                                                  // returns network configuration of the cluster
+	GetState() (clusterstate.Enum, fail.Error)                                                                     // returns the current state of the cluster
 	IsFeatureInstalled(ctx context.Context, name string) (found bool, xerr fail.Error)                             // tells if a feature is installed in Cluster using only metadata
 	ListInstalledFeatures(ctx context.Context) ([]Feature, fail.Error)                                             // returns the list of installed features
 	ListMasters(ctx context.Context) (IndexedListOfClusterNodes, fail.Error)                                       // lists the node instances corresponding to masters (if there is such masters in the flavor...)

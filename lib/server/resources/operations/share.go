@@ -670,7 +670,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 		}
 
 		// VPL: why this ?
-		//return props.Inspect(/*task, */hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+		//return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 		//	hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
 		//	if !ok {
 		//		return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())

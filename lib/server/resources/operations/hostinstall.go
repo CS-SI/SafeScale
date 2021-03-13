@@ -77,7 +77,7 @@ func (instance *host) AddFeature(ctx context.Context, name string, vars data.Map
 		}
 
 		// updates HostFeatures property for host
-		return props.Alter(/*task, */hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 			hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 			if !ok {
 				return fail.InconsistentError("expected '*propertiesv1.HostFeatures', received '%s'", reflect.TypeOf(clonable))

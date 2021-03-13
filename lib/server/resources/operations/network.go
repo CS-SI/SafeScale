@@ -298,7 +298,7 @@ func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
 }
 
 // Browse walks through all the metadata objects in subnet
-func (instance *network) Browse(ctx context.Context,callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
+func (instance *network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value of network, so do not validate rn
@@ -549,7 +549,7 @@ func (instance *network) InspectSubnet(ref string) (_ resources.Subnet, xerr fai
 }
 
 // AdoptSubnet registers a Subnet to the Network metadata
-func (instance *network) AdoptSubnet(ctx context.Context,subnet resources.Subnet) (xerr fail.Error) {
+func (instance *network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
@@ -600,7 +600,7 @@ func (instance *network) AdoptSubnet(ctx context.Context,subnet resources.Subnet
 }
 
 // AbandonSubnet unregisters a Subnet from the Network (does not imply the Subnet is deleted)
-func (instance *network) AbandonSubnet(ctx context.Context,subnetID string) (xerr fail.Error) {
+func (instance *network) AbandonSubnet(ctx context.Context, subnetID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {

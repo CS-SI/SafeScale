@@ -48,7 +48,7 @@ type feature struct {
 	installers      map[installmethod.Enum]Installer // defines the installers available for the feature
 	specs           *viper.Viper                     // is the Viper instance containing feature specification
 	// task            concurrency.Task                 // is theTask that will trigger all feature operations
-	svc             iaas.Service                     // is the iaas.Service to use to interact with Cloud Provider
+	svc iaas.Service // is the iaas.Service to use to interact with Cloud Provider
 }
 
 func nullFeature() *feature {
