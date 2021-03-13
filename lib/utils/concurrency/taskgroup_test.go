@@ -206,7 +206,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 
 	select {
 	case <-time.After(time.Duration(300) * time.Millisecond):
-		stats, statsErr := overlord.Stats()
+		stats, statsErr := overlord.GetGroupStatuss()
 		if statsErr != nil {
 			t.Fatal(statsErr)
 		}
