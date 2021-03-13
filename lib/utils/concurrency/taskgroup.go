@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -44,7 +45,7 @@ type TaskGroup interface {
 	TaskCore
 	TaskGroupGuard
 
-	Stats() (map[TaskStatus][]string, fail.Error)
+	GetGroupStatuss() (map[TaskStatus][]string, fail.Error)
 }
 
 type subTask struct {
@@ -53,7 +54,8 @@ type subTask struct {
 }
 
 type subTasks struct {
-	lock  TaskedLock
+	// lock  TaskedLock
+	lock sync.Mutex
 	tasks []subTask
 }
 
@@ -108,20 +110,20 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err fail
 	tg = &taskGroup{
 		task: t.(*task),
 		children: subTasks{
-			lock: NewTaskedLock(),
+			// lock: NewTaskedLock(),
 		},
 	}
 	return tg, err
 }
 
-// IsNull ...
-func (tg *taskGroup) IsNull() bool {
+// isNull ...
+func (tg *taskGroup) isNull() bool {
 	return tg == nil || tg.task.IsNull()
 }
 
 // GetID returns an unique id for the task
 func (tg *taskGroup) GetID() (string, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -130,7 +132,7 @@ func (tg *taskGroup) GetID() (string, fail.Error) {
 
 // GetSignature builds the "signature" of the task group, ie a string representation of the task ID in the format "{taskgroup <id>}".
 func (tg *taskGroup) GetSignature() string {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return ""
 	}
 
@@ -144,7 +146,7 @@ func (tg *taskGroup) GetSignature() string {
 
 // GetStatus returns the current task status
 func (tg *taskGroup) GetStatus() (TaskStatus, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return TaskStatus(0), fail.InvalidInstanceError()
 	}
 
@@ -153,7 +155,7 @@ func (tg *taskGroup) GetStatus() (TaskStatus, fail.Error) {
 
 // GetContext returns the current task status
 func (tg *taskGroup) GetContext() context.Context {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return context.TODO()
 	}
 
@@ -163,7 +165,7 @@ func (tg *taskGroup) GetContext() context.Context {
 // SetID allows to specify task ID. The uniqueness of the ID through all the tasks
 // becomes the responsibility of the developer...
 func (tg *taskGroup) SetID(id string) fail.Error {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -172,7 +174,7 @@ func (tg *taskGroup) SetID(id string) fail.Error {
 
 // StartInSubtask starts an action in a subtask
 func (tg *taskGroup) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return tg, fail.InvalidInstanceError()
 	}
 
@@ -182,7 +184,7 @@ func (tg *taskGroup) StartInSubtask(action TaskAction, params TaskParameters, op
 // Start runs in goroutine the function with parameters
 // Each sub-Task created has its ID forced to TaskGroup ID + "-<index>".
 func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return tg, fail.InvalidInstanceError()
 	}
 
@@ -219,9 +221,11 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 		return tg, err
 	}
 
-	tg.children.lock.SafeLock(tg.task)
+	// tg.children.lock.SafeLock(tg.task)
+	tg.children.lock.Lock()
 	tg.children.tasks = append(tg.children.tasks, newChild)
-	tg.children.lock.SafeUnlock(tg.task)
+	// tg.children.lock.SafeUnlock(tg.task)
+	tg.children.lock.Unlock()
 
 	if status != RUNNING {
 		tg.task.mu.Lock()
@@ -233,9 +237,10 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 
 // Wait ...
 func (tg *taskGroup) Wait() (TaskResult, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return tg, fail.InvalidInstanceError()
 	}
+
 	return tg.WaitGroup()
 }
 
@@ -246,7 +251,7 @@ func (tg *taskGroup) Wait() (TaskResult, fail.Error) {
 //       for abortion signal and quit the go routine accordingly to reduce the risk (a taskgroup remains abortable with
 //       this recommandation).
 func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -279,12 +284,13 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		}
 		tg.task.mu.Unlock()
 
-		tg.children.lock.SafeLock(tg.task)
-		defer tg.children.lock.SafeUnlock(tg.task)
+		// tg.children.lock.SafeLock(tg.task)
+		// defer tg.children.lock.SafeUnlock(tg.task)
+		tg.children.lock.Lock()
+		defer tg.children.lock.Unlock()
 
 		for _, s := range tg.children.tasks {
-			lerr, _ := s.task.GetLastError()
-			if lerr != nil {
+			if lerr, _ := s.task.GetLastError(); lerr != nil {
 				errors = append(errors, lerr)
 			}
 		}
@@ -294,8 +300,10 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 
-	tg.children.lock.SafeLock(tg.task)
-	defer tg.children.lock.SafeUnlock(tg.task)
+	// tg.children.lock.SafeLock(tg.task)
+	// defer tg.children.lock.SafeUnlock(tg.task)
+	tg.children.lock.Lock()
+	defer tg.children.lock.Unlock()
 
 	doneWaitSize := len(tg.children.tasks)
 	doneWaitStates := make(map[int]bool, doneWaitSize)
@@ -370,7 +378,7 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 
 // TryWait ...
 func (tg *taskGroup) TryWait() (bool, TaskResult, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -379,7 +387,7 @@ func (tg *taskGroup) TryWait() (bool, TaskResult, fail.Error) {
 
 // TryWaitGroup tries to wait on a task; if done returns the error and true, if not returns nil and false
 func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -398,8 +406,10 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
 		return false, nil, fail.NewError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 
-	tg.children.lock.SafeLock(tg.task)
-	defer tg.children.lock.SafeUnlock(tg.task)
+	// tg.children.lock.SafeLock(tg.task)
+	// defer tg.children.lock.SafeUnlock(tg.task)
+	tg.children.lock.Lock()
+	defer tg.children.lock.Unlock()
 
 	for _, s := range tg.children.tasks {
 		if ok, _, _ := s.task.TryWait(); !ok {
@@ -414,7 +424,7 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
 
 // WaitFor ...
 func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -424,7 +434,7 @@ func (tg *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fail.Err
 // WaitGroupFor waits for the task to end, for 'duration' duration
 // If duration elapsed, returns (false, nil, nil)
 func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]TaskResult, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
@@ -472,20 +482,21 @@ func (tg *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[string]Task
 
 // Abort aborts the task execution
 func (tg *taskGroup) Abort() fail.Error {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return fail.InvalidInstanceError()
 	}
 
 	var errors []error
 
 	// Send abort signal to subtasks
-	tg.children.lock.SafeLock(tg.task)
+	// tg.children.lock.SafeLock(tg.task)
+	tg.children.lock.Lock()
 	for _, st := range tg.children.tasks {
 		if xerr := st.task.Abort(); xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
-	tg.children.lock.SafeUnlock(tg.task)
+	tg.children.lock.Unlock()
 
 	// Send abort signal to subtask parent task
 	if xerr := tg.task.Abort(); xerr != nil {
@@ -500,7 +511,7 @@ func (tg *taskGroup) Abort() fail.Error {
 
 // Aborted tells if the task group is aborted
 func (tg *taskGroup) Aborted() bool {
-	if tg.IsNull() || tg.task.IsNull() {
+	if tg.isNull() || tg.task.IsNull() {
 		return false
 	}
 	return tg.task.Aborted()
@@ -508,20 +519,23 @@ func (tg *taskGroup) Aborted() bool {
 
 // New creates a subtask from current task
 func (tg *taskGroup) New() (Task, fail.Error) {
-	if tg.IsNull() {
+	if tg.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	return newTask(context.TODO(), tg.task)
 }
 
-func (tg *taskGroup) Stats() (map[TaskStatus][]string, fail.Error) {
-	if tg.IsNull() {
+// GetGroupStatus returns the status of all tasks running in TaskGroup
+func (tg *taskGroup) GetGroupStatuss() (map[TaskStatus][]string, fail.Error) {
+	if tg.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tg.children.lock.SafeLock(tg.task)
-	defer tg.children.lock.SafeUnlock(tg.task)
+	// tg.children.lock.SafeLock(tg.task)
+	// defer tg.children.lock.SafeUnlock(tg.task)
+	tg.children.lock.Lock()
+	defer tg.children.lock.Unlock()
 
 	status := make(map[TaskStatus][]string)
 	for _, sub := range tg.children.tasks {
