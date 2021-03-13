@@ -3856,8 +3856,6 @@ func (instance *cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 			return innerXErr
 		}
 
-		// FIXME: do not use resources.Host to describe nodes, too much information and too much time wasted. Use ClusterNodes instead
-		//        if user wants more information about a node, he can use safescale host inspect.
 		innerXErr = props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
@@ -3868,17 +3866,11 @@ func (instance *cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 				list := make([]*protocol.Host, 0, len(in))
 				for _, v := range in {
 					if node, found := nodesV3.ByNumericalID[v]; found {
-						host, xerr := LoadHost(instance.GetService(), node.ID)
-						if xerr != nil {
-							continue
-						}
-						defer func(hostInstance resources.Host) {
-							hostInstance.Released()
-						}(host)
-
-						ph, xerr := host.ToProtocol()
-						if xerr != nil {
-							continue
+						ph := &protocol.Host{
+							Name:      node.Name,
+							Id:        node.ID,
+							PublicIp:  node.PublicIP,
+							PrivateIp: node.PrivateIP,
 						}
 						list = append(list, ph)
 					}
