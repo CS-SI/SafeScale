@@ -3036,6 +3036,7 @@ func (instance *cluster) deleteMaster(ctx context.Context, host resources.Host) 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// master seems already deleted, so consider it as a success
+			logrus.Tracef("master not found, deletion considered as a success")
 		default:
 			return xerr
 		}

@@ -508,7 +508,8 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 		return nil, xerr
 	}
 
-	var errors []error
+	var loadErrors []error
+	var taskErrors []error
 	for i, master := range masters {
 		if master.ID == "" {
 			continue
@@ -517,7 +518,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 		host, xerr := LoadHost(instance.GetService(), master.ID)
 		if xerr != nil {
 			logrus.Warnf("failed to get metadata of Host: %s", xerr.Error())
-			errors = append(errors, xerr)
+			loadErrors = append(loadErrors, xerr)
 			continue
 		}
 		defer func(hostInstance resources.Host) {
@@ -529,20 +530,18 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 			Host:  host,
 		})
 		if xerr != nil {
-			errors = append(errors, xerr)
+			taskErrors = append(taskErrors, xerr)
 		}
-		// subtasks = append(subtasks, subtask)
 	}
 
-	// for _, s := range subtasks {
-	// 	_, state := s.Wait()
-	// 	if state != nil {
-	// 		errors = append(errors, state)
-	// 	}
-	// }
-	// if len(errors) > 0 {
-	// 	return nil, fail.NewErrorList(errors)
-	// }
+	if len(loadErrors) != 0 {
+		logrus.Warnf("there were error reading master's metadata")
+	}
+
+	if len(taskErrors) != 0 {
+		return nil, fail.NewErrorList(taskErrors)
+	}
+
 	if _, xerr = tg.Wait(); xerr != nil {
 		return nil, xerr
 	}

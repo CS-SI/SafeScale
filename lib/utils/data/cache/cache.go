@@ -159,31 +159,31 @@ func (instance *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xe
 
 // unsafeCommitEntry is the workforce of CommitEntry, without locking
 // The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.GetID() has to be the final key.
-func (c *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
-	if _, ok := c.reserved[key]; !ok {
+func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
+	if _, ok := instance.reserved[key]; !ok {
 		return nil, fail.NotAvailableError("the cache entry '%s' is not reserved", key)
 	}
 
 	// content may bring new key, based on content.GetID(), than the key reserved; we have to check if this new key has not been reserved by someone else...
 	if content.GetID() != key {
-		if _, ok := c.reserved[content.GetID()]; ok {
+		if _, ok := instance.reserved[content.GetID()]; ok {
 			return nil, fail.InconsistentError("the cache entry '%s' corresponding to the ID of the content is reserved; content cannot be committed", content.GetID())
 		}
 	}
 
 	// Everything seems ok, we can update
 	var ok bool
-	if ce, ok = c.cache[key]; ok {
+	if ce, ok = instance.cache[key]; ok {
 		ce.content = data.NewImmutableKeyValue(content.GetID(), content)
 		// reserved key may have to change accordingly with the ID of content
-		delete(c.cache, key)
-		delete(c.reserved, key)
-		c.cache[content.GetID()] = ce
+		delete(instance.cache, key)
+		delete(instance.reserved, key)
+		instance.cache[content.GetID()] = ce
 		ce.unlock()
 
 		// FIXME: URGENT If there is a error adding the observer, we must rollback the changes in caches and entries
 		// Also, this has to be tested with a specific unit test
-		return ce, fail.ConvertError(content.AddObserver(c))
+		return ce, fail.ConvertError(content.AddObserver(instance))
 	}
 
 	return nil, fail.NotFoundError("failed to find cache entry identified by '%s'", key)
