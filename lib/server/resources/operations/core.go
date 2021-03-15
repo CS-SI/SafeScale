@@ -796,13 +796,13 @@ func (c *core) AddObserver(o observer.Observer) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if pre, ok := c.observers[c.id.Load().(string)]; ok {
+	if pre, ok := c.observers[o.GetID()]; ok {
 		if pre == o {
 			return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
 		}
 		return nil
 	}
-	c.observers[c.id.Load().(string)] = o
+	c.observers[o.GetID()] = o
 	return nil
 }
 

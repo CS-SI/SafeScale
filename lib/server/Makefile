@@ -5,8 +5,10 @@ include ../../common.mk
 all:	lib/server/iaas lib/server/resources 
 
 generate: clean
+	@(mkdir -p mocks) || true
 	@(cd iaas && $(MAKE) $@)
 	@(cd resources && $(MAKE) $@)
+	@(cd handlers && $(MAKE) $@)
 
 vet:
 	@$(GO) vet ./...

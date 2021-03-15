@@ -38,7 +38,7 @@ type TaskGroupGuard interface {
 	WaitGroupFor(time.Duration) (bool, map[string]TaskResult, fail.Error)
 }
 
-//go:generate moq -out taskgroup_moq_test.go . TaskGroup
+//go:generate minimock -o ../mocks/mock_taskgroup.go -i github.com/CS-SI/SafeScale/lib/utils/concurrency.TaskGroup
 
 // TaskGroup is the task group interface
 type TaskGroup interface {
