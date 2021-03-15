@@ -32,6 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -572,10 +573,10 @@ func (c *core) delete() (xerr fail.Error) {
 
 	// Checks entries exist in Object Storage
 	if xerr = c.folder.Lookup(byIDFolderName, c.id.Load().(string)); xerr != nil {
-		// If not found, consider it not an error
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If entry not found, consider it not an error
+			logrus.Tracef("folder not found by id, maybe not an error")
 		default:
 			errors = append(errors, xerr)
 		}
@@ -587,6 +588,7 @@ func (c *core) delete() (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If entry not found, consider it not an error
+			logrus.Tracef("folder not found by name, maybe not an error")
 		default:
 			errors = append(errors, xerr)
 		}

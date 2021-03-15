@@ -1985,6 +1985,7 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						// A host not found is considered as a successful deletion
+						logrus.Tracef("host not found, deletion considered as a success")
 					default:
 						return fail.Wrap(derr, "cannot delete host")
 					}
@@ -2044,9 +2045,11 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 
 	// Deletes metadata from Object Storage
 	if xerr = instance.core.delete(); xerr != nil {
-		// If entry not found, considered as success
+		// If entry not found, considered as a success
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
+		} else {
+			logrus.Tracef("core instance not found, deletion considered as a success")
 		}
 	}
 

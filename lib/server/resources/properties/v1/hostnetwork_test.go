@@ -10,11 +10,11 @@ import (
 func TestHostNetwork_Clone(t *testing.T) {
 	ct := &HostNetwork{
 		DefaultNetworkID: "id1",
-		NetworksByID: map[string]string{"id1": "subnet1"},
-		NetworksByName: map[string]string{"subnet1": "id1"},
-		PublicIPv4: "195.32.4.1",
-		IPv4Addresses: map[string]string{"id1": "192.168.2.10"},
-		IPv6Addresses: map[string]string{"id1": "2001:db8:3333:4444:5555:6666:7777:8888"},
+		NetworksByID:     map[string]string{"id1": "subnet1"},
+		NetworksByName:   map[string]string{"subnet1": "id1"},
+		PublicIPv4:       "195.32.4.1",
+		IPv4Addresses:    map[string]string{"id1": "192.168.2.10"},
+		IPv6Addresses:    map[string]string{"id1": "2001:db8:3333:4444:5555:6666:7777:8888"},
 	}
 
 	clonedCt, ok := ct.Clone().(*HostNetwork)

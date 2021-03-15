@@ -3399,7 +3399,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 
 	if rs != nil {
 		subnetName := rs.GetName()
-		logrus.Debugf("Deleting Subnet '%s'", subnetName)
+		logrus.Debugf("Cluster Deleting Subnet '%s'", subnetName)
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
 			func() error {
 				if innerXErr := rs.Delete(ctx); innerXErr != nil {
