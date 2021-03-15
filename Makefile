@@ -33,7 +33,6 @@ LINTER := golang.org/x/lint/golint
 ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
-GOVENDOR := github.com/kardianos/govendor
 
 BUILD_TAGS =
 export BUILD_TAGS
@@ -73,8 +72,8 @@ ground:
 
 getdevdeps: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which rice go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
-    	$(GO) get -u $(RICE) $(COVER) $(XUNIT) $(GOVENDOR) $(COVERTOOL) &>/dev/null || true; \
+	@which rice go2xunit cover covertool > /dev/null; if [ $$? -ne 0 ]; then \
+    	$(GO) get -u $(RICE) $(COVER) $(XUNIT) $(COVERTOOL) &>/dev/null || true; \
     fi
 	@which protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null || true; \
@@ -152,7 +151,7 @@ generate: sdk
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@$(GO) generate ./... >> generation_results.log 2>&1 || true
-	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warning generating code, if RICE related, then is a false warning !$(NO_COLOR)\n";fi;
+	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warnings generating code !$(NO_COLOR)\n";fi;
 
 test: begin # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
