@@ -665,9 +665,6 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		// Starting from here, remove Subnet from Network metadata if exiting with error
 		defer func() {
 			if xerr != nil && !req.KeepOnFailure {
-				// Disable abort signal during clean up
-				defer task.DisarmAbortSignal()()
-
 				derr := rn.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 						nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
@@ -776,15 +773,20 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		primaryGateway, secondaryGateway   *host
 		primaryUserdata, secondaryUserdata *userdata.Content
 		primaryTask, secondaryTask         concurrency.Task
-		secondaryErr                       fail.Error
-		secondaryResult                    concurrency.TaskResult
+		// secondaryErr                       fail.Error
+		// secondaryResult                    concurrency.TaskResult
 	)
+
+	tg, xerr := concurrency.NewTaskGroupWithContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
 
 	// Starts primary gateway creation
 	primaryRequest := gwRequest
 	primaryRequest.ResourceName = primaryGatewayName
 	primaryRequest.HostName = primaryGatewayName + domain
-	primaryTask, xerr = task.StartInSubtask(instance.taskCreateGateway, taskCreateGatewayParameters{
+	primaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
 		request: primaryRequest,
 		sizing:  *gwSizing,
 	})
@@ -800,7 +802,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		if req.Domain != "" {
 			secondaryRequest.HostName = secondaryGatewayName + domain
 		}
-		secondaryTask, xerr = task.StartInSubtask(instance.taskCreateGateway, taskCreateGatewayParameters{
+		secondaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
 			request: secondaryRequest,
 			sizing:  *gwSizing,
 		})
@@ -809,46 +811,145 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		}
 	}
 
-	primaryResult, primaryErr := primaryTask.Wait()
-	if primaryErr == nil {
-		result, ok := primaryResult.(data.Map)
-		if !ok {
-			return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(primaryResult).String())
-		}
-		primaryGateway = result["host"].(*host)
-		primaryUserdata = result["userdata"].(*userdata.Content)
-		primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+	// primaryResult, primaryErr := primaryTask.Wait()
+	// if primaryErr == nil {
+	// 	result, ok := primaryResult.(data.Map)
+	// 	if !ok {
+	// 		return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(primaryResult).String())
+	// 	}
+	// 	primaryGateway = result["host"].(*host)
+	// 	primaryUserdata = result["userdata"].(*userdata.Content)
+	// 	primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
-		// Starting from here, deletes the primary gateway if exiting with error
-		defer func() {
-			if xerr != nil && !req.KeepOnFailure {
-				logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
-				if derr := primaryGateway.relaxedDeleteHost(context.Background()); xerr != nil {
-					switch derr.(type) {
-					case *fail.ErrTimeout:
-						logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
-					default:
-					}
-					_ = xerr.AddConsequence(derr)
-				} else {
-					logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
-				}
-				if failover {
-					if derr := instance.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
-					}
-				}
-			}
-		}()
+	// 	// Starting from here, deletes the primary gateway if exiting with error
+	// 	defer func() {
+	// 		if xerr != nil && !req.KeepOnFailure {
+	// 			logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
+	// 			if derr := primaryGateway.relaxedDeleteHost(context.Background()); xerr != nil {
+	// 				switch derr.(type) {
+	// 				case *fail.ErrTimeout:
+	// 					logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
+	// 				default:
+	// 				}
+	// 				_ = xerr.AddConsequence(derr)
+	// 			} else {
+	// 				logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
+	// 			}
+	// 			if failover {
+	// 				if derr := instance.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
+	// 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
+	// 				}
+	// 			}
+	// 		}
+	// 	}()
+	// }
+	// if failover && secondaryTask != nil {
+	// 	secondaryResult, secondaryErr = secondaryTask.Wait()
+	// 	if secondaryErr == nil {
+	// 		result, ok := secondaryResult.(data.Map)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(secondaryResult).String())
+	// 		}
+
+	// 		secondaryGateway = result["host"].(*host)
+	// 		secondaryUserdata = result["userdata"].(*userdata.Content)
+	// 		secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+
+	// 		// Starting from here, deletes the secondary gateway if exiting with error
+	// 		defer func() {
+	// 			if xerr != nil && !req.KeepOnFailure {
+	// 				// Disable abort signal during clean up
+	// 				defer task.DisarmAbortSignal()()
+
+	// 				if derr := secondaryGateway.relaxedDeleteHost(ctx); xerr != nil {
+	// 					switch derr.(type) {
+	// 					case *fail.ErrTimeout:
+	// 						logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
+	// 					default:
+	// 					}
+	// 					_ = xerr.AddConsequence(derr)
+	// 				}
+	// 				if derr := instance.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
+	// 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
+	// 				}
+	// 			}
+	// 		}()
+	// 	}
+	// }
+	// if primaryErr != nil {
+	// 	return fail.Wrap(primaryErr, "failed to create gateway '%s'", primaryGatewayName)
+	// }
+	// if secondaryErr != nil {
+	// 	return fail.Wrap(secondaryErr, "failed to create gateway '%s'", secondaryGatewayName)
+	// }
+	results, groupXErr := tg.WaitGroup()
+	if results == nil && groupXErr != nil {
+		return groupXErr
 	}
-	if failover && secondaryTask != nil {
-		secondaryResult, secondaryErr = secondaryTask.Wait()
-		if secondaryErr == nil {
-			result, ok := secondaryResult.(data.Map)
-			if !ok {
-				return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(secondaryResult).String())
-			}
 
+	id, xerr := primaryTask.GetID()
+	if xerr != nil {
+		if groupXErr == nil {
+			groupXErr = xerr
+		} else {
+			_ = groupXErr.AddConsequence(xerr)
+		}
+	} else {
+		result, ok := results[id].(data.Map)
+		if !ok {
+			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(result).String())
+			if groupXErr == nil {
+				groupXErr = xerr
+			} else {
+				_ = groupXErr.AddConsequence(xerr)
+			}
+		} else {
+			primaryGateway = result["host"].(*host)
+			primaryUserdata = result["userdata"].(*userdata.Content)
+			primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+
+			// Starting from here, deletes the primary gateway if exiting with error
+			defer func() {
+				if xerr != nil && !req.KeepOnFailure {
+					logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
+					if derr := primaryGateway.relaxedDeleteHost(context.Background()); xerr != nil {
+						switch derr.(type) {
+						case *fail.ErrTimeout:
+							logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
+						default:
+						}
+						_ = xerr.AddConsequence(derr)
+					} else {
+						logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
+					}
+					if failover {
+						if derr := instance.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
+							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
+						}
+					}
+				}
+			}()
+		}
+	}
+
+	if failover {
+		id, xerr := secondaryTask.GetID()
+		if xerr != nil {
+			if groupXErr == nil {
+				groupXErr = xerr
+			} else {
+				_ = groupXErr.AddConsequence(xerr)
+			}
+		}
+		result, ok := results[id].(data.Map)
+		if !ok {
+			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(result).String())
+			if groupXErr == nil {
+				groupXErr = xerr
+			} else {
+				_ = groupXErr.AddConsequence(xerr)
+			}
+		} else {
 			secondaryGateway = result["host"].(*host)
 			secondaryUserdata = result["userdata"].(*userdata.Content)
 			secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
@@ -856,9 +957,6 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
 				if xerr != nil && !req.KeepOnFailure {
-					// Disable abort signal during clean up
-					defer task.DisarmAbortSignal()()
-
 					if derr := secondaryGateway.relaxedDeleteHost(ctx); xerr != nil {
 						switch derr.(type) {
 						case *fail.ErrTimeout:
@@ -874,11 +972,8 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			}()
 		}
 	}
-	if primaryErr != nil {
-		return fail.Wrap(primaryErr, "failed to create gateway '%s'", primaryGatewayName)
-	}
-	if secondaryErr != nil {
-		return fail.Wrap(secondaryErr, "failed to create gateway '%s'", secondaryGatewayName)
+	if groupXErr != nil {
+		return groupXErr
 	}
 
 	// Update userdata of gateway(s)
@@ -907,6 +1002,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			primaryUserdata.DefaultRouteIP = primaryUserdata.PrimaryGatewayPrivateIP
 			primaryUserdata.EndpointIP = primaryUserdata.PrimaryGatewayPublicIP
 		}
+
 		if secondaryGateway != nil {
 			// as.SecondaryGatewayID = secondaryGateway.GetID()
 			primaryUserdata.SecondaryGatewayPrivateIP, innerXErr = secondaryGateway.GetPrivateIP()
@@ -931,9 +1027,6 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	// As hosts are marked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
-	if primaryTask, xerr = concurrency.NewTask(); xerr != nil {
-		return xerr
-	}
 	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -947,18 +1040,22 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		return xerr
 	}
 
-	primaryTask, xerr = primaryTask.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+	// if primaryTask, xerr = concurrency.NewTask(); xerr != nil {
+	// 	return xerr
+	// }
+	if tg, xerr = concurrency.NewTaskGroupWithContext(ctx); xerr != nil {
+		return xerr
+	}
+
+	_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
 		host:     primaryGateway,
 		userdata: primaryUserdata,
 	})
 	if xerr != nil {
 		return xerr
 	}
-	if failover && secondaryTask != nil {
-		if secondaryTask, xerr = concurrency.NewTask(); xerr != nil {
-			return xerr
-		}
-		secondaryTask, xerr = secondaryTask.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+	if failover {
+		_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
 			host:     secondaryGateway,
 			userdata: secondaryUserdata,
 		})
@@ -966,13 +1063,16 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			return xerr
 		}
 	}
-	if _, primaryErr = primaryTask.Wait(); primaryErr != nil {
-		return primaryErr
-	}
-	if failover && secondaryTask != nil {
-		if _, secondaryErr = secondaryTask.Wait(); secondaryErr != nil {
-			return secondaryErr
-		}
+	// if _, primaryErr = primaryTask.Wait(); primaryErr != nil {
+	// 	return primaryErr
+	// }
+	// if failover && secondaryTask != nil {
+	// 	if _, secondaryErr = secondaryTask.Wait(); secondaryErr != nil {
+	// 		return secondaryErr
+	// 	}
+	// }
+	if _, xerr = tg.Wait(); xerr != nil {
+		return xerr
 	}
 
 	// --- Updates subnet state in metadata ---
