@@ -822,11 +822,8 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		// Starting from here, deletes the primary gateway if exiting with error
 		defer func() {
 			if xerr != nil && !req.KeepOnFailure {
-				// Disable abort signal during clean up
-				defer task.DisarmAbortSignal()()
-
 				logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
-				if derr := primaryGateway.relaxedDeleteHost(ctx); xerr != nil {
+				if derr := primaryGateway.relaxedDeleteHost(context.Background()); xerr != nil {
 					switch derr.(type) {
 					case *fail.ErrTimeout:
 						logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists

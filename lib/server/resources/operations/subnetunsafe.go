@@ -38,8 +38,12 @@ func (instance *subnet) unsafeInspectGateway(primary bool) (_ resources.Host, xe
 	if !primary {
 		gwIdx = 1
 	}
+	out := instance.gateways[gwIdx]
+	if out == nil {
+		return nil, fail.NotFoundError("failed to find gateway")
+	}
 
-	return instance.gateways[gwIdx], nil
+	return out, nil
 }
 
 // unsafeInspectNetwork returns the Network instance owning the Subnet
