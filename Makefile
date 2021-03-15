@@ -147,11 +147,11 @@ generate: sdk
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@rm -f ./generation_results.log || true
 	@$(GO) generate -run stringer ./...  2>&1 | tee -a generation_results.log
-	@$(GO) generate -run minimock ./... >> generation_results.log 2>&1 || true
 	@cd cli && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
 	@cd lib && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
+	@$(GO) generate ./... >> generation_results.log 2>&1 || true
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warning generating code, if RICE related, then is a false warning !$(NO_COLOR)\n";fi;
 
 test: begin # Run unit tests
