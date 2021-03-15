@@ -41,12 +41,6 @@ RACE_CHECK=
 endif
 
 BRANCH_NAME?="develop"
-FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
-BUILD := $(shell git rev-parse HEAD)
-UPSTREAM := $(shell git rev-parse origin/$(BRANCH_NAME))
-LOCAL := $(shell git rev-parse HEAD)
-REMOTE := $(shell git rev-parse $(UPSTREAM))
-BASE := $(shell git merge-base HEAD $(UPSTREAM))
 
 GO?=go
 GOFMT?=gofmt

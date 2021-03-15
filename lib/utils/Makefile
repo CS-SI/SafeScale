@@ -5,6 +5,8 @@ GO?=go
 all: generate
 
 generate:
+	@(mkdir -p mocks) || true
+	@(mkdir -p data/mocks) || true
 	@$(GO) generate -run stringer ./...
 
 vet:
