@@ -15,7 +15,7 @@ nfs:
 
 generate: clean gensrc
 	@(cd nfs && $(MAKE) $(@))
-	@(go generate .)
+	@$(GO) generate . > /dev/null 2>&1
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true

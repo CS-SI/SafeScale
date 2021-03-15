@@ -58,7 +58,7 @@ type Makers struct {
 	GetState               func(c resources.Cluster) (clusterstate.Enum, fail.Error)
 }
 
-func getTemplateBox() (*rice.Box, fail.Error) {
+func getTemplateBox() (*rice.Box, fail.Error) { //nolint
 	anon := templateBox.Load()
 	if anon == nil {
 		// Note: path MUST be literal for rice to work

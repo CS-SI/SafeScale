@@ -290,7 +290,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Su
 
 			if an.Name == networkRef || an.ID == networkRef {
 				// We are in default Network context, query subnet list and search for the one requested
-				list, xerr := ListSubnets(nil, svc, an.ID, false)
+				list, xerr := ListSubnets(context.TODO(), svc, an.ID, false)
 				if xerr != nil {
 					return nil, xerr
 				}
@@ -1914,6 +1914,7 @@ func (instance *subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// missing gateway is considered as a successful deletion, continue
+					logrus.Tracef("host instance not found, gateway deletion considered as a success")
 				default:
 					return ids, xerr
 				}
@@ -1927,6 +1928,7 @@ func (instance *subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// missing gateway is considered as a successful deletion, continue
+						logrus.Tracef("host instance not found, relaxed gateway deletion considered as a success")
 					default:
 						return ids, xerr
 					}

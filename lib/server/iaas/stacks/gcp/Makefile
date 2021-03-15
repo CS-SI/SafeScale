@@ -8,7 +8,7 @@ vet:
 	@$(GO) vet ./...
 
 generate: clean
-	@$(GO) generate
+	@$(GO) generate > /dev/null 2>&1
 
 test:
 	@$(GO) test -race -v ./...
