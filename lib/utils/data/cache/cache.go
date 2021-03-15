@@ -180,6 +180,9 @@ func (c *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Entry, xer
 		delete(c.reserved, key)
 		c.cache[content.GetID()] = ce
 		ce.unlock()
+
+		// FIXME: URGENT If there is a error adding the observer, we must rollback the changes in caches and entries
+		// Also, this has to be tested with a specific unit test
 		return ce, fail.ConvertError(content.AddObserver(c))
 	}
 
