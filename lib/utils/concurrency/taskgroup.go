@@ -300,17 +300,15 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 
-	// tg.children.lock.SafeLock(tg.task)
-	// defer tg.children.lock.SafeUnlock(tg.task)
-	tg.children.lock.Lock()
-	defer tg.children.lock.Unlock()
-
 	doneWaitSize := len(tg.children.tasks)
 	doneWaitStates := make(map[int]bool, doneWaitSize)
 	for k := range tg.children.tasks {
 		doneWaitStates[k] = false
 	}
 	doneWaitCount := 0
+
+	// tg.children.lock.Lock()
+	// defer tg.children.lock.Unlock()
 
 	for {
 		stop := false

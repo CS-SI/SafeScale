@@ -23,10 +23,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
-
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // FIXME: The whole file taskgroup_test.go MUST pass UT flawlessly before using it confidently
@@ -173,10 +172,11 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	for ind := 0; ind < 2800; ind++ {
 		rt, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := tools.RandomInt(5, 25)
-			time.Sleep(time.Duration(rint) * time.Millisecond)
-			if rint > 10 {
-				time.Sleep(time.Duration(800) * time.Millisecond)
+			if rint > 16 {
+				rint += 10000
 			}
+			fmt.Printf("sleeping %dms...\n", rint)
+			time.Sleep(time.Duration(rint) * time.Millisecond)
 
 			return "waiting game", nil
 		}, nil)
