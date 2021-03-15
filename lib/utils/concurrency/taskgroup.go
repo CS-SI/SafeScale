@@ -80,8 +80,8 @@ func NewTaskGroupWithParent(parentTask Task) (*taskGroup, fail.Error) { // nolin
 }
 
 // NewTaskGroupWithContext ...
-func NewTaskGroupWithContext(ctx context.Context, parentTask Task) (*taskGroup, fail.Error) { // nolint
-	return newTaskGroup(ctx, parentTask)
+func NewTaskGroupWithContext(ctx context.Context) (*taskGroup, fail.Error) { // nolint
+	return newTaskGroup(ctx, nil)
 }
 
 func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err fail.Error) {
@@ -235,7 +235,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 	return tg, nil
 }
 
-// Wait ...
+// Wait is a synonym to WaitGroup (exists to satisfy interface Task)
 func (tg *taskGroup) Wait() (TaskResult, fail.Error) {
 	if tg.isNull() {
 		return tg, fail.InvalidInstanceError()

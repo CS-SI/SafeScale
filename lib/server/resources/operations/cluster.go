@@ -1062,18 +1062,15 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during the clean up
-			// defer task.DisarmAbortSignal()()
-
-			if derr := rs.Delete(ctx); derr != nil {
+			if derr := rs.Delete(context.Background()); derr != nil {
 				_ = xerr.AddConsequence(derr)
 			}
 		}
 	}()
 
-	// if task.Aborted() {
-	// 	return nil, nil, fail.AbortedError(nil, "aborted")
-	// }
+	if task.Aborted() {
+		return nil, nil, fail.AbortedError(nil, "aborted")
+	}
 
 	// Updates again cluster metadata, propertiesv3.ClusterNetwork, with subnet infos
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1201,9 +1198,9 @@ func (instance *cluster) createHostResources(
 			return fail.Wrap(xerr, "failed to wait for remote ssh service to become ready")
 		}
 
-		// if task.Aborted() {
-		// 	return fail.AbortedError(nil, "aborted")
-		// }
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
 	}
 
 	masterCount, _, _, xerr := instance.determineRequiredNodes()
@@ -1211,9 +1208,9 @@ func (instance *cluster) createHostResources(
 		return xerr
 	}
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
 	primaryGatewayTask, xerr = task.StartInSubtask(instance.taskInstallGateway, taskInstallGatewayParameters{primaryGateway})
@@ -1227,9 +1224,9 @@ func (instance *cluster) createHostResources(
 		}
 	}()
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	if haveSecondaryGateway {
 		if secondaryGatewayTask, xerr = task.StartInSubtask(instance.taskInstallGateway, taskInstallGatewayParameters{secondaryGateway}); xerr != nil {
