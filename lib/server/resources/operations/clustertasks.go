@@ -61,6 +61,7 @@ func (instance *cluster) taskStartHost(task concurrency.Task, params concurrency
 	if xerr = instance.GetService().StartHost(id); xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already started is considered as a successful run
+			logrus.Tracef("host duplicated, start considered as a success")
 			return nil, nil
 		}
 	}
@@ -88,6 +89,7 @@ func (instance *cluster) taskStopHost(task concurrency.Task, params concurrency.
 	if xerr = instance.GetService().StopHost(id); xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already stopped is considered as a successful run
+			logrus.Tracef("host duplicated, stopping considered as a success")
 			return nil, nil
 		}
 	}

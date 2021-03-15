@@ -586,21 +586,6 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 				func() error {
 					_, innerErr := s.Stack.Driver.Request("DELETE", url, &opts)
 					return innerErr
-					// r, innerErr := s.Stack.Driver.Request("DELETE", url, &opts)
-					// if r != nil {
-					// 	switch r.StatusCode {
-					// 	case 404:
-					// 		logrus.Infof("subnet '%s' not found, considered as success", id)
-					// 		fallthrough
-					// 	case 200, 204:
-					// 		return nil
-					// 	case 409:
-					// 		return fail.NewError("409")
-					// 	default:
-					// 		return fail.NewError("DELETE command failed with status %d", r.StatusCode)
-					// 	}
-					// }
-					// return nil
 				},
 				normalizeError,
 			)

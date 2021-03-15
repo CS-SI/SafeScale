@@ -33,6 +33,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+
+	"github.com/sirupsen/logrus"
 )
 
 // delete effectively remove a Security Group
@@ -205,9 +207,10 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 	// Deletes metadata from Object Storage
 	if xerr = instance.core.delete(); xerr != nil {
-		// If entry not found, considered as success
+		// If entry not found, considered as a success
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			logrus.Tracef("core not found, deletion considered as a success")
 			// continue
 		default:
 			return xerr

@@ -1917,6 +1917,7 @@ func (instance *subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// missing gateway is considered as a successful deletion, continue
+					logrus.Tracef("host instance not found, gateway deletion considered as a success")
 				default:
 					return ids, xerr
 				}
@@ -1930,6 +1931,7 @@ func (instance *subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// missing gateway is considered as a successful deletion, continue
+						logrus.Tracef("host instance not found, relaxed gateway deletion considered as a success")
 					default:
 						return ids, xerr
 					}

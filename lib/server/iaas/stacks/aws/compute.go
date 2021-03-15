@@ -1045,6 +1045,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// a host not found is considered as a successful deletion, continue
+			logrus.Tracef("host not found, deletion considered as a success")
 		default:
 			return xerr
 		}
@@ -1126,7 +1127,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-				// A missing volume is considered as a successful deletion
+					// A missing volume is considered as a successful deletion
+					logrus.Tracef("volume not found, deletion considered as a success")
 				default:
 					logrus.Warnf("failed to delete volume %s", volume)
 				}
@@ -1149,6 +1151,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// A missing keypair is considered as a successful deletion
+					logrus.Tracef("keypair not found, deletion considered as a success")
 				default:
 					return fail.Wrap(xerr, "error deleting keypair")
 				}
