@@ -510,10 +510,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	// Starting from here, delete subnet if exiting with error
 	defer func() {
 		if xerr != nil && as != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			// defer task.DisarmAbortSignal()()
-
-			if derr := svc.DeleteSubnet(as.ID); derr != nil {
+			if derr := instance.deleteSubnetAndConfirm(as.ID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", actionFromError(xerr)))
 			}
 		}
@@ -527,9 +524,6 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	// Starting from here, delete subnet metadata if exiting with error
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			// defer task.DisarmAbortSignal()()
-
 			if derr := instance.core.delete(); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete subnet metadata", actionFromError(xerr)))
 			}
@@ -558,9 +552,6 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// // Disable abort signal during clean up
-			// defer task.DisarmAbortSignal()()
-
 			if derr := subnetGWSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateway from subnet", actionFromError(xerr)))
 			}
@@ -573,9 +564,6 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// // Disable abort signal during clean up
-			// defer task.DisarmAbortSignal()()
-
 			if derr := subnetInternalSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for Hosts from Subnet", actionFromError(xerr)))
 			}
@@ -1005,6 +993,34 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	return instance.updateCachedInformation()
+}
+
+// deleteSubnetAndConfirm deletes the Subnet idnetified by 'id' and wait for deletion confirmation
+func (instance *subnet) deleteSubnetAndConfirm(id string) fail.Error {
+	svc := instance.GetService()
+	if xerr := svc.DeleteSubnet(id); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If subnet doesn't exist anymore on the provider infrastructure, do not fail
+			return nil
+		default:
+			return xerr
+		}
+	}
+	return retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			if _, xerr := svc.InspectSubnet(id); xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// Subnet not found, good
+				default:
+					return xerr
+				}
+			}
+			return nil
+		},
+		temporal.GetContextTimeout(),
+	)
 }
 
 // validateCIDR tests if CIDR requested is valid, or select one if no CIDR is provided
@@ -1793,30 +1809,7 @@ func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 		// finally delete subnet
 		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
-		if innerXErr = svc.DeleteSubnet(as.ID); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				// If subnet doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
-				logrus.Debugf("Subnet not found on provider side, cleaning up metadata")
-			default:
-				return innerXErr
-			}
-		}
-		innerXErr = retry.WhileUnsuccessfulDelay1Second(
-			func() error {
-				if _, recErr := svc.InspectSubnet(as.ID); recErr != nil {
-					switch recErr.(type) {
-					case *fail.ErrNotFound:
-						// Subnet not found, good
-					default:
-						return recErr
-					}
-				}
-				return nil
-			},
-			temporal.GetContextTimeout(),
-		)
-		if innerXErr != nil {
+		if innerXErr = instance.deleteSubnetAndConfirm(as.ID); innerXErr != nil {
 			return innerXErr
 		}
 		logrus.Infof("Subnet '%s' successfully deleted.", as.Name)
