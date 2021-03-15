@@ -183,7 +183,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 				if xerr = s.rpcDeleteFirewallRuleByID(r); xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
-						// rule not found, consider it as a removal success
+						// rule not found, consider as a removal success
 					default:
 						return fail.Wrap(xerr, "failed to delete rule %d", k)
 					}

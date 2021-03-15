@@ -2048,9 +2048,8 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		// If entry not found, considered as a success
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
-		} else {
-			logrus.Tracef("core instance not found, deletion considered as a success")
 		}
+		logrus.Tracef("core instance not found, deletion considered as a success")
 	}
 
 	// newHost := nullHost()
