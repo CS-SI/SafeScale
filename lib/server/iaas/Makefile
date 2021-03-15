@@ -11,6 +11,7 @@ generate: clean
 	@(cd providers && $(MAKE) $(@))
 	@(cd userdata && $(MAKE) $(@))
 	@(cd stacks && $(MAKE) $(@))
+	@$(GO) generate ./...
 
 vet:
 	@$(GO) vet ./...

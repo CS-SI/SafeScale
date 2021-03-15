@@ -6,6 +6,7 @@ GO?=go
 generate: clean
 	@(mkdir -p mocks) || true
 	@(mkdir -p ../mocks) || true
+	@$(GO) generate -run minimock .
 #all: generate
 #	@(cd cloudferro && $(MAKE) $(@))
 #	@(cd flexibleengine && $(MAKE) $(@))

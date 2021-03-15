@@ -8,6 +8,7 @@ generate: clean
 	@(mkdir -p mocks) || true
 	@(cd iaas && $(MAKE) $@)
 	@(cd resources && $(MAKE) $@)
+	@(cd handlers && $(MAKE) $@)
 
 vet:
 	@$(GO) vet ./...
