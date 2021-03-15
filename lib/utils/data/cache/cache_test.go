@@ -364,7 +364,6 @@ func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
 			t.Fail()
 			return
 		}
-		return
 	}()
 
 	failed := waitTimeout(&wg, 3*time.Second)
