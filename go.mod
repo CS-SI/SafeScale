@@ -21,7 +21,6 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gojuno/minimock/v3 v3.0.8
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
-	github.com/golang/mock v1.5.0
 	github.com/golang/protobuf v1.4.1
 	github.com/gophercloud/gophercloud v0.0.0-20190509032623-7892efa714f1
 	github.com/gopherjs/gopherjs v0.0.0-20210202160940-bed99a852dfe // indirect
@@ -43,7 +42,6 @@ require (
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/common v0.4.1
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sanity-io/litter v1.3.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
@@ -60,7 +58,7 @@ require (
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	go.opencensus.io v0.22.2 // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
+	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
 	golang.org/x/sys v0.0.0-20210301091718-77cc2087c03b
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
@@ -68,7 +66,7 @@ require (
 	google.golang.org/api v0.15.0
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.27.1
-	google.golang.org/protobuf v1.25.0
+	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
