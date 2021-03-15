@@ -23,22 +23,15 @@ echo "Get dev deps"
 make getdevdeps
 [ $? -ne 0 ] && echo "Build getdevdeps failure" && exit 1
 
-sleep 45
-hash -r
-
-echo "Get dev deps"
-make getdevdeps
-[ $? -ne 0 ] && echo "Build getdevdeps failure" && exit 1
-
-sleep 45
-hash -r
-
-echo "Get dev deps"
-make getdevdeps
-[ $? -ne 0 ] && echo "Build getdevdeps failure" && exit 1
-
-sleep 45
-hash -r
+counter=6
+until [[ -n $(which stringer) ]]; do
+  hash -r
+  make getdevdeps
+  [ $? -ne 0 ] && echo "Build getdevdeps failure" && exit 1
+  sleep 35
+  let counter-=1
+  [ $counter -le 0 ] && echo "Build getdevdeps failure, too many iterations" && exit 1
+done
 
 echo "Ensure"
 make ensure
