@@ -50,8 +50,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.ScannerHandler
-
 // PriceInfo stores price information
 type PriceInfo struct {
 	Currency      string  `json:"currency"`                 // contains the currency of the price info

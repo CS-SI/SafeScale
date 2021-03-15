@@ -7,6 +7,7 @@ DIRECTORIES := $(sort $(dir $(wildcard */)))
 all: generate
 
 generate:
+	@(mkdir -p mocks) || true
 	@(cd enums && $(MAKE) $(@))
 	@(cd operations && $(MAKE) $(@))
 

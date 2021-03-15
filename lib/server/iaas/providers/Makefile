@@ -4,6 +4,8 @@ GO?=go
 .PHONY:	clean vet
 
 generate: clean
+	@(mkdir -p mocks) || true
+	@(mkdir -p ../mocks) || true
 #all: generate
 #	@(cd cloudferro && $(MAKE) $(@))
 #	@(cd flexibleengine && $(MAKE) $(@))
