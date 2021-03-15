@@ -22,16 +22,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pengux/check"
-	"github.com/sirupsen/logrus"
-
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
-	"github.com/gophercloud/gophercloud/pagination"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -42,6 +32,14 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
+	"github.com/gophercloud/gophercloud/pagination"
+	"github.com/pengux/check"
+	"github.com/sirupsen/logrus"
 )
 
 // VPCRequest defines a request to create a VPC
@@ -356,9 +354,10 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 
 	an, xerr := s.InspectNetwork(req.NetworkID)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(req.NetworkID)
+		default:
 		}
 	}
 	if xerr != nil {
@@ -376,15 +375,6 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 	if xerr != nil {
 		return nullAS, fail.Wrap(xerr, "error creating subnet '%s'", req.Name)
 	}
-
-	// // starting from here delete subnet
-	// defer func() {
-	// 	if xerr != nil {
-	// 		if derr := s.DeleteSubnet(resp.ID); derr != nil {
-	// 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", resp.Name))
-	// 		}
-	// 	}
-	// }()
 
 	subnet = abstract.NewSubnet()
 	subnet.ID = resp.ID
@@ -788,13 +778,24 @@ func (s stack) CreateVIP(networkID, subnetID, name string, sgs []string) (*abstr
 		return nullAVIP, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	// It seems FlexibleEngine encapsulates openstack subnet inside an openstack network; SubnetID is, in openstack context, a network ID.
+	// So, we need to recover the real openstack network and subnet IDs for this call to succeed
+	as, xerr := s.InspectSubnet(subnetID)
+	if xerr != nil {
+		return nullAVIP, xerr
+	}
+	openstackAS, xerr := s.Stack.InspectSubnetByName(networkID, as.Name)
+	if xerr != nil {
+		return nullAVIP, xerr
+	}
+
 	asu := true
 	options := ports.CreateOpts{
-		NetworkID:      subnetID,
+		NetworkID:      openstackAS.Network,
 		AdminStateUp:   &asu,
 		Name:           name,
 		SecurityGroups: &sgs,
-		FixedIPs:       []ports.IP{{SubnetID: subnetID}},
+		FixedIPs:       []ports.IP{{SubnetID: openstackAS.ID}},
 	}
 	port, err := ports.Create(s.NetworkClient, options).Extract()
 	if err != nil {
