@@ -36,7 +36,7 @@ fi
 
 echo "Docker build OK"
 
-docker create -ti --name dummy safescale:local-$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') bash
+docker create -ti --name dummy safescale:local-$VERNAME bash
 if [ $? -ne 0 ]; then
   echo "Failure extracting binaries 1/3"
   exit 1
