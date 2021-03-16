@@ -113,8 +113,7 @@ func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskRe
 
 	keep := true
 	for keep {
-		// FIXME: this line generates a data race with line 298
-		fmt.Println("Living forever")
+		// fmt.Println("Living forever")
 		_, _ = heavyDutyTask(10*time.Millisecond, true)
 	}
 
@@ -292,7 +291,7 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	_ = w.Close()
-	// FIXME: this command generate a data race with line 117
+
 	out, _ := ioutil.ReadAll(r)
 	os.Stdout = rescueStdout
 
