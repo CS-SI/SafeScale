@@ -895,6 +895,10 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			_ = groupXErr.AddConsequence(xerr)
 		}
 	} else {
+		if _, ok := results[id]; !ok {
+			return fail.InconsistentError("task results doesn't contain %s", id)
+		}
+
 		result, ok := results[id].(data.Map)
 		if !ok {
 			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
@@ -941,6 +945,11 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 				_ = groupXErr.AddConsequence(xerr)
 			}
 		}
+
+		if _, ok := results[id]; !ok {
+			return fail.InconsistentError("task results doesn't contain %s", id)
+		}
+
 		result, ok := results[id].(data.Map)
 		if !ok {
 			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
