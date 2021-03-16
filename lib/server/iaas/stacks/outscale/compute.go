@@ -450,24 +450,24 @@ func (s stack) deleteNICs(nics []osc.Nic) fail.Error {
 
 func hostState(state string) hoststate.Enum {
 	if state == "pending" {
-		return hoststate.STARTING
+		return hoststate.Starting
 	}
 	if state == "running" {
-		return hoststate.STARTED
+		return hoststate.Started
 	}
 	if state == "stopping" || state == "shutting-down" {
-		return hoststate.STOPPING
+		return hoststate.Stopping
 	}
 	if state == "stopped" {
-		return hoststate.STOPPED
+		return hoststate.Stopped
 	}
 	if state == "terminated" {
-		return hoststate.TERMINATED
+		return hoststate.Terminated
 	}
 	if state == "quarantine" {
-		return hoststate.ERROR
+		return hoststate.Error
 	}
-	return hoststate.UNKNOWN
+	return hoststate.Unknown
 }
 
 func (s stack) hostState(id string) (hoststate.Enum, fail.Error) {
@@ -475,9 +475,9 @@ func (s stack) hostState(id string) (hoststate.Enum, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return hoststate.TERMINATED, nil
+			return hoststate.Terminated, nil
 		default:
-			return hoststate.ERROR, xerr
+			return hoststate.Error, xerr
 		}
 	}
 	return hostState(vm.State), nil
@@ -490,7 +490,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 		return abstract.NewHostCore(), fail.InvalidInstanceError()
 	}
 
-	return s.WaitHostState(hostParam, hoststate.STARTED, timeout)
+	return s.WaitHostState(hostParam, hoststate.Started, timeout)
 }
 
 // WaitHostState wait for host to be in the specified state
@@ -519,18 +519,18 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
-					// if waited state is TERMINATED, a missing host means a terminated host, so consider this as a success
-					if state != hoststate.TERMINATED {
+					// if waited state is Terminated, a missing host means a terminated host, so consider this as a success
+					if state != hoststate.Terminated {
 						return innerXErr
 					}
-					st = hoststate.TERMINATED
+					st = hoststate.Terminated
 				default:
 					return innerXErr
 				}
 			}
 
 			switch st {
-			case hoststate.ERROR:
+			case hoststate.Error:
 				return retry.StopRetryError(fail.NewError("host in 'error' state"))
 			case state:
 				ahf.CurrentState, ahf.Core.LastState = st, st
@@ -939,15 +939,16 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				}
 			}()
 
-			_, innerXErr = s.WaitHostState(vm.VmId, hoststate.STARTED, temporal.GetHostTimeout())
+			_, innerXErr = s.WaitHostState(vm.VmId, hoststate.Started, temporal.GetHostTimeout())
 			return innerXErr
 		},
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		switch retryErr.(type) { //nolint
+		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
 			retryErr = fail.ConvertError(retryErr.Cause())
+		default:
 		}
 	}
 	if retryErr != nil {
@@ -987,7 +988,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
-	if _, xerr = s.WaitHostState(vm.VmId, hoststate.STARTED, temporal.GetHostTimeout()); xerr != nil {
+	if _, xerr = s.WaitHostState(vm.VmId, hoststate.Started, temporal.GetHostTimeout()); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 
@@ -996,7 +997,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Core.Name = request.ResourceName
 	ahf.Core.Password = request.Password
 	ahf.Core.PrivateKey = udc.FirstPrivateKey
-	// ahf.CurrentState, ahf.Core.LastState = hoststate.STARTED, hoststate.STARTED
+	// ahf.CurrentState, ahf.Core.LastState = hoststate.Started, hoststate.Started
 	nics = append(nics, defaultNic)
 	xerr = s.setHostProperties(ahf, request.Subnets, vm, nics)
 	return ahf, udc, xerr
@@ -1013,7 +1014,7 @@ func (s stack) deleteHost(id string) fail.Error {
 	if xerr := s.rpcDeleteVms([]string{id}); xerr != nil {
 		return xerr
 	}
-	_, xerr := s.WaitHostState(id, hoststate.TERMINATED, temporal.GetHostCreationTimeout())
+	_, xerr := s.WaitHostState(id, hoststate.Terminated, temporal.GetHostCreationTimeout())
 	return xerr
 }
 
@@ -1168,7 +1169,7 @@ func (s stack) complementHost(ahf *abstract.HostFull, vm osc.Vm) fail.Error {
 // GetHostState returns the current state of the host identified by id
 func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
 	if s.IsNull() {
-		return hoststate.UNKNOWN, fail.InvalidInstanceError()
+		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -1176,7 +1177,7 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, x
 
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
-		return hoststate.UNKNOWN, xerr
+		return hoststate.Unknown, xerr
 	}
 
 	return s.hostState(ahf.Core.ID)
@@ -1200,7 +1201,7 @@ func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 
 	var hosts abstract.HostList
 	for _, vm := range resp {
-		if hostState(vm.State) == hoststate.TERMINATED {
+		if hostState(vm.State) == hoststate.Terminated {
 			continue
 		}
 

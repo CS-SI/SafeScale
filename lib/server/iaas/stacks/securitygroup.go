@@ -63,8 +63,8 @@ func DefaultTCPRules(sshPort int32) []abstract.SecurityGroupRule {
 	return []abstract.SecurityGroupRule{
 		// Ingress: allow SSH only
 		{
-			Description: "INGRESS: TCP4: Allow everything",
-			Direction:   securitygroupruledirection.INGRESS,
+			Description: "Ingress: TCP4: Allow everything",
+			Direction:   securitygroupruledirection.Ingress,
 			PortFrom:    sshPort,
 			//PortTo:      sshPort,
 			EtherType: ipversion.IPv4,
@@ -72,8 +72,8 @@ func DefaultTCPRules(sshPort int32) []abstract.SecurityGroupRule {
 			Targets:   []string{"0.0.0.0/0"},
 		},
 		{
-			Description: "INGRESS: TCP6: Allow everything",
-			Direction:   securitygroupruledirection.INGRESS,
+			Description: "Ingress: TCP6: Allow everything",
+			Direction:   securitygroupruledirection.Ingress,
 			PortFrom:    sshPort,
 			//PortTo:      sshPort,
 			EtherType: ipversion.IPv6,
@@ -83,8 +83,8 @@ func DefaultTCPRules(sshPort int32) []abstract.SecurityGroupRule {
 
 		// Egress: allow everything
 		{
-			Description: "EGRESS: TCP4: Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Description: "Egress: TCP4: Allow everything",
+			Direction:   securitygroupruledirection.Egress,
 			PortFrom:    1,
 			PortTo:      65535,
 			EtherType:   ipversion.IPv4,
@@ -92,8 +92,8 @@ func DefaultTCPRules(sshPort int32) []abstract.SecurityGroupRule {
 			Targets:     []string{"0.0.0.0/0"},
 		},
 		{
-			Description: "EGRESS: TCP6: Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Description: "Egress: TCP6: Allow everything",
+			Direction:   securitygroupruledirection.Egress,
 			PortFrom:    1,
 			PortTo:      65535,
 			EtherType:   ipversion.IPv6,
@@ -109,8 +109,8 @@ func DefaultUDPRules() []abstract.SecurityGroupRule {
 	return []abstract.SecurityGroupRule{
 		// Outbound = egress == going to Outside
 		{
-			Description: "EGRESS: UDP4: Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Description: "Egress: UDP4: Allow everything",
+			Direction:   securitygroupruledirection.Egress,
 			PortFrom:    1,
 			PortTo:      65535,
 			EtherType:   ipversion.IPv4,
@@ -118,8 +118,8 @@ func DefaultUDPRules() []abstract.SecurityGroupRule {
 			Targets:     []string{"0.0.0.0/0"},
 		},
 		{
-			Description: "EGRESS: UDP4: Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Description: "Egress: UDP4: Allow everything",
+			Direction:   securitygroupruledirection.Egress,
 			PortFrom:    1,
 			PortTo:      65535,
 			EtherType:   ipversion.IPv6,
@@ -135,30 +135,30 @@ func DefaultICMPRules() []abstract.SecurityGroupRule {
 	return []abstract.SecurityGroupRule{
 		// Inbound == ingress == coming from Outside
 		{
-			Description: "INGRESS: ICMP4: Allow everything",
-			Direction:   securitygroupruledirection.INGRESS,
+			Description: "Ingress: ICMP4: Allow everything",
+			Direction:   securitygroupruledirection.Ingress,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
 			Targets:     []string{"0.0.0.0/0"},
 		},
 		{
-			Description: "INGRESS: ICMP6: Allow everything",
-			Direction:   securitygroupruledirection.INGRESS,
+			Description: "Ingress: ICMP6: Allow everything",
+			Direction:   securitygroupruledirection.Ingress,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
 			Targets:     []string{"::/0"},
 		},
 		// Outbound = egress == going to Outside
 		{
-			Description: "EGRESS: ICMP4: Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Description: "Egress: ICMP4: Allow everything",
+			Direction:   securitygroupruledirection.Egress,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
 			Targets:     []string{"0.0.0.0/0"},
 		},
 		{
-			Description: "EGRESS: ICMP6: Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Description: "Egress: ICMP6: Allow everything",
+			Direction:   securitygroupruledirection.Egress,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
 			Targets:     []string{"::/0"},

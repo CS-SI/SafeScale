@@ -131,8 +131,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		UseLayer3Networking:       true,
 		AutoHostNetworkInterfaces: true,
 		VolumeSpeeds: map[string]volumespeed.Enum{
-			"HDD": volumespeed.HDD,
-			"SSD": volumespeed.SSD,
+			"Hdd": volumespeed.Hdd,
+			"Ssd": volumespeed.Ssd,
 		},
 		MetadataBucket:   metadataBucketName,
 		DNSList:          cloudferroDNSServers,

@@ -460,11 +460,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			ahc.Name = server.Name
 
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ahc, hoststate.STARTED, temporal.GetHostTimeout())
+			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, temporal.GetHostTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					return fail.Wrap(innerXErr, "host '%s' is in ERROR state", request.ResourceName)
+					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
 					return fail.Wrap(innerXErr, "timeout waiting host '%s' ready", request.ResourceName)
 				}
@@ -579,7 +579,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nullAHF, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.STARTED, 2*temporal.GetBigDelay())
+	server, xerr := s.WaitHostState(ahf, hoststate.Started, 2*temporal.GetBigDelay())
 	if xerr != nil {
 		return nullAHF, xerr
 	}
@@ -614,7 +614,7 @@ func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (
 		host.Name = server.Name
 	}
 	host.LastState = toHostState(server.Status)
-	if host.LastState != hoststate.STARTED {
+	if host.LastState != hoststate.Started {
 		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
 	}
 
@@ -886,7 +886,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 							normalizeError,
 						)
 						if commRetryErr == nil {
-							if toHostState(host.Status) == hoststate.ERROR {
+							if toHostState(host.Status) == hoststate.Error {
 								return nil
 							}
 							return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
@@ -913,7 +913,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			if !resourcePresent {
 				return nil
 			}
-			return fail.NewError("host '%s' in state 'ERROR', retrying to delete", hostRef)
+			return fail.NewError("host '%s' in state 'Error', retrying to delete", hostRef)
 		},
 		0,
 		temporal.GetHostCleanupTimeout(),
@@ -1100,14 +1100,14 @@ func (s stack) getOpenstackPortID(host *abstract.HostFull) (*string, fail.Error)
 func toHostState(status string) hoststate.Enum {
 	switch status {
 	case "BUILD", "build", "BUILDING", "building":
-		return hoststate.STARTING
+		return hoststate.Starting
 	case "ACTIVE", "active":
-		return hoststate.STARTED
+		return hoststate.Started
 	case "RESCUED", "rescued":
-		return hoststate.STOPPING
-	case "STOPPED", "stopped", "SHUTOFF", "shutoff":
-		return hoststate.STOPPED
+		return hoststate.Stopping
+	case "Stopped", "stopped", "SHUTOFF", "shutoff":
+		return hoststate.Stopped
 	default:
-		return hoststate.ERROR
+		return hoststate.Error
 	}
 }

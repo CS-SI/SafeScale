@@ -610,7 +610,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		as.State = subnetstate.GATEWAY_CREATION //nolint
+		as.State = subnetstate.GatewayCreation
 		as.GWSecurityGroupID = subnetGWSG.GetID()
 		as.InternalSecurityGroupID = subnetInternalSG.GetID()
 		as.PublicIPSecurityGroupID = subnetPublicIPSG.GetID()
@@ -1042,7 +1042,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		as.State = subnetstate.GATEWAY_CONFIGURATION
+		as.State = subnetstate.GatewayConfiguration
 		return nil
 	})
 	if xerr != nil {
@@ -1091,7 +1091,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		as.State = subnetstate.READY
+		as.State = subnetstate.Ready
 		return nil
 	})
 	if xerr != nil {
@@ -1307,7 +1307,7 @@ func (instance *subnet) createGWSecurityGroup(ctx context.Context, req abstract.
 	rules := abstract.SecurityGroupRules{
 		{
 			Description: "[ingress][ipv4][tcp] Allow SSH",
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			PortFrom:    22,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "tcp",
@@ -1316,7 +1316,7 @@ func (instance *subnet) createGWSecurityGroup(ctx context.Context, req abstract.
 		},
 		{
 			Description: "[ingress][ipv6][tcp] Allow SSH",
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			PortFrom:    22,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
@@ -1325,7 +1325,7 @@ func (instance *subnet) createGWSecurityGroup(ctx context.Context, req abstract.
 		},
 		{
 			Description: "[ingress][ipv4][icmp] Allow everything",
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
 			Sources:     []string{"0.0.0.0/0"},
@@ -1333,7 +1333,7 @@ func (instance *subnet) createGWSecurityGroup(ctx context.Context, req abstract.
 		},
 		{
 			Description: "[ingress][ipv6][icmp] Allow everything",
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
 			Sources:     []string{"::/0"},
@@ -1376,14 +1376,14 @@ func (instance *subnet) createPublicIPSecurityGroup(ctx context.Context, req abs
 	rules := abstract.SecurityGroupRules{
 		{
 			Description: "[egress][ipv4][all] Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Direction:   securitygroupruledirection.Egress,
 			EtherType:   ipversion.IPv4,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{"0.0.0.0/0"},
 		},
 		{
 			Description: "[egress][ipv6][all] Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Direction:   securitygroupruledirection.Egress,
 			EtherType:   ipversion.IPv6,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{"::0/0"},
@@ -1443,28 +1443,28 @@ func (instance *subnet) createInternalSecurityGroup(ctx context.Context, req abs
 		{
 			Description: fmt.Sprintf("[egress][ipv4][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv4,
-			Direction:   securitygroupruledirection.EGRESS,
+			Direction:   securitygroupruledirection.Egress,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{sg.GetID()},
 		},
 		{
 			Description: fmt.Sprintf("[egress][ipv6][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv6,
-			Direction:   securitygroupruledirection.EGRESS,
+			Direction:   securitygroupruledirection.Egress,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{sg.GetID()},
 		},
 		{
 			Description: fmt.Sprintf("[ingress][ipv4][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv4,
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{sg.GetID()},
 		},
 		{
 			Description: fmt.Sprintf("[ingress][ipv6][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv6,
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{sg.GetID()},
 		},
@@ -1968,6 +1968,7 @@ func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		// 			if !ok {
 		// 				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		// 			}
+		//
 		// 			delete(nsV1.ByID, as.ID)
 		// 			delete(nsV1.ByName, as.Name)
 		// 			return nil
@@ -2178,7 +2179,7 @@ func (instance *subnet) GetState() (state subnetstate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance.isNull() {
-		return subnetstate.UNKNOWN, fail.InvalidInstanceError()
+		return subnetstate.Unknown, fail.InvalidInstanceError()
 	}
 
 	instance.lock.RLock()

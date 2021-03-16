@@ -380,7 +380,7 @@ func NewHostFull() *HostFull {
 		Sizing:       NewHostEffectiveSizing(),
 		Networking:   NewHostNetworking(),
 		Description:  &HostDescription{},
-		CurrentState: hoststate.UNKNOWN,
+		CurrentState: hoststate.Unknown,
 	}
 }
 

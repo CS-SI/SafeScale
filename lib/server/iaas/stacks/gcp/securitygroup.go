@@ -118,15 +118,15 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (string, bool
 		return "", false, nil, false, nil, nil, xerr
 	}
 	switch in.Direction {
-	case securitygroupruledirection.INGRESS:
-		direction = "INGRESS"
+	case securitygroupruledirection.Ingress:
+		direction = "Ingress"
 		sources = in.Sources
 		targets = in.Targets
-	case securitygroupruledirection.EGRESS:
-		direction = "EGRESS"
+	case securitygroupruledirection.Egress:
+		direction = "Egress"
 		targets = in.Targets
 	default:
-		return "", false, nil, false, nil, nil, fail.InvalidParameterError("in.Direction", "must contain either 'securitygroupruledirection.INGRESS' or 'securitygroupruledirection.EGRESS'")
+		return "", false, nil, false, nil, nil, fail.InvalidParameterError("in.Direction", "must contain either 'securitygroupruledirection.Ingress' or 'securitygroupruledirection.Egress'")
 	}
 
 	var allowed []*compute.FirewallAllowed

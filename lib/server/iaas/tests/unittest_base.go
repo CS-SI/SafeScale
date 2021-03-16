@@ -592,7 +592,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
-		// assert.Equal(t, host.State, hoststate.STOPPED)
+		// assert.Equal(t, host.State, hoststate.Stopped)
 	}
 	{
 		err := tester.Service.StartHost(host.Core.ID)

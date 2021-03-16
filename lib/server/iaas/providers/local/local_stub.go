@@ -182,7 +182,7 @@ func (provider *provider) InspectHostByName(string) (*abstract.HostFull, fail.Er
 	return abstract.NewHostFull(), gReport
 }
 func (provider *provider) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	return hoststate.ERROR, gReport
+	return hoststate.Error, gReport
 }
 func (provider *provider) ListHosts(bool) (abstract.HostList, fail.Error) {
 	return nil, gReport

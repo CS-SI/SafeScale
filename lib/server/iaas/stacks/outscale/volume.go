@@ -46,7 +46,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
 	}
 	IOPS := 0
-	if request.Speed == volumespeed.SSD {
+	if request.Speed == volumespeed.Ssd {
 		IOPS = request.Size * 300
 		if IOPS > 13000 {
 			IOPS = 13000
@@ -65,7 +65,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 		}
 	}()
 
-	xerr = s.WaitForVolumeState(resp.VolumeId, volumestate.AVAILABLE)
+	xerr = s.WaitForVolumeState(resp.VolumeId, volumestate.Available)
 	if xerr != nil {
 		return nullAV, xerr
 	}
@@ -74,7 +74,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	volume.ID = resp.VolumeId
 	volume.Speed = s.toAbstractVolumeSpeed(resp.VolumeType)
 	volume.Size = int(resp.Size)
-	volume.State = volumestate.AVAILABLE
+	volume.State = volumestate.Available
 	volume.Name = request.Name
 	return volume, nil
 }
@@ -83,7 +83,7 @@ func (s stack) toAbstractVolumeSpeed(t string) volumespeed.Enum {
 	if s, ok := s.configurationOptions.VolumeSpeeds[t]; ok {
 		return s
 	}
-	return volumespeed.HDD
+	return volumespeed.Hdd
 }
 
 func (s stack) fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
@@ -92,26 +92,26 @@ func (s stack) fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
 			return t
 		}
 	}
-	return s.fromAbstractVolumeSpeed(volumespeed.HDD)
+	return s.fromAbstractVolumeSpeed(volumespeed.Hdd)
 }
 
 func toAbstractVolumeState(state string) volumestate.Enum {
 	if state == "creating" {
-		return volumestate.CREATING
+		return volumestate.Creating
 	}
 	if state == "available" {
-		return volumestate.AVAILABLE
+		return volumestate.Available
 	}
 	if state == "in-use" {
-		return volumestate.USED
+		return volumestate.Used
 	}
 	if state == "deleting" {
-		return volumestate.DELETING
+		return volumestate.Deleting
 	}
 	if state == "error" {
-		return volumestate.ERROR
+		return volumestate.Error
 	}
-	return volumestate.OTHER
+	return volumestate.Unknown
 }
 
 // WaitForVolumeState wait for volume to be in the specified state
@@ -384,5 +384,5 @@ func (s stack) DeleteVolumeAttachment(serverID, volumeID string) (xerr fail.Erro
 	if xerr != nil {
 		return xerr
 	}
-	return s.WaitForVolumeState(volumeID, volumestate.AVAILABLE)
+	return s.WaitForVolumeState(volumeID, volumestate.Available)
 }

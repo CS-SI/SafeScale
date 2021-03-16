@@ -832,7 +832,7 @@ func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Erro
 				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId), aws.Int64Value(i.State.Code)&0xff)
 				continue
 			}
-			if state != hoststate.TERMINATED {
+			if state != hoststate.Terminated {
 				instance = i
 				found++
 			}
@@ -918,7 +918,7 @@ func (s stack) rpcDescribeInstances(ids []*string) ([]*ec2.Instance, fail.Error)
 				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId), aws.Int64Value(i.State.Code)&0xff)
 				continue
 			}
-			if state != hoststate.TERMINATED {
+			if state != hoststate.Terminated {
 				out = append(out, i)
 			}
 		}

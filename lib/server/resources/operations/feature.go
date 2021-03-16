@@ -476,7 +476,7 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	// FIXME: restore feature check cache using iaas.ResourceCache
 	// _ = checkCache.ForceSet(featureName()+"@"+targetName, results)
 
-	return results, target.RegisterFeature(f, nil, target.TargetType() == featuretargettype.CLUSTER)
+	return results, target.RegisterFeature(f, nil, target.TargetType() == featuretargettype.Cluster)
 }
 
 // Remove uninstalls the feature from the target
@@ -586,17 +586,17 @@ func (f *feature) installRequirements(ctx context.Context, t resources.Targetabl
 			msgHead := fmt.Sprintf("Checking requirements of feature '%s'", f.GetName())
 			var msgTail string
 			switch t.TargetType() {
-			case featuretargettype.HOST:
+			case featuretargettype.Host:
 				msgTail = fmt.Sprintf("on host '%s'", t.(data.Identifiable).GetName())
-			case featuretargettype.NODE:
+			case featuretargettype.Node:
 				msgTail = fmt.Sprintf("on cluster node '%s'", t.(data.Identifiable).GetName())
-			case featuretargettype.CLUSTER:
+			case featuretargettype.Cluster:
 				msgTail = fmt.Sprintf("on cluster '%s'", t.(data.Identifiable).GetName())
 			}
 			logrus.Debugf("%s %s...", msgHead, msgTail)
 		}
 
-		targetIsCluster := t.TargetType() == featuretargettype.CLUSTER
+		targetIsCluster := t.TargetType() == featuretargettype.Cluster
 
 		// clone FeatureSettings to set DoNotUpdateHostMetadataInClusterContext
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
@@ -632,7 +632,7 @@ func (f *feature) installRequirements(ctx context.Context, t resources.Targetabl
 }
 
 func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targetable, installed resources.Feature, requiredBy resources.Feature, results resources.Results) fail.Error {
-	if target.TargetType() == featuretargettype.CLUSTER {
+	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register feature in successful hosts
 		successfulHosts := map[string]struct{}{}
 		for _, k := range results.Keys() {
@@ -657,7 +657,7 @@ func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targe
 }
 
 func unregisterOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targetable, installed resources.Feature, results resources.Results) fail.Error {
-	if target.TargetType() == featuretargettype.CLUSTER {
+	if target.TargetType() == featuretargettype.Cluster {
 		// Walk through results and register feature in successful hosts
 		successfulHosts := map[string]struct{}{}
 		for _, k := range results.Keys() {

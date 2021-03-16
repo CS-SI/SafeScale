@@ -42,7 +42,7 @@ type ClusterNetwork struct {
 
 func newClusterNetwork() *ClusterNetwork {
 	return &ClusterNetwork{
-		NetworkState: subnetstate.UNKNOWN,
+		NetworkState: subnetstate.Unknown,
 	}
 }
 

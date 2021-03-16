@@ -22,8 +22,8 @@ package featuretargettype
 type Enum uint
 
 const (
-	UNKNOWN Enum = iota
-	HOST
-	CLUSTER
-	NODE
+	Unknown Enum = iota
+	Host
+	Cluster
+	Node
 )

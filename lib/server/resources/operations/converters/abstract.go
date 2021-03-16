@@ -194,7 +194,7 @@ func HostCoreFromAbstractToProtocol(in *abstract.HostCore) *protocol.Host {
 // HostFullFromAbstractToProtocol ...
 func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 	state := in.Core.LastState
-	if in.CurrentState != hoststate.UNKNOWN {
+	if in.CurrentState != hoststate.Unknown {
 		state = in.CurrentState
 	}
 	ph := &protocol.Host{
@@ -306,11 +306,11 @@ func HostStatusFromAbstractToProtocol(name string, status hoststate.Enum) *proto
 // VolumeSpeedFromAbstractToProtocol ...
 func VolumeSpeedFromAbstractToProtocol(in volumespeed.Enum) protocol.VolumeSpeed {
 	switch in {
-	case volumespeed.COLD:
+	case volumespeed.Cold:
 		return protocol.VolumeSpeed_VS_COLD
-	case volumespeed.SSD:
+	case volumespeed.Ssd:
 		return protocol.VolumeSpeed_VS_SSD
-	case volumespeed.HDD:
+	case volumespeed.Hdd:
 		fallthrough
 	default:
 		return protocol.VolumeSpeed_VS_HDD

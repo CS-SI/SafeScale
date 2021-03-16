@@ -127,9 +127,9 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { //nolint
 		SecretKey: options.Identity.SecretKey,
 	})
 	volumeSpeeds := map[string]volumespeed.Enum{
-		"standard": volumespeed.COLD,
-		"gp2":      volumespeed.HDD,
-		"io1":      volumespeed.SSD,
+		"standard": volumespeed.Cold,
+		"gp2":      volumespeed.Hdd,
+		"io1":      volumespeed.Ssd,
 	}
 	s := stack{
 		Options:         *options,

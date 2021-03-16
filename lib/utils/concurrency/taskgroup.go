@@ -19,7 +19,6 @@ package concurrency
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -182,7 +181,7 @@ func (tg *taskGroup) StartInSubtask(action TaskAction, params TaskParameters, op
 }
 
 // Start runs in goroutine the function with parameters
-// Each sub-Task created has its ID forced to TaskGroup ID + "-<index>".
+// Returns the subtask created to run the action (should be ignored in majority of cases)
 func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if tg.isNull() {
 		return tg, fail.InvalidInstanceError()
@@ -199,9 +198,10 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 		return tg, err
 	}
 
-	if err = subtask.SetID(tg.task.id + "-" + strconv.Itoa(int(tg.last))); err != nil {
-		return tg, err
-	}
+	// VPL: why this ?
+	// if err = subtask.SetID(tg.task.id + "-" + strconv.Itoa(int(tg.last))); err != nil {
+	// 	return tg, err
+	// }
 
 	newChild := subTask{
 		task: subtask,
@@ -232,7 +232,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 		tg.task.status = RUNNING
 		tg.task.mu.Unlock()
 	}
-	return tg, nil
+	return subtask, nil
 }
 
 // Wait is a synonym to WaitGroup (exists to satisfy interface Task)
@@ -266,13 +266,13 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	}
 
 	errs := make(map[string]error)
-	results := make(map[string]TaskResult)
+	results := make(TaskGroupResult, len(tg.children.tasks))
 
 	if taskStatus == DONE {
 		tg.task.mu.Lock()
 		defer tg.task.mu.Unlock()
 
-		results[tid] = tg.result
+		results = tg.result
 		return results, tg.task.err
 	}
 	if taskStatus == ABORTED {
@@ -486,8 +486,8 @@ func (tg *taskGroup) Abort() fail.Error {
 
 	var errors []error
 
+	// TODO: check if sending Abort to parent task is not sufficient (it should because of use of context)
 	// Send abort signal to subtasks
-	// tg.children.lock.SafeLock(tg.task)
 	tg.children.lock.Lock()
 	for _, st := range tg.children.tasks {
 		if xerr := st.task.Abort(); xerr != nil {

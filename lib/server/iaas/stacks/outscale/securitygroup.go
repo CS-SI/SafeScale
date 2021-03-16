@@ -60,10 +60,10 @@ func toAbstractSecurityGroup(in osc.SecurityGroup) *abstract.SecurityGroup {
 	out.Description = in.Description
 	out.Rules = make(abstract.SecurityGroupRules, 0, len(in.InboundRules)+len(in.OutboundRules))
 	for _, v := range in.InboundRules {
-		out.Rules = append(out.Rules, toAbstractSecurityGroupRule(v, securitygroupruledirection.INGRESS))
+		out.Rules = append(out.Rules, toAbstractSecurityGroupRule(v, securitygroupruledirection.Ingress))
 	}
 	for _, v := range in.OutboundRules {
-		out.Rules = append(out.Rules, toAbstractSecurityGroupRule(v, securitygroupruledirection.EGRESS))
+		out.Rules = append(out.Rules, toAbstractSecurityGroupRule(v, securitygroupruledirection.Egress))
 	}
 	return out
 }
@@ -273,14 +273,14 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ 
 		usesGroups bool
 	)
 	switch in.Direction {
-	case securitygroupruledirection.INGRESS:
+	case securitygroupruledirection.Ingress:
 		flow = "Inbound"
 		involved = in.Targets
 		usesGroups, xerr = in.TargetsConcernGroups()
 		if xerr != nil {
 			return "", rule, xerr
 		}
-	case securitygroupruledirection.EGRESS:
+	case securitygroupruledirection.Egress:
 		flow = "Outbound"
 		involved = in.Sources
 		usesGroups, xerr = in.SourcesConcernGroups()

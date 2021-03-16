@@ -136,12 +136,12 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 		commandCB: cb,
 	}
 	switch t.TargetType() {
-	case featuretargettype.CLUSTER:
+	case featuretargettype.Cluster:
 		w.cluster = t.(*cluster)
-	// case featuretargettype.NODE:
+	// case featuretargettype.Node:
 	// 	w.node = true
 	// 	fallthrough
-	case featuretargettype.HOST:
+	case featuretargettype.Host:
 		w.host = t.(*host)
 	}
 
@@ -165,15 +165,13 @@ func (w *worker) ConcernsCluster() bool {
 // CanProceed tells if the combination Feature/Target can work
 func (w *worker) CanProceed(ctx context.Context, s resources.FeatureSettings) fail.Error {
 	switch w.target.TargetType() {
-	case featuretargettype.CLUSTER:
+	case featuretargettype.Cluster:
 		xerr := w.validateContextForCluster()
 		if xerr == nil && !s.SkipSizingRequirements {
 			xerr = w.validateClusterSizing(ctx)
 		}
 		return xerr
-	// case featuretargettype.NODE:
-	// 	return nil
-	case featuretargettype.HOST:
+	case featuretargettype.Host:
 		// If the target is a host inside a worker for a cluster, validate unconditionally
 		if w.cluster != nil {
 			return nil
@@ -639,7 +637,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 
 	// Determine list of hosts concerned by the step
 	var hostsList []resources.Host
-	if w.target.TargetType() == featuretargettype.HOST {
+	if w.target.TargetType() == featuretargettype.Host {
 		hostsList, xerr = w.identifyHosts(task.GetContext(), map[string]string{"hosts": "1"})
 	} else {
 		anon, ok = p.stepMap[yamlTargetsKeyword]
@@ -1302,7 +1300,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			defer gwSG.Released()
 
 			sgRule := abstract.NewSecurityGroupRule()
-			sgRule.Direction = securitygroupruledirection.INGRESS // Implicit for gateways
+			sgRule.Direction = securitygroupruledirection.Ingress // Implicit for gateways
 			sgRule.EtherType = ipversion.IPv4
 			sgRule.Protocol, _ = r["protocol"].(string)
 			sgRule.Sources = []string{"0.0.0.0/0"}
