@@ -897,7 +897,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	} else {
 		result, ok := results[id].(data.Map)
 		if !ok {
-			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(result[id]).String())
+			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
 			if groupXErr == nil {
 				groupXErr = xerr
 			} else {
@@ -943,7 +943,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		}
 		result, ok := results[id].(data.Map)
 		if !ok {
-			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(result[id]).String())
+			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
 			if groupXErr == nil {
 				groupXErr = xerr
 			} else {
