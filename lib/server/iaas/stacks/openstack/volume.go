@@ -41,21 +41,21 @@ import (
 func toVolumeState(status string) volumestate.Enum {
 	switch status {
 	case "creating":
-		return volumestate.CREATING
+		return volumestate.Creating
 	case "available":
-		return volumestate.AVAILABLE
+		return volumestate.Available
 	case "attaching":
-		return volumestate.ATTACHING
+		return volumestate.Attaching
 	case "detaching":
-		return volumestate.DETACHING
+		return volumestate.Detaching
 	case "in-use":
-		return volumestate.USED
+		return volumestate.Used
 	case "deleting":
-		return volumestate.DELETING
+		return volumestate.Deleting
 	case "error", "error_deleting", "error_backing-up", "error_restoring", "error_extending":
-		return volumestate.ERROR
+		return volumestate.Error
 	default:
-		return volumestate.OTHER
+		return volumestate.Unknown
 	}
 }
 
@@ -66,10 +66,10 @@ func (s Stack) getVolumeType(speed volumespeed.Enum) string {
 		}
 	}
 	switch speed {
-	case volumespeed.SSD:
-		return s.getVolumeType(volumespeed.HDD)
-	case volumespeed.HDD:
-		return s.getVolumeType(volumespeed.COLD)
+	case volumespeed.Ssd:
+		return s.getVolumeType(volumespeed.Hdd)
+	case volumespeed.Hdd:
+		return s.getVolumeType(volumespeed.Cold)
 	default:
 		return ""
 	}
@@ -80,7 +80,8 @@ func (s Stack) getVolumeSpeed(vType string) volumespeed.Enum {
 	if ok {
 		return speed
 	}
-	return volumespeed.HDD
+
+	return volumespeed.Hdd
 }
 
 // CreateVolume creates a block volume

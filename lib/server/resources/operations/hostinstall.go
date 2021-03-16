@@ -216,10 +216,10 @@ func (instance *host) DeleteFeature(ctx context.Context, name string, vars data.
 // satisfies install.Targetable interface.
 func (instance *host) TargetType() featuretargettype.Enum {
 	if instance.isNull() {
-		return featuretargettype.UNKNOWN
+		return featuretargettype.Unknown
 	}
 
-	return featuretargettype.HOST
+	return featuretargettype.Host
 }
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)

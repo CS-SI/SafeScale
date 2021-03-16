@@ -1328,8 +1328,8 @@ func (instance *cluster) createHostResources(
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	// Step 3: run (not start so no parallelism here) gateway configuration (needs MasterIPs so masters must be installed first)
-	// Configure getGateway(s) and waits for the result
+	// Step 3: start gateway configuration (needs MasterIPs so masters must be installed first)
+	// Configure gateway(s) and waits for the result
 	if cfgGatewayTask, xerr = task.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway}); xerr != nil {
 		return xerr
 	}

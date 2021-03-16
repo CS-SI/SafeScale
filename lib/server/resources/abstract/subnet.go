@@ -71,7 +71,7 @@ type Subnet struct {
 // NewSubnet initializes a new instance of Subnet
 func NewSubnet() *Subnet {
 	return &Subnet{
-		State:          subnetstate.UNKNOWN,
+		State:          subnetstate.Unknown,
 		DefaultSSHPort: 22,
 	}
 }

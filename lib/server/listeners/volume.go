@@ -33,12 +33,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
+// safescale volume create v1 --speed="Ssd" --size=2000 (par default Hdd, possible Ssd, Hdd, Cold)
 // safescale volume attach v1 host1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
 // safescale volume detach v1
 // safescale volume delete v1
 // safescale volume inspect v1
-// safescale volume update v1 --speed="HDD" --size=1000
+// safescale volume update v1 --speed="Hdd" --size=1000
 
 // VolumeHandler ...
 var VolumeHandler = handlers.NewVolumeHandler

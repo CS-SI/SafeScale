@@ -134,9 +134,9 @@ func (s stack) fromAbstractSecurityGroupRules(asg abstract.SecurityGroup, in abs
 			return nil, nil, xerr
 		}
 		switch v.Direction {
-		case securitygroupruledirection.INGRESS:
+		case securitygroupruledirection.Ingress:
 			ingress = append(ingress, item)
-		case securitygroupruledirection.EGRESS:
+		case securitygroupruledirection.Egress:
 			egress = append(egress, item)
 		default:
 			return nil, nil, fail.InvalidRequestError("rule #%d contains an invalid direction '%d'", v.Direction)
@@ -152,13 +152,13 @@ func (s stack) fromAbstractSecurityGroupRule(asg abstract.SecurityGroup, in abst
 		usesGroups bool
 	)
 	switch in.Direction {
-	case securitygroupruledirection.INGRESS:
+	case securitygroupruledirection.Ingress:
 		involved = in.Sources
 		usesGroups, xerr = in.SourcesConcernGroups()
 		if xerr != nil {
 			return nil, xerr
 		}
-	case securitygroupruledirection.EGRESS:
+	case securitygroupruledirection.Egress:
 		involved = in.Targets
 		usesGroups, xerr = in.TargetsConcernGroups()
 		if xerr != nil {
@@ -293,7 +293,7 @@ func toAbstractSecurityGroupRules(in *ec2.SecurityGroup) (abstract.SecurityGroup
 	}
 	var out abstract.SecurityGroupRules
 	for _, v := range in.IpPermissions {
-		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.INGRESS, ipversion.IPv4)
+		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.Ingress, ipversion.IPv4)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -301,7 +301,7 @@ func toAbstractSecurityGroupRules(in *ec2.SecurityGroup) (abstract.SecurityGroup
 	}
 
 	for _, v := range in.IpPermissionsEgress {
-		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.EGRESS, ipversion.IPv4)
+		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.Egress, ipversion.IPv4)
 		if xerr != nil {
 			return nil, xerr
 		}

@@ -407,28 +407,24 @@ func toHostState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) {
 	//
 	//    * 80 : stopped
 	if state == nil {
-		return hoststate.ERROR, fail.NewError("unexpected host state")
+		return hoststate.Error, fail.NewError("unexpected host state")
 	}
-	code := aws.Int64Value(state.Code) & 0xff
-	if code == 0 {
-		return hoststate.STARTING, nil
+
+	switch aws.Int64Value(state.Code) & 0xff {
+	case 0:
+		return hoststate.Starting, nil
+	case 16:
+		return hoststate.Started, nil
+	case 32:
+		return hoststate.Stopping, nil
+	case 48:
+		return hoststate.Terminated, nil
+	case 64:
+		return hoststate.Stopping, nil
+	case 80:
+		return hoststate.Stopped, nil
 	}
-	if code == 16 {
-		return hoststate.STARTED, nil
-	}
-	if code == 32 {
-		return hoststate.STOPPING, nil
-	}
-	if code == 48 {
-		return hoststate.TERMINATED, nil
-	}
-	if code == 64 {
-		return hoststate.STOPPING, nil
-	}
-	if code == 80 {
-		return hoststate.STOPPED, nil
-	}
-	return hoststate.ERROR, fail.NewError("unexpected host state")
+	return hoststate.Error, fail.NewError("unexpected host state")
 }
 
 // CreateSubnet ...

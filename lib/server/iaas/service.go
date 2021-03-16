@@ -227,7 +227,7 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 		if host.CurrentState == state {
 			return nil
 		}
-		if host.CurrentState == hoststate.ERROR {
+		if host.CurrentState == hoststate.Error {
 			return fail.NotAvailableError("host in error state")
 		}
 		select {

@@ -450,13 +450,13 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 			ahf = hostTmp
 
-			if hostTmp.CurrentState == hoststate.ERROR {
+			if hostTmp.CurrentState == hoststate.Error {
 				innerXErr = retry.StopRetryError(fail.NewError("last state: %s", hostTmp.CurrentState.String()), "error waiting for host in ready state")
 				// logrus.Warn(innerXErr.Error())
 				return innerXErr
 			}
 
-			if hostTmp.CurrentState != hoststate.STARTED {
+			if hostTmp.CurrentState != hoststate.Started {
 				innerXErr = fail.NewError("not in ready state (current state: %s)", ahf.CurrentState.String())
 				//logrus.Warn(innerXErr.Error())
 				return innerXErr
@@ -951,12 +951,12 @@ func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.E
 // GetHostState returns the current state of the host
 func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
 	if s.IsNull() {
-		return hoststate.UNKNOWN, fail.InvalidInstanceError()
+		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
 	host, xerr := s.InspectHost(hostParam)
 	if xerr != nil {
-		return hoststate.ERROR, xerr
+		return hoststate.Error, xerr
 	}
 
 	return host.CurrentState, nil
@@ -1095,7 +1095,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					}
 				}
 
-				if hostTmp.CurrentState != hoststate.TERMINATED {
+				if hostTmp.CurrentState != hoststate.Terminated {
 					return fail.NewError(innerXErr, "not in stopped or terminated state (current state: %s)", hostTmp.CurrentState.String())
 				}
 				return nil
@@ -1187,7 +1187,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 				return err
 			}
 
-			if hostTmp.CurrentState != hoststate.STOPPED && hostTmp.CurrentState != hoststate.TERMINATED {
+			if hostTmp.CurrentState != hoststate.Stopped && hostTmp.CurrentState != hoststate.Terminated {
 				return fail.NewError("not in stopped or terminated state (current state: %s)", hostTmp.CurrentState.String())
 			}
 			return nil
@@ -1231,7 +1231,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 				return innerErr
 			}
 
-			if hostTmp.CurrentState != hoststate.STARTED {
+			if hostTmp.CurrentState != hoststate.Started {
 				return fail.NewError("not in started state (current state: %s)", hostTmp.CurrentState.String())
 			}
 			return nil
@@ -1275,7 +1275,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 				return innerErr
 			}
 
-			if hostTmp.CurrentState != hoststate.STARTED {
+			if hostTmp.CurrentState != hoststate.Started {
 				return fail.NewError("not in started state (current state: %s)", hostTmp.CurrentState.String())
 			}
 			return nil

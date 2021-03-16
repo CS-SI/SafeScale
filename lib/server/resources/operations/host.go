@@ -488,7 +488,7 @@ func (instance *host) Browse(ctx context.Context, callback func(*abstract.HostCo
 func (instance *host) ForceGetState(ctx context.Context) (state hoststate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	state = hoststate.UNKNOWN
+	state = hoststate.Unknown
 	if instance.isNull() {
 		return state, fail.InvalidInstanceError()
 	}
@@ -611,7 +611,7 @@ func (instance *host) Reload() (xerr fail.Error) {
 
 // GetState returns the last known state of the host, without forced inspect
 func (instance *host) GetState() (state hoststate.Enum) {
-	state = hoststate.UNKNOWN
+	state = hoststate.Unknown
 	if instance.isNull() {
 		return state
 	}
@@ -2013,8 +2013,8 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 							return stateErr
 						}
 					}
-					if state == hoststate.ERROR {
-						return fail.NotAvailableError("host is in state ERROR")
+					if state == hoststate.Error {
+						return fail.NotAvailableError("host is in state Error")
 					}
 					return nil
 				},
@@ -2297,7 +2297,7 @@ func (instance *host) Start(ctx context.Context) (xerr fail.Error) {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			return svc.WaitHostState(hostID, hoststate.STARTED, temporal.GetHostTimeout())
+			return svc.WaitHostState(hostID, hoststate.Started, temporal.GetHostTimeout())
 		},
 		5*time.Minute,
 	)
@@ -2358,7 +2358,7 @@ func (instance *host) Stop(ctx context.Context) (xerr fail.Error) {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			return svc.WaitHostState(hostID, hoststate.STOPPED, temporal.GetHostTimeout())
+			return svc.WaitHostState(hostID, hoststate.Stopped, temporal.GetHostTimeout())
 		},
 		// FIXME: static value
 		5*time.Minute,

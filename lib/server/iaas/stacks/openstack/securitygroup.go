@@ -280,11 +280,11 @@ func toAbstractSecurityGroupRules(in []secrules.SecGroupRule) (abstract.Security
 	out := make(abstract.SecurityGroupRules, 0, len(in))
 	for k, v := range in {
 		direction := convertDirectionToAbstract(v.Direction)
-		if direction == securitygroupruledirection.UNKNOWN {
+		if direction == securitygroupruledirection.Unknown {
 			return nil, fail.InvalidRequestError("invalid value '%s' to 'Direction' field in rule #%d", v.Direction, k+1)
 		}
 		etherType := convertEtherTypeToAbstract(secrules.RuleEtherType(v.EtherType))
-		if etherType == ipversion.UNKNOWN {
+		if etherType == ipversion.Unknown {
 			return nil, fail.InvalidRequestError("invalid value '%s' to 'EtherType' field in rule #%d", v.EtherType, k+1)
 		}
 
@@ -298,13 +298,13 @@ func toAbstractSecurityGroupRules(in []secrules.SecGroupRule) (abstract.Security
 			PortTo:      int32(v.PortRangeMax),
 		}
 		switch direction {
-		case securitygroupruledirection.INGRESS:
+		case securitygroupruledirection.Ingress:
 			if v.RemoteGroupID != "" {
 				r.Sources = []string{v.RemoteGroupID}
 			} else {
 				r.Sources = []string{v.RemoteIPPrefix}
 			}
-		case securitygroupruledirection.EGRESS:
+		case securitygroupruledirection.Egress:
 			if v.RemoteGroupID != "" {
 				r.Targets = []string{v.RemoteGroupID}
 			} else {
@@ -320,20 +320,20 @@ func toAbstractSecurityGroupRules(in []secrules.SecGroupRule) (abstract.Security
 func convertDirectionToAbstract(in string) securitygroupruledirection.Enum {
 	switch secrules.RuleDirection(in) {
 	case secrules.DirIngress:
-		return securitygroupruledirection.INGRESS
+		return securitygroupruledirection.Ingress
 	case secrules.DirEgress:
-		return securitygroupruledirection.EGRESS
+		return securitygroupruledirection.Egress
 	default:
-		return securitygroupruledirection.UNKNOWN
+		return securitygroupruledirection.Unknown
 	}
 }
 
 // convertDirectionFromAbstract ...
 func convertDirectionFromAbstract(in securitygroupruledirection.Enum) secrules.RuleDirection {
 	switch in {
-	case securitygroupruledirection.EGRESS:
+	case securitygroupruledirection.Egress:
 		return secrules.DirEgress
-	case securitygroupruledirection.INGRESS:
+	case securitygroupruledirection.Ingress:
 		return secrules.DirIngress
 	default:
 		return ""
@@ -347,7 +347,7 @@ func convertEtherTypeToAbstract(in secrules.RuleEtherType) ipversion.Enum {
 	case secrules.EtherType6:
 		return ipversion.IPv6
 	default:
-		return ipversion.UNKNOWN
+		return ipversion.Unknown
 	}
 }
 
@@ -399,13 +399,13 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		usesGroups bool
 	)
 	switch rule.Direction {
-	case securitygroupruledirection.INGRESS:
+	case securitygroupruledirection.Ingress:
 		involved = rule.Sources
 		usesGroups, xerr = rule.SourcesConcernGroups()
 		if xerr != nil {
 			return nil, xerr
 		}
-	case securitygroupruledirection.EGRESS:
+	case securitygroupruledirection.Egress:
 		involved = rule.Targets
 		usesGroups, xerr = rule.TargetsConcernGroups()
 		if xerr != nil {

@@ -27,21 +27,21 @@ import (
 type Enum uint8
 
 const (
-	UNKNOWN Enum = iota
-	INGRESS
-	EGRESS
+	Unknown Enum = iota
+	Ingress
+	Egress
 )
 
 var (
 	stringMap = map[string]Enum{
-		"ingress": INGRESS,
-		"egress":  EGRESS,
+		"ingress": Ingress,
+		"egress":  Egress,
 	}
 
 	enumMap = map[Enum]string{
-		UNKNOWN: "unknown",
-		INGRESS: "ingress",
-		EGRESS:  "egress",
+		Unknown: "unknown",
+		Ingress: "ingress",
+		Egress:  "egress",
 	}
 )
 
@@ -55,7 +55,7 @@ func Parse(v string) (Enum, fail.Error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return UNKNOWN, fail.NotFoundError("failed to find a securitygroupruledirection.Enum corresponding to '%s'", v)
+		return Unknown, fail.NotFoundError("failed to find a securitygroupruledirection.Enum corresponding to '%s'", v)
 	}
 	return e, nil
 

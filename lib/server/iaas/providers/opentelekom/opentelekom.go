@@ -119,9 +119,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{
-			"SATA": volumespeed.COLD,
-			"SAS":  volumespeed.HDD,
-			"SSD":  volumespeed.SSD,
+			"SATA": volumespeed.Cold,
+			"SAS":  volumespeed.Hdd,
+			"Ssd":  volumespeed.Ssd,
 		},
 		MetadataBucket:     metadataBucketName,
 		OperatorUsername:   operatorUsername,

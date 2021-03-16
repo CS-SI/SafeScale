@@ -78,7 +78,7 @@ func getTemplateBox() (*rice.Box, error) {
 //
 // satisfies resources.Targetable interface
 func (instance *cluster) TargetType() featuretargettype.Enum {
-	return featuretargettype.CLUSTER
+	return featuretargettype.Cluster
 }
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)

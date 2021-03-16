@@ -57,7 +57,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	// TODO: validate content of request
 
 	selectedType := fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-standard", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
-	if request.Speed == volumespeed.SSD {
+	if request.Speed == volumespeed.Ssd {
 		selectedType = fmt.Sprintf("projects/%s/zones/%s/diskTypes/pd-ssd", s.GcpConfig.ProjectID, s.GcpConfig.Zone)
 	}
 
@@ -77,9 +77,9 @@ func toAbstractVolume(in compute.Disk) (out *abstract.Volume, xerr fail.Error) {
 	out = abstract.NewVolume()
 	out.Name = in.Name
 	if strings.Contains(in.Type, "pd-ssd") {
-		out.Speed = volumespeed.SSD
+		out.Speed = volumespeed.Ssd
 	} else {
-		out.Speed = volumespeed.HDD
+		out.Speed = volumespeed.Hdd
 	}
 	out.Size = int(in.SizeGb)
 	out.ID = strconv.FormatUint(in.Id, 10)
@@ -116,16 +116,16 @@ func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
 
 func toAbstractVolumeState(in string) (volumestate.Enum, fail.Error) {
 	switch in {
-	case "CREATING":
-		return volumestate.CREATING, nil
-	case "DELETING":
-		return volumestate.DELETING, nil
+	case "Creating":
+		return volumestate.Creating, nil
+	case "Deleting":
+		return volumestate.Deleting, nil
 	case "FAILED":
-		return volumestate.ERROR, nil
+		return volumestate.Error, nil
 	case "READY":
-		return volumestate.AVAILABLE, nil
+		return volumestate.Available, nil
 	case "RESTORING":
-		return volumestate.CREATING, nil
+		return volumestate.Creating, nil
 	default:
 		return -1, fail.NewError("unexpected volume status '%s'", in)
 	}

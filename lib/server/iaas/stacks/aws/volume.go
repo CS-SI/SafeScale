@@ -212,30 +212,28 @@ func (s stack) rpcDescribeVolumeByID(id *string) (*ec2.Volume, fail.Error) {
 
 func fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
 	switch speed {
-	case volumespeed.COLD:
+	case volumespeed.Cold:
 		return "sc1"
-	case volumespeed.HDD:
-		return "st1"
-	case volumespeed.SSD:
+	case volumespeed.Ssd:
 		return "gp2"
 	}
-	return "gp2"
+	return "st1"
 }
 
 func toAbstractVolumeSpeed(t *string) volumespeed.Enum {
 	if t == nil {
-		return volumespeed.HDD
+		return volumespeed.Hdd
 	}
 	if *t == "sc1" {
-		return volumespeed.COLD
+		return volumespeed.Cold
 	}
 	if *t == "st1" {
-		return volumespeed.HDD
+		return volumespeed.Hdd
 	}
 	if *t == "gp2" {
-		return volumespeed.SSD
+		return volumespeed.Ssd
 	}
-	return volumespeed.HDD
+	return volumespeed.Hdd
 }
 
 func toAbstractVolumeState(s *string) volumestate.Enum {
@@ -246,27 +244,27 @@ func toAbstractVolumeState(s *string) volumestate.Enum {
 	// VolumeStateDeleted = "deleted"
 	// VolumeStateError = "error"
 	if s == nil {
-		return volumestate.ERROR
+		return volumestate.Error
 	}
 	if *s == "creating" {
-		return volumestate.CREATING
+		return volumestate.Creating
 	}
 	if *s == "available" {
-		return volumestate.AVAILABLE
+		return volumestate.Available
 	}
 	if *s == "in-use" {
-		return volumestate.USED
+		return volumestate.Used
 	}
 	if *s == "deleting" {
-		return volumestate.DELETING
+		return volumestate.Deleting
 	}
 	if *s == "deleted" {
-		return volumestate.DELETING
+		return volumestate.Deleting
 	}
 	if *s == "error" {
-		return volumestate.ERROR
+		return volumestate.Error
 	}
-	return volumestate.OTHER
+	return volumestate.Unknown
 }
 
 // ListVolumes ...

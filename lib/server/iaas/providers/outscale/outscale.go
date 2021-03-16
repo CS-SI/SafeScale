@@ -75,13 +75,14 @@ func getList(m map[string]interface{}, key string) []string {
 }
 
 func volumeSpeed(s string) volumespeed.Enum {
-	if s == "COLD" {
-		return volumespeed.COLD
+	switch s {
+	case "Cold":
+		return volumespeed.Cold
+	case "Ssd":
+		return volumespeed.Ssd
+	default:
+		return volumespeed.Hdd
 	}
-	if s == "COLD" {
-		return volumespeed.SSD
-	}
-	return volumespeed.HDD
 }
 
 // IsNull returns true if the instance is considered as a null value
@@ -127,7 +128,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			DNSList:            getList(compute, "DNSList"),
 			DefaultTenancy:     get(compute, "DefaultTenancy", "default"),
 			DefaultImage:       get(compute, "DefaultImage"),
-			DefaultVolumeSpeed: volumeSpeed(get(compute, "DefaultVolumeSpeed", "HDD")),
+			DefaultVolumeSpeed: volumeSpeed(get(compute, "DefaultVolumeSpeed", "Hdd")),
 			OperatorUsername:   get(compute, "OperatorUsername", "safescale"),
 			// BlacklistImageRegexp:    regexp.MustCompile(get(compute, "BlacklistImageRegexp")),
 			// BlacklistTemplateRegexp: regexp.MustCompile(get(compute, "BlacklistTemplateRegexp")),
