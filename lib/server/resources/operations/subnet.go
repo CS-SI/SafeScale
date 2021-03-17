@@ -589,8 +589,9 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	// Creates VIP for gateways if asked for
+	var avip *abstract.VirtualIP
 	if failover {
-		if as.VIP, xerr = svc.CreateVIP(as.Network, as.ID, fmt.Sprintf(virtualIPNamePattern, as.Name, an.Name), []string{subnetGWSG.GetID()}); xerr != nil {
+		if avip, xerr = svc.CreateVIP(as.Network, as.ID, fmt.Sprintf(virtualIPNamePattern, as.Name, an.Name), []string{subnetGWSG.GetID()}); xerr != nil {
 			return fail.Wrap(xerr, "failed to create VIP")
 		}
 
@@ -610,6 +611,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
+		as.VIP = avip
 		as.State = subnetstate.GatewayCreation
 		as.GWSecurityGroupID = subnetGWSG.GetID()
 		as.InternalSecurityGroupID = subnetInternalSG.GetID()
@@ -747,12 +749,6 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	if domain != "" {
 		domain = "." + domain
 	}
-	//
-	// keypairName := "kp_" + subnetName
-	// keypair, xerr := svc.CreateKeyPair(keypairName)
-	// if xerr != nil {
-	// 	return xerr
-	// }
 
 	keepalivedPassword, err := utils.GeneratePassword(16)
 	if err != nil {
@@ -1894,8 +1890,7 @@ func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 		// 2nd delete VIP if needed
 		if as.VIP != nil {
-			innerXErr := svc.DeleteVIP(as.VIP)
-			if innerXErr != nil {
+			if innerXErr := svc.DeleteVIP(as.VIP); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to delete VIP for gateways")
 			}
 		}
