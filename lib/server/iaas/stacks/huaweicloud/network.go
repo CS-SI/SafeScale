@@ -769,7 +769,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, sgs []string) (*abstr
 	if xerr != nil {
 		return nullAVIP, xerr
 	}
-	
+
 	openstackAS, xerr := s.Stack.InspectSubnetByName(networkID, as.Name)
 	if xerr != nil {
 		return nullAVIP, xerr

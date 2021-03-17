@@ -199,8 +199,16 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 		return tg, err
 	}
 
-	if err = subtask.SetID(tg.task.id + "-" + strconv.Itoa(int(tg.last))); err != nil {
+	stID, err := subtask.GetID()
+	if err != nil {
 		return tg, err
+	}
+
+	// FIXME: Either change this, either change the way client code is used
+	if stID == "" {
+		if err = subtask.SetID(tg.task.id + "-" + strconv.Itoa(int(tg.last))); err != nil {
+			return tg, err
+		}
 	}
 
 	newChild := subTask{
@@ -232,7 +240,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 		tg.task.status = RUNNING
 		tg.task.mu.Unlock()
 	}
-	return tg, nil
+	return subtask, nil
 }
 
 // Wait is a synonym to WaitGroup (exists to satisfy interface Task)
