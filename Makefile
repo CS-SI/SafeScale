@@ -8,7 +8,8 @@ default: help ;
 include ./common.mk
 
 # Binaries generated
-EXECS=cli/safescale/safescale cli/safescale/safescale-cover cli/safescaled/safescaled cli/safescaled/safescaled-cover
+EXECS=cli/safescale/safescale cli/safescaled/safescaled
+COVEREXECS=cli/safescale/safescale-cover cli/safescaled/safescaled-cover
 
 # List of files
 PKG_FILES := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks )
@@ -94,6 +95,7 @@ getdevdeps: begin ground
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u $(STRINGER) &>/dev/null || true; \
 	fi
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
+    	printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.26.0 || true; \
 	fi
 
@@ -121,10 +123,12 @@ mrproper: clean
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
+	@($(CP) -f $(COVEREXECS) $(GOBIN) > /dev/null 2>&1 || true)
 
 installci:
 	@(mkdir -p $(CIBIN) || true)
 	@($(CP) -f $(EXECS) $(CIBIN) || true)
+	@($(CP) -f $(COVEREXECS) $(CIBIN) > /dev/null 2>&1 || true)
 
 godocs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -145,7 +149,7 @@ depclean: begin
 generate: sdk
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@rm -f ./generation_results.log || true
-	@$(GO) generate -run stringer ./...  2>&1 | tee -a generation_results.log
+	@$(GO) generate -run stringer ./... 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
 	@cd lib && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log

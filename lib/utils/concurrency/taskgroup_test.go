@@ -54,6 +54,51 @@ func TestChildrenWaitingGame(t *testing.T) {
 	require.NotEmpty(t, res)
 }
 
+func TestChildrenHaveDistinctIDs(t *testing.T) {
+	overlord, err := NewTaskGroup(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	const numTasks = 10
+	dictOfIDs := make(map[string]int)
+
+	for ind := 0; ind < numTasks; ind++ {
+		subtaskID, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+		} else {
+			theID, _ := subtaskID.GetID()
+			dictOfIDs[theID] = ind
+		}
+	}
+
+	res, err := overlord.WaitGroup()
+	require.Nil(t, err)
+	require.NotEmpty(t, res)
+
+	if len(res) != numTasks {
+		t.Errorf("The waitgroup doesn't have %d tasks: %d", numTasks, len(res))
+		t.FailNow()
+	}
+
+	if len(dictOfIDs) != numTasks {
+		t.Errorf("The dict of IDs doesn't have %d tasks: %d", numTasks, len(dictOfIDs))
+		t.FailNow()
+	}
+
+	if len(res) != len(dictOfIDs) {
+		t.Errorf("The waitgroup and the dict of IDs don't have the same size: %d vs %d", len(res), len(dictOfIDs))
+		t.FailNow()
+	}
+}
+
 func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	overlord, err := NewTaskGroup(nil)
 	require.NotNil(t, overlord)
