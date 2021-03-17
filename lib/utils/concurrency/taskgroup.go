@@ -198,11 +198,6 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 		return tg, err
 	}
 
-	// VPL: why this ?
-	// if err = subtask.SetID(tg.task.id + "-" + strconv.Itoa(int(tg.last))); err != nil {
-	// 	return tg, err
-	// }
-
 	newChild := subTask{
 		task: subtask,
 	}
