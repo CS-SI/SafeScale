@@ -424,15 +424,15 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 			return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
 		}
 
-		// Cannot abort starting from here
-		defer task.DisarmAbortSignal()()
+		// // Cannot abort starting from here
+		// defer task.DisarmAbortSignal()()
 
 		// delete Network, with tolerance
 		if innerXErr = svc.DeleteNetwork(an.ID); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
-				// If Network doesn't exist anymore on the provider side, do not fail to cleanup the metadata: log but continue
-				logrus.Warnf("failed to find Network on provider side, cleaning up metadata.")
+				// If Network does not exist anymore on the provider side, do not fail to cleanup the metadata: log and continue
+				logrus.Debugf("failed to find Network on provider side, cleaning up metadata.")
 			case *fail.ErrTimeout:
 				logrus.Error("cannot delete Network due to a timeout")
 				errWaitMore := retry.WhileUnsuccessfulDelay1Second(
