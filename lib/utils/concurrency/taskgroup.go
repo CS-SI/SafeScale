@@ -53,7 +53,6 @@ type subTask struct {
 }
 
 type subTasks struct {
-	// lock  TaskedLock
 	lock  sync.Mutex
 	tasks []subTask
 }
@@ -212,14 +211,13 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 		}
 	}
 
-	if _, err = subtask.Start(action, params); err != nil {
+	_, xerr := subtask.Start(action, params)
+	if xerr != nil {
 		return tg, err
 	}
 
-	// tg.children.lock.SafeLock(tg.task)
 	tg.children.lock.Lock()
 	tg.children.tasks = append(tg.children.tasks, newChild)
-	// tg.children.lock.SafeUnlock(tg.task)
 	tg.children.lock.Unlock()
 
 	if status != RUNNING {
@@ -227,6 +225,7 @@ func (tg *taskGroup) Start(action TaskAction, params TaskParameters, options ...
 		tg.task.status = RUNNING
 		tg.task.mu.Unlock()
 	}
+
 	return subtask, nil
 }
 
@@ -279,8 +278,6 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		}
 		tg.task.mu.Unlock()
 
-		// tg.children.lock.SafeLock(tg.task)
-		// defer tg.children.lock.SafeUnlock(tg.task)
 		tg.children.lock.Lock()
 		defer tg.children.lock.Unlock()
 
@@ -302,8 +299,8 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	}
 	doneWaitCount := 0
 
-	// tg.children.lock.Lock()
-	// defer tg.children.lock.Unlock()
+	tg.children.lock.Lock()
+	defer tg.children.lock.Unlock()
 
 	for {
 		stop := false
