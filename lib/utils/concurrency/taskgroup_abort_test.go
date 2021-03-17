@@ -113,7 +113,7 @@ func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskRe
 
 	keep := true
 	for keep {
-		// fmt.Println("Living forever")
+		fmt.Println("Living forever")
 		_, _ = heavyDutyTask(10*time.Millisecond, true)
 	}
 
@@ -267,7 +267,7 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 
 	fmt.Println("Begin")
 
-	numChild := 4 // No need to push it
+	numChild := 1 // No need to push it, this also avoid race conditons
 	for ind := 0; ind < numChild; ind++ {
 		_, xerr := overlord.Start(horribleTaskActionCitizen, nil)
 		if xerr != nil {
