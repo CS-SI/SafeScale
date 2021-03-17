@@ -85,6 +85,7 @@ type TaskCore interface {
 	GetStatus() (TaskStatus, fail.Error)
 	GetContext() context.Context
 	GetLastError() (error, fail.Error)
+	GetResult() (TaskResult, fail.Error)
 
 	Run(TaskAction, TaskParameters) (TaskResult, fail.Error)
 	RunInSubtask(TaskAction, TaskParameters) (TaskResult, fail.Error)
@@ -253,6 +254,22 @@ func (t *task) GetLastError() (error, fail.Error) { //nolint
 	return t.err, nil
 }
 
+// GetResult returns the result of the ended task
+func (t *task) GetResult() (TaskResult, fail.Error) {
+	if t.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.status != DONE {
+		return nil, fail.InvalidRequestError("task is not done, there is no result yet")
+	}
+
+	return t.result, nil
+}
+
 // GetID returns an unique id for the task
 func (t *task) GetID() (string, fail.Error) {
 	if t.IsNull() {
@@ -356,9 +373,8 @@ func (t *task) Start(action TaskAction, params TaskParameters, options ...data.I
 	return t.StartWithTimeout(action, params, 0)
 }
 
-// StartWithTimeout runs in goroutine the TasAction with TaskParameters, and stops after timeout (if > 0)
-// If timeout happens, error returned will be ErrTimeout
-// This function is useful when you know at the time you use it there will be a timeout to apply.
+// StartWithTimeout runs in goroutine the TaskAction with TaskParameters, and stops after timeout (if > 0)
+// If timeout happens, error returned will be '*fail.ErrTimeout'
 func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()

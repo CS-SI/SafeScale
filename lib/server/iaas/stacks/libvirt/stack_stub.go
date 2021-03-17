@@ -214,7 +214,7 @@ func (s stack) InspectHostByName(string) (*abstract.HostFull, fail.Error) {
 
 // GetHostState stub
 func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	return hoststate.ERROR, gError
+	return hoststate.Error, gError
 }
 
 // ListHosts stub
