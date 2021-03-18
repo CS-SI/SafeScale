@@ -71,7 +71,7 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 	userData, cerr := rgw.Create(task.GetContext(), hostReq, hostSizing) // cerr is tested later
 
 	// Set link to Subnet before testing if Host has been successfully created; in case of failure, we need to have registered the gateway ID in Subnet
-	xerr = instance.Alter( /*task,  */ func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
