@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,6 +30,7 @@ import (
 
 	scribble "github.com/nanobox-io/golang-scribble"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server"
@@ -47,8 +49,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
-
-//go:generate minimock -o ../mocks/mock_imageapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.ScannerHandler
 
 // PriceInfo stores price information
 type PriceInfo struct {
@@ -233,7 +233,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	defer func() {
-		derr := network.Delete(task)
+		derr := network.Delete(task.GetContext())
 		if derr != nil {
 			logrus.Warnf("Error deleting network '%s'", network.GetID())
 		}
@@ -246,15 +246,19 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, fail.Wrap(xerr, "could not get/create the scan subnet")
 	}
 	defer func() {
-		derr := subnet.Delete(task)
-		if derr != nil {
+		if derr := subnet.Delete(context.Background()); derr != nil {
 			logrus.Warnf("Error deleting subnet '%s'", subnet.GetID())
+			_ = xerr.AddConsequence(derr)
 		}
-		_ = xerr.AddConsequence(derr)
 	}()
 
-	xerr = subnet.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		handler.abstractSubnet = clonable.(*abstract.Subnet)
+	xerr = subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		handler.abstractSubnet = as
 		return nil
 	})
 	if xerr != nil {
@@ -336,22 +340,22 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 		Image: defaultScanImage,
 	}
 
-	if _, xerr = host.Create(task, req, def); xerr != nil {
+	if _, xerr = host.Create(task.GetContext(), req, def); xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
 	}
 
 	defer func() {
 		logrus.Infof("Deleting host '%s' with ID '%s'", hostName, host.GetID())
-		derr := host.Delete(task)
-		if derr != nil {
+		if derr := host.Delete(context.Background()); derr != nil {
 			logrus.Warnf("Error deleting host '%s'", hostName)
 		}
 	}()
 
-	_, cout, _, xerr := host.Run(task, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
+	_, cout, _, xerr := host.Run(task.GetContext(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
 	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 	}
+
 	daCPU, xerr := createCPUInfo(cout)
 	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s]: Problem building cpu info", template.Name)
@@ -493,7 +497,7 @@ func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
 func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr fail.Error) {
 	task := handler.job.GetTask()
 	svc := handler.job.GetService()
-	network, xerr = networkfactory.Load(task, svc, scanNetworkName)
+	network, xerr = networkfactory.Load(svc, scanNetworkName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return nil, xerr
@@ -507,7 +511,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 			Name: scanNetworkName,
 			CIDR: scanNetworkCIDR,
 		}
-		if xerr = network.Create(task, req); xerr != nil {
+		if xerr = network.Create(task.GetContext(), req); xerr != nil {
 			return nil, xerr
 		}
 		return network, xerr
@@ -518,7 +522,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, xerr fail.Error) {
 	task := handler.job.GetTask()
 	svc := handler.job.GetService()
-	subnet, xerr = subnetfactory.Load(task, svc, scanNetworkName, scanSubnetName)
+	subnet, xerr = subnetfactory.Load(svc, scanNetworkName, scanSubnetName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return nil, xerr
@@ -537,7 +541,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 		subnetHostSizing := abstract.HostSizingRequirements{
 			MinGPU: -1,
 		}
-		if xerr = subnet.Create(task, req, "", &subnetHostSizing); xerr != nil {
+		if xerr = subnet.Create(task.GetContext(), req, "", &subnetHostSizing); xerr != nil {
 			return nil, xerr
 		}
 

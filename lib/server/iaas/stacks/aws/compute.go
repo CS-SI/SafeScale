@@ -18,12 +18,12 @@ package aws
 
 import (
 	"fmt"
+	"sort"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -360,38 +360,22 @@ func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Err
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	// resp, xerr := s.rpcGetProducts(nil)
-	// if xerr != nil {
-	// 	return emptySlice, xerr
-	// }
-	//
-	// list := make([]abstract.HostTemplate, 0, len(resp))
-	// for _, v := range resp {
-	// 	price, xerr := NewPriceFromJSONValue(v)
-	// 	if xerr != nil {
-	// 		continue
-	// 	}
-	//
-	// 	tpl := abstract.HostTemplate{
-	// 		ID:        price.Product.Attributes.InstanceType,
-	// 		Name:      price.Product.Attributes.InstanceType,
-	// 		Cores:     price.GetCores(),
-	// 		GPUNumber: price.GetGPUNumber(),
-	// 		DiskSize:  int(price.GetDiskSize()),
-	// 		RAMSize:   float32(price.GetRAMSize()),
-	// 	}
-	// 	list = append(list, tpl)
-	// }
-
 	resp, xerr := s.rpcDescribeInstanceTypes(nil)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
 
+	// sort response on Network Performance to potentially have cheaper choices first
+	sort.Slice(resp, func(i, j int) bool {
+		return aws.StringValue(resp[i].NetworkInfo.NetworkPerformance) < aws.StringValue(resp[j].NetworkInfo.NetworkPerformance)
+	})
+
+	// converts response from AWS to abstract
 	list := make([]abstract.HostTemplate, 0, len(resp))
 	for _, v := range resp {
 		list = append(list, toAbstractHostTemplate(*v))
 	}
+
 	return list, nil
 }
 
@@ -450,13 +434,13 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 			ahf = hostTmp
 
-			if hostTmp.CurrentState == hoststate.ERROR {
+			if hostTmp.CurrentState == hoststate.Error {
 				innerXErr = retry.StopRetryError(fail.NewError("last state: %s", hostTmp.CurrentState.String()), "error waiting for host in ready state")
 				// logrus.Warn(innerXErr.Error())
 				return innerXErr
 			}
 
-			if hostTmp.CurrentState != hoststate.STARTED {
+			if hostTmp.CurrentState != hoststate.Started {
 				innerXErr = fail.NewError("not in ready state (current state: %s)", ahf.CurrentState.String())
 				//logrus.Warn(innerXErr.Error())
 				return innerXErr
@@ -688,7 +672,6 @@ func (s stack) buildAwsSpotMachine(
 	lastPrice := resp[len(resp)-1]
 	logrus.Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
-	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(isGateway), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), []byte(data))
 	// input := &ec2.RequestSpotInstancesInput{
 	// 	InstanceCount: aws.Int64(1),
 	// 	LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
@@ -712,6 +695,7 @@ func (s stack) buildAwsSpotMachine(
 	// 	},
 	// 	normalizeError,
 	// )
+	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(isGateway), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), []byte(data))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -753,7 +737,7 @@ func (s stack) buildAwsMachine(
 // FIXME: see if anything is needed (does nothing for now)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
-	// if s.IsNull() {
+	// if s.isNull() {
 	// 	return fail.InvalidInstanceError()
 	// }
 	// ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
@@ -887,23 +871,6 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 // FIXME: too slow, find a way to speed it up
 func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) (abstract.HostEffectiveSizing, fail.Error) {
 	nullSizing := abstract.HostEffectiveSizing{}
-
-	// resp, xerr := s.rpcGetProductByID(aws.String(machineType))
-	// if xerr != nil {
-	// 	return nullSizing, xerr
-	// }
-	// price, xerr := NewPriceFromJSONValue(resp)
-	// if xerr != nil {
-	// 	return nullSizing, xerr
-	// }
-	// hs := abstract.HostEffectiveSizing{
-	// 	Cores:     price.GetCores(),
-	// 	GPUNumber: price.GetGPUNumber(),
-	// 	CPUFreq:   float32(price.GetCPUFreq()),
-	// 	DiskSize:  int(price.GetDiskSize()),
-	// 	RAMSize:   float32(price.GetRAMSize()),
-	// }
-
 	resp, xerr := s.rpcDescribeInstanceTypeByID(aws.String(machineType))
 	if xerr != nil {
 		return nullSizing, xerr
@@ -951,12 +918,12 @@ func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.E
 // GetHostState returns the current state of the host
 func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, xerr fail.Error) {
 	if s.IsNull() {
-		return hoststate.UNKNOWN, fail.InvalidInstanceError()
+		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
 	host, xerr := s.InspectHost(hostParam)
 	if xerr != nil {
-		return hoststate.ERROR, xerr
+		return hoststate.Error, xerr
 	}
 
 	return host.CurrentState, nil
@@ -1045,6 +1012,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// a host not found is considered as a successful deletion, continue
+			logrus.Tracef("host not found, deletion considered as a success")
 		default:
 			return xerr
 		}
@@ -1094,7 +1062,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					}
 				}
 
-				if hostTmp.CurrentState != hoststate.TERMINATED {
+				if hostTmp.CurrentState != hoststate.Terminated {
 					return fail.NewError(innerXErr, "not in stopped or terminated state (current state: %s)", hostTmp.CurrentState.String())
 				}
 				return nil
@@ -1126,7 +1094,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-				// A missing volume is considered as a successful deletion
+					// A missing volume is considered as a successful deletion
+					logrus.Tracef("volume not found, deletion considered as a success")
 				default:
 					logrus.Warnf("failed to delete volume %s", volume)
 				}
@@ -1149,6 +1118,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// A missing keypair is considered as a successful deletion
+					logrus.Tracef("keypair not found, deletion considered as a success")
 				default:
 					return fail.Wrap(xerr, "error deleting keypair")
 				}
@@ -1184,7 +1154,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 				return err
 			}
 
-			if hostTmp.CurrentState != hoststate.STOPPED && hostTmp.CurrentState != hoststate.TERMINATED {
+			if hostTmp.CurrentState != hoststate.Stopped && hostTmp.CurrentState != hoststate.Terminated {
 				return fail.NewError("not in stopped or terminated state (current state: %s)", hostTmp.CurrentState.String())
 			}
 			return nil
@@ -1228,7 +1198,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 				return innerErr
 			}
 
-			if hostTmp.CurrentState != hoststate.STARTED {
+			if hostTmp.CurrentState != hoststate.Started {
 				return fail.NewError("not in started state (current state: %s)", hostTmp.CurrentState.String())
 			}
 			return nil
@@ -1272,7 +1242,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 				return innerErr
 			}
 
-			if hostTmp.CurrentState != hoststate.STARTED {
+			if hostTmp.CurrentState != hoststate.Started {
 				return fail.NewError("not in started state (current state: %s)", hostTmp.CurrentState.String())
 			}
 			return nil

@@ -420,15 +420,15 @@ func (s Stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEff
 func toHostState(status string) hoststate.Enum {
 	switch strings.ToLower(status) {
 	case "build", "building":
-		return hoststate.STARTING
+		return hoststate.Starting
 	case "active":
-		return hoststate.STARTED
+		return hoststate.Started
 	case "rescued":
-		return hoststate.STOPPING
+		return hoststate.Stopping
 	case "stopped", "shutoff":
-		return hoststate.STOPPED
+		return hoststate.Stopped
 	default:
-		return hoststate.ERROR
+		return hoststate.Error
 	}
 }
 
@@ -445,7 +445,7 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
-	server, xerr := s.WaitHostState(ahf, hoststate.STARTED, 2*temporal.GetBigDelay())
+	server, xerr := s.WaitHostState(ahf, hoststate.Started, 2*temporal.GetBigDelay())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -478,7 +478,7 @@ func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 	}
 
 	state := toHostState(server.Status)
-	if state == hoststate.ERROR || state == hoststate.STARTING {
+	if state == hoststate.Error || state == hoststate.Starting {
 		logrus.Warnf("[TRACE] Unexpected host's last state: %v", state)
 	}
 
@@ -743,12 +743,12 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 			// Wait that host is ready, not just that the build is started
 			timeout := temporal.GetHostTimeout()
-			server, innerXErr = s.WaitHostState(ahc, hoststate.STARTED, timeout)
+			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timeout)
 			if innerXErr != nil {
 				logrus.Errorf("failed to reach server '%s' after %s; deleting it and trying again", request.ResourceName, temporal.FormatDuration(timeout))
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					return fail.Wrap(innerXErr, "host '%s' is in ERROR state", request.ResourceName)
+					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
 					return fail.Wrap(innerXErr, "timeout waiting host '%s' ready", request.ResourceName)
 				}
@@ -1033,7 +1033,7 @@ func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 		return nullAHC, xerr
 	}
 
-	server, xerr := s.WaitHostState(hostParam, hoststate.STARTED, timeout)
+	server, xerr := s.WaitHostState(hostParam, hoststate.Started, timeout)
 	if xerr != nil {
 		return nullAHC, xerr
 	}
@@ -1099,11 +1099,11 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				return nil
 			}
 
-			if lastState == hoststate.ERROR {
+			if lastState == hoststate.Error {
 				return retry.StopRetryError(abstract.ResourceNotAvailableError("host", hostLabel), "")
 			}
 
-			if lastState != hoststate.STARTING && lastState != hoststate.STOPPING {
+			if lastState != hoststate.Starting && lastState != hoststate.Stopping {
 				return retry.StopRetryError(nil, "host status of '%s' is in state '%s', and that's not a transition state", hostLabel, server.Status)
 			}
 
@@ -1133,14 +1133,14 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
 func (s Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if s.IsNull() {
-		return hoststate.UNKNOWN, fail.InvalidInstanceError()
+		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	host, xerr := s.InspectHost(hostParam)
 	if xerr != nil {
-		return hoststate.ERROR, xerr
+		return hoststate.Error, xerr
 	}
 	return host.CurrentState, nil
 }
@@ -1289,20 +1289,20 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			// 2nd, check host status every 5 seconds until check failed.
 			// If check succeeds but state is Error, retry the deletion.
 			// If check fails and error is not 'not found', retry
-			var state hoststate.Enum = hoststate.UNKNOWN
+			var state hoststate.Enum = hoststate.Unknown
 			innerXErr := retry.WhileUnsuccessfulDelay5Seconds(
 				func() error {
 					server, gerr := s.rpcGetServer(ahf.Core.ID)
 					if gerr != nil {
 						switch gerr.(type) { //nolint
 						case *fail.ErrNotFound:
-							state = hoststate.TERMINATED
+							state = hoststate.Terminated
 							return nil
 						}
 						return gerr
 					}
 					// if Host is found but in error state, exist inner retry but retry the deletion
-					if state = toHostState(server.Status); state == hoststate.ERROR {
+					if state = toHostState(server.Status); state == hoststate.Error {
 						return nil
 					}
 					return fail.NewError("host %s state is '%s'", hostRef, server.Status)
@@ -1312,7 +1312,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			if innerXErr != nil {
 				return innerXErr
 			}
-			if state == hoststate.ERROR {
+			if state == hoststate.Error {
 				return fail.NotAvailableError("failed to trigger server deletion, retrying...")
 			}
 			return nil

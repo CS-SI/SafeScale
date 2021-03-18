@@ -214,7 +214,7 @@ func (s stack) InspectHostByName(string) (*abstract.HostFull, fail.Error) {
 
 // GetHostState stub
 func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	return hoststate.ERROR, gError
+	return hoststate.Error, gError
 }
 
 // ListHosts stub
@@ -318,12 +318,12 @@ func (s stack) GetDefaultSecurityGroupName() string {
 }
 
 // AddRuleToSecurityGroup ...
-func (s stack) AddRuleToSecurityGroup(stacks.SecurityGroupParameter, abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) AddRuleToSecurityGroup(stacks.SecurityGroupParameter, *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gError
 }
 
 // DeleteRuleFromSecurityGroup ...
-func (s stack) DeleteRuleFromSecurityGroup(stacks.SecurityGroupParameter, abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) DeleteRuleFromSecurityGroup(stacks.SecurityGroupParameter, *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gError
 }
 
@@ -338,7 +338,7 @@ func (s stack) ListSecurityGroups(string) ([]*abstract.SecurityGroup, fail.Error
 }
 
 // CreateSecurityGroup ...
-func (s stack) CreateSecurityGroup(string, string, string, []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) CreateSecurityGroup(string, string, string, abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gError
 }
 

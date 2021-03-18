@@ -31,8 +31,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -43,6 +41,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 )
 
 // VPL: SSH ControlMaster options: -oControlMaster=auto -oControlPath=/tmp/safescale-%C -oControlPersist=5m
@@ -494,13 +494,19 @@ func (scmd *SSHCommand) Start() fail.Error {
 // type *ExitError. Other error types may be returned for other situations.
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
-func (scmd *SSHCommand) Run(task concurrency.Task, outs outputs.Enum) (int, string, string, fail.Error) {
+func (scmd *SSHCommand) Run(ctx context.Context, outs outputs.Enum) (int, string, string, fail.Error) {
 	if scmd == nil {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return -1, "", "", fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+	if ctx == nil {
+		return -1, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return -1, "", "", xerr
+	}
+
 	if task.Aborted() {
 		return -1, "", "", fail.AbortedError(nil, "aborted")
 	}
@@ -508,7 +514,7 @@ func (scmd *SSHCommand) Run(task concurrency.Task, outs outputs.Enum) (int, stri
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s)", outs.String()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return scmd.RunWithTimeout(task, outs, 0)
+	return scmd.RunWithTimeout(ctx, outs, 0)
 }
 
 // RunWithTimeout ...
@@ -519,13 +525,19 @@ func (scmd *SSHCommand) Run(task concurrency.Task, outs outputs.Enum) (int, stri
 // - xerr fail.Error
 //   . *fail.ErrNotAvailable if remote SSH is not available
 //   . *fail.ErrTimeout if 'timeout' is reached
-func (scmd *SSHCommand) RunWithTimeout(task concurrency.Task, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	if scmd == nil {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return -1, "", "", fail.InvalidParameterError("task", "cannot be nil")
+	if ctx == nil {
+		return -1, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return -1, "", "", xerr
+	}
+
 	if task.Aborted() {
 		return -1, "", "", fail.AbortedError(nil, "aborted")
 	}
@@ -595,10 +607,7 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 		"stderr":  "",
 	}
 
-	ctx, xerr := task.GetContext()
-	if xerr != nil {
-		return result, xerr
-	}
+	ctx := task.GetContext()
 
 	// Prepare command
 	scmd.cmd = exec.CommandContext(ctx, "bash", "-c", scmd.runCmdString)
@@ -827,27 +836,29 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 }
 
 // NewCommand returns the cmd struct to execute runCmdString remotely
-func (sconf *SSHConfig) NewCommand(task concurrency.Task, cmdString string) (*SSHCommand, fail.Error) {
-	return sconf.newCommand(task, cmdString, false, false)
+func (sconf *SSHConfig) NewCommand(ctx context.Context, cmdString string) (*SSHCommand, fail.Error) {
+	return sconf.newCommand(ctx, cmdString, false, false)
 }
 
 // NewSudoCommand returns the cmd struct to execute runCmdString remotely. NewCommand is executed with sudo
-func (sconf *SSHConfig) NewSudoCommand(task concurrency.Task, cmdString string) (*SSHCommand, fail.Error) {
-	return sconf.newCommand(task, cmdString, false, true)
+func (sconf *SSHConfig) NewSudoCommand(ctx context.Context, cmdString string) (*SSHCommand, fail.Error) {
+	return sconf.newCommand(ctx, cmdString, false, true)
 }
 
-func (sconf *SSHConfig) newCommand(task concurrency.Task, cmdString string, withTty, withSudo bool) (*SSHCommand, fail.Error) {
+func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTty, withSudo bool) (*SSHCommand, fail.Error) {
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if cmdString = strings.TrimSpace(cmdString); cmdString == "" {
 		return nil, fail.InvalidParameterError("runCmdString", "cannot be empty string")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -879,21 +890,27 @@ func (sconf *SSHConfig) newCommand(task concurrency.Task, cmdString string, with
 }
 
 // WaitServerReady waits until the SSH server is ready
-func (sconf *SSHConfig) WaitServerReady(task concurrency.Task, phase string, timeout time.Duration) (out string, xerr fail.Error) {
+func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, xerr fail.Error) {
 	if sconf == nil {
 		return "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return "", fail.InvalidParameterError("task", "cannot be nil")
-	}
-	if task.Aborted() {
-		return "", fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	if phase == "" {
 		return "", fail.InvalidParameterError("phase", "cannot be empty string")
 	}
 	if sconf.IPAddress == "" {
 		return "", fail.InvalidInstanceContentError("sconf.IPAddress", "cannot be empty string")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return "", xerr
+	}
+
+	if task.Aborted() {
+		return "", fail.AbortedError(nil, "aborted")
 	}
 
 	defer debug.NewTracer(task, tracing.ShouldTrace("sconf"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
@@ -913,7 +930,7 @@ func (sconf *SSHConfig) WaitServerReady(task concurrency.Task, phase string, tim
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 
-			sshCmd, innerErr := sconf.NewCommand(task, fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
+			sshCmd, innerErr := sconf.NewCommand(ctx, fmt.Sprintf("sudo cat /opt/safescale/var/state/user_data.%s.done", phase))
 			if innerErr != nil {
 				return innerErr
 			}
@@ -921,7 +938,7 @@ func (sconf *SSHConfig) WaitServerReady(task concurrency.Task, phase string, tim
 			defer func() { _ = sshCmd.Close() }()
 
 			var innerXErr fail.Error
-			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(task, outputs.COLLECT, timeout)
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -944,24 +961,31 @@ func (sconf *SSHConfig) WaitServerReady(task concurrency.Task, phase string, tim
 }
 
 // Copy copies a file/directory from/to local to/from remote
-func (sconf *SSHConfig) Copy(task concurrency.Task, remotePath, localPath string, isUpload bool) (errc int, stdout string, stderr string, err fail.Error) {
-	return sconf.copy(task, remotePath, localPath, isUpload, 0)
+func (sconf *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, isUpload bool) (errc int, stdout string, stderr string, err fail.Error) {
+	return sconf.copy(ctx, remotePath, localPath, isUpload, 0)
 }
 
 // CopyWithTimeout copies a file/directory from/to local to/from remote, and fails after 'timeout'
 func (sconf *SSHConfig) CopyWithTimeout(
-	task concurrency.Task, remotePath, localPath string, isUpload bool, timeout time.Duration,
+	ctx context.Context, remotePath, localPath string, isUpload bool, timeout time.Duration,
 ) (int, string, string, fail.Error) {
 
-	return sconf.copy(task, remotePath, localPath, isUpload, timeout)
+	return sconf.copy(ctx, remotePath, localPath, isUpload, timeout)
 }
 
 // copy copies a file/directory from/to local to/from remote, and fails after 'timeout' (if timeout > 0)
-func (sconf *SSHConfig) copy(task concurrency.Task,
+func (sconf *SSHConfig) copy(
+	ctx context.Context,
 	remotePath, localPath string,
 	isUpload bool,
 	timeout time.Duration,
 ) (retcode int, stdout string, stderr string, xerr fail.Error) {
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return 0, "", "", xerr
+	}
+
 	if task.Aborted() {
 		return 0, "", "", fail.AbortedError(nil, "aborted")
 	}
@@ -981,7 +1005,7 @@ func (sconf *SSHConfig) copy(task concurrency.Task,
 		return 0, "", "", fail.Wrap(err, "error parsing Command template")
 	}
 
-	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error"
+	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error -v"
 	var copyCommand bytes.Buffer
 	err = cmdTemplate.Execute(&copyCommand, struct {
 		IdentityFile string
@@ -1016,7 +1040,7 @@ func (sconf *SSHConfig) copy(task concurrency.Task,
 		keyFile:      identityfile,
 	}
 
-	return sshCommand.RunWithTimeout(task, outputs.COLLECT, timeout)
+	return sshCommand.RunWithTimeout(ctx, outputs.COLLECT, timeout)
 }
 
 // Enter Enter to interactive shell

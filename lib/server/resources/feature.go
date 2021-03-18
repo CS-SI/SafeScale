@@ -17,10 +17,11 @@
 package resources
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -29,12 +30,12 @@ import (
 type Targetable interface {
 	data.Identifiable
 
-	ComplementFeatureParameters(task concurrency.Task, v data.Map) fail.Error                             // adds parameters corresponding to the Target in preparation of feature installation
-	UnregisterFeature(task concurrency.Task, f string) fail.Error                                         // unregisters a Feature from Target in metadata
-	InstalledFeatures(task concurrency.Task) []string                                                     // returns a list of installed features
-	InstallMethods(task concurrency.Task) map[uint8]installmethod.Enum                                    // returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
-	RegisterFeature(task concurrency.Task, f Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
-	TargetType() featuretargettype.Enum                                                                   // returns the type of the target
+	ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error        // adds parameters corresponding to the Target in preparation of feature installation
+	UnregisterFeature(f string) fail.Error                                         // unregisters a Feature from Target in metadata
+	InstalledFeatures() []string                                                   // returns a list of installed features
+	InstallMethods() map[uint8]installmethod.Enum                                  // returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+	RegisterFeature(f Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
+	TargetType() featuretargettype.Enum                                            // returns the type of the target
 }
 
 // Feature defines the interface of feature
@@ -42,13 +43,13 @@ type Feature interface {
 	data.Clonable
 	data.Identifiable
 
-	Add(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)    // Add installs the feature on the target
-	Applyable(Targetable) bool                                                 // Applyable tells if the feature is installable on the target
-	GetDisplayFilename() string                                                // GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
-	GetFilename() string                                                       // GetFilename returns the filename of the feature
-	GetRequirements() (map[string]struct{}, fail.Error)                        // GetRequirements returns the other features needed as requirements
-	Check(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // Check if feature is installed on target
-	Remove(t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // Remove uninstalls the feature from the target
+	Add(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)    // Add installs the feature on the target
+	Applyable(Targetable) bool                                                                      // Applyable tells if the feature is installable on the target
+	GetDisplayFilename() string                                                                     // GetDisplayFilename displays the filename of display (optionally adding '[embedded]' for embedded features)
+	GetFilename() string                                                                            // GetFilename returns the filename of the feature
+	GetRequirements() (map[string]struct{}, fail.Error)                                             // GetRequirements returns the other features needed as requirements
+	Check(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error)  // Check if feature is installed on target
+	Remove(ctx context.Context, t Targetable, v data.Map, fs FeatureSettings) (Results, fail.Error) // Remove uninstalls the feature from the target
 	ToProtocol() *protocol.FeatureResponse
 }
 

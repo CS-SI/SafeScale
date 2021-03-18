@@ -122,8 +122,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		ProviderName:              providerName,
 		DefaultSecurityGroupName:  "default",
 		VolumeSpeeds: map[string]volumespeed.Enum{
-			"standard":   volumespeed.COLD,
-			"performant": volumespeed.HDD,
+			"standard":   volumespeed.Cold,
+			"performant": volumespeed.Hdd,
 		},
 	}
 

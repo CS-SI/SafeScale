@@ -206,7 +206,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	if resp == nil {
 		return nil, fail.NotFoundError("bucket '%s' not found", bucketName)
 	}
-	return converters.BucketMountPointFromResourceToProtocol(task, resp)
+	return converters.BucketMountPointFromResourceToProtocol(task.GetContext(), resp)
 }
 
 // Mount a bucket on the filesystem of the host

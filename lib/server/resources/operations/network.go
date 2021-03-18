@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -49,6 +51,8 @@ const (
 // network links Object Storage folder and Networking
 type network struct {
 	*core
+
+	lock sync.RWMutex
 }
 
 func nullNetwork() resources.Network {
@@ -66,17 +70,14 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 		return nullNetwork(), xerr
 	}
 
-	return &network{core: coreInstance}, nil
+	instance := &network{
+		core: coreInstance,
+	}
+	return instance, nil
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (rn resources.Network, xerr fail.Error) {
-	if task == nil {
-		return nullNetwork(), fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nullNetwork(), fail.AbortedError(nil, "aborted")
-	}
+func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.Error) {
 	if svc == nil {
 		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
 	}
@@ -97,14 +98,24 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (rn resour
 			}
 
 			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = rn.Read(task, ref); innerXErr != nil {
+			if innerXErr = rn.Read(ref); innerXErr != nil {
 				return nil, innerXErr
+			}
+
+			// Deal with legacy
+			if xerr = rn.(*network).upgradeNetworkPropertyIfNeeded(); xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrAlteredNothing:
+					// ignore
+				default:
+					return nil, fail.Wrap(xerr, "failed to upgrade Network properties")
+				}
 			}
 
 			return rn, nil
 		}),
 	}
-	cacheEntry, xerr := networkCache.Get(task, ref, options...)
+	cacheEntry, xerr := networkCache.Get(ref, options...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -125,32 +136,19 @@ func LoadNetwork(task concurrency.Task, svc iaas.Service, ref string) (rn resour
 		}
 	}()
 
-	// Deal with legacy
-	if xerr = rn.(*network).upgradeNetworkPropertyIfNeeded(task); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrAlteredNothing:
-			// ignore
-		default:
-			return nullNetwork(), fail.Wrap(xerr, "failed to upgrade Networking properties")
-		}
-	}
 	return rn, nil
 }
 
 // upgradeNetworkPropertyIfNeeded upgrades properties to most recent version
-func (rn *network) upgradeNetworkPropertyIfNeeded(task concurrency.Task) fail.Error {
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	return rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+func (instance *network) upgradeNetworkPropertyIfNeeded() fail.Error {
+	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		if props.Count() > 0 && !props.Lookup(networkproperty.SubnetsV1) {
-			rs, xerr := NewSubnet(rn.GetService())
+			rs, xerr := NewSubnet(instance.GetService())
 			if xerr != nil {
 				return xerr
 			}
@@ -160,43 +158,48 @@ func (rn *network) upgradeNetworkPropertyIfNeeded(task concurrency.Task) fail.Er
 			as.Network = an.ID
 			as.CIDR = an.CIDR
 			as.DNSServers = an.DNSServers
-			return rs.Carry(task, as)
+			return rs.(*subnet).carry(as)
 		}
 		return fail.AlteredNothingError()
 	})
 }
 
-// IsNull tells if the instance corresponds to subnet Null Value
-func (rn *network) IsNull() bool {
-	return rn == nil || rn.core.IsNull()
+// isNull tells if the instance corresponds to subnet Null Value
+func (instance *network) isNull() bool {
+	return instance == nil || instance.core.isNull()
 }
 
 // Create creates a network
-func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (xerr fail.Error) {
+func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: do not use .IsNull() here
-	if rn == nil {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task,
-		true,
-		"('%s', '%s')", req.Name, req.CIDR,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
 	// Check if subnet already exists and is managed by SafeScale
-	svc := rn.GetService()
-	if _, xerr = LoadNetwork(task, svc, req.Name); xerr == nil {
+	svc := instance.GetService()
+	if existing, xerr := LoadNetwork(svc, req.Name); xerr == nil {
+		existing.Released()
 		return fail.DuplicateError("network '%s' already exists", req.Name)
 	}
 
@@ -222,6 +225,7 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to determine if CIDR is not routable")
 		}
+
 		if routable {
 			return fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose an appropriate CIDR (RFC1918)")
 		}
@@ -252,54 +256,75 @@ func (rn *network) Create(task concurrency.Task, req abstract.NetworkRequest) (x
 
 	// Write subnet object metadata
 	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
-	return rn.Carry(task, an)
+	return instance.carry(an)
 }
 
-// Carry overloads rv.core.Carry() to add Volume to service cache
-func (rn *network) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
-	// Note: do not use .IsNull() there because Carry() should be called from null value (but not nil)
-	if rn == nil {
-		return fail.InvalidInstanceError()
+// carry registers clonable as core value and deals with cache
+func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
+	identifiable, ok := clonable.(data.Identifiable)
+	if !ok {
+		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	// Note: do not validate parameters, this call will do it
-	if xerr := rn.core.Carry(task, clonable); xerr != nil {
-		return xerr
-	}
-
-	networkCache, xerr := rn.GetService().GetCache(networkKind)
+	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
 	if xerr != nil {
 		return xerr
 	}
 
-	cacheEntry, xerr := networkCache.AddEntry(task, rn)
+	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
+		return xerr
+	}
+	defer func() {
+		if xerr != nil {
+			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
+			}
+		}
+	}()
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := instance.core.carry(clonable); xerr != nil {
+		return xerr
+	}
+
+	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
 	if xerr != nil {
 		return xerr
 	}
 
 	cacheEntry.LockContent()
+
 	return nil
 }
 
 // Browse walks through all the metadata objects in subnet
-func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
+func (instance *network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value of network, so do not validate rn
-	// if rn.IsNull() {
+	// if rn.isNull() {
 	//     return fail.InvalidInstanceError()
 	// }
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
 
-	return rn.core.BrowseFolder(task, func(buf []byte) fail.Error {
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	return instance.core.BrowseFolder(func(buf []byte) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}
@@ -309,20 +334,27 @@ func (rn network) Browse(task concurrency.Task, callback func(*abstract.Network)
 		if xerr != nil {
 			return xerr
 		}
+
 		return callback(an)
 	})
 }
 
 // Delete deletes subnet
-func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
+func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rn.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -331,19 +363,19 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	rn.SafeLock(task)
-	defer rn.SafeUnlock(task)
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	xerr = rn.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		svc := rn.GetService()
+		svc := instance.GetService()
 
 		var subnets map[string]string
-		innerXErr := props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -366,10 +398,10 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 					return fail.AbortedError(nil, "aborted")
 				}
 
-				if k == rn.GetName() {
+				if k == instance.GetName() {
 					found = true
 					// the single subnet present is a subnet named like the network, delete it first
-					rs, xerr := LoadSubnet(task, svc, "", v)
+					rs, xerr := LoadSubnet(svc, "", v)
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
@@ -379,28 +411,28 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 						}
 					} else {
 						subnetName := rs.GetName()
-						if xerr = rs.Delete(task); xerr != nil {
+						if xerr = rs.Delete(ctx); xerr != nil {
 							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 						}
 					}
 				}
 			}
 			if !found {
-				return fail.InvalidRequestError("failed to delete Network '%s', 1 Subnet still inside", rn.GetName())
+				return fail.InvalidRequestError("failed to delete Network '%s', 1 Subnet still inside", instance.GetName())
 			}
 		default:
-			return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", rn.GetName(), subnetsLen)
+			return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
 		}
 
-		// Cannot abort starting from here
-		defer task.DisarmAbortSignal()()
+		// // Cannot abort starting from here
+		// defer task.DisarmAbortSignal()()
 
 		// delete Network, with tolerance
 		if innerXErr = svc.DeleteNetwork(an.ID); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
-				// If Network doesn't exist anymore on the provider side, do not fail to cleanup the metadata: log but continue
-				logrus.Warnf("failed to find Network on provider side, cleaning up metadata.")
+				// If Network does not exist anymore on the provider side, do not fail to cleanup the metadata: log and continue
+				logrus.Debugf("failed to find Network on provider side, cleaning up metadata.")
 			case *fail.ErrTimeout:
 				logrus.Error("cannot delete Network due to a timeout")
 				errWaitMore := retry.WhileUnsuccessfulDelay1Second(
@@ -434,25 +466,22 @@ func (rn *network) Delete(task concurrency.Task) (xerr fail.Error) {
 	}
 
 	// Remove metadata
-	return rn.core.Delete(task)
+	return instance.core.delete()
 }
 
 // GetCIDR returns the CIDR of the subnet
-func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
+func (instance *network) GetCIDR() (cidr string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rn.IsNull() {
+	if instance.isNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return "", fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return "", fail.AbortedError(nil, "aborted")
-	}
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	cidr = ""
-	xerr = rn.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -465,24 +494,18 @@ func (rn network) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) 
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr fail.Error) {
+func (instance *network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rn.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, true, "").Entering()
-	defer tracer.Exiting()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	var pn *protocol.Network
-	xerr = rn.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		an, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -495,16 +518,12 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 			Cidr: an.CIDR,
 		}
 
-		return props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			for k := range nsV1.ByName {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
 				pn.Subnets = append(pn.Subnets, k)
 			}
 			return nil
@@ -513,23 +532,114 @@ func (rn network) ToProtocol(task concurrency.Task) (_ *protocol.Network, xerr f
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return pn, nil
 }
 
 // InspectSubnet returns the instance of resources.Subnet corresponding to the subnet referenced by 'ref' attached to
 // the subnet
-func (rn network) InspectSubnet(task concurrency.Task, ref string) (_ resources.Subnet, xerr fail.Error) {
+func (instance *network) InspectSubnet(ref string) (_ resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rn.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+
+	return LoadSubnet(instance.GetService(), instance.GetID(), ref)
+}
+
+// AdoptSubnet registers a Subnet to the Network metadata
+func (instance *network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if subnet == nil {
+		return fail.InvalidParameterCannotBeNilError("subnet")
 	}
 
-	return LoadSubnet(task, rn.GetService(), rn.GetID(), ref)
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	parentNetwork, xerr := subnet.InspectNetwork()
+	if xerr != nil {
+		return xerr
+	}
+
+	if parentNetwork.GetName() != instance.GetName() {
+		return fail.InvalidRequestError("cannot adopt Subnet '%s' because Network '%s' does not own it", subnet.GetName(), instance.GetName())
+	}
+
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			name := subnet.GetName()
+			id := subnet.GetID()
+			nsV1.ByID[id] = name
+			nsV1.ByName[name] = id
+			return nil
+		})
+	})
+}
+
+// AbandonSubnet unregisters a Subnet from the Network (does not imply the Subnet is deleted)
+func (instance *network) AbandonSubnet(ctx context.Context, subnetID string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			id := subnetID
+			name, ok := nsV1.ByID[subnetID]
+			if !ok {
+				if id, ok = nsV1.ByName[subnetID]; !ok {
+					return fail.NotFoundError("failed to find a Subnet identified by %s in Network '%s'", subnetID, instance.GetName())
+				}
+			}
+
+			delete(nsV1.ByID, id)
+			delete(nsV1.ByName, name)
+			return nil
+		})
+	})
 }

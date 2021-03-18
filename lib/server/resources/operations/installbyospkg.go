@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
@@ -40,10 +41,13 @@ type genericPackager struct {
 }
 
 // Check checks if the feature is installed
-func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(xerr)
 
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
 	if f == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
@@ -64,22 +68,25 @@ func (g *genericPackager) Check(f resources.Feature, t resources.Targetable, v d
 	}
 	defer worker.Terminate()
 
-	if xerr = worker.CanProceed(s); xerr != nil {
+	if xerr = worker.CanProceed(ctx, s); xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
 
-	if r, xerr = worker.Proceed(v, s); xerr != nil {
+	if r, xerr = worker.Proceed(ctx, v, s); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to check if Feature '%s' is installed on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 	return r, xerr
 }
 
 // Add installs the feature using apt
-func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&xerr)
 
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
 	if f == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
@@ -101,22 +108,25 @@ func (g *genericPackager) Add(f resources.Feature, t resources.Targetable, v dat
 	}
 	defer worker.Terminate()
 
-	if xerr = worker.CanProceed(s); xerr != nil {
+	if xerr = worker.CanProceed(ctx, s); xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
 
-	if r, xerr = worker.Proceed(v, s); xerr != nil {
+	if r, xerr = worker.Proceed(ctx, v, s); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 	return r, xerr
 }
 
 // Remove uninstalls the feature using the RemoveScript script
-func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
+func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&xerr)
 
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
 	if f == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("f")
 	}
@@ -135,13 +145,13 @@ func (g *genericPackager) Remove(f resources.Feature, t resources.Targetable, v 
 	if xerr != nil {
 		return nil, xerr
 	}
-	if xerr = worker.CanProceed(s); xerr != nil {
+	if xerr = worker.CanProceed(ctx, s); xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
 	defer worker.Terminate()
 
-	if r, xerr = worker.Proceed(v, s); xerr != nil {
+	if r, xerr = worker.Proceed(ctx, v, s); xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 	return r, xerr

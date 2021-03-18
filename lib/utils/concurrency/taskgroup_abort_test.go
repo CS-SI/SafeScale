@@ -112,9 +112,10 @@ func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskRe
 	}(&xerr)
 
 	keep := true
+	theCh := parameters.(chan string)
+
 	for keep {
-		// FIXME: this line generates a data race with line 298
-		fmt.Println("Living forever")
+		theCh <- "Living forever"
 		_, _ = heavyDutyTask(10*time.Millisecond, true)
 	}
 
@@ -268,9 +269,11 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 
 	fmt.Println("Begin")
 
+	stCh := make(chan string, 100)
+
 	numChild := 4 // No need to push it
 	for ind := 0; ind < numChild; ind++ {
-		_, xerr := overlord.Start(horribleTaskActionCitizen, nil)
+		_, xerr := overlord.Start(horribleTaskActionCitizen, stCh)
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
@@ -289,15 +292,15 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 		t.Fail()
 	}
 
-	time.Sleep(100 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
 	_ = w.Close()
-	// FIXME: this command generate a data race with line 117
+
 	out, _ := ioutil.ReadAll(r)
 	os.Stdout = rescueStdout
+	_ = out
 
-	count := strings.Count(string(out), "Living forever")
-	fmt.Println(count)
+	count := len(stCh)
 	if count < 5 {
 		t.Fail()
 	}

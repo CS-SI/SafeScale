@@ -164,8 +164,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AutoHostNetworkInterfaces: false,
 		DNSList:                   dnsServers,
 		VolumeSpeeds: map[string]volumespeed.Enum{
-			"classic":    volumespeed.COLD,
-			"high-speed": volumespeed.HDD,
+			"classic":    volumespeed.Cold,
+			"high-speed": volumespeed.Hdd,
 		},
 		MetadataBucket:           metadataBucketName,
 		OperatorUsername:         operatorUsername,

@@ -19,16 +19,15 @@ package listeners
 import (
 	"context"
 
-	"github.com/asaskevich/govalidator"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/asaskevich/govalidator"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
 )
 
 // PrepareJob creates a new job
@@ -91,7 +90,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 
 	// ctx, cancelFunc := context.WithCancel(ctx)
-	task, xerr := concurrency.NewTaskWithContext(ctx, nil)
+	task, xerr := concurrency.NewTaskWithContext(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -141,7 +140,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	task, xerr := concurrency.NewTaskWithContext(ctx, nil)
+	task, xerr := concurrency.NewTaskWithContext(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}

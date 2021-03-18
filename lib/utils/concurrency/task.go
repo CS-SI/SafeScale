@@ -23,11 +23,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
-
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 )
 
 // TaskStatus ...
@@ -83,14 +83,15 @@ type TaskCore interface {
 	GetID() (string, fail.Error)
 	GetSignature() string
 	GetStatus() (TaskStatus, fail.Error)
-	GetContext() (context.Context, fail.Error)
+	GetContext() context.Context
 	GetLastError() (error, fail.Error)
+	GetResult() (TaskResult, fail.Error)
 
 	Run(TaskAction, TaskParameters) (TaskResult, fail.Error)
 	RunInSubtask(TaskAction, TaskParameters) (TaskResult, fail.Error)
-	Start(TaskAction, TaskParameters) (Task, fail.Error)
-	StartWithTimeout(TaskAction, TaskParameters, time.Duration) (Task, fail.Error)
-	StartInSubtask(TaskAction, TaskParameters) (Task, fail.Error)
+	Start(TaskAction, TaskParameters, ...data.ImmutableKeyValue) (Task, fail.Error)
+	StartWithTimeout(TaskAction, TaskParameters, time.Duration, ...data.ImmutableKeyValue) (Task, fail.Error)
+	StartInSubtask(TaskAction, TaskParameters, ...data.ImmutableKeyValue) (Task, fail.Error)
 }
 
 // Task is the interface of a task running in goroutine, allowing to identity (indirectly) goroutines
@@ -117,7 +118,7 @@ type task struct {
 	result TaskResult
 
 	abortDisengaged bool
-	subtasks        map[string]Task // list of subtasks created from this task
+	//	subtasks        map[string]Task // list of subtasks created from this task
 }
 
 var globalTask atomic.Value
@@ -140,6 +141,25 @@ func RootTask() (Task, fail.Error) {
 // VoidTask is a new task that do nothing
 func VoidTask() (Task, fail.Error) {
 	return NewTask()
+}
+
+// user-defined type to use as key in context.WithValue()
+type taskContextKey string
+
+const keyForTaskInContext taskContextKey = "task"
+
+// TaskFromContext extracts the task instance from context
+func TaskFromContext(ctx context.Context) (Task, fail.Error) {
+	if ctx != nil {
+		if ctxValue := ctx.Value(keyForTaskInContext); ctxValue != nil {
+			if task, ok := ctxValue.(*task); ok {
+				return task, nil
+			}
+			return nil, fail.InconsistentError("context value for 'task' is not a 'concurrency.Task'")
+		}
+	}
+
+	return VoidTask()
 }
 
 // NewTask ...
@@ -168,12 +188,12 @@ func NewTaskWithParent(parentTask Task) (Task, fail.Error) {
 }
 
 // NewTaskWithContext ...
-func NewTaskWithContext(ctx context.Context, parentTask Task) (Task, fail.Error) {
+func NewTaskWithContext(ctx context.Context /*, parentTask Task*/) (Task, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	return newTask(ctx, parentTask)
+	return newTask(ctx, nil /*parentTask*/)
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
@@ -197,13 +217,13 @@ func newTask(ctx context.Context, parentTask Task) (*task, fail.Error) {
 		childContext, cancel = context.WithCancel(parentTask.(*task).ctx)
 	}
 	t := task{
-		ctx:      childContext,
+		// ctx:      childContext,
 		cancel:   cancel,
 		status:   READY,
 		abortCh:  make(chan bool, 1),
 		doneCh:   make(chan bool, 1),
 		finishCh: make(chan struct{}, 1),
-		subtasks: make(map[string]Task),
+		//		subtasks: make(map[string]Task),
 	}
 
 	u, err := uuid.NewV4()
@@ -212,6 +232,7 @@ func newTask(ctx context.Context, parentTask Task) (*task, fail.Error) {
 	}
 
 	t.id = u.String()
+	t.ctx = context.WithValue(childContext, keyForTaskInContext, &t)
 
 	return &t, nil
 }
@@ -221,6 +242,7 @@ func (t *task) IsNull() bool {
 	return t == nil || t.id == ""
 }
 
+// GetLastError returns the last error of the Task
 func (t *task) GetLastError() (error, fail.Error) { //nolint
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -230,6 +252,22 @@ func (t *task) GetLastError() (error, fail.Error) { //nolint
 	defer t.mu.Unlock()
 
 	return t.err, nil
+}
+
+// GetResult returns the result of the ended task
+func (t *task) GetResult() (TaskResult, fail.Error) {
+	if t.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.status != DONE {
+		return nil, fail.InvalidRequestError("task is not done, there is no result yet")
+	}
+
+	return t.result, nil
 }
 
 // GetID returns an unique id for the task
@@ -247,7 +285,7 @@ func (t *task) GetID() (string, fail.Error) {
 // // MustGetSignature builds the "signature" of the task passed as parameter,
 // // ie a string representation of the task ID in the format "{task <id>}".
 // func (t *task) MustGetSignature() (string, fail.Error) {
-// 	if t.IsNull() {
+// 	if t.isNull() {
 // 		return "", fail.InvalidInstanceError()
 // 	}
 //
@@ -292,19 +330,15 @@ func (t *task) GetStatus() (TaskStatus, fail.Error) {
 }
 
 // GetContext returns the context associated to the task
-func (t *task) GetContext() (context.Context, fail.Error) {
+func (t *task) GetContext() context.Context {
 	if t.IsNull() {
-		return nil, fail.InvalidInstanceError()
+		return context.TODO()
 	}
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.status == ABORTED {
-		return t.ctx, fail.AbortedError(nil, "aborted")
-	}
-
-	return t.ctx, nil
+	return t.ctx
 }
 
 // SetID allows to specify task ID. The uniqueness of the ID through all the tasks
@@ -332,17 +366,16 @@ func (t *task) SetID(id string) fail.Error {
 }
 
 // Start runs in goroutine the function with parameters
-func (t *task) Start(action TaskAction, params TaskParameters) (Task, fail.Error) {
+func (t *task) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	return t.StartWithTimeout(action, params, 0)
 }
 
-// StartWithTimeout runs in goroutine the TasAction with TaskParameters, and stops after timeout (if > 0)
-// If timeout happens, error returned will be ErrTimeout
-// This function is useful when you know at the time you use it there will be a timeout to apply.
-func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration) (Task, fail.Error) {
+// StartWithTimeout runs in goroutine the TaskAction with TaskParameters, and stops after timeout (if > 0)
+// If timeout happens, error returned will be '*fail.ErrTimeout'
+func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -373,7 +406,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 }
 
 // StartInSubtask runs in a subtask goroutine the function with parameters
-func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, fail.Error) {
+func (t *task) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -386,8 +419,8 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters) (Task, f
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	subtaskID, _ := st.GetID()
-	t.subtasks[subtaskID] = st
+	// subtaskID, _ := st.GetID()
+	// t.subtasks[subtaskID] = st
 
 	return st.Start(action, params)
 }
@@ -414,7 +447,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				traceR.trace("receiving signal from context, aborting t...")
+				traceR.trace("receiving signal from context, aborting task...")
 				t.mu.Lock()
 				t.status = ABORTED
 				t.err = fail.AbortedError(t.err)
@@ -456,7 +489,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				traceR.trace("receiving signal from context, aborting t...")
+				traceR.trace("receiving signal from context, aborting task...")
 				t.mu.Lock()
 				t.status = ABORTED
 				t.err = fail.AbortedError(t.err)
@@ -768,7 +801,7 @@ func (t *task) Abortable() (bool, fail.Error) {
 // // call with task as parameter may abort before the end.
 // // By design, this function panics if t is null value. fail.OnPanic() may be used to catch this panic if needed.
 // func (t *task) IgnoreAbortSignal(ignore bool) {
-// 	if t.IsNull() {
+// 	if t.isNull() {
 // 		panic("task.IgnoreAbortSignal() called from null value of task; ignored.")
 // 	}
 //

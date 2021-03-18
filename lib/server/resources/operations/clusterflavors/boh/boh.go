@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -50,21 +49,13 @@ var (
 	}
 )
 
-func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error) {
+func minimumRequiredServers(clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) {
 	var (
 		privateNodeCount uint
 		masterNodeCount  uint
 	)
 
-	if task.Aborted() {
-		return 0, 0, 0, fail.AbortedError(nil, "aborted")
-	}
-
-	complexity, xerr := c.GetComplexity(task)
-	if xerr != nil {
-		return 0, 0, 0, xerr
-	}
-	switch complexity {
+	switch clusterIdentity.Complexity {
 	case clustercomplexity.Small:
 		privateNodeCount = 1
 		masterNodeCount = 1
@@ -78,7 +69,7 @@ func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, u
 	return masterNodeCount, privateNodeCount, 0, nil
 }
 
-func gatewaySizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
+func gatewaySizing(_ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
@@ -89,7 +80,7 @@ func gatewaySizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingR
 	}
 }
 
-func nodeSizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
+func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
@@ -100,7 +91,7 @@ func nodeSizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequ
 	}
 }
 
-func defaultImage(_ concurrency.Task, _ resources.Cluster) string {
+func defaultImage(_ resources.Cluster) string {
 	return "Ubuntu 18.04"
 }
 

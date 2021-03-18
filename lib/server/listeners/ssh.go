@@ -83,12 +83,12 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, job.GetService(), hostRef)
+	rh, xerr := hostfactory.Load(job.GetService(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	retcode, stdout, stderr, xerr := rh.Run(task, command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := rh.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -166,14 +166,14 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		localPath = dest
 	}
 
-	rh, xerr := hostfactory.Load(task, job.GetService(), hostRef)
+	rh, xerr := hostfactory.Load(job.GetService(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 	if pull {
-		retcode, stdout, stderr, xerr = rh.Pull(task, hostPath, localPath, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = rh.Pull(task.GetContext(), hostPath, localPath, temporal.GetLongOperationTimeout())
 	} else {
-		retcode, stdout, stderr, xerr = rh.Push(task, localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = rh.Push(task.GetContext(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
 	}
 	if xerr != nil {
 		return nil, xerr

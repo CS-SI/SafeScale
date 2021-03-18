@@ -42,7 +42,7 @@ type ClusterNetwork struct {
 
 func newClusterNetwork() *ClusterNetwork {
 	return &ClusterNetwork{
-		NetworkState: subnetstate.UNKNOWN,
+		NetworkState: subnetstate.Unknown,
 	}
 }
 
@@ -55,7 +55,7 @@ func (n ClusterNetwork) Clone() data.Clonable {
 // Replace ...
 // satisfies interface data.Clonable
 func (n *ClusterNetwork) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if n == nil || p == nil {
 		return n
 	}

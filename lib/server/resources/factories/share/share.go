@@ -20,7 +20,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -33,19 +32,6 @@ func New(svc iaas.Service) (resources.Share, fail.Error) {
 }
 
 // Load loads the metadata of a share and returns an instance of resources.Share
-func Load(task concurrency.Task, svc iaas.Service, ref string) (resources.Share, fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if ref == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
-	}
-
-	return operations.LoadShare(task, svc, ref)
+func Load(svc iaas.Service, ref string) (resources.Share, fail.Error) {
+	return operations.LoadShare(svc, ref)
 }

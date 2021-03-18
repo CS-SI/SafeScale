@@ -73,7 +73,7 @@ type Service interface {
 	// Provider --- from interface iaas.Providers ---
 	providers.Provider
 
-	LookupRuleInSecurityGroup(*abstract.SecurityGroup, abstract.SecurityGroupRule) (bool, fail.Error)
+	LookupRuleInSecurityGroup(*abstract.SecurityGroup, *abstract.SecurityGroupRule) (bool, fail.Error)
 
 	// Location --- from interface objectstorage.Location ---
 	objectstorage.Location
@@ -227,7 +227,7 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 		if host.CurrentState == state {
 			return nil
 		}
-		if host.CurrentState == hoststate.ERROR {
+		if host.CurrentState == hoststate.Error {
 			return fail.NotAvailableError("host in error state")
 		}
 		select {
@@ -876,10 +876,10 @@ func SimilarityScore(ref string, s string) float64 {
 
 // // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
 // func InitializeBucket(svc service, location objectstorage.Location) fail.Error {
-// 	if svc.IsNull() {
+// 	if svc.isNull() {
 // 		return fail.InvalidParameterError("svc", "cannot be null value")
 // 	}
-// 	if location.IsNull() {
+// 	if location.isNull() {
 // 		return fail.InvalidParameterError("location", "cannot be nil")
 // 	}
 //
@@ -899,7 +899,7 @@ func SimilarityScore(ref string, s string) float64 {
 // }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
-func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule abstract.SecurityGroupRule) (bool, fail.Error) {
+func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule) (bool, fail.Error) {
 	if asg.IsNull() {
 		return false, fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}

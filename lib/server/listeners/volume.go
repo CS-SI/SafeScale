@@ -33,12 +33,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)
+// safescale volume create v1 --speed="Ssd" --size=2000 (par default Hdd, possible Ssd, Hdd, Cold)
 // safescale volume attach v1 host1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
 // safescale volume detach v1
 // safescale volume delete v1
 // safescale volume inspect v1
-// safescale volume update v1 --speed="HDD" --size=1000
+// safescale volume update v1 --speed="Hdd" --size=1000
 
 // VolumeHandler ...
 var VolumeHandler = handlers.NewVolumeHandler
@@ -89,10 +89,11 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	// Map resources.Volume to protocol.Volume
 	var pbvolumes []*protocol.VolumeInspectResponse
 	for _, v := range volumes {
-		pbVolume, xerr := v.ToProtocol(task)
+		pbVolume, xerr := v.ToProtocol()
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		pbvolumes = append(pbvolumes, pbVolume)
 	}
 	rv := &protocol.VolumeListResponse{Volumes: pbvolumes}
@@ -139,7 +140,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 	}
 
 	tracer.Trace("Volume '%s' created", name)
-	return rv.ToProtocol(task)
+	return rv.ToProtocol()
 }
 
 // Attach a volume to an host and create a mount point
@@ -335,5 +336,5 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, xerr
 	}
 
-	return rv.ToProtocol(task)
+	return rv.ToProtocol()
 }

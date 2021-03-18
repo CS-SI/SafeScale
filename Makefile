@@ -8,7 +8,8 @@ default: help ;
 include ./common.mk
 
 # Binaries generated
-EXECS=cli/safescale/safescale cli/safescale/safescale-cover cli/safescaled/safescaled cli/safescaled/safescaled-cover
+EXECS=cli/safescale/safescale cli/safescaled/safescaled
+COVEREXECS=cli/safescale/safescale-cover cli/safescaled/safescaled-cover
 
 # List of files
 PKG_FILES := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks )
@@ -33,7 +34,6 @@ LINTER := golang.org/x/lint/golint
 ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
-GOVENDOR := github.com/kardianos/govendor
 
 BUILD_TAGS =
 export BUILD_TAGS
@@ -73,8 +73,8 @@ ground:
 
 getdevdeps: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which rice go2xunit cover covertool govendor > /dev/null; if [ $$? -ne 0 ]; then \
-    	$(GO) get -u $(RICE) $(COVER) $(XUNIT) $(GOVENDOR) $(COVERTOOL) &>/dev/null || true; \
+	@which rice go2xunit cover covertool > /dev/null; if [ $$? -ne 0 ]; then \
+    	$(GO) get -u $(RICE) $(COVER) $(XUNIT) $(COVERTOOL) &>/dev/null || true; \
     fi
 	@which protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null || true; \
@@ -83,18 +83,19 @@ getdevdeps: begin ground
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) install $(MINIMOCK) &>/dev/null || true; \
 	fi
 	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u  $(ERRCHECK) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u $(ERRCHECK) &>/dev/null || true; \
 	fi
 	@which goconvey > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get -u  $(CONVEY) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get -u $(CONVEY) &>/dev/null || true; \
 	fi
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get -u  $(LINTER) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get -u $(LINTER) &>/dev/null || true; \
 	fi
 	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u  $(STRINGER) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u $(STRINGER) &>/dev/null || true; \
 	fi
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
+    	printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.26.0 || true; \
 	fi
 
@@ -122,10 +123,12 @@ mrproper: clean
 
 install:
 	@($(CP) -f $(EXECS) $(GOBIN) || true)
+	@($(CP) -f $(COVEREXECS) $(GOBIN) > /dev/null 2>&1 || true)
 
 installci:
 	@(mkdir -p $(CIBIN) || true)
 	@($(CP) -f $(EXECS) $(CIBIN) || true)
+	@($(CP) -f $(COVEREXECS) $(CIBIN) > /dev/null 2>&1 || true)
 
 godocs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -146,12 +149,13 @@ depclean: begin
 generate: sdk
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@rm -f ./generation_results.log || true
-	@$(GO) generate -run stringer ./...  2>&1 | tee -a generation_results.log
+	@$(GO) generate -run stringer ./... 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
 	@cd lib && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
-	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warning generating code, if RICE related, then is a false warning !$(NO_COLOR)\n";fi;
+	@$(GO) generate ./... >> generation_results.log 2>&1 || true
+	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warnings generating code !$(NO_COLOR)\n";fi;
 
 test: begin # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -215,14 +219,6 @@ logclean: begin
 	@$(RM) cover.out || true
 	@$(RM) cover.html || true
 
-status: with_git
-	@git remote update >/dev/null 2>&1
-	@printf "%b" "$(WARN_COLOR)LOCAL BUILD STATUS:$(NO_COLOR)\n";
-	@printf "%b" "$(NO_COLOR)  Build hash $(OK_COLOR)$(BUILD)$(GOLD_COLOR)$(NO_COLOR)\n";
-	@printf "%b" "$(WARN_COLOR)";
-	@if [ $(LOCAL) = $(REMOTE) ]; then echo "  Build Up-to-date"; elif [ $(LOCAL) = $(BASE) ]; then echo "  You are behind origin/develop"; elif [ $(REMOTE) = $(BASE) ]; then echo "  You have local commits NOT PUSHED to origin/develop"; else echo "  Build Diverged, you have to merge"; fi
-	@printf "%b" "$(NO_COLOR)";
-
 help: with_git
 	@echo ''
 	@git remote update >/dev/null 2>&1
@@ -253,6 +249,5 @@ help: with_git
 	@echo '  clean        - Removes files generated by build.'
 	@echo '  depclean     - Rebuilds vendor dependencies'
 	@echo '  logclean     - Removes log files generated by build.'
-	@echo '  status       - Shows build status.'
 	@echo ''
 	@echo

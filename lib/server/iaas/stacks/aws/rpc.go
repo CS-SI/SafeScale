@@ -832,7 +832,7 @@ func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Erro
 				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId), aws.Int64Value(i.State.Code)&0xff)
 				continue
 			}
-			if state != hoststate.TERMINATED {
+			if state != hoststate.Terminated {
 				instance = i
 				found++
 			}
@@ -918,7 +918,7 @@ func (s stack) rpcDescribeInstances(ids []*string) ([]*ec2.Instance, fail.Error)
 				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId), aws.Int64Value(i.State.Code)&0xff)
 				continue
 			}
-			if state != hoststate.TERMINATED {
+			if state != hoststate.Terminated {
 				out = append(out, i)
 			}
 		}
@@ -1209,9 +1209,13 @@ func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo,
 		request.InstanceTypes = ids
 	} else {
 		request.Filters = []*ec2.Filter{
-			{
+			{ // keep only x86_64 processor architecture
 				Name:   aws.String("processor-info.supported-architecture"),
 				Values: []*string{aws.String("x86_64")},
+			},
+			{ // filter instances that are burstable, stable performance are preferred
+				Name:   aws.String("burstable-performance-supported"),
+				Values: []*string{aws.String("false")},
 			},
 		}
 	}
@@ -1244,7 +1248,6 @@ func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo,
 			}
 			out = append(out, v)
 		}
-		// out = append(out, resp.InstanceTypes...)
 
 		if resp.NextToken == nil {
 			break

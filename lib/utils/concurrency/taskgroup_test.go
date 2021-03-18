@@ -23,13 +23,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
-
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// FIXME: The whole file taskgroup_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
+// FIXME: The whole file taskgroup_test.go MUST pass UT flawlessly before using it confidently
 
 func TestChildrenWaitingGame(t *testing.T) {
 	overlord, err := NewTaskGroup(nil)
@@ -53,6 +52,51 @@ func TestChildrenWaitingGame(t *testing.T) {
 	res, err := overlord.Wait()
 	require.Nil(t, err)
 	require.NotEmpty(t, res)
+}
+
+func TestChildrenHaveDistinctIDs(t *testing.T) {
+	overlord, err := NewTaskGroup(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	const numTasks = 10
+	dictOfIDs := make(map[string]int)
+
+	for ind := 0; ind < numTasks; ind++ {
+		subtaskID, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+		} else {
+			theID, _ := subtaskID.GetID()
+			dictOfIDs[theID] = ind
+		}
+	}
+
+	res, err := overlord.WaitGroup()
+	require.Nil(t, err)
+	require.NotEmpty(t, res)
+
+	if len(res) != numTasks {
+		t.Errorf("The waitgroup doesn't have %d tasks: %d", numTasks, len(res))
+		t.FailNow()
+	}
+
+	if len(dictOfIDs) != numTasks {
+		t.Errorf("The dict of IDs doesn't have %d tasks: %d", numTasks, len(dictOfIDs))
+		t.FailNow()
+	}
+
+	if len(res) != len(dictOfIDs) {
+		t.Errorf("The waitgroup and the dict of IDs don't have the same size: %d vs %d", len(res), len(dictOfIDs))
+		t.FailNow()
+	}
 }
 
 func TestChildrenWaitingGameWithPanic(t *testing.T) {
@@ -173,10 +217,11 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	for ind := 0; ind < 2800; ind++ {
 		rt, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := tools.RandomInt(5, 25)
-			time.Sleep(time.Duration(rint) * time.Millisecond)
-			if rint > 10 {
-				time.Sleep(time.Duration(800) * time.Millisecond)
+			if rint > 16 {
+				rint += 10000
 			}
+			fmt.Printf("sleeping %dms...\n", rint)
+			time.Sleep(time.Duration(rint) * time.Millisecond)
 
 			return "waiting game", nil
 		}, nil)
@@ -206,7 +251,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 
 	select {
 	case <-time.After(time.Duration(300) * time.Millisecond):
-		stats, statsErr := overlord.Stats()
+		stats, statsErr := overlord.GetGroupStatuss()
 		if statsErr != nil {
 			t.Fatal(statsErr)
 		}
@@ -301,7 +346,7 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 
 	fmt.Println("Here we are")
 
-	if end >= (time.Millisecond * 20) {
+	if end >= (time.Microsecond * 20100) {
 		t.Errorf("It should have finished near 20 ms but it didn't, it was %s !!", end)
 	}
 }

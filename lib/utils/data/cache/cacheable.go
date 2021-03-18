@@ -19,7 +19,6 @@ package cache
 //go:generate minimock -o ../mocks/mock_cacheable.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Cacheable
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 )
 
@@ -27,6 +26,6 @@ import (
 type Cacheable interface {
 	observer.Observable
 
-	Released(concurrency.Task)  // Tells cache handler the instance is no more used, giving a chance to free this instance from cache
-	Destroyed(concurrency.Task) // tells cache handler the instance has been deleted and MUST be removed from cache
+	Released()  // Tells cache handler the instance is no more used, giving a chance to free this instance from cache
+	Destroyed() // tells cache handler the instance has been deleted and MUST be removed from cache
 }

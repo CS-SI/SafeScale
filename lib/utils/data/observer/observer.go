@@ -17,7 +17,6 @@
 package observer
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 )
 
@@ -28,16 +27,16 @@ import (
 type Observer interface {
 	data.Identifiable
 
-	SignalChange(task concurrency.Task, id string)  // is called by Observable to signal an Observer a change occurred
-	MarkAsFreed(task concurrency.Task, id string)   // is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
-	MarkAsDeleted(task concurrency.Task, id string) // used to mark the Observable as deleted (allowing to remove the entry from the Observer internals)
+	SignalChange(id string)  // is called by Observable to signal an Observer a change occurred
+	MarkAsFreed(id string)   // is called by Observable to signal an Observer the content will not be used anymore (decreasing the counter of uses)
+	MarkAsDeleted(id string) // used to mark the Observable as deleted (allowing to remove the entry from the Observer internals)
 }
 
 // Observable is the interface a struct must satisfy to signal internal change to observers
 type Observable interface {
 	data.Identifiable
 
-	AddObserver(task concurrency.Task, o Observer) error     // register an Observer to be kept in touch
-	NotifyObservers(task concurrency.Task) error             // notify observers a change occurred on content (using Observer.SignalChange)
-	RemoveObserver(task concurrency.Task, name string) error // deregister an Observer that will not be notified further
+	AddObserver(o Observer) error     // register an Observer to be kept in touch
+	NotifyObservers() error           // notify observers a change occurred on content (using Observer.SignalChange)
+	RemoveObserver(name string) error // deregister an Observer that will not be notified further
 }

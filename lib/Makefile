@@ -28,6 +28,7 @@ test:
 	@$(GO) test -race -v ./...
 
 gensrc:
+	@(mkdir -p mocks) || true
 	@(cd server/iaas/userdata && $(MAKE) $(@))
 	@(cd system && $(MAKE) $(@))
 

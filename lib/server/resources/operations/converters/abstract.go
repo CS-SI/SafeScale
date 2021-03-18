@@ -194,7 +194,7 @@ func HostCoreFromAbstractToProtocol(in *abstract.HostCore) *protocol.Host {
 // HostFullFromAbstractToProtocol ...
 func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 	state := in.Core.LastState
-	if in.CurrentState != hoststate.UNKNOWN {
+	if in.CurrentState != hoststate.Unknown {
 		state = in.CurrentState
 	}
 	ph := &protocol.Host{
@@ -306,11 +306,11 @@ func HostStatusFromAbstractToProtocol(name string, status hoststate.Enum) *proto
 // VolumeSpeedFromAbstractToProtocol ...
 func VolumeSpeedFromAbstractToProtocol(in volumespeed.Enum) protocol.VolumeSpeed {
 	switch in {
-	case volumespeed.COLD:
+	case volumespeed.Cold:
 		return protocol.VolumeSpeed_VS_COLD
-	case volumespeed.SSD:
+	case volumespeed.Ssd:
 		return protocol.VolumeSpeed_VS_SSD
-	case volumespeed.HDD:
+	case volumespeed.Hdd:
 		fallthrough
 	default:
 		return protocol.VolumeSpeed_VS_HDD
@@ -342,10 +342,10 @@ func ClusterListFromAbstractToProtocol(in []abstract.ClusterIdentity) *protocol.
 }
 
 // SecurityGroupRulesFromAbstractToProtocol converts a []abstract.SecurityGroupRule to a []*protocol.SecurityGroupRule
-func SecurityGroupRulesFromAbstractToProtocol(in []abstract.SecurityGroupRule) []*protocol.SecurityGroupRule {
+func SecurityGroupRulesFromAbstractToProtocol(in abstract.SecurityGroupRules) []*protocol.SecurityGroupRule {
 	out := make([]*protocol.SecurityGroupRule, 0, len(in))
 	for _, v := range in {
-		out = append(out, SecurityGroupRuleFromAbstractToProtocol(v))
+		out = append(out, SecurityGroupRuleFromAbstractToProtocol(*v))
 	}
 	return out
 }

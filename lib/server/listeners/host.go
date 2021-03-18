@@ -107,11 +107,11 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
+	rh, xerr := hostfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rh.Start(task); xerr != nil {
+	if xerr = rh.Start(task.GetContext()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -154,12 +154,12 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
+	rh, xerr := hostfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.Stop(task); xerr != nil {
+	if xerr = rh.Stop(task.GetContext()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -200,12 +200,12 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
+	rh, xerr := hostfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.Reboot(task); xerr != nil {
+	if xerr = rh.Reboot(task.GetContext()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -244,7 +244,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 
 	// handler := handlers.NewHostHandler(job)
 	// hosts, xerr := handler.List(all)
-	hosts, xerr := hostfactory.List(task, job.GetService(), all)
+	hosts, xerr := hostfactory.List(task.GetContext(), job.GetService(), all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -313,36 +313,40 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	)
 	networkValue := in.GetNetwork()
 	if networkValue != "" {
-		_, xerr = networkfactory.Load(task, job.GetService(), networkValue)
+		_, xerr = networkfactory.Load(job.GetService(), networkValue)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
 	if len(in.GetSubnets()) == 0 {
-		rs, xerr = subnetfactory.Load(task, job.GetService(), networkValue, networkValue)
+		rs, xerr = subnetfactory.Load(job.GetService(), networkValue, networkValue)
 		if xerr != nil {
 			return nil, xerr
 		}
-		err = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+
+		err = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			subnets = []*abstract.Subnet{as}
+
+			subnets = []*abstract.Subnet{as.Clone().(*abstract.Subnet)}
 			return nil
 		})
 	} else {
 		for _, v := range in.GetSubnets() {
-			rs, xerr = subnetfactory.Load(task, job.GetService(), networkValue, v)
+			rs, xerr = subnetfactory.Load(job.GetService(), networkValue, v)
 			if xerr != nil {
 				return nil, xerr
 			}
-			xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+
+			xerr = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
 					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				subnets = append(subnets, as)
+
+				subnets = append(subnets, as.Clone().(*abstract.Subnet))
 				return nil
 			})
 			if xerr != nil {
@@ -353,11 +357,12 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 
 	domain := in.Domain
 	if domain == "" {
-		xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		xerr = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
 				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			domain = as.Domain
 			return nil
 		})
@@ -383,12 +388,12 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, xerr
 	}
 
-	if _, xerr = objh.Create(task, hostReq, *sizing); xerr != nil {
+	if _, xerr = objh.Create(task.GetContext(), hostReq, *sizing); xerr != nil {
 		return nil, xerr
 	}
 
 	// logrus.Infof("Host '%s' created", name)
-	return objh.ToProtocol(task)
+	return objh.ToProtocol()
 }
 
 // Resize an host
@@ -431,18 +436,19 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		MinCPUFreq:  in.GetCpuFreq(),
 	}
 
-	rh, xerr := hostfactory.Load(task, job.GetService(), name)
+	rh, xerr := hostfactory.Load(job.GetService(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	reduce := false
-	xerr = rh.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
+	xerr = rh.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
 			nhs, ok := clonable.(*propertiesv1.HostSizing)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			reduce = reduce || (sizing.MinCores < nhs.RequestedSize.MinCores)
 			reduce = reduce || (sizing.MinRAMSize < nhs.RequestedSize.MinRAMSize)
 			reduce = reduce || (sizing.MinGPU < nhs.RequestedSize.MinGPU)
@@ -458,12 +464,12 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		logrus.Warn("Asking for less resource... is not going to happen")
 	}
 
-	if xerr = rh.Resize(task, sizing); xerr != nil {
+	if xerr = rh.Resize(task.GetContext(), sizing); xerr != nil {
 		return nil, xerr
 	}
 
 	tracer.Trace("Host '%s' successfully resized", name)
-	return rh.ToProtocol(task)
+	return rh.ToProtocol()
 }
 
 // Status returns the status of a host (running or stopped mainly)
@@ -502,7 +508,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
+	rh, xerr := hostfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -512,7 +518,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		}
 	}
 
-	return converters.HostStatusFromAbstractToProtocol(rh.GetName(), rh.GetState(task)), nil
+	return converters.HostStatusFromAbstractToProtocol(rh.GetName(), rh.GetState()), nil
 }
 
 // Inspect an host
@@ -551,7 +557,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
+	rh, xerr := hostfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -561,7 +567,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		}
 	}
 
-	return rh.ToProtocol(task)
+	return rh.ToProtocol()
 }
 
 // Delete an host
@@ -601,12 +607,12 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, job.GetService(), ref)
+	rh, xerr := hostfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.Delete(task); xerr != nil {
+	if xerr = rh.Delete(task.GetContext()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -706,11 +712,12 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	rh, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+
+	sg, xerr := securitygroupfactory.Load(svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -723,7 +730,7 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 		enable = resources.SecurityGroupEnable
 	}
 
-	if xerr = rh.BindSecurityGroup(task, sg, enable); xerr != nil {
+	if xerr = rh.BindSecurityGroup(task.GetContext(), sg, enable); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil
@@ -772,17 +779,17 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	rh, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	sg, xerr := securitygroupfactory.Load(svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.UnbindSecurityGroup(task, sg); xerr != nil {
+	if xerr = rh.UnbindSecurityGroup(task.GetContext(), sg); xerr != nil {
 		return empty, xerr
 	}
 
@@ -832,17 +839,17 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	rh, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	sg, xerr := securitygroupfactory.Load(svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.EnableSecurityGroup(task, sg); xerr != nil {
+	if xerr = rh.EnableSecurityGroup(task.GetContext(), sg); xerr != nil {
 		return empty, xerr
 	}
 
@@ -892,17 +899,17 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	rh, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	sg, xerr := securitygroupfactory.Load(svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.DisableSecurityGroup(task, sg); xerr != nil {
+	if xerr = rh.DisableSecurityGroup(task.GetContext(), sg); xerr != nil {
 		return empty, xerr
 	}
 
@@ -942,16 +949,16 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 	task := job.GetTask()
 	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s)", hostRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "(%s)", hostRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(task, svc, hostRef)
+	rh, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	bonds, xerr := rh.ListSecurityGroups(task, securitygroupstate.All)
+	bonds, xerr := rh.ListSecurityGroups(securitygroupstate.All)
 	if xerr != nil {
 		return nil, xerr
 	}
