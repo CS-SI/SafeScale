@@ -105,7 +105,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 	sizing.Image = in.GetGateway().GetImageId()
 
-	rn, xerr := networkfactory.Load(task, svc, networkRef)
+	rn, xerr := networkfactory.Load(svc, networkRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -123,12 +123,16 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	if xerr != nil {
 		return nil, xerr
 	}
-	if xerr = rs.Create(task, req, gwName, sizing); xerr != nil {
+	if xerr = rs.Create(task.GetContext(), req, gwName, sizing); xerr != nil {
+		return nil, xerr
+	}
+
+	if xerr = rn.AdoptSubnet(task.GetContext(), rs); xerr != nil {
 		return nil, xerr
 	}
 
 	tracer.Trace("Subnet '%s' successfully created.", req.Name)
-	return rs.ToProtocol(task)
+	return rs.ToProtocol()
 }
 
 // List existing networks
@@ -175,13 +179,13 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 			}
 		}
 	} else {
-		rn, xerr := networkfactory.Load(task, svc, networkRef)
+		rn, xerr := networkfactory.Load(svc, networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}
 		networkID = rn.GetID()
 	}
-	list, xerr := subnetfactory.List(task, svc, networkID, in.GetAll())
+	list, xerr := subnetfactory.List(task.GetContext(), svc, networkID, in.GetAll())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -238,11 +242,12 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnet, xerr := subnetfactory.Load(task, job.GetService(), networkRef, subnetRef)
+	subnet, xerr := subnetfactory.Load(job.GetService(), networkRef, subnetRef)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return subnet.ToProtocol(task)
+
+	return subnet.ToProtocol()
 }
 
 // Delete a/many subnet/s
@@ -288,9 +293,16 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	var rs resources.Subnet
-	if rs, xerr = subnetfactory.Load(task, svc, networkRef, subnetRef); xerr == nil {
-		xerr = rs.Delete(task)
+	var (
+		rn       resources.Network
+		rs       resources.Subnet
+		subnetID string
+	)
+	if rs, xerr = subnetfactory.Load(svc, networkRef, subnetRef); xerr == nil {
+		subnetID = rs.GetID()
+		if rn, xerr = rs.InspectNetwork(); xerr == nil {
+			xerr = rs.Delete(task.GetContext())
+		}
 	}
 	if xerr != nil {
 		switch xerr.(type) {
@@ -298,6 +310,12 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 			// consider a Subnet not found as a successful deletion
 		default:
 			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
+		}
+	}
+
+	if rn != nil {
+		if xerr = rn.AbandonSubnet(task.GetContext(), subnetID); xerr != nil {
+			return empty, xerr
 		}
 	}
 
@@ -350,11 +368,11 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef)
+	rs, xerr := subnetfactory.Load(svc, networkRef, subnetRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	sg, xerr := securitygroupfactory.Load(svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -367,7 +385,7 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		enable = resources.SecurityGroupEnable
 	}
 
-	if xerr = rs.BindSecurityGroup(task, sg, enable); xerr != nil {
+	if xerr = rs.BindSecurityGroup(task.GetContext(), sg, enable); xerr != nil {
 		return empty, xerr
 	}
 
@@ -424,20 +442,20 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var sg resources.SecurityGroup
-	sg, xerr = securitygroupfactory.Load(task, svc, sgRef)
+	sg, xerr = securitygroupfactory.Load(svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
 	var rs resources.Subnet
-	if rs, xerr = subnetfactory.Load(task, svc, networkRef, subnetRef); xerr == nil {
-		xerr = rs.UnbindSecurityGroup(task, sg)
+	if rs, xerr = subnetfactory.Load(svc, networkRef, subnetRef); xerr == nil {
+		xerr = rs.UnbindSecurityGroup(task.GetContext(), sg)
 	}
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If Subnet does not exist, try to see if there is metadata in Security Group to clean up
-			if xerr = sg.UnbindFromSubnetByReference(task, subnetRef); xerr != nil {
+			if xerr = sg.UnbindFromSubnetByReference(task.GetContext(), subnetRef); xerr != nil {
 				return empty, xerr
 			}
 		default:
@@ -492,15 +510,15 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef)
+	rs, xerr := subnetfactory.Load(svc, networkRef, subnetRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	sg, xerr := securitygroupfactory.Load(svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.EnableSecurityGroup(task, sg); xerr != nil {
+	if xerr = rs.EnableSecurityGroup(task.GetContext(), sg); xerr != nil {
 		return empty, xerr
 	}
 
@@ -553,15 +571,15 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef)
+	rs, xerr := subnetfactory.Load(svc, networkRef, subnetRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	sg, xerr := securitygroupfactory.Load(task, svc, sgRef)
+	sg, xerr := securitygroupfactory.Load(svc, sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.DisableSecurityGroup(task, sg); xerr != nil {
+	if xerr = rs.DisableSecurityGroup(task.GetContext(), sg); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil
@@ -609,14 +627,16 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 
 	state := securitygroupstate.Enum(in.GetState())
 
-	rs, xerr := subnetfactory.Load(task, svc, networkRef, subnetRef)
+	rs, xerr := subnetfactory.Load(svc, networkRef, subnetRef)
 	if xerr != nil {
 		return nil, xerr
 	}
-	bonds, xerr := rs.ListSecurityGroups(task, state)
+
+	bonds, xerr := rs.ListSecurityGroups(task.GetContext(), state)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	resp := converters.SecurityGroupBondsFromPropertyToProtocol(bonds, "subnets")
 	return resp, nil
 }

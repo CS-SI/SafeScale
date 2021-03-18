@@ -48,7 +48,7 @@ func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 
 // CreateSecurityGroup creates a security group
 // Actually creates GCP Firewall Rules corresponding to the Security Group rules
-func (s stack) CreateSecurityGroup(networkRef, name, description string, rules []abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, xerr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -94,7 +94,11 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules [
 	return asg, nil
 }
 
-func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, bool, []string, bool, []string, []*compute.FirewallAllowed, fail.Error) {
+func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (string, bool, []string, bool, []string, []*compute.FirewallAllowed, fail.Error) {
+	if in == nil {
+		return "", false, nil, false, nil, nil, fail.InvalidParameterCannotBeNilError("in")
+	}
+
 	if in.EtherType == ipversion.IPv6 {
 		return "", false, nil, false, nil, nil, fail.InvalidRequestError("unsupported IPv6 rule")
 	}
@@ -114,15 +118,15 @@ func fromAbstractSecurityGroupRule(in abstract.SecurityGroupRule) (string, bool,
 		return "", false, nil, false, nil, nil, xerr
 	}
 	switch in.Direction {
-	case securitygroupruledirection.INGRESS:
-		direction = "INGRESS"
+	case securitygroupruledirection.Ingress:
+		direction = "Ingress"
 		sources = in.Sources
 		targets = in.Targets
-	case securitygroupruledirection.EGRESS:
-		direction = "EGRESS"
+	case securitygroupruledirection.Egress:
+		direction = "Egress"
 		targets = in.Targets
 	default:
-		return "", false, nil, false, nil, nil, fail.InvalidParameterError("in.Direction", "must contain either 'securitygroupruledirection.INGRESS' or 'securitygroupruledirection.EGRESS'")
+		return "", false, nil, false, nil, nil, fail.InvalidParameterError("in.Direction", "must contain either 'securitygroupruledirection.Ingress' or 'securitygroupruledirection.Egress'")
 	}
 
 	var allowed []*compute.FirewallAllowed
@@ -179,7 +183,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 				if xerr = s.rpcDeleteFirewallRuleByID(r); xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
-						// rule not found, consider it as a removal success
+						// rule not found, consider as a removal success
 					default:
 						return fail.Wrap(xerr, "failed to delete rule %d", k)
 					}
@@ -238,7 +242,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -249,6 +253,9 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	}
 	if !asg.IsComplete() {
 		return nullASG, fail.InvalidParameterError("sgParam", "must be complete")
+	}
+	if rule == nil {
+		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
@@ -276,7 +283,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule from a security group
 // For now, this function does nothing in GCP context (have to figure out how to identify Firewall rule corresponding to abstract Security Group rule
-func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -287,6 +294,9 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	}
 	if !asg.IsComplete() {
 		return nullASG, fail.InvalidParameterError("sgParam", "must contain Security Group ID")
+	}
+	if rule == nil {
+		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()

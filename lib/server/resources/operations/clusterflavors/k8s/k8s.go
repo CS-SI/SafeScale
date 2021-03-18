@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -45,20 +45,12 @@ var (
 	}
 )
 
-func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error) {
-	if task.Aborted() {
-		return 0, 0, 0, fail.AbortedError(nil, "aborted")
-	}
-
-	complexity, xerr := c.GetComplexity(task)
-	if xerr != nil {
-		return 0, 0, 0, xerr
-	}
+func minimumRequiredServers(clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) {
 	var masterCount uint
 	var privateNodeCount uint
 	var publicNodeCount uint
 
-	switch complexity {
+	switch clusterIdentity.Complexity {
 	case clustercomplexity.Small:
 		masterCount = 1
 		privateNodeCount = 1
@@ -72,7 +64,7 @@ func minimumRequiredServers(task concurrency.Task, c resources.Cluster) (uint, u
 	return masterCount, privateNodeCount, publicNodeCount, nil
 }
 
-func gatewaySizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
+func gatewaySizing(_ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    2,
 		MaxCores:    4,
@@ -83,7 +75,7 @@ func gatewaySizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingR
 	}
 }
 
-func nodeSizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequirements {
+func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
 	return abstract.HostSizingRequirements{
 		MinCores:    4,
 		MaxCores:    8,
@@ -94,15 +86,11 @@ func nodeSizing(_ concurrency.Task, _ resources.Cluster) abstract.HostSizingRequ
 	}
 }
 
-func defaultImage(_ concurrency.Task, _ resources.Cluster) string {
+func defaultImage(_ resources.Cluster) string {
 	return "Ubuntu 18.04"
 }
 
-func configureCluster(task concurrency.Task, c resources.Cluster) fail.Error {
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
+func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
@@ -111,10 +99,11 @@ func configureCluster(task concurrency.Task, c resources.Cluster) fail.Error {
 	// 	return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error()
 	// }
 	// results, err := feat.Add(c, data.Map{}, resources.FeatureSettings{})
-	results, xerr := c.AddFeature(task, "kubernetes", data.Map{}, resources.FeatureSettings{})
+	results, xerr := c.AddFeature(ctx, "kubernetes", data.Map{}, resources.FeatureSettings{})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
 	}
+
 	if !results.Successful() {
 		xerr = fail.NewError(fmt.Errorf(results.AllErrorMessages()), nil, "failed to add feature 'kubernetes' to cluster '%s'", clusterName)
 		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, xerr.Error())

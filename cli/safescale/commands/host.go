@@ -301,16 +301,6 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
-		askedGpus := int32(c.Int("gpu"))
-		if askedGpus <= -1 {
-			logrus.Debug("No GPU parameters used")
-		} else {
-			if askedGpus == 0 {
-				logrus.Debug("NO GPU explicitly required")
-			} else {
-				logrus.Debugf("GPUs required: %d", askedGpus)
-			}
-		}
 
 		sizing, err := constructHostDefinitionStringFromCLI(c, "sizing")
 		if err != nil {
@@ -809,13 +799,9 @@ func hostFeatureAddAction(c *cli.Context) error {
 	if xerr != nil {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
-	task, xerr := clientSession.GetTask()
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
 
 	// Wait for SSH service on remote host first
-	err = clientSession.SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
+	err = clientSession.SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
@@ -874,13 +860,9 @@ func hostFeatureCheckAction(c *cli.Context) error {
 	if xerr != nil {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
-	task, xerr := clientSession.GetTask()
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
 
 	// Wait for SSH service on remote host first
-	if err = clientSession.SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout()); err != nil {
+	if err = clientSession.SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout()); err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
@@ -940,13 +922,9 @@ func hostFeatureRemoveAction(c *cli.Context) error {
 	if xerr != nil {
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 	}
-	task, xerr := clientSession.GetTask()
-	if xerr != nil {
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-	}
 
 	// Wait for SSH service on remote host first
-	err = clientSession.SSH.WaitReady(task, hostInstance.Id, temporal.GetConnectionTimeout())
+	err = clientSession.SSH.WaitReady(hostInstance.Id, temporal.GetConnectionTimeout())
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))

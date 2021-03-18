@@ -92,7 +92,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 	defer fail.OnPanic(&xerr)
 
-	host, xerr := hostfactory.Load(task, svc, hostRef)
+	host, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -112,7 +112,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		user = abstract.DefaultUser
 	}
 
-	ip, xerr := host.GetAccessIP(task)
+	ip, xerr := host.GetAccessIP()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -124,35 +124,36 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 	}
 
 	var rs resources.Subnet
-	xerr = host.Inspect(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
 		if !ok {
 			return fail.InconsistentError("")
 		}
+
 		sshConfig.PrivateKey = ahc.PrivateKey
 
 		if props.Lookup(hostproperty.NetworkV2) {
-			return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 				var innerXErr fail.Error
 				if hnV2.DefaultSubnetID != "" {
-					rs, innerXErr = subnetfactory.Load(task, svc, "", hnV2.DefaultSubnetID)
+					rs, innerXErr = subnetfactory.Load(svc, "", hnV2.DefaultSubnetID)
 					return innerXErr
 				}
 				return nil
 			})
 		}
-		return props.Inspect(task, hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 			if hnV2.DefaultSubnetID != "" {
 				var innerXErr fail.Error
-				rs, innerXErr = subnetfactory.Load(task, svc, "", hnV2.DefaultSubnetID)
+				rs, innerXErr = subnetfactory.Load(svc, "", hnV2.DefaultSubnetID)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -172,11 +173,11 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		ok    bool
 	)
 
-	if _, xerr = host.GetPublicIP(task); xerr != nil {
+	if _, xerr = host.GetPublicIP(); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// gets primary gateway information
-			gw, xerr := rs.InspectGateway(task, true)
+			gw, xerr := rs.InspectGateway(true)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -185,17 +186,18 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 					return nil, xerr
 				}
 			} else {
-				xerr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				xerr = gw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					if gwahc, ok = clonable.(*abstract.HostCore); !ok {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
+
 					return nil
 				})
 				if xerr != nil {
 					return nil, xerr
 				}
 
-				if ip, xerr = gw.GetAccessIP(task); xerr != nil {
+				if ip, xerr = gw.GetAccessIP(); xerr != nil {
 					return nil, xerr
 				}
 				GatewayConfig := system.SSHConfig{
@@ -209,7 +211,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			}
 
 			// gets secondary gateway information
-			gw, xerr = rs.InspectGateway(task, false)
+			gw, xerr = rs.InspectGateway(false)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -221,7 +223,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 					return nil, xerr
 				}
 			} else {
-				xerr = gw.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				xerr = gw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					gwahc, ok = clonable.(*abstract.HostCore)
 					if !ok {
 						return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -232,7 +234,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 					return nil, xerr
 				}
 
-				if ip, xerr = gw.GetAccessIP(task); xerr != nil {
+				if ip, xerr = gw.GetAccessIP(); xerr != nil {
 					return nil, xerr
 				}
 				GatewayConfig := system.SSHConfig{
@@ -273,7 +275,7 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 	if xerr != nil {
 		return xerr
 	}
-	_, xerr = ssh.WaitServerReady(task, "ready", timeout)
+	_, xerr = ssh.WaitServerReady(task.GetContext(), "ready", timeout)
 	return xerr
 }
 
@@ -298,13 +300,13 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
-	host, xerr := hostfactory.Load(task, handler.job.GetService(), hostRef)
+	host, xerr := hostfactory.Load(handler.job.GetService(), hostRef)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
 
 	// retrieve ssh config to perform some commands
-	ssh, xerr := host.GetSSHConfig(task)
+	ssh, xerr := host.GetSSHConfig()
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -331,14 +333,14 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 // run executes command on the host
 func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (int, string, string, fail.Error) {
 	// Create the command
-	sshCmd, xerr := ssh.NewCommand(handler.job.GetTask(), cmd)
+	sshCmd, xerr := ssh.NewCommand(handler.job.GetTask().GetContext(), cmd)
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
 
 	defer func() { _ = sshCmd.Close() }()
 
-	return sshCmd.RunWithTimeout(handler.job.GetTask(), outputs.DISPLAY, duration)
+	return sshCmd.RunWithTimeout(handler.job.GetTask().GetContext(), outputs.DISPLAY, duration)
 }
 
 func extracthostName(in string) (string, fail.Error) {
@@ -346,9 +348,11 @@ func extracthostName(in string) (string, fail.Error) {
 	if len(parts) == 1 {
 		return "", nil
 	}
+
 	if len(parts) > 2 {
 		return "", fail.InvalidRequestError("too many parts in path")
 	}
+
 	hostName := strings.TrimSpace(parts[0])
 	for _, protocol := range []string{"file", "http", "https", "ftp"} {
 		if strings.ToLower(hostName) == protocol {
@@ -437,7 +441,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		upload = true
 	}
 
-	host, xerr := hostfactory.Load(task, handler.job.GetService(), hostName)
+	host, xerr := hostfactory.Load(handler.job.GetService(), hostName)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -448,6 +452,6 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return -1, "", "", xerr
 	}
 
-	cRc, cStcOut, cStdErr, cErr := ssh.Copy(handler.job.GetTask(), remotePath, localPath, upload)
+	cRc, cStcOut, cStdErr, cErr := ssh.Copy(handler.job.GetTask().GetContext(), remotePath, localPath, upload)
 	return cRc, cStcOut, cStdErr, cErr
 }

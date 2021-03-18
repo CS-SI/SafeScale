@@ -5,7 +5,7 @@ GO?=go
 all: generate
 
 generate:
-	@$(GO) generate
+	@$(GO) generate > /dev/null 2>&1
 
 vet:
 	@$(GO) vet ./...

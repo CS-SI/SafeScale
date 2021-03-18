@@ -17,21 +17,19 @@
 package securitygroup
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // List returns a list of available security groups
-func List(task concurrency.Task, svc iaas.Service, all bool) ([]*abstract.SecurityGroup, fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+func List(ctx context.Context, svc iaas.Service, all bool) ([]*abstract.SecurityGroup, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -46,7 +44,7 @@ func List(task concurrency.Task, svc iaas.Service, all bool) ([]*abstract.Securi
 		return nil, err
 	}
 	var list []*abstract.SecurityGroup
-	err = rsg.Browse(task, func(asg *abstract.SecurityGroup) fail.Error {
+	err = rsg.Browse(ctx, func(asg *abstract.SecurityGroup) fail.Error {
 		list = append(list, asg)
 		return nil
 	})
@@ -67,21 +65,6 @@ func New(svc iaas.Service) (_ resources.SecurityGroup, xerr fail.Error) {
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
-func Load(task concurrency.Task, svc iaas.Service, ref string) (_ resources.SecurityGroup, xerr fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-	if ref == "" {
-		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
-	}
-
-	// FIXME: tracer...
-
-	return operations.LoadSecurityGroup(task, svc, ref)
+func Load(svc iaas.Service, ref string) (_ resources.SecurityGroup, xerr fail.Error) {
+	return operations.LoadSecurityGroup(svc, ref)
 }

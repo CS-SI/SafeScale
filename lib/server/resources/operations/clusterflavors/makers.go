@@ -17,17 +17,15 @@
 package flavors
 
 import (
-	"bytes"
 	"sync/atomic"
 
 	rice "github.com/GeertJohan/go.rice"
+	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
 
 var (
@@ -36,31 +34,31 @@ var (
 
 // Makers ...
 type Makers struct {
-	MinimumRequiredServers func(task concurrency.Task, c resources.Cluster) (uint, uint, uint, fail.Error)  // returns masterCount, privateNodeCount, publicNodeCount
-	DefaultGatewaySizing   func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // sizing of gateway(s)
-	DefaultMasterSizing    func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of master(s)
-	DefaultNodeSizing      func(task concurrency.Task, c resources.Cluster) abstract.HostSizingRequirements // default sizing of node(s)
-	DefaultImage           func(task concurrency.Task, c resources.Cluster) string                          // default image of server(s)
-	// GetNodeInstallationScript func(task concurrency.Task, c resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map)
-	// GetGlobalSystemRequirements func(task concurrency.Task, c resources.Cluster) (string, fail.Error)
+	MinimumRequiredServers func(clusterIdentity abstract.ClusterIdentity) (uint, uint, uint, fail.Error) // returns masterCount, privateNodeCount, publicNodeCount
+	DefaultGatewaySizing   func(c resources.Cluster) abstract.HostSizingRequirements                     // sizing of gateway(s)
+	DefaultMasterSizing    func(c resources.Cluster) abstract.HostSizingRequirements                     // default sizing of master(s)
+	DefaultNodeSizing      func(c resources.Cluster) abstract.HostSizingRequirements                     // default sizing of node(s)
+	DefaultImage           func(c resources.Cluster) string                                              // default image of server(s)
+	// GetNodeInstallationScript func(c resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map)
+	// GetGlobalSystemRequirements func(c resources.Cluster) (string, fail.Error)
 	// GetTemplateBox         func() (*rice.Box, fail.Error)
-	ConfigureGateway       func(task concurrency.Task, c resources.Cluster) fail.Error
-	CreateMaster           func(task concurrency.Task, c resources.Cluster, index uint) fail.Error
-	ConfigureMaster        func(task concurrency.Task, c resources.Cluster, index uint, host resources.Host) fail.Error
-	UnconfigureMaster      func(task concurrency.Task, c resources.Cluster, host resources.Host) fail.Error
-	CreateNode             func(task concurrency.Task, c resources.Cluster, index uint, host resources.Host) fail.Error
-	ConfigureNode          func(task concurrency.Task, c resources.Cluster, index uint, host resources.Host) fail.Error
-	UnconfigureNode        func(task concurrency.Task, c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
-	ConfigureCluster       func(task concurrency.Task, c resources.Cluster) fail.Error
-	UnconfigureCluster     func(task concurrency.Task, c resources.Cluster) fail.Error
-	JoinMasterToCluster    func(task concurrency.Task, c resources.Cluster, host resources.Host) fail.Error
-	JoinNodeToCluster      func(task concurrency.Task, c resources.Cluster, host resources.Host) fail.Error
-	LeaveMasterFromCluster func(task concurrency.Task, c resources.Cluster, host resources.Host) fail.Error
-	LeaveNodeFromCluster   func(task concurrency.Task, c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
-	GetState               func(task concurrency.Task, c resources.Cluster) (clusterstate.Enum, fail.Error)
+	ConfigureGateway       func(c resources.Cluster) fail.Error
+	CreateMaster           func(c resources.Cluster, index uint) fail.Error
+	ConfigureMaster        func(c resources.Cluster, index uint, host resources.Host) fail.Error
+	UnconfigureMaster      func(c resources.Cluster, host resources.Host) fail.Error
+	CreateNode             func(c resources.Cluster, index uint, host resources.Host) fail.Error
+	ConfigureNode          func(c resources.Cluster, index uint, host resources.Host) fail.Error
+	UnconfigureNode        func(c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
+	ConfigureCluster       func(ctx context.Context, c resources.Cluster) fail.Error
+	UnconfigureCluster     func(c resources.Cluster) fail.Error
+	JoinMasterToCluster    func(c resources.Cluster, host resources.Host) fail.Error
+	JoinNodeToCluster      func(c resources.Cluster, host resources.Host) fail.Error
+	LeaveMasterFromCluster func(c resources.Cluster, host resources.Host) fail.Error
+	LeaveNodeFromCluster   func(c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
+	GetState               func(c resources.Cluster) (clusterstate.Enum, fail.Error)
 }
 
-func getTemplateBox() (*rice.Box, fail.Error) {
+func getTemplateBox() (*rice.Box, fail.Error) { //nolint
 	anon := templateBox.Load()
 	if anon == nil {
 		// Note: path MUST be literal for rice to work
@@ -74,46 +72,46 @@ func getTemplateBox() (*rice.Box, fail.Error) {
 	return anon.(*rice.Box), nil
 }
 
-func GetGlobalSystemRequirements(task concurrency.Task, c resources.Cluster) (string, fail.Error) {
-	// find the rice.Box
-	box, xerr := getTemplateBox()
-	if xerr != nil {
-		return "", xerr
-	}
+// func GetGlobalSystemRequirements(c resources.Cluster) (string, fail.Error) {
+// 	// find the rice.Box
+// 	box, xerr := getTemplateBox()
+// 	if xerr != nil {
+// 		return "", xerr
+// 	}
 
-	// We will need information from cluster network
-	netCfg, xerr := c.GetNetworkConfig(task)
-	if xerr != nil {
-		return "", xerr
-	}
+// 	// We will need information from cluster network
+// 	netCfg, xerr := c.GetNetworkConfig()
+// 	if xerr != nil {
+// 		return "", xerr
+// 	}
 
-	identity, xerr := c.GetIdentity(task)
-	if xerr != nil {
-		return "", xerr
-	}
+// 	identity, xerr := c.GetIdentity()
+// 	if xerr != nil {
+// 		return "", xerr
+// 	}
 
-	// get file contents as string
-	tmplString, err := box.String("node_install_requirements.sh")
-	if err != nil {
-		return "", fail.Wrap(err, "error loading script template")
-	}
+// 	// get file contents as string
+// 	tmplString, err := box.String("node_install_requirements.sh")
+// 	if err != nil {
+// 		return "", fail.Wrap(err, "error loading script template")
+// 	}
 
-	// parse then execute the template
-	tmplPrepared, err := template.Parse("node_install_requirements", tmplString)
-	if err != nil {
-		return "", fail.Wrap(err, "error parsing script template")
-	}
-	dataBuffer := bytes.NewBufferString("")
-	err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
-		"IPRanges":             netCfg.CIDR,
-		"ClusterAdminUsername": "cladm",
-		"ClusterAdminPassword": identity.AdminPassword,
-		"SSHPublicKey":         identity.Keypair.PublicKey,
-		"SSHPrivateKey":        identity.Keypair.PrivateKey,
-	})
-	if err != nil {
-		return "", fail.Wrap(err, "error realizing script template")
-	}
+// 	// parse then execute the template
+// 	tmplPrepared, err := template.Parse("node_install_requirements", tmplString)
+// 	if err != nil {
+// 		return "", fail.Wrap(err, "error parsing script template")
+// 	}
+// 	dataBuffer := bytes.NewBufferString("")
+// 	err = tmplPrepared.Execute(dataBuffer, map[string]interface{}{
+// 		"IPRanges":             netCfg.CIDR,
+// 		"ClusterAdminUsername": "cladm",
+// 		"ClusterAdminPassword": identity.AdminPassword,
+// 		"SSHPublicKey":         identity.Keypair.PublicKey,
+// 		"SSHPrivateKey":        identity.Keypair.PrivateKey,
+// 	})
+// 	if err != nil {
+// 		return "", fail.Wrap(err, "error realizing script template")
+// 	}
 
-	return dataBuffer.String(), nil
-}
+// 	return dataBuffer.String(), nil
+// }

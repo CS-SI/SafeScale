@@ -57,7 +57,7 @@ func (hif HostInstalledFeature) Clone() data.Clonable {
 // Replace ...
 // satisfies interface data.Clonable
 func (hif *HostInstalledFeature) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if hif == nil || p == nil {
 		return hif
 	}
@@ -104,7 +104,7 @@ func (hf HostFeatures) Clone() data.Clonable {
 
 // Replace ...  (data.Clonable interface)
 func (hf *HostFeatures) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if hf == nil || p == nil {
 		return hf
 	}

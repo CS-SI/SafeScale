@@ -28,7 +28,7 @@ import (
 type Enum int
 
 const (
-	UNKNOWN = iota
+	Unknown = iota
 	// IPv4 is IP v4 version
 	IPv4 Enum = 4
 	// IPv6 is IP v6 version
@@ -56,7 +56,7 @@ var (
 	}
 
 	enumMap = map[Enum]string{
-		UNKNOWN: "unknown",
+		Unknown: "unknown",
 		IPv4:    "IPv4",
 		IPv6:    "IPv6",
 	}
@@ -72,7 +72,7 @@ func Parse(v string) (Enum, fail.Error) {
 	)
 	lowered := strings.ToLower(v)
 	if e, ok = stringMap[lowered]; !ok {
-		return UNKNOWN, fail.NotFoundError("failed to find a ipversion.Enum corresponding to '%s'", v)
+		return Unknown, fail.NotFoundError("failed to find a ipversion.Enum corresponding to '%s'", v)
 	}
 	return e, nil
 

@@ -182,7 +182,7 @@ func (provider *provider) InspectHostByName(string) (*abstract.HostFull, fail.Er
 	return abstract.NewHostFull(), gReport
 }
 func (provider *provider) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
-	return hoststate.ERROR, gReport
+	return hoststate.Error, gReport
 }
 func (provider *provider) ListHosts(bool) (abstract.HostList, fail.Error) {
 	return nil, gReport
@@ -263,7 +263,7 @@ func (provider *provider) ListSecurityGroups(networkRef string) ([]*abstract.Sec
 }
 
 // CreateSecurityGroup creates a security group
-func (provider *provider) CreateSecurityGroup(networkRef, name, description string, rules []abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 
@@ -283,12 +283,12 @@ func (provider *provider) ClearSecurityGroup(stacks.SecurityGroupParameter) (*ab
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (provider *provider) AddRuleToSecurityGroup(stacks.SecurityGroupParameter, abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) AddRuleToSecurityGroup(stacks.SecurityGroupParameter, *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 
 // DeleteRuleFromSecurityGroup adds a rule to a security group
-func (provider *provider) DeleteRuleFromSecurityGroup(stacks.SecurityGroupParameter, abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (provider *provider) DeleteRuleFromSecurityGroup(stacks.SecurityGroupParameter, *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	return nil, gReport
 }
 

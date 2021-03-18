@@ -45,7 +45,11 @@ func (sgr *SecurityGroupRule) IsNull() bool {
 }
 
 // EqualTo is a strict equality tester between 2 rules
-func (sgr SecurityGroupRule) EqualTo(in SecurityGroupRule) bool {
+func (sgr *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
+	if sgr == nil || in == nil {
+		return false
+	}
+
 	if sgr.Description != in.Description {
 		return false
 	}
@@ -89,7 +93,11 @@ func (sgr SecurityGroupRule) EqualTo(in SecurityGroupRule) bool {
 }
 
 // EquivalentTo compares 2 rules, except ID and Description, to tell if the target is comparable
-func (sgr SecurityGroupRule) EquivalentTo(in SecurityGroupRule) bool {
+func (sgr *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
+	if sgr == nil || in == nil {
+		return false
+	}
+
 	if sgr.Direction != in.Direction {
 		return false
 	}
@@ -155,7 +163,7 @@ func (sgr SecurityGroupRule) EquivalentTo(in SecurityGroupRule) bool {
 
 // SourcesConcernGroups figures out if rule contains Security Group IDs as sources
 // By design, CIDR and SG ID cannot be mixed
-func (sgr SecurityGroupRule) SourcesConcernGroups() (bool, fail.Error) {
+func (sgr *SecurityGroupRule) SourcesConcernGroups() (bool, fail.Error) {
 	if sgr.IsNull() {
 		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
@@ -164,7 +172,7 @@ func (sgr SecurityGroupRule) SourcesConcernGroups() (bool, fail.Error) {
 
 // TargetsConcernGroups figures out if rule contains Security Group IDs as targets
 // By design, CIDR and SG ID cannot be mixed
-func (sgr SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
+func (sgr *SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
 	if sgr.IsNull() {
 		return false, fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
 	}
@@ -190,18 +198,49 @@ func concernsGroups(in []string) (bool, fail.Error) {
 }
 
 // NewSecurityGroupRule creates an abstract.SecurityGroupRule
-func NewSecurityGroupRule() SecurityGroupRule {
-	return SecurityGroupRule{}
+func NewSecurityGroupRule() *SecurityGroupRule {
+	return &SecurityGroupRule{}
+}
+
+// Clone does a deep-copy of the SecurityGroup
+//
+// satisfies interface data.Clonable
+func (sgr *SecurityGroupRule) Clone() data.Clonable {
+	return NewSecurityGroupRule().Replace(sgr)
+}
+
+// Replace ...
+// satisfies interface data.Clonable
+func (sgr *SecurityGroupRule) Replace(p data.Clonable) data.Clonable {
+	// Do not test with isNull(), it's allowed to clone a null value
+	if sgr == nil || p == nil {
+		return sgr
+	}
+
+	src := p.(*SecurityGroupRule)
+	*sgr = *src
+	sgr.IDs = make([]string, len(src.IDs))
+	copy(sgr.IDs, src.IDs)
+	sgr.Sources = make([]string, len(src.Sources))
+	copy(sgr.Sources, src.Sources)
+	return sgr
 }
 
 // SecurityGroupRules ...
-type SecurityGroupRules []SecurityGroupRule
+type SecurityGroupRules []*SecurityGroupRule
 
 // IndexOfEquivalentRule returns the index of the rule equivalent to the one provided
-func (sgr SecurityGroupRules) IndexOfEquivalentRule(rule SecurityGroupRule) (int, fail.Error) {
+func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (int, fail.Error) {
+	if sgrs == nil {
+		return -1, fail.InvalidInstanceError()
+	}
+	if rule == nil {
+		return -1, fail.InvalidParameterCannotBeNilError("rule")
+	}
+
 	found := false
 	index := -1
-	for k, v := range sgr {
+	for k, v := range sgrs {
 		if rule.EquivalentTo(v) {
 			found = true
 			index = k
@@ -215,10 +254,14 @@ func (sgr SecurityGroupRules) IndexOfEquivalentRule(rule SecurityGroupRule) (int
 }
 
 // IndexOfRuleByID returns the index of the rule containing the provider rule ID provided
-func (sgr SecurityGroupRules) IndexOfRuleByID(id string) (int, fail.Error) {
+func (sgrs SecurityGroupRules) IndexOfRuleByID(id string) (int, fail.Error) {
+	if sgrs == nil {
+		return -1, fail.InvalidInstanceError()
+	}
+
 	found := false
 	index := -1
-	for k, v := range sgr {
+	for k, v := range sgrs {
 		for _, item := range v.IDs {
 			if item == id {
 				found = true
@@ -237,17 +280,17 @@ func (sgr SecurityGroupRules) IndexOfRuleByID(id string) (int, fail.Error) {
 }
 
 // RemoveRuleByIndex removes a rule identified by its index and returns the corresponding SecurityGroupRules
-func (sgr SecurityGroupRules) RemoveRuleByIndex(index int) (SecurityGroupRules, fail.Error) {
+func (sgrs SecurityGroupRules) RemoveRuleByIndex(index int) (SecurityGroupRules, fail.Error) {
 	// Remove corresponding rule in asg, willingly maintaining order
-	length := len(sgr)
+	length := len(sgrs)
 	if index >= length {
-		return sgr, fail.InvalidParameterError("ruleIdx", "cannot be equal or greater to length of 'rules'")
+		return sgrs, fail.InvalidParameterError("ruleIdx", "cannot be equal or greater to length of 'rules'")
 	}
 
 	newRules := make(SecurityGroupRules, 0, length-1)
-	newRules = append(newRules, sgr[:index]...)
+	newRules = append(newRules, sgrs[:index]...)
 	if index < length-1 {
-		newRules = append(newRules, sgr[index+1:]...)
+		newRules = append(newRules, sgrs[index+1:]...)
 	}
 	return newRules, nil
 }
@@ -308,29 +351,31 @@ func (sg *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 
 // NewSecurityGroup ...
 func NewSecurityGroup() *SecurityGroup {
-	return &SecurityGroup{}
+	return &SecurityGroup{
+		Rules: SecurityGroupRules{},
+	}
 }
 
-// Clone does a deep-copy of the IPAddress
-//
+// Clone does a deep-copy of the SecurityGroup
 // satisfies interface data.Clonable
 func (sg SecurityGroup) Clone() data.Clonable {
 	return NewSecurityGroup().Replace(&sg)
 }
 
 // Replace ...
-//
 // satisfies interface data.Clonable
 func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value
+	// Do not test with isNull(), it's allowed to clone a null value
 	if sg == nil || p == nil {
 		return sg
 	}
 
 	src := p.(*SecurityGroup)
 	*sg = *src
-	sg.Rules = make(SecurityGroupRules, len(src.Rules))
-	copy(sg.Rules, src.Rules)
+	sg.Rules = make(SecurityGroupRules, 0, len(src.Rules))
+	for _, v := range src.Rules {
+		sg.Rules = append(sg.Rules, v.Clone().(*SecurityGroupRule))
+	}
 	return sg
 }
 

@@ -8,13 +8,13 @@ import (
 
 func Test_host_IsNull_Empty(t *testing.T) {
 	rh := &host{}
-	itis := rh.IsNull()
+	itis := rh.isNull()
 	require.True(t, itis)
 }
 
 func Test_host_IsNull_Nil(t *testing.T) {
 	var rh *host
 	//goland:noinspection GoNilness
-	itis := rh.IsNull()
+	itis := rh.isNull()
 	require.True(t, itis)
 }

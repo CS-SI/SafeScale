@@ -18,8 +18,7 @@ package concurrency
 
 import (
 	"encoding/json"
-
-	"github.com/sirupsen/logrus"
+	"sync"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -28,116 +27,121 @@ import (
 // Shielded allows to store data with controlled access to it
 type Shielded struct {
 	witness data.Clonable
-	lock    TaskedLock
+	// lock    TaskedLock
+	lock sync.RWMutex
 }
 
-// NewShielded creates a new protected data
+// NewShielded creates a new protected data from a cloned witness
 func NewShielded(witness data.Clonable) *Shielded {
 	return &Shielded{
-		witness: witness,
-		lock:    NewTaskedLock(),
+		witness: witness.Clone(),
+		// lock:    NewTaskedLock(),
 	}
 }
 
 // Clone ...
-func (d *Shielded) Clone() *Shielded {
-	return NewShielded(d.witness.Clone())
+func (instance *Shielded) Clone() *Shielded {
+	return NewShielded(instance.witness.Clone())
 }
 
 // Inspect is used to lock a clonable for read
-func (d *Shielded) Inspect(task Task, inspector func(clonable data.Clonable) fail.Error) (xerr fail.Error) {
-	if d == nil {
+func (instance *Shielded) Inspect( /*task Task, */ inspector func(clonable data.Clonable) fail.Error) (xerr fail.Error) {
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+	// if task == nil {
+	// 	return fail.InvalidParameterCannotBeNilError("task")
+	// }
 	if inspector == nil {
 		return fail.InvalidParameterCannotBeNilError("inspector")
 	}
-	if d.witness == nil {
+	if instance.witness == nil {
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
 
-	if xerr = d.lock.RLock(task); xerr != nil {
-		return xerr
-	}
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
-	defer func() {
-		unlockErr := d.lock.RUnlock(task)
-		if unlockErr != nil {
-			logrus.Warn(unlockErr)
-		}
-		if xerr == nil && unlockErr != nil {
-			xerr = unlockErr
-		}
-	}()
+	// if xerr = d.lock.RLock(task); xerr != nil {
+	// 	return xerr
+	// }
+	instance.lock.RLock()
+	// defer func() {
+	// 	unlockErr := d.lock.RUnlock(task)
+	// 	if unlockErr != nil {
+	// 		logrus.Warn(unlockErr)
+	// 	}
+	// 	if xerr == nil && unlockErr != nil {
+	// 		xerr = unlockErr
+	// 	}
+	// }()
+	defer instance.lock.RUnlock()
 
-	return inspector(d.witness.Clone())
+	return inspector(instance.witness.Clone())
 }
 
 // Alter allows to update a cloneable using a write lock
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
 // The caller of the Alter() method will then be able to known, when an error occurs, if it's because there was no change.
-func (d *Shielded) Alter(task Task, alterer func(data.Clonable) fail.Error) (xerr fail.Error) {
-	if d == nil {
+func (instance *Shielded) Alter( /*task Task, */ alterer func(data.Clonable) fail.Error) (xerr fail.Error) {
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+	// if task == nil {
+	// 	return fail.InvalidParameterCannotBeNilError("task")
+	// }
 	if alterer == nil {
 		return fail.InvalidParameterCannotBeNilError("alterer")
 	}
-	if d.witness == nil {
+	if instance.witness == nil {
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
 	}
 
-	xerr = d.lock.Lock(task)
-	if xerr != nil {
-		return xerr
-	}
-	defer func() {
-		unlockErr := d.lock.Unlock(task)
-		if unlockErr != nil {
-			logrus.Warn(unlockErr)
-		}
-		if xerr == nil && unlockErr != nil {
-			xerr = unlockErr
-		}
-	}()
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
-	clone := d.witness.Clone()
+	instance.lock.Lock()
+	// if xerr = d.lock.Lock(task); xerr != nil {
+	// 	return xerr
+	// }
+	defer instance.lock.Unlock()
+	// defer func() {
+	// 	unlockErr := d.lock.Unlock(task)
+	// 	if unlockErr != nil {
+	// 		logrus.Warn(unlockErr)
+	// 	}
+	// 	if xerr == nil && unlockErr != nil {
+	// 		xerr = unlockErr
+	// 	}
+	// }()
+
+	clone := instance.witness.Clone()
 	if xerr = alterer(clone); xerr != nil {
 		return xerr
 	}
 
-	_ = d.witness.Replace(clone)
+	_ = instance.witness.Replace(clone)
 	return nil
 }
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (d *Shielded) Serialize(task Task) ([]byte, fail.Error) {
-	if d == nil {
+func (instance *Shielded) Serialize( /*task Task*/ ) ([]byte, fail.Error) {
+	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
+	// if task == nil {
+	// 	return nil, fail.InvalidParameterCannotBeNilError("task")
+	// }
+	// if task.Aborted() {
+	// 	return nil, fail.AbortedError(nil, "aborted")
+	// }
 
 	var jsoned []byte
-	xerr := d.Inspect(task, func(clonable data.Clonable) fail.Error {
+	xerr := instance.Inspect(func(clonable data.Clonable) fail.Error {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(clonable)
 		if innerErr != nil {
@@ -154,25 +158,19 @@ func (d *Shielded) Serialize(task Task) ([]byte, fail.Error) {
 
 // Deserialize transforms serialization data to valid content of Shielded instance
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (d *Shielded) Deserialize(task Task, buf []byte) fail.Error {
-	if d == nil {
+func (instance *Shielded) Deserialize(buf []byte) fail.Error {
+	if instance == nil {
 		return fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
 	}
 	if len(buf) == 0 {
 		return fail.InvalidParameterError("buf", "cannot be empty []byte")
 	}
 
-	return d.Alter(task, func(clonable data.Clonable) fail.Error {
-		innerErr := json.Unmarshal(buf, clonable)
-		if innerErr != nil {
+	return instance.Alter(func(clonable data.Clonable) fail.Error {
+		if innerErr := json.Unmarshal(buf, clonable); innerErr != nil {
 			return fail.SyntaxError("failed to unmarshal: %s", innerErr.Error())
 		}
+
 		return nil
 	})
 }

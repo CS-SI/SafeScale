@@ -17,34 +17,33 @@
 package cluster
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // List returns a list of available hosts
-func List(task concurrency.Task, svc iaas.Service) (list []abstract.ClusterIdentity, xerr fail.Error) {
-	var nullList []abstract.ClusterIdentity
+func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentity, xerr fail.Error) {
+	var emptyList []abstract.ClusterIdentity
 
-	if task == nil {
-		return nullList, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if svc == nil {
-		return nullList, fail.InvalidParameterCannotBeNilError("svc")
+		return emptyList, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	objc, xerr := New(task, svc)
+	objc, xerr := New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	list = []abstract.ClusterIdentity{}
-	xerr = objc.Browse(task, func(hc *abstract.ClusterIdentity) fail.Error {
+	xerr = objc.Browse(ctx, func(hc *abstract.ClusterIdentity) fail.Error {
 		list = append(list, *hc)
 		return nil
 	})
@@ -52,31 +51,11 @@ func List(task concurrency.Task, svc iaas.Service) (list []abstract.ClusterIdent
 }
 
 // New creates a new instance of resources.Cluster
-func New(task concurrency.Task, svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
-	if task != nil {
-		if task.Aborted() {
-			return nil, fail.AbortedError(nil, "aborted")
-		}
-	}
-
-	return operations.NewCluster(task, svc)
+func New(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
+	return operations.NewCluster(svc)
 }
 
 // Load loads metadata of a cluster and returns an instance of resources.Cluster
-func Load(task concurrency.Task, svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
-
-	return operations.LoadCluster(task, svc, name)
+func Load(svc iaas.Service, name string) (_ resources.Cluster, xerr fail.Error) {
+	return operations.LoadCluster(svc, name)
 }

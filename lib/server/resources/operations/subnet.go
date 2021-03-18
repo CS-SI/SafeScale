@@ -17,20 +17,19 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"reflect"
 	"strings"
 	"sync"
-	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
@@ -39,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -51,6 +51,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -72,9 +73,9 @@ const (
 type subnet struct {
 	*core
 
-	cacheLock      *sync.Mutex
-	cachedGateways [2]*host
-	cachedNetwork  resources.Network
+	lock          sync.RWMutex
+	gateways      [2]*host
+	parentNetwork resources.Network
 }
 
 func nullSubnet() *subnet {
@@ -82,17 +83,23 @@ func nullSubnet() *subnet {
 }
 
 // ListSubnets returns a list of available subnets
-func ListSubnets(task concurrency.Task, svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, xerr fail.Error) {
+func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bool) (_ []*abstract.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	if all {
@@ -106,7 +113,11 @@ func ListSubnets(task concurrency.Task, svc iaas.Service, networkID string, all 
 
 	// recover subnets from metadata
 	var list []*abstract.Subnet
-	xerr = rs.Browse(task, func(as *abstract.Subnet) fail.Error {
+	xerr = rs.Browse(ctx, func(as *abstract.Subnet) fail.Error {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
 		if networkID == "" || as.Network == networkID {
 			list = append(list, as)
 		}
@@ -132,116 +143,109 @@ func NewSubnet(svc iaas.Service) (_ resources.Subnet, xerr fail.Error) {
 		return nullSubnet(), xerr
 	}
 
-	out := &subnet{
-		core:      coreInstance,
-		cacheLock: &sync.Mutex{},
+	instance := &subnet{
+		core: coreInstance,
 	}
-	return out, nil
+	return instance, nil
 }
 
-// lookupSubnet tells if a Subnet exists
-func lookupSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string) (_ bool, xerr fail.Error) {
-	if task == nil {
-		return false, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
-	}
-	if task.Aborted() {
-		return false, fail.AbortedError(nil, "aborted")
-	}
-	if svc == nil {
-		return false, fail.InvalidParameterError("svc", "cannot be null value")
-	}
-	if subnetRef == "" {
-		return false, fail.InvalidParameterError("subnetRef", "cannot be empty string")
-	}
+// VPL: not used anymore
+// // lookupSubnet tells if a Subnet exists
+// func lookupSubnet(/* ctx context.Context, */svc iaas.Service, networkRef, subnetRef string) (_ bool, xerr fail.Error) {
+// 	if task == nil {
+// 		return false, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
+// 	}
+// 	if task.Aborted() {
+// 		return false, fail.AbortedError(nil, "aborted")
+// 	}
+// 	if svc == nil {
+// 		return false, fail.InvalidParameterError("svc", "cannot be null value")
+// 	}
+// 	if subnetRef == "" {
+// 		return false, fail.InvalidParameterError("subnetRef", "cannot be empty string")
+// 	}
 
-	var subnetID string
-	if networkRef != "" {
-		// If networkRef is not empty, make sure the subnetRef is inside the network
-		rn, xerr := LoadNetwork(task, svc, networkRef)
-		if xerr != nil {
-			return false, xerr
-		}
+// 	var subnetID string
+// 	if networkRef != "" {
+// 		// If networkRef is not empty, make sure the subnetRef is inside the network
+// 		rn, xerr := LoadNetwork(task, svc, networkRef)
+// 		if xerr != nil {
+// 			return false, xerr
+// 		}
 
-		xerr = rn.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				var found bool
-				for k, v := range subnetsV1.ByName {
-					if k == subnetRef || v == subnetRef {
-						subnetID = v
-						found = true
-						break
-					}
-				}
-				if !found {
-					return fail.NotFoundError("failed to find a Subnet referenced by '%s' in Network '%s'", subnetRef, rn.GetName())
-				}
-				return nil
-			})
-		})
-		if xerr != nil {
-			return false, xerr
-		}
-	} else {
-		// If networkRef is empty, subnetRef must be subnetID
-		subnetID = subnetRef
-	}
+// 		xerr = rn.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+// 			return props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+// 				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+// 				if !ok {
+// 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+// 				}
+// 				var found bool
+// 				for k, v := range subnetsV1.ByName {
+// 					if k == subnetRef || v == subnetRef {
+// 						subnetID = v
+// 						found = true
+// 						break
+// 					}
+// 				}
+// 				if !found {
+// 					return fail.NotFoundError("failed to find a Subnet referenced by '%s' in Network '%s'", subnetRef, rn.GetName())
+// 				}
+// 				return nil
+// 			})
+// 		})
+// 		if xerr != nil {
+// 			return false, xerr
+// 		}
+// 	} else {
+// 		// If networkRef is empty, subnetRef must be subnetID
+// 		subnetID = subnetRef
+// 	}
 
-	rs, xerr := NewSubnet(svc)
-	if xerr != nil {
-		return false, xerr
-	}
-	xerr = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			return rs.ReadByID(task, subnetID)
-		},
-		10*time.Second, // FIXME: parameterize
-	)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			return false, nil
-		default:
-			return false, xerr
-		}
-	}
-	return true, nil
-}
+// 	rs, xerr := NewSubnet(svc)
+// 	if xerr != nil {
+// 		return false, xerr
+// 	}
+// 	xerr = retry.WhileUnsuccessfulDelay1Second(
+// 		func() error {
+// 			return rs.ReadByID(task, subnetID)
+// 		},
+// 		10*time.Second, // FIXME: parameterize
+// 	)
+// 	if xerr != nil {
+// 		switch xerr.(type) {
+// 		case *fail.ErrNotFound:
+// 			return false, nil
+// 		default:
+// 			return false, xerr
+// 		}
+// 	}
+// 	return true, nil
+// }
 
 // LoadSubnet loads the metadata of a subnet
-func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef string) (rs resources.Subnet, xerr fail.Error) {
+func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if task == nil {
-		return nullSubnet(), fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nullSubnet(), fail.AbortedError(nil, "aborted")
-	}
 	if svc == nil {
 		return nullSubnet(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
 		return nullSubnet(), fail.InvalidParameterError("subnetRef", "cannot be empty string")
 	}
+
+	// -- First step: identify subnetID from (networkRef, subnetRef) --
+	var (
+		subnetID string
+		rn       resources.Network
+	)
 	networkRef = strings.TrimSpace(networkRef)
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	// First step: identify subnetID from (networkRef, subnetRef)
-	var subnetID string
 	switch networkRef {
 	case "":
 		// If networkRef is empty, subnetRef must be subnetID
 		subnetID = subnetRef
 	default:
 		// Try to load Network metadata
-		rn, xerr := LoadNetwork(task, svc, networkRef)
+		rn, xerr = LoadNetwork(svc, networkRef)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -250,14 +254,16 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 				return nil, xerr
 			}
 		}
+
 		if rn != nil { //nolint
 			// Network metadata loaded, find the ID of the Subnet (subnetRef may be ID or Name)
-			xerr = rn.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			xerr = rn.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 					subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
+
 					var found bool
 					for k, v := range subnetsV1.ByName {
 						if k == subnetRef || v == subnetRef {
@@ -281,12 +287,14 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 			if xerr != nil {
 				return nil, xerr
 			}
+
 			if an.Name == networkRef || an.ID == networkRef {
 				// We are in default Network context, query subnet list and search for the one requested
-				list, xerr := ListSubnets(task, svc, an.ID, false)
+				list, xerr := ListSubnets(context.TODO(), svc, an.ID, false)
 				if xerr != nil {
 					return nil, xerr
 				}
+
 				for _, v := range list {
 					if v.ID == subnetRef || v.Name == subnetRef {
 						subnetID = v.ID
@@ -300,10 +308,7 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 		}
 	}
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
+	// -- second step: search instance in service cache
 	xerr = fail.NotFoundError()
 	if subnetID != "" {
 		subnetCache, xerr := svc.GetCache(subnetKind)
@@ -319,14 +324,14 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 				}
 
 				// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-				if innerXErr = rs.ReadByID(task, subnetID); innerXErr != nil {
+				if innerXErr = rs.ReadByID(subnetID); innerXErr != nil {
 					return nil, innerXErr
 				}
 
-				return rs, nil
+				return rs, rs.(*subnet).updateCachedInformation()
 			}),
 		}
-		cacheEntry, xerr := subnetCache.Get(task, subnetID, options...)
+		cacheEntry, xerr := subnetCache.Get(subnetID, options...)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -341,6 +346,7 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 		}()
 	}
 
+	// -- deal with instance not found and unable to create --
 	if rs == nil {
 		if networkRef != "" {
 			// rewrite NotFoundError, user does not bother about metadata stuff
@@ -348,54 +354,121 @@ func LoadSubnet(task concurrency.Task, svc iaas.Service, networkRef, subnetRef s
 		}
 		return nullSubnet(), fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
 	}
-
 	return rs, nil
 }
 
-// IsNull tells if the instance corresponds to subnet Null Value
-func (rs *subnet) IsNull() bool {
-	return rs == nil || rs.core.IsNull()
-}
+// updateCachedInformation updates the information cached in instance because will be frequently used and will not changed over time
+func (instance *subnet) updateCachedInformation() fail.Error {
+	var networkID, primaryGatewayID, secondaryGatewayID string
+	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
 
-// Carry overloads rv.core.Carry() to add Volume to service cache
-func (rs *subnet) Carry(task concurrency.Task, clonable data.Clonable) (xerr fail.Error) {
-	if rs.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-
-	// Note: do not validate parameters, this call will do it
-	if xerr := rs.core.Carry(task, clonable); xerr != nil {
-		return xerr
-	}
-
-	subnetCache, xerr := rs.GetService().GetCache(subnetKind)
+		networkID = as.Network
+		if len(as.GatewayIDs) > 0 {
+			primaryGatewayID = as.GatewayIDs[0]
+		}
+		if len(as.GatewayIDs) > 1 {
+			secondaryGatewayID = as.GatewayIDs[1]
+		}
+		return nil
+	})
 	if xerr != nil {
 		return xerr
 	}
 
-	cacheEntry, xerr := subnetCache.AddEntry(task, rs)
+	if primaryGatewayID != "" {
+		hostInstance, xerr := LoadHost(instance.GetService(), primaryGatewayID)
+		if xerr != nil {
+			return xerr
+		}
+
+		instance.gateways[0] = hostInstance.(*host)
+	}
+	if secondaryGatewayID != "" {
+		hostInstance, xerr := LoadHost(instance.GetService(), secondaryGatewayID)
+		if xerr != nil {
+			return xerr
+		}
+
+		instance.gateways[1] = hostInstance.(*host)
+	}
+
+	if instance.parentNetwork == nil {
+		networkInstance, xerr := LoadNetwork(instance.GetService(), networkID)
+		if xerr != nil {
+			return xerr
+		}
+		instance.parentNetwork = networkInstance.(*network)
+	}
+
+	return nil
+}
+
+// isNull tells if the instance corresponds to subnet Null Value
+func (instance *subnet) isNull() bool {
+	return instance == nil || instance.core.isNull()
+}
+
+// carry wraps rv.core.Carry() to add Volume to service cache
+func (instance *subnet) carry(clonable data.Clonable) (xerr fail.Error) {
+	if clonable == nil {
+		return fail.InvalidParameterCannotBeNilError("clonable")
+	}
+	identifiable, ok := clonable.(data.Identifiable)
+	if !ok {
+		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
+	}
+
+	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
+	if xerr != nil {
+		return xerr
+	}
+
+	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
+		return xerr
+	}
+	defer func() {
+		if xerr != nil {
+			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
+			}
+		}
+	}()
+
+	// Note: do not validate parameters, this call will do it
+	if xerr := instance.core.carry(clonable); xerr != nil {
+		return xerr
+	}
+
+	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
 	if xerr != nil {
 		return xerr
 	}
 
 	cacheEntry.LockContent()
-	return nil
+
+	return instance.updateCachedInformation()
 }
 
 // Create creates a subnet
 // FIXME: split up this function for readability
-func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
+func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: do not use .IsNull() here
-	if rs == nil {
+	// Note: do not use .isNull() here
+	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
@@ -404,23 +477,26 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr)
 
-	rn, an, xerr := rs.validateNetwork(task, &req)
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	rn, an, xerr := instance.validateNetwork(&req)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Check if subnet already exists and is managed by SafeScale
-	if xerr = rs.checkUnicity(task, req); xerr != nil {
+	if xerr = instance.checkUnicity(req); xerr != nil {
 		return xerr
 	}
 
 	// Verify the CIDR is not routable
-	if xerr = rs.validateCIDR(&req, *an); xerr != nil {
+	if xerr = instance.validateCIDR(&req, *an); xerr != nil {
 		return fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
 
 	// Create the subnet
-	svc := rs.GetService()
+	svc := instance.GetService()
 	as, xerr := svc.CreateSubnet(req)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -434,73 +510,61 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	// Starting from here, delete subnet if exiting with error
 	defer func() {
 		if xerr != nil && as != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
-
-			if derr := svc.DeleteSubnet(as.ID); derr != nil {
+			if derr := instance.deleteSubnetAndConfirm(as.ID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", actionFromError(xerr)))
 			}
 		}
 	}()
 
-	// Write subnet object metadata
-	if xerr = rs.Carry(task, as); xerr != nil {
+	// Write subnet object metadata and updates the service cache
+	if xerr = instance.carry(as); xerr != nil {
 		return xerr
 	}
 
 	// Starting from here, delete subnet metadata if exiting with error
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
-
-			if derr := rs.core.Delete(task); derr != nil {
+			if derr := instance.core.delete(); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete subnet metadata", actionFromError(xerr)))
 			}
 		}
 	}()
 
 	var subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup
-	if subnetGWSG, xerr = rs.createGWSecurityGroup(task, req, *as, *an); xerr != nil {
+	if subnetGWSG, xerr = instance.createGWSecurityGroup(ctx, req /* *as, */, *an); xerr != nil {
 		return xerr
 	}
-	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetGWSG)
+	defer instance.undoCreateSecurityGroup(&xerr, req.KeepOnFailure, subnetGWSG)
 
-	if subnetInternalSG, xerr = rs.createInternalSecurityGroup(task, req, *as, *an); xerr != nil {
+	if subnetInternalSG, xerr = instance.createInternalSecurityGroup(ctx, req /* *as, */, *an); xerr != nil {
 		return xerr
 	}
-	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetInternalSG)
+	defer instance.undoCreateSecurityGroup(&xerr, req.KeepOnFailure, subnetInternalSG)
 
-	if xerr = subnetGWSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
+	if xerr = subnetGWSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
 		return xerr
 	}
 
-	if subnetPublicIPSG, xerr = rs.createPublicIPSecurityGroup(task, req, *as, *an); xerr != nil {
+	if subnetPublicIPSG, xerr = instance.createPublicIPSecurityGroup(ctx, req /* *as,*/, *an); xerr != nil {
 		return xerr
 	}
-	defer rs.undoCreateSecurityGroup(task, &xerr, req.KeepOnFailure, subnetPublicIPSG)
+	defer instance.undoCreateSecurityGroup(&xerr, req.KeepOnFailure, subnetPublicIPSG)
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
-
-			if derr := subnetGWSG.UnbindFromSubnet(task, rs); derr != nil {
+			if derr := subnetGWSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateway from subnet", actionFromError(xerr)))
 			}
 		}
 	}()
 
-	if xerr = subnetInternalSG.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault); xerr != nil {
+	if xerr = subnetInternalSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault); xerr != nil {
 		return xerr
 	}
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
-
-			if derr := subnetInternalSG.UnbindFromSubnet(task, rs); derr != nil {
+			if derr := subnetInternalSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for Hosts from Subnet", actionFromError(xerr)))
 			}
 		}
@@ -508,9 +572,9 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 
 	// IDs of Security Groups to attach to IPAddress used as gateway
 	sgs := map[string]struct{}{
-		subnetGWSG.GetID():       struct{}{},
-		subnetInternalSG.GetID(): struct{}{},
-		subnetPublicIPSG.GetID(): struct{}{},
+		subnetGWSG.GetID():       {},
+		subnetInternalSG.GetID(): {},
+		subnetPublicIPSG.GetID(): {},
 	}
 
 	caps := svc.GetCapabilities()
@@ -525,8 +589,9 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	}
 
 	// Creates VIP for gateways if asked for
+	var avip *abstract.VirtualIP
 	if failover {
-		if as.VIP, xerr = svc.CreateVIP(as.Network, as.ID, fmt.Sprintf(virtualIPNamePattern, as.Name, an.Name), []string{subnetGWSG.GetID()}); xerr != nil {
+		if avip, xerr = svc.CreateVIP(as.Network, as.ID, fmt.Sprintf(virtualIPNamePattern, as.Name, an.Name), []string{subnetGWSG.GetID()}); xerr != nil {
 			return fail.Wrap(xerr, "failed to create VIP")
 		}
 
@@ -540,19 +605,20 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}()
 	}
 
-	xerr = rs.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		as.State = subnetstate.GATEWAY_CREATION //nolint
+		as.VIP = avip
+		as.State = subnetstate.GatewayCreation
 		as.GWSecurityGroupID = subnetGWSG.GetID()
 		as.InternalSecurityGroupID = subnetInternalSG.GetID()
 		as.PublicIPSecurityGroupID = subnetPublicIPSG.GetID()
 
 		// Creates the bind between the subnet default security group and the subnet
-		return props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		return props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -582,12 +648,13 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 
 	// attach Subnet to Network, if Network is not default Network (in this case, it has no metadata)
 	if rn != nil {
-		xerr = rn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+		xerr = rn.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 				nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
+
 				nsV1.ByID[as.ID] = as.Name
 				nsV1.ByName[as.Name] = as.ID
 				return nil
@@ -600,15 +667,13 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		// Starting from here, remove Subnet from Network metadata if exiting with error
 		defer func() {
 			if xerr != nil && !req.KeepOnFailure {
-				// Disable abort signal during clean up
-				defer task.DisarmAbortSignal()()
-
-				derr := rn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Alter(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+				derr := rn.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 						nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 						if !ok {
 							return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
+
 						delete(nsV1.ByID, as.ID)
 						delete(nsV1.ByName, as.Name)
 						return nil
@@ -669,7 +734,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		return fail.Wrap(xerr, "failed to find image '%s'", gwSizing.Image)
 	}
 
-	subnetName := rs.GetName()
+	subnetName := instance.GetName()
 	var primaryGatewayName, secondaryGatewayName string
 	if failover || gwname == "" {
 		primaryGatewayName = "gw-" + subnetName
@@ -684,12 +749,6 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	if domain != "" {
 		domain = "." + domain
 	}
-	//
-	// keypairName := "kp_" + subnetName
-	// keypair, xerr := svc.CreateKeyPair(keypairName)
-	// if xerr != nil {
-	// 	return xerr
-	// }
 
 	keepalivedPassword, err := utils.GeneratePassword(16)
 	if err != nil {
@@ -710,15 +769,20 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		primaryGateway, secondaryGateway   *host
 		primaryUserdata, secondaryUserdata *userdata.Content
 		primaryTask, secondaryTask         concurrency.Task
-		secondaryErr                       fail.Error
-		secondaryResult                    concurrency.TaskResult
+		// secondaryErr                       fail.Error
+		// secondaryResult                    concurrency.TaskResult
 	)
+
+	tg, xerr := concurrency.NewTaskGroupWithContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
 
 	// Starts primary gateway creation
 	primaryRequest := gwRequest
 	primaryRequest.ResourceName = primaryGatewayName
 	primaryRequest.HostName = primaryGatewayName + domain
-	primaryTask, xerr = task.StartInSubtask(rs.taskCreateGateway, taskCreateGatewayParameters{
+	primaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
 		request: primaryRequest,
 		sizing:  *gwSizing,
 	})
@@ -734,7 +798,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		if req.Domain != "" {
 			secondaryRequest.HostName = secondaryGatewayName + domain
 		}
-		secondaryTask, xerr = task.StartInSubtask(rs.taskCreateGateway, taskCreateGatewayParameters{
+		secondaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
 			request: secondaryRequest,
 			sizing:  *gwSizing,
 		})
@@ -743,49 +807,160 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 		}
 	}
 
-	primaryResult, primaryErr := primaryTask.Wait()
-	if primaryErr == nil {
-		result, ok := primaryResult.(data.Map)
-		if !ok {
-			return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(primaryResult).String())
-		}
-		primaryGateway = result["host"].(*host)
-		primaryUserdata = result["userdata"].(*userdata.Content)
-		primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+	// primaryResult, primaryErr := primaryTask.Wait()
+	// if primaryErr == nil {
+	// 	result, ok := primaryResult.(data.Map)
+	// 	if !ok {
+	// 		return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(primaryResult).String())
+	// 	}
+	// 	primaryGateway = result["host"].(*host)
+	// 	primaryUserdata = result["userdata"].(*userdata.Content)
+	// 	primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
-		// Starting from here, deletes the primary gateway if exiting with error
-		defer func() {
-			if xerr != nil && !req.KeepOnFailure {
-				// Disable abort signal during clean up
-				defer task.DisarmAbortSignal()()
+	// 	// Starting from here, deletes the primary gateway if exiting with error
+	// 	defer func() {
+	// 		if xerr != nil && !req.KeepOnFailure {
+	// 			logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
+	// 			if derr := primaryGateway.relaxedDeleteHost(context.Background()); xerr != nil {
+	// 				switch derr.(type) {
+	// 				case *fail.ErrTimeout:
+	// 					logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
+	// 				default:
+	// 				}
+	// 				_ = xerr.AddConsequence(derr)
+	// 			} else {
+	// 				logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
+	// 			}
+	// 			if failover {
+	// 				if derr := instance.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
+	// 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
+	// 				}
+	// 			}
+	// 		}
+	// 	}()
+	// }
+	// if failover && secondaryTask != nil {
+	// 	secondaryResult, secondaryErr = secondaryTask.Wait()
+	// 	if secondaryErr == nil {
+	// 		result, ok := secondaryResult.(data.Map)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(secondaryResult).String())
+	// 		}
 
-				logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
-				if derr := primaryGateway.relaxedDeleteHost(task); xerr != nil {
-					switch derr.(type) {
-					case *fail.ErrTimeout:
-						logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
-					default:
-					}
-					_ = xerr.AddConsequence(derr)
-				} else {
-					logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
-				}
-				if failover {
-					if derr := rs.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
-					}
-				}
-			}
-		}()
+	// 		secondaryGateway = result["host"].(*host)
+	// 		secondaryUserdata = result["userdata"].(*userdata.Content)
+	// 		secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+
+	// 		// Starting from here, deletes the secondary gateway if exiting with error
+	// 		defer func() {
+	// 			if xerr != nil && !req.KeepOnFailure {
+	// 				// Disable abort signal during clean up
+	// 				defer task.DisarmAbortSignal()()
+
+	// 				if derr := secondaryGateway.relaxedDeleteHost(ctx); xerr != nil {
+	// 					switch derr.(type) {
+	// 					case *fail.ErrTimeout:
+	// 						logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
+	// 					default:
+	// 					}
+	// 					_ = xerr.AddConsequence(derr)
+	// 				}
+	// 				if derr := instance.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
+	// 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
+	// 				}
+	// 			}
+	// 		}()
+	// 	}
+	// }
+	// if primaryErr != nil {
+	// 	return fail.Wrap(primaryErr, "failed to create gateway '%s'", primaryGatewayName)
+	// }
+	// if secondaryErr != nil {
+	// 	return fail.Wrap(secondaryErr, "failed to create gateway '%s'", secondaryGatewayName)
+	// }
+	results, groupXErr := tg.WaitGroup()
+	if results == nil && groupXErr != nil {
+		return groupXErr
 	}
-	if failover && secondaryTask != nil {
-		secondaryResult, secondaryErr = secondaryTask.Wait()
-		if secondaryErr == nil {
-			result, ok := secondaryResult.(data.Map)
-			if !ok {
-				return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(secondaryResult).String())
-			}
 
+	id, xerr := primaryTask.GetID()
+	if xerr != nil {
+		if groupXErr == nil {
+			groupXErr = xerr
+		} else {
+			_ = groupXErr.AddConsequence(xerr)
+		}
+	} else {
+		if _, ok := results[id]; !ok {
+			return fail.InconsistentError("task results doesn't contain %s", id)
+		}
+
+		result, ok := results[id].(data.Map)
+		if !ok {
+			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+			if groupXErr == nil {
+				groupXErr = xerr
+			} else {
+				_ = groupXErr.AddConsequence(xerr)
+			}
+		} else {
+			primaryGateway = result["host"].(*host)
+			primaryUserdata = result["userdata"].(*userdata.Content)
+			primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
+
+			// Starting from here, deletes the primary gateway if exiting with error
+			defer func() {
+				if xerr != nil && !req.KeepOnFailure {
+					logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
+					if derr := primaryGateway.relaxedDeleteHost(context.Background()); xerr != nil {
+						switch derr.(type) {
+						case *fail.ErrTimeout:
+							logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
+						default:
+						}
+						_ = xerr.AddConsequence(derr)
+					} else {
+						logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
+					}
+					if failover {
+						if derr := instance.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
+							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
+						}
+					}
+				}
+			}()
+
+			// Bind Internal Security Group to gateway
+			if xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway); xerr != nil {
+				return xerr
+			}
+			defer instance.undoBindInternalSecurityGroupToGateway(ctx, primaryGateway, req.KeepOnFailure, &xerr)
+		}
+	}
+
+	if failover {
+		id, xerr := secondaryTask.GetID()
+		if xerr != nil {
+			if groupXErr == nil {
+				groupXErr = xerr
+			} else {
+				_ = groupXErr.AddConsequence(xerr)
+			}
+		}
+
+		if _, ok := results[id]; !ok {
+			return fail.InconsistentError("task results doesn't contain %s", id)
+		}
+
+		result, ok := results[id].(data.Map)
+		if !ok {
+			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+			if groupXErr == nil {
+				groupXErr = xerr
+			} else {
+				_ = groupXErr.AddConsequence(xerr)
+			}
+		} else {
 			secondaryGateway = result["host"].(*host)
 			secondaryUserdata = result["userdata"].(*userdata.Content)
 			secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
@@ -793,10 +968,7 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
 				if xerr != nil && !req.KeepOnFailure {
-					// Disable abort signal during clean up
-					defer task.DisarmAbortSignal()()
-
-					if derr := secondaryGateway.relaxedDeleteHost(task); xerr != nil {
+					if derr := secondaryGateway.relaxedDeleteHost(ctx); xerr != nil {
 						switch derr.(type) {
 						case *fail.ErrTimeout:
 							logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
@@ -804,30 +976,41 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 						}
 						_ = xerr.AddConsequence(derr)
 					}
-					if derr := rs.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
+					if derr := instance.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
 						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
 					}
 				}
 			}()
+
+			// Bind Internal Security Group to gateway
+			if xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway); xerr != nil {
+				return xerr
+			}
+			defer instance.undoBindInternalSecurityGroupToGateway(ctx, secondaryGateway, req.KeepOnFailure, &xerr)
 		}
 	}
-	if primaryErr != nil {
-		return fail.Wrap(primaryErr, "failed to create gateway '%s'", primaryGatewayName)
-	}
-	if secondaryErr != nil {
-		return fail.Wrap(secondaryErr, "failed to create gateway '%s'", secondaryGatewayName)
+	if groupXErr != nil {
+		return groupXErr
 	}
 
 	// Update userdata of gateway(s)
-	xerr = rs.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		// Updates userdatas to use later
-		primaryUserdata.PrimaryGatewayPrivateIP = primaryGateway.getPrivateIP(task)
-		primaryUserdata.PrimaryGatewayPublicIP = primaryGateway.getPublicIP(task)
+		primaryUserdata.PrimaryGatewayPrivateIP, innerXErr = primaryGateway.GetPrivateIP()
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		primaryUserdata.PrimaryGatewayPublicIP, innerXErr = primaryGateway.GetPublicIP()
+		if innerXErr != nil {
+			return innerXErr
+		}
+
 		primaryUserdata.IsPrimaryGateway = true
 		if as.VIP != nil {
 			primaryUserdata.DefaultRouteIP = as.VIP.PrivateIP
@@ -836,12 +1019,20 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 			primaryUserdata.DefaultRouteIP = primaryUserdata.PrimaryGatewayPrivateIP
 			primaryUserdata.EndpointIP = primaryUserdata.PrimaryGatewayPublicIP
 		}
+
 		if secondaryGateway != nil {
 			// as.SecondaryGatewayID = secondaryGateway.GetID()
-			primaryUserdata.SecondaryGatewayPrivateIP = secondaryGateway.getPrivateIP(task)
+			primaryUserdata.SecondaryGatewayPrivateIP, innerXErr = secondaryGateway.GetPrivateIP()
+			if innerXErr != nil {
+				return innerXErr
+			}
+
 			secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
 			secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
-			primaryUserdata.SecondaryGatewayPublicIP = secondaryGateway.getPublicIP(task)
+			primaryUserdata.SecondaryGatewayPublicIP, innerXErr = secondaryGateway.GetPublicIP()
+			if innerXErr != nil {
+				return innerXErr
+			}
 			secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
 			secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
 			secondaryUserdata.IsPrimaryGateway = false
@@ -853,33 +1044,35 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 	}
 
 	// As hosts are marked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
-	if primaryTask, xerr = concurrency.NewTask(); xerr != nil {
-		return xerr
-	}
-	xerr = rs.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		as.State = subnetstate.GATEWAY_CONFIGURATION
+
+		as.State = subnetstate.GatewayConfiguration
 		return nil
 	})
 	if xerr != nil {
 		return xerr
 	}
 
-	primaryTask, xerr = primaryTask.Start(rs.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+	// if primaryTask, xerr = concurrency.NewTask(); xerr != nil {
+	// 	return xerr
+	// }
+	if tg, xerr = concurrency.NewTaskGroupWithContext(ctx); xerr != nil {
+		return xerr
+	}
+
+	_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
 		host:     primaryGateway,
 		userdata: primaryUserdata,
 	})
 	if xerr != nil {
 		return xerr
 	}
-	if failover && secondaryTask != nil {
-		if secondaryTask, xerr = concurrency.NewTask(); xerr != nil {
-			return xerr
-		}
-		secondaryTask, xerr = secondaryTask.Start(rs.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+	if failover {
+		_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
 			host:     secondaryGateway,
 			userdata: secondaryUserdata,
 		})
@@ -887,34 +1080,116 @@ func (rs *subnet) Create(task concurrency.Task, req abstract.SubnetRequest, gwna
 			return xerr
 		}
 	}
-	if _, primaryErr = primaryTask.Wait(); primaryErr != nil {
-		return primaryErr
-	}
-	if failover && secondaryTask != nil {
-		if _, secondaryErr = secondaryTask.Wait(); secondaryErr != nil {
-			return secondaryErr
-		}
+	// if _, primaryErr = primaryTask.Wait(); primaryErr != nil {
+	// 	return primaryErr
+	// }
+	// if failover && secondaryTask != nil {
+	// 	if _, secondaryErr = secondaryTask.Wait(); secondaryErr != nil {
+	// 		return secondaryErr
+	// 	}
+	// }
+	if _, xerr = tg.Wait(); xerr != nil {
+		return xerr
 	}
 
 	// --- Updates subnet state in metadata ---
-	return rs.Alter(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		as.State = subnetstate.READY
+
+		as.State = subnetstate.Ready
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	return instance.updateCachedInformation()
+}
+
+// bindInternalSecurityGroupTogateway does what its name says
+func (instance *subnet) bindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host) fail.Error {
+	return instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		sg, innerXErr := LoadSecurityGroup(instance.GetService(), as.InternalSecurityGroupID)
+		if innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
+		}
+		defer sg.Released()
+
+		if innerXErr = sg.BindToHost(ctx, host, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", as.Name, sg.GetName(), host.GetName())
+		}
+
 		return nil
 	})
 }
 
+// undoBindInternalSecurityGroupToGateway does what its name says
+func (instance *subnet) undoBindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error) {
+	if xerr != nil && *xerr != nil && keepOnFailure {
+		_ = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			sg, derr := LoadSecurityGroup(instance.GetService(), as.InternalSecurityGroupID)
+			if derr == nil {
+				derr = sg.UnbindFromHost(context.Background(), host)
+				sg.Released()
+			}
+			if derr != nil {
+				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
+			}
+			return nil
+		})
+	}
+}
+
+// deleteSubnetAndConfirm deletes the Subnet idnetified by 'id' and wait for deletion confirmation
+func (instance *subnet) deleteSubnetAndConfirm(id string) fail.Error {
+	svc := instance.GetService()
+	if xerr := svc.DeleteSubnet(id); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If subnet doesn't exist anymore on the provider infrastructure, do not fail
+			return nil
+		default:
+			return xerr
+		}
+	}
+	return retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			if _, xerr := svc.InspectSubnet(id); xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// Subnet not found, good
+				default:
+					return xerr
+				}
+			}
+			return nil
+		},
+		temporal.GetContextTimeout(),
+	)
+}
+
 // validateCIDR tests if CIDR requested is valid, or select one if no CIDR is provided
-func (rs subnet) validateCIDR(req *abstract.SubnetRequest, network abstract.Network) fail.Error {
+func (instance *subnet) validateCIDR(req *abstract.SubnetRequest, network abstract.Network) fail.Error {
 	_, networkDesc, _ := net.ParseCIDR(network.CIDR)
 	if req.CIDR != "" {
 		routable, xerr := netutils.IsCIDRRoutable(req.CIDR)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to determine if CIDR is not routable")
 		}
+
 		if routable {
 			return fail.InvalidRequestError("cannot create such a subnet, CIDR must NOT be routable; please choose an appropriate CIDR (RFC1918)")
 		}
@@ -923,6 +1198,7 @@ func (rs subnet) validateCIDR(req *abstract.SubnetRequest, network abstract.Netw
 		if err != nil {
 			return fail.ConvertError(err)
 		}
+
 		// ... and if CIDR is inside VPC's one
 		if !netutils.CIDROverlap(*networkDesc, *subnetDesc) {
 			return fail.InvalidRequestError("not inside Network CIDR '%s'", req.CIDR, req.Name, network.CIDR)
@@ -933,7 +1209,7 @@ func (rs subnet) validateCIDR(req *abstract.SubnetRequest, network abstract.Netw
 	// CIDR is empty, choose the first Class C available one
 	logrus.Debugf("CIDR is empty, choosing one...")
 
-	subnets, xerr := rs.GetService().ListSubnets(network.ID)
+	subnets, xerr := instance.GetService().ListSubnets(network.ID)
 	if xerr != nil {
 		return xerr
 	}
@@ -984,34 +1260,28 @@ func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
 }
 
 // checkUnicity checks if the Subnet name is not already used
-func (rs subnet) checkUnicity(task concurrency.Task, req abstract.SubnetRequest) fail.Error {
-	svc := rs.GetService()
-	if found, xerr := lookupSubnet(task, svc, req.NetworkID, req.Name); xerr == nil && found {
-		return fail.DuplicateError("subnet '%s' already exists", req.Name)
-	}
-
-	// Verify if the subnet already exist and in this case is not managed by SafeScale
-	if _, xerr := svc.InspectSubnetByName(req.NetworkID, req.Name); xerr != nil {
+func (instance *subnet) checkUnicity(req abstract.SubnetRequest) fail.Error {
+	resSubnet, xerr := LoadSubnet(instance.GetService(), req.NetworkID, req.Name)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// continue
+			return nil
 		default:
 			return xerr
 		}
-	} else {
-		return fail.DuplicateError("subnet '%s' already exists (not managed by SafeScale)", req.Name)
 	}
 
-	return nil
+	resSubnet.Released()
+	return fail.DuplicateError("subnet '%s' already exists", req.Name)
 }
 
 // validateNetwork verifies the Network exists and make sure req.Network field is an ID
-func (rs subnet) validateNetwork(task concurrency.Task, req *abstract.SubnetRequest) (resources.Network, *abstract.Network, fail.Error) {
+func (instance *subnet) validateNetwork(req *abstract.SubnetRequest) (resources.Network, *abstract.Network, fail.Error) {
 	var an *abstract.Network
-	svc := rs.GetService()
-	rn, xerr := LoadNetwork(task, svc, req.NetworkID)
+	svc := instance.GetService()
+	rn, xerr := LoadNetwork(svc, req.NetworkID)
 	if xerr == nil {
-		xerr = rn.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		xerr = rn.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			var ok bool
 			an, ok = clonable.(*abstract.Network)
 			if !ok {
@@ -1052,7 +1322,12 @@ func (rs subnet) validateNetwork(task concurrency.Task, req *abstract.SubnetRequ
 }
 
 // createGWSecurityGroup creates a Security Group to be applied to gateways of the Subnet
-func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, subnet abstract.Subnet, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
+func (instance *subnet) createGWSecurityGroup(ctx context.Context, req abstract.SubnetRequest /*subnet abstract.Subnet,*/, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -1061,21 +1336,21 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, req.Name, network.Name)
 
 	var sg resources.SecurityGroup
-	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr != nil {
+	if sg, xerr = NewSecurityGroup(instance.GetService()); xerr != nil {
 		return nil, xerr
 	}
 
 	description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, req.Name, network.Name)
-	if xerr = sg.Create(task, network.ID, sgName, description, nil); xerr != nil {
+	if xerr = sg.Create(ctx, network.ID, sgName, description, nil); xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
+			// // Disable abort signal during clean up
+			// defer task.DisarmAbortSignal()()
 
-			if derr := sg.Delete(task); derr != nil {
+			if derr := sg.Delete(context.Background(), true); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), req.Name))
 			}
 		}
@@ -1084,7 +1359,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 	rules := abstract.SecurityGroupRules{
 		{
 			Description: "[ingress][ipv4][tcp] Allow SSH",
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			PortFrom:    22,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "tcp",
@@ -1093,7 +1368,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 		},
 		{
 			Description: "[ingress][ipv6][tcp] Allow SSH",
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			PortFrom:    22,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "tcp",
@@ -1102,7 +1377,7 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 		},
 		{
 			Description: "[ingress][ipv4][icmp] Allow everything",
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			EtherType:   ipversion.IPv4,
 			Protocol:    "icmp",
 			Sources:     []string{"0.0.0.0/0"},
@@ -1110,14 +1385,14 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 		},
 		{
 			Description: "[ingress][ipv6][icmp] Allow everything",
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			EtherType:   ipversion.IPv6,
 			Protocol:    "icmp",
 			Sources:     []string{"::/0"},
 			Targets:     []string{sg.GetID()},
 		},
 	}
-	if xerr = sg.AddRules(task, rules); xerr != nil {
+	if xerr = sg.AddRules(ctx, rules); xerr != nil {
 		return nil, xerr
 	}
 
@@ -1125,26 +1400,26 @@ func (rs subnet) createGWSecurityGroup(task concurrency.Task, req abstract.Subne
 }
 
 // createPublicIPSecurityGroup creates a Security Group to be applied to host of the Subnet with public IP that is not a gateway
-func (rs subnet) createPublicIPSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, subnet abstract.Subnet, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
+func (instance *subnet) createPublicIPSecurityGroup(ctx context.Context, req abstract.SubnetRequest /* subnet abstract.Subnet, */, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
 	// Creates security group for hosts in Subnet to allow internal access
 	sgName := fmt.Sprintf(subnetPublicIPSecurityGroupNamePattern, req.Name, network.Name)
 
 	var sg resources.SecurityGroup
-	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr != nil {
+	if sg, xerr = NewSecurityGroup(instance.GetService()); xerr != nil {
 		return nil, xerr
 	}
+
 	description := fmt.Sprintf(subnetPublicIPSecurityGroupDescriptionPattern, req.Name, network.Name)
-	xerr = sg.Create(task, network.ID, sgName, description, nil)
-	if xerr != nil {
+	if xerr = sg.Create(ctx, network.ID, sgName, description, nil); xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
+			// // Disable abort signal during clean up
+			// defer task.DisarmAbortSignal()()
 
-			if derr := sg.Delete(task); derr != nil {
+			if derr := sg.Delete(context.Background(), true); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), req.Name))
 			}
 		}
@@ -1153,20 +1428,20 @@ func (rs subnet) createPublicIPSecurityGroup(task concurrency.Task, req abstract
 	rules := abstract.SecurityGroupRules{
 		{
 			Description: "[egress][ipv4][all] Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Direction:   securitygroupruledirection.Egress,
 			EtherType:   ipversion.IPv4,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{"0.0.0.0/0"},
 		},
 		{
 			Description: "[egress][ipv6][all] Allow everything",
-			Direction:   securitygroupruledirection.EGRESS,
+			Direction:   securitygroupruledirection.Egress,
 			EtherType:   ipversion.IPv6,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{"::0/0"},
 		},
 	}
-	if xerr = sg.AddRules(task, rules); xerr != nil {
+	if xerr = sg.AddRules(ctx, rules); xerr != nil {
 		return nil, xerr
 	}
 
@@ -1174,42 +1449,42 @@ func (rs subnet) createPublicIPSecurityGroup(task concurrency.Task, req abstract
 }
 
 // Starting from here, delete the Security Group if exiting with error
-func (rs subnet) undoCreateSecurityGroup(task concurrency.Task, errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) {
+func (instance *subnet) undoCreateSecurityGroup(errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) {
 	if errorPtr == nil {
 		logrus.Errorf("trying to cancel an action based on the content of a nil fail.Error; cancel cannot be run")
 		return
 	}
 	if *errorPtr != nil && !keepOnFailure {
-		// Disable abort signal during clean up
-		defer task.DisarmAbortSignal()()
+		// // Disable abort signal during clean up
+		// defer task.DisarmAbortSignal()()
 
 		sgName := sg.GetName()
-		if derr := sg.Delete(task); derr != nil {
+		if derr := sg.Delete(context.Background(), true); derr != nil {
 			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Subnet's Security Group for gateways '%s'", actionFromError(*errorPtr), sgName))
 		}
 	}
 }
 
 // Creates a Security Group to be applied on Hosts in Subnet to allow internal access
-func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract.SubnetRequest, subnet abstract.Subnet, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
+func (instance *subnet) createInternalSecurityGroup(ctx context.Context, req abstract.SubnetRequest /*subnet abstract.Subnet, */, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
 	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, req.Name, network.Name)
 
 	var sg resources.SecurityGroup
-	if sg, xerr = NewSecurityGroup(rs.GetService()); xerr != nil {
+	if sg, xerr = NewSecurityGroup(instance.GetService()); xerr != nil {
 		return nil, xerr
 	}
 
 	description := fmt.Sprintf(subnetInternalSecurityGroupDescriptionPattern, req.Name, network.Name)
-	if xerr = sg.Create(task, network.ID, sgName, description, nil); xerr != nil {
+	if xerr = sg.Create(ctx, network.ID, sgName, description, nil); xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during clean up
-			defer task.DisarmAbortSignal()()
+			// // Disable abort signal during clean up
+			// defer task.DisarmAbortSignal()()
 
-			if derr := sg.Delete(task); derr != nil {
+			if derr := sg.Delete(context.Background(), true); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Subnet's Security Group for gateways '%s'", actionFromError(xerr), req.Name))
 			}
 		}
@@ -1220,33 +1495,33 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 		{
 			Description: fmt.Sprintf("[egress][ipv4][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv4,
-			Direction:   securitygroupruledirection.EGRESS,
+			Direction:   securitygroupruledirection.Egress,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{sg.GetID()},
 		},
 		{
 			Description: fmt.Sprintf("[egress][ipv6][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv6,
-			Direction:   securitygroupruledirection.EGRESS,
+			Direction:   securitygroupruledirection.Egress,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{sg.GetID()},
 		},
 		{
 			Description: fmt.Sprintf("[ingress][ipv4][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv4,
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{sg.GetID()},
 		},
 		{
 			Description: fmt.Sprintf("[ingress][ipv6][all] Allow LAN traffic in %s", req.CIDR),
 			EtherType:   ipversion.IPv6,
-			Direction:   securitygroupruledirection.INGRESS,
+			Direction:   securitygroupruledirection.Ingress,
 			Sources:     []string{sg.GetID()},
 			Targets:     []string{sg.GetID()},
 		},
 	}
-	if xerr = sg.AddRules(task, rules); xerr != nil {
+	if xerr = sg.AddRules(ctx, rules); xerr != nil {
 		return nil, xerr
 	}
 
@@ -1255,10 +1530,10 @@ func (rs subnet) createInternalSecurityGroup(task concurrency.Task, req abstract
 
 // unbindHostFromVIP unbinds a VIP from IPAddress
 // Actually does nothing in aws for now
-func (rs subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (xerr fail.Error) {
+func (instance *subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if xerr := rs.GetService().UnbindHostFromVIP(vip, host.GetID()); xerr != nil {
+	if xerr := instance.GetService().UnbindHostFromVIP(vip, host.GetID()); xerr != nil {
 		return fail.Wrap(xerr, "cleaning up on %s, failed to unbind gateway '%s' from VIP", actionFromError(xerr), host.GetName())
 	}
 
@@ -1266,62 +1541,115 @@ func (rs subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host)
 }
 
 // Browse walks through all the metadata objects in subnet
-func (rs subnet) Browse(task concurrency.Task, callback func(*abstract.Subnet) fail.Error) (xerr fail.Error) {
+func (instance *subnet) Browse(ctx context.Context, callback func(*abstract.Subnet) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate rs
-	// if rs.IsNull() {
+	// if rs.isNull() {
 	// 	return fail.InvalidInstanceError()
 	// }
-	if task == nil {
-		return fail.InvalidParameterError("task", "can't be nil")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if callback == nil {
 		return fail.InvalidParameterError("callback", "can't be nil")
 	}
 
-	return rs.core.BrowseFolder(task, func(buf []byte) fail.Error {
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	return instance.core.BrowseFolder(func(buf []byte) fail.Error {
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
 		as := abstract.NewSubnet()
 		if xerr := as.Deserialize(buf); xerr != nil {
 			return xerr
 		}
+
+		if task.Aborted() {
+			return fail.AbortedError(nil, "aborted")
+		}
+
 		return callback(as)
 	})
 }
 
-// BindHost links host ID to the subnet
-func (rs *subnet) BindHost(task concurrency.Task, host resources.Host) (xerr fail.Error) {
+// AdoptHost links host ID to the Subnet
+func (instance *subnet) AdoptHost(ctx context.Context, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
 	}
 
-	tracer := debug.NewTracer(nil, true, "("+host.GetName()+")").Entering()
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	tracer := debug.NewTracer(task, true, "("+host.GetName()+")").Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	hostID := host.GetID()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
 	hostName := host.GetName()
 
-	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+	// To apply the request, the instance must be one of the Subnets of the Host
+	xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			found := false
+			for _, v := range hnV2.SubnetsByID {
+				if v == instance.GetID() {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fail.InvalidRequestError("failed to adopt Host '%s' in Subnet '%s' as Host is not connected to it", hostName, instance.GetID())
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
+			hostID := host.GetID()
 			subnetHostsV1.ByID[hostID] = hostName
 			subnetHostsV1.ByName[hostName] = hostID
 			return nil
@@ -1329,69 +1657,76 @@ func (rs *subnet) BindHost(task concurrency.Task, host resources.Host) (xerr fai
 	})
 }
 
-// UnbindHost unlinks host ID from subnet
-func (rs *subnet) UnbindHost(task concurrency.Task, hostID string) (xerr fail.Error) {
+// AbandonHost unlinks host ID from Subnet
+func (instance *subnet) AbandonHost(ctx context.Context, hostID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if hostID == "" {
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.subnet"), "('"+hostID+"')").Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitTraceError(&xerr, tracer.TraceMessage("error occurred: "))
 
-	return rs.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			shV1, ok := clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			hostName, found := shV1.ByID[hostID]
-			if found {
-				delete(shV1.ByName, hostName)
-				delete(shV1.ByID, hostID)
-			}
-			return nil
-		})
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return instance.unsafeAbandonHost(props, hostID)
 	})
 }
 
 // ListHosts returns the list of Hosts attached to the subnet (excluding gateway)
-func (rs subnet) ListHosts(task concurrency.Task) (_ []resources.Host, xerr fail.Error) {
+func (instance *subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	defer debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering().Exiting()
 
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
 	var list []resources.Host
-	xerr = rs.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			shV1, ok := clonable.(*propertiesv1.SubnetHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			svc := rs.GetService()
+			svc := instance.GetService()
 			for id := range shV1.ByID {
-				host, innerErr := LoadHost(task, svc, id)
+				host, innerErr := LoadHost(svc, id)
 				if innerErr != nil {
 					return innerErr
 				}
@@ -1404,91 +1739,33 @@ func (rs subnet) ListHosts(task concurrency.Task) (_ []resources.Host, xerr fail
 }
 
 // InspectGateway returns the gateway related to subnet
-func (rs *subnet) InspectGateway(task concurrency.Task, primary bool) (_ resources.Host, xerr fail.Error) {
+func (instance *subnet) InspectGateway(primary bool) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return nullHost(), fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nullHost(), fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nullHost(), fail.AbortedError(nil, "aborted")
-	}
 
-	primaryStr := "primary"
-	gwIdx := 0
-	if !primary {
-		primaryStr = "secondary"
-		gwIdx = 1
-	}
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", primaryStr).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	rs.cacheLock.Lock()
-	defer rs.cacheLock.Unlock()
-
-	if rs.cachedGateways[gwIdx] == nil {
-		var gatewayID string
-		xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			if primary {
-				if len(as.GatewayIDs) < 1 {
-					return fail.NotFoundError("no gateway registered")
-				}
-				gatewayID = as.GatewayIDs[0]
-			} else {
-				if len(as.GatewayIDs) < 2 {
-					return fail.NotFoundError("no secondary gateway registered")
-				}
-				gatewayID = as.GatewayIDs[1]
-			}
-			return nil
-		})
-		if xerr != nil {
-			return nullHost(), xerr
-		}
-
-		if gatewayID == "" {
-			return nullHost(), fail.NotFoundError("no %s gateway ID found in subnet properties", primaryStr)
-		}
-
-		rh, xerr := LoadHost(task, rs.GetService(), gatewayID)
-		if xerr != nil {
-			return nullHost(), xerr
-		}
-
-		rs.cachedGateways[gwIdx] = rh.(*host)
-	}
-	return rs.cachedGateways[gwIdx], nil
+	return instance.unsafeInspectGateway(primary)
 }
 
 // GetGatewayPublicIP returns the Public IP of a particular gateway
-func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ string, xerr fail.Error) {
+func (instance *subnet) GetGatewayPublicIP(primary bool) (_ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return "", fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return "", fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%v)", primary).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	var ip string
-	svc := rs.GetService()
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	svc := instance.GetService()
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1503,17 +1780,17 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 			id = as.GatewayIDs[0]
 		} else {
 			if len(as.GatewayIDs) < 2 {
-				return fail.InvalidRequestError("there is no secondary gateway in Subnet '%s'", rs.GetName())
+				return fail.InvalidRequestError("there is no secondary gateway in Subnet '%s'", instance.GetName())
 			}
 
 			id = as.GatewayIDs[1]
 		}
-		if rgw, innerXErr = LoadHost(task, svc, id); innerXErr != nil {
+		if rgw, innerXErr = LoadHost(svc, id); innerXErr != nil {
 			return innerXErr
 		}
-		defer rgw.Released(task)
+		defer rgw.Released()
 
-		if ip, innerXErr = rgw.GetPublicIP(task); innerXErr != nil {
+		if ip, innerXErr = rgw.GetPublicIP(); innerXErr != nil {
 			return innerXErr
 		}
 
@@ -1527,44 +1804,41 @@ func (rs subnet) GetGatewayPublicIP(task concurrency.Task, primary bool) (_ stri
 }
 
 // GetGatewayPublicIPs returns a slice of public IP of gateways
-func (rs subnet) GetGatewayPublicIPs(task concurrency.Task) (_ []string, xerr fail.Error) {
+func (instance *subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	var emptySlice []string
-	if rs.IsNull() {
+	if instance.isNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return emptySlice, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return emptySlice, fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
+	// defer tracer.Exiting()
+	// // defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	var gatewayIPs []string
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
 		gatewayIPs = make([]string, 0, len(as.GatewayIDs))
-		svc := rs.GetService()
+		svc := instance.GetService()
 		for _, v := range as.GatewayIDs {
-			rgw, innerXErr := LoadHost(task, svc, v)
+			rgw, innerXErr := LoadHost(svc, v)
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			defer func(instance resources.Host) {
-				instance.Released(task)
+			defer func(hostInstance resources.Host) {
+				hostInstance.Released()
 			}(rgw)
 
-			ip, innerXErr := rgw.GetPublicIP(task)
+			ip, innerXErr := rgw.GetPublicIP()
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1581,15 +1855,21 @@ func (rs subnet) GetGatewayPublicIPs(task concurrency.Task) (_ []string, xerr fa
 }
 
 // Delete deletes a Subnet
-func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
+func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -1598,36 +1878,43 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	rs.SafeLock(task)
-	defer rs.SafeUnlock(task)
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	xerr = rs.Alter(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		svc := rs.GetService()
+		svc := instance.GetService()
 
 		// Check if hosts are still attached to subnet according to metadata
 		var errorMsg string
-		innerErr := props.Inspect(task, subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+		innerErr := props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			shV1, ok := clonable.(*propertiesv1.SubnetHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			hostsLen := uint(len(shV1.ByName))
+			hostList := make([]string, 0, hostsLen)
 			if hostsLen > 0 {
-				list := make([]string, 0, hostsLen)
 				for k := range shV1.ByName {
-					list = append(list, k)
+					// Check if Host still has metadata and count it if yes
+					if hostInstance, innerXErr := LoadHost(svc, k); innerXErr == nil {
+						hostInstance.Released()
+						hostList = append(hostList, k)
+					}
 				}
+			}
+			if len(hostList) > 0 {
 				verb := "are"
 				if hostsLen == 1 {
 					verb = "is"
 				}
 				errorMsg = fmt.Sprintf("cannot delete subnet '%s': %d host%s %s still attached to it: %s",
-					as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(list, ", "))
+					as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
 				return fail.NotAvailableError(errorMsg)
 			}
 			return nil
@@ -1643,25 +1930,34 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 		}
 
 		// 1st delete gateway(s)
-		if innerXErr := rs.deleteGateways(task, as); innerXErr != nil {
+		gwIDs, innerXErr := instance.deleteGateways(as)
+		if innerXErr != nil {
 			return innerXErr
+		}
+
+		// Unbind Host from current Subnet (not done by relaxedDeleteHost as Host is a gateway to avoid dead-lock as subnet instance may already be locked)
+		if len(gwIDs) > 0 {
+			for _, v := range gwIDs {
+				if innerXErr = instance.unsafeAbandonHost(props, v); innerXErr != nil {
+					return innerXErr
+				}
+			}
 		}
 
 		// 2nd delete VIP if needed
 		if as.VIP != nil {
-			innerXErr := svc.DeleteVIP(as.VIP)
-			if innerXErr != nil {
+			if innerXErr := svc.DeleteVIP(as.VIP); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to delete VIP for gateways")
 			}
 		}
 
 		// 3rd delete security groups associated to subnet by users (do not include SG created with subnet, they will be deleted later)
-		innerXErr := props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			innerXErr := rs.unbindSecurityGroups(task, ssgV1)
+			innerXErr := instance.unbindSecurityGroups(ctx, ssgV1)
 			return innerXErr
 		})
 		if innerXErr != nil {
@@ -1670,30 +1966,7 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 
 		// finally delete subnet
 		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
-		if innerXErr = svc.DeleteSubnet(as.ID); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				// If subnet doesn't exist anymore on the provider infrastructure, don't fail to cleanup the metadata
-				logrus.Debugf("Subnet not found on provider side, cleaning up metadata")
-			default:
-				return innerXErr
-			}
-		}
-		innerXErr = retry.WhileUnsuccessfulDelay1Second(
-			func() error {
-				if _, recErr := svc.InspectSubnet(as.ID); recErr != nil {
-					switch recErr.(type) {
-					case *fail.ErrNotFound:
-						// Subnet not found, good
-					default:
-						return recErr
-					}
-				}
-				return nil
-			},
-			temporal.GetContextTimeout(),
-		)
-		if innerXErr != nil {
+		if innerXErr = instance.deleteSubnetAndConfirm(as.ID); innerXErr != nil {
 			return innerXErr
 		}
 		logrus.Infof("Subnet '%s' successfully deleted.", as.Name)
@@ -1706,10 +1979,10 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 		sgs := [3]string{as.GWSecurityGroupID, as.PublicIPSecurityGroupID, as.InternalSecurityGroupID}
 		for _, v := range sgs {
 			if v != "" {
-				if rsg, innerXErr = LoadSecurityGroup(task, svc, v); innerXErr == nil {
+				if rsg, innerXErr = LoadSecurityGroup(svc, v); innerXErr == nil {
 					sgName = rsg.GetName()
 					logrus.Debugf("Deleting Security Group '%s'...", sgName)
-					if innerXErr = rsg.Delete(task); innerXErr != nil {
+					if innerXErr = rsg.Delete(ctx, true); innerXErr != nil {
 						switch innerXErr.(type) {
 						case *fail.ErrNotFound:
 							// Security Group not found, consider this as a success
@@ -1728,30 +2001,32 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 			}
 		}
 
-		// Remove subnet reference from owner Network
-		rn, innerXErr := LoadNetwork(task, svc, as.Network)
-		if innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				// no Network, consider the Network metadata update as a success (this may be default Network)
-			default:
-				return fail.Wrap(innerXErr, "failed to query parent Network of Subnet")
-			}
-		} else {
-			defer rn.Released(task)
+		// // Remove subnet reference from owner Network
+		// rn, innerXErr := LoadNetwork(task, svc, as.Network)
+		// if innerXErr != nil {
+		// 	switch innerXErr.(type) {
+		// 	case *fail.ErrNotFound:
+		// 		// no Network, consider the Network metadata update as a success (this may be default Network)
+		// 	default:
+		// 		return fail.Wrap(innerXErr, "failed to query parent Network of Subnet")
+		// 	}
+		// } else {
+		// 	defer rn.Released(task)
 
-			return rn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Alter(task, networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-					nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
-					delete(nsV1.ByID, as.ID)
-					delete(nsV1.ByName, as.Name)
-					return nil
-				})
-			})
-		}
+		// 	return rn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// 		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+		// 			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+		// 			if !ok {
+		// 				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		// 			}
+		//
+		// 			delete(nsV1.ByID, as.ID)
+		// 			delete(nsV1.ByName, as.Name)
+		// 			return nil
+		// 		})
+		// 	}, data.NewImmutableKeyValue("Reload", false), // disable reload in Alter because network is already write-locked by the current goroutine, and should lead to dead-lock)
+		// 	)
+		// }
 		return nil
 	})
 	if xerr != nil {
@@ -1759,80 +2034,67 @@ func (rs *subnet) Delete(task concurrency.Task) (xerr fail.Error) {
 	}
 
 	// Remove metadata
-	return rs.core.Delete(task)
+	return instance.core.delete()
+}
+
+// Released overloads core.Released() to release the parent Network instance
+func (instance *subnet) Released() {
+	if instance.isNull() {
+		return
+	}
+
+	instance.parentNetwork.Released()
+	instance.core.Released()
 }
 
 // InspectNetwork returns the Network instance owning the Subnet
-func (rs *subnet) InspectNetwork(task concurrency.Task) (rn resources.Network, xerr fail.Error) {
+func (instance *subnet) InspectNetwork() (rn resources.Network, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	rs.cacheLock.Lock()
-	defer rs.cacheLock.Unlock()
-
-	if rs.cachedNetwork == nil {
-		var networkID string
-		xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			networkID = as.Network
-			return nil
-		})
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		rn, xerr := LoadNetwork(task, rs.GetService(), networkID)
-		if xerr != nil {
-			return nullNetwork(), xerr
-		}
-
-		rs.cachedNetwork = rn.(*network)
-	}
-	return rs.cachedNetwork, nil
+	return instance.parentNetwork, nil
 }
 
 // deleteGateways deletes all the gateways of the subnet
 // A gateway host that is not found must be considered as a success
-func (rs *subnet) deleteGateways(task concurrency.Task, subnet *abstract.Subnet) fail.Error {
-	svc := rs.GetService()
+func (instance *subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, xerr fail.Error) {
+	svc := instance.GetService()
 
+	ids = []string{}
 	if len(subnet.GatewayIDs) > 0 {
+		// FIXME: parallelize
 		for _, v := range subnet.GatewayIDs {
-			rh, xerr := LoadHost(task, svc, v)
+			rh, xerr := LoadHost(svc, v)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// missing gateway is considered as a successful deletion, continue
+					logrus.Tracef("host instance not found, gateway deletion considered as a success")
 				default:
-					return xerr
+					return ids, xerr
 				}
 			} else {
 				name := rh.GetName()
 				logrus.Debugf("Deleting gateway '%s'...", name)
-				if xerr := rh.(*host).relaxedDeleteHost(task); xerr != nil {
+
+				// delete Host
+				ids = append(ids, rh.GetID())
+				if xerr := rh.(*host).relaxedDeleteHost(context.Background()); xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// missing gateway is considered as a successful deletion, continue
+						logrus.Tracef("host instance not found, relaxed gateway deletion considered as a success")
 					default:
-						return xerr
+						return ids, xerr
 					}
 				}
+
 				logrus.Debugf("Gateway '%s' successfully deleted.", name)
 			}
 
@@ -1840,15 +2102,15 @@ func (rs *subnet) deleteGateways(task concurrency.Task, subnet *abstract.Subnet)
 			subnet.GatewayIDs = subnet.GatewayIDs[1:]
 		}
 	}
-	return nil
+	return ids, nil
 }
 
 // unbindSecurityGroups makes sure the security groups bound to subnet are unbound
-func (rs *subnet) unbindSecurityGroups(task concurrency.Task, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
+func (instance *subnet) unbindSecurityGroups(ctx context.Context, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
 	var rsg resources.SecurityGroup
-	svc := rs.GetService()
+	svc := instance.GetService()
 	for k, v := range sgs.ByName {
-		if rsg, xerr = LoadSecurityGroup(task, svc, v); xerr != nil {
+		if rsg, xerr = LoadSecurityGroup(svc, v); xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a Security Group not found as a successful unbind
@@ -1856,12 +2118,12 @@ func (rs *subnet) unbindSecurityGroups(task concurrency.Task, sgs *propertiesv1.
 				return xerr
 			}
 		}
-		defer func(item resources.SecurityGroup) {
-			item.Released(task)
+		defer func(sgInstance resources.SecurityGroup) {
+			sgInstance.Released()
 		}(rsg)
 
 		if rsg != nil {
-			if xerr = rsg.UnbindFromSubnet(task, rs); xerr != nil {
+			if xerr = rsg.UnbindFromSubnet(ctx, instance); xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// consider a Security Group not found as a successful unbind
@@ -1878,77 +2140,31 @@ func (rs *subnet) unbindSecurityGroups(task concurrency.Task, sgs *propertiesv1.
 }
 
 // GetDefaultRouteIP returns the IP of the LAN default route
-func (rs subnet) GetDefaultRouteIP(task concurrency.Task) (ip string, xerr fail.Error) {
+func (instance *subnet) GetDefaultRouteIP() (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return "", fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return "", fail.AbortedError(nil, "aborted")
-	}
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	ip = ""
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		if as.VIP != nil && as.VIP.PrivateIP != "" {
-			ip = as.VIP.PrivateIP
-			return nil
-		}
-		if len(as.GatewayIDs) > 0 {
-			rh, innerErr := LoadHost(task, rs.GetService(), as.GatewayIDs[0])
-			if innerErr != nil {
-				return innerErr
-			}
-
-			ip = rh.(*host).getPrivateIP(task)
-			return nil
-		}
-
-		return fail.NotFoundError("failed to find default route IP: no gateway defined")
-	})
-	return ip, xerr
-}
-
-// getDefaultRouteIP ...
-func (rs subnet) getDefaultRouteIP(task concurrency.Task) string {
-	if rs.IsNull() {
-		return ""
-	}
-	ip, _ := rs.GetDefaultRouteIP(task)
-	return ip
+	return instance.unsafeGetDefaultRouteIP()
 }
 
 // GetEndpointIP returns the internet (public) IP to reach the subnet
-func (rs subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.Error) {
+func (instance *subnet) GetEndpointIP() (ip string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	ip = ""
-	if rs.IsNull() {
+	if instance.isNull() {
 		return ip, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return ip, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return ip, fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1957,12 +2173,13 @@ func (rs subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.Erro
 		if as.VIP != nil && as.VIP.PublicIP != "" {
 			ip = as.VIP.PublicIP
 		} else {
-			objpgw, inErr := LoadHost(task, rs.GetService(), as.GatewayIDs[0])
-			if inErr != nil {
-				return inErr
+			objpgw, innerXErr := LoadHost(instance.GetService(), as.GatewayIDs[0])
+			if innerXErr != nil {
+				return innerXErr
 			}
-			ip = objpgw.(*host).getPublicIP(task)
-			return nil
+
+			ip, innerXErr = objpgw.(*host).GetPublicIP()
+			return innerXErr
 		}
 		return nil
 	})
@@ -1970,168 +2187,69 @@ func (rs subnet) GetEndpointIP(task concurrency.Task) (ip string, xerr fail.Erro
 }
 
 // HasVirtualIP tells if the subnet uses a VIP a default route
-func (rs subnet) HasVirtualIP(task concurrency.Task) bool {
-	// FIXME: Return error
-	if rs.IsNull() {
-		logrus.Errorf(fail.InvalidInstanceError().Error())
-		return false
-	}
-	if task == nil {
-		logrus.Errorf(fail.InvalidParameterCannotBeNilError("task").Error())
-		return false
-	}
-	if task.Aborted() {
-		logrus.Errorf(fail.AbortedError(nil, "aborted").Error())
-		return false
+func (instance *subnet) HasVirtualIP() (bool, fail.Error) {
+	if instance.isNull() {
+		return false, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	var found bool
-	xerr := rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		found = as.VIP != nil
-		return nil
-	})
-	return xerr == nil && found
+	return instance.unsafeHasVirtualIP()
 }
 
 // GetVirtualIP returns an abstract.VirtualIP used by gateway HA
-func (rs subnet) GetVirtualIP(task concurrency.Task) (vip *abstract.VirtualIP, xerr fail.Error) {
+func (instance *subnet) GetVirtualIP() (vip *abstract.VirtualIP, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	xerr = rs.Review(task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		vip = as.VIP
-		return nil
-	})
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "cannot get subnet virtual IP")
-
-	}
-	if vip == nil {
-		return nil, fail.NotFoundError("failed to find Virtual IP binded to gateways for subnet '%s'", rs.GetName())
-	}
-	return vip, nil
+	return instance.unsafeGetVirtualIP()
 }
 
 // GetCIDR returns the CIDR of the subnet
-func (rs subnet) GetCIDR(task concurrency.Task) (cidr string, xerr fail.Error) {
+func (instance *subnet) GetCIDR() (cidr string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return "", fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return "", fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	cidr = ""
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		cidr = as.CIDR
-		return nil
-	})
-	return cidr, xerr
-}
-
-// getCIDR returns the CIDR of the network
-// Intended to be used when objn is notoriously not nil (because previously checked)
-func (rs subnet) getCIDR(task concurrency.Task) string {
-	cidr, _ := rs.GetCIDR(task)
-	return cidr
+	return instance.unsafeGetCIDR()
 }
 
 // GetState returns the current state of the subnet
-func (rs subnet) GetState(task concurrency.Task) (state subnetstate.Enum, xerr fail.Error) {
+func (instance *subnet) GetState() (state subnetstate.Enum, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
-		return subnetstate.UNKNOWN, fail.InvalidInstanceError()
-	}
-	if task == nil {
-		return subnetstate.UNKNOWN, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return subnetstate.UNKNOWN, fail.AbortedError(nil, "aborted")
+	if instance.isNull() {
+		return subnetstate.Unknown, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		state = as.State
-		return nil
-	})
-	return state, xerr
-}
-
-// getState returns the state of the network
-// Intended to be used when rs is notoriously not null (because previously checked)
-func (rs subnet) getState(task concurrency.Task) subnetstate.Enum {
-	state, _ := rs.GetState(task)
-	return state
+	return instance.unsafeGetState()
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (rs subnet) ToProtocol(task concurrency.Task) (_ *protocol.Subnet, xerr fail.Error) {
+func (instance *subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-
-	defer func() {
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to convert resources.Subnet to *protocol.Subnet")
-		}
-	}()
+	// RLock is needed because unsafeInspectGateway needs such a lock
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
 	var (
 		gw  resources.Host
@@ -2139,15 +2257,16 @@ func (rs subnet) ToProtocol(task concurrency.Task) (_ *protocol.Subnet, xerr fai
 	)
 
 	// Get primary gateway ID
-	gw, xerr = rs.InspectGateway(task, true)
+	gw, xerr = instance.unsafeInspectGateway(true)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	primaryGatewayID := gw.GetID()
 
 	// Get secondary gateway id if such a gateway exists
 	gwIDs := []string{primaryGatewayID}
-	gw, xerr = rs.InspectGateway(task, false)
+	gw, xerr = instance.unsafeInspectGateway(false)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return nil, xerr
@@ -2157,15 +2276,15 @@ func (rs subnet) ToProtocol(task concurrency.Task) (_ *protocol.Subnet, xerr fai
 	}
 
 	pn := &protocol.Subnet{
-		Id:         rs.GetID(),
-		Name:       rs.GetName(),
-		Cidr:       rs.getCIDR(task),
+		Id:         instance.GetID(),
+		Name:       instance.GetName(),
+		Cidr:       func() string { out, _ := instance.unsafeGetCIDR(); return out }(),
 		GatewayIds: gwIDs,
-		Failover:   rs.HasVirtualIP(task),
-		State:      protocol.SubnetState(rs.getState(task)),
+		Failover:   func() bool { out, _ := instance.unsafeHasVirtualIP(); return out }(),
+		State:      protocol.SubnetState(func() int32 { out, _ := instance.unsafeGetState(); return int32(out) }()),
 	}
 
-	vip, xerr = rs.GetVirtualIP(task)
+	vip, xerr = instance.unsafeGetVirtualIP()
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return nil, xerr
@@ -2179,28 +2298,41 @@ func (rs subnet) ToProtocol(task concurrency.Task) (_ *protocol.Subnet, xerr fai
 }
 
 // BindSecurityGroup binds a security group to the subnet; if enabled is true, apply it immediately
-func (rs *subnet) BindSecurityGroup(task concurrency.Task, sg resources.SecurityGroup, enabled resources.SecurityGroupActivation) (xerr fail.Error) {
+func (instance *subnet) BindSecurityGroup(ctx context.Context, sg resources.SecurityGroup, enabled resources.SecurityGroupActivation) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2215,7 +2347,7 @@ func (rs *subnet) BindSecurityGroup(task concurrency.Task, sg resources.Security
 			}
 
 			// Bind the security group to the subnet (does the security group side of things)
-			if innerXErr := sg.BindToSubnet(task, rs, enabled, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+			if innerXErr := sg.BindToSubnet(ctx, instance, enabled, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 				return innerXErr
 			}
 
@@ -2227,28 +2359,41 @@ func (rs *subnet) BindSecurityGroup(task concurrency.Task, sg resources.Security
 }
 
 // UnbindSecurityGroup unbinds a security group from the host
-func (rs *subnet) UnbindSecurityGroup(task concurrency.Task, sg resources.SecurityGroup) (xerr fail.Error) {
+func (instance *subnet) UnbindSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	if task == nil {
 		return fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -2269,7 +2414,7 @@ func (rs *subnet) UnbindSecurityGroup(task concurrency.Task, sg resources.Securi
 			}
 
 			// unbind security group from subnet on cloud provider side
-			if innerXErr := sg.UnbindFromSubnet(task, rs); innerXErr != nil {
+			if innerXErr := sg.UnbindFromSubnet(ctx, instance); innerXErr != nil {
 				return innerXErr
 			}
 
@@ -2283,16 +2428,22 @@ func (rs *subnet) UnbindSecurityGroup(task concurrency.Task, sg resources.Securi
 }
 
 // ListSecurityGroups returns a slice of security groups bound to subnet
-func (rs *subnet) ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
+func (instance *subnet) ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	var nullList []*propertiesv1.SecurityGroupBond
-	if rs.IsNull() {
+	if instance.isNull() {
 		return nullList, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return nullList, fail.InvalidParameterError("task", "cannot be null value of '*concurrency.Task'")
+	if ctx == nil {
+		return nullList, fail.InvalidParameterCannotBeNilError("ctx")
 	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return nullList, xerr
+	}
+
 	if task.Aborted() {
 		return nullList, fail.AbortedError(nil, "aborted")
 	}
@@ -2301,12 +2452,16 @@ func (rs *subnet) ListSecurityGroups(task concurrency.Task, state securitygroups
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return list, rs.Inspect(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	return list, instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			list = filterBondsByKind(ssgV1.ByID, state)
 			return nil
 		})
@@ -2314,69 +2469,83 @@ func (rs *subnet) ListSecurityGroups(task concurrency.Task, state securitygroups
 }
 
 // EnableSecurityGroup enables a binded security group to subnet
-func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.SecurityGroup) (xerr fail.Error) {
+func (instance *subnet) EnableSecurityGroup(ctx context.Context, rsg resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
+	if rsg == nil {
+		return fail.InvalidParameterCannotBeNilError("rsg")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
-	if sg == nil {
-		return fail.InvalidParameterCannotBeNilError("sg")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", rsg.GetID()).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	svc := rs.GetService()
-	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	svc := instance.GetService()
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			var asg *abstract.SecurityGroup
-			xerr := sg.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			innerXErr := rsg.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
+
 				return nil
 			})
-			if xerr != nil {
-				return xerr
+			if innerXErr != nil {
+				return innerXErr
 			}
 
 			// First check if the security group is not already registered for the host with the exact same state
 			var found bool
 			for k := range nsgV1.ByID {
+				if task.Aborted() {
+					return fail.AbortedError(nil, "aborted")
+				}
+
 				if k == asg.ID {
 					found = true
 				}
 			}
 			if !found {
-				return fail.NotFoundError("security group '%s' is not binded to subnet '%s'", sg.GetName(), rs.GetID())
+				return fail.NotFoundError("security group '%s' is not binded to subnet '%s'", rsg.GetName(), instance.GetID())
 			}
 
 			// Do security group stuff to enable it
 			if svc.GetCapabilities().CanDisableSecurityGroup {
-				if xerr = svc.EnableSecurityGroup(asg); xerr != nil {
-					return xerr
+				if innerXErr = svc.EnableSecurityGroup(asg); innerXErr != nil {
+					return innerXErr
 				}
 			} else {
-				if xerr = sg.BindToSubnet(task, rs, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
-					switch xerr.(type) {
+				if innerXErr = rsg.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
+					switch innerXErr.(type) {
 					case *fail.ErrDuplicate:
 						// security group already bound to subnet with the same state, consider as a success
 					default:
-						return xerr
+						return innerXErr
 					}
 				}
 			}
@@ -2389,63 +2558,73 @@ func (rs *subnet) EnableSecurityGroup(task concurrency.Task, sg resources.Securi
 }
 
 // DisableSecurityGroup disables an already binded security group on subnet
-func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.SecurityGroup) (xerr fail.Error) {
+func (instance *subnet) DisableSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rs.IsNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if sg == nil {
 		return fail.InvalidParameterCannotBeNilError("sg")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
 	defer tracer.Exiting()
 	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	svc := rs.GetService()
-	return rs.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(task, subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	svc := instance.GetService()
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			var asg *abstract.SecurityGroup
-			xerr := sg.Inspect(task, func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			innerXErr := sg.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
+
 				return nil
 			})
-			if xerr != nil {
+			if innerXErr != nil {
 				return xerr
 			}
 
 			// First check if the security group is not already registered for the host with the exact same state
 			if _, ok := nsgV1.ByID[asg.ID]; !ok {
-				return fail.NotFoundError("security group '%s' is not bound to subnet '%s'", sg.GetName(), rs.GetID())
+				return fail.NotFoundError("security group '%s' is not bound to subnet '%s'", sg.GetName(), instance.GetID())
 			}
 
 			if svc.GetCapabilities().CanDisableSecurityGroup {
-				if xerr = svc.DisableSecurityGroup(asg); xerr != nil {
-					return xerr
+				if innerXErr = svc.DisableSecurityGroup(asg); innerXErr != nil {
+					return innerXErr
 				}
 			} else {
 				// Do security group stuff to disable it
-				if xerr = sg.BindToSubnet(task, rs, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
-					switch xerr.(type) {
+				if innerXErr = sg.BindToSubnet(ctx, instance, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
+					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// security group not bound to subnet, consider as a success
 					default:
-						return xerr
+						return innerXErr
 					}
 				}
 			}
@@ -2458,93 +2637,72 @@ func (rs *subnet) DisableSecurityGroup(task concurrency.Task, sg resources.Secur
 }
 
 // InspectGatewaySecurityGroup returns the instance of SecurityGroup in Subnet related to external access on gateways
-func (rs subnet) InspectGatewaySecurityGroup(task concurrency.Task) (rsg resources.SecurityGroup, xerr fail.Error) {
+func (instance *subnet) InspectGatewaySecurityGroup() (rsg resources.SecurityGroup, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	rsg = nullSecurityGroup()
-	if rs.IsNull() {
+	if instance.isNull() {
 		return rsg, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return rsg, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return rsg, fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		rsg, innerXErr = LoadSecurityGroup(task, rs.GetService(), as.GWSecurityGroupID)
+		rsg, innerXErr = LoadSecurityGroup(instance.GetService(), as.GWSecurityGroupID)
 		return innerXErr
 	})
 	return rsg, xerr
 }
 
 // InspectInternalSecurityGroup returns the instance of SecurityGroup for internal security inside the Subnet
-func (rs subnet) InspectInternalSecurityGroup(task concurrency.Task) (sg resources.SecurityGroup, xerr fail.Error) {
+func (instance *subnet) InspectInternalSecurityGroup() (sg resources.SecurityGroup, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	sg = nullSecurityGroup()
-	if rs.IsNull() {
+	if instance.isNull() {
 		return sg, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return sg, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return sg, fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		sg, innerXErr = LoadSecurityGroup(task, rs.GetService(), as.InternalSecurityGroupID)
+		sg, innerXErr = LoadSecurityGroup(instance.GetService(), as.InternalSecurityGroupID)
 		return innerXErr
 	})
 	return sg, xerr
 }
 
 // InspectPublicIPSecurityGroup returns the instance of SecurityGroup in Subnet for Hosts with Public IP (which does not apply on gateways)
-func (rs subnet) InspectPublicIPSecurityGroup(task concurrency.Task) (sg resources.SecurityGroup, xerr fail.Error) {
+func (instance *subnet) InspectPublicIPSecurityGroup() (sg resources.SecurityGroup, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	sg = nullSecurityGroup()
-	if rs.IsNull() {
+	if instance.isNull() {
 		return sg, fail.InvalidInstanceError()
 	}
-	if task == nil {
-		return sg, fail.InvalidParameterCannotBeNilError("task")
-	}
-	if task.Aborted() {
-		return sg, fail.AbortedError(nil, "aborted")
-	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	xerr = rs.Review(task, func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		sg, innerXErr = LoadSecurityGroup(task, rs.GetService(), as.PublicIPSecurityGroupID)
+		sg, innerXErr = LoadSecurityGroup(instance.GetService(), as.PublicIPSecurityGroupID)
 		return innerXErr
 	})
 	return sg, xerr

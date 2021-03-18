@@ -122,11 +122,13 @@ func normalizeError(in error) (err error) {
 			case "not found": // stow may return that error message if it does not find something
 				return fail.NotFoundError("not found")
 			default: // stow may return an error containing "dial tcp:" for some HTTP errors
+				logrus.Tracef("encountered 'dial tcp' error")
 				if strings.Contains(str, "dial tcp:") {
 					return fail.NotAvailableError(str)
 				}
 				if strings.Contains(str, "EOF") { // stow may return that error message if comm fails
-					return fail.NotFoundError("encountered end-of-file")
+					logrus.Tracef("encountered end-of-file")
+					return fail.NotAvailableError("encountered end-of-file")
 				}
 				// In any other case, the error should explain the retry has to stop
 				return retry.StopRetryError(in)

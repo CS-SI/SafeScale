@@ -290,7 +290,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		func() error {
 			var innerXErr fail.Error
 			if ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1), request.IsGateway, request.SecurityGroupIDs); innerXErr != nil {
-				// if !server.IsNull() {
+				// if !server.isNull() {
 				// 	// try deleting server
 				// 	if derr := s.DeleteHost(server.ID); derr != nil {
 				// 		_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete instance"))
@@ -386,7 +386,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 				return innerErr
 			}
 
-			if hostComplete.CurrentState != hoststate.STARTED {
+			if hostComplete.CurrentState != hoststate.Started {
 				return fail.NotAvailableError("not in ready state (current state: %s)", hostComplete.CurrentState.String())
 			}
 			return nil
@@ -599,23 +599,23 @@ func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instanc
 func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 	switch gcpHostStatus {
 	case "PROVISIONING":
-		return hoststate.STARTING, nil
+		return hoststate.Starting, nil
 	case "REPAIRING":
-		return hoststate.ERROR, nil
+		return hoststate.Error, nil
 	case "RUNNING":
-		return hoststate.STARTED, nil
+		return hoststate.Started, nil
 	case "STAGING":
-		return hoststate.STARTING, nil
-	case "STOPPED":
-		return hoststate.STOPPED, nil
-	case "STOPPING":
-		return hoststate.STOPPING, nil
+		return hoststate.Starting, nil
+	case "Stopped":
+		return hoststate.Stopped, nil
+	case "Stopping":
+		return hoststate.Stopping, nil
 	case "SUSPENDED":
-		return hoststate.STOPPED, nil
+		return hoststate.Stopped, nil
 	case "SUSPENDING":
-		return hoststate.STOPPING, nil
-	case "TERMINATED":
-		return hoststate.STOPPED, nil
+		return hoststate.Stopping, nil
+	case "Terminated":
+		return hoststate.Stopped, nil
 	default:
 		return -1, fail.NewError("unexpected host status: [%s]", gcpHostStatus)
 	}
@@ -759,12 +759,12 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 // GetHostState returns the host identified by id
 func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if s.IsNull() {
-		return hoststate.ERROR, fail.InvalidInstanceError()
+		return hoststate.Error, fail.InvalidInstanceError()
 	}
 
 	host, xerr := s.InspectHost(hostParam)
 	if xerr != nil {
-		return hoststate.ERROR, xerr
+		return hoststate.Error, xerr
 	}
 
 	return host.CurrentState, nil

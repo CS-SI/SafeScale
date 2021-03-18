@@ -18,12 +18,13 @@
 package resources
 
 import (
+	"context"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
@@ -37,26 +38,27 @@ type Subnet interface {
 	observer.Observable
 	cache.Cacheable
 
-	BindHost(task concurrency.Task, _ Host) fail.Error                                                                             // links Host to the Subnet
-	BindSecurityGroup(task concurrency.Task, _ SecurityGroup, _ SecurityGroupActivation) fail.Error                                // binds a Security Group to the Subnet
-	Browse(task concurrency.Task, callback func(*abstract.Subnet) fail.Error) fail.Error                                           // ...
-	Create(task concurrency.Task, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) fail.Error // creates a Subnet
-	DisableSecurityGroup(task concurrency.Task, _ SecurityGroup) fail.Error                                                        // disables a binded Security Group on Subnet
-	EnableSecurityGroup(task concurrency.Task, _ SecurityGroup) fail.Error                                                         // enables a binded Security Group on Subnet
-	GetGatewayPublicIP(task concurrency.Task, primary bool) (string, fail.Error)                                                   // returns the gateway related to Subnet
-	GetGatewayPublicIPs(task concurrency.Task) ([]string, fail.Error)                                                              // returns the gateway IPs of the Subnet
-	GetDefaultRouteIP(task concurrency.Task) (string, fail.Error)                                                                  // returns the private IP of the default route of the Subnet
-	GetEndpointIP(task concurrency.Task) (string, fail.Error)                                                                      // returns the public IP to reach the Subnet from Internet
-	GetState(task concurrency.Task) (subnetstate.Enum, fail.Error)                                                                 // gives the current state of the Subnet
-	HasVirtualIP(task concurrency.Task) bool                                                                                       // tells if the Subnet is using a VIP as default route
-	InspectGateway(task concurrency.Task, primary bool) (Host, fail.Error)                                                         // returns the gateway related to Subnet
-	InspectGatewaySecurityGroup(task concurrency.Task) (SecurityGroup, fail.Error)                                                 // returns the SecurityGroup responsible of network security on Gateway
-	InspectInternalSecurityGroup(task concurrency.Task) (SecurityGroup, fail.Error)                                                // returns the SecurityGroup responsible of internal network security
-	InspectPublicIPSecurityGroup(task concurrency.Task) (SecurityGroup, fail.Error)                                                // returns the SecurityGroup responsible of Hosts with Public IP (excluding gateways)
-	InspectNetwork(task concurrency.Task) (Network, fail.Error)                                                                    // returns the instance of the parent Network of the Subnet
-	ListHosts(task concurrency.Task) ([]Host, fail.Error)                                                                          // returns the list of Host attached to the subnet (excluding gateway)
-	ListSecurityGroups(task concurrency.Task, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)       // lists the security groups bound to the subnet
-	ToProtocol(task concurrency.Task) (*protocol.Subnet, fail.Error)                                                               // converts the subnet to protobuf message
-	UnbindHost(task concurrency.Task, hostID string) fail.Error                                                                    // unlinks host ID from subnet
-	UnbindSecurityGroup(task concurrency.Task, _ SecurityGroup) fail.Error                                                         // unbinds a security group from the subnet
+	AbandonHost(ctx context.Context, hostID string) fail.Error                                                                   // unlinks host ID from subnet
+	AdoptHost(ctx context.Context, _ Host) fail.Error                                                                            // links Host to the Subnet
+	BindSecurityGroup(ctx context.Context, _ SecurityGroup, _ SecurityGroupActivation) fail.Error                                // binds a Security Group to the Subnet
+	Browse(ctx context.Context, callback func(*abstract.Subnet) fail.Error) fail.Error                                           // ...
+	Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) fail.Error // creates a Subnet
+	Delete(ctx context.Context) fail.Error
+	DisableSecurityGroup(ctx context.Context, _ SecurityGroup) fail.Error                                                  // disables a binded Security Group on Subnet
+	EnableSecurityGroup(ctx context.Context, _ SecurityGroup) fail.Error                                                   // enables a binded Security Group on Subnet
+	GetGatewayPublicIP(primary bool) (string, fail.Error)                                                                  // returns the gateway related to Subnet
+	GetGatewayPublicIPs() ([]string, fail.Error)                                                                           // returns the gateway IPs of the Subnet
+	GetDefaultRouteIP() (string, fail.Error)                                                                               // returns the private IP of the default route of the Subnet
+	GetEndpointIP() (string, fail.Error)                                                                                   // returns the public IP to reach the Subnet from Internet
+	GetState() (subnetstate.Enum, fail.Error)                                                                              // gives the current state of the Subnet
+	HasVirtualIP() (bool, fail.Error)                                                                                      // tells if the Subnet is using a VIP as default route
+	InspectGateway(primary bool) (Host, fail.Error)                                                                        // returns the gateway related to Subnet
+	InspectGatewaySecurityGroup() (SecurityGroup, fail.Error)                                                              // returns the SecurityGroup responsible of network security on Gateway
+	InspectInternalSecurityGroup() (SecurityGroup, fail.Error)                                                             // returns the SecurityGroup responsible of internal network security
+	InspectPublicIPSecurityGroup() (SecurityGroup, fail.Error)                                                             // returns the SecurityGroup responsible of Hosts with Public IP (excluding gateways)
+	InspectNetwork() (Network, fail.Error)                                                                                 // returns the instance of the parent Network of the Subnet
+	ListHosts(ctx context.Context) ([]Host, fail.Error)                                                                    // returns the list of Host attached to the subnet (excluding gateway)
+	ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error) // lists the security groups bound to the subnet
+	ToProtocol() (*protocol.Subnet, fail.Error)                                                                            // converts the subnet to protobuf message
+	UnbindSecurityGroup(ctx context.Context, _ SecurityGroup) fail.Error                                                   // unbinds a security group from the subnet
 }

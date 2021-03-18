@@ -35,6 +35,7 @@ type jobManager struct {
 func (c jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
+
 	service := protocol.NewJobServiceClient(c.session.connection)
 	ctx, xerr := utils.GetContext(false)
 	if xerr != nil {
@@ -48,6 +49,7 @@ func (c jobManager) List(timeout time.Duration) (*protocol.JobList, error) {
 func (c jobManager) Stop(uuid string, timeout time.Duration) error {
 	c.session.Connect()
 	defer c.session.Disconnect()
+
 	service := protocol.NewJobServiceClient(c.session.connection)
 	ctx, xerr := utils.GetContext(false)
 	if xerr != nil {

@@ -17,30 +17,32 @@
 package converters
 
 import (
+	"golang.org/x/net/context"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // BucketMountPointFromResourceToProtocol converts a bucket mount point from resource to protocol
-func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.Bucket) (*protocol.BucketMountingPoint, fail.Error) {
-	if task == nil {
-		return nil, fail.InvalidParameterError("task", "cannot be nil")
+func BucketMountPointFromResourceToProtocol(ctx context.Context, in resources.Bucket) (*protocol.BucketMountingPoint, fail.Error) {
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
+
+	// if task.Aborted() {
+	// 	return nil, fail.AbortedError(nil, "aborted")
+	// }
 
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	host, xerr := in.GetHost(task)
+	host, xerr := in.GetHost(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
-	path, err := in.GetMountPoint(task)
+	path, err := in.GetMountPoint(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -115,26 +117,23 @@ func BucketMountPointFromResourceToProtocol(task concurrency.Task, in resources.
 // 	return out, nil
 // }
 
-func IndexedListOfClusterNodesFromResourceToProtocol(task concurrency.Task, in resources.IndexedListOfClusterNodes) (*protocol.ClusterNodeListResponse, fail.Error) {
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
+func IndexedListOfClusterNodesFromResourceToProtocol(in resources.IndexedListOfClusterNodes) (*protocol.ClusterNodeListResponse, fail.Error) {
 	out := &protocol.ClusterNodeListResponse{}
 	if len(in) == 0 {
 		return out, nil
 	}
 	out.Nodes = make([]*protocol.Host, 0, len(in))
 	for _, v := range in {
-		item, xerr := v.ToProtocol(task)
-		if xerr != nil {
-			return &protocol.ClusterNodeListResponse{}, xerr
+		item := &protocol.Host{
+			Id:   v.ID,
+			Name: v.Name,
 		}
 		out.Nodes = append(out.Nodes, item)
 	}
 	return out, nil
 }
 
-func FeatureSliceFromResourceToProtocol(_ concurrency.Task, in []resources.Feature) *protocol.FeatureListResponse {
+func FeatureSliceFromResourceToProtocol(in []resources.Feature) *protocol.FeatureListResponse {
 	out := &protocol.FeatureListResponse{}
 	out.Features = make([]*protocol.FeatureResponse, 0, len(in))
 	for _, v := range in {

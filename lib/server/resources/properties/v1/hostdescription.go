@@ -59,7 +59,7 @@ func (hd HostDescription) Clone() data.Clonable {
 
 // Replace ... (data.Clonable interface)
 func (hd *HostDescription) Replace(p data.Clonable) data.Clonable {
-	// Do not test with IsNull(), it's allowed to clone a null value...
+	// Do not test with isNull(), it's allowed to clone a null value...
 	if hd == nil || p == nil {
 		return hd
 	}

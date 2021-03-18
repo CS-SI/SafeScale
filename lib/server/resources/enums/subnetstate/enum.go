@@ -23,17 +23,17 @@ type Enum int
 
 //goland:noinspection ALL
 const (
-	UNKNOWN Enum = iota
+	Unknown Enum = iota
 
-	// GATEWAY_CREATION when gateway(s) is(are) created
-	GATEWAY_CREATION //nolint
+	// GatewayCreation when gateway(s) is(are) created
+	GatewayCreation
 
-	// GATEWAY_CONFIGURATION when gateway(s) is(are) configured
-	GATEWAY_CONFIGURATION //nolint
+	// GatewayConfiguration when gateway(s) is(are) configured
+	GatewayConfiguration
 
-	// READY when ready
-	READY
+	// Ready when ready
+	Ready
 
-	// ERROR when error
-	ERROR
+	// Error when error
+	Error
 )

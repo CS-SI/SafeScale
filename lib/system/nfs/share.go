@@ -19,8 +19,9 @@ package nfs
 import (
 	"path/filepath"
 
+	"golang.org/x/net/context"
+
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -80,10 +81,10 @@ func NewShare(server *Server, path, options string) (*Share, fail.Error) {
 // }
 
 // Add configures and exports the share
-func (s *Share) Add(task concurrency.Task) fail.Error {
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
+func (s *Share) Add(ctx context.Context) fail.Error {
+	// if task.Aborted() {
+	// 	return fail.AbortedError(nil, "aborted")
+	// }
 
 	data := map[string]interface{}{
 		"Path": s.Path,
@@ -91,7 +92,7 @@ func (s *Share) Add(task concurrency.Task) fail.Error {
 		"Options": s.Options,
 	}
 
-	if _, xerr := executeScript(task, *s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
+	if _, xerr := executeScript(ctx, *s.Server.SSHConfig, "nfs_server_path_export.sh", data); xerr != nil {
 		return fail.Wrap(xerr, "failed to export a shared directory")
 	}
 	return nil

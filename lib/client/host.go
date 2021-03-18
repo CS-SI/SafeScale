@@ -184,6 +184,7 @@ func (h host) SSHConfig(name string) (*system.SSHConfig, error) {
 
 	h.session.Connect()
 	defer h.session.Disconnect()
+
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
 		return nil, xerr
@@ -194,6 +195,7 @@ func (h host) SSHConfig(name string) (*system.SSHConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	sshCfg := converters.SSHConfigFromProtocolToSystem(pbSSHCfg)
 	// if err == nil {
 	// 	nerr := sshCfgCache.Set(name, sshCfg)

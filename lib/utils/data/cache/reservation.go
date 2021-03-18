@@ -17,13 +17,16 @@
 package cache
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"fmt"
+
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // reservation is a struct to simulate a content of a Entry to "reserve" a key
 type reservation struct {
-	key string
+	key       string
+	observers map[string]observer.Observer
 }
 
 func (rc reservation) GetID() string {
@@ -34,20 +37,42 @@ func (rc reservation) GetName() string {
 	return rc.key
 }
 
-func (rc reservation) AddObserver(task concurrency.Task, o observer.Observer) error {
+func (rc reservation) AddObserver(o observer.Observer) error {
+	if _, ok := rc.observers[o.GetID()]; ok {
+		return fail.DuplicateError("there is already an Observer identified by '%s'", o.GetID())
+	}
+
+	if len(rc.observers) == 0 {
+		rc.observers = map[string]observer.Observer{}
+	}
+	rc.observers[o.GetID()] = o
+
 	return nil
 }
 
-func (rc reservation) NotifyObservers(task concurrency.Task) error {
+func (rc reservation) NotifyObservers() error {
+	for _, ob := range rc.observers {
+		ob.SignalChange(rc.key)
+	}
 	return nil
 }
 
-func (rc reservation) RemoveObserver(task concurrency.Task, name string) error {
+func (rc reservation) RemoveObserver(name string) error {
+	if _, ok := rc.observers[name]; !ok {
+		return fmt.Errorf("not there")
+	}
+	delete(rc.observers, name)
 	return nil
 }
 
-func (rc reservation) Released(task concurrency.Task) {
+func (rc reservation) Released() {
+	for _, ob := range rc.observers {
+		ob.MarkAsFreed(rc.key)
+	}
 }
 
-func (rc reservation) Destroyed(task concurrency.Task) {
+func (rc reservation) Destroyed() {
+	for _, ob := range rc.observers {
+		ob.MarkAsFreed(rc.key)
+	}
 }

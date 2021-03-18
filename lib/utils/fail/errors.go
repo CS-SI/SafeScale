@@ -23,13 +23,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
-	grpcstatus "google.golang.org/grpc/status"
-
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
+	grpcstatus "google.golang.org/grpc/status"
 )
 
 // consequencer is the interface exposing the methods manipulating consequences
@@ -869,8 +868,13 @@ type ErrInvalidParameter struct {
 	*errorCore
 }
 
+// InvalidParameterError ...
 func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter {
-	r := newError(nil, nil, callstack.DecorateWith("invalid parameter ", what, strprocess.FormatStrings(why...), 1))
+	return invalidParameterError(what, 2, why...)
+}
+
+func invalidParameterError(what string, skip uint, why ...interface{}) *ErrInvalidParameter {
+	r := newError(nil, nil, callstack.DecorateWith("invalid parameter ", what, strprocess.FormatStrings(why...), skip))
 	r.grpcCode = codes.FailedPrecondition
 	// Systematically log this kind of error
 	logrus.Error(r.Error())
@@ -879,12 +883,12 @@ func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter
 
 // InvalidParameterCannotBeNilError is a specialized *ErrInvalidParameter with message "cannot be nil"
 func InvalidParameterCannotBeNilError(what string) *ErrInvalidParameter {
-	return InvalidParameterError(what, "cannot be nil")
+	return invalidParameterError(what, 3, "cannot be nil")
 }
 
 // InvalidParameterCannotBeEmptyStringError is a specialized *ErrInvalidParameter with message "cannot be empty string"
 func InvalidParameterCannotBeEmptyStringError(what string) *ErrInvalidParameter {
-	return InvalidParameterError(what, "cannot be empty string")
+	return invalidParameterError(what, 3, "cannot be empty string")
 }
 
 // IsNull tells if the instance is null

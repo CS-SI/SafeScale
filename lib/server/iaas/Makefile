@@ -5,8 +5,13 @@ GO?=go
 all: generate
 
 generate: clean
+	@(mkdir -p mocks) || true
+	@(mkdir -p providers/mocks) || true
+	@(mkdir -p ../mocks) || true
 	@(cd providers && $(MAKE) $(@))
 	@(cd userdata && $(MAKE) $(@))
+	@(cd stacks && $(MAKE) $(@))
+	@$(GO) generate ./... > /dev/null 2>&1
 
 vet:
 	@$(GO) vet ./...

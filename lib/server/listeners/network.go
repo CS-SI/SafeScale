@@ -21,11 +21,6 @@ import (
 	"fmt"
 	"net"
 
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
-
-	"github.com/asaskevich/govalidator"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
@@ -35,6 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
+	"github.com/asaskevich/govalidator"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -99,7 +97,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		return nil, xerr
 	}
 
-	if xerr = rn.Create(task, req); xerr != nil {
+	if xerr = rn.Create(job.GetContext(), req); xerr != nil {
 		return nil, xerr
 	}
 
@@ -107,7 +105,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		if err != nil && !in.GetKeepOnFailure() {
 			defer task.DisarmAbortSignal()()
 
-			if derr := rn.Delete(task); derr != nil {
+			if derr := rn.Delete(job.GetContext()); derr != nil {
 				_ = fail.ConvertError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
 			}
 		}
@@ -149,14 +147,14 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			KeepOnFailure:  in.GetKeepOnFailure(),
 			DefaultSSHPort: in.GetGateway().GetSshPort(),
 		}
-		xerr = rs.Create(task, req, in.GetGateway().GetName(), sizing)
+		xerr = rs.Create(job.GetContext(), req, in.GetGateway().GetName(), sizing)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
 		}
 	}
 
 	tracer.Trace("Network '%s' successfully created.", networkName)
-	return rn.ToProtocol(task)
+	return rn.ToProtocol()
 }
 
 // List existing networks
@@ -197,7 +195,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	if in.GetAll() {
 		list, xerr = svc.ListNetworks()
 	} else {
-		list, xerr = networkfactory.List(task, svc)
+		list, xerr = networkfactory.List(job.GetContext(), svc)
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -215,7 +213,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 // Inspect returns infos on a network
 func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.Network, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect network")
+	defer fail.OnExitWrapError(&err, "cannot inspect networkInstance")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -239,22 +237,23 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "network inspect")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "networkInstance inspect")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.networkInstance")*/, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	network, xerr := networkfactory.Load(task, job.GetService(), ref)
+	networkInstance, xerr := networkfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return network.ToProtocol(task)
+
+	return networkInstance.ToProtocol()
 }
 
 // Delete a network
@@ -297,7 +296,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rn, xerr := networkfactory.Load(task, svc, ref)
+	rn, xerr := networkfactory.Load(svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -328,7 +327,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 			return empty, xerr
 		}
 	}
-	if xerr = rn.Delete(task); xerr != nil {
+	if xerr = rn.Delete(job.GetContext()); xerr != nil {
 		return empty, xerr
 	}
 
