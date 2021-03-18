@@ -18,12 +18,12 @@ package aws
 
 import (
 	"fmt"
+	"sort"
 	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -672,7 +672,6 @@ func (s stack) buildAwsSpotMachine(
 	lastPrice := resp[len(resp)-1]
 	logrus.Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
-	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(isGateway), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), []byte(data))
 	// input := &ec2.RequestSpotInstancesInput{
 	// 	InstanceCount: aws.Int64(1),
 	// 	LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
@@ -696,6 +695,7 @@ func (s stack) buildAwsSpotMachine(
 	// 	},
 	// 	normalizeError,
 	// )
+	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(isGateway), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), []byte(data))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -871,23 +871,6 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 // FIXME: too slow, find a way to speed it up
 func (s stack) fromMachineTypeToHostEffectiveSizing(machineType string) (abstract.HostEffectiveSizing, fail.Error) {
 	nullSizing := abstract.HostEffectiveSizing{}
-
-	// resp, xerr := s.rpcGetProductByID(aws.String(machineType))
-	// if xerr != nil {
-	// 	return nullSizing, xerr
-	// }
-	// price, xerr := NewPriceFromJSONValue(resp)
-	// if xerr != nil {
-	// 	return nullSizing, xerr
-	// }
-	// hs := abstract.HostEffectiveSizing{
-	// 	Cores:     price.GetCores(),
-	// 	GPUNumber: price.GetGPUNumber(),
-	// 	CPUFreq:   float32(price.GetCPUFreq()),
-	// 	DiskSize:  int(price.GetDiskSize()),
-	// 	RAMSize:   float32(price.GetRAMSize()),
-	// }
-
 	resp, xerr := s.rpcDescribeInstanceTypeByID(aws.String(machineType))
 	if xerr != nil {
 		return nullSizing, xerr
