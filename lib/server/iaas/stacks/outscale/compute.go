@@ -860,7 +860,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
-	// prepare userdata phase1 execution
+	// -- prepare userdata phase1 execution --
 	userDataPhase1, xerr := udc.Generate(userdata.PHASE1_INIT)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
@@ -873,7 +873,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	buf := bytes.NewBuffer(userDataPhase1)
 
-	// create host
+	// -- create host --
 	vmsRequest := osc.CreateVmsRequest{
 		ImageId:  request.ImageID,
 		UserData: base64.StdEncoding.EncodeToString(buf.Bytes()),
@@ -913,11 +913,16 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 
 	var vm osc.Vm
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			resp, innerXErr := s.rpcCreateVMs(vmsRequest)
 			if innerXErr != nil {
-				return innerXErr
+				switch innerXErr.(type) {
+				case *fail.ErrOverload:
+					return retry.StopRetryError(innerXErr)
+				default:
+					return innerXErr
+				}
 			}
 
 			if len(resp) == 0 {
@@ -944,18 +949,18 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		},
 		temporal.GetLongOperationTimeout(),
 	)
-	if retryErr != nil {
-		switch retryErr.(type) {
+	if xerr != nil {
+		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			retryErr = fail.ConvertError(retryErr.Cause())
+			xerr = fail.ConvertError(xerr.Cause())
 		default:
 		}
 	}
-	if retryErr != nil {
+	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 
-	// Retrieve default Nic use to create public ip
+	// -- Retrieve default Nic use to create public ip --
 	nics, xerr := s.rpcReadNics("", vm.VmId)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
@@ -978,6 +983,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		vm.PublicIp = udc.PublicIP
 	}
 
+	// -- add GPU if asked for --
 	if xerr = s.addGPUs(&request, tpl, vm.VmId); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
