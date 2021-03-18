@@ -779,11 +779,6 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 	}
 
-	// // Give a chance to set a password by safescaled environment (meaning for all Hosts)
-	// if hostReq.Password == "" {
-	// 	hostReq.Password = os.Getenv("SAFESCALE_UNSAFE_PASSWORD")
-	// }
-
 	ahf, userdataContent, xerr := svc.CreateHost(hostReq)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
@@ -844,6 +839,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			_ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
 			creator := ""
 			hostname, _ := os.Hostname()
@@ -871,6 +867,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			_ = hnV2.Replace(converters.HostNetworkingFromAbstractToPropertyV2(*ahf.Networking))
 			hnV2.DefaultSubnetID = defaultSubnet.GetID()
 			hnV2.IsGateway = hostReq.IsGateway
@@ -894,12 +891,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	if xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet); xerr != nil {
 		return nil, xerr
 	}
-	defer func() {
-		// // Disable abort signal during the clean up
-		// defer task.DisarmAbortSignal()()
-
-		instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
-	}()
+	defer instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
 
 	logrus.Infof("Compute resource created: '%s'", instance.GetName())
 
@@ -1008,9 +1000,6 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
-					// // Disable abort signal during the clean up
-					// defer task.DisarmAbortSignal()()
-
 					if derr := gwsg.UnbindFromHost(context.Background(), instance); derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", actionFromError(innerXErr), gwsg.GetName(), instance.GetName()))
 					}
@@ -1112,7 +1101,9 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 			}()
 
 			for _, v := range req.Subnets {
-				if v.ID == defaultSubnetID {
+				// Do not try to bind defaultSubnet on gateway, because this code is running under a lock on defaultSubnet in this case, and this will lead to deadlock
+				// (binding of gateway on defaultSubnet is done inside Subnet.Create() call)
+				if req.IsGateway && v.ID == defaultSubnetID {
 					continue
 				}
 
@@ -1157,7 +1148,6 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 			}
 		}
 
-		// Create and bind a dedicated Security Group to the host (with no rules by default)
 		var an *abstract.Network
 		rn, xerr := defaultSubnet.(*subnet).unsafeInspectNetwork()
 		if xerr != nil {
