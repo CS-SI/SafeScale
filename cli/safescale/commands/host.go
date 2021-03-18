@@ -301,16 +301,6 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
 		}
-		askedGpus := int32(c.Int("gpu"))
-		if askedGpus <= -1 {
-			logrus.Debug("No GPU parameters used")
-		} else {
-			if askedGpus == 0 {
-				logrus.Debug("NO GPU explicitly required")
-			} else {
-				logrus.Debugf("GPUs required: %d", askedGpus)
-			}
-		}
 
 		sizing, err := constructHostDefinitionStringFromCLI(c, "sizing")
 		if err != nil {
