@@ -436,6 +436,10 @@ func parseSizingString(request string) (map[string]*sizingToken, fail.Error) {
 			}
 
 		case "-": // Manages negative number (can be used for gpu)
+			if tok = s.Scan(); tok == scanner.EOF {
+				p := s.Pos()
+				return nil, fail.SyntaxError("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
+			}
 			t += s.TokenText()
 		}
 
