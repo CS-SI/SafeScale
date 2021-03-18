@@ -22,6 +22,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusternodetype"
@@ -35,8 +38,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 func (instance *cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
@@ -377,7 +378,7 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, xerr
 	}
 
-	// Create the Host
+	// -- Create the Host --
 	xerr = subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -409,9 +410,6 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
-			// // Disable abort signal during the clean up
-			// defer task.DisarmAbortSignal()()
-
 			if derr := rh.Delete(context.Background()); derr != nil {
 				_ = xerr.AddConsequence(derr)
 			}

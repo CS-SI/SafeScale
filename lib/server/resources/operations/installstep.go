@@ -24,9 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
@@ -41,6 +38,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -76,7 +75,7 @@ func (sr stepResult) ErrorMessage() string {
 		msg = sr.err.Error()
 	}
 	if msg == "" && sr.retcode != 0 {
-		msg = fmt.Sprintf("exited with error %d", sr.retcode)
+		msg = fmt.Sprintf("exited with error core %d", sr.retcode)
 	}
 	return msg
 }
