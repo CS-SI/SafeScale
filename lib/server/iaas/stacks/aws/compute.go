@@ -360,38 +360,22 @@ func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Err
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	// resp, xerr := s.rpcGetProducts(nil)
-	// if xerr != nil {
-	// 	return emptySlice, xerr
-	// }
-	//
-	// list := make([]abstract.HostTemplate, 0, len(resp))
-	// for _, v := range resp {
-	// 	price, xerr := NewPriceFromJSONValue(v)
-	// 	if xerr != nil {
-	// 		continue
-	// 	}
-	//
-	// 	tpl := abstract.HostTemplate{
-	// 		ID:        price.Product.Attributes.InstanceType,
-	// 		Name:      price.Product.Attributes.InstanceType,
-	// 		Cores:     price.GetCores(),
-	// 		GPUNumber: price.GetGPUNumber(),
-	// 		DiskSize:  int(price.GetDiskSize()),
-	// 		RAMSize:   float32(price.GetRAMSize()),
-	// 	}
-	// 	list = append(list, tpl)
-	// }
-
 	resp, xerr := s.rpcDescribeInstanceTypes(nil)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
 
+	// sort response on Network Performance to potentially have cheaper choices first
+	sort.Slice(resp, func(i, j int) bool {
+		return aws.StringValue(resp[i].NetworkInfo.NetworkPerformance) < aws.StringValue(resp[j].NetworkInfo.NetworkPerformance)
+	})
+
+	// converts response from AWS to abstract
 	list := make([]abstract.HostTemplate, 0, len(resp))
 	for _, v := range resp {
 		list = append(list, toAbstractHostTemplate(*v))
 	}
+
 	return list, nil
 }
 

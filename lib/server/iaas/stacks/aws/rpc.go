@@ -1209,9 +1209,13 @@ func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo,
 		request.InstanceTypes = ids
 	} else {
 		request.Filters = []*ec2.Filter{
-			{
+			{ // keep only x86_64 processor architecture
 				Name:   aws.String("processor-info.supported-architecture"),
 				Values: []*string{aws.String("x86_64")},
+			},
+			{ // filter instances that are burstable, stable performance are preferred
+				Name:   aws.String("burstable-performance-supported"),
+				Values: []*string{aws.String("false")},
 			},
 		}
 	}
@@ -1244,7 +1248,6 @@ func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo,
 			}
 			out = append(out, v)
 		}
-		// out = append(out, resp.InstanceTypes...)
 
 		if resp.NextToken == nil {
 			break

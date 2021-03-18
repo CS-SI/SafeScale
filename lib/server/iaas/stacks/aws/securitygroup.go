@@ -293,41 +293,42 @@ func toAbstractSecurityGroupRules(in *ec2.SecurityGroup) (abstract.SecurityGroup
 	}
 	var out abstract.SecurityGroupRules
 	for _, v := range in.IpPermissions {
-		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.Ingress, ipversion.IPv4)
+		item, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.Ingress, ipversion.IPv4)
 		if xerr != nil {
 			return nil, xerr
 		}
-		out = append(out, items...)
+
+		out = append(out, item)
 	}
 
 	for _, v := range in.IpPermissionsEgress {
-		items, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.Egress, ipversion.IPv4)
+		item, xerr := toAbstractSecurityGroupRule(v, securitygroupruledirection.Egress, ipversion.IPv4)
 		if xerr != nil {
 			return nil, xerr
 		}
-		out = append(out, items...)
+
+		out = append(out, item)
 	}
 
 	return out, nil
 }
 
 // toAbstractSecurityGroupRule converts a security group coming from AWS to a slice of abstracted security group rules
-func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupruledirection.Enum, etherType ipversion.Enum) (abstract.SecurityGroupRules, fail.Error) {
+func toAbstractSecurityGroupRule(in *ec2.IpPermission, direction securitygroupruledirection.Enum, etherType ipversion.Enum) (*abstract.SecurityGroupRule, fail.Error) {
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	out := make(abstract.SecurityGroupRules, 0, len(in.IpRanges))
-	item := abstract.NewSecurityGroupRule()
-	item.Direction = direction
-	item.EtherType = etherType
-	item.Protocol = aws.StringValue(in.IpProtocol)
-	item.PortFrom = int32(aws.Int64Value(in.FromPort))
-	item.PortTo = int32(aws.Int64Value(in.ToPort))
+	out := abstract.NewSecurityGroupRule()
+	out.Direction = direction
+	out.EtherType = etherType
+	out.Protocol = aws.StringValue(in.IpProtocol)
+	out.PortFrom = int32(aws.Int64Value(in.FromPort))
+	out.PortTo = int32(aws.Int64Value(in.ToPort))
 
-	item.Targets = make([]string, 0, len(in.IpRanges))
+	out.Targets = make([]string, 0, len(in.IpRanges))
 	for _, ip := range in.IpRanges {
-		item.Targets = append(item.Targets, aws.StringValue(ip.CidrIp))
+		out.Targets = append(out.Targets, aws.StringValue(ip.CidrIp))
 	}
 	return out, nil
 }
