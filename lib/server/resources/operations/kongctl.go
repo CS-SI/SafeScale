@@ -114,10 +114,14 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		subnet:  subnet,
 		gateway: addressedGateway,
 	}
-	if ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP(); xerr != nil {
+	ctrl.gatewayPrivateIP, xerr = addressedGateway.GetPrivateIP()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
-	if ctrl.gatewayPublicIP, xerr = addressedGateway.GetPublicIP(); xerr != nil {
+	ctrl.gatewayPublicIP, xerr = addressedGateway.GetPublicIP()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -250,7 +254,9 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		}
 
 		// if create {
-		if xerr = k.createUpstream(ruleName, options, values); xerr != nil {
+		xerr = k.createUpstream(ruleName, options, values)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return ruleName, xerr
 		}
 		// }

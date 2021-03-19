@@ -246,7 +246,9 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
-			if cloneV["HostIP"], xerr = h.GetPrivateIP(); xerr != nil {
+			cloneV["HostIP"], xerr = h.GetPrivateIP()
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return nil, xerr
 			}
 
@@ -272,7 +274,9 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 			}
 			cloneV["Hostname"] = h.GetName() + domain
 
-			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
+			cloneV, xerr = realizeVariables(cloneV)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return nil, xerr
 			}
 			subtask, err := concurrency.NewTaskWithParent(task)
@@ -312,7 +316,9 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
-			if cloneV["HostIP"], xerr = h.GetPrivateIP(); xerr != nil {
+			cloneV["HostIP"], xerr = h.GetPrivateIP()
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return nil, xerr
 			}
 
@@ -338,7 +344,9 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 			}
 
 			cloneV["Hostname"] = h.GetName() + domain
-			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
+			cloneV, xerr = realizeVariables(cloneV)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return nil, xerr
 			}
 
@@ -485,7 +493,9 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 			}
 
 			buffer := bytes.NewBufferString("")
-			if err := varTemplate.Execute(buffer, variables); err != nil {
+			err := varTemplate.Execute(buffer, variables)
+			err = errcontrol.Crasher(err)
+			if err != nil {
 				return nil, fail.ConvertError(err)
 			}
 
@@ -505,7 +515,9 @@ func replaceVariablesInString(text string, v data.Map) (string, fail.Error) {
 	}
 
 	dataBuffer := bytes.NewBufferString("")
-	if err := tmpl.Execute(dataBuffer, v); err != nil {
+	err := tmpl.Execute(dataBuffer, v)
+	err = errcontrol.Crasher(err)
+	if err != nil {
 		return "", fail.Wrap(err, "failed to replace variables")
 	}
 

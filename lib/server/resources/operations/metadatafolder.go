@@ -152,7 +152,9 @@ func (f folder) Delete(path string, name string) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	if xerr := f.service.DeleteObject(f.getBucket().Name, f.absolutePath(path, name)); xerr != nil {
+	xerr := f.service.DeleteObject(f.getBucket().Name, f.absolutePath(path, name))
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
 	}
 	return nil
@@ -188,12 +190,16 @@ func (f folder) Read(path string, name string, callback func([]byte) fail.Error)
 	data := buffer.Bytes()
 	if f.crypt {
 		var err error
-		if data, err = crypt.Decrypt(data, f.cryptKey); err != nil {
+		data, err = crypt.Decrypt(data, f.cryptKey)
+		err = errcontrol.Crasher(err)
+		if err != nil {
 			return fail.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
 	}
 
-	if xerr = callback(data); xerr != nil {
+	xerr = callback(data)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return fail.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, xerr)
 	}
 
@@ -215,7 +221,9 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 	var data []byte
 	if f.crypt {
 		var err error
-		if data, err = crypt.Encrypt(content, f.cryptKey); err != nil {
+		data, err = crypt.Encrypt(content, f.cryptKey)
+		err = errcontrol.Crasher(err)
+		if err != nil {
 			return fail.ConvertError(err)
 		}
 	} else {
@@ -316,18 +324,24 @@ func (f folder) Browse(path string, callback folderDecoderCallback) fail.Error {
 	var err error
 	for _, i := range list {
 		var buffer bytes.Buffer
-		if xerr = f.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0); xerr != nil {
+		xerr = f.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", xerr)
 			return xerr
 		}
 
 		data := buffer.Bytes()
 		if f.crypt {
-			if data, err = crypt.Decrypt(data, f.cryptKey); err != nil {
+			data, err = crypt.Decrypt(data, f.cryptKey)
+			err = errcontrol.Crasher(err)
+			if err != nil {
 				return fail.ConvertError(err)
 			}
 		}
-		if xerr = callback(data); xerr != nil {
+		xerr = callback(data)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			logrus.Errorf("Error browsing metadata: running callback: %+v", xerr)
 			return xerr
 		}

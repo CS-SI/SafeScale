@@ -443,7 +443,9 @@ func (instance *subnet) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
+	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	defer func() {
@@ -456,7 +458,9 @@ func (instance *subnet) carry(clonable data.Clonable) (xerr fail.Error) {
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	if xerr := instance.core.carry(clonable); xerr != nil {
+	xerr = instance.core.carry(clonable)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -506,12 +510,16 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	// Check if subnet already exists and is managed by SafeScale
-	if xerr = instance.checkUnicity(req); xerr != nil {
+	xerr = instance.checkUnicity(req)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
 	// Verify the CIDR is not routable
-	if xerr = instance.validateCIDR(&req, *an); xerr != nil {
+	xerr = instance.validateCIDR(&req, *an)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
 
@@ -538,7 +546,9 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}()
 
 	// Write subnet object metadata and updates the service cache
-	if xerr = instance.carry(as); xerr != nil {
+	xerr = instance.carry(as)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -552,21 +562,29 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}()
 
 	var subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup
-	if subnetGWSG, xerr = instance.createGWSecurityGroup(ctx, req /* *as, */, *an); xerr != nil {
+	subnetGWSG, xerr = instance.createGWSecurityGroup(ctx, req /* *as, */, *an)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	defer instance.undoCreateSecurityGroup(&xerr, req.KeepOnFailure, subnetGWSG)
 
-	if subnetInternalSG, xerr = instance.createInternalSecurityGroup(ctx, req /* *as, */, *an); xerr != nil {
+	subnetInternalSG, xerr = instance.createInternalSecurityGroup(ctx, req /* *as, */, *an)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	defer instance.undoCreateSecurityGroup(&xerr, req.KeepOnFailure, subnetInternalSG)
 
-	if xerr = subnetGWSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); xerr != nil {
+	xerr = subnetGWSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
-	if subnetPublicIPSG, xerr = instance.createPublicIPSecurityGroup(ctx, req /* *as,*/, *an); xerr != nil {
+	subnetPublicIPSG, xerr = instance.createPublicIPSecurityGroup(ctx, req /* *as,*/, *an)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	defer instance.undoCreateSecurityGroup(&xerr, req.KeepOnFailure, subnetPublicIPSG)
@@ -579,7 +597,9 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		}
 	}()
 
-	if xerr = subnetInternalSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault); xerr != nil {
+	xerr = subnetInternalSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -612,7 +632,9 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	// Creates VIP for gateways if asked for
 	var avip *abstract.VirtualIP
 	if failover {
-		if avip, xerr = svc.CreateVIP(as.Network, as.ID, fmt.Sprintf(virtualIPNamePattern, as.Name, an.Name), []string{subnetGWSG.GetID()}); xerr != nil {
+		avip, xerr = svc.CreateVIP(as.Network, as.ID, fmt.Sprintf(virtualIPNamePattern, as.Name, an.Name), []string{subnetGWSG.GetID()})
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return fail.Wrap(xerr, "failed to create VIP")
 		}
 
@@ -943,7 +965,9 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			defer func() {
 				if xerr != nil && !req.KeepOnFailure {
 					logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
-					if derr := primaryGateway.relaxedDeleteHost(context.Background()); xerr != nil {
+					derr := primaryGateway.relaxedDeleteHost(context.Background())
+					derr = errcontrol.CrasherFail(derr)
+					if derr != nil {
 						switch derr.(type) {
 						case *fail.ErrTimeout:
 							logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
@@ -962,7 +986,9 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			}()
 
 			// Bind Internal Security Group to gateway
-			if xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway); xerr != nil {
+			xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return xerr
 			}
 			defer instance.undoBindInternalSecurityGroupToGateway(ctx, primaryGateway, req.KeepOnFailure, &xerr)
@@ -1000,7 +1026,9 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			// Starting from here, deletes the secondary gateway if exiting with error
 			defer func() {
 				if xerr != nil && !req.KeepOnFailure {
-					if derr := secondaryGateway.relaxedDeleteHost(ctx); xerr != nil {
+					derr := secondaryGateway.relaxedDeleteHost(ctx)
+					derr = errcontrol.CrasherFail(derr)
+					if derr != nil {
 						switch derr.(type) {
 						case *fail.ErrTimeout:
 							logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
@@ -1008,14 +1036,18 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 						}
 						_ = xerr.AddConsequence(derr)
 					}
-					if derr := instance.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
+					derr = instance.unbindHostFromVIP(as.VIP, secondaryGateway)
+					derr = errcontrol.CrasherFail(derr)
+					if derr != nil {
 						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
 					}
 				}
 			}()
 
 			// Bind Internal Security Group to gateway
-			if xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway); xerr != nil {
+			xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return xerr
 			}
 			defer instance.undoBindInternalSecurityGroupToGateway(ctx, secondaryGateway, req.KeepOnFailure, &xerr)
@@ -1091,10 +1123,9 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		return xerr
 	}
 
-	// if primaryTask, xerr = concurrency.NewTask(); xerr != nil {
-	// 	return xerr
-	// }
-	if tg, xerr = concurrency.NewTaskGroupWithContext(ctx); xerr != nil {
+	tg, xerr = concurrency.NewTaskGroupWithContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -1116,15 +1147,10 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			return xerr
 		}
 	}
-	// if _, primaryErr = primaryTask.Wait(); primaryErr != nil {
-	// 	return primaryErr
-	// }
-	// if failover && secondaryTask != nil {
-	// 	if _, secondaryErr = secondaryTask.Wait(); secondaryErr != nil {
-	// 		return secondaryErr
-	// 	}
-	// }
-	if _, xerr = tg.Wait(); xerr != nil {
+
+	_, xerr = tg.Wait()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -1193,7 +1219,9 @@ func (instance *subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 // deleteSubnetAndConfirm deletes the Subnet idnetified by 'id' and wait for deletion confirmation
 func (instance *subnet) deleteSubnetAndConfirm(id string) fail.Error {
 	svc := instance.GetService()
-	if xerr := svc.DeleteSubnet(id); xerr != nil {
+	xerr := svc.DeleteSubnet(id)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If subnet doesn't exist anymore on the provider infrastructure, do not fail
@@ -1204,7 +1232,9 @@ func (instance *subnet) deleteSubnetAndConfirm(id string) fail.Error {
 	}
 	return retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			if _, xerr := svc.InspectSubnet(id); xerr != nil {
+			_, xerr := svc.InspectSubnet(id)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// Subnet not found, good
@@ -1380,12 +1410,16 @@ func (instance *subnet) createGWSecurityGroup(ctx context.Context, req abstract.
 	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, req.Name, network.Name)
 
 	var sg resources.SecurityGroup
-	if sg, xerr = NewSecurityGroup(instance.GetService()); xerr != nil {
+	sg, xerr = NewSecurityGroup(instance.GetService())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
 	description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, req.Name, network.Name)
-	if xerr = sg.Create(ctx, network.ID, sgName, description, nil); xerr != nil {
+	xerr = sg.Create(ctx, network.ID, sgName, description, nil)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -1436,7 +1470,9 @@ func (instance *subnet) createGWSecurityGroup(ctx context.Context, req abstract.
 			Targets:     []string{sg.GetID()},
 		},
 	}
-	if xerr = sg.AddRules(ctx, rules); xerr != nil {
+	xerr = sg.AddRules(ctx, rules)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -1449,12 +1485,16 @@ func (instance *subnet) createPublicIPSecurityGroup(ctx context.Context, req abs
 	sgName := fmt.Sprintf(subnetPublicIPSecurityGroupNamePattern, req.Name, network.Name)
 
 	var sg resources.SecurityGroup
-	if sg, xerr = NewSecurityGroup(instance.GetService()); xerr != nil {
+	sg, xerr = NewSecurityGroup(instance.GetService())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
 	description := fmt.Sprintf(subnetPublicIPSecurityGroupDescriptionPattern, req.Name, network.Name)
-	if xerr = sg.Create(ctx, network.ID, sgName, description, nil); xerr != nil {
+	xerr = sg.Create(ctx, network.ID, sgName, description, nil)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -1485,7 +1525,9 @@ func (instance *subnet) createPublicIPSecurityGroup(ctx context.Context, req abs
 			Targets:     []string{"::0/0"},
 		},
 	}
-	if xerr = sg.AddRules(ctx, rules); xerr != nil {
+	xerr = sg.AddRules(ctx, rules)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -1514,12 +1556,16 @@ func (instance *subnet) createInternalSecurityGroup(ctx context.Context, req abs
 	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, req.Name, network.Name)
 
 	var sg resources.SecurityGroup
-	if sg, xerr = NewSecurityGroup(instance.GetService()); xerr != nil {
+	sg, xerr = NewSecurityGroup(instance.GetService())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
 	description := fmt.Sprintf(subnetInternalSecurityGroupDescriptionPattern, req.Name, network.Name)
-	if xerr = sg.Create(ctx, network.ID, sgName, description, nil); xerr != nil {
+	xerr = sg.Create(ctx, network.ID, sgName, description, nil)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -1565,7 +1611,9 @@ func (instance *subnet) createInternalSecurityGroup(ctx context.Context, req abs
 			Targets:     []string{sg.GetID()},
 		},
 	}
-	if xerr = sg.AddRules(ctx, rules); xerr != nil {
+	xerr = sg.AddRules(ctx, rules)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -1577,7 +1625,9 @@ func (instance *subnet) createInternalSecurityGroup(ctx context.Context, req abs
 func (instance *subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if xerr := instance.GetService().UnbindHostFromVIP(vip, host.GetID()); xerr != nil {
+	xerr = instance.GetService().UnbindHostFromVIP(vip, host.GetID())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return fail.Wrap(xerr, "cleaning up on %s, failed to unbind gateway '%s' from VIP", actionFromError(xerr), host.GetName())
 	}
 
@@ -1618,7 +1668,9 @@ func (instance *subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 		}
 
 		as := abstract.NewSubnet()
-		if xerr := as.Deserialize(buf); xerr != nil {
+		xerr := as.Deserialize(buf)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
 
@@ -2139,7 +2191,9 @@ func (instance *subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 
 				// delete Host
 				ids = append(ids, rh.GetID())
-				if xerr := rh.(*host).relaxedDeleteHost(context.Background()); xerr != nil {
+				xerr := rh.(*host).relaxedDeleteHost(context.Background())
+				xerr = errcontrol.CrasherFail(xerr)
+				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// missing gateway is considered as a successful deletion, continue
@@ -2164,7 +2218,9 @@ func (instance *subnet) unbindSecurityGroups(ctx context.Context, sgs *propertie
 	var rsg resources.SecurityGroup
 	svc := instance.GetService()
 	for k, v := range sgs.ByName {
-		if rsg, xerr = LoadSecurityGroup(svc, v); xerr != nil {
+		rsg, xerr = LoadSecurityGroup(svc, v)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a Security Group not found as a successful unbind
@@ -2177,7 +2233,9 @@ func (instance *subnet) unbindSecurityGroups(ctx context.Context, sgs *propertie
 		}(rsg)
 
 		if rsg != nil {
-			if xerr = rsg.UnbindFromSubnet(ctx, instance); xerr != nil {
+			xerr = rsg.UnbindFromSubnet(ctx, instance)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// consider a Security Group not found as a successful unbind

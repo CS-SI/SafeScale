@@ -214,7 +214,9 @@ func (instance *share) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
+	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	defer func() {
@@ -228,7 +230,9 @@ func (instance *share) carry(clonable data.Clonable) (xerr fail.Error) {
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	if xerr := instance.core.carry(clonable); xerr != nil {
+	xerr = instance.core.carry(clonable)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -277,7 +281,9 @@ func (instance *share) Browse(ctx context.Context, callback func(string, string)
 		}
 
 		si := &ShareIdentity{}
-		if xerr := si.Deserialize(buf); xerr != nil {
+		xerr = si.Deserialize(buf)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
 
@@ -327,7 +333,9 @@ func (instance *share) Create(
 	defer instance.lock.Unlock()
 
 	// Check if a share already exists with the same name
-	if _, xerr = server.GetShare(shareName); xerr != nil {
+	_, xerr = server.GetShare(shareName)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
@@ -400,7 +408,9 @@ func (instance *share) Create(
 
 			if len(serverSharesV1.ByID) == 0 {
 				// Host doesn't have shares yet, so install NFS
-				if xerr = nfsServer.Install(ctx); xerr != nil {
+				xerr = nfsServer.Install(ctx)
+				xerr = errcontrol.CrasherFail(xerr)
+				if xerr != nil {
 					return xerr
 				}
 			}
@@ -418,7 +428,9 @@ func (instance *share) Create(
 		}
 	}
 
-	if xerr = nfsServer.AddShare(ctx, sharePath, options); xerr != nil {
+	xerr = nfsServer.AddShare(ctx, sharePath, options)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrExecution:
 			var retcode int
@@ -744,11 +756,15 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 				return xerr
 			}
 
-			if xerr = nfsClient.Install(ctx); xerr != nil {
+			xerr = nfsClient.Install(ctx)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return xerr
 			}
 
-			if xerr = nfsClient.Mount(ctx, export, mountPath, withCache); xerr != nil {
+			xerr = nfsClient.Mount(ctx, export, mountPath, withCache)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return xerr
 			}
 
@@ -1074,7 +1090,9 @@ func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
 
 			defer task.DisarmAbortSignal()()
 
-			if xerr = nfsServer.RemoveShare(ctx, hostShare.Path); xerr != nil {
+			xerr = nfsServer.RemoveShare(ctx, hostShare.Path)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return xerr
 			}
 

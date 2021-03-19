@@ -77,7 +77,9 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 				// Do not remove a Security Group marked as default for a host
 				if hostsV1.DefaultFor != "" {
-					if _, xerr := LoadHost(svc, hostsV1.DefaultFor); xerr != nil {
+					_, xerr := LoadHost(svc, hostsV1.DefaultFor)
+					xerr = errcontrol.CrasherFail(xerr)
+					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
 							hostsV1.DefaultFor = ""
@@ -211,7 +213,9 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 	// defer task.DisarmAbortSignal()()
 
 	// Deletes metadata from Object Storage
-	if xerr = instance.core.delete(); xerr != nil {
+	xerr = instance.core.delete()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		// If entry not found, considered as a success
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

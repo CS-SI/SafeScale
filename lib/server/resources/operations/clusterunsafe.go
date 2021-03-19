@@ -162,7 +162,9 @@ func (instance *cluster) unsafeListMasterIPs() (list data.IndexedListOfStrings, 
 	defer fail.OnPanic(&xerr)
 
 	emptyList := data.IndexedListOfStrings{}
-	if xerr = instance.beingRemoved(); xerr != nil {
+	xerr = instance.beingRemoved()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return emptyList, xerr
 	}
 
@@ -242,7 +244,9 @@ func (instance *cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 			return nil, xerr
 		}
 
-		if _, xerr = master.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout()); xerr != nil {
+		_, xerr = master.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrTimeout:
 				lastError = xerr
@@ -294,7 +298,9 @@ func (instance *cluster) unsafeListNodes() (list resources.IndexedListOfClusterN
 func (instance *cluster) unsafeListNodeIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	emptyList := data.IndexedListOfStrings{}
 
-	if xerr = instance.beingRemoved(); xerr != nil {
+	xerr = instance.beingRemoved()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return emptyList, xerr
 	}
 
@@ -349,7 +355,9 @@ func (instance *cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	if xerr = instance.beingRemoved(); xerr != nil {
+	xerr = instance.beingRemoved()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -376,7 +384,9 @@ func (instance *cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 			hostInstance.Released()
 		}(node)
 
-		if _, xerr = node.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout()); xerr != nil {
+		_, xerr = node.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrTimeout:
 				continue

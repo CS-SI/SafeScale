@@ -167,7 +167,9 @@ func (instance *volume) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
+	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	defer func() {
@@ -180,7 +182,9 @@ func (instance *volume) carry(clonable data.Clonable) (xerr fail.Error) {
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	if xerr := instance.core.carry(clonable); xerr != nil {
+	xerr = instance.core.carry(clonable)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -290,7 +294,9 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 		}
 
 		av := abstract.NewVolume()
-		if xerr := av.Deserialize(buf); xerr != nil {
+		xerr = av.Deserialize(buf)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
 
@@ -362,7 +368,9 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 	// defer task.DisarmAbortSignal()()
 
 	// delete volume
-	if xerr = instance.GetService().DeleteVolume(instance.GetID()); xerr != nil {
+	xerr = instance.GetService().DeleteVolume(instance.GetID())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
 			if xerr.Cause() != nil {
@@ -436,7 +444,9 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	}
 
 	// Check if host exists but is not managed by SafeScale
-	if _, xerr = svc.InspectVolume(req.Name); xerr != nil {
+	_, xerr = svc.InspectVolume(req.Name)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue

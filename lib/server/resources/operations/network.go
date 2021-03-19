@@ -106,7 +106,9 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 			}
 
 			// Deal with legacy
-			if xerr = rn.(*network).upgradeNetworkPropertyIfNeeded(); xerr != nil {
+			xerr = rn.(*network).upgradeNetworkPropertyIfNeeded()
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrAlteredNothing:
 					// ignore
@@ -215,7 +217,9 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 	}
 
 	// Verify if the subnet already exist and in this case is not managed by SafeScale
-	if _, xerr = svc.InspectNetworkByName(req.Name); xerr != nil {
+	_, xerr = svc.InspectNetworkByName(req.Name)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
@@ -253,7 +257,9 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			if derr := svc.DeleteNetwork(an.ID); xerr != nil {
+			derr := svc.DeleteNetwork(an.ID)
+			derr = errcontrol.CrasherFail(derr)
+			if derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
 			}
 		}
@@ -281,7 +287,9 @@ func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
+	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	defer func() {
@@ -294,7 +302,9 @@ func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	if xerr := instance.core.carry(clonable); xerr != nil {
+	xerr = instance.core.carry(clonable)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -427,7 +437,9 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 						}
 					} else {
 						subnetName := rs.GetName()
-						if xerr = rs.Delete(ctx); xerr != nil {
+						xerr = rs.Delete(ctx)
+						xerr = errcontrol.CrasherFail(xerr)
+						if xerr != nil {
 							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 						}
 					}

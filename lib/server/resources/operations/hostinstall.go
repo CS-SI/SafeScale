@@ -373,7 +373,9 @@ func (instance *host) ComplementFeatureParameters(_ context.Context, v data.Map)
 	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
 	v["PrimaryPublicIP"] = rgw.(*host).publicIP
 
-	if rgw, xerr = rs.InspectGateway(false); xerr != nil {
+	rgw, xerr = rs.InspectGateway(false)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
@@ -387,12 +389,16 @@ func (instance *host) ComplementFeatureParameters(_ context.Context, v data.Map)
 		v["SecondaryPublicIP"] = rgw.(*host).publicIP
 	}
 
-	if v["EndpointIP"], xerr = rs.GetEndpointIP(); xerr != nil {
+	v["EndpointIP"], xerr = rs.GetEndpointIP()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
 	v["PublicIP"] = v["EndpointIP"]
-	if v["DefaultRouteIP"], xerr = rs.GetDefaultRouteIP(); xerr != nil {
+	v["DefaultRouteIP"], xerr = rs.GetDefaultRouteIP()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
