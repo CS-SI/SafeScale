@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -63,6 +64,7 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Check, g.checkCommand)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -102,6 +104,7 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Add, g.addCommand)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		logrus.Println(xerr.Error())
 		return nil, xerr
@@ -142,6 +145,7 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Remove, g.removeCommand)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -31,6 +31,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
@@ -53,6 +54,7 @@ func (instance *host) AddFeature(ctx context.Context, name string, vars data.Map
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -65,6 +67,7 @@ func (instance *host) AddFeature(ctx context.Context, name string, vars data.Map
 	defer tracer.Exiting()
 
 	feat, xerr := NewFeature(instance.GetService(), name)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -95,6 +98,7 @@ func (instance *host) AddFeature(ctx context.Context, name string, vars data.Map
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -116,6 +120,7 @@ func (instance *host) CheckFeature(ctx context.Context, name string, vars data.M
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -128,6 +133,7 @@ func (instance *host) CheckFeature(ctx context.Context, name string, vars data.M
 	defer tracer.Exiting()
 
 	feat, xerr := NewFeature(instance.GetService(), name)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -160,6 +166,7 @@ func (instance *host) DeleteFeature(ctx context.Context, name string, vars data.
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -172,6 +179,7 @@ func (instance *host) DeleteFeature(ctx context.Context, name string, vars data.
 	defer tracer.Exiting()
 
 	feat, xerr := NewFeature(instance.GetService(), name)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -334,6 +342,7 @@ func (instance *host) ComplementFeatureParameters(_ context.Context, v data.Map)
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -348,11 +357,13 @@ func (instance *host) ComplementFeatureParameters(_ context.Context, v data.Map)
 	}
 
 	rs, xerr := instance.unsafeGetDefaultSubnet()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	rgw, xerr := rs.InspectGateway(true)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}

@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -65,6 +66,7 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 	hostReq.IsGateway = true
 
 	rgw, xerr := NewHost(svc)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -82,6 +84,7 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 		}
 		return nil
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -131,6 +134,7 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 		}
 		return nil
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -185,6 +189,7 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	logrus.Debugf("Rebooting gateway '%s'", gwname)
 	command := "sudo systemctl reboot"
 	retcode, _, _, xerr := objgw.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}

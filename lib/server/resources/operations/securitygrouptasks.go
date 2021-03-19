@@ -20,6 +20,7 @@ import (
 	"reflect"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
@@ -50,6 +51,7 @@ func (instance *securityGroup) taskUnbindFromHost(task concurrency.Task, params 
 
 	// Unbind Security Group from Host on provider side
 	xerr = instance.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID())
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -96,6 +98,7 @@ func (instance *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 	svc := instance.GetService()
 
 	rs, xerr := LoadNetwork(svc, subnetID)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

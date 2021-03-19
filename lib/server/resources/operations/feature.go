@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -76,6 +77,7 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 			for _, f := range files {
 				if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
 					feat, xerr := NewFeature(svc, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+					xerr = errcontrol.CrasherFail(xerr)
 					if xerr != nil {
 						logrus.Error(xerr) // FIXME: Don't hide errors
 						continue
@@ -314,6 +316,7 @@ func (f *feature) Check(ctx context.Context, target resources.Targetable, v data
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -331,6 +334,7 @@ func (f *feature) Check(ctx context.Context, target resources.Targetable, v data
 	// }
 
 	installer, xerr := f.findInstallerForTarget(target, "check")
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -412,6 +416,7 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -429,6 +434,7 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	)()
 
 	installer, xerr := f.findInstallerForTarget(target, "check")
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -448,6 +454,7 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 
 	if !s.AddUnconditionally {
 		results, xerr := f.Check(ctx, target, v, s)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to check feature '%s'", featureName)
 		}
@@ -465,6 +472,7 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	}
 
 	results, xerr := installer.Add(ctx, f, target, myV, s)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -492,6 +500,7 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -520,6 +529,7 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	// 	return nil, fail.NotAvailableError("failed to find a way to uninstall '%s'", featureName)
 	// }
 	installer, xerr := f.findInstallerForTarget(target, "check")
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -549,6 +559,7 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	}
 
 	results, xerr = installer.Remove(ctx, f, target, myV, s)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return results, xerr
 	}
@@ -601,17 +612,20 @@ func (f *feature) installRequirements(ctx context.Context, t resources.Targetabl
 		// clone FeatureSettings to set DoNotUpdateHostMetadataInClusterContext
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
 			needed, xerr := NewFeature(f.svc, requirement)
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to find required feature '%s'", requirement)
 			}
 
 			results, xerr := needed.Check(ctx, t, v, s)
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to check required Feature '%s' for Feature '%s'", requirement, f.GetName())
 			}
 
 			if !results.Successful() {
 				results, xerr := needed.Add(ctx, t, v, s)
+				xerr = errcontrol.CrasherFail(xerr)
 				if xerr != nil {
 					return fail.Wrap(xerr, "failed to install required feature '%s'", requirement)
 				}
@@ -648,6 +662,7 @@ func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targe
 			if xerr == nil {
 				xerr = host.RegisterFeature(installed, requiredBy, true)
 			}
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -673,6 +688,7 @@ func unregisterOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Tar
 			if xerr == nil {
 				xerr = host.UnregisterFeature(installed.GetName())
 			}
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return xerr
 			}

@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -73,11 +74,13 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 
 	// Check if 'edgeproxy4subnet' feature is installed on host
 	rp, xerr := NewFeature(svc, "edgeproxy4subnet")
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	addressedGateway, xerr := subnet.InspectGateway(addressPrimaryGateway)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -88,6 +91,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	} else {
 		setErr := kongProxyCheckedCache.SetBy(subnet.GetName(), func() (interface{}, fail.Error) {
 			results, xerr := rp.Check(ctx, addressedGateway, data.Map{}, resources.FeatureSettings{})
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
 			}
@@ -130,11 +134,13 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	}
 
 	ruleName, xerr := k.realizeRuleData(strings.Trim(rule["name"].(string), "\n"), *values)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return rule["name"].(string), xerr
 	}
 
 	content, xerr := k.realizeRuleData(strings.Trim(rule["content"].(string), "\n"), *values)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return ruleName, xerr
 	}
@@ -159,6 +165,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		}
 		return nil
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -187,6 +194,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 
 		url := "services/" + ruleName
 		response, _, xerr := k.put(ruleName, url, content, values, true)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
@@ -211,6 +219,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		content = string(jsoned)
 		url := "routes/" + ruleName
 		response, _, xerr := k.put(ruleName, url, content, values, true)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
@@ -248,6 +257,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		content = string(jsoned)
 		url := "upstreams/" + ruleName + "/targets"
 		_, _, xerr = k.post(ruleName, url, content, values, false)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
@@ -261,6 +271,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 
 func (k *KongController) realizeRuleData(content string, v data.Map) (string, fail.Error) {
 	contentTmpl, xerr := template.Parse("proxy_content", content)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return "", fail.Wrap(xerr, "error preparing rule")
 	}
@@ -275,6 +286,7 @@ func (k *KongController) realizeRuleData(content string, v data.Map) (string, fa
 func (k *KongController) createUpstream(name string, options data.Map, v *data.Map) fail.Error {
 	jsoned, _ := json.Marshal(&options)
 	response, _, xerr := k.put(name, "upstreams/"+name, string(jsoned), v, true)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -299,6 +311,7 @@ func (k *KongController) addSourceControl(
 	// url += fmt.Sprintf("%s/plugins", resourceID)
 	url += "/plugins"
 	result, _, xerr := k.get(ruleName, url)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -336,6 +349,7 @@ func (k *KongController) addSourceControl(
 	} else {
 		_, _, xerr = k.patch(ref, "plugins/", string(jsoned), v, false)
 	}
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to apply setting 'source-control' of proxy rule '%s'", ruleName)
 		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
@@ -347,6 +361,7 @@ func (k *KongController) addSourceControl(
 func (k *KongController) get(name, url string) (map[string]interface{}, string, fail.Error) {
 	cmd := fmt.Sprintf(curlGet, url)
 	retcode, stdout, _, xerr := k.gateway.Run(context.TODO(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -356,6 +371,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 	}
 
 	response, httpcode, xerr := k.parseResult(stdout)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, httpcode, xerr
 	}
@@ -367,6 +383,7 @@ func (k *KongController) get(name, url string) (map[string]interface{}, string, 
 func (k *KongController) post(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
 	cmd := fmt.Sprintf(curlPost, url, data)
 	retcode, stdout, stderr, xerr := k.gateway.Run(context.TODO(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -376,6 +393,7 @@ func (k *KongController) post(name, url, data string, v *data.Map, propagate boo
 	}
 
 	response, httpcode, xerr := k.parseResult(stdout)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, httpcode, xerr
 	}
@@ -392,6 +410,7 @@ func (k *KongController) post(name, url, data string, v *data.Map, propagate boo
 func (k *KongController) put(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
 	cmd := fmt.Sprintf(curlPut, url, data)
 	retcode, stdout, stderr, xerr := k.gateway.Run(context.TODO(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -401,6 +420,7 @@ func (k *KongController) put(name, url, data string, v *data.Map, propagate bool
 	}
 
 	response, httpcode, xerr := k.parseResult(stdout)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, httpcode, xerr
 	}
@@ -417,6 +437,7 @@ func (k *KongController) put(name, url, data string, v *data.Map, propagate bool
 func (k *KongController) patch(name, url, data string, v *data.Map, propagate bool) (map[string]interface{}, string, fail.Error) {
 	cmd := fmt.Sprintf(curlPatch, url+name, data)
 	retcode, stdout, stderr, xerr := k.gateway.Run(context.TODO(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, "", xerr
 	}
@@ -426,6 +447,7 @@ func (k *KongController) patch(name, url, data string, v *data.Map, propagate bo
 	}
 
 	response, httpcode, xerr := k.parseResult(stdout)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, httpcode, xerr
 	}

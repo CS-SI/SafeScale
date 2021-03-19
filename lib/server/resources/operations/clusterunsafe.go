@@ -30,6 +30,7 @@ import (
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -57,6 +58,7 @@ func (instance *cluster) unsafeGetFlavor() (flavor clusterflavor.Enum, xerr fail
 	defer fail.OnPanic(&xerr)
 
 	aci, xerr := instance.unsafeGetIdentity()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -69,6 +71,7 @@ func (instance *cluster) unsafeGetComplexity() (_ clustercomplexity.Enum, xerr f
 	defer fail.OnPanic(&xerr)
 
 	aci, xerr := instance.unsafeGetIdentity()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -84,6 +87,7 @@ func (instance *cluster) unsafeGetState() (state clusterstate.Enum, xerr fail.Er
 	state = clusterstate.Unknown
 	if instance.makers.GetState != nil {
 		state, xerr = instance.makers.GetState(instance)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return clusterstate.Unknown, xerr
 		}
@@ -113,6 +117,7 @@ func (instance *cluster) unsafeGetState() (state clusterstate.Enum, xerr fail.Er
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return clusterstate.Unknown, xerr
 	}
@@ -144,6 +149,7 @@ func (instance *cluster) unsafeListMasters() (list resources.IndexedListOfCluste
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -176,6 +182,7 @@ func (instance *cluster) unsafeListMasterIPs() (list data.IndexedListOfStrings, 
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -202,6 +209,7 @@ func (instance *cluster) unsafeListNodeIPs() (list data.IndexedListOfStrings, xe
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -215,6 +223,7 @@ func (instance *cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 
 	master = nil
 	masters, xerr := instance.unsafeListMasters()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -228,6 +237,7 @@ func (instance *cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 		}
 
 		master, xerr = LoadHost(instance.GetService(), v.ID)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -271,6 +281,7 @@ func (instance *cluster) unsafeListNodes() (list resources.IndexedListOfClusterN
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -288,6 +299,7 @@ func (instance *cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -316,6 +328,7 @@ func (instance *cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -327,6 +340,7 @@ func (instance *cluster) unsafeListNodeIDs(ctx context.Context) (list data.Index
 // Note: must be used wisely
 func (instance *cluster) unsafeFindAvailableNode(ctx context.Context) (node resources.Host, xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -340,6 +354,7 @@ func (instance *cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 	}
 
 	list, xerr := instance.unsafeListNodes()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -353,6 +368,7 @@ func (instance *cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 		}
 
 		node, xerr = LoadHost(svc, v.ID)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}

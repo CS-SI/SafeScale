@@ -42,6 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
@@ -65,6 +66,7 @@ func getTemplateBox() (*rice.Box, error) {
 	if anon == nil {
 		// Note: path MUST be literal for rice to work
 		b, err = rice.FindBox("../operations/clusterflavors/scripts")
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return nil, err
 		}
@@ -107,6 +109,7 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 
 	identity, xerr := instance.unsafeGetIdentity()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -120,6 +123,7 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 		v["Username"] = abstract.DefaultUser
 	}
 	networkCfg, xerr := instance.GetNetworkConfig()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -151,6 +155,7 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -161,6 +166,7 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
 		master, xerr := instance.unsafeFindAvailableMaster(ctx)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -303,6 +309,7 @@ func (instance *cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
@@ -310,6 +317,7 @@ func (instance *cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	out := make([]resources.Feature, 0, len(list))
 	for k := range list {
 		item, xerr := NewFeature( /*ctx, */ instance.GetService(), k)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return emptySlice, xerr
 		}
@@ -332,6 +340,7 @@ func (instance *cluster) AddFeature(ctx context.Context, name string, vars data.
 	}
 
 	feat, xerr := NewFeature(instance.GetService(), name)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -352,6 +361,7 @@ func (instance *cluster) CheckFeature(ctx context.Context, name string, vars dat
 	}
 
 	feat, xerr := NewFeature(instance.GetService(), name)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -372,6 +382,7 @@ func (instance *cluster) RemoveFeature(ctx context.Context, name string, vars da
 	}
 
 	feat, xerr := NewFeature(instance.GetService(), name)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -394,6 +405,7 @@ func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -403,12 +415,14 @@ func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	box, err := getTemplateBox()
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return -1, "", "", fail.ConvertError(err)
 	}
 
 	// Configures reserved_BashLibrary template var
 	bashLibrary, xerr := system.GetBashLibrary()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -427,6 +441,7 @@ func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	)
 
 	script, path, xerr := realizeTemplate(box, tmplName, data, tmplName)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return -1, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)
 	}
@@ -443,6 +458,7 @@ func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	rfcItem := remotefile.Item{Remote: path}
 	xerr = rfcItem.UploadString(task.GetContext(), script, host)
 	_ = os.Remove(rfcItem.Local)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -464,6 +480,7 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	netCfg, xerr := instance.GetNetworkConfig()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -475,6 +492,7 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 			"tenants": []map[string]interface{}{tp},
 		}
 		jsoned, err := json.MarshalIndent(content, "", "    ")
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return fail.ConvertError(err)
 		}
@@ -492,61 +510,64 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 		_, _ = binaryDir, path
 		/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote),
-		               probaly a feature safescale-binaries to build SafeScale from source...
-		// Uploads safescale binary
-		if binaryDir != "" {
-			path = binaryDir + "/safescale"
-		}
-		if path == "" {
-			path, err = exec.LookPath("safescale")
-			if err != nil {
-				return fail.Wrap(err, "failed to find local binary 'safescale', make sure its path is in environment variable PATH")
-			}
-		}
+				               probaly a feature safescale-binaries to build SafeScale from source...
+				// Uploads safescale binary
+				if binaryDir != "" {
+					path = binaryDir + "/safescale"
+				}
+				if path == "" {
+					path, err = exec.LookPath("safescale")
+					err = errcontrol.Crasher(err)
+		if err != nil {
+						return fail.Wrap(err, "failed to find local binary 'safescale', make sure its path is in environment variable PATH")
+					}
+				}
 
-		retcode, stdout, stderr, xerr := host.Push(task, path, "/opt/safescale/bin/safescale", "root:root", "0755", temporal.GetExecutionTimeout())
-		if xerr != nil {
-			return fail.Wrap(xerr, "failed to upload 'safescale' binary")
-		}
-		if retcode != 0 {
-			output := stdout
-			if output != "" && stderr != "" {
-				output += "\n" + stderr
-			} else if stderr != "" {
-				output = stderr
-			}
-			return fail.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.GetName(), retcode, output)
-		}
+				retcode, stdout, stderr, xerr := host.Push(task, path, "/opt/safescale/bin/safescale", "root:root", "0755", temporal.GetExecutionTimeout())
+				if xerr != nil {
+					return fail.Wrap(xerr, "failed to upload 'safescale' binary")
+				}
+				if retcode != 0 {
+					output := stdout
+					if output != "" && stderr != "" {
+						output += "\n" + stderr
+					} else if stderr != "" {
+						output = stderr
+					}
+					return fail.NewError("failed to copy safescale binary to '%s:/opt/safescale/bin/safescale': retcode=%d, output=%s", host.GetName(), retcode, output)
+				}
 
-		// Uploads safescaled binary
-		path = ""
-		if binaryDir != "" {
-			path = binaryDir + "/safescaled"
-		}
-		if path == "" {
-			path, err = exec.LookPath("safescaled")
-			if err != nil {
-				return fail.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
-			}
-		}
-		if retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.GetExecutionTimeout()); xerr != nil {
-			return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.GetName())
-		}
-		if retcode != 0 {
-			output := stdout
-			if output != "" && stderr != "" {
-				output += "\n" + stderr
-			} else if stderr != "" {
-				output = stderr
-			}
-			return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
-		}
+				// Uploads safescaled binary
+				path = ""
+				if binaryDir != "" {
+					path = binaryDir + "/safescaled"
+				}
+				if path == "" {
+					path, err = exec.LookPath("safescaled")
+					err = errcontrol.Crasher(err)
+		if err != nil {
+						return fail.Wrap(err, "failed to find local binary 'safescaled', make sure its path is in environment variable PATH")
+					}
+				}
+				if retcode, stdout, stderr, xerr = host.Push(task, path, "/opt/safescale/bin/safescaled", "root:root", "0755", temporal.GetExecutionTimeout()); xerr != nil {
+					return fail.Wrap(xerr, "failed to submit content of 'safescaled' binary to host '%s'", host.GetName())
+				}
+				if retcode != 0 {
+					output := stdout
+					if output != "" && stderr != "" {
+						output += "\n" + stderr
+					} else if stderr != "" {
+						output = stderr
+					}
+					return fail.NewError("failed to copy safescaled binary to '%s:/opt/safescale/bin/safescaled': retcode=%d, output=%s", host.GetName(), retcode, output)
+				}
 		*/
 		// Optionally propagate SAFESCALE_METADATA_SUFFIX env vars to master
 		if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
 			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to Host '%s'", host.GetName())
 			}
@@ -565,10 +586,12 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	var dnsServers []string
 	cfg, xerr := instance.GetService().GetConfigurationOptions()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr == nil {
 		dnsServers = cfg.GetSliceOfStrings("DNSList")
 	}
 	identity, xerr := instance.unsafeGetIdentity()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -588,6 +611,7 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 	params["SSHPrivateKey"] = identity.Keypair.PrivateKey
 
 	retcode, stdout, stderr, xerr := instance.ExecuteScript(ctx, "node_install_requirements.sh", params, host)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "[%s] system requirements installation failed", hostLabel)
 	}
@@ -606,6 +630,7 @@ func (instance *cluster) installReverseProxy(ctx context.Context) (xerr fail.Err
 	defer fail.OnPanic(&xerr)
 
 	identity, xerr := instance.unsafeGetIdentity()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -622,6 +647,7 @@ func (instance *cluster) installReverseProxy(ctx context.Context) (xerr fail.Err
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -629,11 +655,13 @@ func (instance *cluster) installReverseProxy(ctx context.Context) (xerr fail.Err
 	if !disabled {
 		logrus.Debugf("[cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
 		feat, xerr := NewFeature(instance.GetService(), "edgeproxy4subnet")
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
 		results, xerr := feat.Add(ctx, instance, data.Map{}, resources.FeatureSettings{})
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -655,6 +683,7 @@ func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 	defer fail.OnPanic(&xerr)
 
 	identity, xerr := instance.unsafeGetIdentity()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -671,6 +700,7 @@ func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -679,6 +709,7 @@ func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 		logrus.Debugf("[cluster %s] adding feature 'remotedesktop'", identity.Name)
 
 		feat, xerr := NewFeature(instance.GetService(), "remotedesktop")
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -689,6 +720,7 @@ func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 			"Password": identity.AdminPassword,
 		}
 		r, xerr := feat.Add(ctx, instance, vars, resources.FeatureSettings{})
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -724,11 +756,13 @@ func (instance *cluster) installProxyCacheClient(ctx context.Context, host resou
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	if !disabled {
 		feat, xerr := NewFeature(instance.GetService(), "proxycache-client")
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -768,17 +802,20 @@ func (instance *cluster) installProxyCacheServer(ctx context.Context, host resou
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	if !disabled {
 		feat, xerr := NewFeature(instance.GetService(), "proxycache-server")
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
 		r, xerr := feat.Add(ctx, host, data.Map{}, resources.FeatureSettings{})
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -795,11 +832,13 @@ func (instance *cluster) installProxyCacheServer(ctx context.Context, host resou
 func (instance *cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
 	// uses NewFeature() to let a chance to the user to use it's own docker feature
 	feat, xerr := NewFeature(instance.GetService(), "docker")
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	r, xerr := feat.Add(ctx, host, data.Map{}, resources.FeatureSettings{})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}

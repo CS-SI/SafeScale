@@ -34,6 +34,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
@@ -225,6 +226,7 @@ type step struct {
 func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, xerr fail.Error) {
 	outcomes = &unitResults{}
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return outcomes, xerr
 	}
@@ -264,6 +266,7 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 					return nil
 				})
 			})
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -278,6 +281,7 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 			}
 
 			outcome, xerr := subtask.Run(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -327,6 +331,7 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 					return nil
 				})
 			})
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -337,11 +342,13 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 			}
 
 			subtask, xerr := concurrency.NewTaskWithParent(task)
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
 
 			subtask, xerr = subtask.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -350,6 +357,7 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 		}
 		for k, s := range subtasks {
 			outcome, xerr := s.Wait()
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				logrus.Warn(tracer.TraceMessage(": %s(%s):step(%s)@%s finished after %s, but failed to recover result",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
@@ -406,6 +414,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 	// Updates variables in step script
 	command, xerr := replaceVariablesInString(is.Script, p.Variables)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return stepResult{err: fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)}, nil
 	}
@@ -419,6 +428,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		}
 		xerr = rfcItem.UploadString(task.GetContext(), is.OptionsFileContent, p.Host)
 		_ = os.Remove(rfcItem.Local)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return stepResult{err: xerr}, nil
 		}
@@ -439,6 +449,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 	xerr = rfcItem.UploadString(task.GetContext(), command, p.Host)
 	_ = os.Remove(rfcItem.Local)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return stepResult{err: xerr}, nil
 	}
@@ -451,6 +462,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 	// Executes the script on the remote host
 	retcode, outrun, _, xerr := p.Host.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", outrun)
 		return stepResult{err: xerr, retcode: retcode, output: outrun}, nil
@@ -466,6 +478,7 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 	for k, v := range cloneV {
 		if variable, ok := v.(string); ok && variable != "" {
 			varTemplate, xerr := template.Parse("realize_var", variable)
+			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
 				return nil, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
 			}
@@ -485,6 +498,7 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 // replaceVariablesInString ...
 func replaceVariablesInString(text string, v data.Map) (string, fail.Error) {
 	tmpl, xerr := template.Parse("replaceVariablesInString", text)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return "", fail.SyntaxError("failed to parse: %s", xerr.Error())
 	}
