@@ -518,9 +518,9 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	)()
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage("failed to create cluster infrastructure:"))
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -547,9 +547,6 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	// Starting from here, delete metadata if exiting with error
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// // Disable abort signal during the clean up
-			// defer task.DisarmAbortSignal()()
-
 			logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", actionFromError(xerr), req.Name)
 			if derr := instance.core.delete(); derr != nil {
 				logrus.Errorf("cleaning up on %s, failed to delete metadata of Cluster '%s'", actionFromError(xerr), req.Name)
@@ -1124,16 +1121,23 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 	return rn, rs, nil
 }
 
-func abortTaskIfStillRunningDuringCleanup(task concurrency.Task, inErr *fail.Error) {
-	if st, err := task.GetStatus(); err == nil {
+func onFailureAbortTask(task concurrency.Task, inErr *fail.Error) {
+	if inErr != nil && *inErr != nil {
+		st, xerr := task.GetStatus()
+		if xerr != nil {
+			_ = (*inErr).AddConsequence(xerr)
+			return
+		}
+
 		if st != concurrency.DONE {
-			abErr := task.Abort()
-			if abErr != nil {
-				_ = (*inErr).AddConsequence(abErr)
+			if xerr = task.Abort(); xerr != nil {
+				_ = (*inErr).AddConsequence(xerr)
+				return
+			}
+			if _, xerr = task.Wait(); xerr != nil {
+				_ = (*inErr).AddConsequence(xerr)
 			}
 		}
-	} else {
-		_ = (*inErr).AddConsequence(err)
 	}
 }
 
@@ -1161,8 +1165,8 @@ func (instance *cluster) createHostResources(
 		primaryGatewayStatus, secondaryGatewayStatus fail.Error
 		mastersStatus, privateNodesStatus            fail.Error
 		primaryGatewayTask, secondaryGatewayTask     concurrency.Task
-		cfgGatewayTask                               concurrency.Task
-		cfg2ndGatewayTask                            concurrency.Task
+		primaryGatewayConfigTask                     concurrency.Task
+		secondaryGatewayConfigTask                   concurrency.Task
 	)
 
 	if primaryGateway, xerr = subnet.InspectGateway(true); xerr != nil {
@@ -1180,27 +1184,18 @@ func (instance *cluster) createHostResources(
 		}
 	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
 	if _, xerr = primaryGateway.WaitSSHReady(ctx, temporal.GetExecutionTimeout()); xerr != nil {
 		return fail.Wrap(xerr, "wait for remote ssh service to be ready")
 	}
 
-	if task.Aborted() {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	// Loads secondary gateway metadata
 	if haveSecondaryGateway {
 		if _, xerr = secondaryGateway.WaitSSHReady(ctx, temporal.GetExecutionTimeout()); xerr != nil {
 			return fail.Wrap(xerr, "failed to wait for remote ssh service to become ready")
 		}
+	}
 
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
 
 	masterCount, _, _, xerr := instance.determineRequiredNodes()
@@ -1217,12 +1212,7 @@ func (instance *cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-
-	defer func() {
-		if xerr != nil {
-			abortTaskIfStillRunningDuringCleanup(primaryGatewayTask, &xerr)
-		}
-	}()
+	defer onFailureAbortTask(primaryGatewayTask, &xerr)
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -1232,12 +1222,7 @@ func (instance *cluster) createHostResources(
 		if secondaryGatewayTask, xerr = task.StartInSubtask(instance.taskInstallGateway, taskInstallGatewayParameters{secondaryGateway}); xerr != nil {
 			return xerr
 		}
-
-		defer func() {
-			if xerr != nil {
-				abortTaskIfStillRunningDuringCleanup(secondaryGatewayTask, &xerr)
-			}
-		}()
+		defer onFailureAbortTask(secondaryGatewayTask, &xerr)
 	}
 
 	if task.Aborted() {
@@ -1252,12 +1237,7 @@ func (instance *cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-
-	defer func() {
-		if xerr != nil {
-			abortTaskIfStillRunningDuringCleanup(mastersTask, &xerr)
-		}
-	}()
+	defer onFailureAbortTask(mastersTask, &xerr)
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -1273,11 +1253,7 @@ func (instance *cluster) createHostResources(
 		return xerr
 	}
 
-	defer func() {
-		if xerr != nil {
-			abortTaskIfStillRunningDuringCleanup(privateNodesTask, &xerr)
-		}
-	}()
+	defer onFailureAbortTask(privateNodesTask, &xerr)
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -1330,34 +1306,24 @@ func (instance *cluster) createHostResources(
 
 	// Step 3: start gateway configuration (needs MasterIPs so masters must be installed first)
 	// Configure gateway(s) and waits for the result
-	if cfgGatewayTask, xerr = task.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway}); xerr != nil {
+	if primaryGatewayConfigTask, xerr = task.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway}); xerr != nil {
 		return xerr
 	}
-
-	defer func() {
-		if xerr != nil {
-			abortTaskIfStillRunningDuringCleanup(cfgGatewayTask, &xerr)
-		}
-	}()
+	defer onFailureAbortTask(primaryGatewayConfigTask, &xerr)
 
 	if haveSecondaryGateway {
-		if cfg2ndGatewayTask, xerr = task.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway}); xerr != nil {
+		if secondaryGatewayConfigTask, xerr = task.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway}); xerr != nil {
 			return xerr
 		}
-
-		defer func() {
-			if xerr != nil {
-				abortTaskIfStillRunningDuringCleanup(cfg2ndGatewayTask, &xerr)
-			}
-		}()
+		defer onFailureAbortTask(secondaryGatewayConfigTask, &xerr)
 	}
 
-	if _, primaryGatewayStatus = cfgGatewayTask.Wait(); primaryGatewayStatus != nil {
+	if _, primaryGatewayStatus = primaryGatewayConfigTask.Wait(); primaryGatewayStatus != nil {
 		return primaryGatewayStatus
 	}
 
-	if haveSecondaryGateway && cfg2ndGatewayTask != nil {
-		if _, secondaryGatewayStatus = cfg2ndGatewayTask.Wait(); secondaryGatewayStatus != nil {
+	if haveSecondaryGateway && secondaryGatewayConfigTask != nil {
+		if _, secondaryGatewayStatus = secondaryGatewayConfigTask.Wait(); secondaryGatewayStatus != nil {
 			return secondaryGatewayStatus
 		}
 	}
