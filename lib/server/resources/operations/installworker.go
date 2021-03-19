@@ -530,12 +530,16 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 	switch w.action {
 	case installaction.Add:
 		if !s.SkipProxy {
-			if xerr = w.setReverseProxy(ctx); xerr != nil {
+			xerr = w.setReverseProxy(ctx)
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to set reverse proxy rules on Subnet")
 			}
 		}
 
-		if xerr := w.setSecurity(ctx); xerr != nil {
+		xerr := w.setSecurity(ctx)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to set security rules on Subnet")
 		}
 	case installaction.Remove:
@@ -1002,7 +1006,9 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 
 	var secondaryKongController *KongController
 	if ok, _ := subnet.HasVirtualIP(); ok {
-		if secondaryKongController, xerr = NewKongController(ctx, svc, subnet, false); xerr != nil {
+		secondaryKongController, xerr = NewKongController(ctx, svc, subnet, false)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 		}
 	}
@@ -1030,7 +1036,9 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 		}(hosts)
 
 		for _, h := range hosts {
-			if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(); xerr != nil {
+			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return xerr
 			}
 
@@ -1069,7 +1077,9 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 
 			var errS fail.Error
 			if secondaryKongController != nil {
-				if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(); xerr != nil {
+				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
+				xerr = errcontrol.CrasherFail(xerr)
+				if xerr != nil {
 					return xerr
 				}
 
@@ -1288,7 +1298,9 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 
 // setSecurity applies the security rules defined in specification file (if there are some)
 func (w *worker) setSecurity(ctx context.Context) (xerr fail.Error) {
-	if xerr = w.setNetworkingSecurity(ctx); xerr != nil {
+	xerr = w.setNetworkingSecurity(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	return nil
@@ -1368,7 +1380,9 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 				sgRule.Description = description + fmt.Sprintf(" (port %d)", ports) + forFeature
 				sgRule.PortFrom = int32(ports)
 
-				if xerr = gwSG.AddRule(ctx, sgRule); xerr != nil {
+				xerr = gwSG.AddRule(ctx, sgRule)
+				xerr = errcontrol.CrasherFail(xerr)
+				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
 						// This rule already exists, consider as a success and continue
@@ -1387,11 +1401,15 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 						sgRule.Description = description
 						dashSplitted := strings.Split(v, "-")
 						if dashCount := len(dashSplitted); dashCount > 0 {
-							if portFrom, err = strconv.Atoi(dashSplitted[0]); err != nil {
+							portFrom, err = strconv.Atoi(dashSplitted[0])
+							err = errcontrol.Crasher(err)
+							if err != nil {
 								return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
 							}
 							if len(dashSplitted) == 2 {
-								if portTo, err = strconv.Atoi(dashSplitted[0]); err != nil {
+								portTo, err = strconv.Atoi(dashSplitted[0])
+								err = errcontrol.Crasher(err)
+								if err != nil {
 									return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
 								}
 							}
@@ -1402,7 +1420,9 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 						}
 
 						sgRule.Description += forFeature
-						if xerr = gwSG.AddRule(ctx, sgRule); xerr != nil {
+						xerr = gwSG.AddRule(ctx, sgRule)
+						xerr = errcontrol.CrasherFail(xerr)
+						if xerr != nil {
 							switch xerr.(type) {
 							case *fail.ErrDuplicate:
 								// This rule already exists, consider as a success and continue

@@ -144,7 +144,9 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
+	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	defer func() {
@@ -158,7 +160,9 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	if xerr := instance.core.carry(clonable); xerr != nil {
+	xerr = instance.core.carry(clonable)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -309,7 +313,9 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 
-	if ab, xerr = instance.GetService().CreateBucket(name); xerr != nil {
+	ab, xerr = instance.GetService().CreateBucket(name)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -455,7 +461,9 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 	defer instance.lock.Unlock()
 
 	// Check bucket existence
-	if _, xerr = instance.GetService().InspectBucket(instance.GetName()); xerr != nil {
+	_, xerr = instance.GetService().InspectBucket(instance.GetName())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -509,7 +517,9 @@ func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Er
 	}
 
 	var buffer bytes.Buffer
-	if err = tpl.Execute(&buffer, data); err != nil {
+	err = tpl.Execute(&buffer, data)
+	err = errcontrol.Crasher(err)
+	if err != nil {
 		return "", fail.ConvertError(err)
 	}
 

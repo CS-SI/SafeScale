@@ -128,7 +128,9 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 		}
 
 		if as != nil && as.VIP != nil {
-			if xerr = svc.BindHostToVIP(as.VIP, rgw.GetID()); xerr != nil {
+			xerr = svc.BindHostToVIP(as.VIP, rgw.GetID())
+			xerr = errcontrol.CrasherFail(xerr)
+			if xerr != nil {
 				return xerr
 			}
 		}
@@ -177,11 +179,15 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
-	if xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData); xerr != nil {
+	xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
-	if xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, userData); xerr != nil {
+	xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, userData)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -197,26 +203,34 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
 	}
 
-	if _, xerr := objgw.waitInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, 0); xerr != nil {
+	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, 0)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
 	// final phase...
-	if xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, userData); xerr != nil {
+	xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, userData)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Final gatewqay reboot
 	logrus.Debugf("Rebooting gateway '%s'", gwname)
 	command = "sudo systemctl reboot"
-	if retcode, _, _, xerr = objgw.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout()); xerr != nil {
+	retcode, _, _, xerr = objgw.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 	if retcode != 0 {
 		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
 	}
 
-	if _, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, time.Duration(0)); xerr != nil {
+	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, time.Duration(0))
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 

@@ -171,13 +171,17 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 			return xerr
 		}
 
-		if v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP(); xerr != nil {
+		v["ClusterControlplaneEndpointIP"], xerr = master.GetPrivateIP()
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	if v["ClusterMasters"], xerr = instance.unsafeListMasters(); xerr != nil {
+	v["ClusterMasters"], xerr = instance.unsafeListMasters()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -193,11 +197,15 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 	v["ClusterMasterIDs"] = list
 
-	if v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs(); xerr != nil {
+	v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
-	if v["ClusterNodes"], xerr = instance.unsafeListNodes(); xerr != nil {
+	v["ClusterNodes"], xerr = instance.unsafeListNodes()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -213,7 +221,9 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 	v["ClusterNodeIDs"] = list
 
-	if v["ClusterNodeIPs"], xerr = instance.unsafeListNodeIPs(); xerr != nil {
+	v["ClusterNodeIPs"], xerr = instance.unsafeListNodeIPs()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -598,7 +608,9 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	if params["MasterIPs"], xerr = instance.unsafeListMasterIPs(); xerr != nil {
+	params["MasterIPs"], xerr = instance.unsafeListMasterIPs()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 

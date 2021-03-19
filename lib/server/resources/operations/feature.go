@@ -350,12 +350,16 @@ func (f *feature) Check(ctx context.Context, target resources.Targetable, v data
 	myV := v.Clone()
 
 	// Inits target parameters
-	if xerr = target.ComplementFeatureParameters(ctx, myV); xerr != nil {
+	xerr = target.ComplementFeatureParameters(ctx, myV)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Checks required parameters have their values
-	if xerr = checkParameters(*f, myV); xerr != nil {
+	xerr = checkParameters(*f, myV)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -444,12 +448,16 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	myV := v.Clone()
 
 	// Inits target parameters
-	if xerr = target.ComplementFeatureParameters(ctx, myV); xerr != nil {
+	xerr = target.ComplementFeatureParameters(ctx, myV)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Checks required parameters have value
-	if xerr = checkParameters(*f, myV); xerr != nil {
+	xerr = checkParameters(*f, myV)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -467,7 +475,9 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	}
 
 	if !s.SkipFeatureRequirements {
-		if xerr = f.installRequirements(ctx, target, v, s); xerr != nil {
+		xerr = f.installRequirements(ctx, target, v, s)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to install requirements")
 		}
 	}
@@ -478,7 +488,9 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 		return nil, xerr
 	}
 
-	if xerr = registerOnSuccessfulHostsInCluster(f.svc, target, f, nil, results); xerr != nil {
+	xerr = registerOnSuccessfulHostsInCluster(f.svc, target, f, nil, results)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -550,12 +562,16 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	// // Inits implicit parameters
 	// err = f.setImplicitParameters(t, myV)
 	// Inits target parameters
-	if xerr = target.ComplementFeatureParameters(ctx, myV); xerr != nil {
+	xerr = target.ComplementFeatureParameters(ctx, myV)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Checks required parameters have value
-	if xerr = checkParameters(*f, myV); xerr != nil {
+	xerr = checkParameters(*f, myV)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -565,7 +581,9 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 		return results, xerr
 	}
 
-	if xerr = unregisterOnSuccessfulHostsInCluster(f.svc, target, f, results); xerr != nil {
+	xerr = unregisterOnSuccessfulHostsInCluster(f.svc, target, f, results)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -636,7 +654,9 @@ func (f *feature) installRequirements(ctx context.Context, t resources.Targetabl
 				}
 
 				// Register the needed feature as a requirement for f
-				if xerr = t.RegisterFeature(needed, f, targetIsCluster); xerr != nil {
+				xerr = t.RegisterFeature(needed, f, targetIsCluster)
+				xerr = errcontrol.CrasherFail(xerr)
+				if xerr != nil {
 					return xerr
 				}
 			}

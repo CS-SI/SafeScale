@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -57,12 +58,16 @@ func (i *bashInstaller) Check(ctx context.Context, f resources.Feature, t resour
 	}
 	defer w.Terminate()
 
-	if xerr = w.CanProceed(ctx, s); xerr != nil {
+	xerr = w.CanProceed(ctx, s)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		logrus.Error(xerr.Error())
 		return nil, xerr
 	}
 
-	if r, xerr = w.Proceed(ctx, v, s); xerr != nil {
+	r, xerr = w.Proceed(ctx, v, s)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to check if Feature '%s' is installed on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 
@@ -98,7 +103,9 @@ func (i *bashInstaller) Add(ctx context.Context, f resources.Feature, t resource
 	}
 	defer w.Terminate()
 
-	if xerr = w.CanProceed(ctx, s); xerr != nil {
+	xerr = w.CanProceed(ctx, s)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
@@ -109,7 +116,9 @@ func (i *bashInstaller) Add(ctx context.Context, f resources.Feature, t resource
 		}
 	}
 
-	if r, xerr = w.Proceed(ctx, v, s); xerr != nil {
+	r, xerr = w.Proceed(ctx, v, s)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 
@@ -143,12 +152,16 @@ func (i *bashInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 	}
 	defer w.Terminate()
 
-	if xerr = w.CanProceed(ctx, s); xerr != nil {
+	xerr = w.CanProceed(ctx, s)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
 
-	if r, xerr = w.Proceed(ctx, v, s); xerr != nil {
+	r, xerr = w.Proceed(ctx, v, s)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 

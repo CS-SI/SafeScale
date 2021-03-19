@@ -192,7 +192,9 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 	}
 	if t, ok := tokens["template"]; ok {
 		var xerr fail.Error
-		if out.Template, _, xerr = t.Validate(); xerr != nil {
+		out.Template, _, xerr = t.Validate()
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return nil, 0, xerr
 		}
 	}

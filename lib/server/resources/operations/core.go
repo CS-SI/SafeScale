@@ -161,7 +161,9 @@ func (c *core) Inspect(callback resources.Callback) (xerr fail.Error) {
 	defer c.lock.RUnlock()
 
 	// Reload reloads data from Object Storage to be sure to have the last revision
-	if xerr = c.reload(); xerr != nil {
+	xerr = c.reload()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return fail.Wrap(xerr, "failed to reload metadata")
 	}
 
@@ -215,7 +217,9 @@ func (c *core) Alter(callback resources.Callback, options ...data.ImmutableKeyVa
 
 	// Make sure c.properties is populated
 	if c.properties == nil {
-		if c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind); xerr != nil {
+		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			c.lock.Unlock()
 			return xerr
 		}
@@ -233,7 +237,9 @@ func (c *core) Alter(callback resources.Callback, options ...data.ImmutableKeyVa
 	}
 	// Reload reloads data from objectstorage to be sure to have the last revision
 	if doReload {
-		if xerr = c.reload(); xerr != nil {
+		xerr = c.reload()
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return fail.Wrap(xerr, "failed to reload metadata")
 		}
 	}
@@ -253,7 +259,9 @@ func (c *core) Alter(callback resources.Callback, options ...data.ImmutableKeyVa
 
 	c.committed = false
 
-	if xerr = c.write(); xerr != nil {
+	xerr = c.write()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -290,7 +298,9 @@ func (c *core) carry(clonable data.Clonable) (xerr fail.Error) {
 	c.shielded = concurrency.NewShielded(clonable)
 	c.loaded = true
 
-	if xerr = c.updateIdentity(); xerr != nil {
+	xerr = c.updateIdentity()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -318,7 +328,9 @@ func (c *core) updateIdentity() fail.Error {
 	c.id.Store("")
 
 	// notify observers there has been changed in the instance
-	if err := c.notifyObservers(); err != nil {
+	err := c.notifyObservers()
+	err = errcontrol.Crasher(err)
+	if err != nil {
 		return fail.ConvertError(err)
 	}
 
@@ -342,7 +354,9 @@ func (c *core) Read(ref string) (xerr fail.Error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if xerr = c.readByReference(ref); xerr != nil {
+	xerr = c.readByReference(ref)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -425,7 +439,9 @@ func (c *core) readByReference(ref string) (xerr fail.Error) {
 			if innerXErr := c.readByID(ref); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound: // If not found, stop immediately
-					if xerr = c.readByName(ref); xerr != nil {
+					xerr = c.readByName(ref)
+					xerr = errcontrol.CrasherFail(xerr)
+					if xerr != nil {
 						switch innerXErr.(type) {
 						case *fail.ErrNotFound:
 							return retry.StopRetryError(innerXErr)
@@ -476,11 +492,15 @@ func (c *core) write() fail.Error {
 			return xerr
 		}
 
-		if xerr = c.folder.Write(byNameFolderName, c.name.Load().(string), jsoned); xerr != nil {
+		xerr = c.folder.Write(byNameFolderName, c.name.Load().(string), jsoned)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
 
-		if xerr = c.folder.Write(byIDFolderName, c.id.Load().(string), jsoned); xerr != nil {
+		xerr = c.folder.Write(byIDFolderName, c.id.Load().(string), jsoned)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
 
@@ -579,7 +599,9 @@ func (c *core) delete() (xerr fail.Error) {
 	)
 
 	// Checks entries exist in Object Storage
-	if xerr = c.folder.Lookup(byIDFolderName, c.id.Load().(string)); xerr != nil {
+	xerr = c.folder.Lookup(byIDFolderName, c.id.Load().(string))
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If entry not found, consider it not an error
@@ -591,7 +613,9 @@ func (c *core) delete() (xerr fail.Error) {
 		idFound = true
 	}
 
-	if xerr = c.folder.Lookup(byNameFolderName, c.name.Load().(string)); xerr != nil {
+	xerr = c.folder.Lookup(byNameFolderName, c.name.Load().(string))
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If entry not found, consider it not an error
@@ -605,12 +629,16 @@ func (c *core) delete() (xerr fail.Error) {
 
 	// Deletes entries found
 	if idFound {
-		if xerr = c.folder.Delete(byIDFolderName, c.id.Load().(string)); xerr != nil {
+		xerr = c.folder.Delete(byIDFolderName, c.id.Load().(string))
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
 	if nameFound {
-		if xerr = c.folder.Delete(byNameFolderName, c.name.Load().(string)); xerr != nil {
+		xerr = c.folder.Delete(byNameFolderName, c.name.Load().(string))
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
@@ -655,7 +683,9 @@ func (c *core) serialize() (_ []byte, xerr fail.Error) {
 		return nil, xerr
 	}
 
-	if err := json.Unmarshal(shieldedJSONed, &shieldedMapped); err != nil {
+	err := json.Unmarshal(shieldedJSONed, &shieldedMapped)
+	err = errcontrol.Crasher(err)
+	if err != nil {
 		// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed shielded into map failed!")
 		return nil, fail.NewError(err.Error())
 	}
@@ -719,7 +749,9 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 	)
 
 	if buf != nil {
-		if err := json.Unmarshal(buf, &mapped); err != nil {
+		err := json.Unmarshal(buf, &mapped)
+		err = errcontrol.Crasher(err)
+		if err != nil {
 			return fail.SyntaxError("unmarshalling JSON to map failed: %s", err.Error())
 		}
 		if props, ok = mapped["properties"].(map[string]interface{}); ok {
@@ -733,7 +765,9 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 		return fail.SyntaxError("failed to marshal core to JSON: %s", err.Error())
 	}
 
-	if xerr = c.shielded.Deserialize(jsoned); xerr != nil {
+	xerr = c.shielded.Deserialize(jsoned)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return fail.Wrap(xerr, "deserializing core failed")
 	}
 
@@ -744,7 +778,9 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 			return fail.SyntaxError("failed to marshal properties to JSON: %s", err.Error())
 		}
 
-		if xerr = c.properties.Deserialize(jsoned); xerr != nil {
+		xerr = c.properties.Deserialize(jsoned)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return fail.Wrap(xerr, "failed to deserialize properties")
 		}
 	}

@@ -100,7 +100,9 @@ func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 		return false, xerr
 	}
 
-	if xerr = rsg.Read(ref); xerr != nil {
+	xerr = rsg.Read(ref)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound, *retry.ErrTimeout:
 			return false, nil
@@ -199,7 +201,9 @@ func (instance *securityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	if xerr := kindCache.ReserveEntry(identifiable.GetID()); xerr != nil {
+	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 	defer func() {
@@ -213,7 +217,9 @@ func (instance *securityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	if xerr := instance.core.carry(clonable); xerr != nil {
+	xerr = instance.core.carry(clonable)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -258,7 +264,9 @@ func (instance *securityGroup) Browse(ctx context.Context, callback func(*abstra
 
 	return instance.core.BrowseFolder(func(buf []byte) fail.Error {
 		asg := abstract.NewSecurityGroup()
-		if xerr = asg.Deserialize(buf); xerr != nil {
+		xerr = asg.Deserialize(buf)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
 
@@ -313,7 +321,9 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	// Check if securityGroup exists and is managed by SafeScale
 	svc := instance.GetService()
 	var found bool
-	if found, xerr = lookupSecurityGroup(svc, name); xerr != nil {
+	found, xerr = lookupSecurityGroup(svc, name)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		// switch xerr.(type) {
 		// case *fail.ErrNotFound:
 		// 	// not found, good, continue
@@ -329,7 +339,9 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	asg := abstract.NewSecurityGroup()
 	asg.Name = name
 	asg.Network = networkID
-	if _, xerr = svc.InspectSecurityGroup(asg); xerr != nil {
+	_, xerr = svc.InspectSecurityGroup(asg)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound, *fail.ErrNotAvailable:
 		// continue
@@ -359,7 +371,9 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	}()
 
 	// Creates metadata
-	if xerr = instance.carry(asg); xerr != nil {
+	xerr = instance.carry(asg)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -376,7 +390,9 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	}()
 
 	if len(rules) == 0 {
-		if xerr = instance.unsafeClear(task); xerr != nil {
+		xerr = instance.unsafeClear(task)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
 	}
@@ -444,7 +460,9 @@ func (instance *securityGroup) unbindFromHosts(ctx context.Context, in *properti
 			break
 		}
 	}
-	if _, xerr = tg.Wait(); xerr != nil {
+	_, xerr = tg.Wait()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -481,11 +499,15 @@ func (instance *securityGroup) unbindFromSubnets(ctx context.Context, in *proper
 	// iterate on all networks bound to the security group to unbind security group from hosts attached to those networks (in parallel)
 	for _, v := range in.ByID {
 		// Unbind security group from hosts attached to subnet
-		if _, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, v.ID); xerr != nil {
+		_, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, v.ID)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			break
 		}
 	}
-	if _, xerr = tg.Wait(); xerr != nil {
+	_, xerr = tg.Wait()
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -571,13 +593,17 @@ func (instance *securityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// Removes all rules...
-	if xerr = instance.unsafeClear(task); xerr != nil {
+	xerr = instance.unsafeClear(task)
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
 		return xerr
 	}
 
 	// ... then re-adds rules from metadata
 	for _, v := range rules {
-		if xerr = instance.unsafeAddRule(task, v); xerr != nil {
+		xerr = instance.unsafeAddRule(task, v)
+		xerr = errcontrol.CrasherFail(xerr)
+		if xerr != nil {
 			return xerr
 		}
 	}
@@ -889,7 +915,9 @@ func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host
 			switch enable {
 			case resources.SecurityGroupEnable:
 				// In case the security group is already bound, we must consider a "duplicate" error has a success
-				if xerr := instance.GetService().BindSecurityGroupToHost(instance.GetID(), hostID); xerr != nil {
+				xerr := instance.GetService().BindSecurityGroupToHost(instance.GetID(), hostID)
+				xerr = errcontrol.CrasherFail(xerr)
+				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
 						// continue
@@ -899,7 +927,9 @@ func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host
 				}
 			case resources.SecurityGroupDisable:
 				// In case the security group has to be disabled, we must consider a "not found" error has a success
-				if xerr := instance.GetService().UnbindSecurityGroupFromHost(instance.GetID(), hostID); xerr != nil {
+				xerr := instance.GetService().UnbindSecurityGroupFromHost(instance.GetID(), hostID)
+				xerr = errcontrol.CrasherFail(xerr)
+				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// continue
