@@ -1936,6 +1936,7 @@ func (instance *subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 				return innerXErr
 			}
 
+			//goland:noinspection ALL
 			defer func(hostInstance resources.Host) {
 				hostInstance.Released()
 			}(rgw)
@@ -2215,10 +2216,9 @@ func (instance *subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 
 // unbindSecurityGroups makes sure the security groups bound to subnet are unbound
 func (instance *subnet) unbindSecurityGroups(ctx context.Context, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
-	var rsg resources.SecurityGroup
 	svc := instance.GetService()
 	for k, v := range sgs.ByName {
-		rsg, xerr = LoadSecurityGroup(svc, v)
+		rsg, xerr := LoadSecurityGroup(svc, v)
 		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -2228,6 +2228,7 @@ func (instance *subnet) unbindSecurityGroups(ctx context.Context, sgs *propertie
 				return xerr
 			}
 		}
+		//goland:noinspection ALL
 		defer func(sgInstance resources.SecurityGroup) {
 			sgInstance.Released()
 		}(rsg)
