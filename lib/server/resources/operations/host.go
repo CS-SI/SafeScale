@@ -2280,6 +2280,7 @@ func (instance *host) GetShare(shareRef string) (_ *propertiesv1.HostShare, xerr
 			return fail.NotFoundError("share '%s' not found in server '%s' metadata", shareRef, instance.GetName())
 		})
 	})
+	err = errcontrol.CrasherFail(err)
 	if err != nil {
 		return nil, err
 	}

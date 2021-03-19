@@ -19,6 +19,7 @@ package operations
 import (
 	"bytes"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/spf13/viper"
 
@@ -44,12 +45,14 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 	if templateBox == nil {
 		var err error
 		templateBox, err = rice.FindBox("../operations/features")
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return "", nil, fail.Wrap(err, "failed to open embedded feature specification folder")
 		}
 	}
 	name += featureFileExt
 	tmplString, err := templateBox.String(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "failed to read embedded feature speficication file '%s'", name)
 	}
@@ -57,6 +60,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
 	err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "syntax error in feature specification file '%s'", name)
 	}
@@ -78,6 +82,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 func dockerFeature() *feature {
 	name := "docker"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -89,25 +94,11 @@ func dockerFeature() *feature {
 	}
 }
 
-// // dockerComposeFeature ...
-// func dockerComposeFeature() *feature {
-// 	name := "docker-compose"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error()
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
 // ntpServerFeature ...
 func ntpServerFeature() *feature {
 	name := "ntpserver"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -123,6 +114,7 @@ func ntpServerFeature() *feature {
 func ntpClientFeature() *feature {
 	name := "ntpclient"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -138,6 +130,7 @@ func ntpClientFeature() *feature {
 func ansibleFeature() *feature {
 	name := "ansible"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -153,6 +146,7 @@ func ansibleFeature() *feature {
 func certificateAuthorityFeature() *feature {
 	name := "certificateauthority"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -168,6 +162,7 @@ func certificateAuthorityFeature() *feature {
 func postgresql4platformFeature() *feature {
 	name := "postgresql4platform"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -183,6 +178,7 @@ func postgresql4platformFeature() *feature {
 func nVidiaDockerFeature() *feature {
 	name := "nvidiadocker"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -198,6 +194,7 @@ func nVidiaDockerFeature() *feature {
 func kubernetesFeature() *feature {
 	name := "kubernetes"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -209,55 +206,11 @@ func kubernetesFeature() *feature {
 	}
 }
 
-// // nexusFeature ...
-// func nexusFeature() *feature { // nolint
-// 	name := "nexus3"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
-// // elasticsearchFeature ...
-// func elasticsearchFeature() *feature {
-// 	name := "elasticsearch"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
-// // logstashFeature ...
-// func logstashFeature() *feature {
-// 	name := "logstash"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
 // helm2Feature ...
 func helm2Feature() *feature {
 	name := "helm2"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -273,6 +226,7 @@ func helm2Feature() *feature {
 func helm3Feature() *feature {
 	name := "helm3"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -288,6 +242,7 @@ func helm3Feature() *feature {
 func sparkmaster4platformFeature() *feature {
 	name := "sparkmaster4platform"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -303,6 +258,7 @@ func sparkmaster4platformFeature() *feature {
 func remoteDesktopFeature() *feature {
 	name := "remotedesktop"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -314,70 +270,11 @@ func remoteDesktopFeature() *feature {
 	}
 }
 
-// // mpichOsPkgFeature ...
-// func mpichOsPkgFeature() *feature {
-// 	name := "mpich-ospkg"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
-// // mpichBuildFeature ...
-// func mpichBuildFeature() *feature {
-// 	name := "mpich-build"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
-// // ohpcSlurmMasterFeature ...
-// func ohpcSlurmMasterFeature() *feature {
-// 	name := "ohpc-slurm-master"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
-// // ohpcSlurmNodeFeature ...
-// func ohpcSlurmNodeFeature() *feature {
-// 	name := "ohpc-slurm-node"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
 // proxycacheServerFeature ...
 func proxycacheServerFeature() *feature {
 	name := "proxycache-server"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -393,6 +290,7 @@ func proxycacheServerFeature() *feature {
 func proxycacheClientFeature() *feature {
 	name := "proxycache-client"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -404,55 +302,11 @@ func proxycacheClientFeature() *feature {
 	}
 }
 
-// // apacheIgniteFeature ...
-// func apacheIgniteFeature() *feature {
-// 	name := "apache-ignite"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
-// // metricbeatFeature ...
-// func metricbeatFeature() *feature {
-// 	name := "metricbeat"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
-// // filebeatFeature ...
-// func filebeatFeature() *feature {
-// 	name := "filebeat"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
 // postgres4gatewayFeature ...
 func postgres4gatewayFeature() *feature {
 	name := "postgres4gateway"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -468,6 +322,7 @@ func postgres4gatewayFeature() *feature {
 func edgeproxy4subnetFeature() *feature {
 	name := "edgeproxy4subnet"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -483,6 +338,7 @@ func edgeproxy4subnetFeature() *feature {
 func keycloak4platformFeature() *feature {
 	name := "keycloak4platform"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -494,40 +350,11 @@ func keycloak4platformFeature() *feature {
 	}
 }
 
-// // kibanaFeature ...
-// func kibanaFeature() *feature {
-// 	name := "kibana"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
-// // elassandraFeature ...
-// func elassandraFeature() *feature {
-// 	name := "elassandra"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
 // consul4platformFeature ...
 func consul4platformFeature() *feature {
 	name := "consul4platform"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -543,6 +370,7 @@ func consul4platformFeature() *feature {
 func monitoring4platformFeature() *feature {
 	name := "monitoring4platform"
 	filename, specs, err := loadSpecFile(name)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -553,41 +381,5 @@ func monitoring4platformFeature() *feature {
 		specs:       specs,
 	}
 }
-
-// // geoserverFeature ...
-// func geoserverFeature() *feature {
-// 	name := "geoserver"
-// 	filename, specs, err := loadSpecFile(name)
-// 	if err != nil {
-// 		panic(err.Error())
-// 	}
-// 	return &feature{
-// 		displayName: name,
-// 		fileName:    filename,
-// 		embedded:    true,
-// 		specs:       specs,
-// 	}
-// }
-
-// ListAvailables returns an array of availables features with the usable installers
-// func ListAvailables() []string {
-// 	var output []string
-// 	for k, v := range allAvailables {
-// 		line := k
-// 		installers := v.Installers()
-// 		if len > 0 {
-// 			line += " ["
-// 			for n, i := range installers {
-// 				if n > 0 {
-// 					line += ", "
-// 				}
-// 				line += i.GetName()
-// 			}
-// 			line += "]"
-// 		}
-// 		output = append(output, fmt.Sprintf("%s"))
-// 	}
-// 	return output
-// }
 
 // NOTE: init() moved in zinit.go, to be sure the init() of rice-box.go is called first

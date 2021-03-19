@@ -19,6 +19,7 @@ package remotefile
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -76,6 +77,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			retcode, _, _, err := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, temporal.GetExecutionTimeout())
+			err = errcontrol.CrasherFail(err)
 			if err != nil {
 				return err
 			}

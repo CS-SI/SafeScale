@@ -17,6 +17,7 @@
 package converters
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -43,6 +44,7 @@ func BucketMountPointFromResourceToProtocol(ctx context.Context, in resources.Bu
 		return nil, xerr
 	}
 	path, err := in.GetMountPoint(ctx)
+	err = errcontrol.CrasherFail(err)
 	if err != nil {
 		return nil, err
 	}

@@ -777,6 +777,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	keepalivedPassword, err := utils.GeneratePassword(16)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
@@ -1232,6 +1233,7 @@ func (instance *subnet) validateCIDR(req *abstract.SubnetRequest, network abstra
 		}
 
 		_, subnetDesc, err := net.ParseCIDR(req.CIDR)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return fail.ConvertError(err)
 		}

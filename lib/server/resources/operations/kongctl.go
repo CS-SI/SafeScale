@@ -179,6 +179,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	case "service":
 		unjsoned := map[string]interface{}{}
 		err := json.Unmarshal([]byte(content), &unjsoned)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return ruleName, fail.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
@@ -204,6 +205,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 	case "route":
 		unjsoned := map[string]interface{}{}
 		err := json.Unmarshal([]byte(content), &unjsoned)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return ruleName, fail.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
@@ -230,6 +232,7 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 		// Separate upstream options from target settings
 		unjsoned := data.Map{}
 		err := json.Unmarshal([]byte(content), &unjsoned)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return ruleName, fail.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
@@ -277,6 +280,7 @@ func (k *KongController) realizeRuleData(content string, v data.Map) (string, fa
 	}
 	dataBuffer := bytes.NewBufferString("")
 	err := contentTmpl.Execute(dataBuffer, v)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
 	}
@@ -466,6 +470,7 @@ func (k *KongController) parseResult(result string) (map[string]interface{}, str
 
 	var response map[string]interface{}
 	err := json.Unmarshal([]byte(output[0]), &response)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, "", fail.ConvertError(err)
 	}
