@@ -16,7 +16,13 @@
 
 package errcontrol
 
+import "github.com/CS-SI/SafeScale/lib/utils/fail"
+
 func Crasher(in error, calldepth ...int) (err error) {
+	return in
+}
+
+func CrasherFail(in fail.Error, calldepth ...int) fail.Error {
 	return in
 }
 
