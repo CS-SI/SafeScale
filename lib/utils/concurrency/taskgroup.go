@@ -44,7 +44,7 @@ type TaskGroup interface {
 	TaskCore
 	TaskGroupGuard
 
-	GetGroupStatuss() (map[TaskStatus][]string, fail.Error)
+	GetGroupStatus() (map[TaskStatus][]string, fail.Error)
 }
 
 type subTask struct {
@@ -517,7 +517,7 @@ func (tg *taskGroup) New() (Task, fail.Error) {
 }
 
 // GetGroupStatus returns the status of all tasks running in TaskGroup
-func (tg *taskGroup) GetGroupStatuss() (map[TaskStatus][]string, fail.Error) {
+func (tg *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error) {
 	if tg.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
