@@ -19,6 +19,7 @@ package operations
 import (
 	"sync/atomic"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -47,6 +48,7 @@ func CurrentTenant() *Tenant {
 		for _, anon := range tenants {
 			name := anon.(string)
 			service, err := iaas.UseService(name)
+			err = errcontrol.CrasherFail(err)
 			if err != nil {
 				return nil
 			}
@@ -66,6 +68,7 @@ func SetCurrentTenant(tenantName string) error {
 	}
 
 	service, err := iaas.UseService(tenantName)
+	err = errcontrol.CrasherFail(err)
 	if err != nil {
 		return err
 	}

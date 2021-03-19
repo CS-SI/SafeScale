@@ -276,6 +276,7 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 				return nil, xerr
 			}
 			subtask, err := concurrency.NewTaskWithParent(task)
+			err = errcontrol.CrasherFail(err)
 			if err != nil {
 				return nil, err
 			}

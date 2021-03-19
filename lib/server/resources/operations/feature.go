@@ -146,6 +146,7 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 
 	casted := nullFeature()
 	err := v.ReadInConfig()
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		switch err.(type) {
 		case viper.ConfigFileNotFoundError:

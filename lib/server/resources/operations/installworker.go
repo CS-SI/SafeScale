@@ -1278,6 +1278,7 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 
 	dataBuffer := bytes.NewBufferString("")
 	err = anon.(*txttmpl.Template).Execute(dataBuffer, params)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
 	}

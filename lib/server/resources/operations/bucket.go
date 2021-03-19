@@ -25,6 +25,7 @@ import (
 	"regexp"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
@@ -474,14 +475,17 @@ func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Er
 	defer fail.OnExitLogError(&xerr, debug.NewTracer(nil, true, "").TraceMessage(""))
 
 	box, err := rice.FindBox("../operations/scripts")
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
 	}
 	scriptContent, err := box.String(script)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
 	}
 	tpl, err := template.Parse("TemplateName", scriptContent)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
 	}

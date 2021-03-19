@@ -249,6 +249,7 @@ func (instance *host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error)
 			return nil
 		})
 	})
+	err = errcontrol.CrasherFail(err)
 	if err != nil {
 		return nil, err
 	}

@@ -468,6 +468,7 @@ func (instance *share) Create(
 			hostShare = propertiesv1.NewHostShare()
 			hostShare.Name = shareName
 			shareID, err := uuid.NewV4()
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				return fail.Wrap(err, "Error creating UUID for share")
 			}

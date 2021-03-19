@@ -77,6 +77,7 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 	}
 
 	coreInstance, err := newCore(svc, volumeKind, volumesFolderName, &abstract.Volume{})
+	err = errcontrol.CrasherFail(err)
 	if err != nil {
 		return nullVolume(), err
 	}
