@@ -264,6 +264,9 @@ func (is *step) Run(ctx context.Context, hosts []resources.Host, v data.Map, s r
 					return nil
 				})
 			})
+			if xerr != nil {
+				return nil, xerr
+			}
 			cloneV["Hostname"] = h.GetName() + domain
 
 			if cloneV, xerr = realizeVariables(cloneV); xerr != nil {
