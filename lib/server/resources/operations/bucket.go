@@ -63,6 +63,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	}
 
 	coreInstance, xerr := newCore(svc, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -83,6 +84,7 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 	}
 
 	bucketCache, xerr := svc.GetCache(bucketKind)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -102,6 +104,7 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 		}),
 	}
 	cacheEntry, xerr := bucketCache.Get(name, options...)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -136,6 +139,7 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -144,6 +148,7 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
@@ -158,6 +163,7 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -177,6 +183,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error)
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -198,6 +205,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error)
 		res = ab.Host
 		return nil
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return res, xerr
 	}
@@ -223,6 +231,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -243,6 +252,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 		res = ab.MountPoint
 		return nil
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		logrus.Errorf(xerr.Error())
 	}
@@ -272,6 +282,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -288,6 +299,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 	defer instance.lock.Unlock()
 
 	ab, xerr := instance.GetService().InspectBucket(name)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
@@ -311,6 +323,7 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -341,6 +354,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -358,6 +372,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 
 	// Get Host data
 	rh, xerr := LoadHost(instance.GetService(), hostName)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
 	}
@@ -423,6 +438,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -445,6 +461,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 
 	// Get Host
 	rh, xerr := LoadHost(instance.GetService(), hostName)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -462,6 +479,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 // Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
 func (instance *bucket) exec(ctx context.Context, host resources.Host, script string, data interface{}) fail.Error {
 	scriptCmd, xerr := getBoxContent(script, data)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
