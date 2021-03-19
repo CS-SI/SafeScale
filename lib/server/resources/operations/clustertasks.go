@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -66,7 +67,11 @@ func (instance *cluster) taskStartHost(task concurrency.Task, params concurrency
 			return nil, nil
 		}
 	}
-	return nil, xerr
+	xerr = errcontrol.CrasherFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+	return nil, nil
 }
 
 func (instance *cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
@@ -251,6 +256,7 @@ func (instance *cluster) taskCreateMasters(task concurrency.Task, params concurr
 			timeout:       timeout,
 			keepOnFailure: p.keepOnFailure,
 		})
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -313,6 +319,7 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("master", clusternodetype.Master)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -337,6 +344,7 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
@@ -369,11 +377,13 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	netCfg, xerr := instance.GetNetworkConfig()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	subnet, xerr := LoadSubnet(instance.GetService(), "", netCfg.SubnetID)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -388,6 +398,7 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 		hostReq.Subnets = []*abstract.Subnet{as}
 		return nil
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -400,6 +411,7 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 	hostReq.KeepOnFailure = p.keepOnFailure
 
 	rh, xerr := NewHost(instance.GetService())
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -451,6 +463,7 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
@@ -494,6 +507,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 	// var subtasks []concurrency.Task
 	masters, xerr := instance.unsafeListMasters()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -502,6 +516,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	}
 
 	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -514,6 +529,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 		}
 
 		host, xerr := LoadHost(instance.GetService(), master.ID)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			logrus.Warnf("failed to get metadata of Host: %s", xerr.Error())
 			loadErrors = append(loadErrors, xerr)
@@ -527,6 +543,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 			Index: i + 1,
 			Host:  host,
 		})
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			taskErrors = append(taskErrors, xerr)
 		}
@@ -662,6 +679,7 @@ func (instance *cluster) taskCreateNodes(task concurrency.Task, params concurren
 			timeout:       timeout,
 			keepOnFailure: p.keepOnFailure,
 		})
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -724,6 +742,7 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("node", clusternodetype.Node)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -747,6 +766,7 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
@@ -775,11 +795,13 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	}()
 
 	netCfg, xerr := instance.GetNetworkConfig()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	subnet, xerr := LoadSubnet(instance.GetService(), "", netCfg.SubnetID)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -794,6 +816,7 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		hostReq.Subnets = []*abstract.Subnet{as}
 		return nil
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -806,6 +829,7 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	hostReq.KeepOnFailure = p.keepOnFailure
 
 	rh, xerr := NewHost(instance.GetService())
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -885,6 +909,7 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			// return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
@@ -926,6 +951,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	list, err := instance.unsafeListNodes()
+	err = errcontrol.CrasherFail(err)
 	if err != nil {
 		return nil, err
 	}
@@ -943,6 +969,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 
 	svc := instance.GetService()
 	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -954,6 +981,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 		}
 
 		host, xerr := LoadHost(svc, node.ID)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", node.Name))
 			continue
@@ -967,6 +995,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 			Index: i + 1,
 			Host:  host,
 		})
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1077,6 +1106,7 @@ func (instance *cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 	logrus.Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
 
 	rh, xerr := LoadHost(instance.GetService(), node.ID)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1125,6 +1155,7 @@ func (instance *cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}
 
 	defer func() {
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			xerr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
 		}
@@ -1174,6 +1205,7 @@ func (instance *cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	} else {
 		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
 	}
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}

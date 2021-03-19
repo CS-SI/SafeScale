@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -58,6 +59,7 @@ func newFolder(svc iaas.Service, path string) (folder, fail.Error) {
 	}
 
 	cryptKey, xerr := svc.GetMetadataKey()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return folder{}, xerr
@@ -127,6 +129,7 @@ func (f folder) Lookup(path string, name string) fail.Error {
 
 	absPath := strings.Trim(f.absolutePath(path), "/")
 	list, xerr := f.service.ListObjects(f.getBucket().Name, absPath, objectstorage.NoPrefix)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -177,6 +180,7 @@ func (f folder) Read(path string, name string, callback func([]byte) fail.Error)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)
 	}
@@ -279,6 +283,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 			}
 		},
 	)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
@@ -297,6 +302,7 @@ func (f folder) Browse(path string, callback folderDecoderCallback) fail.Error {
 	absPath := f.absolutePath(path)
 	metadataBucket := f.getBucket()
 	list, xerr := f.service.ListObjects(metadataBucket.Name, absPath, objectstorage.NoPrefix)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		logrus.Errorf("Error browsing metadata: listing objects: %+v", xerr)
 		return xerr

@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
@@ -79,11 +80,13 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 	}
 
 	fld, xerr := newFolder(svc, path)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nullCore(), xerr
 	}
 
 	props, err := serialize.NewJSONProperties("resources." + kind)
+	err = errcontrol.CrasherFail(err)
 	if err != nil {
 		return nullCore(), err
 	}
@@ -92,9 +95,8 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		kind:       kind,
 		folder:     fld,
 		properties: props,
-		//TaskedLock: concurrency.NewTaskedLock(),
-		shielded:  concurrency.NewShielded(instance),
-		observers: map[string]observer.Observer{},
+		shielded:   concurrency.NewShielded(instance),
+		observers:  map[string]observer.Observer{},
 	}
 	return &c, nil
 }
@@ -239,6 +241,7 @@ func (c *core) Alter(callback resources.Callback, options ...data.ImmutableKeyVa
 	xerr = c.shielded.Alter(func(clonable data.Clonable) fail.Error {
 		return callback(clonable, c.properties)
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
@@ -380,6 +383,7 @@ func (c *core) ReadByID(id string) (xerr fail.Error) {
 		},
 		temporal.GetMinDelay(),
 	)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
@@ -437,6 +441,7 @@ func (c *core) readByReference(ref string) (xerr fail.Error) {
 		},
 		timeout,
 	)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
@@ -466,6 +471,7 @@ func (c *core) readByName(name string) fail.Error {
 func (c *core) write() fail.Error {
 	if !c.committed {
 		jsoned, xerr := c.serialize()
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -519,6 +525,7 @@ func (c *core) reload() (xerr fail.Error) {
 		},
 		temporal.GetMinDelay(),
 	)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
@@ -643,6 +650,7 @@ func (c *core) serialize() (_ []byte, xerr fail.Error) {
 	)
 
 	shieldedJSONed, xerr = c.shielded.Serialize()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -654,6 +662,7 @@ func (c *core) serialize() (_ []byte, xerr fail.Error) {
 
 	if c.properties.Count() > 0 {
 		propsJSONed, xerr := c.properties.Serialize()
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -670,6 +679,7 @@ func (c *core) serialize() (_ []byte, xerr fail.Error) {
 	// logrus.Tracef("everything mapped:\n%s\n", spew.Sdump(shieldedMapped))
 
 	r, err := json.Marshal(shieldedMapped)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
@@ -696,6 +706,7 @@ func (c *core) Deserialize(buf []byte) (xerr fail.Error) {
 func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 	if c.properties == nil {
 		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -717,6 +728,7 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 	}
 
 	jsoned, err := json.Marshal(mapped)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return fail.SyntaxError("failed to marshal core to JSON: %s", err.Error())
 	}
@@ -727,6 +739,7 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 
 	if len(props) > 0 {
 		jsoned, err = json.Marshal(props)
+		err = errcontrol.Crasher(err)
 		if err != nil {
 			return fail.SyntaxError("failed to marshal properties to JSON: %s", err.Error())
 		}

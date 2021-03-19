@@ -51,6 +51,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -91,6 +92,7 @@ func NewCluster(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 	}
 
 	coreInstance, xerr := newCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
@@ -113,6 +115,7 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 	}
 
 	clusterCache, xerr := svc.GetCache(clusterKind)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
@@ -147,6 +150,7 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 		}),
 	}
 	cacheEntry, xerr := clusterCache.Get(name, options...)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -362,6 +366,7 @@ func (instance *cluster) updateClusterNetworkPropertyIfNeeded() fail.Error {
 		}
 		return nil
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrAlteredNothing:
@@ -395,6 +400,7 @@ func (instance *cluster) updateClusterDefaultsPropertyIfNeeded() fail.Error {
 			})
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
@@ -462,6 +468,7 @@ func (instance *cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -470,6 +477,7 @@ func (instance *cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
@@ -484,6 +492,7 @@ func (instance *cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -506,6 +515,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -527,6 +537,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 
 	// Check if cluster exists in metadata; if yes, error
 	existing, xerr := LoadCluster(instance.GetService(), req.Name)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -563,6 +574,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 
 	// Obtain number of nodes to create
 	_, privateNodeCount, _, xerr := instance.determineRequiredNodes()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -577,12 +589,14 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 
 	// Define the sizing requirements for cluster hosts
 	gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(req)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Create the Network and Subnet
 	rn, rs, xerr := instance.createNetworkingResources(ctx, req, gatewaysDef)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -839,6 +853,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 
 	svc := instance.GetService()
 	tmpl, xerr := svc.FindTemplateBySizing(*gatewaysDef)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
@@ -872,6 +887,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 		mastersDef.Template = gatewaysDef.Template
 	} else {
 		tmpl, xerr = svc.FindTemplateBySizing(*mastersDef)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, nil, nil, xerr
 		}
@@ -908,6 +924,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 		nodesDef.Template = mastersDef.Template
 	} else {
 		tmpl, xerr = svc.FindTemplateBySizing(*nodesDef)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, nil, nil, xerr
 		}
@@ -929,6 +946,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
@@ -939,6 +957,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 // createNetworkingResources creates the network and subnet for the cluster
 func (instance *cluster) createNetworkingResources(ctx context.Context, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -1006,6 +1025,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1026,6 +1046,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 	}
 
 	rs, xerr := NewSubnet(instance.GetService())
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1036,6 +1057,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 			// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
 			logrus.Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
 			_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				_ = xerr.AddConsequence(fail.Wrap(err, "failed to compute subset of CIDR '%s'", req.CIDR))
 				return nil, nil, xerr
@@ -1113,6 +1135,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1124,6 +1147,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 func onFailureAbortTask(task concurrency.Task, inErr *fail.Error) {
 	if inErr != nil && *inErr != nil {
 		st, xerr := task.GetStatus()
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			_ = (*inErr).AddConsequence(xerr)
 			return
@@ -1152,6 +1176,7 @@ func (instance *cluster) createHostResources(
 ) (xerr fail.Error) {
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1199,6 +1224,7 @@ func (instance *cluster) createHostResources(
 	}
 
 	masterCount, _, _, xerr := instance.determineRequiredNodes()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1209,6 +1235,7 @@ func (instance *cluster) createHostResources(
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
 	primaryGatewayTask, xerr = task.StartInSubtask(instance.taskInstallGateway, taskInstallGatewayParameters{primaryGateway})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1234,6 +1261,7 @@ func (instance *cluster) createHostResources(
 		mastersDef:    mastersDef,
 		keepOnFailure: keepOnFailure,
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1249,6 +1277,7 @@ func (instance *cluster) createHostResources(
 		nodesDef:      nodesDef,
 		keepOnFailure: keepOnFailure,
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1487,6 +1516,7 @@ func (instance *cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1563,6 +1593,7 @@ func (instance *cluster) GetAdminPassword() (adminPassword string, xerr fail.Err
 	defer tracer.Exiting()
 
 	aci, xerr := instance.GetIdentity()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -1579,6 +1610,7 @@ func (instance *cluster) GetKeyPair() (keyPair abstract.KeyPair, xerr fail.Error
 	}
 
 	aci, xerr := instance.GetIdentity()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nullAKP, xerr
 	}
@@ -1609,6 +1641,7 @@ func (instance *cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nullConfig, xerr
 	}
@@ -1628,6 +1661,7 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1670,6 +1704,7 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 			},
 			5*time.Minute, // FIXME: static timeout
 		)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			if _, ok := xerr.(*retry.ErrTimeout); ok {
 				xerr = fail.Wrap(xerr, "timeout waiting cluster to become started")
@@ -1695,6 +1730,7 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1764,12 +1800,14 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Start gateway(s)
 	taskGroup, xerr := concurrency.NewTaskGroup(task)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1824,6 +1862,7 @@ func (instance *cluster) Stop(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1869,6 +1908,7 @@ func (instance *cluster) Stop(ctx context.Context) (xerr fail.Error) {
 			},
 			5*time.Minute, // FIXME: static timeout
 		)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrTimeout:
@@ -1897,6 +1937,7 @@ func (instance *cluster) Stop(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2024,6 +2065,7 @@ func (instance *cluster) AddNode(ctx context.Context, def abstract.HostSizingReq
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2036,6 +2078,7 @@ func (instance *cluster) AddNode(ctx context.Context, def abstract.HostSizingReq
 	// defer tracer.Exiting()
 
 	nodes, xerr := instance.AddNodes(ctx, 1, def)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nullHost(), xerr
 	}
@@ -2058,6 +2101,7 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2092,6 +2136,7 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2125,6 +2170,7 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			timeout:       timeout,
 			keepOnFailure: false,
 		})
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -2133,6 +2179,7 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 	for _, s := range subtasks {
 		res, err := s.Wait()
+		err = errcontrol.CrasherFail(err)
 		if err != nil {
 			errors = append(errors, err.Error())
 		} else {
@@ -2229,6 +2276,7 @@ func (instance *cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2264,6 +2312,7 @@ func (instance *cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2272,6 +2321,7 @@ func (instance *cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 	}
 
 	selectedMaster, xerr := instance.unsafeFindAvailableMaster(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2298,6 +2348,7 @@ func (instance *cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2324,6 +2375,7 @@ func (instance *cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	} else {
 		selectedMaster, xerr = instance.unsafeFindAvailableMaster(ctx)
 	}
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2349,6 +2401,7 @@ func (instance *cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2367,6 +2420,7 @@ func (instance *cluster) ListMasters(ctx context.Context) (list resources.Indexe
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2399,6 +2453,7 @@ func (instance *cluster) ListMasterNames(ctx context.Context) (list data.Indexed
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2435,6 +2490,7 @@ func (instance *cluster) ListMasterNames(ctx context.Context) (list data.Indexed
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2464,6 +2520,7 @@ func (instance *cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 func (instance *cluster) unsafeListMasterIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	emptyList := data.IndexedListOfStrings{}
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2496,6 +2553,7 @@ func (instance *cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2516,6 +2574,7 @@ func (instance *cluster) ListMasterIPs(ctx context.Context) (list data.IndexedLi
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2545,6 +2604,7 @@ func (instance *cluster) FindAvailableMaster(ctx context.Context) (master resour
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2581,6 +2641,7 @@ func (instance *cluster) ListNodes(ctx context.Context) (list resources.IndexedL
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2603,6 +2664,7 @@ func (instance *cluster) ListNodes(ctx context.Context) (list resources.IndexedL
 // beingRemoved tells if the cluster is currently marked as Removed (meaning a removal operation is running)
 func (instance *cluster) beingRemoved() fail.Error {
 	state, xerr := instance.unsafeGetState()
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2627,6 +2689,7 @@ func (instance *cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2663,6 +2726,7 @@ func (instance *cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2683,6 +2747,7 @@ func (instance *cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2711,6 +2776,7 @@ func (instance *cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2742,6 +2808,7 @@ func (instance *cluster) FindAvailableNode(ctx context.Context) (node resources.
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2776,6 +2843,7 @@ func (instance *cluster) LookupNode(ctx context.Context, ref string) (found bool
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}
@@ -2824,6 +2892,7 @@ func (instance *cluster) CountNodes(ctx context.Context) (count uint, xerr fail.
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -2851,6 +2920,7 @@ func (instance *cluster) CountNodes(ctx context.Context) (count uint, xerr fail.
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -2873,6 +2943,7 @@ func (instance *cluster) GetNodeByID(ctx context.Context, hostID string) (host r
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2904,6 +2975,7 @@ func (instance *cluster) GetNodeByID(ctx context.Context, hostID string) (host r
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2927,6 +2999,7 @@ func (instance *cluster) deleteMaster(ctx context.Context, host resources.Host) 
 	// }
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2964,12 +3037,14 @@ func (instance *cluster) deleteMaster(ctx context.Context, host resources.Host) 
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Starting from here, restore master in cluster properties if exiting with error
 	defer func() {
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			// // Disable abort signal during the clean up
 			// defer task.DisarmAbortSignal()()
@@ -3020,6 +3095,7 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	// }
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3065,12 +3141,14 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Starting from here, restore node in cluster metadata if exiting with error
 	defer func() {
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			// // Disable abort signal during the clean up
 			// defer task.DisarmAbortSignal()()
@@ -3103,6 +3181,7 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	// Deletes node
 	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		hostInstance, xerr := LoadHost(instance.GetService(), nodeRef)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -3160,6 +3239,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3171,6 +3251,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 	var cleaningErrors []error
 
 	defer func() {
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
@@ -3221,6 +3302,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3230,12 +3312,14 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 	masterCount, nodeCount := len(masters), len(nodes)
 	//	subtasks := make([]concurrency.Task, 0, masterCount+nodeCount)
 	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	options := []data.ImmutableKeyValue{
 		data.NewImmutableKeyValue("normalizeError", func(err error) error {
+			err = errcontrol.Crasher(err)
 			if err != nil {
 				switch err.(type) {
 				case *fail.ErrNotFound:
@@ -3309,12 +3393,14 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	allCount := len(all)
 	tg, xerr = concurrency.NewTaskGroupWithParent(task)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3353,6 +3439,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 
 	// --- Deletes the Network, Subnet and gateway ---
 	rn, deleteNetwork, rs, xerr := instance.extractNetworkingInfo(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3380,6 +3467,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			},
 			temporal.GetHostTimeout(),
 		)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
@@ -3388,6 +3476,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 				xerr = fail.ConvertError(xerr.Cause())
 			}
 		}
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -3419,6 +3508,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			},
 			temporal.GetHostTimeout(),
 		)
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
@@ -3427,6 +3517,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 				xerr = fail.ConvertError(xerr.Cause())
 			}
 		}
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -3488,6 +3579,7 @@ func (instance *cluster) extractNetworkingInfo(ctx context.Context) (network res
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nullNetwork(), deleteNetwork, nullSubnet(), xerr
 	}
@@ -3521,6 +3613,7 @@ func containsClusterNode(list []uint, numericalID uint) (bool, int) {
 // params contains a data.Map with primary and secondary getGateway hosts
 func (instance *cluster) configureCluster(ctx context.Context) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3564,6 +3657,7 @@ func (instance *cluster) configureCluster(ctx context.Context) (xerr fail.Error)
 func (instance *cluster) determineRequiredNodes() (uint, uint, uint, fail.Error) {
 	if instance.makers.MinimumRequiredServers != nil {
 		g, m, n, xerr := instance.makers.MinimumRequiredServers(func() abstract.ClusterIdentity { out, _ := instance.unsafeGetIdentity(); return out }())
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return 0, 0, 0, xerr
 		}
@@ -3580,17 +3674,20 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 	}
 
 	tmplString, err := box.String(tmplName)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to load template")
 	}
 
 	tmplCmd, err := template.Parse(fileName, tmplString)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to parse template")
 	}
 
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplCmd.Execute(dataBuffer, data)
+	err = errcontrol.Crasher(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to execute  template")
 	}
@@ -3627,6 +3724,7 @@ func (instance *cluster) configureNodesFromList(task concurrency.Task, hosts []r
 			Index: uint(i + 1),
 			Host:  hosts[i],
 		})
+		err = errcontrol.CrasherFail(err)
 		if err != nil {
 			xerr = err
 			break
@@ -3634,6 +3732,7 @@ func (instance *cluster) configureNodesFromList(task concurrency.Task, hosts []r
 		subtasks = append(subtasks, subtask)
 	}
 	// Deals with the metadata read failure
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", hostID))
 	}
@@ -3653,6 +3752,7 @@ func (instance *cluster) configureNodesFromList(task concurrency.Task, hosts []r
 // joinNodesFromList makes nodes from a list join the cluster
 func (instance *cluster) joinNodesFromList(ctx context.Context, hosts []resources.Host) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3722,6 +3822,7 @@ func (instance *cluster) buildHostname(core string, nodeType clusternodetype.Enu
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -3734,6 +3835,7 @@ func (instance *cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 	}
 
 	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3871,6 +3973,7 @@ func (instance *cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -3890,6 +3993,7 @@ func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
@@ -3907,6 +4011,7 @@ func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	}
 
 	tg, xerr := concurrency.NewTaskGroup(task)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
@@ -3942,11 +4047,13 @@ func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 			return nil
 		})
 	})
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return emptySlice, nil
 	}
 
 	defer func() {
+		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			// // Disable abort signal during the clean up
 			// // VPL: would not be necessary anymore if there is no abort signal test inside the callback...
@@ -4005,6 +4112,7 @@ func (instance *cluster) IsFeatureInstalled(ctx context.Context, name string) (f
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}
