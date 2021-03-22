@@ -81,10 +81,10 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 // LoadNetwork loads the metadata of a subnet
 func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.Error) {
 	if svc == nil {
-		return nullNetwork(), fail.InvalidParameterError("svc", "cannot be null value")
+		return nil, fail.InvalidParameterError("svc", "cannot be null value")
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
-		return nullNetwork(), fail.InvalidParameterError("ref", "cannot be empty string")
+		return nil, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	networkCache, xerr := svc.GetCache(networkKind)
@@ -126,14 +126,14 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nullNetwork(), fail.NotFoundError("failed to find Network '%s'", ref)
+			return nil, fail.NotFoundError("failed to find Network '%s'", ref)
 		default:
-			return nullNetwork(), xerr
+			return nil, xerr
 		}
 	}
 
 	if rn = cacheEntry.Content().(resources.Network); rn == nil {
-		return nullNetwork(), fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
+		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {

@@ -870,7 +870,7 @@ type ErrInvalidParameter struct {
 
 // InvalidParameterError ...
 func InvalidParameterError(what string, why ...interface{}) *ErrInvalidParameter {
-	return invalidParameterError(what, 2, why...)
+	return invalidParameterError(what, 3, why...)
 }
 
 func invalidParameterError(what string, skip uint, why ...interface{}) *ErrInvalidParameter {

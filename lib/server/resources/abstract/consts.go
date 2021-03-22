@@ -38,7 +38,4 @@ const (
 const (
 	// SingleHostNetworkName is the name to use to create the network owning single hosts (not attached to a named network)
 	SingleHostNetworkName = "net-safescale"
-
-	// SingleHostSubnetName is the name to use to create the subnet owning single hosts (not attached to a named network)
-	SingleHostSubnetName = "subnet-safescale"
 )
