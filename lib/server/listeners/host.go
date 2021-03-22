@@ -36,7 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
-	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
 	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
@@ -304,38 +303,41 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	sizing.Image = in.GetImageId()
 
-	// Determine if the subnets to use exist
+	// Determine if the Subnet(s) to use exist
 	// Because of legacy, the subnet can be fully identified by network+subnet, or can be identified by network+network,
 	// because previous release of SafeScale created network AND subnet with the same name
 	var (
-		rs      resources.Subnet
-		subnets []*abstract.Subnet
+		networkRef string
+		rs         resources.Subnet
+		subnets    []*abstract.Subnet
 	)
-	networkValue := in.GetNetwork()
-	if networkValue != "" {
-		_, xerr = networkfactory.Load(job.GetService(), networkValue)
-		if xerr != nil {
-			return nil, xerr
-		}
-	}
-	if len(in.GetSubnets()) == 0 {
-		rs, xerr = subnetfactory.Load(job.GetService(), networkValue, networkValue)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		err = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			subnets = []*abstract.Subnet{as.Clone().(*abstract.Subnet)}
-			return nil
-		})
+	if in.GetPublic() {
+		networkRef = abstract.SingleHostNetworkName
 	} else {
+		networkRef = in.GetNetwork()
+	}
+	if networkRef == "" && len(in.GetSubnets()) == 0 {
+		return nil, fail.InvalidRequestError("no Network and no Subnet defined, cannot continue")
+	}
+
+	if len(in.GetSubnets()) > 0 {
+	// 	rs, xerr = subnetfactory.Load(job.GetService(), networkRef, networkRef)
+	// 	if xerr != nil {
+	// 		return nil, xerr
+	// 	}
+	//
+	// 	err = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	// 		as, ok := clonable.(*abstract.Subnet)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	//
+	// 		subnets = []*abstract.Subnet{as.Clone().(*abstract.Subnet)}
+	// 		return nil
+	// 	})
+	// } else {
 		for _, v := range in.GetSubnets() {
-			rs, xerr = subnetfactory.Load(job.GetService(), networkValue, v)
+			rs, xerr = subnetfactory.Load(job.GetService(), networkRef, v)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -356,20 +358,20 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 
 	domain := in.Domain
-	if domain == "" {
-		xerr = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			domain = as.Domain
-			return nil
-		})
-		if xerr != nil {
-			return nil, xerr
-		}
-	}
+	// if domain == "" {
+	// 	xerr = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+	// 		as, ok := clonable.(*abstract.Subnet)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	//
+	// 		domain = as.Domain
+	// 		return nil
+	// 	})
+	// 	if xerr != nil {
+	// 		return nil, xerr
+	// 	}
+	// }
 	domain = strings.Trim(domain, ".")
 	if domain != "" {
 		domain = "." + domain

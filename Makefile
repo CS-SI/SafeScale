@@ -35,7 +35,8 @@ ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
 
-BUILD_TAGS =
+#BUILD_TAGS = --tags=debug
+BUILD_TAGS = 
 export BUILD_TAGS
 
 all: begin ground getdevdeps sdk generate lib cli err vet

@@ -18,6 +18,7 @@ package operations
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"os/user"
 	"reflect"
@@ -27,6 +28,8 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
+
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -761,6 +764,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		xerr = defaultSubnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
 			if !ok {
@@ -1683,24 +1687,26 @@ func (instance *host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 	return instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, timeout)
 }
 
-// getOrCreateDefaultSubnet gets network abstract.SingleHostNetworkName or create it if necessary
+// getOrCreateDefaultSubnet gets Subnet abstract.SingleHostNetworkName or create it if necessary
 func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resources.Subnet, gw resources.Host, xerr fail.Error) {
 	rn, xerr := LoadNetwork(svc, abstract.SingleHostNetworkName)
 	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-		// continue
+			// continue
 		default:
 			return nil, nil, xerr
 		}
 	}
+
 	if rn == nil {
 		rn, xerr = NewNetwork(svc)
 		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
+
 		req := abstract.NetworkRequest{
 			Name: abstract.SingleHostNetworkName,
 			CIDR: stacks.DefaultNetworkCIDR,
@@ -1714,9 +1720,6 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 		defer func() {
 			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
-				// // Disable abort signal during the clean up
-				// defer task.DisarmAbortSignal()()
-
 				if derr := rn.Delete(context.Background()); derr != nil {
 					_ = xerr.AddConsequence(derr)
 				}
@@ -1724,11 +1727,12 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 		}()
 	}
 
-	rs, xerr = LoadSubnet(svc, rn.GetID(), abstract.SingleHostSubnetName)
+	rs, xerr = LoadSubnet(svc, rn.GetID(), abstract.SingleHostNetworkName)
 	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			// continue
 		default:
 			return nil, nil, xerr
 		}
@@ -1739,6 +1743,7 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 		if xerr != nil {
 			return nil, nil, xerr
 		}
+
 		var DNSServers []string
 		opts, xerr := svc.GetConfigurationOptions()
 		xerr = errcontrol.CrasherFail(xerr)
@@ -1749,12 +1754,25 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 				return nil, nil, xerr
 			}
 		} else {
-			DNSServers = strings.Split(opts.GetString("DNSServers"), ",")
+			dnsServers := strings.TrimSpace(opts.GetString("DNSServers"))
+			if dnsServers != "" {
+				DNSServers = strings.Split(dnsServers, ",")
+			}
 		}
+
+		// Some Cloud Providers do not allow subnet CIDR to be the same as Network CIDR
+		_, networkNet, _ := net.ParseCIDR(stacks.DefaultNetworkCIDR)
+		subnetNet, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
+		if xerr != nil {
+			return nil, nil, xerr
+		}
+
 		req := abstract.SubnetRequest{
-			Name:       abstract.SingleHostSubnetName,
-			CIDR:       "10.0.0.0/17",
+			NetworkID: rn.GetID(),
+			Name:       abstract.SingleHostNetworkName,
+			CIDR:       subnetNet.String(),
 			DNSServers: DNSServers,
+			Domain:     "safescale.net",
 			HA:         false,
 		}
 		xerr = rs.Create(ctx, req, "", nil)
@@ -1770,7 +1788,7 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 				// defer task.DisarmAbortSignal()()
 
 				if derr := rs.Delete(context.Background()); derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete subnet '%s'", actionFromError(xerr), abstract.SingleHostSubnetName))
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete subnet '%s'", actionFromError(xerr), abstract.SingleHostNetworkName))
 				}
 			}
 		}()

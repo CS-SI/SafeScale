@@ -231,10 +231,10 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Su
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
-		return nullSubnet(), fail.InvalidParameterCannotBeNilError("svc")
+		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if subnetRef = strings.TrimSpace(subnetRef); subnetRef == "" {
-		return nullSubnet(), fail.InvalidParameterError("subnetRef", "cannot be empty string")
+		return nil, fail.InvalidParameterError("subnetRef", "cannot be empty string")
 	}
 
 	// -- First step: identify subnetID from (networkRef, subnetRef) --
@@ -361,9 +361,9 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Su
 	if rs == nil {
 		if networkRef != "" {
 			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nullSubnet(), fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
+			return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 		}
-		return nullSubnet(), fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
+		return nil, fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
 	}
 	return rs, nil
 }
@@ -475,7 +475,7 @@ func (instance *subnet) carry(clonable data.Clonable) (xerr fail.Error) {
 	return instance.updateCachedInformation()
 }
 
-// Create creates a subnet
+// Create creates a Subnet
 // FIXME: split up this function for readability
 func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -1386,6 +1386,7 @@ func (instance *subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 	if xerr != nil {
 		return nil, nil, xerr
 	}
+
 	req.NetworkID = an.ID
 	if len(req.DNSServers) == 0 {
 		req.DNSServers = an.DNSServers
