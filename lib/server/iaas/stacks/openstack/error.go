@@ -92,6 +92,10 @@ func NormalizeError(err error) fail.Error {
 		return fail.InvalidRequestError(e.Error())
 	case *gophercloud.ErrMissingInput:
 		return fail.InvalidRequestError(e.Error())
+	case gophercloud.ErrEndpointNotFound:
+		return fail.NotAvailableError(e.Error())
+	case *gophercloud.ErrEndpointNotFound:
+		return fail.NotAvailableError(e.Error())
 	case *url.Error:
 		return fail.NewErrorWithCause(e)
 	default:
