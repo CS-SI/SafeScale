@@ -124,9 +124,10 @@ func (n network) Create(
 		NoSubnet:      noSubnet,
 		KeepOnFailure: keepOnFailure,
 		Gateway: &protocol.GatewayDefinition{
-			Name:    gwname,
-			SshPort: gwSSHPort,
-			ImageId: os,
+			Name:           gwname,
+			SshPort:        gwSSHPort,
+			ImageId:        os,
+			SizingAsString: sizing,
 		},
 	}
 	return service.Create(ctx, def)
