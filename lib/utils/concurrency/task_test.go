@@ -489,6 +489,8 @@ func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 	// Forever young...
 	// Aborted
 
+	_, _ = single.Wait()
+
 	outString := string(out)
 	nah := strings.Split(outString, "\n")
 

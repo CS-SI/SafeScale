@@ -605,13 +605,14 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 	if status == DONE {
 		return t.result, t.err
 	}
-	if status == ABORTED || status == TIMEOUT {
+	if status == TIMEOUT {
 		return nil, t.err
 	}
-	if status != RUNNING {
-		return nil, fail.InconsistentError("cannot wait task '%s': not running (%d)", tid, status)
+	if status == UNKNOWN {
+		return nil, fail.InconsistentError("cannot wait task '%s': unknown status", tid)
 	}
 
+	// status == ABORTED does not prevent to wait the end of the task
 	<-t.finishCh
 
 	t.mu.Lock()
@@ -625,7 +626,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 // TryWait tries to wait on a task
 // If task done, returns (true, TaskResult, <error from the task>)
-// If task aborted, returns (true, utils.ErrAborted)
+// If task aborted, returns (false, utils.ErrAborted) (subsequent calls of TryWait may be necessary)
 // If task still running, returns (false, nil)
 func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 	if t.IsNull() {
@@ -650,11 +651,12 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 	if status == ABORTED {
 		t.mu.Lock()
 		defer t.mu.Unlock()
-		return true, nil, t.err
+		return false, nil, t.err
 	}
 	if status != RUNNING {
 		return false, nil, fail.NewError("cannot wait task '%s': not running (%d)", tid, status)
 	}
+
 	if len(t.finishCh) == 1 {
 		_, err := t.Wait()
 		return true, t.result, err
@@ -722,8 +724,9 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 }
 
 // Abort aborts the task execution if running and marks it as ABORTED unless it's already DONE
-// A call of this method doesn't actually stop the running task if there is one; a subsequent
-// call of Wait() is still needed
+// A call of this method does not actually stop the running task if there is one; a subsequent
+// call of Wait() may still be needed, it's still the responsability of the executed code in task to stop
+// early on Abort.
 func (t *task) Abort() (err fail.Error) {
 	if t.IsNull() {
 		return fail.InvalidInstanceError()
