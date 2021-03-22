@@ -27,6 +27,9 @@ import (
 	txttmpl "text/template"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -44,14 +47,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -190,7 +191,7 @@ func (w *worker) identifyAvailableMaster() (_ resources.Host, xerr fail.Error) {
 	}
 	if w.availableMaster == nil {
 		w.availableMaster, xerr = w.cluster.unsafeFindAvailableMaster(context.TODO())
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -205,7 +206,7 @@ func (w *worker) identifyAvailableNode() (_ resources.Host, xerr fail.Error) {
 	}
 	if w.availableNode == nil {
 		w.availableNode, xerr = w.cluster.unsafeFindAvailableNode(context.TODO())
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -222,12 +223,12 @@ func (w *worker) identifyConcernedMasters(ctx context.Context) ([]resources.Host
 
 	if w.concernedMasters == nil {
 		hosts, xerr := w.identifyAllMasters(ctx)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 		concernedHosts, xerr := w.extractHostsFailingCheck(ctx, hosts)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -287,13 +288,13 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []resources.Host{}
 		masters, xerr := w.cluster.unsafeListMasterIDs(ctx)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 		for _, i := range masters {
 			host, xerr := LoadHost(w.cluster.GetService(), i)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -313,13 +314,13 @@ func (w *worker) identifyConcernedNodes(ctx context.Context) ([]resources.Host, 
 
 	if w.concernedNodes == nil {
 		hosts, xerr := w.identifyAllNodes(ctx)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 
 		concernedHosts, xerr := w.extractHostsFailingCheck(ctx, hosts)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -339,13 +340,13 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 	if w.allNodes == nil {
 		var allHosts []resources.Host
 		list, xerr := w.cluster.unsafeListNodeIDs(ctx)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 		for _, i := range list {
 			host, xerr := LoadHost(w.cluster.GetService(), i)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -367,7 +368,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 	// Not in cluster context
 	if w.cluster == nil {
 		subnet, xerr := w.host.GetDefaultSubnet()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -377,14 +378,14 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 			_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
 		}
 
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if gw, xerr = subnet.InspectGateway(false); xerr == nil {
 				_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
 			}
 		}
 
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.NotAvailableError("no gateway available")
 		}
@@ -393,7 +394,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 	} else {
 		// In cluster context
 		netCfg, xerr := w.cluster.GetNetworkConfig()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -401,13 +402,13 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		if gw, xerr = LoadHost(w.cluster.GetService(), netCfg.GatewayID); xerr == nil {
 			_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
 		}
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if gw, xerr = LoadHost(w.cluster.GetService(), netCfg.SecondaryGatewayID); xerr == nil {
 				_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
 			}
 		}
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to find an available gateway")
 		}
@@ -423,13 +424,13 @@ func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.H
 	var hosts []resources.Host
 
 	hosts, xerr = w.identifyAllGateways(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	concernedHosts, xerr := w.extractHostsFailingCheck(ctx, hosts)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -458,7 +459,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 	} else {
 		rs, xerr = w.host.GetDefaultSubnet()
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -491,7 +492,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 	outcomes = &results{}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return outcomes, xerr
 	}
@@ -523,14 +524,14 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 	case installaction.Add:
 		if !s.SkipProxy {
 			xerr = w.setReverseProxy(ctx)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to set reverse proxy rules on Subnet")
 			}
 		}
 
 		xerr := w.setSecurity(ctx)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to set security rules on Subnet")
 		}
@@ -569,13 +570,13 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			stepMap:   stepMap,
 			variables: v,
 		})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return outcomes, xerr
 		}
 
 		tr, xerr := subtask.Wait()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return outcomes, xerr
 		}
@@ -675,7 +676,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 
 		hostsList, xerr = w.identifyHosts(task.GetContext(), stepT)
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -722,7 +723,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			content interface{}
 		)
 		complexity, xerr := w.cluster.GetComplexity()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -769,7 +770,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		"reserved_Action":  strings.ToLower(w.action.String()),
 		"reserved_Step":    p.stepName,
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -798,7 +799,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 	r, xerr := stepInstance.Run(task.GetContext(), hostsList, p.variables, w.settings)
 	// If an error occurred, do not execute the remaining steps, fail immediately
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -829,7 +830,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommended)
 func (w *worker) validateContextForCluster() fail.Error {
 	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -870,7 +871,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 
 func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -887,13 +888,13 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 		}
 
 		count, _, _, xerr := w.parseClusterSizingRequest(request)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
 		masters, xerr := w.cluster.ListMasterIDs(ctx)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -910,13 +911,13 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 		}
 
 		count, _, _, xerr := w.parseClusterSizingRequest(request)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
 		list, xerr := w.cluster.ListNodeIDs(ctx)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -938,7 +939,7 @@ func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, f
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
 func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -956,13 +957,13 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 	}
 
 	rgw, xerr := w.identifyAvailableGateway(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	found, xerr := rgw.IsFeatureInstalled("edgeproxy4subnet")
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -973,20 +974,20 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 	svc := w.cluster.GetService()
 
 	netprops, xerr := w.cluster.GetNetworkConfig()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	subnet, xerr := LoadSubnet(svc, "", netprops.SubnetID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer subnet.Released() // mark instance as released at the end of the function, for cache considerations
 
 	primaryKongController, xerr := NewKongController(ctx, svc, subnet, true)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 	}
@@ -994,7 +995,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 	var secondaryKongController *KongController
 	if ok, _ := subnet.HasVirtualIP(); ok {
 		secondaryKongController, xerr = NewKongController(ctx, svc, subnet, false)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to apply reverse proxy rules")
 		}
@@ -1011,7 +1012,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 		rule := r.(map[interface{}]interface{})
 		targets := w.interpretRuleTargets(rule)
 		hosts, xerr := w.identifyHosts(ctx, targets)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to apply proxy rules: %s")
 		}
@@ -1025,7 +1026,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 
 		for _, h := range hosts {
 			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -1046,7 +1047,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 					return nil
 				})
 			})
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -1058,7 +1059,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 				rule:       r.(map[interface{}]interface{}),
 				variables:  &primaryGatewayVariables,
 			})
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to apply proxy rules")
 			}
@@ -1066,7 +1067,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 			var errS fail.Error
 			if secondaryKongController != nil {
 				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
@@ -1087,7 +1088,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 						return nil
 					})
 				})
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
@@ -1140,7 +1141,7 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 	}
 
 	ruleName, xerr := p.controller.Apply(p.rule, p.variables)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		msg := "failed to apply proxy rule"
 		if ruleName != "" {
@@ -1157,7 +1158,7 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 // identifyHosts identifies hosts concerned based on 'targets' and returns a list of hosts
 func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]resources.Host, fail.Error) {
 	hostT, masterT, nodeT, gwT, xerr := targets.parse()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1177,7 +1178,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 	switch masterT {
 	case "1":
 		host, xerr := w.identifyAvailableMaster()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1188,7 +1189,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 		} else {
 			all, xerr = w.identifyAllMasters(ctx)
 		}
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1198,7 +1199,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 	switch nodeT {
 	case "1":
 		host, xerr := w.identifyAvailableNode()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1209,7 +1210,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 		} else {
 			all, xerr = w.identifyAllNodes(ctx)
 		}
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1219,7 +1220,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 	switch gwT {
 	case "1":
 		host, xerr := w.identifyAvailableGateway(ctx)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1230,7 +1231,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 		} else {
 			all, xerr = w.identifyAllGateways(ctx)
 		}
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1258,7 +1259,7 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 		// parse then execute the template
 		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder)
 		r, xerr := template.Parse("normalize_script", tmpl)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return "", fail.SyntaxError("error parsing bash template: %s", xerr.Error())
 		}
@@ -1268,7 +1269,7 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 
 	// Configures BashLibrary template var
 	bashLibrary, xerr := system.GetBashLibrary()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -1276,7 +1277,7 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 
 	dataBuffer := bytes.NewBufferString("")
 	err = anon.(*txttmpl.Template).Execute(dataBuffer, params)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
 	}
@@ -1287,7 +1288,7 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 // setSecurity applies the security rules defined in specification file (if there are some)
 func (w *worker) setSecurity(ctx context.Context) (xerr fail.Error) {
 	xerr = w.setNetworkingSecurity(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1297,7 +1298,7 @@ func (w *worker) setSecurity(ctx context.Context) (xerr fail.Error) {
 // setNetworkingSecurity applies the network security rules defined in specification file (if there are some)
 func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1325,7 +1326,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 	} else if w.host != nil {
 		rs, xerr = w.host.GetDefaultSubnet()
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1350,7 +1351,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			}
 
 			gwSG, xerr := rs.InspectGatewaySecurityGroup()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -1371,7 +1372,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 				sgRule.PortFrom = int32(ports)
 
 				xerr = gwSG.AddRule(ctx, sgRule)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
@@ -1392,13 +1393,13 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 						dashSplitted := strings.Split(v, "-")
 						if dashCount := len(dashSplitted); dashCount > 0 {
 							portFrom, err = strconv.Atoi(dashSplitted[0])
-							err = errcontrol.Crasher(err)
+							err = debug.InjectPlannedError(err)
 							if err != nil {
 								return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
 							}
 							if len(dashSplitted) == 2 {
 								portTo, err = strconv.Atoi(dashSplitted[0])
-								err = errcontrol.Crasher(err)
+								err = debug.InjectPlannedError(err)
 								if err != nil {
 									return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
 								}
@@ -1411,7 +1412,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 
 						sgRule.Description += forFeature
 						xerr = gwSG.AddRule(ctx, sgRule)
-						xerr = errcontrol.CrasherFail(xerr)
+						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
 							switch xerr.(type) {
 							case *fail.ErrDuplicate:

@@ -19,7 +19,6 @@ package remotefile
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -73,25 +72,25 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, err := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, temporal.GetExecutionTimeout())
-			err = errcontrol.CrasherFail(err)
-			if err != nil {
-				return err
+			retcode, _, _, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, temporal.GetExecutionTimeout())
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
 			}
 			if retcode != 0 {
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 {
 					// File may exist on target, try to remote it
-					_, _, _, err = host.Run(ctx, fmt.Sprintf("sudo rm -f %s", rfc.Remote), outputs.COLLECT, temporal.GetLongOperationTimeout(), temporal.GetExecutionTimeout())
-					if err == nil {
+					_, _, _, xerr = host.Run(ctx, fmt.Sprintf("sudo rm -f %s", rfc.Remote), outputs.COLLECT, temporal.GetLongOperationTimeout(), temporal.GetExecutionTimeout())
+					if xerr == nil {
 						return fail.NewError("file may exist on remote with inappropriate access rights, deleted it and retrying")
 					}
 					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
-					return retry.StopRetryError(err, "an unrecoverable network error has occurred")
+					return retry.StopRetryError(xerr, "an unrecoverable network error has occurred")
 				}
 				if system.IsSCPRetryable(retcode) {
-					err = fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.GetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
-					return err
+					xerr = fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.GetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
+					return xerr
 				}
 				return nil
 			}

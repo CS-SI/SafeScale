@@ -24,10 +24,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -120,7 +121,7 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 	}
 
 	coreInstance, xerr := newCore(svc, shareKind, sharesFolderName, &ShareIdentity{})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullShare(), xerr
 	}
@@ -147,7 +148,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 	}
 
 	shareCache, xerr := svc.GetCache(shareKind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -168,7 +169,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 		}),
 	}
 	cacheEntry, xerr := shareCache.Get(ref, options...)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -184,7 +185,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
@@ -209,18 +210,18 @@ func (instance *share) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	xerr = kindCache.ReserveEntry(identifiable.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
@@ -231,13 +232,13 @@ func (instance *share) carry(clonable data.Clonable) (xerr fail.Error) {
 
 	// Note: do not validate parameters, this call will do it
 	xerr = instance.core.carry(clonable)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -260,7 +261,7 @@ func (instance *share) Browse(ctx context.Context, callback func(string, string)
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -279,7 +280,7 @@ func (instance *share) Browse(ctx context.Context, callback func(string, string)
 
 		si := &ShareIdentity{}
 		xerr = si.Deserialize(buf)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -317,7 +318,7 @@ func (instance *share) Create(
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -331,7 +332,7 @@ func (instance *share) Create(
 
 	// Check if a share already exists with the same name
 	_, xerr = server.GetShare(shareName)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -343,7 +344,7 @@ func (instance *share) Create(
 
 	// Sanitize path
 	sharePath, xerr := sanitize(path)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -373,14 +374,14 @@ func (instance *share) Create(
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Installs NFS getServer software if needed
 	sshConfig, xerr := server.GetSSHConfig()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -390,7 +391,7 @@ func (instance *share) Create(
 	}
 
 	nfsServer, xerr := nfs.NewServer(sshConfig)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -406,7 +407,7 @@ func (instance *share) Create(
 			if len(serverSharesV1.ByID) == 0 {
 				// Host doesn't have shares yet, so install NFS
 				xerr = nfsServer.Install(ctx)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
@@ -415,7 +416,7 @@ func (instance *share) Create(
 			return fail.AlteredNothingError()
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
@@ -426,7 +427,7 @@ func (instance *share) Create(
 	}
 
 	xerr = nfsServer.AddShare(ctx, sharePath, options)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrExecution:
@@ -454,7 +455,7 @@ func (instance *share) Create(
 
 	// Starting from here, remove share from host if exiting with error
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			// Disable abort signal during clean up
 			defer task.DisarmAbortSignal()()
@@ -477,7 +478,7 @@ func (instance *share) Create(
 			hostShare = propertiesv1.NewHostShare()
 			hostShare.Name = shareName
 			shareID, err := uuid.NewV4()
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return fail.Wrap(err, "Error creating UUID for share")
 			}
@@ -491,14 +492,14 @@ func (instance *share) Create(
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Starting from here, delete share reference in server if exiting with error
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			derr := server.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -551,18 +552,18 @@ func (instance *share) GetServer() (_ resources.Host, xerr fail.Error) {
 		hostName = share.HostName
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	svc := instance.GetService()
 	server, xerr := LoadHost(svc, hostID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		server, xerr = LoadHost(svc, hostName)
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -589,7 +590,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -621,7 +622,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 	})
 
 	rhServer, xerr := instance.GetServer()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -641,7 +642,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -652,7 +653,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 
 	// Sanitize path
 	mountPath, xerr := sanitize(path)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "invalid mount path '%s'", path)
 	}
@@ -703,13 +704,13 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 		export = serverPrivateIP + ":" + hostShare.Path
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	targetSSHConfig, xerr := target.GetSSHConfig()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -730,19 +731,19 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 			shareID := hostSharesV1.ByName[shareName]
 
 			nfsClient, xerr := nfs.NewNFSClient(targetSSHConfig)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 
 			xerr = nfsClient.Install(ctx)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 
 			xerr = nfsClient.Mount(ctx, export, mountPath, withCache)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -760,14 +761,14 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Starting from here, remove share mount from server share when exiting with error
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			derr := rhServer.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -822,7 +823,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -845,7 +846,7 @@ func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -877,14 +878,14 @@ func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr
 	})
 
 	rhServer, xerr := instance.GetServer()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	serverName := rhServer.GetName()
 	serverPrivateIP, xerr := rhServer.GetPrivateIP()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -904,7 +905,7 @@ func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -949,7 +950,7 @@ func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -967,7 +968,7 @@ func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -987,7 +988,7 @@ func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1016,13 +1017,13 @@ func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
 		shareName = si.ShareName
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	objserver, xerr := instance.GetServer()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1053,13 +1054,13 @@ func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
 			}
 
 			sshConfig, xerr := objserver.GetSSHConfig()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 
 			nfsServer, xerr := nfs.NewServer(sshConfig)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -1067,7 +1068,7 @@ func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
 			defer task.DisarmAbortSignal()()
 
 			xerr = nfsServer.RemoveShare(ctx, hostShare.Path)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -1077,7 +1078,7 @@ func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1112,13 +1113,13 @@ func (instance *share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 	shareID := instance.GetID()
 	shareName := instance.GetName()
 	server, xerr := instance.GetServer()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	share, xerr := server.GetShare(shareID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1136,7 +1137,7 @@ func (instance *share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 	}
 	for k := range share.ClientsByName {
 		h, xerr := LoadHost(instance.GetService(), k)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Errorf(xerr.Error())
 			continue
@@ -1147,7 +1148,7 @@ func (instance *share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 		}(h)
 
 		mounts, xerr := h.GetMounts()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Errorf(xerr.Error())
 			continue

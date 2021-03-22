@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -61,7 +60,7 @@ func (instance *cluster) taskStartHost(task concurrency.Task, params concurrency
 	}
 
 	xerr = instance.GetService().StartHost(id)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already started is considered as a successful run
@@ -69,7 +68,7 @@ func (instance *cluster) taskStartHost(task concurrency.Task, params concurrency
 			return nil, nil
 		}
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -95,7 +94,7 @@ func (instance *cluster) taskStopHost(task concurrency.Task, params concurrency.
 	}
 
 	xerr = instance.GetService().StopHost(id)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrDuplicate: // A host already stopped is considered as a successful run
@@ -140,28 +139,28 @@ func (instance *cluster) taskInstallGateway(task concurrency.Task, params concur
 	logrus.Debugf("[%s] starting installation...", hostLabel)
 
 	_, xerr = p.Host.WaitSSHReady(task.GetContext(), temporal.GetHostTimeout())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Installs docker and docker-compose on gateway
 	xerr = instance.installDocker(task.GetContext(), p.Host, hostLabel)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Installs proxycache server on gateway (if not disabled)
 	xerr = instance.installProxyCacheServer(task.GetContext(), p.Host, hostLabel)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Installs requirements as defined by cluster Flavor (if it exists)
 	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Gateway, p.Host, hostLabel)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -205,7 +204,7 @@ func (instance *cluster) taskConfigureGateway(task concurrency.Task, params conc
 
 	if instance.makers.ConfigureGateway != nil {
 		xerr = instance.makers.ConfigureGateway(instance)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -268,7 +267,7 @@ func (instance *cluster) taskCreateMasters(task concurrency.Task, params concurr
 			timeout:       timeout,
 			keepOnFailure: p.keepOnFailure,
 		})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -330,7 +329,7 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("master", clusternodetype.Master)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -355,7 +354,7 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
@@ -385,13 +384,13 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	netCfg, xerr := instance.GetNetworkConfig()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	subnet, xerr := LoadSubnet(instance.GetService(), "", netCfg.SubnetID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -406,13 +405,13 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 		hostReq.Subnets = []*abstract.Subnet{as}
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -421,13 +420,13 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 	hostReq.KeepOnFailure = p.keepOnFailure
 
 	rh, xerr := NewHost(instance.GetService())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	_, xerr = rh.Create(task.GetContext(), hostReq, p.masterDef)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -475,7 +474,7 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
@@ -483,13 +482,13 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 	hostLabel = fmt.Sprintf("master #%d (%s)", p.index, rh.GetName())
 
 	xerr = instance.installProxyCacheClient(task.GetContext(), rh, hostLabel)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Master, rh, hostLabel)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -522,7 +521,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 	// var subtasks []concurrency.Task
 	masters, xerr := instance.unsafeListMasters()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -531,7 +530,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	}
 
 	tg, xerr := concurrency.NewTaskGroupWithParent(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -544,7 +543,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 		}
 
 		host, xerr := LoadHost(instance.GetService(), master.ID)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Warnf("failed to get metadata of Host: %s", xerr.Error())
 			loadErrors = append(loadErrors, xerr)
@@ -560,7 +559,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 			Index: i + 1,
 			Host:  host,
 		})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			taskErrors = append(taskErrors, xerr)
 		}
@@ -575,7 +574,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	}
 
 	_, xerr = tg.Wait()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -627,7 +626,7 @@ func (instance *cluster) taskConfigureMaster(task concurrency.Task, params concu
 
 	// install docker feature (including docker-compose)
 	xerr = instance.installDocker(task.GetContext(), p.Host, hostLabel)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -635,7 +634,7 @@ func (instance *cluster) taskConfigureMaster(task concurrency.Task, params concu
 	// Configure master for flavour
 	if instance.makers.ConfigureMaster != nil {
 		xerr = instance.makers.ConfigureMaster(instance, p.Index, p.Host)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to configure master '%s'", p.Host.GetName())
 		}
@@ -700,7 +699,7 @@ func (instance *cluster) taskCreateNodes(task concurrency.Task, params concurren
 			timeout:       timeout,
 			keepOnFailure: p.keepOnFailure,
 		})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -762,7 +761,7 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("node", clusternodetype.Node)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -786,7 +785,7 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
@@ -815,13 +814,13 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	}()
 
 	netCfg, xerr := instance.GetNetworkConfig()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	subnet, xerr := LoadSubnet(instance.GetService(), "", netCfg.SubnetID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -836,13 +835,13 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		hostReq.Subnets = []*abstract.Subnet{as}
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	hostReq.DefaultRouteIP, xerr = subnet.GetDefaultRouteIP()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -851,13 +850,13 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	hostReq.KeepOnFailure = p.keepOnFailure
 
 	rh, xerr := NewHost(instance.GetService())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	_, xerr = rh.Create(task.GetContext(), hostReq, p.nodeDef)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -900,7 +899,7 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
@@ -908,13 +907,13 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	hostLabel = fmt.Sprintf("node #%d (%s)", p.index, rh.GetName())
 
 	xerr = instance.installProxyCacheClient(task.GetContext(), rh, hostLabel)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Node, rh, hostLabel)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -945,7 +944,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 	defer tracer.Exiting()
 
 	list, err := instance.unsafeListNodes()
-	err = errcontrol.CrasherFail(err)
+	err = debug.InjectPlannedFail(err)
 	if err != nil {
 		return nil, err
 	}
@@ -963,7 +962,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 
 	svc := instance.GetService()
 	tg, xerr := concurrency.NewTaskGroupWithParent(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -975,7 +974,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 		}
 
 		host, xerr := LoadHost(svc, node.ID)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", node.Name))
 			continue
@@ -990,7 +989,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 			Index: i + 1,
 			Host:  host,
 		})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -1002,7 +1001,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 		return nil, fail.NewErrorList(errs)
 	}
 	_, xerr = tg.Wait()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1052,7 +1051,7 @@ func (instance *cluster) taskConfigureNode(task concurrency.Task, params concurr
 
 	// Docker and docker-compose installation is mandatory on all nodes
 	xerr = instance.installDocker(task.GetContext(), p.Host, hostLabel)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1062,7 +1061,7 @@ func (instance *cluster) taskConfigureNode(task concurrency.Task, params concurr
 		return nil, nil
 	}
 	xerr = instance.makers.ConfigureNode(instance, p.Index, p.Host)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Error(xerr.Error())
 		return nil, xerr
@@ -1098,13 +1097,13 @@ func (instance *cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 	logrus.Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
 
 	rh, xerr := LoadHost(instance.GetService(), node.ID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = rh.Delete(context.Background())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Errorf(prefix + fmt.Sprintf("failed to delete Host '%s'", hostName))
 		return nil, xerr
@@ -1149,7 +1148,7 @@ func (instance *cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}
 
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			xerr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
 		}
@@ -1161,7 +1160,7 @@ func (instance *cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}
 	logrus.Debugf("Deleting Node '%s'", nodeName)
 	xerr = instance.deleteNode(task.GetContext(), p.node, p.master)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1201,14 +1200,14 @@ func (instance *cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	} else {
 		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	logrus.Debugf("Deleting Master '%s'", p.node.Name)
 	xerr = instance.deleteMaster(task.GetContext(), host)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Errorf("Failed to delete Master '%s'", p.node.Name)
 		return nil, xerr
@@ -1241,7 +1240,7 @@ func (instance *cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 	logrus.Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
 
 	xerr = hostInstance.Delete(context.Background())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Errorf(prefix + fmt.Sprintf("failed to delete Host '%s'", hostName))
 		return nil, xerr

@@ -20,8 +20,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"golang.org/x/net/context"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
@@ -41,7 +42,7 @@ import (
 // delete effectively remove a Security Group
 func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -78,7 +79,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 				// Do not remove a Security Group marked as default for a host
 				if hostsV1.DefaultFor != "" {
 					_, xerr := LoadHost(svc, hostsV1.DefaultFor)
-					xerr = errcontrol.CrasherFail(xerr)
+					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
@@ -123,7 +124,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 				// Do not remove a Security Group marked as default for a subnet
 				if subnetsV1.DefaultFor != "" {
 					subnetInstance, xerr := LoadSubnet(svc, "", subnetsV1.DefaultFor)
-					xerr = errcontrol.CrasherFail(xerr)
+					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
@@ -191,7 +192,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 			temporal.GetCommunicationTimeout(),
 		)
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
@@ -199,7 +200,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		default:
 		}
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -214,7 +215,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 	// Deletes metadata from Object Storage
 	xerr = instance.core.delete()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		// If entry not found, considered as a success
 		switch xerr.(type) {

@@ -29,6 +29,9 @@ import (
 	"sync"
 	"time"
 
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -52,7 +55,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -60,8 +62,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	rice "github.com/GeertJohan/go.rice"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -93,7 +93,7 @@ func NewCluster(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 	}
 
 	coreInstance, xerr := newCore(svc, "cluster", clustersFolderName, &abstract.ClusterIdentity{})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
@@ -116,7 +116,7 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 	}
 
 	clusterCache, xerr := svc.GetCache(clusterKind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullCluster(), xerr
 	}
@@ -134,19 +134,19 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 
 			// deal with legacy
 			xerr = rc.(*cluster).updateClusterNodesPropertyIfNeeded()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nullCluster(), xerr
 			}
 
 			xerr = rc.(*cluster).updateClusterNetworkPropertyIfNeeded()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nullCluster(), xerr
 			}
 
 			xerr = rc.(*cluster).updateClusterDefaultsPropertyIfNeeded()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nullCluster(), xerr
 			}
@@ -157,7 +157,7 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 		}),
 	}
 	cacheEntry, xerr := clusterCache.Get(name, options...)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -295,7 +295,7 @@ func (instance *cluster) updateClusterNodesPropertyIfNeeded() fail.Error {
 		// Returning explicitly this error tells Alter not to try to commit changes, there are none
 		return fail.AlteredNothingError()
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	return xerr
 }
 
@@ -375,7 +375,7 @@ func (instance *cluster) updateClusterNetworkPropertyIfNeeded() fail.Error {
 		}
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrAlteredNothing:
@@ -409,7 +409,7 @@ func (instance *cluster) updateClusterDefaultsPropertyIfNeeded() fail.Error {
 			})
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
@@ -477,13 +477,13 @@ func (instance *cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	xerr = kindCache.ReserveEntry(identifiable.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -498,13 +498,13 @@ func (instance *cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 
 	// Note: do not validate parameters, this call will do it
 	xerr = instance.core.carry(clonable)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -536,7 +536,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	_ = errcontrol.CrashSetup(crashPlan)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -557,7 +557,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 
 	// Check if cluster exists in metadata; if yes, error
 	existing, xerr := LoadCluster(instance.GetService(), req.Name)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -572,7 +572,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 
 	// Create first metadata of Cluster after initialization
 	xerr = instance.firstLight(req)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -596,7 +596,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 
 	// Obtain number of nodes to create
 	_, privateNodeCount, _, xerr := instance.determineRequiredNodes()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -611,14 +611,14 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 
 	// Define the sizing requirements for cluster hosts
 	gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(req)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Create the Network and Subnet
 	rn, rs, xerr := instance.createNetworkingResources(ctx, req, gatewaysDef)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -649,7 +649,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 
 	// Creates and configures hosts
 	xerr = instance.createHostResources(ctx, rs, *mastersDef, *nodesDef, req.InitialNodeCount, req.KeepOnFailure)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -695,7 +695,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 
 	// configure cluster as a whole
 	xerr = instance.configureCluster(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -711,7 +711,7 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	return xerr
 }
 
@@ -727,13 +727,13 @@ func (instance *cluster) firstLight(req abstract.ClusterRequest) fail.Error {
 	ci.Flavor = req.Flavor
 	ci.Complexity = req.Complexity
 
-	err := instance.carry(ci)
-	err = errcontrol.CrasherFail(err)
-	if err != nil {
-		return err
+	xerr := instance.carry(ci)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
 	}
 
-	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		aci, ok := clonable.(*abstract.ClusterIdentity)
 		if !ok {
 			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -818,7 +818,7 @@ func (instance *cluster) firstLight(req abstract.ClusterRequest) fail.Error {
 		// Links maker based on Flavor
 		return instance.bootstrap(aci.Flavor)
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	return xerr
 }
 
@@ -881,7 +881,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 
 	svc := instance.GetService()
 	tmpl, xerr := svc.FindTemplateBySizing(*gatewaysDef)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
@@ -915,7 +915,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 		mastersDef.Template = gatewaysDef.Template
 	} else {
 		tmpl, xerr = svc.FindTemplateBySizing(*mastersDef)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, nil, xerr
 		}
@@ -952,7 +952,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 		nodesDef.Template = mastersDef.Template
 	} else {
 		tmpl, xerr = svc.FindTemplateBySizing(*nodesDef)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, nil, xerr
 		}
@@ -974,7 +974,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
@@ -985,7 +985,7 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 // createNetworkingResources creates the network and subnet for the cluster
 func (instance *cluster) createNetworkingResources(ctx context.Context, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -1010,7 +1010,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 	var rn resources.Network
 	if req.NetworkID != "" {
 		rn, xerr = LoadNetwork(instance.GetService(), req.NetworkID)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to use network %s to contain cluster Subnet", req.NetworkID)
 		}
@@ -1023,13 +1023,13 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 		}
 
 		rn, xerr = NewNetwork(instance.GetService())
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to instanciate new Network")
 		}
 
 		xerr = rn.Create(ctx, networkReq)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to create Network '%s'", req.Name)
 		}
@@ -1056,7 +1056,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1077,20 +1077,20 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 	}
 
 	rs, xerr := NewSubnet(instance.GetService())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
 	xerr = rs.Create(ctx, subnetReq, "", gatewaysDef)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrInvalidRequest:
 			// Some cloud providers do not allow to create a Subnet with the same CIDR than the Network; try with a sub-CIDR once
 			logrus.Warnf("Cloud Provider does not allow to use the same CIDR than the Network one, trying a subset of CIDR...")
 			_, ipNet, err := net.ParseCIDR(subnetReq.CIDR)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				_ = xerr.AddConsequence(fail.Wrap(err, "failed to compute subset of CIDR '%s'", req.CIDR))
 				return nil, nil, xerr
@@ -1135,6 +1135,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 			if innerXErr != nil {
 				return innerXErr
 			}
+
 			var secondaryGateway resources.Host
 			if !gwFailoverDisabled {
 				secondaryGateway, innerXErr = rs.InspectGateway(false)
@@ -1168,7 +1169,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1180,7 +1181,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 func onFailureAbortTask(task concurrency.Task, inErr *fail.Error) {
 	if inErr != nil && *inErr != nil {
 		st, xerr := task.GetStatus()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			_ = (*inErr).AddConsequence(xerr)
 			return
@@ -1188,13 +1189,13 @@ func onFailureAbortTask(task concurrency.Task, inErr *fail.Error) {
 
 		if st != concurrency.DONE {
 			xerr = task.Abort()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				_ = (*inErr).AddConsequence(xerr)
 				return
 			}
 			_, xerr = task.Wait()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				_ = (*inErr).AddConsequence(xerr)
 			}
@@ -1213,7 +1214,7 @@ func (instance *cluster) createHostResources(
 ) (xerr fail.Error) {
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1232,14 +1233,14 @@ func (instance *cluster) createHostResources(
 	)
 
 	primaryGateway, xerr = subnet.InspectGateway(true)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	haveSecondaryGateway := true
 	secondaryGateway, xerr = subnet.InspectGateway(false)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1251,14 +1252,14 @@ func (instance *cluster) createHostResources(
 	}
 
 	_, xerr = primaryGateway.WaitSSHReady(ctx, temporal.GetExecutionTimeout())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "wait for remote ssh service to be ready")
 	}
 
 	if haveSecondaryGateway {
 		_, xerr = secondaryGateway.WaitSSHReady(ctx, temporal.GetExecutionTimeout())
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to wait for remote ssh service to become ready")
 		}
@@ -1269,7 +1270,7 @@ func (instance *cluster) createHostResources(
 	}
 
 	masterCount, _, _, xerr := instance.determineRequiredNodes()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1280,7 +1281,7 @@ func (instance *cluster) createHostResources(
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
 	primaryGatewayTask, xerr = task.StartInSubtask(instance.taskInstallGateway, taskInstallGatewayParameters{primaryGateway})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1292,7 +1293,7 @@ func (instance *cluster) createHostResources(
 
 	if haveSecondaryGateway {
 		secondaryGatewayTask, xerr = task.StartInSubtask(instance.taskInstallGateway, taskInstallGatewayParameters{secondaryGateway})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -1308,7 +1309,7 @@ func (instance *cluster) createHostResources(
 		mastersDef:    mastersDef,
 		keepOnFailure: keepOnFailure,
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1324,7 +1325,7 @@ func (instance *cluster) createHostResources(
 		nodesDef:      nodesDef,
 		keepOnFailure: keepOnFailure,
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1383,7 +1384,7 @@ func (instance *cluster) createHostResources(
 	// Step 3: start gateway configuration (needs MasterIPs so masters must be installed first)
 	// Configure gateway(s) and waits for the result
 	primaryGatewayConfigTask, xerr = task.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1391,7 +1392,7 @@ func (instance *cluster) createHostResources(
 
 	if haveSecondaryGateway {
 		secondaryGatewayConfigTask, xerr = task.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -1567,7 +1568,7 @@ func (instance *cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1579,7 +1580,7 @@ func (instance *cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 	return instance.core.BrowseFolder(func(buf []byte) fail.Error {
 		aci := abstract.NewClusterIdentity()
 		xerr := aci.Deserialize(buf)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -1646,7 +1647,7 @@ func (instance *cluster) GetAdminPassword() (adminPassword string, xerr fail.Err
 	defer tracer.Exiting()
 
 	aci, xerr := instance.GetIdentity()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -1663,7 +1664,7 @@ func (instance *cluster) GetKeyPair() (keyPair abstract.KeyPair, xerr fail.Error
 	}
 
 	aci, xerr := instance.GetIdentity()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullAKP, xerr
 	}
@@ -1694,7 +1695,7 @@ func (instance *cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullConfig, xerr
 	}
@@ -1714,7 +1715,7 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1733,7 +1734,7 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 	// If the cluster is in state Stopping or Stopped, do nothing
 	var prevState clusterstate.Enum
 	prevState, xerr = instance.unsafeGetState()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1759,7 +1760,7 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 			},
 			5*time.Minute, // FIXME: hardcoded timeout
 		)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if _, ok := xerr.(*retry.ErrTimeout); ok {
 				xerr = fail.Wrap(xerr, "timeout waiting cluster to become started")
@@ -1785,7 +1786,7 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1855,27 +1856,27 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Start gateway(s)
 	taskGroup, xerr := concurrency.NewTaskGroup(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	_, xerr = taskGroup.Start(instance.taskStartHost, gatewayID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	if secondaryGatewayID != "" {
 		_, xerr = taskGroup.Start(instance.taskStartHost, secondaryGatewayID)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -1884,7 +1885,7 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 	// Start masters
 	for _, n := range masters {
 		_, xerr = taskGroup.Start(instance.taskStartHost, n)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -1892,13 +1893,13 @@ func (instance *cluster) Start(ctx context.Context) (xerr fail.Error) {
 	// Start nodes
 	for _, n := range nodes {
 		_, xerr = taskGroup.Start(instance.taskStartHost, n)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 	}
 	_, xerr = taskGroup.WaitGroup()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1927,7 +1928,7 @@ func (instance *cluster) Stop(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1946,7 +1947,7 @@ func (instance *cluster) Stop(ctx context.Context) (xerr fail.Error) {
 	// If the cluster is stopped, do nothing
 	var prevState clusterstate.Enum
 	prevState, xerr = instance.unsafeGetState()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1975,7 +1976,7 @@ func (instance *cluster) Stop(ctx context.Context) (xerr fail.Error) {
 			},
 			5*time.Minute, // FIXME: hardcoded timeout
 		)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrTimeout:
@@ -2004,7 +2005,7 @@ func (instance *cluster) Stop(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2129,7 +2130,7 @@ func (instance *cluster) AddNode(ctx context.Context, def abstract.HostSizingReq
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2139,7 +2140,7 @@ func (instance *cluster) AddNode(ctx context.Context, def abstract.HostSizingReq
 	}
 
 	nodes, xerr := instance.AddNodes(ctx, 1, def)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullHost(), xerr
 	}
@@ -2162,7 +2163,7 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2179,7 +2180,7 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2199,7 +2200,7 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2233,7 +2234,7 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			timeout:       timeout,
 			keepOnFailure: false,
 		})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -2242,7 +2243,7 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 	for _, s := range subtasks {
 		res, err := s.Wait()
-		err = errcontrol.CrasherFail(err)
+		err = debug.InjectPlannedFail(err)
 		if err != nil {
 			errors = append(errors, err.Error())
 		} else {
@@ -2271,14 +2272,14 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	// Now configure new nodes
 	xerr = instance.configureNodesFromList(task, hosts)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// At last join nodes to cluster
 	xerr = instance.joinNodesFromList(ctx, hosts)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2340,7 +2341,7 @@ func (instance *cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2357,7 +2358,7 @@ func (instance *cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2378,7 +2379,7 @@ func (instance *cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2387,13 +2388,13 @@ func (instance *cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 	}
 
 	selectedMaster, xerr := instance.unsafeFindAvailableMaster(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = instance.deleteNode(ctx, node, selectedMaster.(*host))
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2416,7 +2417,7 @@ func (instance *cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2433,7 +2434,7 @@ func (instance *cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2444,7 +2445,7 @@ func (instance *cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	} else {
 		selectedMaster, xerr = instance.unsafeFindAvailableMaster(ctx)
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2470,7 +2471,7 @@ func (instance *cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2489,7 +2490,7 @@ func (instance *cluster) ListMasters(ctx context.Context) (list resources.Indexe
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2503,7 +2504,7 @@ func (instance *cluster) ListMasters(ctx context.Context) (list resources.Indexe
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2524,7 +2525,7 @@ func (instance *cluster) ListMasterNames(ctx context.Context) (list data.Indexed
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2538,7 +2539,7 @@ func (instance *cluster) ListMasterNames(ctx context.Context) (list data.Indexed
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2563,7 +2564,7 @@ func (instance *cluster) ListMasterNames(ctx context.Context) (list data.Indexed
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2593,7 +2594,7 @@ func (instance *cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 func (instance *cluster) unsafeListMasterIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	emptyList := data.IndexedListOfStrings{}
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2603,7 +2604,7 @@ func (instance *cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 	}
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2628,7 +2629,7 @@ func (instance *cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2649,7 +2650,7 @@ func (instance *cluster) ListMasterIPs(ctx context.Context) (list data.IndexedLi
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2679,7 +2680,7 @@ func (instance *cluster) FindAvailableMaster(ctx context.Context) (master resour
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2696,7 +2697,7 @@ func (instance *cluster) FindAvailableMaster(ctx context.Context) (master resour
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2718,7 +2719,7 @@ func (instance *cluster) ListNodes(ctx context.Context) (list resources.IndexedL
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2732,7 +2733,7 @@ func (instance *cluster) ListNodes(ctx context.Context) (list resources.IndexedL
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2743,7 +2744,7 @@ func (instance *cluster) ListNodes(ctx context.Context) (list resources.IndexedL
 // beingRemoved tells if the cluster is currently marked as Removed (meaning a removal operation is running)
 func (instance *cluster) beingRemoved() fail.Error {
 	state, xerr := instance.unsafeGetState()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2768,7 +2769,7 @@ func (instance *cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2782,7 +2783,7 @@ func (instance *cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2807,7 +2808,7 @@ func (instance *cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2828,7 +2829,7 @@ func (instance *cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2857,7 +2858,7 @@ func (instance *cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptyList, xerr
 	}
@@ -2871,7 +2872,7 @@ func (instance *cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2891,7 +2892,7 @@ func (instance *cluster) FindAvailableNode(ctx context.Context) (node resources.
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2925,7 +2926,7 @@ func (instance *cluster) LookupNode(ctx context.Context, ref string) (found bool
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}
@@ -2939,14 +2940,14 @@ func (instance *cluster) LookupNode(ctx context.Context, ref string) (found bool
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}
 
 	var host resources.Host
 	host, xerr = LoadHost(instance.GetService(), ref)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}
@@ -2978,7 +2979,7 @@ func (instance *cluster) CountNodes(ctx context.Context) (count uint, xerr fail.
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -2992,7 +2993,7 @@ func (instance *cluster) CountNodes(ctx context.Context) (count uint, xerr fail.
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -3008,7 +3009,7 @@ func (instance *cluster) CountNodes(ctx context.Context) (count uint, xerr fail.
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -3031,7 +3032,7 @@ func (instance *cluster) GetNodeByID(ctx context.Context, hostID string) (host r
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -3048,7 +3049,7 @@ func (instance *cluster) GetNodeByID(ctx context.Context, hostID string) (host r
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -3065,7 +3066,7 @@ func (instance *cluster) GetNodeByID(ctx context.Context, hostID string) (host r
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -3079,7 +3080,7 @@ func (instance *cluster) GetNodeByID(ctx context.Context, hostID string) (host r
 // deleteMaster deletes the master specified by its ID
 func (instance *cluster) deleteMaster(ctx context.Context, host resources.Host) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3117,14 +3118,14 @@ func (instance *cluster) deleteMaster(ctx context.Context, host resources.Host) 
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Starting from here, restore master in cluster properties if exiting with error
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -3148,7 +3149,7 @@ func (instance *cluster) deleteMaster(ctx context.Context, host resources.Host) 
 
 	// Finally delete host
 	xerr = host.Delete(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -3164,7 +3165,7 @@ func (instance *cluster) deleteMaster(ctx context.Context, host resources.Host) 
 // deleteNode deletes a node identified by its ID
 func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.ClusterNode, master *host) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3204,14 +3205,14 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Starting from here, restore node in cluster metadata if exiting with error
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -3241,7 +3242,7 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	// Deletes node
 	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		hostInstance, xerr := LoadHost(instance.GetService(), nodeRef)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -3284,7 +3285,7 @@ func (instance *cluster) Delete(ctx context.Context, force bool) (xerr fail.Erro
 
 	if !force {
 		xerr = instance.beingRemoved()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -3301,7 +3302,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3313,7 +3314,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 	var cleaningErrors []error
 
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
@@ -3364,7 +3365,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3374,14 +3375,14 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 	masterCount, nodeCount := len(masters), len(nodes)
 	//	subtasks := make([]concurrency.Task, 0, masterCount+nodeCount)
 	tg, xerr := concurrency.NewTaskGroupWithParent(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	options := []data.ImmutableKeyValue{
 		data.NewImmutableKeyValue("normalizeError", func(err error) error {
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				switch err.(type) {
 				case *fail.ErrNotFound:
@@ -3402,7 +3403,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			if n, ok := all[v]; ok {
 				// subtask, xerr := task.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: n})
 				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, options...)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
 					break
@@ -3420,7 +3421,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			if n, ok := all[v]; ok {
 				// subtask, xerr := task.StartInSubtask(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n})
 				_, xerr := tg.Start(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, options...)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
 					break
@@ -3430,7 +3431,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 		}
 	}
 	_, xerr = tg.WaitGroup()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		cleaningErrors = append(cleaningErrors, xerr)
 	}
@@ -3451,14 +3452,14 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	allCount := len(all)
 	tg, xerr = concurrency.NewTaskGroupWithParent(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3470,7 +3471,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			}
 
 			_, xerr = task.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: v})
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", v.Name))
 				break
@@ -3479,7 +3480,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	_, xerr = tg.WaitGroup()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		cleaningErrors = append(cleaningErrors, xerr)
 	}
@@ -3489,7 +3490,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 
 	// --- Deletes the Network, Subnet and gateway ---
 	rn, deleteNetwork, rs, xerr := instance.extractNetworkingInfo(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3517,7 +3518,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			},
 			temporal.GetHostTimeout(),
 		)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
@@ -3526,7 +3527,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 				xerr = fail.ConvertError(xerr.Cause())
 			}
 		}
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -3558,7 +3559,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 			},
 			temporal.GetHostTimeout(),
 		)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
@@ -3567,7 +3568,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 				xerr = fail.ConvertError(xerr.Cause())
 			}
 		}
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -3625,7 +3626,7 @@ func (instance *cluster) extractNetworkingInfo(ctx context.Context) (network res
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullNetwork(), deleteNetwork, nullSubnet(), xerr
 	}
@@ -3650,7 +3651,7 @@ func containsClusterNode(list []uint, numericalID uint) (bool, int) {
 // params contains a data.Map with primary and secondary getGateway hosts
 func (instance *cluster) configureCluster(ctx context.Context) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3673,14 +3674,14 @@ func (instance *cluster) configureCluster(ctx context.Context) (xerr fail.Error)
 
 	// Install reverseproxy feature on cluster (gateways)
 	xerr = instance.installReverseProxy(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Install remotedesktop feature on cluster (all masters)
 	xerr = instance.installRemoteDesktop(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3697,7 +3698,7 @@ func (instance *cluster) configureCluster(ctx context.Context) (xerr fail.Error)
 func (instance *cluster) determineRequiredNodes() (uint, uint, uint, fail.Error) {
 	if instance.makers.MinimumRequiredServers != nil {
 		g, m, n, xerr := instance.makers.MinimumRequiredServers(func() abstract.ClusterIdentity { out, _ := instance.unsafeGetIdentity(); return out }())
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return 0, 0, 0, xerr
 		}
@@ -3714,20 +3715,20 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 	}
 
 	tmplString, err := box.String(tmplName)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to load template")
 	}
 
 	tmplCmd, err := template.Parse(fileName, tmplString)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to parse template")
 	}
 
 	dataBuffer := bytes.NewBufferString("")
 	err = tmplCmd.Execute(dataBuffer, data)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to execute  template")
 	}
@@ -3763,7 +3764,7 @@ func (instance *cluster) configureNodesFromList(task concurrency.Task, hosts []r
 			Index: uint(i + 1),
 			Host:  hosts[i],
 		})
-		err = errcontrol.CrasherFail(err)
+		err = debug.InjectPlannedFail(err)
 		if err != nil {
 			xerr = err
 			break
@@ -3771,7 +3772,7 @@ func (instance *cluster) configureNodesFromList(task concurrency.Task, hosts []r
 		subtasks = append(subtasks, subtask)
 	}
 	// Deals with the metadata read failure
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", hostID))
 	}
@@ -3791,7 +3792,7 @@ func (instance *cluster) configureNodesFromList(task concurrency.Task, hosts []r
 // joinNodesFromList makes nodes from a list join the cluster
 func (instance *cluster) joinNodesFromList(ctx context.Context, hosts []resources.Host) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3814,7 +3815,7 @@ func (instance *cluster) joinNodesFromList(ctx context.Context, hosts []resource
 	if instance.makers.JoinMasterToCluster != nil {
 		for _, host := range hosts {
 			xerr = instance.makers.JoinNodeToCluster(instance, host)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -3833,7 +3834,7 @@ func (instance *cluster) leaveNodesFromList(hosts []resources.Host, master resou
 	for _, rh := range hosts {
 		if instance.makers.LeaveNodeFromCluster != nil {
 			xerr = instance.makers.LeaveNodeFromCluster(instance, rh, master)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -3865,7 +3866,7 @@ func (instance *cluster) buildHostname(core string, nodeType clusternodetype.Enu
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -3878,7 +3879,7 @@ func (instance *cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 	}
 
 	tg, xerr := concurrency.NewTaskGroupWithParent(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3886,13 +3887,13 @@ func (instance *cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 	errors := make([]error, 0, len(hosts)+1)
 	for _, h := range hosts {
 		_, xerr = tg.StartInSubtask(instance.taskDeleteHostOnFailure, taskDeleteHostOnFailureParameters{host: h.(*host)})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
 	_, xerr = tg.WaitGroup()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		errors = append(errors, xerr)
 	}
@@ -3910,7 +3911,7 @@ func (instance *cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -4022,7 +4023,7 @@ func (instance *cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -4042,7 +4043,7 @@ func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
@@ -4056,13 +4057,13 @@ func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
 
 	tg, xerr := concurrency.NewTaskGroup(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
@@ -4098,13 +4099,13 @@ func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptySlice, nil
 	}
 
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
@@ -4130,13 +4131,13 @@ func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 
 	for _, v := range removedNodes {
 		_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, master: nil})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
 	_, xerr = tg.Wait()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		errors = append(errors, xerr)
 	}
@@ -4163,7 +4164,7 @@ func (instance *cluster) IsFeatureInstalled(ctx context.Context, name string) (f
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}
@@ -4176,7 +4177,7 @@ func (instance *cluster) IsFeatureInstalled(ctx context.Context, name string) (f
 	defer instance.lock.RUnlock()
 
 	xerr = instance.beingRemoved()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}

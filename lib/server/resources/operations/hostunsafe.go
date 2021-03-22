@@ -23,8 +23,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"golang.org/x/net/context"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
@@ -50,7 +51,7 @@ func (instance *host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
@@ -99,7 +100,7 @@ func (instance *host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// Create the command
 	sshCmd, xerr := ssh.NewCommand(ctx, cmd)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
@@ -140,7 +141,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 		},
 		timeout+time.Minute,
 	)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
@@ -167,7 +168,7 @@ func (instance *host) unsafePush(ctx context.Context, source, target, owner, mod
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
@@ -199,7 +200,7 @@ func (instance *host) unsafePush(ctx context.Context, source, target, owner, mod
 		},
 		2*timeout,
 	)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return retcode, stdout, stderr, xerr
 	}
@@ -216,7 +217,7 @@ func (instance *host) unsafePush(ctx context.Context, source, target, owner, mod
 	}
 	if cmd != "" {
 		retcode, stdout, stderr, xerr = run(ctx, instance.sshProfile, cmd, outputs.DISPLAY, timeout)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
@@ -232,7 +233,7 @@ func (instance *host) unsafePush(ctx context.Context, source, target, owner, mod
 // Note: must be used with wisdom
 func (instance *host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error) {
 	var hvV1 *propertiesv1.HostVolumes
-	err := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
@@ -243,10 +244,11 @@ func (instance *host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error)
 			return nil
 		})
 	})
-	err = errcontrol.CrasherFail(err)
-	if err != nil {
-		return nil, err
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
 	}
+
 	return hvV1, nil
 }
 
@@ -264,7 +266,7 @@ func (instance *host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr f
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -287,7 +289,7 @@ func (instance *host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -298,7 +300,7 @@ func (instance *host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 
 	hostName := instance.GetName()
 	f, xerr := system.CreateTempFileFromString(content, 0600)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")
 	}
@@ -424,7 +426,7 @@ func (instance *host) unsafeGetDefaultSubnet() (rs resources.Subnet, xerr fail.E
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullSubnet(), xerr
 	}

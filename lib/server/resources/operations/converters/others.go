@@ -29,6 +29,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -90,20 +91,21 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 	out := abstract.HostSizingRequirements{}
 	if t, ok := tokens["cpu"]; ok {
 		min, max, xerr := t.Validate()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, 0, xerr
 		}
+
 		if min != "" {
 			out.MinCores, err = strconv.Atoi(min)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return nil, 0, fail.SyntaxError("invalid min value '%s' for 'cpu'", min)
 			}
 		}
 		if max != "" {
 			out.MaxCores, err = strconv.Atoi(max)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return nil, 0, fail.SyntaxError("invalid max value '%s' for 'cpu'", max)
 			}
@@ -112,40 +114,44 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 	var count int
 	if t, ok := tokens["count"]; ok {
 		c, _, xerr := t.Validate()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, 0, xerr
 		}
+
 		count, err = strconv.Atoi(c)
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return nil, 0, fail.SyntaxError("invalid value '%s' for 'count'", c)
 		}
 	}
 	if t, ok := tokens["cpufreq"]; ok {
 		min, _, xerr := t.Validate()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, 0, xerr
 		}
+
 		if min != "" {
 			c, err := strconv.ParseFloat(min, 64)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return nil, 0, fail.SyntaxError("invalid value '%s' for 'cpufreq'", min)
 			}
+
 			out.MinCPUFreq = float32(c)
 		}
 	}
 	if t, ok := tokens["gpu"]; ok {
 		min, _, xerr := t.Validate()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, 0, xerr
 		}
+
 		if min != "" {
 			out.MinGPU, err = strconv.Atoi(min)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return nil, 0, fail.SyntaxError("invalid value '%s' for 'gpu'", min)
 			}
@@ -155,36 +161,40 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 	}
 	if t, ok := tokens["ram"]; ok {
 		min, max, xerr := t.Validate()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, 0, xerr
 		}
+
 		if min != "" {
 			c, err := strconv.ParseFloat(min, 64)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return nil, 0, fail.SyntaxError("invalid min value '%s' for 'ram'", min)
 			}
+
 			out.MinRAMSize = float32(c)
 		}
 		if max != "" {
 			c, err := strconv.ParseFloat(max, 64)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return nil, 0, fail.SyntaxError("invalid max value '%s' for 'ram'", max)
 			}
+
 			out.MaxRAMSize = float32(c)
 		}
 	}
 	if t, ok := tokens["disk"]; ok {
 		min, _, xerr := t.Validate()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, 0, xerr
 		}
+
 		if min != "" {
 			out.MinDiskSize, err = strconv.Atoi(min)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return nil, 0, fail.SyntaxError("invalid value '%s' for 'disk'", min)
 			}
@@ -193,7 +203,7 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 	if t, ok := tokens["template"]; ok {
 		var xerr fail.Error
 		out.Template, _, xerr = t.Validate()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, 0, xerr
 		}
@@ -204,7 +214,8 @@ func HostSizingRequirementsFromStringToAbstract(in string) (*abstract.HostSizing
 // NodeCountFromStringToInteger extracts initial node count from string
 func NodeCountFromStringToInteger(in string) (int, fail.Error) {
 	tokens, xerr := parseSizingString(in)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
+
 	if xerr != nil {
 		return 0, xerr
 	}
@@ -212,10 +223,11 @@ func NodeCountFromStringToInteger(in string) (int, fail.Error) {
 	if t, ok := tokens["count"]; ok {
 		if min, _, xerr := t.Validate(); xerr == nil && min != "" {
 			count, err := strconv.Atoi(min)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return 0, fail.SyntaxError("invalid value '%s' for 'count'", min)
 			}
+
 			return count, nil
 		}
 	}
@@ -302,10 +314,10 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 		}
 
 		vali, err := strconv.Atoi(value)
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return "", "", fail.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
@@ -325,13 +337,13 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 				}
 				min := splitted[0]
 				_, err := strconv.ParseFloat(min, 64)
-				err = errcontrol.Crasher(err)
+				err = debug.InjectPlannedError(err)
 				if err != nil {
 					return "", "", fail.InvalidRequestError("first value '%s' of interval for token '%s' isn't a valid number: %s", min, keyword, err.Error())
 				}
 				max := splitted[1]
 				_, err = strconv.ParseFloat(max, 64)
-				err = errcontrol.Crasher(err)
+				err = debug.InjectPlannedError(err)
 				if err != nil {
 					return "", "", fail.InvalidRequestError("second value '%s' of interval for token '%s' isn't a valid number: %s", max, keyword, err.Error())
 				}
@@ -339,12 +351,12 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 			}
 		}
 		_, err := strconv.Atoi(value)
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			if keyword != "count" {
 				_, err = strconv.ParseFloat(value, 64)
 			}
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return "", "", fail.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
@@ -362,10 +374,10 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 		}
 
 		vali, err := strconv.Atoi(value)
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return "", "", fail.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
@@ -384,10 +396,10 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 		}
 
 		_, err := strconv.Atoi(value)
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			_, err := strconv.ParseFloat(value, 64)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return "", "", fail.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
@@ -405,10 +417,10 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 		}
 
 		vali, err := strconv.Atoi(value)
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			valf, err := strconv.ParseFloat(value, 64)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return "", "", fail.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
@@ -424,10 +436,10 @@ func (t *sizingToken) Validate() (string, string, fail.Error) {
 		}
 
 		_, err := strconv.Atoi(value)
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			_, err := strconv.ParseFloat(value, 64)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return "", "", fail.InvalidRequestError(fmt.Sprintf("value '%s' of token '%s' isn't a valid number: %s", value, keyword, err.Error()))
 			}
@@ -480,21 +492,21 @@ func parseSizingString(request string) (map[string]*sizingToken, fail.Error) {
 			mytoken = newSizingToken()
 		}
 		err := mytoken.Push(t)
-		err = errcontrol.CrasherFail(err)
+		err = debug.InjectPlannedFail(err)
 		if err != nil {
 			p := s.Pos()
 			return nil, fail.SyntaxError("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
 		}
 
 		// handles the cases >= or <=
-		if val, err := mytoken.GetOperator(); err == nil && (val == ">" || val == "<") {
+		if val, xerr := mytoken.GetOperator(); xerr == nil && (val == ">" || val == "<") {
 			if tok = s.Scan(); tok != scanner.EOF {
 				if s.TokenText() == "=" {
 					mytoken.members[mytoken.pos-1] += "="
 				} else {
-					err = mytoken.Push(s.TokenText())
-					err = errcontrol.CrasherFail(err)
-					if err != nil {
+					xerr = mytoken.Push(s.TokenText())
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
 						p := s.Pos()
 						return nil, fail.NewError("invalid content '%s' at line %d, column %d", request, p.Line, p.Column)
 					}

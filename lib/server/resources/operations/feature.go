@@ -22,7 +22,6 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -77,7 +76,7 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 			for _, f := range files {
 				if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
 					feat, xerr := NewFeature(svc, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
-					xerr = errcontrol.CrasherFail(xerr)
+					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						logrus.Warn(xerr) // Don't hide errors
 						continue
@@ -146,7 +145,7 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 
 	casted := nullFeature()
 	err := v.ReadInConfig()
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		switch err.(type) {
 		case viper.ConfigFileNotFoundError:
@@ -317,7 +316,7 @@ func (f *feature) Check(ctx context.Context, target resources.Targetable, v data
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -330,7 +329,7 @@ func (f *feature) Check(ctx context.Context, target resources.Targetable, v data
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	installer, xerr := f.findInstallerForTarget(target, "check")
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -340,14 +339,14 @@ func (f *feature) Check(ctx context.Context, target resources.Targetable, v data
 
 	// Inits target parameters
 	xerr = target.ComplementFeatureParameters(ctx, myV)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Checks required parameters have their values
 	xerr = checkParameters(*f, myV)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -410,7 +409,7 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -428,7 +427,7 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	)()
 
 	installer, xerr := f.findInstallerForTarget(target, "check")
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -438,21 +437,21 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 
 	// Inits target parameters
 	xerr = target.ComplementFeatureParameters(ctx, myV)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Checks required parameters have value
 	xerr = checkParameters(*f, myV)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	if !s.AddUnconditionally {
 		results, xerr := f.Check(ctx, target, v, s)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to check feature '%s'", featureName)
 		}
@@ -465,20 +464,20 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 
 	if !s.SkipFeatureRequirements {
 		xerr = f.installRequirements(ctx, target, v, s)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to install requirements")
 		}
 	}
 
 	results, xerr := installer.Add(ctx, f, target, myV, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = registerOnSuccessfulHostsInCluster(f.svc, target, f, nil, results)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -502,7 +501,7 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -520,7 +519,7 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	)
 
 	installer, xerr := f.findInstallerForTarget(target, "check")
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -535,26 +534,26 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 
 	// Inits target parameters
 	xerr = target.ComplementFeatureParameters(ctx, myV)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Checks required parameters have value
 	xerr = checkParameters(*f, myV)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	results, xerr = installer.Remove(ctx, f, target, myV, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return results, xerr
 	}
 
 	xerr = unregisterOnSuccessfulHostsInCluster(f.svc, target, f, results)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -600,20 +599,20 @@ func (f *feature) installRequirements(ctx context.Context, t resources.Targetabl
 		// clone FeatureSettings to set DoNotUpdateHostMetadataInClusterContext
 		for _, requirement := range f.specs.GetStringSlice(yamlKey) {
 			needed, xerr := NewFeature(f.svc, requirement)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to find required feature '%s'", requirement)
 			}
 
 			results, xerr := needed.Check(ctx, t, v, s)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to check required Feature '%s' for Feature '%s'", requirement, f.GetName())
 			}
 
 			if !results.Successful() {
 				results, xerr := needed.Add(ctx, t, v, s)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return fail.Wrap(xerr, "failed to install required feature '%s'", requirement)
 				}
@@ -624,7 +623,7 @@ func (f *feature) installRequirements(ctx context.Context, t resources.Targetabl
 
 				// Register the needed feature as a requirement for f
 				xerr = t.RegisterFeature(needed, f, targetIsCluster)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
@@ -652,7 +651,7 @@ func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targe
 			if xerr == nil {
 				xerr = host.RegisterFeature(installed, requiredBy, true)
 			}
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -678,7 +677,7 @@ func unregisterOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Tar
 			if xerr == nil {
 				xerr = host.UnregisterFeature(installed.GetName())
 			}
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
