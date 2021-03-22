@@ -19,13 +19,12 @@ package operations
 import (
 	"reflect"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -51,7 +50,7 @@ func (instance *securityGroup) taskUnbindFromHost(task concurrency.Task, params 
 
 	// Unbind Security Group from Host on provider side
 	xerr = instance.GetService().UnbindSecurityGroupFromHost(sgID, rh.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -98,7 +97,7 @@ func (instance *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 	svc := instance.GetService()
 
 	rs, xerr := LoadNetwork(svc, subnetID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

@@ -22,7 +22,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -67,7 +66,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 	}
 
 	coreInstance, xerr := newCore(svc, networkKind, networksFolderName, &abstract.Network{})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullNetwork(), xerr
 	}
@@ -88,7 +87,7 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 	}
 
 	networkCache, xerr := svc.GetCache(networkKind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -107,7 +106,7 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 
 			// Deal with legacy
 			xerr = rn.(*network).upgradeNetworkPropertyIfNeeded()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrAlteredNothing:
@@ -121,7 +120,7 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 		}),
 	}
 	cacheEntry, xerr := networkCache.Get(ref, options...)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -137,7 +136,7 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
@@ -156,7 +155,7 @@ func (instance *network) upgradeNetworkPropertyIfNeeded() fail.Error {
 
 		if props.Count() > 0 && !props.Lookup(networkproperty.SubnetsV1) {
 			rs, xerr := NewSubnet(instance.GetService())
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -189,7 +188,7 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -217,7 +216,7 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	// Verify if the subnet already exist and in this case is not managed by SafeScale
 	_, xerr = svc.InspectNetworkByName(req.Name)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -232,7 +231,7 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 	// Verify the CIDR is not routable
 	if req.CIDR != "" {
 		routable, xerr := net.IsCIDRRoutable(req.CIDR)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to determine if CIDR is not routable")
 		}
@@ -249,7 +248,7 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 	// Create the network
 	logrus.Debugf("Creating network '%s' with CIDR '%s'...", req.Name, req.CIDR)
 	an, xerr := svc.CreateNetwork(req)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -257,7 +256,7 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			derr := svc.DeleteNetwork(an.ID)
-			derr = errcontrol.CrasherFail(derr)
+			derr = debug.InjectPlannedFail(derr)
 			if derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
 			}
@@ -281,18 +280,18 @@ func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	xerr = kindCache.ReserveEntry(identifiable.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
@@ -302,13 +301,13 @@ func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
 
 	// Note: do not validate parameters, this call will do it
 	xerr = instance.core.carry(clonable)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -330,7 +329,7 @@ func (instance *network) Browse(ctx context.Context, callback func(*abstract.Net
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -349,7 +348,7 @@ func (instance *network) Browse(ctx context.Context, callback func(*abstract.Net
 
 		an := abstract.NewNetwork()
 		xerr := an.Deserialize(buf)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -370,7 +369,7 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -421,7 +420,7 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 					found = true
 					// the single subnet present is a subnet named like the network, delete it first
 					rs, xerr := LoadSubnet(svc, "", v)
-					xerr = errcontrol.CrasherFail(xerr)
+					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
@@ -432,7 +431,7 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 					} else {
 						subnetName := rs.GetName()
 						xerr = rs.Delete(ctx)
-						xerr = errcontrol.CrasherFail(xerr)
+						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
 							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 						}
@@ -480,7 +479,7 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 		}
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -549,7 +548,7 @@ func (instance *network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -584,7 +583,7 @@ func (instance *network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -597,7 +596,7 @@ func (instance *network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 	defer instance.lock.Unlock()
 
 	parentNetwork, xerr := subnet.InspectNetwork()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -634,7 +633,7 @@ func (instance *network) AbandonSubnet(ctx context.Context, subnetID string) (xe
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}

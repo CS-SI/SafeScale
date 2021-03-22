@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -97,7 +97,7 @@ func (instance *subnet) unsafeGetVirtualIP() (vip *abstract.VirtualIP, xerr fail
 		vip = as.VIP
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "cannot get subnet virtual IP")
 

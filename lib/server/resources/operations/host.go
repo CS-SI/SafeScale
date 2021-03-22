@@ -27,7 +27,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 
 	"github.com/sirupsen/logrus"
@@ -89,7 +88,7 @@ func NewHost(svc iaas.Service) (_ resources.Host, xerr fail.Error) {
 	}
 
 	coreInstance, xerr := newCore(svc, hostKind, hostsFolderName, &abstract.HostCore{})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -118,7 +117,7 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 	}
 
 	hostCache, xerr := svc.GetCache(hostKind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullHost(), xerr
 	}
@@ -137,7 +136,7 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 
 			// deal with legacy
 			xerr = rh.(*host).upgradeIfNeeded()
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrAlteredNothing:
@@ -167,7 +166,7 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 	}
 	_ = ce.LockContent()
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			_ = ce.UnlockContent()
 		}
@@ -258,13 +257,13 @@ func (instance *host) updateCachedInformation() fail.Error {
 
 			if !hnV2.IsGateway {
 				subnetInstance, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
 
 				rgw, xerr := subnetInstance.(*subnet).unsafeInspectGateway(true)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
@@ -296,7 +295,7 @@ func (instance *host) updateCachedInformation() fail.Error {
 
 				// Secondary gateway may not exist...
 				rgw, xerr = subnetInstance.InspectGateway(false)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
@@ -387,7 +386,7 @@ func (instance *host) updateCachedInformation() fail.Error {
 
 func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
 	cfg, xerr := svc.GetConfigurationOptions()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -422,18 +421,18 @@ func (instance *host) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	xerr = kindCache.ReserveEntry(identifiable.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
@@ -444,13 +443,13 @@ func (instance *host) carry(clonable data.Clonable) (xerr fail.Error) {
 
 	// Note: do not validate parameters, this call will do it
 	xerr = instance.core.carry(clonable)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -475,7 +474,7 @@ func (instance *host) Browse(ctx context.Context, callback func(*abstract.HostCo
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -517,7 +516,7 @@ func (instance *host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return state, xerr
 	}
@@ -554,7 +553,7 @@ func (instance *host) Reload() (xerr fail.Error) {
 	defer instance.lock.Unlock()
 
 	xerr = instance.core.Reload()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout: // If retry timed out, log it and return error ErrNotFound
@@ -566,7 +565,7 @@ func (instance *host) Reload() (xerr fail.Error) {
 
 	// Request host inspection from provider
 	ahf, xerr := instance.GetService().InspectHost(instance.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -620,7 +619,7 @@ func (instance *host) Reload() (xerr fail.Error) {
 		}
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
@@ -672,7 +671,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -691,7 +690,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 	// Check if host exists and is managed bySafeScale
 	_, xerr = LoadHost(svc, hostReq.ResourceName)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -705,7 +704,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 	// Check if host exists but is not managed by SafeScale
 	_, xerr = svc.InspectHost(abstract.NewHostCore().SetName(hostReq.ResourceName))
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -721,7 +720,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	if hostReq.TemplateID == "" {
 		if hostDef.Template != "" {
 			tmpl, xerr := svc.FindTemplateByName(hostDef.Template)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
@@ -736,7 +735,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}
 	if hostReq.TemplateID == "" {
 		hostReq.TemplateID, xerr = instance.findTemplateID(hostDef)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -748,7 +747,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		// By convention, default subnet is the first of the list
 		as := hostReq.Subnets[0]
 		defaultSubnet, xerr = LoadSubnet(svc, "", as.ID)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -757,7 +756,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 	} else {
 		defaultSubnet, _, xerr = getOrCreateDefaultSubnet(ctx, svc)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -771,7 +770,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			hostReq.Subnets = append(hostReq.Subnets, as)
 			return nil
 		})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
 		}
@@ -780,7 +779,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	// If hostReq.ImageID is not explicitly defined, find an image ID corresponding to the content of hostDef.Image
 	if hostReq.ImageID == "" {
 		hostReq.ImageID, xerr = instance.findImageID(&hostDef)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to find image to use on compute resource")
 		}
@@ -794,7 +793,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 
 		opts, xerr := svc.GetConfigurationOptions()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -811,7 +810,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 				}
 				return nil
 			})
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
 			}
@@ -819,7 +818,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}
 
 	ahf, userdataContent, xerr := svc.CreateHost(hostReq)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
 			return nil, xerr
@@ -844,7 +843,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 	// Creates metadata early to "reserve" host name
 	xerr = instance.carry(ahf.Core)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -922,19 +921,19 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = instance.updateCachedInformation()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -949,7 +948,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 	// FIXME: configurable timeout here
 	status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, time.Duration(0))
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
@@ -978,14 +977,14 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// -- Updates host link with subnets --
 	xerr = instance.updateSubnets(task, hostReq)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -994,7 +993,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}()
 
 	xerr = instance.finalizeProvisioning(ctx, userdataContent)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1154,7 +1153,7 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				}
 
 				subnetInstance, xerr := LoadSubnet(svc, "", v.ID)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
@@ -1181,7 +1180,7 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					}
 					return nil
 				})
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
@@ -1199,7 +1198,7 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 		var an *abstract.Network
 		rn, xerr := defaultSubnet.(*subnet).unsafeInspectNetwork()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -1293,7 +1292,7 @@ func (instance *host) findTemplateID(hostDef abstract.HostSizingRequirements) (s
 	}
 
 	template, xerr := svc.FindTemplateBySizing(hostDef)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -1305,7 +1304,7 @@ func (instance *host) findImageID(hostDef *abstract.HostSizingRequirements) (str
 	svc := instance.GetService()
 	if hostDef.Image == "" {
 		cfg, xerr := svc.GetConfigurationOptions()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return "", xerr
 		}
@@ -1321,7 +1320,7 @@ func (instance *host) findImageID(hostDef *abstract.HostSizingRequirements) (str
 		},
 		10*time.Second,
 	)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -1332,14 +1331,14 @@ func (instance *host) findImageID(hostDef *abstract.HostSizingRequirements) (str
 func (instance *host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) fail.Error {
 	// execute userdata 'final' (phase4) script to final install/configure of the host (no need to reboot)
 	content, xerr := userdataContent.Generate(phase)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	file := fmt.Sprintf("/opt/safescale/var/tmp/user_data.%s.sh", phase)
 	xerr = instance.unsafePushStringToFile(ctx, string(content), file)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1347,7 +1346,7 @@ func (instance *host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 	command := fmt.Sprintf("sudo bash %s; exit $?", file)
 	// Executes the script on the remote host
 	retcode, _, stderr, xerr := instance.unsafeRun(ctx, command, outputs.COLLECT, 0, 0)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply configuration phase '%s'", phase)
 	}
@@ -1372,7 +1371,7 @@ func (instance *host) waitInstallPhase(ctx context.Context, phase userdata.Phase
 	// TODO: configurable timeout here
 	duration := time.Duration(sshDefaultTimeout) * time.Minute
 	status, xerr := instance.sshProfile.WaitServerReady(ctx, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
@@ -1481,7 +1480,7 @@ func (instance *host) undoUpdateSubnets(req abstract.HostRequest, errorPtr *fail
 				return nil
 			})
 		})
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			_ = (*errorPtr).AddConsequence(fail.Wrap(xerr, "cleaning up on %s, failed to remove Host relationships with Subnets", actionFromError(xerr)))
 		}
@@ -1490,7 +1489,7 @@ func (instance *host) undoUpdateSubnets(req abstract.HostRequest, errorPtr *fail
 
 func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent *userdata.Content) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1501,14 +1500,14 @@ func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent 
 
 	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
 	xerr = instance.GetService().ClearHostStartupScript(instance.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure subnet and security
 	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1523,12 +1522,12 @@ func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent 
 		ah.PrivateKey = userdataContent.FinalPrivateKey
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to update Keypair")
 	}
 	xerr = instance.updateCachedInformation()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1536,13 +1535,13 @@ func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent 
 	// Reboot host
 	command := "sudo systemctl reboot"
 	_, _, _, xerr = instance.unsafeRun(ctx, command, outputs.COLLECT, temporal.GetContextTimeout(), temporal.GetHostTimeout())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 0)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1552,7 +1551,7 @@ func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent 
 	if !userdataContent.IsGateway {
 		// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
 		xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -1560,26 +1559,26 @@ func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent 
 		// Reboot host
 		command = "sudo systemctl reboot"
 		_, _, _, xerr = instance.unsafeRun(ctx, command, outputs.COLLECT, 0, 0)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
 		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, 0)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
 		// execute userdata.PHASE5_FINAL script to final install/configure of the host (no need to reboot)
 		xerr = instance.runInstallPhase(ctx, userdata.PHASE5_FINAL, userdataContent)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
 		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, temporal.GetHostTimeout())
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) { //nolint
 			case *fail.ErrTimeout:
@@ -1607,7 +1606,7 @@ func (instance *host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
@@ -1628,7 +1627,7 @@ func (instance *host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 // getOrCreateDefaultSubnet gets Subnet abstract.SingleHostNetworkName or create it if necessary
 func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resources.Subnet, gw resources.Host, xerr fail.Error) {
 	rn, xerr := LoadNetwork(svc, abstract.SingleHostNetworkName)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1640,7 +1639,7 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 
 	if rn == nil {
 		rn, xerr = NewNetwork(svc)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
@@ -1650,13 +1649,13 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 			CIDR: stacks.DefaultNetworkCIDR,
 		}
 		xerr = rn.Create(ctx, req)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
 
 		defer func() {
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				if derr := rn.Delete(context.Background()); derr != nil {
 					_ = xerr.AddConsequence(derr)
@@ -1666,7 +1665,7 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 	}
 
 	rs, xerr = LoadSubnet(svc, rn.GetID(), abstract.SingleHostNetworkName)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -1677,14 +1676,14 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 	}
 	if rs == nil {
 		rs, xerr = NewSubnet(svc)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
 
 		var DNSServers []string
 		opts, xerr := svc.GetConfigurationOptions()
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -1714,13 +1713,13 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 			HA:         false,
 		}
 		xerr = rs.Create(ctx, req, "", nil)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, xerr
 		}
 
 		defer func() {
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				if derr := rs.Delete(context.Background()); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete subnet '%s'", actionFromError(xerr), abstract.SingleHostNetworkName))
@@ -1730,7 +1729,7 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 	}
 
 	rh, xerr := rs.InspectGateway(true)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -1750,7 +1749,7 @@ func (instance *host) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1779,7 +1778,7 @@ func (instance *host) Delete(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1792,7 +1791,7 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1845,7 +1844,7 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2073,14 +2072,14 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Deletes metadata from Object Storage
 	xerr = instance.core.delete()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		// If entry not found, considered as a success
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
@@ -2123,7 +2122,7 @@ func (instance *host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -2159,7 +2158,7 @@ func (instance *host) Pull(ctx context.Context, target, source string, timeout t
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -2213,7 +2212,7 @@ func (instance *host) Push(ctx context.Context, source, target, owner, mode stri
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -2264,7 +2263,7 @@ func (instance *host) GetShare(shareRef string) (_ *propertiesv1.HostShare, xerr
 			return fail.NotFoundError("share '%s' not found in server '%s' metadata", shareRef, instance.GetName())
 		})
 	})
-	err = errcontrol.CrasherFail(err)
+	err = debug.InjectPlannedFail(err)
 	if err != nil {
 		return nil, err
 	}
@@ -2298,7 +2297,7 @@ func (instance *host) Start(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2318,7 +2317,7 @@ func (instance *host) Start(ctx context.Context) (xerr fail.Error) {
 
 	svc := instance.GetService()
 	xerr = svc.StartHost(hostID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2333,7 +2332,7 @@ func (instance *host) Start(ctx context.Context) (xerr fail.Error) {
 		},
 		5*time.Minute,
 	)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted:
@@ -2362,7 +2361,7 @@ func (instance *host) Stop(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2382,7 +2381,7 @@ func (instance *host) Stop(ctx context.Context) (xerr fail.Error) {
 
 	svc := instance.GetService()
 	xerr = svc.StopHost(hostID)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2398,7 +2397,7 @@ func (instance *host) Stop(ctx context.Context) (xerr fail.Error) {
 		// FIXME: hardcoded value
 		5*time.Minute,
 	)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted:
@@ -2427,7 +2426,7 @@ func (instance *host) Reboot(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2440,7 +2439,7 @@ func (instance *host) Reboot(ctx context.Context) (xerr fail.Error) {
 	defer tracer.Exiting()
 
 	xerr = instance.Stop(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2460,7 +2459,7 @@ func (instance *host) Resize(ctx context.Context, hostSize abstract.HostSizingRe
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2637,7 +2636,7 @@ func (instance *host) IsGateway() (_ bool, xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}
@@ -2668,7 +2667,7 @@ func (instance *host) PushStringToFileWithOwnership(ctx context.Context, content
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2747,7 +2746,7 @@ func (instance *host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 			})
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return ph, xerr
 	}
@@ -2783,7 +2782,7 @@ func (instance *host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2849,7 +2848,7 @@ func (instance *host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2929,7 +2928,7 @@ func (instance *host) ListSecurityGroups(state securitygroupstate.Enum) (list []
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
@@ -2952,7 +2951,7 @@ func (instance *host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -2985,7 +2984,7 @@ func (instance *host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 
 				return nil
 			})
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -3008,14 +3007,14 @@ func (instance *host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 
 			if svc.GetCapabilities().CanDisableSecurityGroup {
 				xerr = svc.EnableSecurityGroup(asg)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
 			} else {
 				// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), consider as a success
 				xerr = sg.GetService().BindSecurityGroupToHost(asg, instance.GetID())
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
@@ -3048,7 +3047,7 @@ func (instance *host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -3081,7 +3080,7 @@ func (instance *host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 
 				return nil
 			})
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -3104,14 +3103,14 @@ func (instance *host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 
 			if svc.GetCapabilities().CanDisableSecurityGroup {
 				xerr = svc.DisableSecurityGroup(asg)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
 				}
 			} else {
 				// Bind the security group on provider side; if security group not binded, consider as a success
 				xerr = svc.UnbindSecurityGroupFromHost(asg, instance.GetID())
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:

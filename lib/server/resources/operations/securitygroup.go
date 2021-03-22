@@ -22,6 +22,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -36,11 +38,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -64,7 +64,7 @@ func NewSecurityGroup(svc iaas.Service) (resources.SecurityGroup, fail.Error) {
 	}
 
 	coreInstance, xerr := newCore(svc, securityGroupKind, securityGroupsFolderName, &abstract.SecurityGroup{})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -90,13 +90,13 @@ func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 	}
 
 	rsg, xerr := NewSecurityGroup(svc)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}
 
 	xerr = rsg.Read(ref)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound, *retry.ErrTimeout:
@@ -121,7 +121,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (rsg resources.SecurityGrou
 	}
 
 	sgCache, xerr := svc.GetCache(securityGroupKind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullSecurityGroup(), fail.Wrap(xerr, "failed to get cache for Security Groups")
 	}
@@ -143,7 +143,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (rsg resources.SecurityGrou
 		}),
 	}
 	cacheEntry, xerr := sgCache.Get(ref, options...)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -159,7 +159,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (rsg resources.SecurityGrou
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
@@ -191,18 +191,18 @@ func (instance *securityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	xerr = kindCache.ReserveEntry(identifiable.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
@@ -213,13 +213,13 @@ func (instance *securityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 
 	// Note: do not validate parameters, this call will do it
 	xerr = instance.core.carry(clonable)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -242,7 +242,7 @@ func (instance *securityGroup) Browse(ctx context.Context, callback func(*abstra
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -257,7 +257,7 @@ func (instance *securityGroup) Browse(ctx context.Context, callback func(*abstra
 	return instance.core.BrowseFolder(func(buf []byte) fail.Error {
 		asg := abstract.NewSecurityGroup()
 		xerr = asg.Deserialize(buf)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -293,7 +293,7 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -313,7 +313,7 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	svc := instance.GetService()
 	var found bool
 	found, xerr = lookupSecurityGroup(svc, name)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
 	}
@@ -326,7 +326,7 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	asg.Name = name
 	asg.Network = networkID
 	_, xerr = svc.InspectSecurityGroup(asg)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound, *fail.ErrNotAvailable:
@@ -339,7 +339,7 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	}
 
 	asg, xerr = svc.CreateSecurityGroup(networkID, name, description, rules)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrInvalidRequest); ok {
 			return xerr
@@ -348,7 +348,7 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	}
 
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := svc.DeleteSecurityGroup(asg); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), name))
@@ -358,13 +358,13 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 
 	// Creates metadata
 	xerr = instance.carry(asg)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			// Disable abort signal during clean up
 			defer task.DisarmAbortSignal()()
@@ -377,7 +377,7 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 
 	if len(rules) == 0 {
 		xerr = instance.unsafeClear(task)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -396,7 +396,7 @@ func (instance *securityGroup) Delete(ctx context.Context, force bool) (xerr fai
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -414,13 +414,13 @@ func (instance *securityGroup) Delete(ctx context.Context, force bool) (xerr fai
 // unbindFromHosts unbinds security group from all the hosts bound to it and update the host metadata accordingly
 func (instance *securityGroup) unbindFromHosts(ctx context.Context, in *propertiesv1.SecurityGroupHosts) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	tg, xerr := concurrency.NewTaskGroup(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from hosts", instance.GetName())
 	}
@@ -432,7 +432,7 @@ func (instance *securityGroup) unbindFromHosts(ctx context.Context, in *properti
 			return fail.InvalidRequestError("cannot unbind from host a security group applied from subnet; use disable instead or remove from bound subnet")
 		}
 		rh, xerr := LoadHost(svc, v.ID)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			break
 		}
@@ -443,13 +443,13 @@ func (instance *securityGroup) unbindFromHosts(ctx context.Context, in *properti
 		}(rh)
 
 		_, xerr = tg.Start(instance.taskUnbindFromHost, rh)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			break
 		}
 	}
 	_, xerr = tg.Wait()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -473,13 +473,13 @@ func (instance *securityGroup) unbindFromHosts(ctx context.Context, in *properti
 // unbindFromSubnets unbinds security group from all the subnets bound to it and update the Subnet metadata accordingly
 func (instance *securityGroup) unbindFromSubnets(ctx context.Context, in *propertiesv1.SecurityGroupSubnets) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	tg, xerr := concurrency.NewTaskGroup(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from subnets", instance.GetName())
 	}
@@ -488,13 +488,13 @@ func (instance *securityGroup) unbindFromSubnets(ctx context.Context, in *proper
 	for _, v := range in.ByID {
 		// Unbind security group from hosts attached to subnet
 		_, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, v.ID)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			break
 		}
 	}
 	_, xerr = tg.Wait()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -527,7 +527,7 @@ func (instance *securityGroup) Clear(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -553,7 +553,7 @@ func (instance *securityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -575,14 +575,14 @@ func (instance *securityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 		rules = asg.Rules
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Removes all rules...
 	xerr = instance.unsafeClear(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -590,7 +590,7 @@ func (instance *securityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 	// ... then re-adds rules from metadata
 	for _, v := range rules {
 		xerr = instance.unsafeAddRule(task, v)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -610,7 +610,7 @@ func (instance *securityGroup) AddRule(ctx context.Context, rule *abstract.Secur
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -637,7 +637,7 @@ func (instance *securityGroup) AddRules(ctx context.Context, rules abstract.Secu
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -686,7 +686,7 @@ func (instance *securityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -726,7 +726,7 @@ func (instance *securityGroup) GetBoundHosts(ctx context.Context) (_ []*properti
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -772,7 +772,7 @@ func (instance *securityGroup) GetBoundSubnets(ctx context.Context) (list []*pro
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -852,7 +852,7 @@ func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -904,7 +904,7 @@ func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host
 			case resources.SecurityGroupEnable:
 				// In case the security group is already bound, we must consider a "duplicate" error has a success
 				xerr := instance.GetService().BindSecurityGroupToHost(instance.GetID(), hostID)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
@@ -916,7 +916,7 @@ func (instance *securityGroup) BindToHost(ctx context.Context, rh resources.Host
 			case resources.SecurityGroupDisable:
 				// In case the security group has to be disabled, we must consider a "not found" error has a success
 				xerr := instance.GetService().UnbindSecurityGroupFromHost(instance.GetID(), hostID)
-				xerr = errcontrol.CrasherFail(xerr)
+				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
@@ -946,7 +946,7 @@ func (instance *securityGroup) UnbindFromHost(ctx context.Context, rh resources.
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -999,7 +999,7 @@ func (instance *securityGroup) UnbindFromHostByReference(ctx context.Context, ho
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1063,7 +1063,7 @@ func (instance *securityGroup) BindToSubnet(ctx context.Context, rs resources.Su
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1081,7 +1081,7 @@ func (instance *securityGroup) BindToSubnet(ctx context.Context, rs resources.Su
 	case resources.SecurityGroupDisable:
 		xerr = instance.disableOnHostsAttachedToSubnet(task, rs)
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1129,7 +1129,7 @@ func (instance *securityGroup) BindToSubnet(ctx context.Context, rs resources.Su
 // enableOnHostsAttachedToSubnet enables the security group on hosts attached to the network
 func (instance *securityGroup) enableOnHostsAttachedToSubnet(task concurrency.Task, rs resources.Subnet) fail.Error {
 	tg, xerr := concurrency.NewTaskGroup(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create a task group to disable security group '%s' on hosts", instance.GetName())
 	}
@@ -1155,7 +1155,7 @@ func (instance *securityGroup) enableOnHostsAttachedToSubnet(task concurrency.Ta
 // disableSecurityGroupOnHosts disables (ie remove) the security group from bound hosts
 func (instance *securityGroup) disableOnHostsAttachedToSubnet(task concurrency.Task, rs resources.Subnet) fail.Error {
 	tg, xerr := concurrency.NewTaskGroup(task)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create a task group to disable security group '%s' on hosts", instance.GetName())
 	}
@@ -1193,7 +1193,7 @@ func (instance *securityGroup) UnbindFromSubnet(ctx context.Context, rs resource
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1245,7 +1245,7 @@ func (instance *securityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}

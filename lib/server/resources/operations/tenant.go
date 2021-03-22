@@ -19,8 +19,9 @@ package operations
 import (
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 )
@@ -47,11 +48,12 @@ func CurrentTenant() *Tenant {
 		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
 		for _, anon := range tenants {
 			name := anon.(string)
-			service, err := iaas.UseService(name)
-			err = errcontrol.CrasherFail(err)
-			if err != nil {
+			service, xerr := iaas.UseService(name)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
 				return nil
 			}
+
 			currentTenant.Store(&Tenant{Name: name, Service: service})
 			break // nolint
 		}
@@ -67,11 +69,12 @@ func SetCurrentTenant(tenantName string) error {
 		return nil
 	}
 
-	service, err := iaas.UseService(tenantName)
-	err = errcontrol.CrasherFail(err)
-	if err != nil {
-		return err
+	service, xerr := iaas.UseService(tenantName)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
 	}
+
 	tenant = &Tenant{Name: tenantName, Service: service}
 	currentTenant.Store(tenant)
 	return nil

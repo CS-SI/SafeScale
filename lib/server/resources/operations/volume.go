@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -76,10 +75,10 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 		return nullVolume(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, err := newCore(svc, volumeKind, volumesFolderName, &abstract.Volume{})
-	err = errcontrol.CrasherFail(err)
-	if err != nil {
-		return nullVolume(), err
+	coreInstance, xerr := newCore(svc, volumeKind, volumesFolderName, &abstract.Volume{})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nullVolume(), xerr
 	}
 
 	instance := &volume{
@@ -100,7 +99,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 	}
 
 	volumeCache, xerr := svc.GetCache(volumeKind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nullVolume(), xerr
 	}
@@ -121,7 +120,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 		}),
 	}
 	cacheEntry, xerr := volumeCache.Get(ref, options...)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -137,7 +136,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
@@ -162,18 +161,18 @@ func (instance *volume) carry(clonable data.Clonable) (xerr fail.Error) {
 	}
 
 	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	xerr = kindCache.ReserveEntry(identifiable.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
@@ -183,13 +182,13 @@ func (instance *volume) carry(clonable data.Clonable) (xerr fail.Error) {
 
 	// Note: do not validate parameters, this call will do it
 	xerr = instance.core.carry(clonable)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	cacheEntry, xerr := kindCache.CommitEntry(identifiable.GetID(), instance)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -249,7 +248,7 @@ func (instance *volume) GetAttachments() (_ *propertiesv1.VolumeAttachments, xer
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -272,7 +271,7 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -295,7 +294,7 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 
 		av := abstract.NewVolume()
 		xerr = av.Deserialize(buf)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -320,7 +319,7 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -358,14 +357,14 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// delete volume
 	xerr = instance.GetService().DeleteVolume(instance.GetID())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
@@ -375,7 +374,7 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 		default:
 		}
 	}
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -407,7 +406,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -425,7 +424,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	// Check if Volume exists and is managed by SafeScale
 	svc := instance.GetService()
 	existing, xerr := LoadVolume(svc, req.Name)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -440,7 +439,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 
 	// Check if host exists but is not managed by SafeScale
 	_, xerr = svc.InspectVolume(req.Name)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -457,14 +456,14 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	}
 
 	av, xerr := svc.CreateVolume(req)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Starting from here, remove volume if exiting with error
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := svc.DeleteVolume(av.ID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", actionFromError(xerr), req.Name))
@@ -501,7 +500,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -562,7 +561,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -621,7 +620,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			})
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -634,7 +633,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	// Note: some providers are not able to tell the real device name the volume
 	//       will have on the host, so we have to use a way that can work everywhere
 	oldDiskSet, xerr := listAttachedDevices(ctx, host)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -649,14 +648,14 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		HostID:   targetID,
 		VolumeID: volumeID,
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	// Starting from here, remove volume attachment if exiting with error
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := svc.DeleteVolumeAttachment(targetID, vaID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", actionFromError(xerr), volumeName, targetName))
@@ -673,7 +672,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	retryErr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			newDiskSet, xerr := listAttachedDevices(ctx, host)
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -786,13 +785,13 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	defer func() {
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", actionFromError(xerr), volumeName, targetName))
@@ -849,7 +848,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			return nil
 		})
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -865,7 +864,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 	)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -879,7 +878,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 			}
 
 			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -920,7 +919,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -952,7 +951,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 		volumeName = volume.Name
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -1159,7 +1158,7 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 	}
 
 	attachments, xerr := instance.GetAttachments()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1167,7 +1166,7 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 	svc := instance.GetService()
 	for k := range attachments.Hosts {
 		rh, xerr := LoadHost(svc, k)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}

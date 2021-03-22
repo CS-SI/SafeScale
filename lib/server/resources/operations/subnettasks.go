@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -66,7 +65,7 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 	hostReq.IsGateway = true
 
 	rgw, xerr := NewHost(svc)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -84,7 +83,7 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 		}
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -129,14 +128,14 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 
 		if as != nil && as.VIP != nil {
 			xerr = svc.BindHostToVIP(as.VIP, rgw.GetID())
-			xerr = errcontrol.CrasherFail(xerr)
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 		}
 		return nil
 	})
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -180,13 +179,13 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	)()
 
 	xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, userData)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -195,7 +194,7 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	logrus.Debugf("Rebooting gateway '%s'", gwname)
 	command := "sudo systemctl reboot"
 	retcode, _, _, xerr := objgw.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -204,14 +203,14 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 
 	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, 0)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// final phase...
 	xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, userData)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -220,7 +219,7 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	logrus.Debugf("Rebooting gateway '%s'", gwname)
 	command = "sudo systemctl reboot"
 	retcode, _, _, xerr = objgw.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -229,7 +228,7 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 
 	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, time.Duration(0))
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}

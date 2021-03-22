@@ -2,7 +2,6 @@
 
 /*
  * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
- * Inspired by github.com/VividCortex/robustly
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,18 +16,18 @@
  * limitations under the License.
  */
 
-package errcontrol
+package debug
 
-import "github.com/CS-SI/SafeScale/lib/utils/fail"
+import (
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+)
 
-func Crasher(in error, calldepth ...int) (err error) {
+func InjectPlannedError(in error, calldepth ...int) (err error) {
 	return in
 }
 
-func CrasherFail(in fail.Error, calldepth ...int) fail.Error {
+func InjectPlannedFail(in fail.Error, calldepth ...int) fail.Error {
 	return in
 }
 
-func CrashSetup(spec string) error {
-	return nil
-}
+func InitializeErrorInjector() {}

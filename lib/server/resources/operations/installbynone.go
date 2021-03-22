@@ -17,9 +17,10 @@
 package operations
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
@@ -78,14 +79,14 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 	defer w.Terminate()
 
 	xerr = w.CanProceed(ctx, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Error(xerr.Error())
 		return nil, xerr
 	}
 
 	r, xerr = w.Proceed(ctx, v, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
@@ -112,14 +113,14 @@ func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 	defer w.Terminate()
 
 	xerr = w.CanProceed(ctx, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Error(xerr.Error())
 		return nil, xerr
 	}
 
 	r, xerr = w.Proceed(ctx, v, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}

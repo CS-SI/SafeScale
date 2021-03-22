@@ -21,8 +21,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -59,7 +60,7 @@ func newFolder(svc iaas.Service, path string) (folder, fail.Error) {
 	}
 
 	cryptKey, xerr := svc.GetMetadataKey()
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return folder{}, xerr
@@ -129,7 +130,7 @@ func (f folder) Lookup(path string, name string) fail.Error {
 
 	absPath := strings.Trim(f.absolutePath(path), "/")
 	list, xerr := f.service.ListObjects(f.getBucket().Name, absPath, objectstorage.NoPrefix)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
@@ -153,7 +154,7 @@ func (f folder) Delete(path string, name string) fail.Error {
 	}
 
 	xerr := f.service.DeleteObject(f.getBucket().Name, f.absolutePath(path, name))
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
 	}
@@ -182,7 +183,7 @@ func (f folder) Read(path string, name string, callback func([]byte) fail.Error)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)
 	}
@@ -191,14 +192,14 @@ func (f folder) Read(path string, name string, callback func([]byte) fail.Error)
 	if f.crypt {
 		var err error
 		data, err = crypt.Decrypt(data, f.cryptKey)
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return fail.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
 	}
 
 	xerr = callback(data)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, xerr)
 	}
@@ -222,7 +223,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 	if f.crypt {
 		var err error
 		data, err = crypt.Encrypt(content, f.cryptKey)
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return fail.ConvertError(err)
 		}
@@ -291,7 +292,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 			}
 		},
 	)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
@@ -310,7 +311,7 @@ func (f folder) Browse(path string, callback folderDecoderCallback) fail.Error {
 	absPath := f.absolutePath(path)
 	metadataBucket := f.getBucket()
 	list, xerr := f.service.ListObjects(metadataBucket.Name, absPath, objectstorage.NoPrefix)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Errorf("Error browsing metadata: listing objects: %+v", xerr)
 		return xerr
@@ -325,7 +326,7 @@ func (f folder) Browse(path string, callback folderDecoderCallback) fail.Error {
 	for _, i := range list {
 		var buffer bytes.Buffer
 		xerr = f.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", xerr)
 			return xerr
@@ -334,13 +335,13 @@ func (f folder) Browse(path string, callback folderDecoderCallback) fail.Error {
 		data := buffer.Bytes()
 		if f.crypt {
 			data, err = crypt.Decrypt(data, f.cryptKey)
-			err = errcontrol.Crasher(err)
+			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return fail.ConvertError(err)
 			}
 		}
 		xerr = callback(data)
-		xerr = errcontrol.CrasherFail(xerr)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Errorf("Error browsing metadata: running callback: %+v", xerr)
 			return xerr

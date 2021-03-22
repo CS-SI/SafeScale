@@ -20,9 +20,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
@@ -64,21 +65,21 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Check, g.checkCommand)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer worker.Terminate()
 
 	xerr = worker.CanProceed(ctx, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
 
 	r, xerr = worker.Proceed(ctx, v, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to check if Feature '%s' is installed on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
@@ -108,7 +109,7 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Add, g.addCommand)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Println(xerr.Error())
 		return nil, xerr
@@ -116,14 +117,14 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 	defer worker.Terminate()
 
 	xerr = worker.CanProceed(ctx, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
 	}
 
 	r, xerr = worker.Proceed(ctx, v, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
@@ -153,12 +154,12 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Remove, g.removeCommand)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 	xerr = worker.CanProceed(ctx, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Info(xerr.Error())
 		return nil, xerr
@@ -166,7 +167,7 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 	defer worker.Terminate()
 
 	r, xerr = worker.Proceed(ctx, v, s)
-	xerr = errcontrol.CrasherFail(xerr)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}

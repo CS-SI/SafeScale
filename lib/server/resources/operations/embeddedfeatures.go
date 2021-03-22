@@ -19,9 +19,10 @@ package operations
 import (
 	"bytes"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/spf13/viper"
+
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -45,14 +46,14 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 	if templateBox == nil {
 		var err error
 		templateBox, err = rice.FindBox("../operations/features")
-		err = errcontrol.Crasher(err)
+		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return "", nil, fail.Wrap(err, "failed to open embedded feature specification folder")
 		}
 	}
 	name += featureFileExt
 	tmplString, err := templateBox.String(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "failed to read embedded feature speficication file '%s'", name)
 	}
@@ -60,7 +61,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 	v := viper.New()
 	v.SetConfigType("yaml")
 	err = v.ReadConfig(bytes.NewBuffer([]byte(tmplString)))
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "syntax error in feature specification file '%s'", name)
 	}
@@ -82,7 +83,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 func dockerFeature() *feature {
 	name := "docker"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -98,7 +99,7 @@ func dockerFeature() *feature {
 func ntpServerFeature() *feature {
 	name := "ntpserver"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -114,7 +115,7 @@ func ntpServerFeature() *feature {
 func ntpClientFeature() *feature {
 	name := "ntpclient"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -130,7 +131,7 @@ func ntpClientFeature() *feature {
 func ansibleFeature() *feature {
 	name := "ansible"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -146,7 +147,7 @@ func ansibleFeature() *feature {
 func certificateAuthorityFeature() *feature {
 	name := "certificateauthority"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -162,7 +163,7 @@ func certificateAuthorityFeature() *feature {
 func postgresql4platformFeature() *feature {
 	name := "postgresql4platform"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -178,7 +179,7 @@ func postgresql4platformFeature() *feature {
 func nVidiaDockerFeature() *feature {
 	name := "nvidiadocker"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -194,7 +195,7 @@ func nVidiaDockerFeature() *feature {
 func kubernetesFeature() *feature {
 	name := "kubernetes"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -210,7 +211,7 @@ func kubernetesFeature() *feature {
 func helm2Feature() *feature {
 	name := "helm2"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -226,7 +227,7 @@ func helm2Feature() *feature {
 func helm3Feature() *feature {
 	name := "helm3"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -242,7 +243,7 @@ func helm3Feature() *feature {
 func sparkmaster4platformFeature() *feature {
 	name := "sparkmaster4platform"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -258,7 +259,7 @@ func sparkmaster4platformFeature() *feature {
 func remoteDesktopFeature() *feature {
 	name := "remotedesktop"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -274,7 +275,7 @@ func remoteDesktopFeature() *feature {
 func proxycacheServerFeature() *feature {
 	name := "proxycache-server"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -290,7 +291,7 @@ func proxycacheServerFeature() *feature {
 func proxycacheClientFeature() *feature {
 	name := "proxycache-client"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -306,7 +307,7 @@ func proxycacheClientFeature() *feature {
 func postgres4gatewayFeature() *feature {
 	name := "postgres4gateway"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -322,7 +323,7 @@ func postgres4gatewayFeature() *feature {
 func edgeproxy4subnetFeature() *feature {
 	name := "edgeproxy4subnet"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -338,7 +339,7 @@ func edgeproxy4subnetFeature() *feature {
 func keycloak4platformFeature() *feature {
 	name := "keycloak4platform"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -354,7 +355,7 @@ func keycloak4platformFeature() *feature {
 func consul4platformFeature() *feature {
 	name := "consul4platform"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -370,7 +371,7 @@ func consul4platformFeature() *feature {
 func monitoring4platformFeature() *feature {
 	name := "monitoring4platform"
 	filename, specs, err := loadSpecFile(name)
-	err = errcontrol.Crasher(err)
+	err = debug.InjectPlannedError(err)
 	if err != nil {
 		panic(err.Error())
 	}
