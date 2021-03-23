@@ -176,8 +176,6 @@ func assembleListenString(c *cli.Context) string {
 func main() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	debug.InitializeErrorInjector()
-
 	app := cli.NewApp()
 	app.Name = "safescaled"
 	app.Usage = "safescaled [OPTIONS]"

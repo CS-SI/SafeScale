@@ -64,24 +64,34 @@ type taskGroup struct {
 	result TaskGroupResult
 
 	children subTasks //[]subTask
+
+	options []data.ImmutableKeyValue
 }
 
+var (
+	// FUTURE: next version of TaskGroup will allow to use options
+	// FailEarly tells the TaskGroup to fail as soon as a child fails
+	FailEarly = data.NewImmutableKeyValue("fail", "early")
+	// FailLately tells the TaskGroup to end all children before determine if TaskGroup has failed
+	FailLately = data.NewImmutableKeyValue("fail", "lately")
+)
+
 // NewTaskGroup ...
-func NewTaskGroup(parentTask Task) (*taskGroup, fail.Error) { // nolint
-	return newTaskGroup(context.TODO(), parentTask)
+func NewTaskGroup(parentTask Task, options ...data.ImmutableKeyValue) (*taskGroup, fail.Error) { // nolint
+	return newTaskGroup(context.TODO(), parentTask, options...)
 }
 
 // NewTaskGroupWithParent ...
-func NewTaskGroupWithParent(parentTask Task) (*taskGroup, fail.Error) { // nolint
-	return newTaskGroup(context.TODO(), parentTask)
+func NewTaskGroupWithParent(parentTask Task, options ...data.ImmutableKeyValue) (*taskGroup, fail.Error) { // nolint
+	return newTaskGroup(context.TODO(), parentTask, options...)
 }
 
 // NewTaskGroupWithContext ...
-func NewTaskGroupWithContext(ctx context.Context) (*taskGroup, fail.Error) { // nolint
-	return newTaskGroup(ctx, nil)
+func NewTaskGroupWithContext(ctx context.Context, options ...data.ImmutableKeyValue) (*taskGroup, fail.Error) { // nolint
+	return newTaskGroup(ctx, nil, options...)
 }
 
-func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err fail.Error) {
+func newTaskGroup(ctx context.Context, parentTask Task, options ...data.ImmutableKeyValue) (tg *taskGroup, err fail.Error) {
 	var t Task
 
 	if parentTask == nil {
@@ -109,6 +119,7 @@ func newTaskGroup(ctx context.Context, parentTask Task) (tg *taskGroup, err fail
 		children: subTasks{
 			// lock: NewTaskedLock(),
 		},
+		options: options,
 	}
 	return tg, err
 }
@@ -350,7 +361,9 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 
 		tg.task.result = results
 		if len(errors) > 0 {
-			tg.task.err = fail.AbortedError(fail.NewErrorList(errors), "aborted")
+			if taskStatus == ABORTED {
+				tg.task.err = fail.AbortedError(fail.NewErrorList(errors), "aborted")
+			}
 		} else {
 			tg.task.err = nil
 		}

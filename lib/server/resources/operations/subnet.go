@@ -785,7 +785,7 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		}
 	} else {
 		if _, ok := results[id]; !ok {
-			return fail.InconsistentError("task results doesn't contain %s", id)
+			return fail.InconsistentError("task results does not contain %s", id)
 		}
 
 		result, ok := results[id].(data.Map)
