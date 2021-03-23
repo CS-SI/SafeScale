@@ -321,21 +321,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 
 	if len(in.GetSubnets()) > 0 {
-	// 	rs, xerr = subnetfactory.Load(job.GetService(), networkRef, networkRef)
-	// 	if xerr != nil {
-	// 		return nil, xerr
-	// 	}
-	//
-	// 	err = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-	// 		as, ok := clonable.(*abstract.Subnet)
-	// 		if !ok {
-	// 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 		}
-	//
-	// 		subnets = []*abstract.Subnet{as.Clone().(*abstract.Subnet)}
-	// 		return nil
-	// 	})
-	// } else {
 		for _, v := range in.GetSubnets() {
 			rs, xerr = subnetfactory.Load(job.GetService(), networkRef, v)
 			if xerr != nil {
@@ -358,20 +343,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 
 	domain := in.Domain
-	// if domain == "" {
-	// 	xerr = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-	// 		as, ok := clonable.(*abstract.Subnet)
-	// 		if !ok {
-	// 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 		}
-	//
-	// 		domain = as.Domain
-	// 		return nil
-	// 	})
-	// 	if xerr != nil {
-	// 		return nil, xerr
-	// 	}
-	// }
 	domain = strings.Trim(domain, ".")
 	if domain != "" {
 		domain = "." + domain
@@ -657,11 +628,6 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	// handler := handlers.NewHostHandler(job)
-	// sshConfig, err := handler.SSH(ref)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	sshHandler := handlers.NewSSHHandler(job)
 	sshConfig, xerr := sshHandler.GetConfig(ref)
 	if xerr != nil {

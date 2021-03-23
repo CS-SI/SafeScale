@@ -138,16 +138,6 @@ func (instance *host) CheckFeature(ctx context.Context, name string, vars data.M
 		return nil, xerr
 	}
 
-	// Wait for SSH service on remote host first
-	// ssh, err := mh.GetSSHConfig(task)
-	// if err != nil {
-	// 	return srvutils.ThrowErr(err)
-	// }
-	// _, err = ssh.WaitServerReady(2 * time.Minute)
-	// if err != nil {
-	// 	return srvutils.ThrowErr(err)
-	// }
-
 	return feat.Check(ctx, instance, vars, settings)
 }
 
@@ -183,16 +173,6 @@ func (instance *host) DeleteFeature(ctx context.Context, name string, vars data.
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	// // Wait for SSH service on remote host first
-	// ssh, err := mh.GetSSHConfig(task)
-	// if err != nil {
-	// 	return srvutils.ThrowErr(err)
-	// }
-	// _, err = ssh.WaitServerReady(2 * time.Minute)
-	// if err != nil {
-	// 	return srvutils.ThrowErr(err)
-	// }
 
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		outcomes, innerXErr := feat.Remove(ctx, instance, vars, settings)

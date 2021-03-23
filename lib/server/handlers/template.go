@@ -36,7 +36,7 @@ import (
 // TemplateHandler defines API to manipulate hosts
 type TemplateHandler interface {
 	List(all bool) ([]abstract.HostTemplate, fail.Error)
-	Inspect(all bool, onlyScanned bool) (_ *protocol.TemplateList, xerr fail.Error)
+	Inspect(all bool, onlyScanned bool) (tlist *protocol.TemplateList, xerr fail.Error)
 }
 
 // templateHandler template service
@@ -45,7 +45,6 @@ type templateHandler struct {
 }
 
 // NewTemplateHandler creates a template service
-// FIXME: what to do if job == nil ?
 func NewTemplateHandler(job server.Job) TemplateHandler {
 	return &templateHandler{job: job}
 }
@@ -152,7 +151,7 @@ func (handler *templateHandler) Inspect(all bool, onlyScanned bool) (templateLis
 					EphDiskSize_Gb:       acpu.EphDiskSize,
 					PriceInDollarsSecond: acpu.PricePerSecond,
 					PriceInDollarsHour:   acpu.PricePerHour,
-					// Not yet implemented
+					// Not yet implemented, FIXME: Implement this
 					// Prices: []*protocol.PriceInfo{{
 					// 	Currency:      "euro-fake",
 					// 	DurationLabel: "perMonth",

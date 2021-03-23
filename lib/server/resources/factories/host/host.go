@@ -30,7 +30,7 @@ import (
 // List returns a list of available hosts
 func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, fail.Error) {
 	var nullList abstract.HostList
-	if svc == nil {
+	if ctx == nil {
 		return nullList, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if svc == nil {

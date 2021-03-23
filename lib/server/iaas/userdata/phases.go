@@ -18,6 +18,7 @@ package userdata
 
 type Phase string
 
+//goland:noinspection GoSnakeCaseUsage
 const (
 	PHASE1_INIT                      Phase = "init"   //nolint
 	PHASE2_NETWORK_AND_SECURITY      Phase = "netsec" //nolint

@@ -162,9 +162,3 @@ func Test_Containers(t *testing.T) {
 	require.Nil(t, err)
 	tt.Buckets(t)
 }
-
-// func Test_Objects(t *testing.T) {
-// 	tt, err := getTester()
-// 	require.Nil(t, err)
-// 	tt.Objects(t)
-// }

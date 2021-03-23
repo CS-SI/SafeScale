@@ -164,7 +164,7 @@ var hostList = &cli.Command{
 		}
 		jsoned, _ := json.Marshal(hosts.GetHosts())
 		var result []map[string]interface{}
-		err = json.Unmarshal([]byte(jsoned), &result)
+		err = json.Unmarshal(jsoned, &result)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}

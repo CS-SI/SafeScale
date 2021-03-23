@@ -148,11 +148,9 @@ func Test_NetworksWithDelete(t *testing.T) {
 	}
 	require.Nil(t, err)
 	net, err := tt.Service.CreateNetwork(abstract.NetworkRequest{
-		Name: "my-net",
-		//IPVersion:  ipversion.IPv4,
+		Name:       "my-net",
 		CIDR:       "192.168.23.0/24",
 		DNSServers: nil,
-		//HA:         false,
 	})
 	assert.NoError(t, err)
 	err = tt.Service.DeleteNetwork(net.ID)
@@ -190,11 +188,9 @@ func Test_VMWithGPU(t *testing.T) {
 	}()
 	assert.NotNil(t, tpl)
 	net, err := tt.Service.CreateNetwork(abstract.NetworkRequest{
-		Name: "public-net",
-		//IPVersion:  ipversion.IPv4,
+		Name:       "public-net",
 		CIDR:       "192.168.23.0/24",
 		DNSServers: nil,
-		//HA:         false,
 	})
 	assert.NoError(t, err)
 	defer func() {
@@ -232,21 +228,3 @@ func Test_VMWithGPU(t *testing.T) {
 	err = tt.Service.DeleteHost(h.GetID())
 	assert.NoError(t, err)
 }
-
-// func Test_Test(t *testing.T) {
-//	tt, err := getTester()
-//	if err != nil {
-//		t.Skip(err)
-//	}
-//	require.Nil(t, err)
-//	hosts, err := tt.Service.ListHosts()
-//	for _, h := range hosts {
-//		fmt.Printf("%v", h)
-//	}
-// }
-
-// func Test_Objects(t *testing.T) {
-// 	tt, err := getTester()
-// 	require.Nil(t, err)
-// 	tt.Objects(t)
-// }

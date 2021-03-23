@@ -44,14 +44,6 @@ type Tracer interface {
 	Stopwatch() temporal.Stopwatch
 }
 
-// // IsLogActive ... FIXME:
-// func IsLogActive(key string) bool {
-//     if logs := os.Getenv("SAFESCALE_OPTIONAL_LOGS"); logs != "" {
-//         return strings.Contains(logs, key)
-//     }
-//     return false
-// }
-
 // tracer ...
 type tracer struct {
 	taskSig      string

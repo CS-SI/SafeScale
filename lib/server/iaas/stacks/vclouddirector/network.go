@@ -1,4 +1,4 @@
-// +build ignore
+// +build vcloud,!ignore
 
 /*
  * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
@@ -25,12 +25,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware/go-vcloud-director/govcd"
-	"github.com/vmware/go-vcloud-director/types/v56"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/vmware/go-vcloud-director/govcd"
 )
 
 func (s *stack) getOrgVdc() (govcd.Org, govcd.Vdc, fail.Error) {

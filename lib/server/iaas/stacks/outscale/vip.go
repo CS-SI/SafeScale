@@ -41,7 +41,6 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, '%s')", subnetID, name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	subnet, xerr := s.InspectSubnet(subnetID)
 	if xerr != nil {
@@ -55,12 +54,6 @@ func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 	if len(resp.PrivateIps) < 1 {
 		return nil, fail.InconsistentError("inconsistent provider response, no interface found")
 	}
-
-	// ip, err := s.addPublicIP(&nic)
-	// VPL: twice ?
-	// if len(res.Nic.PrivateIps) < 1 {
-	//	return nil, fail.InconsistentError("Inconsistent provider response")
-	// }
 
 	vip := abstract.NewVirtualIP()
 	vip.ID = resp.NicId
@@ -115,37 +108,6 @@ func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) (xerr fail.
 		return fail.InvalidParameterError("host", "cannot be empty string")
 	}
 
-	// tracer := debug.NewTracer(nil, debug.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()
-	// defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-
-	// deviceNumber, err := s.getFirstFreeDeviceNumber(hostID)
-	// if err != nil {
-	// 	return err
-	// }
-	// res, err := s.client.POST_ReadNics(osc.ReadNicsRequest{
-	// 	Filters: osc.FiltersNic{
-	// 		NicIds: []string{vip.ID},
-	// 	},
-	// })
-	// if err != nil {
-	// 	return normalizeError(err)
-	// }
-	// if res == nil || (res.OK != nil && len(res.OK.Nics) > 1) {
-	// 	return fail.InconsistentError("Inconsistent provider response")
-	// }
-	// if res.OK == nil || len(res.OK.Nics) == 0 {
-	// 	return fail.InvalidParameterError("vip", "VIP does not exixt")
-	// }
-	// _, err = s.client.POST_LinkNic(osc.LinkNicRequest{
-	// 	NicId:        res.OK.Nics[0].NicId,
-	// 	VmId:         hostID,
-	// 	DeviceNumber: deviceNumber,
-	// })
-	// if err != nil {
-	// 	logrus.Errorf("BindHostToVIP %v", err)
-	// 	return normalizeError(err)
-	// }
 	return nil
 
 }
@@ -162,29 +124,6 @@ func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) (xerr f
 		return fail.InvalidParameterError("host", "cannot be empty string")
 	}
 
-	// tracer := debug.NewTracer(nil, debug.ShouldTrace("stacks.outscale"), "(%v, %s)", vip, hostID).WithStopwatch().Entering()
-	// defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-
-	// res, err := s.client.POST_ReadNics(osc.ReadNicsRequest{
-	// 	Filters: osc.FiltersNic{
-	// 		NicIds: []string{vip.ID},
-	// 	},
-	// })
-	// if err != nil {
-	// 	return normalizeError(err)
-	// }
-	// if res == nil || (res.OK != nil && len(res.OK.Nics) > 1) {
-	// 	return fail.InconsistentError("Inconsistent provider response")
-	// }
-	// if res.OK == nil || len(res.OK.Nics) == 0 {
-	// 	return fail.InvalidParameterError("vip", "VIP does not exixt")
-	// }
-	// nic := res.OK.Nics[0]
-	// _, err = s.client.POST_UnlinkNic(osc.UnlinkNicRequest{
-	// 	LinkNicId: nic.LinkNic.LinkNicId,
-	// })
-	// return normalizeError(err)
 	return nil
 }
 
@@ -199,7 +138,6 @@ func (s stack) DeleteVIP(vip *abstract.VirtualIP) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", vip).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	if xerr := s.rpcDeleteNic(vip.ID); xerr != nil {
 		return xerr

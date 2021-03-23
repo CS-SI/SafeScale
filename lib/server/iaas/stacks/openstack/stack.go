@@ -133,7 +133,6 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 	}
 
 	// Compute API
-	//endpointOpts := gophercloud.EndpointOpts{Region: auth.Region}
 	switch s.versions["compute"] {
 	case "v2":
 		xerr = stacks.RetryableRemoteCall(

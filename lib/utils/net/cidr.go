@@ -116,26 +116,6 @@ func (cs CIDRString) IntersectsWith(cidr CIDRString) (bool, error) {
 }
 
 // type CIDR net.IPNet
-
-// // Contains tells if 'c' contains 'cidr'
-// func (c CIDR) Contains(cidr CIDR) bool {
-// 	return c.Contains(cidr)
-// }
-//
-// // IntersectsWith tells if the 2 cidr intersects
-// func (c CIDR) IntersectsWith(cidr CIDR) bool {
-// 	return c.Contains(cidr) || cidr.Contains(c)
-// }
-//
-// func DoCIDRsIntersect(cidr1, cidr2 string) (bool, error) {
-// 	_, cidr1Desc, _ := net.ParseCIDR(cidr1)
-// 	_, cidr2Desc, err := net.ParseCIDR(cidr2)
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	return cidr2Desc.Contains(cidr1Desc.IP) || cidr1Desc.Contains(cidr2Desc.IP), nil
-// }
-
 func init() {
 	notRoutables := []string{"10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
 

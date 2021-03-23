@@ -740,17 +740,6 @@ var clusterShrinkCommand = &cli.Command{
 			countS = "s"
 		}
 
-		// VPL: to move inside safescaled
-		// present, err := clusterInstance.CountNodes(concurrency.RootTask()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(err)
-		// }
-		// if count > present {
-		// 	msg := fmt.Sprintf("cannot delete %d node%s, the cluster contains only %d of them", count, countS, present)
-		// 	return clitools.FailureResponse(clitools.ExitOnInvalidOption(msg))
-		// }
-
 		if !yes {
 			msg := fmt.Sprintf("Are you sure you want to delete %d node%s from Cluster %s", count, countS, clusterName)
 			if !utils.UserConfirmed(msg) {
@@ -1011,13 +1000,6 @@ func executeCommand(clientSession *client.Session, command string, files *client
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
 	}
 	if retcode != 0 {
-		// msg := fmt.Sprintf("command executed on master '%s' of cluster '%s' with failure: %s", master.GetName(), clusterName, stdout)
-		// if stderr != "" {
-		// 	if stdout != "" {
-		// 		msg += "\n"
-		// 	}
-		// 	msg += stderr
-		// }
 		return cli.NewExitError("" /*msg*/, retcode)
 	}
 	return nil
@@ -1153,12 +1135,6 @@ var clusterNodeListCommand = &cli.Command{
 		return clitools.SuccessResponse(formatted)
 	},
 }
-
-// // formatNodeConfig...
-// func formatNodeConfig(value interface{}) map[string]interface{} {
-// 	core := value.(map[string]interface{})
-// 	return core
-// }
 
 // clusterNodeInspectCmd handles 'deploy cluster <clustername> inspect'
 var clusterNodeInspectCommand = &cli.Command{

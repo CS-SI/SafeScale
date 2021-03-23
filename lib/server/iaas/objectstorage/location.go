@@ -135,10 +135,6 @@ func (l *location) IsNull() bool {
 	return l == nil || l.stowLocation == nil
 }
 
-// func (l *stowLocation) getStowLocation() stow.location {
-// 	return l.stowLocation
-// }
-
 // Connect connects to an Object Storage location
 func (l *location) connect() fail.Error {
 	// FIXME: GCP Remove specific driver code, Google requires a custom cfg here..., this will require a refactoring based on stow.ConfigMap

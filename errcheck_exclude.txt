@@ -1,5 +1,0 @@
-lib/security/
-lib/system/firewall/
-gomock_reflect_
-cluster/mocks/
-stack_mocks

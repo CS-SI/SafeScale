@@ -325,7 +325,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 		return xerr
 	}
 
-	// Fix harcoded flexible engine host name regex
+	// FIXME: Fix hardcoded flexible engine host name regex
 	if tenantName == "flexibleengine" {
 		hostName = strings.ReplaceAll(hostName, ".", "_")
 	}

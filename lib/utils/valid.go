@@ -6,5 +6,5 @@ package utils
 
 // Valid interface is used to check data validity
 type Valid interface {
-    OK() bool
+	OK() bool
 }

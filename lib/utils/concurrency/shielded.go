@@ -49,9 +49,7 @@ func (instance *Shielded) Inspect( /*task Task, */ inspector func(clonable data.
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	// if task == nil {
-	// 	return fail.InvalidParameterCannotBeNilError("task")
-	// }
+
 	if inspector == nil {
 		return fail.InvalidParameterCannotBeNilError("inspector")
 	}
@@ -59,23 +57,8 @@ func (instance *Shielded) Inspect( /*task Task, */ inspector func(clonable data.
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
-	// if xerr = d.lock.RLock(task); xerr != nil {
-	// 	return xerr
-	// }
 	instance.lock.RLock()
-	// defer func() {
-	// 	unlockErr := d.lock.RUnlock(task)
-	// 	if unlockErr != nil {
-	// 		logrus.Warn(unlockErr)
-	// 	}
-	// 	if xerr == nil && unlockErr != nil {
-	// 		xerr = unlockErr
-	// 	}
-	// }()
+
 	defer instance.lock.RUnlock()
 
 	return inspector(instance.witness.Clone())
@@ -89,9 +72,7 @@ func (instance *Shielded) Alter( /*task Task, */ alterer func(data.Clonable) fai
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-	// if task == nil {
-	// 	return fail.InvalidParameterCannotBeNilError("task")
-	// }
+
 	if alterer == nil {
 		return fail.InvalidParameterCannotBeNilError("alterer")
 	}
@@ -99,24 +80,9 @@ func (instance *Shielded) Alter( /*task Task, */ alterer func(data.Clonable) fai
 		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
 	}
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	instance.lock.Lock()
-	// if xerr = d.lock.Lock(task); xerr != nil {
-	// 	return xerr
-	// }
+
 	defer instance.lock.Unlock()
-	// defer func() {
-	// 	unlockErr := d.lock.Unlock(task)
-	// 	if unlockErr != nil {
-	// 		logrus.Warn(unlockErr)
-	// 	}
-	// 	if xerr == nil && unlockErr != nil {
-	// 		xerr = unlockErr
-	// 	}
-	// }()
 
 	clone := instance.witness.Clone()
 	if xerr = alterer(clone); xerr != nil {
@@ -133,12 +99,6 @@ func (instance *Shielded) Serialize( /*task Task*/ ) ([]byte, fail.Error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	// if task == nil {
-	// 	return nil, fail.InvalidParameterCannotBeNilError("task")
-	// }
-	// if task.Aborted() {
-	// 	return nil, fail.AbortedError(nil, "aborted")
-	// }
 
 	var jsoned []byte
 	xerr := instance.Inspect(func(clonable data.Clonable) fail.Error {

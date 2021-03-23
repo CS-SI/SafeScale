@@ -43,6 +43,7 @@ const (
 type provider struct {
 	api.Stack
 
+	templatesWithGPU []string
 	tenantParameters map[string]interface{}
 }
 
@@ -94,8 +95,6 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Region:           region,
 		AvailabilityZone: zone,
 		AllowReauth:      true,
-		//DefaultNetworkName:          vpcName,
-		//DefaultNetworkCIDR:          vpcCIDR,
 	}
 
 	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
@@ -133,48 +132,6 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	if xerr != nil {
 		return nil, xerr
 	}
-	//xerr = stack.InitDefaultSecurityGroups()
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-
-	// VPL: moved to stacks.openstack.New()
-	// validRegions, xerr := stack.ListRegions()
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	// if len(validRegions) != 0 {
-	// 	regionIsValidInput := false
-	// 	for _, vr := range validRegions {
-	// 		if region == vr {
-	// 			regionIsValidInput = true
-	// 		}
-	// 	}
-	// 	if !regionIsValidInput {
-	// 		return nil, fail.InvalidRequestError("invalid Region '%s'", region)
-	// 	}
-	// }
-	//
-	// validAvailabilityZones, err := stack.ListAvailabilityZones()
-	// if err != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// if len(validAvailabilityZones) != 0 {
-	// 	var validZones []string
-	// 	zoneIsValidInput := false
-	// 	for az, valid := range validAvailabilityZones {
-	// 		if valid {
-	// 			if az == zone {
-	// 				zoneIsValidInput = true
-	// 			}
-	// 			validZones = append(validZones, az)
-	// 		}
-	// 	}
-	// 	if !zoneIsValidInput {
-	// 		return nil, fail.InvalidRequestError("invalid availability zone '%s', valid zones are %v", zone, validZones)
-	// 	}
-	// }
 
 	newP := provider{
 		Stack:            stack,
@@ -257,10 +214,9 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	}
 
 	var (
-		templatesWithGPU []string
-		out              []*regexp.Regexp
+		out []*regexp.Regexp
 	)
-	for _, v := range templatesWithGPU {
+	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
 			return emptySlice

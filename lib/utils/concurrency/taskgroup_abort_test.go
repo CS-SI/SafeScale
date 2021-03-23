@@ -111,15 +111,12 @@ func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskRe
 		}
 	}(&xerr)
 
-	keep := true
 	theCh := parameters.(chan string)
 
-	for keep {
+	for {
 		theCh <- "Living forever"
 		_, _ = heavyDutyTask(10*time.Millisecond, true)
 	}
-
-	return result, xerr
 }
 
 func heavyDutyTask(duration time.Duration, wantedResult bool) (bool, fail.Error) {
@@ -188,10 +185,6 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 		t.Errorf("It should have finished in less than 3s ms but it didn't, it was %s !!", end)
 	}
 }
-
-// func typeof(v interface{}) string {
-// 	return fmt.Sprintf("%T", v)
-// }
 
 func TestBadTaskActionCitizen(t *testing.T) {
 	overlord, xerr := NewTaskGroup(nil)

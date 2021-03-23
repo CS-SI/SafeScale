@@ -131,16 +131,7 @@ func (s *stack) initVPC() fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// FIXME: error or automatic DefaultNetwork creation ?
-				//// VPC not found, create it
-				//req := abstract.NetworkRequest{
-				//	Name: s.authOpts.DefaultNetworkName,
-				//	CIDR: s.authOpts.DefaultNetworkCIDR,
-				//}
-				//an, xerr = s.CreateNetwork(req)
-				//if xerr != nil {
-				//	return fail.NewError("failed to initialize VPC '%s'", s.authOpts.DefaultNetworkName)
-				//}
-				//s.vpc = an
+				// continue
 			default:
 				return xerr
 			}

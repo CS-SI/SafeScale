@@ -34,6 +34,7 @@ import (
 type provider struct {
 	api.Stack
 
+	templatesWithGPU []string
 	tenantParameters map[string]interface{}
 }
 
@@ -153,10 +154,6 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		tenantParameters: params,
 	}
 
-	//evalid := providers.NewValidatedProvider(p, providerName)
-	//etrace := providers.NewErrorTraceProvider(newP, providerName)
-	//prov := providers.NewLoggedProvider(etrace, providerName)
-	//return prov, nil
 	return newP, nil
 }
 
@@ -230,10 +227,9 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	}
 
 	var (
-		templatesWithGPU []string
-		out              []*regexp.Regexp
+		out []*regexp.Regexp
 	)
-	for _, v := range templatesWithGPU {
+	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
 			return emptySlice

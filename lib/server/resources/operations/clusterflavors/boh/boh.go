@@ -29,14 +29,6 @@ import (
 )
 
 var (
-	// // funcMap defines the custome functions to be used in templates
-	// funcMap = txttmpl.FuncMap{
-	// 	// The name "inc" is what the function will be called in the template text.
-	// 	"inc": func(i int) int {
-	// 		return i + 1
-	// 	},
-	// }
-
 	// Makers returns a configured Makers to construct a BOH Cluster
 	Makers = flavors.Makers{
 		MinimumRequiredServers: minimumRequiredServers,
@@ -94,18 +86,3 @@ func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
 func defaultImage(_ resources.Cluster) string {
 	return "Ubuntu 18.04"
 }
-
-// VPL: eventually this part will be removed (some things have to be included in node_install_requirements
-// func getNodeInstallationScript(task concurrency.Task, _ resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map) {
-// 	data := data.Map{}
-// 	script := ""
-//
-// 	switch nodeType {
-// 	case clusternodetype.Master:
-// 		script = "boh_install_master.sh"
-// 	case clusternodetype.getGateway, clusternodetype.Node:
-// 		script = "boh_install_node.sh"
-// 	}
-// 	return script, data
-// }
-// ENDVPL

@@ -495,17 +495,6 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	return empty, fail.NotImplementedError("not yet implemented")
-	// rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// xerr = rsg.CheckConsistency(task.GetContext())
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	// tracer.Trace("Security Group %s is in sync with metadata %s")
-	// return empty, nil
 }
 
 // Bonds lists the resources bound to the Security Group
@@ -524,6 +513,9 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
+	if err != nil {
+		logrus.Warnf("Error running structure validator: %v", err)
+	}
 	if err == nil && !ok {
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}

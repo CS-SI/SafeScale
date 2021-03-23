@@ -138,13 +138,6 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 		return nullAN, normalizeError(err)
 	}
 
-	//// Searching for the Openstack Network bound to the VPC
-	//n, xerr := s.findOpenStackNetworkBoundToVPC(vpc.Name)
-	//if xerr != nil {
-	//	return nil, fail.Wrap(xerr, "failed to find network binded to VPC")
-	//}
-	////vpc.Network = network
-	//
 	an := abstract.NewNetwork()
 	an.ID = vpc.ID
 	an.Name = req.Name
@@ -293,7 +286,6 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 			an := abstract.NewNetwork()
 			an.Name = item["name"].(string)
 			an.ID = item["id"].(string)
-			//an.Description = item["description"].(string)
 			an.CIDR = item["cidr"].(string)
 			list = append(list, an)
 		}

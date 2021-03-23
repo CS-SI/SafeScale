@@ -63,7 +63,6 @@ type taskGroup struct {
 	*task
 	result TaskGroupResult
 
-	//	subtasksLock TaskedLock
 	children subTasks //[]subTask
 }
 
@@ -139,7 +138,7 @@ func (tg *taskGroup) GetSignature() string {
 		return ""
 	}
 
-	return `{taskgroup ` + tid + `}`
+	return `{taskGroup ` + tid + `}`
 }
 
 // GetStatus returns the current task status
@@ -282,11 +281,11 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		defer tg.children.lock.Unlock()
 
 		for _, s := range tg.children.tasks {
-			if lerr, _ := s.task.GetLastError(); lerr != nil {
-				errors = append(errors, lerr)
+			if err, _ := s.task.GetLastError(); err != nil {
+				errors = append(errors, err)
 			}
 		}
-		return nil, fail.AbortedError(fail.NewErrorList(errors), "taskgroup was already aborted")
+		return nil, fail.AbortedError(fail.NewErrorList(errors), "taskGroup was already aborted")
 	}
 	if taskStatus != RUNNING && taskStatus != READY {
 		return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
@@ -396,8 +395,6 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
 		return false, nil, fail.NewError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 
-	// tg.children.lock.SafeLock(tg.task)
-	// defer tg.children.lock.SafeUnlock(tg.task)
 	tg.children.lock.Lock()
 	defer tg.children.lock.Unlock()
 
@@ -522,8 +519,6 @@ func (tg *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	// tg.children.lock.SafeLock(tg.task)
-	// defer tg.children.lock.SafeUnlock(tg.task)
 	tg.children.lock.Lock()
 	defer tg.children.lock.Unlock()
 

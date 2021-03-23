@@ -61,7 +61,6 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 	}
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcCreateNetwork(req.Name, req.CIDR)
 	if xerr != nil {
@@ -256,7 +255,6 @@ func (s stack) InspectNetwork(id string) (_ *abstract.Network, xerr fail.Error) 
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadNetByID(id)
 	if xerr != nil {
@@ -275,7 +273,6 @@ func (s stack) InspectNetworkByName(name string) (_ *abstract.Network, xerr fail
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadNetByName(name)
 	if xerr != nil {
@@ -294,7 +291,6 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadNets(nil)
 	if xerr != nil {
@@ -309,28 +305,6 @@ func (s stack) ListNetworks() (_ []*abstract.Network, xerr fail.Error) {
 	return nets, nil
 }
 
-//func (s stack) deleteSecurityGroup(networkID string) fail.Error {
-//	if networkID == "" {
-//		return fail.InvalidParameterError("networkID", "cannot be empty string")
-//	}
-//	resp, xerr := s.rpcReadSecurityGroups(networkID, nil)
-//	if xerr != nil {
-//		return xerr
-//	}
-//
-//	if len(resp) == 0 {
-//		logrus.Debugf("No Security Groups in Network with ID %s", networkID)
-//		return nil
-//	}
-//
-//	for _, sg := range resp {
-//		if xerr = s.rpcDeleteSecurityGroup(sg.SecurityGroupId); xerr != nil {
-//			return xerr
-//		}
-//	}
-//	return nil
-//}
-
 // DeleteNetwork deletes the network identified by id
 func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 	if s.IsNull() {
@@ -339,7 +313,6 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Reads NICs that belong to the subnet
 	resp, xerr := s.rpcReadNics(id, "")
@@ -379,7 +352,6 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", req).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Check if CIDR intersects with VPC cidr; if not, error
 	vpc, xerr := s.InspectNetwork(req.NetworkID)
@@ -394,9 +366,6 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 	if !ok {
 		return nullAS, fail.InvalidRequestError("subnet CIDR '%s' must be inside Network/VPC CIDR ('%s')", req.CIDR, vpc.CIDR)
 	}
-	// if vpc.CIDR == req.CIDR {
-	// 	return nullAS, fail.InvalidRequestError("subnet CIDR '%s' cannot be equal to Network CIDR ('%s')", req.CIDR, vpc.CIDR)
-	// }
 
 	// Create a subnet with the same Targets than the network
 	resp, xerr := s.rpcCreateSubnet(req.Name, vpc.ID, req.CIDR)
@@ -436,7 +405,6 @@ func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadSubnetByID(id)
 	if xerr != nil {
@@ -461,7 +429,6 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s)", networkRef, subnetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	var networkID string
 	// If networkRef is not empty string, networkRef can be an ID or a Name; let's find out the ID of this network for sure
@@ -532,7 +499,6 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.E
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	if networkRef == "" {
 		networkRef = s.Options.Network.DefaultNetworkName
@@ -606,7 +572,6 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Reads NIS that belong to the subnet
 	resp, xerr := s.rpcReadNics(id, "")
@@ -640,17 +605,6 @@ func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	// asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// if !asg.IsConsistent() {
-	// 	asg, xerr = s.InspectSecurityGroup(asg.ID)
-	// 	if xerr != nil {
-	// 		return xerr
-	// 	}
-	// }
-
 	return nil
 }
 
@@ -663,16 +617,6 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 	if subnetID == "" {
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
-	// asg, _, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// if !asg.IsConsistent() {
-	// 	asg, xerr = s.InspectSecurityGroup(asg.ID)
-	// 	if xerr != nil {
-	// 		return xerr
-	// 	}
-	// }
 
 	return nil
 }
@@ -691,29 +635,6 @@ func (s stack) updateDefaultSecurityRules(sg osc.SecurityGroup) fail.Error {
 	}
 	return nil
 }
-
-// VPL: obsolete
-//func (s stack) getNetworkSecurityGroup(netID string) (*osc.SecurityGroup, fail.Error) {
-//	readSecurityGroupsRequest := osc.ReadSecurityGroupsRequest{
-//		Filters: osc.FiltersSecurityGroup{
-//			SecurityGroupNames: []string{"default"},
-//		},
-//	}
-//	res, _, err := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &osc.ReadSecurityGroupsOpts{
-//		ReadSecurityGroupsRequest: optional.NewInterface(readSecurityGroupsRequest),
-//	})
-//	if err != nil {
-//		return nil, normalizeError(err)
-//	}
-//
-//	for _, sg := range res.SecurityGroups {
-//		if sg.NetId == netID {
-//			return &sg, nil
-//		}
-//	}
-//	// should never go there, in case this means that the network do not have a default security group
-//	return nil, fail.NotFoundError("failed to get security group of Networking '%s'", netID)
-//}
 
 // open all ports, ingress is controlled by the vm firewall
 func (s stack) createTCPPermissions() []osc.SecurityGroupRule {

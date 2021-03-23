@@ -34,6 +34,8 @@ import (
 // see https://docs.outscale.com/api
 type provider struct {
 	api.Stack
+
+	templatesWithGPU []string
 }
 
 func remap(s interface{}) map[string]interface{} {
@@ -130,14 +132,9 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			DefaultImage:       get(compute, "DefaultImage"),
 			DefaultVolumeSpeed: volumeSpeed(get(compute, "DefaultVolumeSpeed", "Hdd")),
 			OperatorUsername:   get(compute, "OperatorUsername", "safescale"),
-			// BlacklistImageRegexp:    regexp.MustCompile(get(compute, "BlacklistImageRegexp")),
-			// BlacklistTemplateRegexp: regexp.MustCompile(get(compute, "BlacklistTemplateRegexp")),
-			// WhitelistImageRegexp:    regexp.MustCompile(get(compute, "WhitelistImageRegexp")),
-			// WhitelistTemplateRegexp: regexp.MustCompile(get(compute, "WhitelistTemplateRegexp")),
 		},
 		Network: outscale.NetworkConfiguration{
 			DefaultNetworkCIDR: get(network, "DefaultNetworkCIDR", get(network, "VPCCIDR")),
-			//VPCID:              get(network, "VPCID"),
 			DefaultNetworkName: get(network, "DefaultNetworkName", get(network, "VPCName")),
 		},
 		ObjectStorage: outscale.StorageConfiguration{
@@ -175,7 +172,6 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("AccessKey", opts.AccessKeyID)
 	cfg.Set("SecretKey", opts.SecretAccessKey)
 	cfg.Set("Region", opts.Region)
-	//cfg.Set("Service", opts.)
 	cfg.Set("URL", opts.IdentityEndpoint)
 	return cfg, nil
 }
@@ -241,10 +237,10 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	}
 
 	var (
-		templatesWithGPU []string
-		out              []*regexp.Regexp
+		out []*regexp.Regexp
 	)
-	for _, v := range templatesWithGPU {
+
+	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
 			return emptySlice

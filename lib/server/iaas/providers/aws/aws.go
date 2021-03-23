@@ -9,7 +9,7 @@
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or provideried.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
@@ -37,6 +37,7 @@ type provider struct {
 	api.Stack
 
 	tenantParameters map[string]interface{}
+	templatesWithGPU []string
 }
 
 // IsNull returns true if the instance is considered as a null value
@@ -104,19 +105,6 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	if !ok {
 		return &provider{}, fail.SyntaxError("field 'Zone' in section 'compute' not found in tenants.toml")
 	}
-
-	// s3Endpoint, ok := computeCfg["S3"].(string)
-	// if !ok {
-	// 	return &provider{}, fail.SyntaxError("field 'S3' in section 'compute' not found in tenants.toml")
-	// }
-	// ec2Endpoint, ok := computeCfg["EC2"].(string)
-	// if !ok {
-	// 	return &provider{}, fail.SyntaxError("field 'EC2' in section 'compute' not found in tenants.toml")
-	// }
-	// ssmEndpoint, ok := computeCfg["SSM"].(string)
-	// if !ok {
-	// 	return &provider{}, fail.SyntaxError("field 'SSM' in section 'cimpute' not found in tenants.toml")
-	// }
 
 	awsConf := stacks.AWSConfiguration{
 		// S3Endpoint:  s3Endpoint,
@@ -281,10 +269,10 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	}
 
 	var (
-		templatesWithGPU []string
-		out              []*regexp.Regexp
+		out []*regexp.Regexp
 	)
-	for _, v := range templatesWithGPU {
+
+	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
 			return emptySlice

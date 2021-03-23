@@ -62,7 +62,7 @@ func DecorateWith(prefix, what, why string, ignoreCount uint) string {
 			msg += ": " + why
 		}
 	}
-	msg += "\n" + string(IgnoreTraceUntil(godebug.Stack(), "SafeScale/lib/utils/debug/callstack/callstack", FirstOccurence))
+	msg += "\n" + IgnoreTraceUntil(godebug.Stack(), "SafeScale/lib/utils/debug/callstack/callstack", FirstOccurrence)
 	return msg
 }
 
@@ -70,13 +70,13 @@ func DecorateWith(prefix, what, why string, ignoreCount uint) string {
 type Occurrence bool
 
 const (
-	FirstOccurence Occurrence = false
-	LastOccurence  Occurrence = true
+	FirstOccurrence Occurrence = false
+	LastOccurrence  Occurrence = true
 )
 
 // IgnoreTraceUntil cuts all the lines of the trace before and including lines with 'search' in it
-// if 'stop' contains FirstOccurence, cuts until the first occurence of line containing 'search'
-// if 'stop' contains LastOccurence, cuts until the last occurence of line containing 'search'
+// if 'stop' contains FirstOccurrence, cuts until the first occurrence of line containing 'search'
+// if 'stop' contains LastOccurrence, cuts until the last occurrence of line containing 'search'
 func IgnoreTraceUntil(callTrace interface{}, search string, stop Occurrence) string {
 	if callTrace == nil {
 		return ""
@@ -110,11 +110,11 @@ func IgnoreTraceUntil(callTrace interface{}, search string, stop Occurrence) str
 	changeSourcePathFunc := SourceFilePathUpdater()
 	for scanner.Scan() {
 		line := scanner.Text()
-		if stop == LastOccurence && strings.Contains(line, search) {
+		if stop == LastOccurrence && strings.Contains(line, search) {
 			buffer = ""
 			found = true
 			continue
-		} else if !found && stop == FirstOccurence && strings.Contains(line, search) {
+		} else if !found && stop == FirstOccurrence && strings.Contains(line, search) {
 			buffer = ""
 			found = true
 			continue

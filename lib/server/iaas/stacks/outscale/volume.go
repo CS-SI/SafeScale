@@ -39,7 +39,6 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	v, _ := s.InspectVolumeByName(request.Name)
 	if v != nil {
@@ -122,7 +121,6 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	return retry.WhileUnsuccessfulDelay5SecondsTimeout(
 		func() error {
@@ -151,7 +149,6 @@ func (s stack) InspectVolume(id string) (av *abstract.Volume, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadVolumeByID(id)
 	if xerr != nil {
@@ -179,7 +176,6 @@ func (s stack) InspectVolumeByName(name string) (av *abstract.Volume, xerr fail.
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadVolumeByName(name)
 	if xerr != nil {
@@ -204,7 +200,6 @@ func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadVolumes(nil)
 	if xerr != nil {
@@ -235,7 +230,6 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	return s.rpcDeleteVolume(id)
 }
@@ -283,7 +277,6 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	firstDeviceName, xerr := s.getFirstFreeDeviceName(request.HostID)
 	if xerr != nil {
@@ -312,7 +305,6 @@ func (s stack) InspectVolumeAttachment(serverID, volumeID string) (_ *abstract.V
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadVolumeByID(volumeID)
 	if xerr != nil {
@@ -348,7 +340,6 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", serverID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	volumes, err := s.ListVolumes()
 	if err != nil {
@@ -378,7 +369,6 @@ func (s stack) DeleteVolumeAttachment(serverID, volumeID string) (xerr fail.Erro
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s, %s)", serverID, volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	xerr = s.rpcUnlinkVolume(volumeID)
 	if xerr != nil {

@@ -362,22 +362,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nil, userData, xerr
 	}
 
-	//// Gets security group to use by default
-	//// FUTURE: allow user to define default security group in tenants.json file ?
-	//var securityGroups []string
-	//if request.IsGateway || request.PublicIP {
-	//	sgName := request.ResourceName + abstract.HostDefaultSecurityGroupNameSuffix
-	//	asg, xerr := s.InspectSecurityGroup(sgName)
-	//	if xerr != nil {
-	//		return nil, userData, fail.Wrap(xerr, "failed to load default Security Group '%s' for host; must be created first", sgName)
-	//	}
-	//	securityGroups = append(securityGroups, asg.ID)
-	//}
-	//
 	// defines creation options
 	srvOpts := serverCreateOpts{
-		Name: request.ResourceName,
-		//SecurityGroups:   securityGroups,
+		Name:             request.ResourceName,
 		SecurityGroups:   []string{},
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
@@ -405,7 +392,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// Retry creation until success, for 10 minutes
 	var (
-		//httpResp *http.Response
 		r      servers.CreateResult
 		server *servers.Server
 	)
@@ -422,7 +408,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 						if server != nil && server.ID != "" {
 							derr := servers.Delete(s.Stack.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
-								//logrus.Errorf("cleaning up on failure, failed to delete host: %v", derr)
 								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host"))
 							}
 						}

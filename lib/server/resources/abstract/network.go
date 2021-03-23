@@ -40,16 +40,11 @@ type Network struct {
 	Name       string   `json:"name,omitempty"`        // name of the network
 	CIDR       string   `json:"mask,omitempty"`        // network in CIDR notation (if it has a meaning...)
 	DNSServers []string `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
-	//Subnets    []string `json:"subnets,omitempty"`     // contains the list of subnet IDs created in Networking
-
-	//SubnetState networkstate_obsolete.Enum `json:"status,omitempty"`  // state of the Networking
 }
 
 // NewNetwork initializes a new instance of Network
 func NewNetwork() *Network {
-	return &Network{
-		//SubnetState: networkstate_obsolete.UNKNOWNSTATE,
-	}
+	return &Network{}
 }
 
 // Clone ...
@@ -70,8 +65,6 @@ func (n *Network) Replace(p data.Clonable) data.Clonable {
 	*n = *src
 	n.DNSServers = make([]string, 0, len(src.DNSServers))
 	copy(n.DNSServers, src.DNSServers)
-	//n.Subnets = make([]string, 0, len(src.Subnets))
-	//copy(n.Subnets, src.Subnets)
 	return n
 }
 

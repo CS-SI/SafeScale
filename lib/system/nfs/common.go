@@ -190,13 +190,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	if xerr != nil {
 		return "", xerr
 	}
-	// VPL: Whaaaaat ?
-	// if xerr == nil {
-	// 	if connected := strings.Contains(uptext, "/scp"); !connected {
-	// 		logrus.Warn("SUDO problem ?")
-	// 	}
-	// }
-	// }
 
 	// Execute script on remote host with retries if needed
 	var (

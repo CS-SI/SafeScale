@@ -40,11 +40,6 @@ func ResourceTimeoutError(resource, name string, dur time.Duration) fail.Error {
 	return fail.TimeoutError(nil, dur, msgFinal)
 }
 
-// // TimeoutError creates a ErrTimeout error
-// func TimeoutError(message string, dur time.Duration) fail.ErrTimeout {
-// 	return fail.TimeoutError(nil, dur, message)
-// }
-
 // ResourceNotAvailableError creates a ResourceNotAvailable error
 func ResourceNotAvailableError(resource, name string) fail.Error {
 	msgFinal := fmt.Sprintf("%s %s is unavailable", resource, name)

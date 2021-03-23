@@ -74,18 +74,8 @@ func NewShare(server *Server, path, options string) (*Share, fail.Error) {
 	return &share, nil
 }
 
-// // AddACL adds an ACL to the share
-// func (s *Share) AddACL(acl ExportACL) {
-// 	acls := append(s.ACLs, acl)
-// 	s.ACLs = acls
-// }
-
 // Add configures and exports the share
 func (s *Share) Add(ctx context.Context) fail.Error {
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	data := map[string]interface{}{
 		"Path": s.Path,
 		// "AccessRights": strings.TrimSpace(acls),

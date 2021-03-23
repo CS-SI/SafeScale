@@ -749,9 +749,6 @@ func (t *task) Abort() (err fail.Error) {
 
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
-		// } else if t.status == DONE {
-		// 	t.status = ABORTED
-		// 	t.err = fail.AbortedError(t.err)
 	} else {
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)

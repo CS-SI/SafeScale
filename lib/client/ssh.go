@@ -167,9 +167,6 @@ func extractPath(in string) (string, fail.Error) {
 
 // Copy ...
 func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
-	// if s == nil {
-	//     return -1, "", "", fail.InvalidInstanceError()
-	// }
 	if from == "" {
 		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
 	}
@@ -393,10 +390,6 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 
 // WaitReady waits the SSH service of remote host is ready, for 'timeout' duration
 func (s ssh) WaitReady( /*ctx context.Context, */ hostName string, timeout time.Duration) error {
-	// if ctx == nil {
-	// 	return fail.InvalidParameterCannotBeNilError("ctx")
-	// }
-
 	task, xerr := s.session.GetTask()
 	if xerr != nil {
 		return xerr

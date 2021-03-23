@@ -312,20 +312,6 @@ func toAbstractVolumeAttachment(serverName, diskName string) abstract.VolumeAtta
 	}
 }
 
-//type gcpDiskAttachment struct {
-//	attachmentID string
-//	hostName     string
-//	diskName     string
-//}
-
-//func newGcpDiskAttachment(hostName string, diskName string) gcpDiskAttachment {
-//	return gcpDiskAttachment{
-//		hostName:     hostName,
-//		diskName:     diskName,
-//		attachmentID: generateDiskAttachmentID(hostName, diskName),
-//	}
-//}
-
 const attachmentIDSeparator = "---"
 
 func generateDiskAttachmentID(hostName string, diskName string) string {
@@ -341,14 +327,3 @@ func extractFromAttachmentID(theID string) (serverName, diskName string) {
 	}
 	return "", ""
 }
-
-//
-//func newGcpDiskAttachmentFromID(theID string) gcpDiskAttachment {
-//	sep := "---"
-//	if strings.Contains(theID, sep) {
-//		host := strings.Split(theID, sep)[0]
-//		drive := strings.Split(theID, sep)[1]
-//		return newGcpDiskAttachment(host, drive)
-//	}
-//	return gcpDiskAttachment{}
-//}

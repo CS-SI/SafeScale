@@ -166,7 +166,7 @@ func OnPanic(err interface{}) {
 		switch v := err.(type) {
 		case *Error:
 			if v != nil {
-				*v = RuntimePanicError("runtime panic occurred:\n%s", callstack.IgnoreTraceUntil(x, "src/runtime/panic", callstack.FirstOccurence))
+				*v = RuntimePanicError("runtime panic occurred:\n%s", callstack.IgnoreTraceUntil(x, "src/runtime/panic", callstack.FirstOccurrence))
 			} else {
 				logrus.Errorf(callstack.DecorateWith("fail.OnPanic()", " intercepted panic but '*err' is nil", "", 5))
 			}

@@ -128,10 +128,6 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		return fail.InvalidParameterCannotBeNilError("inspector")
 	}
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	var (
 		item  *jsonProperty
 		found bool

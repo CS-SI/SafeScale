@@ -19,8 +19,10 @@
 package local
 
 import (
+	"regexp"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"

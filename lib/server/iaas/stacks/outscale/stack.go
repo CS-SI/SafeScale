@@ -47,10 +47,6 @@ type ComputeConfiguration struct {
 	DefaultTenancy     string
 	DNSList            []string
 	OperatorUsername   string
-	// WhitelistTemplateRegexp *regexp.Regexp
-	// BlacklistTemplateRegexp *regexp.Regexp
-	// WhitelistImageRegexp    *regexp.Regexp
-	// BlacklistImageRegexp    *regexp.Regexp
 }
 
 // NetworkConfiguration Outscale network configuration
@@ -97,13 +93,6 @@ type stack struct {
 	deviceNames          []string
 
 	vpc *abstract.Network
-
-	// // DefaultSecurityGroupName is the name of the default security groups
-	// DefaultSecurityGroupName string
-	// // DefaultSecurityGroupDescription contains a description for the default security groups
-	// DefaultSecurityGroupDescription string
-	// SecurityGroup is an instance of the default security group
-	//SecurityGroup     *secgroups.SecGroup
 }
 
 // NullStack returns a null value of the stack
@@ -119,7 +108,6 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { //nolint
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	client := osc.NewAPIClient(osc.NewConfiguration())
 	auth := context.WithValue(context.Background(), osc.ContextAWSv4, osc.AWSv4{
@@ -213,7 +201,6 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	return []string{
 		"cn-southeast-1",
@@ -232,7 +219,6 @@ func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, _, err := s.client.SubregionApi.ReadSubregions(s.auth, nil)
 	if err != nil {

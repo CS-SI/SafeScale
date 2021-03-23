@@ -587,10 +587,9 @@ func (s stack) rpcCreateRoute(networkName, subnetName string) (*compute.Route, f
 	routeName := fmt.Sprintf(natRouteNameFormat, networkName, subnetName)
 
 	request := compute.Route{
-		DestRange: "0.0.0.0/0",
-		Name:      routeName,
-		Network:   fmt.Sprintf("%s/global/networks/%s", s.selfLinkPrefix, networkName),
-		//NextHopIP: ???,
+		DestRange:       "0.0.0.0/0",
+		Name:            routeName,
+		Network:         fmt.Sprintf("%s/global/networks/%s", s.selfLinkPrefix, networkName),
 		NextHopInstance: fmt.Sprintf("%s/zones/%s/instances/gw-%s", s.selfLinkPrefix, s.GcpConfig.Zone, subnetName),
 		Priority:        800,
 		Tags:            []string{fmt.Sprintf(natRouteTagFormat, networkName, subnetName)},
@@ -977,19 +976,6 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 
 	return resp, nil
 }
-
-// func publicAccess(isPublic bool) []*compute.AccessConfig {
-// 	if isPublic {
-// 		return []*compute.AccessConfig{
-// 			{
-// 				Type: "ONE_TO_ONE_NAT",
-// 				Name: "External NAT",
-// 			},
-// 		}
-// 	}
-//
-// 	return []*compute.AccessConfig{}
-// }
 
 func (s stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
 	if ref == "" {

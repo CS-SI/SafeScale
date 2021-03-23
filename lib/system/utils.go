@@ -48,21 +48,3 @@ func GetBashLibrary() (string, fail.Error) {
 	}
 	return anon.(string), nil
 }
-
-// // ExtractRetCode extracts info from the error
-// func ExtractRetCode(xerr fail.Error) (string, int, error) {
-// 	retCode := -1
-// 	msg := "__ NO MESSAGE __"
-// 	if ee, ok := err.(*exec.ExitError); ok {
-// 		// Try to get retCode
-// 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {
-// 			retCode = status.ExitStatus()
-// 		} else {
-// 			return msg, retCode, fail.NewError("ExitError.Sys is not a 'syscall.WaitStatus'")
-// 		}
-// 		// Retrive error message
-// 		msg = ee.Error()
-// 		return msg, retCode, nil
-// 	}
-// 	return msg, retCode, fail.NewError("error is not an 'ExitError'")
-// }

@@ -26,7 +26,7 @@ import (
 func IPv4ToUInt32(ip net.IP) uint32 {
 	ipv4 := ip.To4() // make sure we have the version with 4 first significant bytes
 	result := (uint32(ipv4[0]) << 24) | (uint32(ipv4[1]) << 16) | (uint32(ipv4[2]) << 8) | uint32(ipv4[3])
-	return uint32(result)
+	return result
 }
 
 // IPv4StringToUInt32 converts IPv4 to uint32

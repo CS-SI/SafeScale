@@ -224,7 +224,6 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		return nullASG, fail.NotFoundError("failed to find Security Group %s", asgLabel)
 	}
 
-	//asg = abstract.NewSecurityGroup(r.Name)
 	asg.ID = r.ID
 	asg.Name = r.Name
 	asg.Description = r.Description

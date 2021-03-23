@@ -97,19 +97,6 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 		n.MasterByID[k] = v
 	}
 
-	// n.PublicNodes = make([]uint, 0, len(src.PublicNodes))
-	// copy(n.PublicNodes, src.PublicNodes)
-	//
-	// n.PublicNodeByName = make(map[string]uint, len(src.PublicNodeByName))
-	// for k, v := range src.PublicNodeByName {
-	// 	n.PublicNodeByName[k] = v
-	// }
-	//
-	// n.PublicNodeByID = make(map[string]uint, len(src.PublicNodeByID))
-	// for k, v := range src.PublicNodeByID {
-	// 	n.PublicNodeByID[k] = v
-	// }
-
 	n.PrivateNodes = make([]uint, len(src.PrivateNodes))
 	copy(n.PrivateNodes, src.PrivateNodes)
 

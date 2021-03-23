@@ -23,47 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// // List lists all features suitable for hosts
-// func ErrorList() ([]interface{}, error) {
-// 	cfgFiles := mapset.NewSet()
-
-// 	captured := mapset.NewSet()
-
-// 	var paths []string
-// 	paths = append(paths, utils.AbsPathify("$HOME/.safescale/features"))
-// 	paths = append(paths, utils.AbsPathify("$HOME/.config/safescale/features"))
-// 	paths = append(paths, utils.AbsPathify("/etc/safescale/features"))
-
-// 	for _, path := range paths {
-// 		files, err := ioutil.ReadDir(path)
-// 		if err == nil {
-// 			for _, f := range files {
-// 				if isCfgFile := strings.HasSuffix(strings.ToLower(f.GetName()), ".yml"); isCfgFile == true {
-// 					cfgFiles.Add(strings.Replace(strings.ToLower(f.GetName()), ".yml", "", 1))
-// 				}
-// 			}
-// 		}
-// 	}
-// 	for _, feat := range operations.GetAllEmbeddedFeatures() {
-// 		yamlKey := "feature.suitableFor.host"
-
-// 		if !captured.Contains(feat.GetName()) {
-// 			ok := false
-// 			if feat.GetSpecs().IsSet(yamlKey) {
-// 				value := strings.ToLower(feat.GetSpecs().GetString(yamlKey))
-// 				ok = value == "ok" || value == "yes" || value == "true" || value == "1"
-// 			}
-// 			if ok {
-// 				cfgFiles.Add(feat.GetFilename())
-// 			}
-
-// 			captured.Add(feat.GetName())
-// 		}
-// 	}
-
-// 	return cfgFiles.ToSlice(), nil
-// }
-
 // New searches for a spec file name 'name' and initializes a new Feature object
 // with its content
 func New(svc iaas.Service, name string) (resources.Feature, fail.Error) {

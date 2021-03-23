@@ -1,4 +1,4 @@
-// +build ignore
+// +build vcloud,!ignore
 
 /*
  * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
@@ -27,9 +27,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"github.com/vmware/go-vcloud-director/govcd"
-	"github.com/vmware/go-vcloud-director/types/v56"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -40,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
+	"github.com/vmware/go-vcloud-director/govcd"
 )
 
 // -------------IMAGES---------------------------------------------------------------------------------------------------
@@ -339,8 +337,6 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 	if utils.IsEmpty(catalogitem) {
 		return nullAhf, userData, fail.NewError("failed to find item '%s' in the catalog", itemName)
 	}
-
-	// FIXME: Use template
 
 	// Determine system disk size based on vcpus count
 	template, xerr := s.GetTemplate(request.TemplateID)
@@ -653,22 +649,6 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 // FIXME: determine if anything is needed (does nothing for now)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
-	// if s.isNull() {
-	// 	return fail.InvalidInstanceError()
-	// }
-	// ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// if !ahf.IsConsistent() {
-	// 	return fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
-	// }
-	//
-	// tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
-	// defer tracer.Exiting()
-	// defer fail.OnPanic(&xerr)
-	//
-	// return s.rpcResetStartupScriptOfInstance(ahf.GetID())
 }
 
 // InspectHost returns the host identified by ref (name or id) or by a *abstract.IPAddress containing an id

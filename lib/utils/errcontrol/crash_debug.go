@@ -38,7 +38,9 @@ func CrasherWithDescription(in error, description string, calldepth ...int) (err
 		if _, ok := rerr.(error); ok {
 			err = rerr.(error)
 		} else {
-			err = fmt.Errorf("error %s: %v", description, rerr)
+			if rerr != nil {
+				err = fmt.Errorf("error %s: %v", description, rerr)
+			}
 		}
 	}()
 	if in != nil {
@@ -56,7 +58,9 @@ func Crasher(in error, calldepth ...int) (err error) {
 		if _, ok := rerr.(error); ok {
 			err = rerr.(error)
 		} else {
-			err = fmt.Errorf("error: %v", rerr)
+			if rerr != nil {
+				err = fmt.Errorf("error: %v", rerr)
+			}
 		}
 	}()
 	if in != nil {
@@ -74,7 +78,9 @@ func CrasherFail(in fail.Error, calldepth ...int) (err fail.Error) {
 		if _, ok := rerr.(error); ok {
 			err = fail.ConvertError(rerr.(error))
 		} else {
-			err = fail.ConvertError(fmt.Errorf("error: %v", rerr))
+			if rerr != nil {
+				err = fail.ConvertError(fmt.Errorf("error: %v", rerr))
+			}
 		}
 	}()
 	if in != nil {

@@ -101,15 +101,6 @@ var (
 	}
 )
 
-// // IsSSHRetryable tells if the retcode of a ssh command may be retried
-// func IsSSHRetryable(code int) bool {
-// 	if code == 2 || code == 4 || code == 5 || code == 66 || code == 67 || code == 70 || code == 74 || code == 75 || code == 76 {
-// 		return true
-// 	}
-// 	return false
-//
-// }
-
 // IsSCPRetryable tells if the retcode of a scp command may be retried
 func IsSCPRetryable(code int) bool {
 	if code == 4 || code == 5 || code == 66 || code == 67 || code == 70 || code == 74 || code == 75 || code == 76 {
@@ -829,7 +820,6 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 	if cmdString != "" {
 		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
-	//logrus.Debugf("createSSHCommand() sshCmdString: %s\n", sshCmdString)
 
 	return sshCmdString, f, nil
 
@@ -1101,48 +1091,3 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 	}
 	return nil
 }
-
-// // NewCommandWithContext is like NewCommand but includes a context.
-// //
-// // The provided context is used to kill the process (by calling
-// // os.Process.Kill) if the context becomes done before the command
-// // completes on its own.
-// func (ssh *SSHConfig) NewCommandWithContext(ctx context.Context, runCmdString string) (*SSHCommand, error) {
-// 	tunnels, sshConfig, err := ssh.CreateTunneling()
-// 	if err != nil {
-// 		return nil, fmt.Errorf("unable to create command : %s", err.Error()
-// 	}
-// 	sshCmdString, sshPingCmdString, keyFile, err := createSSHCommand(sshConfig, runCmdString, false)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("unable to create command : %s", err.Error()
-// 	}
-//
-// 	cmd := exec.CommandContext(ctx, "bash", "-c", sshCmdString)
-// 	sshCommand := SSHCommand{
-// 		cmd:     cmd,
-// 		tunnels: tunnels,
-// 		keyFile: keyFile,
-// 	}
-// 	return &sshCommand, nil
-// }
-
-// // CreateKeyPair creates a key pair
-// func CreateKeyPair() (publicKeyBytes []byte, privateKeyBytes []byte, xerr fail.Error) {
-// 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
-// 	publicKey := privateKey.PublicKey
-// 	pub, err := ssh.NewPublicKey(&publicKey)
-// 	if err != nil {
-// 		return nil, nil, fail.ConvertError(err)
-// 	}
-//
-// 	publicKeyBytes = ssh.MarshalAuthorizedKey(pub)
-//
-// 	priBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-// 	privateKeyBytes = pem.EncodeToMemory(
-// 		&pem.Block{
-// 			Type:  "RSA PRIVATE KEY",
-// 			Bytes: priBytes,
-// 		},
-// 	)
-// 	return publicKeyBytes, privateKeyBytes, nil
-// }
