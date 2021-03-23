@@ -523,15 +523,6 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	crashPlan := ""
-	if crashPlanCandidate := os.Getenv("SAFESCALE_PLANNED_CRASHES"); crashPlanCandidate != "" {
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			logrus.Warnf("Reloading crashplan: %s", crashPlanCandidate)
-		}
-		crashPlan = crashPlanCandidate
-	}
-	_ = errcontrol.CrashSetup(crashPlan)
-
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
