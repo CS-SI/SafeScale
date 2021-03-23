@@ -9,12 +9,14 @@ all: generate
 
 generate: clean gensrc
 	@$(GO) generate -run rice .
+	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true
 	@echo "package userdata" > $(VERSIONFILE)
 	@echo "const (" >> $(VERSIONFILE)
 	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
+	@echo "  Tags = \"$(BUILD_TAGS)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
 
 vet:

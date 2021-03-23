@@ -1,30 +1,20 @@
-FROM safescale:$THISBRANCH
+FROM alpine:3.6
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
 ARG LC_ALL=C.UTF-8
 ARG LANG=C.UTF-8
-ENV DEBIAN_FRONTEND noninteractive
 ENV BUILD_ENV docker
-ENV TENANT $TENANT
-ENV CLUTYPE $CLUTYPE
-ENV OSTESTED $OSTESTED
-ENV CLUSIZE $CLUSIZE
 
-RUN mkdir -p /etc/safescale
-RUN mkdir -p /root/.safescale/forensics
+RUN apk update && \
+    apk add --no-cache \
+    curl \
+    wget \
+    openssl \
+    ca-certificates \
+    iproute2 \
+    iperf
 
-COPY tenants.toml /etc/safescale/tenants.toml
+RUN ln -s /usr/lib/tc /lib/tc
 
-COPY markerCi-$TENANT-$CLUTYPE-*-$CLUSIZE /tmp/
-
-COPY small.sh /exported
-COPY medium.sh /exported
-COPY large.sh /exported
-COPY poc.sh /exported
-
-COPY director.sh /exported
-
-RUN cd /exported && ./director.sh
-
-RUN rm -f /etc/safescale/tenants.toml
+RUN apk add --no-cache bash

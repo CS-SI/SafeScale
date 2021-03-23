@@ -3,7 +3,6 @@ module github.com/CS-SI/SafeScale
 go 1.14
 
 require (
-	cloud.google.com/go v0.41.0 // indirect
 	github.com/GeertJohan/go.rice v1.0.2
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
@@ -20,8 +19,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gojuno/minimock/v3 v3.0.8
-	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
-	github.com/golang/protobuf v1.4.1
+	github.com/golang/protobuf v1.4.3
 	github.com/gophercloud/gophercloud v0.0.0-20190509032623-7892efa714f1
 	github.com/gopherjs/gopherjs v0.0.0-20210202160940-bed99a852dfe // indirect
 	github.com/gregoryv/gocyclo v0.1.0
@@ -56,16 +54,14 @@ require (
 	github.com/stretchr/testify v1.5.1
 	github.com/urfave/cli/v2 v2.1.1
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
-	go.opencensus.io v0.22.2 // indirect
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/net v0.0.0-20201021035429-f5854403a974
-	golang.org/x/oauth2 v0.0.0-20191202225959-858c2ad4c8b6
-	golang.org/x/sys v0.0.0-20210314195730-07df6a141424
-	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
+	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4
+	golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84
+	golang.org/x/sys v0.0.0-20210320140829-1e4c9ba3b0c4
 	gomodules.xyz/stow v0.2.4
-	google.golang.org/api v0.15.0
-	google.golang.org/appengine v1.6.5 // indirect
-	google.golang.org/grpc v1.27.1
+	google.golang.org/api v0.30.0
+	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/grpc v1.31.0
 	google.golang.org/protobuf v1.25.0
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

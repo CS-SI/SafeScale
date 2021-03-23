@@ -8,21 +8,12 @@ default: help ;
 include ./common.mk
 
 # Binaries generated
-EXECS=cli/safescale/safescale cli/safescaled/safescaled
-COVEREXECS=cli/safescale/safescale-cover cli/safescaled/safescaled-cover
+EXECS=cli/safescale/safescale$(EXT) cli/safescaled/safescaled$(EXT)
+COVEREXECS=cli/safescale/safescale-cover$(EXT) cli/safescaled/safescaled-cover$(EXT)
 
-# List of files
-PKG_FILES := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks )
-# List of packages
-PKG_LIST := $(shell $(GO) list ./... | grep -v lib/security/)
-# List of packages alt
-PKG_LIST_ALT := $(shell find . -type f -name '*.go' | grep -v version.go | grep -v gomock_reflect_ | grep -v /mocks | grep -v vclouddirector | grep -v ebrc | grep -v cli | xargs -I {} dirname {} | uniq )
-# List of packages to test
-TESTABLE_PKG_LIST := $(shell $(GO) list ./... | grep -v /cli)
-
-# DEPENDENCIES MANAGEMENT
+# Code generation
 STRINGER := golang.org/x/tools/cmd/stringer
-RICE := github.com/GeertJohan/go.rice github.com/GeertJohan/go.rice/rice
+RICE := github.com/GeertJohan/go.rice/rice
 PROTOC := github.com/golang/protobuf
 PROTOBUF := github.com/golang/protobuf/protoc-gen-go
 
@@ -35,11 +26,11 @@ ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
 
-#BUILD_TAGS = --tags=debug
+# Default build tags
 BUILD_TAGS = 
 export BUILD_TAGS
 
-all: begin ground getdevdeps sdk generate lib cli err vet
+all: logclean ground getdevdeps sdk generate mod lib cli err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps sdk generate
@@ -50,8 +41,15 @@ versioncut:
 begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
 
+mod:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(GO) mod download)
+
 libvirt:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Libvirt driver enabled$(NO_COLOR)\n";
+	@which lsmod > /dev/null; if [ $$? -ne 0 ]; then \
+		@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Libvirt not available in this platform !\n"; exit 1;\
+	fi
 	@systemctl status libvirtd.service >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) libvirt is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@lsmod | grep kvm >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) kvm is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@grep -E '^flags.*(vmx|svm)' /proc/cpuinfo >/dev/null 2>&1 && \
@@ -60,8 +58,20 @@ libvirt:
 	else \
 		printf "%b" "$(WARN_COLOR)$(WARN_STRING) Hardware acceleration is NOT available!\n"; \
 	fi
-	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Libvirt doesn't work on develop branch right now!\n"; exit 1;\
-	#$(eval BUILD_TAGS = "--tags=libvirt")
+	$(eval BUILD_TAGS = "libvirt,$(BUILD_TAGS)") \
+	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Libvirt doesn't work on develop branch right now!\n"; exit 1;
+
+debug:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'debug' flag$(NO_COLOR)\n";
+	$(eval BUILD_TAGS = "debug,$(BUILD_TAGS)")
+
+vcloud:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'vcloud' flag$(NO_COLOR)\n";
+	$(eval BUILD_TAGS = "vcloud,$(BUILD_TAGS)")
+
+alltests:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'alltests' flag$(NO_COLOR)\n";
+	$(eval BUILD_TAGS = "alltests,$(BUILD_TAGS)")
 
 with_git:
 	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
@@ -72,28 +82,46 @@ ground:
 	@command -v $(GO) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) go is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v protoc >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) protoc is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 
+coverdeps: begin ground
+	@which cover > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading cover...\n" && $(GO) install $(COVER)@v0.1.0 &>/dev/null || true; \
+	fi
+	@which covertool > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading covertool...\n" && $(GO) install $(COVERTOOL) &>/dev/null || true; \
+	fi
+	@which go2xunit > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading go2xunit...\n" && $(GO) install $(XUNIT)@v1.4.10 &>/dev/null || true; \
+	fi
+
 getdevdeps: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@which rice go2xunit cover covertool > /dev/null; if [ $$? -ne 0 ]; then \
-    	$(GO) get -u $(RICE) $(COVER) $(XUNIT) $(COVERTOOL) &>/dev/null || true; \
+	@which rice > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) install $(RICE)@v1.0.2 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing rice module...$(NO_COLOR)\n" && $(GO) mod download github.com/GeertJohan/go.rice@v1.0.2 &>/dev/null || true; \
     fi
+	@sleep 2
+	@which rice > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) install $(RICE)@v1.0.2 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing rice module...$(NO_COLOR)\n" && $(GO) mod download github.com/GeertJohan/go.rice@v1.0.2 &>/dev/null || true; \
+	fi
+	@sleep 2
 	@which protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) install github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null || true; \
 	fi
 	@which minimock > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) install $(MINIMOCK) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) install $(MINIMOCK)@v3.0.8 &>/dev/null || true; \
 	fi
 	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u $(ERRCHECK) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) install $(ERRCHECK)@v1.6.0 &>/dev/null || true; \
 	fi
 	@which goconvey > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get -u $(CONVEY) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) install $(CONVEY)@v1.6.4 &>/dev/null || true; \
 	fi
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get -u $(LINTER) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) install $(LINTER)@v0.0.0-20201208152925-83fdc39ff7b5 &>/dev/null || true; \
 	fi
 	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u $(STRINGER) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) install $(STRINGER)@v0.1.0 &>/dev/null || true; \
 	fi
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
     	printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
@@ -143,66 +171,65 @@ conveystop:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Stopping goconvey in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(ps -ef | grep goconvey | grep -v grep | grep 8082 | awk {'print $2'} | xargs kill -9 || true)
 
-depclean: begin
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning vendor and redownloading deps, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(GO) mod download)
-
 generate: sdk
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@rm -f ./generation_results.log || true
-	@$(GO) generate -run stringer ./... 2>&1 | tee -a generation_results.log
-	@cd cli && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
-	@cd lib && $(MAKE) gensrc 2>&1 | tee -a generation_results.log
-	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
-	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
+	@$(RM) ./generation_results.log || true
+	@$(GO) generate -run stringer ./... 2>&1 | $(TEE) -a generation_results.log
+	@cd cli && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log
+	@cd lib && $(MAKE) gensrc 2>&1 | $(TEE) -a generation_results.log
+	@cd lib && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log
+	@cd cli && $(MAKE) generate 2>&1 | $(TEE) -a generation_results.log
 	@$(GO) generate ./... >> generation_results.log 2>&1 || true
 	@if [ -s ./generation_results.log ]; then printf "%b" "$(WARN_COLOR)$(WARN_STRING) Warnings generating code !$(NO_COLOR)\n";fi;
 
 test: begin # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) test -race -v github.com/CS-SI/SafeScale/integrationtests/... github.com/CS-SI/SafeScale/lib/... 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 60s -v ./... 2>&1 > test_results.log || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
 gofmt: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running gofmt checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@if [ -n "$$($(GOFMT) -d $(PKG_FILES))" ]; then \
-		"$$($(GOFMT) -d $(PKG_FILES))" \
+	@if [ -n "$$($(GOFMT) -d .)" ]; then \
+		"$$($(GOFMT) -d .)" \
 		echo "-- gofmt check failed"; \
 		false; \
 	fi
 
 err: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@errcheck $(PKG_LIST_ALT) 2>&1 | tee err_results.log
+	@$(GO) list ./... | grep -v mock | grep -v cli | xargs errcheck | $(TEE) err_results.log
 	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
 
 vet: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running vet checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) vet ${PKG_LIST_ALT} 2>&1 | tee vet_results.log
+	@$(GO) list ./... | grep -v mock | grep -v cli | xargs $(GO) vet | $(TEE) vet_results.log
 	@if [ -s ./vet_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) vet FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
 minimock:
-	@$(GO) generate -run minimock ./... 2>&1 | tee -a generation_results.log
-
-silentminimock:
-	@$(GO) generate -run minimock ./... 2>&1 >> generation_results.log
-
-lint: begin generate
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running lint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@golint ./... | grep -v vendor | grep -v test | grep -v Test | grep -v enum\. | grep -v version\.go || true
+	@$(GO) generate -run minimock ./... 2>&1 | $(TEE) -a generation_results.log
 
 metalint: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(which golangci-lint > /dev/null && golangci-lint --color never --disable-all --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard run --enable=dogsled --enable=funlen --enable=gochecknoglobals ./... || true) || echo "golangci-lint not installed in your system"
+	@(which golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
+	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v cli | xargs golangci-lint --color never --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard --enable=dogsled --enable=funlen --enable=gochecknoglobals run || true
+
+metalint-full: begin generate
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(which golangci-lint > /dev/null && golangci-lint --color never --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard run --enable=dogsled --enable=funlen --enable=gochecknoglobals ./... || true) || echo "golangci-lint not installed in your system"
 
 style: begin generate gofmt
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(which golangci-lint > /dev/null && golangci-lint --color never --disable-all --enable=errcheck --enable=stylecheck --enable=deadcode --enable=golint --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ${PKG_LIST_ALT} || true) || echo "golangci-lint not installed in your system"
+	@(which golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
+	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v cli | xargs golangci-lint --color never --enable=errcheck --enable=stylecheck --enable=deadcode --enable=golint --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run || true
+
+style-full: begin generate gofmt
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(which golangci-lint > /dev/null && golangci-lint --color never --enable=errcheck --enable=stylecheck --enable=deadcode --enable=golint --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... || true) || echo "golangci-lint not installed in your system"
 
 coverage: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) test -race -v ${TESTABLE_PKG_LIST} -coverprofile=cover.out > coverage_results.log 2>&1 || true
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 60s -v ./... -coverprofile=cover.out > coverage_results.log 2>&1 || true
 	@$(GO) tool cover -html=cover.out -o cover.html || true
 
 show-cov: begin generate
@@ -222,7 +249,6 @@ logclean: begin
 
 help: with_git
 	@echo ''
-	@git remote update >/dev/null 2>&1
 	@printf "%b" "$(GOLD_COLOR) *************** SAFESCALE BUILD$(GOLD_COLOR) ****************$(NO_COLOR)\n";
 	@echo ' If in doubt, try "make all"'
 	@echo ''
@@ -232,12 +258,12 @@ help: with_git
 	@echo '  help         - Prints this help message'
 	@echo '  godocs       - Runs godoc in background at port 6060.'
 	@echo '                 Go to (http://localhost:6060/pkg/github.com/CS-SI/)'
-	@echo '  install      - Copies all binaries to $(GOBIN)'
+	@echo '  install      - Copies all binaries to $(GOPATH)/bin'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)TESTING TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)";
-	@echo '  lint         - Runs linter'
 	@echo '  metalint     - Runs golangci-lint'
+	@echo '  style        - Runs golangci-lint focusing on style issues'
 	@echo '  vet          - Runs all checks'
 	@echo '  err          - Looks for unhandled errors'
 	@echo '  test         - Runs all unit tests'
@@ -248,7 +274,5 @@ help: with_git
 	@printf "%b" "$(OK_COLOR)DEV TARGETS:$(NO_COLOR)\n";
 	@printf "%b" "$(NO_COLOR)";
 	@echo '  clean        - Removes files generated by build.'
-	@echo '  depclean     - Rebuilds vendor dependencies'
 	@echo '  logclean     - Removes log files generated by build.'
-	@echo ''
 	@echo
