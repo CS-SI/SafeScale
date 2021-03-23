@@ -396,14 +396,16 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 			t.Fail()
 		}
 
-	if _, xerr := overlord.WaitGroup(); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrAborted:
-			// Wanted situation, continue
-		default:
-			t.Fail()
+		if _, xerr := overlord.WaitGroup(); xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrAborted:
+				// Wanted situation, continue
+			default:
+				t.Fail()
+			}
 		}
-	}
+
+		end := time.Since(begin)
 
 		fmt.Println("Here we are")
 

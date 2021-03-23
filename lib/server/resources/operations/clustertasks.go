@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"reflect"
@@ -24,7 +25,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"

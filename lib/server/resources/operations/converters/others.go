@@ -24,7 +24,6 @@ import (
 	"strings"
 	"text/scanner"
 
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
