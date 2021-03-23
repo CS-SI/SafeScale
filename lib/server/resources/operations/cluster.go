@@ -1051,7 +1051,7 @@ func (instance *cluster) createNetworkingResources(ctx context.Context, req abst
 			}
 
 			networkV3.NetworkID = rn.GetID()
-			networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the cluster will
+			networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the cluster will be
 			networkV3.CIDR = req.CIDR
 			return nil
 		})

@@ -53,7 +53,7 @@ type subTask struct {
 }
 
 type subTasks struct {
-	lock  sync.Mutex
+	lock  sync.RWMutex
 	tasks []subTask
 }
 
@@ -174,7 +174,6 @@ func (tg *taskGroup) StartInSubtask(action TaskAction, params TaskParameters, op
 	if tg.isNull() {
 		return tg, fail.InvalidInstanceError()
 	}
-
 	return tg.Start(action, params, options...)
 }
 
@@ -261,108 +260,110 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	errs := make(map[string]error)
 	results := make(TaskGroupResult, len(tg.children.tasks))
 
-	if taskStatus == DONE {
+	switch taskStatus {
+	case DONE:
 		tg.task.mu.Lock()
 		defer tg.task.mu.Unlock()
 
 		results = tg.result
 		return results, tg.task.err
-	}
-	if taskStatus == ABORTED {
-		var errors []error
 
-		tg.task.mu.Lock()
-		if tg.task.err != nil {
-			errors = append(errors, tg.task.err)
+	//case ABORTED:
+	//	var errors []error
+	//
+	//	tg.task.mu.Lock()
+	//	if tg.task.err != nil {
+	//		errors = append(errors, tg.task.err)
+	//	}
+	//	tg.task.mu.Unlock()
+	//
+	//	tg.children.lock.RLock()
+	//	defer tg.children.lock.RUnlock()
+	//
+	//	for _, s := range tg.children.tasks {
+	//		if lerr, _ := s.task.GetLastError(); lerr != nil {
+	//			errors = append(errors, lerr)
+	//		}
+	//	}
+	//	return nil, fail.AbortedError(fail.NewErrorList(errors), "taskgroup was already aborted")
+	//}
+	case RUNNING, READY, ABORTED:
+		doneWaitSize := len(tg.children.tasks)
+		doneWaitStates := make(map[int]bool, doneWaitSize)
+		for k := range tg.children.tasks {
+			doneWaitStates[k] = false
 		}
-		tg.task.mu.Unlock()
+		doneWaitCount := 0
 
-		tg.children.lock.Lock()
-		defer tg.children.lock.Unlock()
+		tg.children.lock.RLock()
+		defer tg.children.lock.RUnlock()
 
-		for _, s := range tg.children.tasks {
-			if err, _ := s.task.GetLastError(); err != nil {
-				errors = append(errors, err)
+		for {
+			//stop := false
+			for k, s := range tg.children.tasks {
+				//if tg.Aborted() {
+				//	stop = true
+				//	break
+				//}
+
+				if doneWaitStates[k] {
+					continue
+				}
+
+				sid, err := s.task.GetID()
+				if err != nil {
+					continue
+				}
+
+				done, result, err := s.task.TryWait()
+				if done {
+					if err != nil {
+						if s.normalizeError != nil {
+							if normalizedError := s.normalizeError(err); normalizedError != nil {
+								errs[sid] = normalizedError
+							}
+						} else {
+							errs[sid] = err
+						}
+					}
+
+					results[sid] = result
+					doneWaitStates[k] = true
+					doneWaitCount++
+				}
 			}
-		}
-		return nil, fail.AbortedError(fail.NewErrorList(errors), "taskGroup was already aborted")
-	}
-	if taskStatus != RUNNING && taskStatus != READY {
-		return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
-	}
 
-	doneWaitSize := len(tg.children.tasks)
-	doneWaitStates := make(map[int]bool, doneWaitSize)
-	for k := range tg.children.tasks {
-		doneWaitStates[k] = false
-	}
-	doneWaitCount := 0
-
-	tg.children.lock.Lock()
-	defer tg.children.lock.Unlock()
-
-	for {
-		stop := false
-		for k, s := range tg.children.tasks {
-			if tg.Aborted() {
-				stop = true
+			if /*stop || */ doneWaitCount >= doneWaitSize {
 				break
 			}
 
-			if doneWaitStates[k] {
-				continue
-			}
-
-			sid, err := s.task.GetID()
-			if err != nil {
-				continue
-			}
-
-			done, result, err := s.task.TryWait()
-			if done {
-				if err != nil {
-					if s.normalizeError != nil {
-						if normalizedError := s.normalizeError(err); normalizedError != nil {
-							errs[sid] = normalizedError
-						}
-					} else {
-						errs[sid] = err
-					}
-				}
-
-				results[sid] = result
-				doneWaitStates[k] = true
-				doneWaitCount++
-			}
+			time.Sleep(1 * time.Millisecond)
 		}
 
-		if stop || doneWaitCount >= doneWaitSize {
-			break
+		var errors []error
+		for i, e := range errs {
+			errors = append(errors, fail.Wrap(e, "%s", i))
 		}
 
-		time.Sleep(1 * time.Millisecond)
-	}
+		tg.task.mu.Lock()
+		defer tg.task.mu.Unlock()
 
-	var errors []error
-	for i, e := range errs {
-		errors = append(errors, fail.Wrap(e, "%s", i))
-	}
+		tg.task.result = results
+		if len(errors) > 0 {
+			tg.task.err = fail.AbortedError(fail.NewErrorList(errors), "aborted")
+		} else {
+			tg.task.err = nil
+		}
 
-	tg.task.mu.Lock()
-	defer tg.task.mu.Unlock()
+		if tg.task.status != ABORTED {
+			tg.task.status = DONE
+		}
+		tg.result = results
+		return results, tg.task.err
 
-	tg.task.result = results
-	if len(errors) > 0 {
-		tg.task.err = fail.NewErrorList(errors)
-	} else {
-		tg.task.err = nil
+	default:
+		return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
-
-	if tg.task.status != ABORTED {
-		tg.task.status = DONE
-	}
-	tg.result = results
-	return results, tg.task.err
 }
 
 // TryWait ...
@@ -391,16 +392,18 @@ func (tg *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
 	if xerr != nil {
 		return false, nil, xerr
 	}
-	if taskStatus != RUNNING {
+	if taskStatus != RUNNING && taskStatus != ABORTED {
 		return false, nil, fail.NewError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 
-	tg.children.lock.Lock()
-	defer tg.children.lock.Unlock()
+	{
+		tg.children.lock.RLock()
+		defer tg.children.lock.RUnlock()
 
-	for _, s := range tg.children.tasks {
-		if ok, _, _ := s.task.TryWait(); !ok {
-			return false, nil, nil
+		for _, s := range tg.children.tasks {
+			if ok, _, _ := s.task.TryWait(); !ok {
+				return false, nil, nil
+			}
 		}
 	}
 
@@ -477,15 +480,15 @@ func (tg *taskGroup) Abort() fail.Error {
 
 	// TODO: check if sending Abort to parent task is not sufficient (it should because of use of context)
 	// Send abort signal to subtasks
-	tg.children.lock.Lock()
+	tg.children.lock.RLock()
 	for _, st := range tg.children.tasks {
 		if xerr := st.task.Abort(); xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
-	tg.children.lock.Unlock()
+	tg.children.lock.RUnlock()
 
-	// Send abort signal to subtask parent task
+	// Send abort signal to subtasks' parent task
 	if xerr := tg.task.Abort(); xerr != nil {
 		errors = append(errors, xerr)
 	}
@@ -519,8 +522,8 @@ func (tg *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tg.children.lock.Lock()
-	defer tg.children.lock.Unlock()
+	tg.children.lock.RLock()
+	defer tg.children.lock.RUnlock()
 
 	status := make(map[TaskStatus][]string)
 	for _, sub := range tg.children.tasks {
