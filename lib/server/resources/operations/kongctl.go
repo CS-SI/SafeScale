@@ -253,13 +253,11 @@ func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Ma
 			options[k] = v
 		}
 
-		// if create {
 		xerr = k.createUpstream(ruleName, options, values)
 		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
 			return ruleName, xerr
 		}
-		// }
 
 		// Now ready to add target to upstream
 		jsoned, _ := json.Marshal(&target)

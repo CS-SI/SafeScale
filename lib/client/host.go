@@ -178,10 +178,6 @@ func (h host) Delete(names []string, timeout time.Duration) error {
 
 // SSHConfig ...
 func (h host) SSHConfig(name string) (*system.SSHConfig, error) {
-	// if anon, ok := sshCfgCache.Get(name); ok {
-	// 	return anon.(*system.SSHConfig), nil
-	// }
-
 	h.session.Connect()
 	defer h.session.Disconnect()
 
@@ -197,12 +193,7 @@ func (h host) SSHConfig(name string) (*system.SSHConfig, error) {
 	}
 
 	sshCfg := converters.SSHConfigFromProtocolToSystem(pbSSHCfg)
-	// if err == nil {
-	// 	nerr := sshCfgCache.Set(name, sshCfg)
-	// 	if nerr != nil {
-	// 		return sshCfg, nerr
-	// 	}
-	// }
+
 	return sshCfg, err
 }
 

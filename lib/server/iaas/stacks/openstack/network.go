@@ -249,7 +249,6 @@ func (s Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 						newNet := abstract.NewNetwork()
 						newNet.ID = n.ID
 						newNet.Name = n.Name
-						//newNet.Subnets = n.Subnets
 
 						netList = append(netList, newNet)
 					}
@@ -318,13 +317,6 @@ func (s Stack) DeleteNetwork(id string) fail.Error {
 // ToGophercloudIPVersion converts ipversion.Enum (corresponding to SafeScale abstract) to gophercloud.IPVersion
 // if v is invalid, returns gophercloud.IPv4
 func ToGophercloudIPVersion(v ipversion.Enum) gophercloud.IPVersion {
-	//if v == ipversion.IPv4 {
-	//	return gophercloud.IPv4
-	//}
-	//if v == ipversion.IPv6 {
-	//	return gophercloud.IPv6
-	//}
-	//return -1
 	switch v {
 	case ipversion.IPv6:
 		return gophercloud.IPv6
@@ -359,15 +351,9 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 	defer tracer.Exiting()
 
 	// Checks if CIDR is valid...
-	// if req.CIDR != "" {
 	if _, _, err := net.ParseCIDR(req.CIDR); err != nil {
 		return nullAS, fail.ConvertError(err)
 	}
-	// } else { // CIDR is empty, choose the first Class C possible
-	// 	tracer.Trace("CIDR is empty, choosing one...")
-	// 	req.CIDR = "192.168.1.0/24"
-	// 	tracer.Trace("CIDR chosen for subnet is '%s'", req.CIDR)
-	// }
 
 	// If req.IPVersion contains invalid value, force to IPv4
 	var ipVersion gophercloud.IPVersion
@@ -405,34 +391,10 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 		func() (innerErr error) {
 			subnet, innerErr = subnets.Create(s.NetworkClient, opts).Extract()
 			return innerErr
-			// if innerErr != nil {
-			// 	switch innerErr.(type) { // nolint
-			// 	case *fail.ErrInvalidRequest:
-			// 		neutronError, innerXErr := ParseNeutronError(innerErr.Error())
-			// 		if innerXErr != nil {
-			// 			switch innerXErr.(type) {
-			// 			case *fail.ErrSyntax:
-			// 				return innerXErr
-			// 			default:
-			// 				return retry.StopRetryError(innerXErr)
-			// 			}
-			// 		}
-			// 		if neutronError != nil {
-			// 			return retry.StopRetryError(fail.NewError("bad request: %s", neutronError["message"]))
-			// 		}
-			// 	default:
-			// 		return retry.StopRetryError(innerErr)
-			// 	}
-			// }
-			// return nil
 		},
 		NormalizeError,
 	)
 	if xerr != nil {
-		// switch xerr.(type) {
-		// case *retry.ErrStopRetry:
-		// 	xerr = fail.ConvertError(xerr.Cause())
-		// }
 		return nullAS, xerr
 	}
 
@@ -485,14 +447,10 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 }
 
 func (s Stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {
-	// _, networkDesc, _ := net.ParseCIDR(network.CIDR)
 	_, _ /*subnetDesc*/, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
 		return fail.Wrap(err, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
-	// if networkDesc.IP.Equal(subnetDesc.IP) && networkDesc.Mask.String() == subnetDesc.Mask.String() {
-	// 	return fail.InvalidRequestError("cannot create Subnet with CIDR '%s': equal to Network one", req.CIDR)
-	// }
 	return nil
 }
 
@@ -687,25 +645,6 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 					msg := "hosts or services are still attached"
 					logrus.Warnf(strprocess.Capitalize(msg))
 					return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
-				// default: // case gophercloud.ErrUnexpectedResponseCode:
-				// 	neutronError, innerErr := ParseNeutronError(innerXErr.Error())
-				// 	if innerErr != nil {
-				// 		switch innerErr.(type) {
-				// 		case *fail.ErrSyntax:
-				// 		default:
-				// 			return retry.StopRetryError(innerXErr)
-				// 		}
-				// 	}
-				//
-				// 	switch neutronError["type"] {
-				// 	case "SubnetInUse":
-				// 		msg := "hosts or services are still attached"
-				// 		logrus.Warnf(strprocess.Capitalize(msg))
-				// 		return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
-				// 	default:
-				// 		logrus.Debugf("NeutronError: type = %s", neutronError["type"])
-				// 	}
-				// }
 				default:
 					return innerXErr
 				}
@@ -836,22 +775,10 @@ func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
 
-	// asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// if !asg.IsConsistent() {
-	// 	asg, xerr = s.InspectSecurityGroup(asg.ID)
-	// 	if xerr != nil {
-	// 		return xerr
-	// 	}
-	// }
-
 	return stacks.RetryableRemoteCall(
 		func() error {
 			var innerErr error
 			// FIXME: bind security group to port associated to subnet
-			//innerErr = secgroups.AddServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 			return innerErr
 		},
 		NormalizeError,
@@ -866,22 +793,11 @@ func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 	if subnetID == "" {
 		return fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
-	// asg, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// if !asg.IsConsistent() {
-	// 	asg, xerr = s.InspectSecurityGroup(asg.ID)
-	// 	if xerr != nil {
-	// 		return xerr
-	// 	}
-	// }
 
 	return stacks.RetryableRemoteCall(
 		func() error {
 			var innerErr error
 			// FIXME: unbind security group from port associated to subnet
-			//innerErr := secgroups.RemoveServer(s.ComputeClient, ahf.Core.ID, asg.ID).ExtractErr()
 			return innerErr
 		},
 		NormalizeError,

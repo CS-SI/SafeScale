@@ -380,6 +380,8 @@ func (instance *cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 		if xerr != nil {
 			return nil, xerr
 		}
+
+		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
 			hostInstance.Released()
 		}(node)

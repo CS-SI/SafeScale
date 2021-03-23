@@ -290,14 +290,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		func() error {
 			var innerXErr fail.Error
 			if ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1), request.IsGateway, request.SecurityGroupIDs); innerXErr != nil {
-				// if !server.isNull() {
-				// 	// try deleting server
-				// 	if derr := s.DeleteHost(server.ID); derr != nil {
-				// 		_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete instance"))
-				// 	}
-				// 	return innerXErr
-				// }
-
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate:
 					return retry.StopRetryError(innerXErr)
@@ -355,10 +347,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Networking.IsGateway = request.IsGateway
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
 	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
-
-	// if !ahf.OK() {
-	// 	logrus.Warnf("Missing data in ahf: %s", spew.Sdump(ahf))
-	// }
 
 	return ahf, userData, nil
 }
@@ -466,7 +454,6 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
 
 	var (
@@ -500,10 +487,6 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	if xerr = s.complementHost(ahf, instance); xerr != nil {
 		return nullAHF, xerr
 	}
-
-	// if !ahf.OK() {
-	// 	logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
-	// }
 
 	return ahf, nil
 }
@@ -578,23 +561,8 @@ func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instanc
 	host.Networking.SubnetsByName = subnetIDByName
 	host.Networking.PublicIPv4 = ipv4
 
-	//host.Sizing = s.fromMachineTypeToAllocatedSize(instance.MachineType)
-
 	return nil
 }
-
-//func (s stack) fromMachineTypeToAllocatedSize(machineType string) *abstract.HostEffectiveSizing {
-//	hz := abstract.HostEffectiveSizing{}
-//	mt, xerr := s.rpcGetMachineType(machineType)
-//	if xerr != nil {
-//		return &hz
-//	}
-//
-//	// FIXME: complete mapping
-//	hz.Cores = int(mt.GuestCpus)
-//	hz.RAMSize = float32(mt.MemoryMb / 1024.0)
-//	return &hz
-//}
 
 func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 	switch gcpHostStatus {
@@ -632,7 +600,6 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	if xerr := s.rpcDeleteInstance(ahf.Core.ID); xerr != nil {
 		return xerr
@@ -672,7 +639,6 @@ func (s stack) ListHosts(detailed bool) (_ abstract.HostList, xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(detailed=%v)", detailed).Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	resp, xerr := s.rpcListInstances()
 	if xerr != nil {
@@ -715,7 +681,6 @@ func (s stack) StopHost(hostParam stacks.HostParameter) fail.Error {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	return s.rpcStopInstance(ahf.Core.ID)
 }
@@ -731,7 +696,6 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	return s.rpcStartInstance(ahf.Core.ID)
 }
@@ -747,7 +711,6 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	if xerr := s.rpcStopInstance(ahf.Core.ID); xerr != nil {
 		return xerr
@@ -780,7 +743,6 @@ func (s stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	resp, xerr := s.rpcListZones()
 	if xerr != nil {
@@ -802,7 +764,6 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	resp, xerr := s.rpcListRegions()
 	if xerr != nil {
@@ -836,7 +797,6 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	return s.rpcAddTagsToInstance(ahf.GetID(), []string{asg.GetID()})
 }
@@ -859,7 +819,6 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute")).Entering().Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	return s.rpcRemoveTagsFromInstance(ahf.GetID(), []string{asg.GetID()})
 }

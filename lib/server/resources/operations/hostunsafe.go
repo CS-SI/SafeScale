@@ -176,12 +176,6 @@ func (instance *host) unsafePush(ctx context.Context, source, target, owner, mod
 		return 0, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	// // retrieve ssh config to perform some commands
-	// ssh, xerr := instance.GetSSHConfig(task)
-	// if xerr != nil {
-	// 	return 0, "", "", xerr
-	// }
-
 	if timeout < temporal.GetHostTimeout() {
 		timeout = temporal.GetHostTimeout()
 	}

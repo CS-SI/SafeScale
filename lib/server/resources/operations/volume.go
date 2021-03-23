@@ -331,7 +331,6 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -363,9 +362,6 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-
-	// // Starting from here, no way to abort the task
-	// defer task.DisarmAbortSignal()()
 
 	// delete volume
 	xerr = instance.GetService().DeleteVolume(instance.GetID())
@@ -422,7 +418,6 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s', %f, %s)", req.Name, req.Size, req.Speed.String()).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -517,7 +512,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s', %s, %s, %v)", host.GetName(), path, format, doNotFormat).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -800,9 +794,6 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer func() {
 		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
-			// // Disable abort signal during the clean up
-			// defer task.DisarmAbortSignal()()
-
 			if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", actionFromError(xerr), volumeName, targetName))
 			}
@@ -941,7 +932,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 	targetID := host.GetID()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.volume"), "('%s')", targetID).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -951,7 +941,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 		mountPath            string
 	)
 
-	// -- retrives volume data --
+	// -- retrieves volume data --
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		volume, ok := clonable.(*abstract.Volume)
 		if !ok {
@@ -1181,6 +1171,7 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 		if xerr != nil {
 			return nil, xerr
 		}
+		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
 			hostInstance.Released()
 		}(rh)

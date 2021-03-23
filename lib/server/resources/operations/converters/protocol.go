@@ -49,20 +49,6 @@ func SSHConfigFromProtocolToSystem(from *protocol.SshConfig) *system.SSHConfig {
 	}
 }
 
-// // FromProtocolHostDefinitionToProtocolGatewayDefinition converts a protocol.HostDefinition to protocol.GatewayDefinition
-// func FromProtocolHostDefinitionToProtocolGatewayDefinition(in protocol.HostDefinition) protocol.GatewayDefinition {
-// 	def := protocol.GatewayDefinition{
-// 		ImageId:  in.ImageId,
-// 		Cpu:      in.CpuCount,
-// 		Ram:      in.Ram,
-// 		Disk:     in.Disk,
-// 		GpuCount: in.GpuCount,
-// 		Sizing:   &protocol.HostSizing{},
-// 	}
-// 	*def.Sizing = *in.Sizing
-// 	return def
-// }
-
 // FeatureSettingsFromProtocolToResource ...
 func FeatureSettingsFromProtocolToResource(in *protocol.FeatureSettings) resources.FeatureSettings {
 	if in == nil {

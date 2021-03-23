@@ -217,14 +217,6 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error)
 	return res, nil
 }
 
-// VPL: not used
-// // Host ...
-// func (instance *bucket) Host(ctx context.Context) string {
-// 	// FIXME: Ignored error without warning
-// 	res, _ := instance.GetHost(task)
-// 	return res
-// }
-
 // GetMountPoint ...
 func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) {
 	if instance.isNull() {
@@ -262,14 +254,6 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 	}
 	return res, nil
 }
-
-// VPL: not used
-// // MountPoint ...
-// func (instance *bucket) MountPoint(ctx context.Context) string {
-// 	// FIXME: Ignored error without warning
-// 	res, _ := instance.GetMountPoint(task)
-// 	return res
-// }
 
 // Create a bucket
 func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Error) {

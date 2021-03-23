@@ -101,25 +101,6 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
-	// ctx, cancelFunc := context.WithCancel(ctx)
-	// // LATER: handle jobregister error
-	// if err := srvutils.JobRegister(ctx, cancelFunc, "Stop job "+uuid); err == nil {
-	// 	defer srvutils.JobDeregister(ctx)
-	// } /* else {
-	// 	return empty, fail.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	// }*/
-
-	// tenant := GetCurrentTenant()
-	// if tenant == nil {
-	// 	msg := "cannot stop process: no tenant set"
-	// 	tracer.Trace(strprocess.Capitalize(msg))
-	// 	return empty, status.Errorf(codes.FailedPrecondition, msg)
-	// }
-
-	// handler := JobManagerHandler(tenant.GetService)
-	// handler.Stop(ctx, in.Uuid)
-	// srvutils.JobCancelUUID(uuid)
-
 	return empty, server.AbortJobByID(uuid)
 }
 
@@ -148,21 +129,6 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	// ctx, cancelFunc := context.WithCancel(ctx)
-	// // LATER: handle jobregister error
-	// if err := srvutils.JobRegister(ctx, cancelFunc, "ErrorList Processes"); err == nil {
-	// 	defer srvutils.JobDeregister(ctx)
-	// } /* else {
-	// 	return nil, fail.InvalidInstanceContentError("ctx", "has no uuid").ToGRPCStatus()
-	// }*/
-
-	// tenant := GetCurrentTenant()
-	// if tenant == nil {
-	// 	msg := "cannot list process: no tenant set"
-	// 	tracer.Trace(strprocess.Capitalize(msg))
-	// 	return nil, status.Errorf(codes.FailedPrecondition, msg)
-	// }
 
 	// handler := JobManagerHandler(tenant.GetService)
 	jobMap := server.ListJobs()

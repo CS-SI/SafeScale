@@ -22,8 +22,9 @@ func TestTakiTaki(t *testing.T) {
 	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
 
 	takitaki, err := NewTask()
-	if err != nil {
+	if err != nil || takitaki == nil {
 		t.Errorf("Error creating task")
+		t.FailNow()
 	}
 	err = takitaki.SetID("foo")
 	if err != nil {
@@ -31,8 +32,9 @@ func TestTakiTaki(t *testing.T) {
 	}
 
 	nagasaki, err := NewTask()
-	if err != nil {
+	if err != nil || nagasaki == nil {
 		t.Errorf("Error creating the other task")
+		t.FailNow()
 	}
 	err = nagasaki.SetID("bar")
 	if err != nil {
@@ -90,6 +92,11 @@ func TestCriminal(t *testing.T) {
 	criminal, err := NewTask()
 	if err != nil {
 		t.Errorf("Error creating task")
+		t.FailNow()
+	}
+	if criminal == nil {
+		t.Errorf("Error creating task")
+		t.FailNow()
 	}
 	err = criminal.SetID("foo")
 	if err != nil {
@@ -99,6 +106,10 @@ func TestCriminal(t *testing.T) {
 	estilo, err := NewTask()
 	if err != nil {
 		t.Errorf("Error creating the other task")
+	}
+	if estilo == nil {
+		t.Errorf("Error creating the other task")
+		t.FailNow()
 	}
 	err = estilo.SetID("bar")
 	if err != nil {

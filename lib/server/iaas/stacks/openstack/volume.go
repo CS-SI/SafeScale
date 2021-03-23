@@ -99,16 +99,6 @@ func (s Stack) CreateVolume(request abstract.VolumeRequest) (volume *abstract.Vo
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "(%s)", request.Name).WithStopwatch().Entering().Exiting()
 
-	// VPL: openstack is old enough to sayby itself when a volume already exist at creation
-	// if volume, xerr = s.InspectVolume(request.Name); xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrTimeout:
-	// 		// continue
-	// 	default:
-	// 		return nullAV, xerr
-	// 	}
-	// }
-
 	az, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
 		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
@@ -261,10 +251,6 @@ func (s Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	if xerr != nil || len(vs) == 0 {
 		return emptySlice, xerr
 	}
-	// VPL: empty list is not an abnormal situation, do not log
-	// if len(vs) == 0 {
-	// logrus.Warnf("Complete volume list empty")
-	// }
 
 	return vs, nil
 }

@@ -13,23 +13,6 @@ import (
 
 // -------- tests for log helpers ---------
 
-// var itFailed = "it failed"
-
-// func chaos() (err error) {
-// 	logrus.SetOutput(os.Stdout)
-// 	defer OnExitLogErrorWithLevel(&err, logrus.InfoLevel, "Here it begins")
-//
-// 	// return nil
-// 	return fmt.Errorf(itFailed)
-// }
-
-// func success() (err error) {
-// 	logrus.SetOutput(os.Stdout)
-// 	defer OnExitLogErrorWithLevel(&err, logrus.InfoLevel, "Here it begins")
-//
-// 	return nil
-// }
-
 func getNotFoundErrorWithLog() (err error) {
 	defer OnExitLogError(&err)
 	return NotFoundError("not there !!!")

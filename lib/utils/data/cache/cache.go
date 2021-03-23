@@ -33,7 +33,6 @@ import (
 
 // Cache interface describing what a struct must implement to be considered as a Cache
 type Cache interface {
-	// concurrency.TaskedLock
 	observer.Observer
 
 	GetEntry(key string) (*Entry, fail.Error) // returns a cache entry from its key
@@ -174,6 +173,13 @@ func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Ent
 	// Everything seems ok, we can update
 	var ok bool
 	if ce, ok = instance.cache[key]; ok {
+		// FIXME: this has to be tested with a specific unit test
+		err := content.AddObserver(instance)
+		if err != nil {
+			return nil, fail.ConvertError(err)
+		}
+		// if there was an error after this point we should Remove the observer
+
 		ce.content = data.NewImmutableKeyValue(content.GetID(), content)
 		// reserved key may have to change accordingly with the ID of content
 		delete(instance.cache, key)
@@ -181,9 +187,7 @@ func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Ent
 		instance.cache[content.GetID()] = ce
 		ce.unlock()
 
-		// FIXME: URGENT If there is a error adding the observer, we must rollback the changes in caches and entries
-		// Also, this has to be tested with a specific unit test
-		return ce, fail.ConvertError(content.AddObserver(instance))
+		return ce, nil
 	}
 
 	return nil, fail.NotFoundError("failed to find cache entry identified by '%s'", key)

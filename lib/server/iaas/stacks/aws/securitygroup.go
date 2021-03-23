@@ -115,13 +115,9 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 	return asg, nil
 }
 
-// fromAbstractSecurityGroupRules converts a slice of abstract.SecurityGrouRule to a couple of slices of AWS ec2.IpPermission,
-// corresponding rspectively to ingress and egress IpPermission
+// fromAbstractSecurityGroupRules converts a slice of abstract.SecurityGroupRule to a couple of slices of AWS ec2.IpPermission,
+// corresponding respectively to ingress and egress IpPermission
 func (s stack) fromAbstractSecurityGroupRules(asg abstract.SecurityGroup, in abstract.SecurityGroupRules) ([]*ec2.IpPermission, []*ec2.IpPermission, fail.Error) {
-	// if len(in) == 0 {
-	// 	return nil, nil, fail.InvalidParameterError("in", "cannot be empty slice")
-	// }
-
 	ingress := make([]*ec2.IpPermission, 0, len(in))
 	egress := make([]*ec2.IpPermission, 0, len(in))
 	for _, v := range in {

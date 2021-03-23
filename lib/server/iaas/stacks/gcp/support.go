@@ -39,10 +39,3 @@ func genURL(urlCand string) SelfLink {
 	}
 	return *theURL
 }
-
-// func assertEq(exp, got interface{}) error {
-// 	if !reflect.DeepEqual(exp, got) {
-// 		return fmt.Errorf("wanted %v; Got %v", exp, got)
-// 	}
-// 	return nil
-// }

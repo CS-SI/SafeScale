@@ -485,10 +485,6 @@ func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 
 // installNodeRequirements ...
 func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
-	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
-	// defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-
 	netCfg, xerr := instance.GetNetworkConfig()
 	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {

@@ -252,9 +252,6 @@ func (instance *share) Browse(ctx context.Context, callback func(string, string)
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate instance
-	// if instance.isNull() {
-	// 	return fail.InvalidInstanceError()
-	// }
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -503,9 +500,6 @@ func (instance *share) Create(
 	defer func() {
 		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
-			// // Disable abort signal during clean up
-			// defer task.DisarmAbortSignal()()
-
 			derr := server.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -635,7 +629,6 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 	// serverID = rhServer.GetID()
 	// serverName = rhServer.GetName()
 	serverPrivateIP := rhServer.(*host).privateIP
-	//serverAccessIP := rhServer.(*host).unsafeGetAccessIP(task)
 
 	xerr = rhServer.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -707,20 +700,6 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 			return innerXErr
 		}
 
-		// VPL: why this ?
-		//return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-		//	hostNetworkV2, ok := clonable.(*propertiesv2.HostNetwork)
-		//	if !ok {
-		//		return fail.InconsistentError("'*propertiesv2.HostNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		//	}
-		//	if hostNetworkV2.DefaultGatewayPrivateIP == serverPrivateIP {
-		//		export = serverPrivateIP + ":" + hostShare.Path
-		//	} else {
-		//		export = serverAccessIP + ":" + hostShare.Path
-		//	}
-		//	return nil
-		//})
-
 		export = serverPrivateIP + ":" + hostShare.Path
 		return nil
 	})
@@ -790,9 +769,6 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 	defer func() {
 		xerr = errcontrol.CrasherFail(xerr)
 		if xerr != nil {
-			// // Disable abort signal during clean up
-			// defer task.DisarmAbortSignal()()
-
 			derr := rhServer.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -1165,6 +1141,7 @@ func (instance *share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 			logrus.Errorf(xerr.Error())
 			continue
 		}
+		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
 			hostInstance.Released()
 		}(h)

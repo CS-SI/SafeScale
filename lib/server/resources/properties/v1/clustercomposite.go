@@ -24,7 +24,7 @@ import (
 
 // ClusterComposite ...
 type ClusterComposite struct {
-	// Array of tenants hosting a multu-tenant cluster (multi starting from 1)
+	// Array of tenants hosting a multi-tenant cluster (multi starting from 1)
 	Tenants []string `json:"tenants"`
 }
 

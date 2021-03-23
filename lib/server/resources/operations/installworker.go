@@ -422,19 +422,11 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.Host, xerr fail.Error) {
 	var hosts []resources.Host
 
-	//if w.host != nil {
-	//	host, xerr := gatewayFromHost(w.feature.task, w.host)
-	//	if xerr != nil {
-	//		return nil, xerr
-	//	}
-	//	hosts = []resources.IPAddress{host}
-	//} else if w.cluster != nil {
 	hosts, xerr = w.identifyAllGateways(ctx)
 	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
-	//}
 
 	concernedHosts, xerr := w.extractHostsFailingCheck(ctx, hosts)
 	xerr = errcontrol.CrasherFail(xerr)
@@ -543,6 +535,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			return nil, fail.Wrap(xerr, "failed to set security rules on Subnet")
 		}
 	case installaction.Remove:
+		// FIXME: Uncomplete ??
 		// if !s.SkipProxy {
 		// 	rgw, xerr := w.identifyAvailableGateway()
 		// 	if xerr == nil {
@@ -569,12 +562,6 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			msg := `syntax error in feature '%s' specification file (%s): no key '%s' found`
 			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
 		}
-		// params := data.Map{
-		// 	"stepName":  k,
-		// 	"stepKey":   stepKey,
-		// 	"stepMap":   stepMap,
-		// 	"variables": v,
-		// }
 
 		subtask, xerr := task.StartInSubtask(w.taskLaunchStep, taskLaunchStepParameters{
 			stepName:  k,
@@ -1029,6 +1016,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 			return fail.Wrap(xerr, "failed to apply proxy rules: %s")
 		}
 
+		//goland:noinspection ALL
 		defer func(list []resources.Host) {
 			for _, v := range list {
 				v.Released()
@@ -1366,6 +1354,8 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			if xerr != nil {
 				return xerr
 			}
+
+			//goland:noinspection ALL
 			defer gwSG.Released()
 
 			sgRule := abstract.NewSecurityGroupRule()

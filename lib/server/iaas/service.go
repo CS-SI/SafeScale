@@ -874,30 +874,6 @@ func SimilarityScore(ref string, s string) float64 {
 	return score(d, len(ref)) / (math.Log10(10 * (1. + ds)))
 }
 
-// // InitializeBucket creates the Object Storage Container/Bucket that will store the metadata
-// func InitializeBucket(svc service, location objectstorage.Location) fail.Error {
-// 	if svc.isNull() {
-// 		return fail.InvalidParameterError("svc", "cannot be null value")
-// 	}
-// 	if location.isNull() {
-// 		return fail.InvalidParameterError("location", "cannot be nil")
-// 	}
-//
-// 	cfg, err := svc.Provider.GetConfigurationOptions()
-// 	if err != nil {
-// 		return fail.Wrap(err, "failed to get client options: %s")
-// 	}
-// 	anon, found := cfg.Get("GetMetadataBucket")
-// 	if !found || anon.(string) == "" {
-// 		return fail.SyntaxError("failed to get value of option 'GetMetadataBucket'")
-// 	}
-// 	_, err = location.CreateBucket(anon.(string))
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
 func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule) (bool, fail.Error) {
 	if asg.IsNull() {

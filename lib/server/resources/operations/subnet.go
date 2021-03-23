@@ -153,79 +153,6 @@ func NewSubnet(svc iaas.Service) (_ resources.Subnet, xerr fail.Error) {
 	return instance, nil
 }
 
-// VPL: not used anymore
-// // lookupSubnet tells if a Subnet exists
-// func lookupSubnet(/* ctx context.Context, */svc iaas.Service, networkRef, subnetRef string) (_ bool, xerr fail.Error) {
-// 	if task == nil {
-// 		return false, fail.InvalidParameterError("task", "cannot be null value of 'concurrency.Task'")
-// 	}
-// 	if task.Aborted() {
-// 		return false, fail.AbortedError(nil, "aborted")
-// 	}
-// 	if svc == nil {
-// 		return false, fail.InvalidParameterError("svc", "cannot be null value")
-// 	}
-// 	if subnetRef == "" {
-// 		return false, fail.InvalidParameterError("subnetRef", "cannot be empty string")
-// 	}
-
-// 	var subnetID string
-// 	if networkRef != "" {
-// 		// If networkRef is not empty, make sure the subnetRef is inside the network
-// 		rn, xerr := LoadNetwork(task, svc, networkRef)
-// 		if xerr != nil {
-// 			return false, xerr
-// 		}
-
-// 		xerr = rn.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-// 			return props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-// 				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-// 				var found bool
-// 				for k, v := range subnetsV1.ByName {
-// 					if k == subnetRef || v == subnetRef {
-// 						subnetID = v
-// 						found = true
-// 						break
-// 					}
-// 				}
-// 				if !found {
-// 					return fail.NotFoundError("failed to find a Subnet referenced by '%s' in Network '%s'", subnetRef, rn.GetName())
-// 				}
-// 				return nil
-// 			})
-// 		})
-// 		if xerr != nil {
-// 			return false, xerr
-// 		}
-// 	} else {
-// 		// If networkRef is empty, subnetRef must be subnetID
-// 		subnetID = subnetRef
-// 	}
-
-// 	rs, xerr := NewSubnet(svc)
-// 	if xerr != nil {
-// 		return false, xerr
-// 	}
-// 	xerr = retry.WhileUnsuccessfulDelay1Second(
-// 		func() error {
-// 			return rs.ReadByID(task, subnetID)
-// 		},
-// 		10*time.Second, // FIXME: parameterize
-// 	)
-// 	if xerr != nil {
-// 		switch xerr.(type) {
-// 		case *fail.ErrNotFound:
-// 			return false, nil
-// 		default:
-// 			return false, xerr
-// 		}
-// 	}
-// 	return true, nil
-// }
-
 // LoadSubnet loads the metadata of a subnet
 func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -498,7 +425,6 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr)
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -741,25 +667,10 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to find appropriate template")
 	}
-	// msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
-	// if template.CPUFreq > 0 {
-	// 	msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
-	// }
-	// msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-	// if template.GPUNumber > 0 {
-	// 	msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
-	// 	if template.GPUType != "" {
-	// 		msg += fmt.Sprintf(" %s", template.GPUType)
-	// 	}
-	// }
-	// msg += ")"
-	// logrus.Infof(msg)
 
 	// define image...
 	if gwSizing.Image == "" {
-		// if gwSizing.Image != "" {
 		gwSizing.Image = req.Image
-		// }
 	}
 	if gwSizing.Image == "" {
 		cfg, xerr := svc.GetConfigurationOptions()
@@ -859,77 +770,6 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		}
 	}
 
-	// primaryResult, primaryErr := primaryTask.Wait()
-	// if primaryErr == nil {
-	// 	result, ok := primaryResult.(data.Map)
-	// 	if !ok {
-	// 		return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(primaryResult).String())
-	// 	}
-	// 	primaryGateway = result["host"].(*host)
-	// 	primaryUserdata = result["userdata"].(*userdata.Content)
-	// 	primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
-
-	// 	// Starting from here, deletes the primary gateway if exiting with error
-	// 	defer func() {
-	// 		if xerr != nil && !req.KeepOnFailure {
-	// 			logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
-	// 			if derr := primaryGateway.relaxedDeleteHost(context.Background()); xerr != nil {
-	// 				switch derr.(type) {
-	// 				case *fail.ErrTimeout:
-	// 					logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
-	// 				default:
-	// 				}
-	// 				_ = xerr.AddConsequence(derr)
-	// 			} else {
-	// 				logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
-	// 			}
-	// 			if failover {
-	// 				if derr := instance.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
-	// 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
-	// 				}
-	// 			}
-	// 		}
-	// 	}()
-	// }
-	// if failover && secondaryTask != nil {
-	// 	secondaryResult, secondaryErr = secondaryTask.Wait()
-	// 	if secondaryErr == nil {
-	// 		result, ok := secondaryResult.(data.Map)
-	// 		if !ok {
-	// 			return fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(secondaryResult).String())
-	// 		}
-
-	// 		secondaryGateway = result["host"].(*host)
-	// 		secondaryUserdata = result["userdata"].(*userdata.Content)
-	// 		secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
-
-	// 		// Starting from here, deletes the secondary gateway if exiting with error
-	// 		defer func() {
-	// 			if xerr != nil && !req.KeepOnFailure {
-	// 				// Disable abort signal during clean up
-	// 				defer task.DisarmAbortSignal()()
-
-	// 				if derr := secondaryGateway.relaxedDeleteHost(ctx); xerr != nil {
-	// 					switch derr.(type) {
-	// 					case *fail.ErrTimeout:
-	// 						logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
-	// 					default:
-	// 					}
-	// 					_ = xerr.AddConsequence(derr)
-	// 				}
-	// 				if derr := instance.unbindHostFromVIP(as.VIP, secondaryGateway); derr != nil {
-	// 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
-	// 				}
-	// 			}
-	// 		}()
-	// 	}
-	// }
-	// if primaryErr != nil {
-	// 	return fail.Wrap(primaryErr, "failed to create gateway '%s'", primaryGatewayName)
-	// }
-	// if secondaryErr != nil {
-	// 	return fail.Wrap(secondaryErr, "failed to create gateway '%s'", secondaryGatewayName)
-	// }
 	results, groupXErr := tg.WaitGroup()
 	if results == nil && groupXErr != nil {
 		return groupXErr
@@ -1288,11 +1128,6 @@ func (instance *subnet) validateCIDR(req *abstract.SubnetRequest, network abstra
 		found    bool
 	)
 	mask, _ := networkDesc.Mask.Size()
-	//if mask >= 24 {
-	//	bitShift = 1
-	//} else {
-	//	bitShift = 24 - uint8(mask)
-	//}
 	maxBitShift := uint(30 - mask)
 
 	for bs := uint(1); bs <= maxBitShift && !found; bs++ {
@@ -1426,9 +1261,6 @@ func (instance *subnet) createGWSecurityGroup(ctx context.Context, req abstract.
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// // Disable abort signal during clean up
-			// defer task.DisarmAbortSignal()()
-
 			if derr := sg.Delete(context.Background(), true); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), req.Name))
 			}
@@ -1501,9 +1333,6 @@ func (instance *subnet) createPublicIPSecurityGroup(ctx context.Context, req abs
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// // Disable abort signal during clean up
-			// defer task.DisarmAbortSignal()()
-
 			if derr := sg.Delete(context.Background(), true); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", actionFromError(xerr), req.Name))
 			}
@@ -1542,9 +1371,6 @@ func (instance *subnet) undoCreateSecurityGroup(errorPtr *fail.Error, keepOnFail
 		return
 	}
 	if *errorPtr != nil && !keepOnFailure {
-		// // Disable abort signal during clean up
-		// defer task.DisarmAbortSignal()()
-
 		sgName := sg.GetName()
 		if derr := sg.Delete(context.Background(), true); derr != nil {
 			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Subnet's Security Group for gateways '%s'", actionFromError(*errorPtr), sgName))
@@ -1572,9 +1398,6 @@ func (instance *subnet) createInternalSecurityGroup(ctx context.Context, req abs
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// // Disable abort signal during clean up
-			// defer task.DisarmAbortSignal()()
-
 			if derr := sg.Delete(context.Background(), true); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Subnet's Security Group for gateways '%s'", actionFromError(xerr), req.Name))
 			}
@@ -1640,9 +1463,6 @@ func (instance *subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate rs
-	// if rs.isNull() {
-	// 	return fail.InvalidInstanceError()
-	// }
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -1709,7 +1529,6 @@ func (instance *subnet) AdoptHost(ctx context.Context, host resources.Host) (xer
 
 	tracer := debug.NewTracer(task, true, "("+host.GetName()+")").Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -1783,7 +1602,6 @@ func (instance *subnet) AbandonHost(ctx context.Context, hostID string) (xerr fa
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.subnet"), "('"+hostID+"')").Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitTraceError(&xerr, tracer.TraceMessage("error occurred: "))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -1915,10 +1733,6 @@ func (instance *subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	// tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering()
-	// defer tracer.Exiting()
-	// // defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
@@ -1982,7 +1796,6 @@ func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("operations.subnet")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -2107,32 +1920,6 @@ func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			}
 		}
 
-		// // Remove subnet reference from owner Network
-		// rn, innerXErr := LoadNetwork(task, svc, as.Network)
-		// if innerXErr != nil {
-		// 	switch innerXErr.(type) {
-		// 	case *fail.ErrNotFound:
-		// 		// no Network, consider the Network metadata update as a success (this may be default Network)
-		// 	default:
-		// 		return fail.Wrap(innerXErr, "failed to query parent Network of Subnet")
-		// 	}
-		// } else {
-		// 	defer rn.Released(task)
-
-		// 	return rn.Alter(task, func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// 		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-		// 			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-		// 			if !ok {
-		// 				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		// 			}
-		//
-		// 			delete(nsV1.ByID, as.ID)
-		// 			delete(nsV1.ByName, as.Name)
-		// 			return nil
-		// 		})
-		// 	}, data.NewImmutableKeyValue("Reload", false), // disable reload in Alter because network is already write-locked by the current goroutine, and should lead to dead-lock)
-		// 	)
-		// }
 		return nil
 	})
 	xerr = errcontrol.CrasherFail(xerr)
@@ -2444,7 +2231,6 @@ func (instance *subnet) BindSecurityGroup(ctx context.Context, sg resources.Secu
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -2506,7 +2292,6 @@ func (instance *subnet) UnbindSecurityGroup(ctx context.Context, sg resources.Se
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -2570,7 +2355,6 @@ func (instance *subnet) ListSecurityGroups(ctx context.Context, state securitygr
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", state.String()).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -2614,7 +2398,6 @@ func (instance *subnet) EnableSecurityGroup(ctx context.Context, rsg resources.S
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", rsg.GetID()).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -2704,7 +2487,6 @@ func (instance *subnet) DisableSecurityGroup(ctx context.Context, sg resources.S
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()

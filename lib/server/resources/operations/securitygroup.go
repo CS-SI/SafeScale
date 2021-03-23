@@ -49,11 +49,6 @@ const (
 	securityGroupsFolderName = "security-groups"
 )
 
-//var (
-//	securityGroupCacheByID data.Cache
-//	securityGroupIDsByName map[string]string
-//)
-
 // securityGroup ...
 // follows interface resources.SecurityGroup
 type securityGroup struct {
@@ -239,9 +234,6 @@ func (instance *securityGroup) Browse(ctx context.Context, callback func(*abstra
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate instance
-	// if instance.isNull() {
-	// 	return fail.InvalidInstanceError()
-	// }
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -313,7 +305,6 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.security-group"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	// Log or propagate errors: here we propagate
-	//defer fail.OnExitLogError(&xerr, "failed to create securityGroup")
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -324,12 +315,7 @@ func (instance *securityGroup) Create(ctx context.Context, networkID, name, desc
 	found, xerr = lookupSecurityGroup(svc, name)
 	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
-		// switch xerr.(type) {
-		// case *fail.ErrNotFound:
-		// 	// not found, good, continue
-		// default:
 		return fail.Wrap(xerr, "failed to check if Security Group '%s' already exists", name)
-		// }
 	}
 	if found {
 		return fail.DuplicateError("a Security Group named '%s' already exists", name)
@@ -450,6 +436,8 @@ func (instance *securityGroup) unbindFromHosts(ctx context.Context, in *properti
 		if xerr != nil {
 			break
 		}
+
+		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
 			hostInstance.Released()
 		}(rh)

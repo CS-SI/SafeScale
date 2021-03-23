@@ -40,10 +40,6 @@ func NewNFSClient(sshconfig *system.SSHConfig) (*Client, fail.Error) {
 
 // Install installs NFS client on remote host
 func (c *Client) Install(ctx context.Context) fail.Error {
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	stdout, xerr := executeScript(ctx, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", stdout)
@@ -54,10 +50,6 @@ func (c *Client) Install(ctx context.Context) fail.Error {
 
 // Mount defines a mount of a remote share and mount it
 func (c *Client) Mount(ctx context.Context, export string, mountPoint string, withCache bool) fail.Error {
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	data := map[string]interface{}{
 		"Export":      export,
 		"MountPoint":  mountPoint,
@@ -73,10 +65,6 @@ func (c *Client) Mount(ctx context.Context, export string, mountPoint string, wi
 
 // Unmount a nfs share from NFS server
 func (c *Client) Unmount(ctx context.Context, export string) fail.Error {
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	data := map[string]interface{}{"Export": export}
 	stdout, xerr := executeScript(ctx, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
 	if xerr != nil {

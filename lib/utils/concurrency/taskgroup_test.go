@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -218,7 +219,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 		rt, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := tools.RandomInt(5, 25)
 			if rint > 16 {
-				rint += 10000
+				rint += 1000
 			}
 			fmt.Printf("sleeping %dms...\n", rint)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
@@ -352,49 +353,61 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
-	require.NotNil(t, overlord)
-	require.Nil(t, xerr)
-
-	theID, xerr := overlord.GetID()
-	require.Nil(t, xerr)
-	require.NotEmpty(t, theID)
-
-	fmt.Println("Begin")
-
-	for ind := 0; ind < 10; ind++ {
-		fmt.Println("Iterating...")
-		rint := time.Duration(rand.Intn(20)+30) * 10 * time.Millisecond
-		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			delay := parameters.(time.Duration)
-			fmt.Printf("Entering (waiting %v)\n", delay)
-			defer fmt.Println("Exiting")
-
-			time.Sleep(delay * 1000)
-			return "waiting game", nil
-		}, rint)
-		if xerr != nil {
-			t.Errorf("Unexpected: %s", xerr)
-		}
-	}
-
-	begin := time.Now()
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
-		time.Sleep(350 * time.Millisecond)
-		if xerr := overlord.Abort(); xerr != nil {
+		defer wg.Done()
+
+		overlord, xerr := NewTaskGroup(nil)
+		require.NotNil(t, overlord)
+		require.Nil(t, xerr)
+
+		theID, xerr := overlord.GetID()
+		require.Nil(t, xerr)
+		require.NotEmpty(t, theID)
+
+		fmt.Println("Begin")
+
+		for ind := 0; ind < 10; ind++ {
+			fmt.Println("Iterating...")
+			rint := time.Duration(rand.Intn(20)+30) * 10 * time.Millisecond
+			_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				delay := parameters.(time.Duration)
+				fmt.Printf("Entering (waiting %v)\n", delay)
+				defer fmt.Println("Exiting")
+
+				time.Sleep(delay * 1000)
+				return "waiting game", nil
+			}, rint)
+			if xerr != nil {
+				t.Errorf("Unexpected: %s", xerr)
+			}
+		}
+
+		begin := time.Now()
+		go func() {
+			time.Sleep(350 * time.Millisecond)
+			if xerr := overlord.Abort(); xerr != nil {
+				t.Fail()
+			}
+		}()
+
+		if _, xerr := overlord.WaitGroup(); xerr != nil {
 			t.Fail()
+		}
+
+		end := time.Since(begin)
+
+		fmt.Println("Here we are")
+
+		if end >= (time.Millisecond * 400) {
+			t.Errorf("It should have finished near 350 ms but it didn't, it was %v !!", end)
 		}
 	}()
 
-	if _, xerr := overlord.WaitGroup(); xerr != nil {
-		t.Fail()
-	}
-
-	end := time.Since(begin)
-
-	fmt.Println("Here we are")
-
-	if end >= (time.Millisecond * 400) {
-		t.Errorf("It should have finished near 350 ms but it didn't, it was %v !!", end)
+	runOutOfTime := waitTimeout(&wg, time.Duration(15*time.Second))
+	if runOutOfTime {
+		t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
+		t.FailNow()
 	}
 }

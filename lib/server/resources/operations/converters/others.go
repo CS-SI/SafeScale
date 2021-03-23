@@ -24,11 +24,11 @@ import (
 	"strings"
 	"text/scanner"
 
+	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/errcontrol"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 

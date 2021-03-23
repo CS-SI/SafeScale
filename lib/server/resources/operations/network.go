@@ -200,7 +200,6 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	tracer := debug.NewTracer(task, true, "('%s', '%s')", req.Name, req.CIDR).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -323,10 +322,6 @@ func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
 func (instance *network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: Browse is intended to be callable from null value of network, so do not validate rn
-	// if rn.isNull() {
-	//     return fail.InvalidInstanceError()
-	// }
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -386,7 +381,6 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -451,9 +445,6 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 		default:
 			return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
 		}
-
-		// // Cannot abort starting from here
-		// defer task.DisarmAbortSignal()()
 
 		// delete Network, with tolerance
 		if innerXErr = svc.DeleteNetwork(an.ID); innerXErr != nil {

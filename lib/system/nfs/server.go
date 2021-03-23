@@ -40,23 +40,12 @@ func NewServer(sshconfig *system.SSHConfig) (srv *Server, err fail.Error) {
 	return &server, nil
 }
 
-// // GetHost returns the hostname or IP address of the nfs.getServer
-// func (s *Server) GetHost() string {
-// 	return s.SSHConfig.IPAddress
-// }
-
 // Install installs and configure NFS service on the remote host
 func (s *Server) Install(ctx context.Context) fail.Error {
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
-	// retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
-	// return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to install nfs server")
 	stdout, xerr := executeScript(ctx, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", stdout)
@@ -68,9 +57,6 @@ func (s *Server) Install(ctx context.Context) fail.Error {
 // AddShare configures a local path to be exported by NFS
 func (s *Server) AddShare(ctx context.Context, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error {
 	// FIXME: validate parameters
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
 
 	share, xerr := NewShare(s, path, options)
 	if xerr != nil {
@@ -116,15 +102,10 @@ func (s *Server) AddShare(ctx context.Context, path string, options string /*sec
 
 // RemoveShare stops export of a local mount point by NFS on the remote server
 func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	data := map[string]interface{}{
 		"Path": path,
 	}
-	// retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
-	// return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to unexport a shared directory")
+
 	stdout, xerr := executeScript(ctx, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", stdout)
@@ -135,18 +116,13 @@ func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
 
 // MountBlockDevice mounts a block device in the remote system
 func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, format string, doNotFormat bool) (string, fail.Error) {
-	// if task.Aborted() {
-	// 	return "", fail.AbortedError(nil, "aborted")
-	// }
-
 	data := map[string]interface{}{
 		"Device":      deviceName,
 		"MountPoint":  mountPoint,
 		"FileSystem":  format,
 		"DoNotFormat": doNotFormat,
 	}
-	// retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_mount.sh", data)
-	// err = fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to mount block device")
+
 	stdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_mount.sh", data)
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", stdout)
@@ -157,15 +133,10 @@ func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, f
 
 // UnmountBlockDevice unmounts a local block device on the remote system
 func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail.Error {
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	data := map[string]interface{}{
 		"UUID": volumeUUID,
 	}
-	// retcode, stdout, stderr, err := executeScript(task, *s.SSHConfig, "block_device_unmount.sh", data)
-	// return fail.ReturnedValuesFromShellToError(retcode, stdout, stderr, err, "Error executing script to umount block device")
+
 	stdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
 	if xerr != nil {
 		_ = xerr.Annotate("stdout", stdout)

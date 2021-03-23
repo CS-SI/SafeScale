@@ -66,18 +66,6 @@ func HostEffectiveSizingFromAbstractToProtocol(in *abstract.HostEffectiveSizing)
 	}
 }
 
-// // GatewayDefinitionFromAbstractToProtocol ...
-// func GatewayDefinitionFromAbstractToProtocol(in *abstract.HostEffectiveSizing) *protocol.GatewayDefinition {
-// 	return &protocol.GatewayDefinition{
-// 		Cpu:      int32(in.Cores),
-// 		Ram:      in.RAMSize,
-// 		Disk:     int32(in.DiskSize),
-// 		ImageId:  in.ImageID,
-// 		GpuCount: int32(in.GPUNumber),
-// 		GpuType:  in.GPUType,
-// 	}
-// }
-
 // HostTemplateFromAbstractToProtocol ...
 func HostTemplateFromAbstractToProtocol(in abstract.HostTemplate) *protocol.HostTemplate {
 	return &protocol.HostTemplate{
@@ -106,7 +94,6 @@ func NetworkFromAbstractToProtocol(in *abstract.Network) *protocol.Network {
 		Name:       in.Name,
 		Cidr:       in.CIDR,
 		DnsServers: in.DNSServers,
-		//Subnets:    in.Subnets,
 	}
 	return out
 }
@@ -229,22 +216,6 @@ func HostDescriptionFromAbstractToPropertyV1(src abstract.HostDescription) *prop
 	}
 }
 
-//// HostNetworkFromAbstractToPropertyV1 ... DEPRECATED
-//func HostNetworkFromAbstractToPropertyV1(src abstract.HostNetworking) *propertiesv1.HostNetworking {
-//	return &propertiesv1.HostNetworking{
-//		IsGateway:               src.IsGateway,
-//		DefaultGatewayID:        src.DefaultGatewayID,
-//		DefaultGatewayPrivateIP: src.DefaultGatewayPrivateIP,
-//		DefaultNetworkID:        src.DefaultSubnetID,
-//		NetworksByID:            src.SubnetsByID,
-//		NetworksByName:          src.SubnetsByName,
-//		PublicIPv4:              src.PublicIPv4,
-//		PublicIPv6:              src.PublicIPv6,
-//		IPv4Addresses:           src.IPv4Addresses,
-//		IPv6Addresses:           src.IPv6Addresses,
-//	}
-//}
-
 // HostNetworkingFromAbstractToPropertyV2 ...
 func HostNetworkingFromAbstractToPropertyV2(src abstract.HostNetworking) *propertiesv2.HostNetworking {
 	return &propertiesv2.HostNetworking{
@@ -331,7 +302,6 @@ func ClusterIdentityFromAbstractToProtocol(in abstract.ClusterIdentity) *protoco
 func ClusterListFromAbstractToProtocol(in []abstract.ClusterIdentity) *protocol.ClusterListResponse {
 	out := &protocol.ClusterListResponse{}
 	out.Clusters = make([]*protocol.ClusterResponse, 0, len(in))
-	//out.Clusters = []*protocol.ClusterResponse{}
 	for _, v := range in {
 		cr := &protocol.ClusterResponse{
 			Identity: ClusterIdentityFromAbstractToProtocol(v),

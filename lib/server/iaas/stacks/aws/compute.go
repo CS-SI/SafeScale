@@ -237,28 +237,6 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	// VPL: price is not a consideration to have at this level (stack)
-	// resp, xerr := s.rpcGetProductByID(aws.String(id))
-	// if xerr != nil {
-	// 	return nullAHT, xerr
-	// }
-	//
-	// price, xerr := NewPriceFromJSONValue(resp)
-	// if xerr != nil {
-	// 	return nullAHT, xerr
-	// }
-	//
-	// tpl := abstract.HostTemplate{
-	// 	ID:        price.Product.Attributes.InstanceType,
-	// 	Name:      price.Product.Attributes.InstanceType,
-	// 	Cores:     price.GetCores(),
-	// 	GPUNumber: price.GetGPUNumber(),
-	// 	DiskSize:  int(price.GetDiskSize()),
-	// 	RAMSize:   float32(price.GetRAMSize()),
-	// }
-	//
-	// return &tpl, nil
-
 	resp, xerr := s.rpcDescribeInstanceTypeByID(aws.String(id))
 	if xerr != nil {
 		return nullAHT, xerr
@@ -436,13 +414,11 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 			if hostTmp.CurrentState == hoststate.Error {
 				innerXErr = retry.StopRetryError(fail.NewError("last state: %s", hostTmp.CurrentState.String()), "error waiting for host in ready state")
-				// logrus.Warn(innerXErr.Error())
 				return innerXErr
 			}
 
 			if hostTmp.CurrentState != hoststate.Started {
 				innerXErr = fail.NewError("not in ready state (current state: %s)", ahf.CurrentState.String())
-				//logrus.Warn(innerXErr.Error())
 				return innerXErr
 			}
 			return nil
@@ -470,9 +446,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if s.IsNull() {
 		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
-	// if request.KeyPair == nil {
-	// 	return nullAHF, nullUDC, fail.InvalidParameterCannotBeNilError("request.KeyPair")
-	// }
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&xerr)
@@ -672,29 +645,6 @@ func (s stack) buildAwsSpotMachine(
 	lastPrice := resp[len(resp)-1]
 	logrus.Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
-	// input := &ec2.RequestSpotInstancesInput{
-	// 	InstanceCount: aws.Int64(1),
-	// 	LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
-	// 		ImageId:           aws.String(imageID),
-	// 		InstanceType:      aws.String(template.ID),
-	// 		KeyName:           aws.String(keypairName),
-	// 		NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{ni},
-	// 		Placement: &ec2.SpotPlacement{
-	// 			AvailabilityZone: aws.String(zone),
-	// 		},
-	// 		UserData: aws.String(base64.StdEncoding.EncodeToString([]byte(data))),
-	// 	},
-	// 	SpotPrice: lastPrice.SpotPrice, // FIXME: Round up
-	// 	Type:      aws.String("one-time"),
-	// }
-	// var result *ec2.RequestSpotInstancesOutput
-	// xerr = stacks.RetryableRemoteCall(
-	// 	func() (err error) {
-	// 		result, err = s.EC2Service.RequestSpotInstances(input)
-	// 		return err
-	// 	},
-	// 	normalizeError,
-	// )
 	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(isGateway), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), []byte(data))
 	if xerr != nil {
 		return nil, xerr
@@ -718,7 +668,6 @@ func (s stack) buildAwsMachine(
 	data string,
 	isGateway bool,
 	template abstract.HostTemplate,
-	//sgID string,
 ) (*abstract.HostCore, fail.Error) {
 
 	instance, xerr := s.rpcRunInstance(aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), aws.Bool(isGateway), []byte(data))
@@ -737,22 +686,6 @@ func (s stack) buildAwsMachine(
 // FIXME: see if anything is needed (does nothing for now)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
-	// if s.isNull() {
-	// 	return fail.InvalidInstanceError()
-	// }
-	// ahf, hostLabel, xerr := stacks.ValidateHostParameter(hostParam)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// if !ahf.IsConsistent() {
-	// 	return fail.InvalidParameterError("hostParam", "must be either ID as string or an '*abstract.HostCore' or '*abstract.HostFull' with value in 'ID' field")
-	// }
-	//
-	// tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.gcp") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).Entering()
-	// defer tracer.Exiting()
-	// defer fail.OnPanic(&xerr)
-	//
-	// return s.rpcResetStartupScriptOfInstance(ahf.GetID())
 }
 
 // InspectHost loads information of a host from AWS
@@ -860,10 +793,6 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 	ahf.Sizing.DiskSize = sizing.DiskSize
 
 	ahf.Core.Name = instanceName
-
-	// if !ahf.OK() {
-	// 	logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
-	// }
 
 	return nil
 }

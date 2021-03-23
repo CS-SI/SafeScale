@@ -186,24 +186,8 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 		return nil, fail.InvalidParameterError("p", "must be a 'taskReadParameters'")
 	}
 
-	// var (
-	// 	bridge    PipeBridge
-	// 	displayCh chan<- outputItem
-	// )
-	//
-	// if bridge, ok = params["bridge"].(PipeBridge); !ok {
-	// 	return nil, fail.InvalidParameterError("params['bridge']", "must be a PipeBridge")
-	// }
-	// if bridge == nil {
-	// 	return nil, fail.InvalidParameterCannotBeNilError("params['bridge']")
-	// }
-	// if displayCh, ok = params["displayCh"].(chan<- outputItem); !ok {
-	// 	return nil, fail.InvalidParameterError("params['displayCh']", "must be a 'chan<- outputItem'")
-	// }
-
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("cli")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	// bufio.Scanner.Scan() may panic...
 	var panicErr error

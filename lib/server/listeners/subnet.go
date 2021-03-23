@@ -193,9 +193,7 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	// Build response mapping abstract.Networking to protocol.Networking
 	var pbList []*protocol.Subnet
 	for _, subnet := range list {
-		//if networkID == "" || subnet.Networking == networkID {
 		pbList = append(pbList, converters.SubnetFromAbstractToProtocol(subnet))
-		//}
 	}
 	resp := &protocol.SubnetList{Subnets: pbList}
 	return resp, nil

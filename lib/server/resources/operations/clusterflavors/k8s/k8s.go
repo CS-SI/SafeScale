@@ -94,11 +94,6 @@ func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
-	// feat, err := featurefactory.New(task, c.GetService(), "kubernetes")
-	// if err != nil {
-	// 	return fmt.Errorf("failed to prepare feature 'kubernetes': %s : %s", fmt.Sprintf("[cluster %s] failed to instantiate feature 'kubernetes': %v", clusterName, err), err.Error()
-	// }
-	// results, err := feat.Add(c, data.Map{}, resources.FeatureSettings{})
 	results, xerr := c.AddFeature(ctx, "kubernetes", data.Map{}, resources.FeatureSettings{})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
@@ -113,21 +108,3 @@ func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 
 	return nil
 }
-
-//
-// // VPL: eventually this part will be removed (some things have to be included in node_install_requirements
-// func getNodeInstallationScript(task concurrency.Task, _ resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map) {
-// 	script := ""
-// 	data := data.Map{}
-//
-// 	switch nodeType {
-// 	case clusternodetype.Gateway:
-// 	case clusternodetype.Master:
-// 		script = "k8s_install_master.sh"
-// 	case clusternodetype.Node:
-// 		script = "k8s_install_node.sh"
-// 	}
-// 	return script, data
-// }
-
-// ENDVPL

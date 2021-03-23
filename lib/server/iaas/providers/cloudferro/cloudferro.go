@@ -45,6 +45,7 @@ type provider struct {
 	api.Stack /**openstack.Stack*/
 
 	tenantParameters map[string]interface{}
+	templatesWithGPU []string
 }
 
 // New creates a new instance of cloudferro provider
@@ -145,59 +146,6 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	if xerr != nil {
 		return nil, xerr
 	}
-	//xerr = stack.InitDefaultSecurityGroups()
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-
-	// VPL: moved to stacks.openstack.New()
-	// validRegions, xerr := stack.ListRegions()
-	// if xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound:
-	// 		// continue
-	// 	default:
-	// 		return nil, xerr
-	// 	}
-	// } else {
-	// 	if len(validRegions) != 0 {
-	// 		regionIsValidInput := false
-	// 		for _, vr := range validRegions {
-	// 			if region == vr {
-	// 				regionIsValidInput = true
-	// 			}
-	// 		}
-	// 		if !regionIsValidInput {
-	// 			return nil, fail.InvalidRequestError("invalid Region '%s'", region)
-	// 		}
-	// 	}
-	// }
-	//
-	// validAvailabilityZones, xerr := stack.ListAvailabilityZones()
-	// if xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound:
-	// 		// continue
-	// 	default:
-	// 		return nil, xerr
-	// 	}
-	// } else {
-	// 	if len(validAvailabilityZones) != 0 {
-	// 		var validZones []string
-	// 		zoneIsValidInput := false
-	// 		for az, valid := range validAvailabilityZones {
-	// 			if valid {
-	// 				if az == zone {
-	// 					zoneIsValidInput = true
-	// 				}
-	// 				validZones = append(validZones, `'`+az+`'`)
-	// 			}
-	// 		}
-	// 		if !zoneIsValidInput {
-	// 			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", zone, strings.Join(validZones, ","))
-	// 		}
-	// 	}
-	// }
 
 	newP := &provider{
 		Stack:            stack,
@@ -303,10 +251,9 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	}
 
 	var (
-		templatesWithGPU []string
-		out              []*regexp.Regexp
+		out []*regexp.Regexp
 	)
-	for _, v := range templatesWithGPU {
+	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
 			return emptySlice

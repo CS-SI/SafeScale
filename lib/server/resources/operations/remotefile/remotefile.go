@@ -41,8 +41,6 @@ type Item struct {
 	RemoteRights string
 }
 
-// FIXME: validate parameters everywhere
-
 // Upload transfers the local file to the hostname
 func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -72,7 +70,6 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 
 	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
@@ -126,10 +123,6 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	f, xerr := system.CreateTempFileFromString(content, 0600)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")
@@ -140,10 +133,6 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 
 // RemoveRemote deletes the remote file from host
 func (rfc Item) RemoveRemote(ctx context.Context, host resources.Host) fail.Error {
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	cmd := "rm -rf " + rfc.Remote
 	retcode, _, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil || retcode != 0 {
@@ -171,10 +160,6 @@ func (rfh *RemoteFilesHandler) Count() uint {
 // Upload executes the copy of files
 // TODO: allow to upload to many hosts
 func (rfh *RemoteFilesHandler) Upload(ctx context.Context, host resources.Host) fail.Error {
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	for _, v := range rfh.items {
 		xerr := v.Upload(ctx, host)
 		if xerr != nil {
@@ -188,10 +173,6 @@ func (rfh *RemoteFilesHandler) Upload(ctx context.Context, host resources.Host) 
 // NOTE: Removal of local files is the responsability of the caller, not the RemoteFilesHandler.
 // TODO: allow to cleanup on many hosts
 func (rfh *RemoteFilesHandler) Cleanup(ctx context.Context, host resources.Host) fail.Error {
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil, "aborted")
-	// }
-
 	for _, v := range rfh.items {
 		xerr := v.RemoveRemote(ctx, host)
 		if xerr != nil {

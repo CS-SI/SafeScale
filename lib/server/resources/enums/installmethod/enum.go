@@ -26,6 +26,7 @@ import (
 // Enum represents the type of a method
 type Enum uint8
 
+//goland:noinspection ALL
 const (
 	_ Enum = iota
 

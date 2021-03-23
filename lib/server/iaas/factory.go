@@ -114,18 +114,6 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 			continue
 		}
 
-		// tenantIdentity, found := tenant["identity"].(map[string]interface{})
-		// if !found {
-		// 	logrus.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
-		// }
-		// tenantCompute, found := tenant["compute"].(map[string]interface{})
-		// if !found {
-		// 	logrus.Debugf("No section 'compute' found in tenant '%s', continuing.", name)
-		// }
-		// tenantNetwork, found := tenant["network"].(map[string]interface{})
-		// if !found {
-		// 	logrus.Debugf("No section 'network' found in tenant '%s', continuing.", name)
-		// }
 		_, found = tenant["identity"].(map[string]interface{})
 		if !found {
 			logrus.Debugf("No section 'identity' found in tenant '%s', continuing.", name)
@@ -138,11 +126,7 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 		if !found {
 			logrus.Debugf("No section 'network' found in tenant '%s', continuing.", name)
 		}
-		// tenantClient := map[string]interface{}{
-		// 	"identity": tenantIdentity,
-		// 	"compute":  tenantCompute,
-		// 	"network":  tenantNetwork,
-		// }
+
 		_, tenantObjectStorageFound := tenant["objectstorage"]
 		_, tenantMetadataFound := tenant["metadata"]
 

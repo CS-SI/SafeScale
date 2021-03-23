@@ -140,7 +140,6 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 
 	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	defer func() {
 		if err != nil {
 			switch err.(type) {

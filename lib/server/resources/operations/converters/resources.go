@@ -31,10 +31,6 @@ func BucketMountPointFromResourceToProtocol(ctx context.Context, in resources.Bu
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	// if task.Aborted() {
-	// 	return nil, fail.AbortedError(nil, "aborted")
-	// }
-
 	if in == nil {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
@@ -55,69 +51,6 @@ func BucketMountPointFromResourceToProtocol(ctx context.Context, in resources.Bu
 	}
 	return out, nil
 }
-
-// func VolumeFromResourceToProtocol(task concurrency.Task, in resources.Volume) (*protocol.VolumeInspectResponse, error) {
-// 	empty := &protocol.VolumeIspectResponse{}
-// 	if task == nil {
-// 		return empty, fail.InvalidParameterError("task", "cannot be nil")
-// 	}
-// 	if in == nil {
-// 		return empty, fail.InvalidParameterError("in", "cannot be nil")
-// 	}
-
-// 	va, err := in.GetAttachments(task)
-// 	if err != nil {
-// 		return empty, err
-// 	}
-// 	if len(va.Hosts) == 0 {
-// 		return empty, fail.InconsistentError("failed to find hosts that have mounted the volume")
-// 	}
-// 	var hostID string
-// 	for hostID, _ := range va.Hosts {
-// 		break
-// 	}
-
-// 	h, err := hostfactory(task, in.GetService(), hostID)
-// 	if err != nil {
-// 		return empty, err
-// 	}
-// 	// 1st get volumes attached to the host...
-// 	hostVolumes, err := h.GetVolumes(task)
-// 	if err != nil {
-// 		return empty, err
-// 	}
-// 	// ... then identify HostVolume struct associated to volume...
-// 	hostVolume, ok := hostVolumes.VolumeByID[in.GetID()]
-// 	if !ok {
-// 		return empty, fail.InconsistentError("failed to find device where volume '%s' is attached on host '%s'", in.GetName(), h.GetName())
-// 	}
-// 	// ... then get mounts on the host...
-// 	hostMounts, err := h.GetMounts(task)
-// 	if err != nil {
-// 		return empty, err
-// 	}
-// 	// ... and identify the HostMount struct corresponding to the mounted volume
-// 	hostMount, ok := hostMounts.LocalMountsByDevice[hostVolume.Device]
-// 	if !ok {
-// 		return empty, fail.InconsistentError("failed to find where volume '%s' is mounted on host '%s'", in.GetName(), h.GetName())
-// 	}
-
-// 	// For now, volume is attachable only to one host...
-// 	a := &protocol.VolumeAttachment{
-// 		IPAddress:      &protocol.Reference{GetID: hostID},
-// 		MountPath: hostMount.Path,
-// 		Format:    hostMount.FileSystem,
-// 		Device:    hostMmount.Device,
-// 	}
-// 	out := &protocol.VolumeInspectResponse{
-// 		Id:          in.GetID(),
-// 		GetName:        in.GetName(),
-// 		getSpeed:       in.getSpeed(task),
-// 		getSize:        in.getSize(task),
-// 		Attachments: &protocol.VolumeAttachment{a},
-// 	}
-// 	return out, nil
-// }
 
 func IndexedListOfClusterNodesFromResourceToProtocol(in resources.IndexedListOfClusterNodes) (*protocol.ClusterNodeListResponse, fail.Error) {
 	out := &protocol.ClusterNodeListResponse{}

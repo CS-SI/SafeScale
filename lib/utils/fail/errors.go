@@ -1002,7 +1002,7 @@ func ExecutionError(exitError error, msg ...interface{}) *ErrExecution {
 	r := newError(exitError, nil, msg...)
 	r.grpcCode = codes.Internal
 
-	retcode := int(-1)
+	retcode := -1
 	stderr := ""
 	if ee, ok := exitError.(*exec.ExitError); ok {
 		if status, ok := ee.Sys().(syscall.WaitStatus); ok {

@@ -127,7 +127,6 @@ func (instance *cluster) taskInstallGateway(task concurrency.Task, params concur
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	p, ok := params.(taskInstallGatewayParameters)
 	if !ok {
@@ -201,7 +200,6 @@ func (instance *cluster) taskConfigureGateway(task concurrency.Task, params conc
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	logrus.Debugf("[%s] starting configuration...", p.Host.GetName())
 
@@ -316,7 +314,6 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Convert and validate parameters
 	p, ok := params.(taskCreateMasterParameters)
@@ -366,9 +363,6 @@ func (instance *cluster) taskCreateMaster(task concurrency.Task, params concurre
 	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
-			// // Disable abort signal during the clean up
-			// defer task.DisarmAbortSignal()()
-
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -522,7 +516,6 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	logrus.Debugf("[cluster %s] Configuring masters...", instance.GetName())
 	started := time.Now()
@@ -557,6 +550,8 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 			loadErrors = append(loadErrors, xerr)
 			continue
 		}
+
+		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
 			hostInstance.Released()
 		}(host)
@@ -611,7 +606,6 @@ func (instance *cluster) taskConfigureMaster(task concurrency.Task, params concu
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	// Convert and validate params
 	p, ok := params.(taskConfigureMasterParameters)
@@ -688,7 +682,6 @@ func (instance *cluster) taskCreateNodes(task concurrency.Task, params concurren
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	clusterName := instance.GetName()
 
@@ -763,7 +756,6 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	hostLabel := fmt.Sprintf("node #%d", p.index)
 	logrus.Debugf("[%s] starting Host creation...", hostLabel)
@@ -872,9 +864,6 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
-			// // Disable abort signal during the clean up
-			// defer task.DisarmAbortSignal()()
-
 			if derr := rh.Delete(context.Background()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", actionFromError(xerr), rh.GetName()))
 			}
@@ -909,36 +898,6 @@ func (instance *cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			nodesV3.PrivateNodeByID[node.ID] = node.NumericalID
 
 			return nil
-			//
-			// nodesV3.GlobalLastIndex++
-			//
-			// pubIP, innerXErr := rh.GetPublicIP(task)
-			// if innerXErr != nil {
-			// 	switch innerXErr.(type) {
-			// 	case *fail.ErrNotFound:
-			// 		// No public IP, this can happen; continue
-			// 	default:
-			// 		return innerXErr
-			// 	}
-			// }
-			//
-			// privIP, innerXErr := rh.GetPrivateIP(task)
-			// if innerXErr != nil {
-			// 	return innerXErr
-			// }
-			//
-			// node = &propertiesv3.ClusterNode{
-			// 	ID:          rh.GetID(),
-			// 	NumericalID: nodesV3.GlobalLastIndex,
-			// 	Name:        rh.GetName(),
-			// 	PrivateIP:   privIP,
-			// 	PublicIP:    pubIP,
-			// }
-			// nodesV3.ByNumericalID[node.NumericalID] = node
-			// nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, node.NumericalID)
-			// nodesV3.PrivateNodeByName[node.Name] = node.NumericalID
-			// nodesV3.PrivateNodeByID[node.ID] = node.NumericalID
-			// return nil
 		})
 	})
 	xerr = errcontrol.CrasherFail(xerr)
@@ -984,7 +943,6 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	list, err := instance.unsafeListNodes()
 	err = errcontrol.CrasherFail(err)
@@ -1022,11 +980,12 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 			errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", node.Name))
 			continue
 		}
+
+		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
 			hostInstance.Released()
 		}(host)
 
-		// subtask, xerr := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
 		_, xerr = task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
 			Index: i + 1,
 			Host:  host,
@@ -1087,7 +1046,6 @@ func (instance *cluster) taskConfigureNode(task concurrency.Task, params concurr
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Host.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", p.Index, p.Host.GetName())
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
@@ -1134,9 +1092,6 @@ func (instance *cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 
 	// Convert and validate params
 	node := params.(taskDeleteNodeOnFailureParameters).node
-	// if rh.isNull() {
-	// 	return nil, fail.InvalidParameterError("params", "must be a valid '*host'")
-	// }
 
 	prefix := "Cleaning up on failure, "
 	hostName := node.Name
@@ -1280,9 +1235,6 @@ func (instance *cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 
 	// Convert and validate params
 	hostInstance := params.(taskDeleteHostOnFailureParameters).host
-	// if rh.isNull() {
-	// 	return nil, fail.InvalidParameterError("params", "must be a valid '*host'")
-	// }
 
 	prefix := "Cleaning up on failure, "
 	hostName := hostInstance.GetName()

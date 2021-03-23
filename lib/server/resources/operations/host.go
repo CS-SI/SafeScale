@@ -486,7 +486,6 @@ func (instance *host) Browse(ctx context.Context, callback func(*abstract.HostCo
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitTraceError(&xerr, "failed to create host")
 
 	instance.lock.RLock()
 	defer instance.lock.RLock()
@@ -529,7 +528,6 @@ func (instance *host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitTraceError(&xerr, "failed to create host")
 
 	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ahc, ok := clonable.(*abstract.HostCore)
@@ -685,7 +683,6 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitTraceError(&xerr, "failed to create host")
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -993,9 +990,6 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, xerr
 	}
 	defer func() {
-		// // Disable abort signal during the clean up
-		// defer task.DisarmAbortSignal()()
-
 		instance.undoUpdateSubnets(hostReq, &xerr)
 	}()
 
@@ -1085,9 +1079,6 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
-					// // Disable abort signal during the clean up
-					// defer task.DisarmAbortSignal()()
-
 					if derr := pubipsg.UnbindFromHost(context.Background(), instance); derr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", actionFromError(innerXErr), pubipsg.GetName(), instance.GetName()))
 					}
@@ -1108,9 +1099,6 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 		if req.IsGateway || !isolatedHost {
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
-					// // Disable abort signal during the clean up
-					// defer task.DisarmAbortSignal()()
-
 					var (
 						sg     resources.SecurityGroup
 						derr   error
@@ -1126,6 +1114,8 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 							_ = innerXErr.AddConsequence(deeperXErr)
 							continue
 						}
+
+						//goland:noinspection ALL
 						defer func(item resources.Subnet) {
 							item.Released()
 						}(subnetInstance)
@@ -1168,6 +1158,7 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				if xerr != nil {
 					return xerr
 				}
+				//goland:noinspection ALL
 				defer func(subnetInstance resources.Subnet) {
 					subnetInstance.Released()
 				}(subnetInstance)
@@ -1246,17 +1237,6 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 			}
 		}
 
-		// // register the security group in properties
-		// item := &propertiesv1.SecurityGroupBond{
-		// 	ID:         hostSG.GetID(),
-		// 	Name:       hostSG.GetName(),
-		// 	Disabled:   false,
-		// 	FromSubnet: false,
-		// }
-		// hsgV1.ByID[item.ID] = item
-		// hsgV1.ByName[item.Name] = item.ID
-		// hsgV1.DefaultID = item.ID
-
 		return nil
 	})
 }
@@ -1317,31 +1297,7 @@ func (instance *host) findTemplateID(hostDef abstract.HostSizingRequirements) (s
 	if xerr != nil {
 		return "", xerr
 	}
-	//useScannerDB := hostDef.MinGPU > 0 || hostDef.MinCPUFreq > 0
-	//templates, xerr := svc.ListTemplatesBySizing(hostDef, useScannerDB)
-	//if xerr != nil {
-	//	return "", fail.Wrap(xerr, "failed to find template corresponding to requested resources")
-	//}
-	//var template abstract.HostTemplate
-	//if len(templates) > 0 {
-	//	template = *(templates[0])
-	//	msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
-	//	if template.CPUFreq > 0 {
-	//		msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
-	//	}
-	//	msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-	//	if template.GPUNumber > 0 {
-	//		msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, strprocess.Plural(uint(template.GPUNumber)))
-	//		if template.GPUType != "" {
-	//			msg += fmt.Sprintf(" %s", template.GPUType)
-	//		}
-	//	}
-	//	msg += ")"
-	//	logrus.Infof(msg)
-	//} else {
-	//	logrus.Errorf("failed to find template corresponding to requested resources")
-	//	return "", fail.Wrap(xerr, "failed to find template corresponding to requested resources")
-	//}
+
 	return template.ID, nil
 }
 
@@ -1381,20 +1337,12 @@ func (instance *host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 		return xerr
 	}
 
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil)
-	// }
-
 	file := fmt.Sprintf("/opt/safescale/var/tmp/user_data.%s.sh", phase)
 	xerr = instance.unsafePushStringToFile(ctx, string(content), file)
 	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
-
-	// if task.Aborted() {
-	// 	return fail.AbortedError(nil)
-	// }
 
 	command := fmt.Sprintf("sudo bash %s; exit $?", file)
 	// Executes the script on the remote host
@@ -1413,10 +1361,6 @@ func (instance *host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 }
 
 func (instance *host) waitInstallPhase(ctx context.Context, phase userdata.Phase, timeout time.Duration) (string, fail.Error) {
-	// if task.Aborted() {
-	// 	return "", fail.AbortedError(nil, "aborted")
-	// }
-
 	sshDefaultTimeout := int(temporal.GetHostTimeout().Minutes())
 	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		if num, err := strconv.Atoi(sshDefaultTimeoutCandidate); err == nil {
@@ -1424,11 +1368,6 @@ func (instance *host) waitInstallPhase(ctx context.Context, phase userdata.Phase
 			sshDefaultTimeout = num
 		}
 	}
-
-	// sshCfg, xerr := instance.GetSSHConfig(task)
-	// if xerr != nil {
-	// 	return "", xerr
-	// }
 
 	// TODO: configurable timeout here
 	duration := time.Duration(sshDefaultTimeout) * time.Minute
@@ -1679,7 +1618,6 @@ func (instance *host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -1768,7 +1706,7 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 		}
 
 		req := abstract.SubnetRequest{
-			NetworkID: rn.GetID(),
+			NetworkID:  rn.GetID(),
 			Name:       abstract.SingleHostNetworkName,
 			CIDR:       subnetNet.String(),
 			DNSServers: DNSServers,
@@ -1784,9 +1722,6 @@ func getOrCreateDefaultSubnet(ctx context.Context, svc iaas.Service) (rs resourc
 		defer func() {
 			xerr = errcontrol.CrasherFail(xerr)
 			if xerr != nil {
-				// // Disable abort signal during the clean up
-				// defer task.DisarmAbortSignal()()
-
 				if derr := rs.Delete(context.Background()); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete subnet '%s'", actionFromError(xerr), abstract.SingleHostNetworkName))
 				}
@@ -1826,7 +1761,6 @@ func (instance *host) Delete(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -1936,6 +1870,7 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					return loopErr
 				}
 
+				//goland:noinspection ALL
 				defer func(item resources.Share) {
 					item.Released()
 				}(shareInstance)
@@ -1973,6 +1908,7 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				return loopErr
 			}
 
+			//goland:noinspection ALL
 			defer func(item resources.Share) {
 				item.Released()
 			}(shareInstance)
@@ -2014,6 +1950,7 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				if !hostNetworkV2.IsGateway || k != hostNetworkV2.DefaultSubnetID {
 					subnetInstance, loopErr := LoadSubnet(svc, "", k)
 					if loopErr == nil {
+						//goland:noinspection ALL
 						defer func(item resources.Subnet) {
 							item.Released()
 						}(subnetInstance)
@@ -2025,21 +1962,6 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 						errors = append(errors, loopErr)
 						continue
 					}
-					// loopErr = subnetInstance.Alter(task, func(_ data.Clonable, netprops *serialize.JSONProperties) fail.Error {
-					// 	return netprops.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-					// 		subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
-					// 		if !ok {
-					// 			return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					// 		}
-					// 		delete(subnetHostsV1.ByID, hostID)
-					// 		delete(subnetHostsV1.ByName, hostName)
-					// 		return nil
-					// 	})
-					// })
-					// if loopErr != nil {
-					// 	logrus.Errorf(loopErr.Error())
-					// 	errors = append(errors, loopErr)
-					// }
 				}
 			}
 			if len(errors) > 0 {
@@ -2063,6 +1985,7 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 			for _, v := range hsgV1.ByID {
 				rsg, derr := LoadSecurityGroup(svc, v.ID)
 				if derr == nil {
+					//goland:noinspection ALL
 					defer func(sgInstance resources.SecurityGroup) {
 						sgInstance.Released()
 					}(rsg)
@@ -2166,8 +2089,6 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		logrus.Tracef("core instance not found, deletion considered as a success")
 	}
 
-	// newHost := nullHost()
-	// *instance = *newHost
 	return nil
 }
 
@@ -2213,7 +2134,6 @@ func (instance *host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(cmd='%s', outs=%s)", outs.String()).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -2250,16 +2170,9 @@ func (instance *host) Pull(ctx context.Context, target, source string, timeout t
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(target=%s,source=%s)", target, source).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
-
-	// // retrieve ssh config to perform some commands
-	// ssh, xerr := instance.GetSSHConfig(task)
-	// if xerr != nil {
-	// 	return 0, "", "", xerr
-	// }
 
 	// FIXME: reintroduce timeout on ssh.
 	// if timeout < temporal.GetHostTimeout() {
@@ -2311,7 +2224,6 @@ func (instance *host) Push(ctx context.Context, source, target, owner, mode stri
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner, mode).Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -2397,7 +2309,6 @@ func (instance *host) Start(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -2462,7 +2373,6 @@ func (instance *host) Stop(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -2485,7 +2395,7 @@ func (instance *host) Stop(ctx context.Context) (xerr fail.Error) {
 
 			return svc.WaitHostState(hostID, hoststate.Stopped, temporal.GetHostTimeout())
 		},
-		// FIXME: static value
+		// FIXME: hardcoded value
 		5*time.Minute,
 	)
 	xerr = errcontrol.CrasherFail(xerr)
@@ -2528,7 +2438,6 @@ func (instance *host) Reboot(ctx context.Context) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	xerr = instance.Stop(ctx)
 	xerr = errcontrol.CrasherFail(xerr)
@@ -2558,7 +2467,6 @@ func (instance *host) Resize(ctx context.Context, hostSize abstract.HostSizingRe
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	return fail.NotImplementedError("Host.Resize() not yet implemented")
 }
@@ -2771,7 +2679,6 @@ func (instance *host) PushStringToFileWithOwnership(ctx context.Context, content
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(content, filename='%s', ownner=%s, mode=%s", filename, owner, mode).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -2887,7 +2794,6 @@ func (instance *host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s', enable=%v", rsg.GetName(), enable).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -2955,7 +2861,6 @@ func (instance *host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 	sgName := sg.GetName()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -3059,7 +2964,6 @@ func (instance *host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 	sgName := sg.GetName()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -3156,7 +3060,6 @@ func (instance *host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 	sgName := rsg.GetName()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()

@@ -29,7 +29,6 @@ import (
 
 // List returns a slice of *abstract.Network corresponding to managed networks
 func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Error) {
-	// FIXME: Check inputs
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}

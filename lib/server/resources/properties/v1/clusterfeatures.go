@@ -65,14 +65,6 @@ func (cif *ClusterInstalledFeature) Replace(p data.Clonable) data.Clonable {
 	return cif
 }
 
-// // Reset resets the content of the property
-// func (p *HostInstalledFeature) Reset() {
-// 	*p = HostInstalledFeature{
-// 		RequiredBy: []string{},
-// 		Requires:   []string{},
-// 	}
-// }
-
 // ClusterFeatures ...
 // not FROZEN yet
 type ClusterFeatures struct {

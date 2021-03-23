@@ -1140,11 +1140,6 @@ func (s stack) rpcGetProducts(ids []*string) ([]aws.JSONValue, fail.Error) {
 	var emptySlice []aws.JSONValue
 	filters := make([]*pricing.Filter, 0, 2+len(ids))
 	filters = append(filters, []*pricing.Filter{
-		// {
-		// 	Field: aws.String("ServiceCode"),
-		// 	Type:  aws.String("TERM_MATCH"),
-		// 	Value: aws.String("AmazonEC2"),
-		// },
 		{
 			Field: aws.String("operatingSystem"),
 			Type:  aws.String("TERM_MATCH"),

@@ -194,9 +194,6 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	if commRetryErr != nil {
 		return emptySlice, commRetryErr
 	}
-	// VPL: empty list is not an abnormal situation, do not log or raise error
-	// if len(vs) == 0 {
-	//     logrus.Warnf("Complete volume list empty")
-	// }
+
 	return vs, nil
 }

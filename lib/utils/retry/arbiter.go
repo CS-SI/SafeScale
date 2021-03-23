@@ -122,14 +122,7 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 func Successful() Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
-			// switch cerr := t.Err.(type) {
-			// case *ErrStopRetry:
-			// 	return verdict.Done, cerr
-			// case *fail.ErrRuntimePanic:
-			// 	return verdict.Done, cerr
-			// default:
-			return verdict.Done, nil
-			// }
+			return verdict.Done, nil // FIXME: Losing context
 		}
 		return verdict.Retry, nil
 	}

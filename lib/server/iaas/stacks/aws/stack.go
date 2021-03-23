@@ -18,6 +18,7 @@ package aws
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/aws/aws-sdk-go/service/s3"
 
 	"fmt"
 
@@ -37,13 +38,13 @@ type stack struct {
 	AuthOptions *stacks.AuthenticationOptions
 	AwsConfig   *stacks.AWSConfiguration
 
-	// S3Service      *s3.S3
+	S3Service      *s3.S3
 	EC2Service     *ec2.EC2
 	SSMService     *ssm.SSM
 	PricingService *pricing.Pricing
 }
 
-// NullStack is not exposed through API, is needed essentially by testss
+// NullStack is not exposed through API, is needed essentially by tests
 func NullStack() *stack { //nolint
 	return &stack{}
 }
@@ -84,13 +85,13 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	accessKeyID := auth.AccessKeyID
 	secretAccessKey := auth.SecretAccessKey
 
-	// VPL: S3 is not used through AWS API, but through STOW
-	// ss3 := session.Must(session.NewSession(&aws.Config{
-	// 	Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
-	// 	S3ForcePathStyle: aws.Bool(true),
-	// 	Region:           aws.String(localCfg.Region),
-	// 	Endpoint:         aws.String(localCfg.S3Endpoint),
-	// }))
+	// not used directly but for mocks
+	ss3 := session.Must(session.NewSession(&aws.Config{
+		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
+		S3ForcePathStyle: aws.Bool(true),
+		Region:           aws.String(localCfg.Region),
+		Endpoint:         aws.String(localCfg.S3Endpoint),
+	}))
 
 	sec2 := session.Must(session.NewSession(&aws.Config{
 		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
@@ -112,7 +113,7 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 		Region:           aws.String(endpoints.UsEast1RegionID),
 	}))
 
-	// stack.S3Service = s3.New(ss3, &aws.Config{})
+	stack.S3Service = s3.New(ss3, &aws.Config{})
 	stack.EC2Service = ec2.New(sec2, &aws.Config{})
 	stack.SSMService = ssm.New(sssm, &aws.Config{})
 	stack.PricingService = pricing.New(spricing, &aws.Config{})

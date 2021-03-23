@@ -61,9 +61,6 @@ func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
-			// if v != verdict.Done {
-			// 	spew.Dump(v)
-			// }
 			switch v { //nolint
 			case verdict.Retry:
 				logrus.Warningf("communication failed (%s), retrying", t.Err.Error())

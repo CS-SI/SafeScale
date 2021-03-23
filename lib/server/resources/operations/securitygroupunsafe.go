@@ -226,8 +226,6 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		}
 	}
 
-	// newSecurityGroup := nullSecurityGroup()
-	// *instance = *newSecurityGroup
 	return nil
 }
 

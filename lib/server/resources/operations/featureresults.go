@@ -23,32 +23,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// type unitResult struct {
-// 	completed bool // if true, the script has been run to completion
-// 	output    string
-// 	success   bool  // if true, the script has been run successfully and the result is a success
-// 	err       error // if an error occurred, contains the err
-// }
-
-// func (ur unitResult) Successful() bool {
-// 	return ur.success
-// }
-
-// func (ur unitResult) Completed() bool {
-// 	return ur.completed
-// }
-
-// func (ur unitResult) Error() error {
-// 	return ur.err
-// }
-
-// func (ur unitResult) ErrorMessage() string {
-// 	if ur.err != nil {
-// 		return ur.err.Error()
-// 	}
-// 	return ""
-// }
-
 // unitResults contains the errors of the step for each host target
 type unitResults map[string]resources.UnitResult
 

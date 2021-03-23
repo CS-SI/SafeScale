@@ -178,8 +178,6 @@ func (s Stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// VPL: coding rule : propagate the error OR log it, do not both
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	var img *images.Image
 	xerr = stacks.RetryableRemoteCall(
@@ -213,8 +211,6 @@ func (s Stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// CODING RULE: propagate the error OR log it, do not both
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	// Try to get template
 	var flv *flavors.Flavor
@@ -721,10 +717,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 						logrus.Debugf(derr.Error())
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
 
-						// switch derr.(type) {
-						// case *fail.ErrNotAvailable: // If host is not available (ie in error state), stop retries, something is wrong on provider side
-						// 	innerXErr = retry.StopRetryError(innerXErr)
-						// }
 						return
 					}
 					logrus.Debugf("unresponsive server '%s' deleted", request.ResourceName)
@@ -733,11 +725,11 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 			creationZone, innerXErr := s.GetAvailabilityZoneOfServer(ahc.ID)
 			if innerXErr != nil {
-				logrus.Tracef("Host successfully created but cannot confirm AZ: %s", innerXErr)
+				logrus.Tracef("Host '%s' successfully created but cannot confirm AZ: %s", ahc.Name, innerXErr)
 			} else {
-				logrus.Tracef("Host successfully created in requested AZ '%s'", creationZone)
+				logrus.Tracef("Host '%s' successfully created in requested AZ '%s'", ahc.Name, creationZone)
 				if creationZone != azone && azone != "" {
-					logrus.Warnf("Host created in the WRONG availability zone: requested '%s' and got instead '%s'", azone, creationZone)
+					logrus.Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", ahc.Name, azone, creationZone)
 				}
 			}
 
@@ -786,9 +778,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				}
 				_ = fail.AddConsequence(xerr, derr)
 			}
-			// if derr := s.deletePortsInSlice(createdPorts); derr != nil {
-			// 	_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
-			// }
 		}
 	}()
 
@@ -806,15 +795,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	if s.cfgOpts.UseFloatingIP && request.PublicIP {
 		// Create the floating IP
 		var ip *floatingips.FloatingIP
-		// xerr = stacks.RetryableRemoteCall(
-		// 	func() (innerErr error) {
-		// 		ip, innerErr = floatingips.Create(s.ComputeClient, floatingips.CreateOpts{
-		// 			Pool: s.authOpts.FloatingIPPool,
-		// 		}).Extract()
-		// 		return innerErr
-		// 	},
-		// 	NormalizeError,
-		// )
 		if ip, xerr = s.rpcCreateFloatingIP(); xerr != nil {
 			return nullAHF, nullUDC, xerr
 		}
@@ -823,12 +803,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		defer func() {
 			if xerr != nil {
 				logrus.Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
-				// derr := stacks.RetryableRemoteCall(
-				// 	func() error {
-				// 		return floatingips.Delete(s.ComputeClient, ip.ID).ExtractErr()
-				// 	},
-				// 	NormalizeError,
-				// )
 				if derr := s.rpcDeleteFloatingIP(ip.ID); derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
 					_ = xerr.AddConsequence(derr)
@@ -928,7 +902,6 @@ func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 
 		nets = append(nets, servers.Network{Port: port.ID})
 		netPorts = append(netPorts, *port)
-		//nets = append(nets, servers.Networking{UUID: s.ProviderNetworkID})
 	}
 
 	// private networks
@@ -938,7 +911,6 @@ func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 			Name:        fmt.Sprintf("nic_%s_subnet_%s", request.ResourceName, n.Name),
 			Description: fmt.Sprintf("nic of host '%s' on subnet '%s'", request.ResourceName, n.Name),
 			FixedIPs:    []ports.IP{{SubnetID: n.ID}},
-			//SecurityGroups: &sgs,
 		}
 		port, xerr := s.rpcCreatePort(req)
 		if xerr != nil {

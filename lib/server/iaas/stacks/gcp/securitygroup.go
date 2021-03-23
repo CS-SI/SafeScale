@@ -205,9 +205,6 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		return asg, fail.InvalidParameterError("sgParam", "must be consistent")
 	}
 
-	// tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
-	// defer tracer.Exiting()
-
 	return asg, fail.NotAvailableError("no real Security Group resource proposed by gcp")
 }
 

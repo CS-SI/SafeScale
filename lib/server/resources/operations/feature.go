@@ -79,7 +79,7 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 					feat, xerr := NewFeature(svc, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
 					xerr = errcontrol.CrasherFail(xerr)
 					if xerr != nil {
-						logrus.Error(xerr) // FIXME: Don't hide errors
+						logrus.Warn(xerr) // Don't hide errors
 						continue
 					}
 					casted := feat.(*feature)
@@ -329,11 +329,6 @@ func (f *feature) Check(ctx context.Context, target resources.Targetable, v data
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	// cacheKey := f.DisplayName() + "@" + t.GetName()
-	// if anon, ok := checkCache.Get(cacheKey); ok {
-	// 	return anon.(Results), nil
-	// }
-
 	installer, xerr := f.findInstallerForTarget(target, "check")
 	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
@@ -341,12 +336,6 @@ func (f *feature) Check(ctx context.Context, target resources.Targetable, v data
 	}
 
 	logrus.Debugf("Checking if feature '%s' is installed on %s '%s'...\n", featureName, targetType, targetName)
-
-	// 'v' may be updated by parallel tasks, so use copy of it
-	// myV := make(data.Map, len(v))
-	// for key, value := range v {
-	// 	myV[key] = value
-	// }
 	myV := v.Clone()
 
 	// Inits target parameters
@@ -432,7 +421,7 @@ func (f *feature) Add(ctx context.Context, target resources.Targetable, v data.M
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+
 	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting addition of feature '%s' on %s '%s'...", featureName, targetType, targetName),
 		fmt.Sprintf("Ending addition of feature '%s' on %s '%s'", featureName, targetType, targetName),
@@ -529,18 +518,7 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 		results resources.Results
 		// installer Installer
 	)
-	// methods := target.InstallMethods(f.task)
-	// for _, meth := range methods {
-	// 	if f.specs.IsSet("feature.install." + strings.ToLower(meth.String())) {
-	// 		installer = f.installerOfMethod(meth)
-	// 		if installer != nil {
-	// 			break
-	// 		}
-	// 	}
-	// }
-	// if installer == nil {
-	// 	return nil, fail.NotAvailableError("failed to find a way to uninstall '%s'", featureName)
-	// }
+
 	installer, xerr := f.findInstallerForTarget(target, "check")
 	xerr = errcontrol.CrasherFail(xerr)
 	if xerr != nil {
@@ -553,14 +531,8 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	)()
 
 	// 'v' may be updated by parallel tasks, so use copy of it
-	// myV := make(data.Map, len(v))
-	// for key, value := range v {
-	// 	myV[key] = value
-	// }
 	myV := v.Clone()
 
-	// // Inits implicit parameters
-	// err = f.setImplicitParameters(t, myV)
 	// Inits target parameters
 	xerr = target.ComplementFeatureParameters(ctx, myV)
 	xerr = errcontrol.CrasherFail(xerr)
@@ -587,9 +559,6 @@ func (f *feature) Remove(ctx context.Context, target resources.Targetable, v dat
 		return nil, xerr
 	}
 
-	// if xerr == nil {
-	// 	checkCache.Reset(f.DisplayName() + "@" + targetName)
-	// }
 	return results, target.UnregisterFeature(f.GetName())
 }
 

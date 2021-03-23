@@ -66,17 +66,6 @@ func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.H
 	}
 }
 
-// // VolumeAttachmentFromPropertyToProtocol converts an api.Volume to a *VolumeInfo
-// func VolumeAttachmentFromPropertyToProtocol(hostRef string, va propertiesv1.HostLocalMount) *protocol.VolumeAttachmentResponse {
-// 	out := &protocol.VolumeAttachmentResponse{
-// 		IPAddress:      &protocol.Reference{GetName: hostRef},
-// 		MountPath: va.Path,
-// 		Device:    va.Device,
-// 		Format:    va.FileSystem,
-// 	}
-// 	return out
-// }
-
 // HostSizingRequirementsFromPropertyToProtocol ...
 func HostSizingRequirementsFromPropertyToProtocol(in propertiesv1.HostSizingRequirements) *protocol.HostSizing {
 	return &protocol.HostSizing{

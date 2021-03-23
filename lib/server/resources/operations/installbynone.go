@@ -90,15 +90,6 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 
-	// // Forge a completed and successful results
-	// out := &results{
-	// 	t.GetName(): &unitResults{
-	// 		"none": &stepResult{
-	// 			completed: true,
-	// 			success:   true,
-	// 		},
-	// 	},
-	// }
 	return r, xerr
 }
 
@@ -134,19 +125,9 @@ func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 	}
 
 	return r, xerr
-	// // Forge a completed and successful results
-	// out := &results{
-	// 	t.GetName(): &unitResults{
-	// 		"none": &stepResult{
-	// 			completed: true,
-	// 			success:   true,
-	// 		},
-	// 	},
-	// }
-	// return out, nil
 }
 
-// newNoneInstaller creates a new instanc
+// newNoneInstaller creates a new instance
 func newNoneInstaller() Installer {
 	return &noneInstaller{}
 }

@@ -1,4 +1,4 @@
-// +build danger
+// +build alltests,ignore
 
 package concurrency
 

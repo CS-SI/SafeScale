@@ -408,11 +408,6 @@ var networkSecurityGroupInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 		}
 
-		// networkRef := c.Args().First()
-		// if networkRef == "-" {
-		// 	networkRef = ""
-		// }
-
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
@@ -565,11 +560,6 @@ var networkSecurityGroupDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 		}
 
-		// networkRef := c.Args().First()
-		// if networkRef == "-" {
-		// 	networkRef = ""
-		// }
-
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
@@ -608,11 +598,6 @@ var networkSecurityGroupBonds = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 		}
 
-		// networkRef := c.Args().First()
-		// if networkRef == "-" {
-		// 	networkRef = ""
-		// }
-
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
@@ -629,7 +614,7 @@ var networkSecurityGroupBonds = &cli.Command{
 		if len(list.Hosts) > 0 {
 			hosts := make([]map[string]interface{}, len(list.Hosts))
 			jsoned, _ := json.Marshal(list.Hosts)
-			err = json.Unmarshal([]byte(jsoned), &hosts)
+			err = json.Unmarshal(jsoned, &hosts)
 			if err != nil {
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
 			}
@@ -638,7 +623,7 @@ var networkSecurityGroupBonds = &cli.Command{
 		if len(list.Subnets) > 0 {
 			networks := make([]map[string]interface{}, len(list.Subnets))
 			jsoned, _ := json.Marshal(list.Subnets)
-			err = json.Unmarshal([]byte(jsoned), &networks)
+			err = json.Unmarshal(jsoned, &networks)
 			if err != nil {
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
 			}
@@ -719,10 +704,6 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 		}
-		//networkRef := c.Args().First()
-		//if networkRef == "-" {
-		//	networkRef = ""
-		//}
 
 		etherType, xerr := ipversion.Parse(c.String("type"))
 		if xerr != nil {
@@ -808,11 +789,6 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument GROUPREF."))
 		}
-
-		// networkRef := c.Args().First()
-		// if networkRef == "-" {
-		// 	networkRef = ""
-		// }
 
 		etherType, xerr := ipversion.Parse(c.String("type"))
 		if xerr != nil {
@@ -904,7 +880,7 @@ var subnetList = &cli.Command{
 			if err != nil {
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
 			}
-			if err != json.Unmarshal([]byte(jsoned), &result) {
+			if err != json.Unmarshal(jsoned, &result) {
 				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
 			}
 			for _, v := range result {
@@ -923,8 +899,7 @@ var subnetDelete = &cli.Command{
 	ArgsUsage: "NETWORKREF SUBNETREF [SUBNETREF ...]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name: "network",
-			//Aliases: []string{"N"},
+			Name:  "network",
 			Value: "",
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
@@ -1147,17 +1122,6 @@ var subnetVIPCreateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 		}
 
-		// networkRef := c.Args().First()
-		// if networkRef == "-" {
-		// 	networkRef = ""
-		// }
-
-		// network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network VIP", false).Error()))
-		// }
-
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "creation of subnet VIP not yet implemented"))
 	},
 }
@@ -1188,17 +1152,6 @@ var subnetVIPInspectCommand = &cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 		}
-
-		// networkRef := c.Args().First()
-		// if networkRef == "-" {
-		// 	networkRef = ""
-		// }
-
-		// network, err := clientSession.Networking.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network VIP", false).Error()))
-		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "inspection of subnet VIP not yet implemented"))
 
@@ -1231,17 +1184,6 @@ var subnetVIPDeleteCommand = &cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 		}
-
-		// networkRef := c.Args().First()
-		// if networkRef == "-" {
-		// 	networkRef = ""
-		// }
-
-		// network, err := clientSession.Networking.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of network VIP", false).Error()))
-		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "deletion of subnet VIP not yet implemented"))
 	},
@@ -1277,17 +1219,6 @@ var subnetVIPBindCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
 		}
 
-		// networkRef := c.Args().First()
-		// if networkRef == "-" {
-		// 	networkRef = ""
-		// }
-
-		// network, err := clientSession.Networking.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network VIP", false).Error()))
-		// }
-
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "bind host to subnet VIP not yet implemented"))
 	},
 }
@@ -1321,17 +1252,6 @@ var subnetVIPUnbindCommand = &cli.Command{
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
 		}
-
-		// networkRef := c.Args().First()
-		// if networkRef == "-" {
-		// 	networkRef = ""
-		// }
-
-		// network, err := clientSession.Networking.Inspect(c.Args().First(), temporal.GetExecutionTimeout()
-		// if err != nil {
-		// 	err = fail.FromGRPCStatus(err)
-		// 	return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "unbind host from network VIP", false).Error()))
-		// }
 
 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "unbind host from subnet VIP not yet implemented"))
 	},

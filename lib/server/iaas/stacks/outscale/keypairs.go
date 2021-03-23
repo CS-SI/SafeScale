@@ -37,7 +37,6 @@ func (s stack) CreateKeyPair(name string) (akp *abstract.KeyPair, xerr fail.Erro
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	akp, xerr = abstract.NewKeyPair(name)
 	if xerr != nil {
@@ -57,7 +56,6 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", keypair.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	return s.rpcCreateKeypair(keypair.Name, base64.StdEncoding.EncodeToString([]byte(keypair.PublicKey)))
 }
@@ -74,7 +72,6 @@ func (s stack) InspectKeyPair(id string) (akp *abstract.KeyPair, xerr fail.Error
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	//defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadKeypairByName(id)
 	if xerr != nil {
@@ -97,7 +94,6 @@ func (s stack) ListKeyPairs() (_ []abstract.KeyPair, xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	resp, xerr := s.rpcReadKeypairs(nil)
 	if xerr != nil {
@@ -126,7 +122,6 @@ func (s stack) DeleteKeyPair(name string) (xerr fail.Error) {
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "'%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	// defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	return s.rpcDeleteKeypair(name)
 }

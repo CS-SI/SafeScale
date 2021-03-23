@@ -212,9 +212,3 @@ func Test_Containers(t *testing.T) {
 	require.Nil(t, err)
 	cli.Buckets(t)
 }
-
-// func Test_Objects(t *testing.T) {
-// 	cli, err := getTester()
-// 	require.Nil(t, err)
-// 	cli.Objects(t)
-// }
