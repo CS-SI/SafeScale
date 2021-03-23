@@ -322,9 +322,9 @@ func (t *task) GetStatus() (TaskStatus, fail.Error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	if t.status == ABORTED {
-		return t.status, fail.AbortedError(nil, "aborted")
-	}
+	//if t.status == ABORTED {
+	//	return t.status, fail.AbortedError(nil, "aborted")
+	//}
 
 	return t.status, nil
 }
@@ -643,25 +643,24 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 		return false, nil, err
 	}
 
-	if status == DONE {
+	switch status {
+	case DONE:
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		return true, t.result, t.err
-	}
-	if status == ABORTED {
-		t.mu.Lock()
-		defer t.mu.Unlock()
-		return false, nil, t.err
-	}
-	if status != RUNNING {
+	//case ABORTED:
+	//	t.mu.Lock()
+	//	defer t.mu.Unlock()
+	//	return false, nil, t.err
+	case RUNNING, ABORTED:
+		if len(t.finishCh) == 1 {
+			_, err := t.Wait()
+			return true, t.result, err
+		}
+		return false, nil, nil
+	default:
 		return false, nil, fail.NewError("cannot wait task '%s': not running (%d)", tid, status)
 	}
-
-	if len(t.finishCh) == 1 {
-		_, err := t.Wait()
-		return true, t.result, err
-	}
-	return false, nil, nil
 }
 
 // WaitFor waits for the task to end, for 'duration' duration.
