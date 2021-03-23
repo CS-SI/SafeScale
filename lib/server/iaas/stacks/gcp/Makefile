@@ -11,7 +11,7 @@ generate: clean
 	@$(GO) generate > /dev/null 2>&1
 
 test:
-	@$(GO) test -race -v ./...
+	@$(GO) test $(RACE_CHECK_TEST) -v ./...
 
 clean:
 	@$(RM) rice-box.go || true

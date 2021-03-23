@@ -87,6 +87,9 @@ func main() {
 	app.Name = "safescale"
 	app.Usage = "safescale COMMAND"
 	app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
+	if len(Tags) > 1 { // nolint
+		app.Version += fmt.Sprintf(", with Tags: (%s)", Tags)
+	}
 	app.Authors = []*cli.Author{
 		{
 			Name:  "CS-SI",
@@ -224,18 +227,6 @@ func main() {
 	sort.Sort(cli.CommandsByName(commands.ClusterCommand.Subcommands))
 
 	sort.Sort(cli.CommandsByName(app.Commands))
-
-	// // Starts ctrl+c handler before app.RunContext()
-	// signalCh := make(chan os.Signal)
-	// signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
-	// go func() {
-	// 	for {
-	// 		<-signalCh
-	// 		atomic.StoreUint32(&onAbort, 1)
-	// 		cleanup(clientSession, &onAbort)
-	// 		cancelfunc()
-	// 	}
-	// }()
 
 	err := app.RunContext(mainCtx, os.Args)
 	if err != nil {

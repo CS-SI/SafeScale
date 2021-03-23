@@ -124,6 +124,9 @@ func work(c *cli.Context) {
 	reflection.Register(s)
 
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
+	if len(Tags) > 1 { // nolint
+		version += fmt.Sprintf(", with Tags: (%s)", Tags)
+	}
 	fmt.Printf("Safescaled version: %s\nReady to serve on '%s' :-)\n", version, listen)
 	if err := s.Serve(lis); err != nil {
 		logrus.Fatalf("Failed to serve: %v", err)

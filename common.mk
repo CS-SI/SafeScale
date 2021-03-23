@@ -1,4 +1,4 @@
-VERSION=21.02.0-alpha
+VERSION=21.03.0-alpha
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
@@ -36,8 +36,10 @@ endif
 
 ifeq (, $(GOOS))
 RACE_CHECK=-race
+RACE_CHECK_TEST=-race
 else
 RACE_CHECK=
+RACE_CHECK_TEST=-race
 endif
 
 BRANCH_NAME?="develop"
@@ -47,10 +49,39 @@ GOFMT?=gofmt
 CP?=cp
 RM?=rm
 BROWSER?=firefox
-BUILDTOOL?=mod
+GREP?=grep
+EGREP?=egrep
+CAT?=cat
+CUT?=cut
+AWK?=awk
+SED?=sed
+TEE?=tee
+EXT?=
 
 ifeq ($(OS),Windows_NT)
-HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && cat .tmpfile && $(RM) .tmpfile)
+EXT=.exe
+endif
+
+ifeq (, $(shell which $(GREP)))
+$(error "No grep in your PATH: [$(PATH)], you must have grep installed and available through your PATH")
+endif
+
+ifeq (, $(shell which $(CAT)))
+$(error "No cat in your PATH: [$(PATH)], you must have cat installed and available through your PATH")
+endif
+
+ifeq (, $(shell which $(TEE)))
+$(error "No tee in your PATH: [$(PATH)], you must have tee installed and available through your PATH")
+endif
+
+ifneq ($(OS),Windows_NT)
+ifeq (, $(shell which $(EGREP)))
+$(error "No egrep in your PATH: [$(PATH)], you must have egrep installed and available through your PATH")
+endif
+endif
+
+ifeq ($(OS),Windows_NT)
+HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && $(CAT) .tmpfile && $(RM) .tmpfile)
 ifeq (, $(shell which rm))
 RM = del /Q
 endif
@@ -64,6 +95,18 @@ GOPATH?=$(HOME)/go
 GOBIN?=$(GOPATH)/bin
 CIBIN?=/tmp
 
+ifneq ($(OS),Windows_NT)
+ARCH_DETECTS_RACES=$(shell $(GO) test -race 2>&1 | egrep -c "no Go")
+
+ifeq ($(ARCH_DETECTS_RACES),1)
+RACE_CHECK=-race
+RACE_CHECK_TEST=-race
+else
+RACE_CHECK=
+RACE_CHECK_TEST=
+endif
+endif
+
 ifeq (, $(shell which git))
 $(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
 endif
@@ -73,9 +116,12 @@ $(error "No GOPATH defined")
 endif
 
 # Handling multiple gopath: use ~/go by default
+ifneq ($(OS),Windows_NT)
 ifeq ($(findstring :,$(GOBIN)),:)
-# GOBIN=$(HOME)/go/bin
 GOBIN=$(shell $(GO) env GOBIN | cut -d: -f1)
+endif
+else
+GOBIN=$(shell printf "%b" "$(GOPATH)/bin" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && $(CAT) .tmpfile && $(RM) .tmpfile)
 endif
 
 # Handling multiple gopath: use $(HOME)/go by default

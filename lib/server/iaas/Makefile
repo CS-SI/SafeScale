@@ -18,4 +18,6 @@ vet:
 
 clean:
 	@(cd providers && $(MAKE) $(@))
+	@(cd userdata && $(MAKE) $(@))
+	@(cd stacks && $(MAKE) $(@))
 	@$(RM) ./mocks/*.go || true
