@@ -29,5 +29,3 @@ func InjectPlannedError(in error, calldepth ...int) (err error) {
 func InjectPlannedFail(in fail.Error, calldepth ...int) fail.Error {
 	return in
 }
-
-func InitializeErrorInjector() {}

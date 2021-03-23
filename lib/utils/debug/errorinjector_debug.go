@@ -117,8 +117,11 @@ func InjectPlannedFail(in fail.Error, calldepth ...int) (err fail.Error) {
 	if in != nil {
 		return in
 	}
+
 	if crash != nil {
-		return fail.ConvertError(crash(calldepth...))
+		if err := crash(calldepth...); err != nil {
+			return fail.AbortedError(err, "planned error injected")
+		}
 	}
 
 	return nil
@@ -181,7 +184,9 @@ func setup(spec string) error {
 		}]
 
 		if chance > 0 && rand.Float64() <= chance {
-			return fmt.Errorf("error injected at %s:%d, probability %f", file, line, chance)
+			err := fmt.Errorf("error injected at %s:%d, probability %f", file, line, chance)
+			logrus.Debug(err.Error())
+			return err
 		}
 
 		return nil
@@ -222,7 +227,7 @@ func newSite(s string) (string, int64, float64, error) {
 }
 
 // InitializeErrorInjector loads error plans from environment and setup the error injector
-func InitializeErrorInjector() {
+func init() {
 	if errorPlans := os.Getenv("SAFESCALE_PLANNED_ERRORS"); errorPlans != "" {
 		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
 			logrus.Warnf("Reloading planned errors: %s", errorPlans)
