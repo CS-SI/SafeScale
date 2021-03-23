@@ -599,17 +599,15 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 		return nil, err
 	}
 
-	if status == READY { // Waiting a ready task always succeed by design
+	switch status {
+	case READY: // Waiting a ready task always succeed by design
 		return nil, nil
-	}
-	if status == DONE {
+	case DONE:
 		return t.result, t.err
-	}
-	if status == TIMEOUT {
+	case TIMEOUT:
 		return nil, t.err
-	}
-	if status == UNKNOWN {
-		return nil, fail.InconsistentError("cannot wait task '%s': unknown status", tid)
+	case UNKNOWN:
+			return nil, fail.InconsistentError("cannot wait task '%s': unknown status", tid)
 	}
 
 	// status == ABORTED does not prevent to wait the end of the task
@@ -741,7 +739,8 @@ func (t *task) Abort() (err fail.Error) {
 	previousErr := t.err
 	previousStatus := t.status
 
-	if t.status == RUNNING {
+	switch t.status {
+	case RUNNING:
 		// Tell controller to stop go routine
 		t.abortCh <- true
 		close(t.abortCh)
@@ -751,7 +750,11 @@ func (t *task) Abort() (err fail.Error) {
 
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
-	} else {
+		// } else if t.status == DONE {
+		// 	t.status = ABORTED
+		// 	t.err = fail.AbortedError(t.err)
+	case ABORTED:
+	default:
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
 	}
@@ -780,7 +783,6 @@ func (t *task) Aborted() bool {
 	}
 
 	return t.status == ABORTED
-
 }
 
 // Abortable tells if task can be aborted
