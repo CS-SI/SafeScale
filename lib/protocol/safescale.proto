@@ -183,7 +183,7 @@ message NetworkCreateRequest{
 	bool keep_on_failure = 7;
 	string tenant_id = 8;
 	repeated string dns_servers = 9;
-	bool no_subnet = 10;
+	bool no_subnet = 10;            // tells not to create Subnet if set to true
 }
 
 enum NetworkState {
