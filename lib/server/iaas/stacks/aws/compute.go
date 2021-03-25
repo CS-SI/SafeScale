@@ -472,13 +472,13 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		}
 		return request.Subnets[0], request.Subnets[0].ID
 	}()
-	isGateway := request.IsGateway // && defaultNet != nil && defaultNet.Name != abstract.SingleHostNetworkName
+	isGateway := request.IsGateway // && defaultNet != nil && defaultNet.Name != abstract.IsolatedHostNetworkName
 
+	// FIXME: probably not necessary anymore, even when an isolated Host is requested, a dedicated subnet is created...
 	if defaultSubnet == nil {
 		if !request.PublicIP {
 			return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or attached network")
 		}
-		// FIXME: fallback to net-safescale ?
 		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without default subnet")
 	}
 

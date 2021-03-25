@@ -65,7 +65,7 @@ type Content struct {
 	ConfIF bool
 	// IsGateway, if set to true, activate IP forwarding
 	IsGateway bool
-	// getPublicIP contains a public IP binded to the host
+	// PublicIP contains a public IP binded to the host
 	PublicIP string
 	// AddGateway, if set to true, configure default gateway
 	AddGateway bool
@@ -192,7 +192,7 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	ud.FinalPublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.FinalPrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces
-	ud.IsGateway = request.IsGateway && request.Subnets[0].Name != abstract.SingleHostNetworkName
+	ud.IsGateway = request.IsGateway /*&& request.Subnets[0].Name != abstract.IsolatedHostNetworkName*/
 	ud.AddGateway = !request.IsGateway && !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
 	ud.CIDR = cidr

@@ -253,8 +253,9 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			Usage: "Image name for the host",
 		},
 		&cli.BoolFlag{
-			Name:  "public",
-			Usage: "Create with public IP",
+			Name:  "isolated",
+			Aliases: []string{"public"},
+			Usage: "Create isolated with public IP",
 		},
 		&cli.StringFlag{
 			Name:  "domain",
@@ -317,7 +318,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			ImageId:        c.String("os"),
 			Network:        c.String("network"),
 			Subnets:        c.StringSlice("subnet"),
-			Public:         c.Bool("public"),
+			Isolated:       c.Bool("isolated"),
 			Force:          c.Bool("force"),
 			SizingAsString: sizing,
 			KeepOnFailure:  c.Bool("keep-on-failure"),
