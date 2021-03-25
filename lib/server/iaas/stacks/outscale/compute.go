@@ -730,7 +730,7 @@ func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.
 		return request.Subnets[0]
 	}()
 
-	isGateway := request.IsGateway // && defaultSubnet != nil && defaultSubnet.Name != abstract.SingleHostNetworkName
+	isGateway := request.IsGateway // && defaultSubnet != nil && defaultSubnet.Name != abstract.IsolatedHostNetworkName
 	template, err := s.InspectTemplate(request.TemplateID)
 	if err != nil {
 		return err

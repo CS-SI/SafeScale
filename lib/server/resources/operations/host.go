@@ -801,7 +801,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 		anon, ok := opts.Get("UseNATService")
 		useNATService := ok && anon.(bool)
-		if hostReq.PublicIP || useNATService {
+		if (!hostReq.Isolated && hostReq.PublicIP) || useNATService {
 			xerr = defaultSubnet.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
@@ -934,12 +934,14 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, xerr
 	}
 
-	xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
+	if !hostReq.Isolated {
+		xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
+		defer instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
 	}
-	defer instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
 
 	logrus.Infof("Compute resource created: '%s'", instance.GetName())
 
@@ -1639,6 +1641,9 @@ func getOrCreateSingleNetworking(ctx context.Context, svc iaas.Service, hostName
 		default:
 			return nil, xerr
 		}
+	} else {
+		hostInstance.Released()
+		return nil, fail.DuplicateError("host '%s' already exists", hostName)
 	}
 
 	if an == nil || an.ID == "" {
@@ -2076,6 +2081,14 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
+	if isolated {
+		// delete its dedicated Subnet
+		xerr = svc.DeleteSubnet(isolatedSubnetID)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+	}
 	// Deletes metadata from Object Storage
 	xerr = instance.core.delete()
 	xerr = debug.InjectPlannedFail(xerr)
