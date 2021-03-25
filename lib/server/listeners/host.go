@@ -311,12 +311,12 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		rs         resources.Subnet
 		subnets    []*abstract.Subnet
 	)
-	if in.GetPublic() {
-		networkRef = abstract.SingleHostNetworkName
+	if in.GetIsolated() {
+		networkRef = abstract.IsolatedHostNetworkName
 	} else {
 		networkRef = in.GetNetwork()
 	}
-	if networkRef == "" && len(in.GetSubnets()) == 0 {
+	if networkRef == "" && len(in.GetSubnets()) == 0 && !in.GetIsolated() {
 		return nil, fail.InvalidRequestError("no Network and no Subnet defined, cannot continue")
 	}
 
@@ -351,22 +351,22 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	hostReq := abstract.HostRequest{
 		ResourceName:  name,
 		HostName:      name + domain,
-		PublicIP:      in.GetPublic(),
+		Isolated:      in.GetIsolated(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 		Subnets:       subnets,
 	}
 
-	objh, xerr := hostfactory.New(job.GetService())
+	hostInstance, xerr := hostfactory.New(job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if _, xerr = objh.Create(task.GetContext(), hostReq, *sizing); xerr != nil {
+	if _, xerr = hostInstance.Create(task.GetContext(), hostReq, *sizing); xerr != nil {
 		return nil, xerr
 	}
 
 	// logrus.Infof("Host '%s' created", name)
-	return objh.ToProtocol()
+	return hostInstance.ToProtocol()
 }
 
 // Resize an host

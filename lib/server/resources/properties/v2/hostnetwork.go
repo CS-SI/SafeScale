@@ -23,18 +23,19 @@ import (
 )
 
 // HostNetworking contains network information related to IPAddress
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostNetworking struct {
-	IsGateway       bool              `json:"is_gateway,omitempty"`        // Tells if host is a gateway of a network
 	DefaultSubnetID string            `json:"default_subnet_id,omitempty"` // contains the ID of the default subnet
-	SubnetsByID     map[string]string `json:"subnet_by_id,omitempty"`      // contains the name of each subnet bound to the host (indexed by ID)
-	SubnetsByName   map[string]string `json:"subnet_by_name,omitempty"`    // contains the ID of each subnet bound to the host (indexed by Name)
 	PublicIPv4      string            `json:"public_ip_v4,omitempty"`
 	PublicIPv6      string            `json:"public_ip_v6,omitempty"`
+	SubnetsByID     map[string]string `json:"subnet_by_id,omitempty"`   // contains the name of each subnet bound to the host (indexed by ID)
+	SubnetsByName   map[string]string `json:"subnet_by_name,omitempty"` // contains the ID of each subnet bound to the host (indexed by Name)
 	IPv4Addresses   map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
 	IPv6Addresses   map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Networking ID) allocated to the host
+	IsGateway       bool              `json:"is_gateway,omitempty"`     // Tells if host is a gateway of a Subnet
+	Isolated        bool              `json:"isolated,omitempty"`       // Tells if the Host is isolated (and then a gateway for its Subnet)
 }
 
 // NewHostNetworking ...
