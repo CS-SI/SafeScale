@@ -19,11 +19,9 @@ package openstack
 import (
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
-
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -200,7 +198,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				var innerErr error
-				s.ProviderNetworkID, innerErr = networks.IDFromName(s.NetworkClient, cfg.ProviderNetwork)
+				s.ProviderNetworkID, innerErr = getIDFromName(s.NetworkClient, cfg.ProviderNetwork)
 				return innerErr
 			},
 			NormalizeError,

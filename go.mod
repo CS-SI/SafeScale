@@ -20,7 +20,7 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gojuno/minimock/v3 v3.0.8
 	github.com/golang/protobuf v1.4.3
-	github.com/gophercloud/gophercloud v0.0.0-20190509032623-7892efa714f1
+	github.com/gophercloud/gophercloud v0.16.0
 	github.com/gopherjs/gopherjs v0.0.0-20210202160940-bed99a852dfe // indirect
 	github.com/gregoryv/gocyclo v0.1.0
 	github.com/huandu/xstrings v1.3.0 // indirect
