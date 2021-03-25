@@ -25,7 +25,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 
 	// Execute the remote call with tolerance for transient communication failure
 	// xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
-	xerr := netutils.WhileCommunicationUnsuccessful(
+	xerr := netutils.WhileUnsuccessfulButRetryable(
 		func() error {
 			if innerErr := callback(); innerErr != nil {
 				innerErr = normalizeError(innerErr)
