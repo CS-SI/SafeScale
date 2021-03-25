@@ -241,7 +241,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 		var flavorID string
 		xerr := stacks.RetryableRemoteCall(
 			func() (innerErr error) {
-				flavorID, innerErr = flavors.IDFromName(sc, opts.FlavorName)
+				flavorID, innerErr = getFlavorIDFromName(sc, opts.FlavorName)
 				return normalizeError(innerErr)
 			},
 			normalizeError,
@@ -253,6 +253,44 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 	}
 
 	return map[string]interface{}{"server": b}, nil
+}
+
+// getFlavorIDFromName is a convienience function that returns a flavor's ID given its name.
+func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	count := 0
+	id := ""
+	allPages, err := flavors.ListDetail(client, nil).AllPages()
+	if err != nil {
+		return "", err
+	}
+
+	all, err := flavors.ExtractFlavors(allPages)
+	if err != nil {
+		return "", err
+	}
+
+	for _, f := range all {
+		if f.Name == name {
+			count++
+			id = f.ID
+		}
+	}
+
+	switch count {
+	case 0:
+		err := &gophercloud.ErrResourceNotFound{}
+		err.ResourceType = "flavor"
+		err.Name = name
+		return "", err
+	case 1:
+		return id, nil
+	default:
+		err := &gophercloud.ErrMultipleResourcesFound{}
+		err.ResourceType = "flavor"
+		err.Name = name
+		err.Count = count
+		return "", err
+	}
 }
 
 // CreateHost creates a new host
