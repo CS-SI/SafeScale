@@ -737,7 +737,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		defaultSubnetID = defaultSubnet.GetID()
 	} else {
 		if hostReq.Isolated {
-			as, xerr := getOrCreateIsolatedNetworking(ctx, svc, hostReq.ResourceName)
+			as, xerr := createIsolatedHostSubnet(ctx, svc, hostReq.ResourceName)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -753,6 +753,8 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			}()
 
 			hostReq.Subnets = append(hostReq.Subnets, as)
+			hostReq.IsGateway = true
+
 			defaultSubnetID = as.ID
 		} else {
 			return nil, fail.InvalidRequestError("cannot create a Host if there are no Network/Subnet and without --public flag")
@@ -941,12 +943,14 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, xerr
 	}
 
-	xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
+	if !hostReq.Isolated {
+		xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
+		defer instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
 	}
-	defer instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
 
 	logrus.Infof("Compute resource created: '%s'", instance.GetName())
 
@@ -1076,7 +1080,7 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 		}
 
 		// Apply Security Group for hosts with public IP in default Subnet
-		if req.IsGateway {
+		if req.IsGateway || req.Isolated {
 			if pubipsg, innerXErr = LoadSecurityGroup(svc, as.PublicIPSecurityGroupID); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to query Subnet '%s' Security Group with ID %s", defaultSubnet.GetName(), as.PublicIPSecurityGroupID)
 			}
@@ -1105,7 +1109,7 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 		}
 
 		// Apply internal Security Group of each other subnets
-		if req.IsGateway {
+		if req.IsGateway || !req.Isolated {
 			defer func() {
 				if innerXErr != nil && !req.KeepOnFailure {
 					var (
@@ -1636,8 +1640,35 @@ func (instance *host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 	return instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, timeout)
 }
 
-// getOrCreateIsolatedNetworking gets Subnet for isolated hosts or create it if necessary
-func getOrCreateIsolatedNetworking(ctx context.Context, svc iaas.Service, hostName string) (_ *abstract.Subnet, xerr fail.Error) {
+// createIsolatedHostSubnet gets Subnet abstract.IsolatedHostNetworkName or create it if necessary
+func createIsolatedHostSubnet(ctx context.Context, svc iaas.Service, hostName string) (_ *abstract.Subnet, xerr fail.Error) {
+	hostInstance, xerr := LoadHost(svc, hostName)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return nil, xerr
+		}
+	} else {
+		hostInstance.Released()
+		return nil, fail.DuplicateError("host '%s' already exists", hostName)
+	}
+
+	_, xerr = svc.InspectHostByName(hostName)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return nil, fail.Wrap(xerr, "failed to check if Host '%s' already exist", hostName)
+		}
+	} else {
+		return nil, fail.DuplicateError("host '%s' already exists (not managed by SafeScale)", hostName)
+	}
+
 	an, xerr := svc.InspectNetworkByName(abstract.IsolatedHostNetworkName)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1670,7 +1701,7 @@ func getOrCreateIsolatedNetworking(ctx context.Context, svc iaas.Service, hostNa
 		}()
 	}
 
-	as, xerr := svc.InspectSubnetByName(an.ID, abstract.IsolatedHostNetworkName)
+	_, xerr = svc.InspectSubnetByName(an.ID, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1680,17 +1711,22 @@ func getOrCreateIsolatedNetworking(ctx context.Context, svc iaas.Service, hostNa
 			return nil, xerr
 		}
 	} else {
-		return as, nil
+		return nil, fail.DuplicateError("support Subnet '%s' for isolated Host '%s' already exists", hostName, hostName)
 	}
 
-	// Subnet has to be created
+	list, xerr := svc.ListSubnets(an.ID)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	_, networkNet, err := net.ParseCIDR(abstract.IsolatedHostNetworkCIDR)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return nil, fail.Wrap(err, "failed to convert CIDR to net.IPNet")
 	}
 
-	subnetCIDR, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
+	subnetCIDR, xerr := netretry.NthIncludedSubnet(*networkNet, 20, uint(len(list))+1)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1712,14 +1748,14 @@ func getOrCreateIsolatedNetworking(ctx context.Context, svc iaas.Service, hostNa
 	}
 
 	subnetReq := abstract.SubnetRequest{
-		Name: abstract.IsolatedHostNetworkName,
+		Name: hostName,
 		NetworkID: an.ID,
 		IPVersion: ipversion.IPv4,
 		CIDR: subnetCIDR.String(),
 		DNSServers: dnsServers,
 		HA: false,
 	}
-	as, xerr = svc.CreateSubnet(subnetReq)
+	as, xerr := svc.CreateSubnet(subnetReq)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
