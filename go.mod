@@ -53,6 +53,7 @@ require (
 	github.com/spf13/viper v1.6.2
 	github.com/stretchr/testify v1.5.1
 	github.com/urfave/cli/v2 v2.1.1
+	github.com/vmware/go-vcloud-director v2.0.0+incompatible // indirect
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
 	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4

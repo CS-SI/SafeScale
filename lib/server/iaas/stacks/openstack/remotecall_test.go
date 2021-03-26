@@ -19,8 +19,8 @@ var numNotThere int
 
 func gen404Err() error {
 	numNotThere++
-	return gophercloud.ErrDefault404{ // nolint
-		gophercloud.ErrUnexpectedResponseCode{
+	return gophercloud.ErrDefault404{
+		ErrUnexpectedResponseCode: gophercloud.ErrUnexpectedResponseCode{
 			BaseError: gophercloud.BaseError{},
 			URL:       "",
 			Method:    "",
@@ -33,8 +33,8 @@ func gen404Err() error {
 
 func gen503Err() error {
 	numCalls++
-	return gophercloud.ErrDefault503{ // nolint
-		gophercloud.ErrUnexpectedResponseCode{
+	return gophercloud.ErrDefault503{
+		ErrUnexpectedResponseCode: gophercloud.ErrUnexpectedResponseCode{
 			BaseError: gophercloud.BaseError{},
 			URL:       "",
 			Method:    "",
