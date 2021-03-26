@@ -19,6 +19,7 @@ package openstack
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/url"
 	"reflect"
 	"strings"
@@ -96,7 +97,9 @@ func NormalizeError(err error) fail.Error {
 		return fail.NotAvailableError(e.Error())
 	case *gophercloud.ErrEndpointNotFound:
 		return fail.NotAvailableError(e.Error())
-	case *url.Error:
+	case *url.Error: // go connection errors, this is a 'subclass' of next error net.Error, that captures all go connection errors
+		return fail.NewErrorWithCause(e)
+	case net.Error: // also go connection errors
 		return fail.NewErrorWithCause(e)
 	default:
 		switch err.Error() {

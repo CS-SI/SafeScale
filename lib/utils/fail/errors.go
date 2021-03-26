@@ -189,7 +189,7 @@ func (e errorCore) Unwrap() error {
 	return e.cause
 }
 
-// Cause returns an error's cause
+// Cause is just an accessor for internal e.cause
 func (e errorCore) Cause() error {
 	return e.cause
 }

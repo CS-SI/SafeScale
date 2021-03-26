@@ -607,7 +607,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 	case TIMEOUT:
 		return nil, t.err
 	case UNKNOWN:
-			return nil, fail.InconsistentError("cannot wait task '%s': unknown status", tid)
+		return nil, fail.InconsistentError("cannot wait task '%s': unknown status", tid)
 	}
 
 	// status == ABORTED does not prevent to wait the end of the task

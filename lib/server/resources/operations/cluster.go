@@ -550,7 +550,6 @@ func (instance *cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	return nil
 }
 
-
 // Serialize converts cluster data to JSON
 func (instance *cluster) Serialize() (_ []byte, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
