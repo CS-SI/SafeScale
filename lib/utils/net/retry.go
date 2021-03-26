@@ -30,9 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 )
 
-// WhileUnsuccessfulButRetryable executes callback inside a retry loop with tolerance for communication errors (relative to net package),
-// or some fail.Error that are considered retryable: asking "waitor" to wait between each try, with a duration limit of 'timeout'.
-func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer, timeout time.Duration) fail.Error {
+// WhileCommunicationUnsuccessful executes callback inside a retry loop with tolerance for communication errors (relative to net package),
+// asking "waitor" to wait between each try, with a duration limit of 'timeout'.
+func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer, timeout time.Duration) fail.Error {
 	if waitor == nil {
 		return fail.InvalidParameterCannotBeNilError("waitor")
 	}
@@ -53,10 +53,9 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
-			switch v {
+			switch v { //nolint
 			case verdict.Retry:
 				logrus.Warningf("communication failed (%s), retrying", t.Err.Error())
-			default:
 			}
 		},
 	)
@@ -66,18 +65,16 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 			xerr = fail.ConvertError(realErr.Cause())
 		case *retry.ErrTimeout:
 			xerr = fail.ConvertError(realErr.Cause())
-		default:
-			return xerr
 		}
+		return xerr
 	}
-
 	return nil
 }
 
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),
 // waiting 1 second between each try, with a limit of 'timeout'
 func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessfulButRetryable(callback, retry.Constant(1*time.Second), timeout)
+	return WhileCommunicationUnsuccessful(callback, retry.Constant(1*time.Second), timeout)
 }
 
 // normalizeError analyzes the error passed as parameter and rewrite it to be more explicit
@@ -88,9 +85,10 @@ func normalizeError(in error) (err error) {
 	defer func() {
 		if err != nil {
 			switch err.(type) {
-			case fail.ErrInvalidRequest, *fail.ErrInvalidRequest:
+			case fail.ErrInvalidRequest:
 				logrus.Warning(err.Error())
-			default:
+			case *fail.ErrInvalidRequest:
+				logrus.Warning(err.Error())
 			}
 		}
 	}()
@@ -104,16 +102,8 @@ func normalizeError(in error) (err error) {
 			switch cause := realErr.Cause().(type) { // nolint
 			case *url.Error:
 				return normalizeURLError(cause)
-			default:
 			}
-
-			// If error is *fail.ErrNotAvailable, *fail.ErrOverflow or *fail.ErrOverload, leave a chance to retry
-			switch realErr.(type) {
-			case *fail.ErrNotAvailable, *fail.ErrOverflow, *fail.ErrOverload:
-				return realErr
-			default:
-				return retry.StopRetryError(realErr)
-			}
+			return retry.StopRetryError(in)
 		default:
 			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
