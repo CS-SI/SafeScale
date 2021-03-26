@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"reflect"
 
@@ -38,8 +39,10 @@ func normalizeError(err error) fail.Error {
 	switch cerr := err.(type) {
 	case fail.Error:
 		return cerr
-	case *url.Error:
-		return fail.NewErrorWithCause(err)
+	case *url.Error: // go connection errors, this is a 'subclass' of next error net.Error, that captures all go connection errors
+		return fail.NewErrorWithCause(cerr)
+	case net.Error: // also go connection errors
+		return fail.NewErrorWithCause(cerr)
 	case *googleapi.Error:
 		switch cerr.Code {
 		case 400:

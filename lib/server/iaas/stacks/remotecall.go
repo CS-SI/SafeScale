@@ -25,15 +25,15 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 
 	// Execute the remote call with tolerance for transient communication failure
 	// xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
-	xerr := netutils.WhileCommunicationUnsuccessful(
+	xerr := netutils.WhileUnsuccessfulButRetryable(
 		func() error {
 			if innerErr := callback(); innerErr != nil {
-				innerErr = normalizeError(innerErr)
-				switch innerErr.(type) { //nolint
+				captured := normalizeError(innerErr)
+				switch captured.(type) { //nolint
 				case *fail.ErrNotFound:
-					return retry.StopRetryError(innerErr)
+					return retry.StopRetryError(captured)
 				}
-				return innerErr
+				return captured
 			}
 			return nil
 		},
@@ -43,9 +43,15 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.ConvertError(xerr.Cause())
+			if xerr.Cause() != nil {
+				return fail.ConvertError(xerr.Cause())
+			}
+			return fail.ConvertError(xerr)
 		case *retry.ErrTimeout: // On timeout, raise a NotFound error with the cause as message
-			return fail.NotFoundError(xerr.Cause().Error())
+			if xerr.Cause() != nil {
+				return fail.NotFoundError(xerr.Cause().Error())
+			}
+			return fail.NotFoundError(xerr.Error())
 		default:
 			return xerr
 		}

@@ -18,6 +18,8 @@ package aws
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"reflect"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -90,6 +92,10 @@ func normalizeError(err error) fail.Error {
 				return fail.NewError("unhandled error received from provider: %s", err.Error())
 			}
 		}
+	case *url.Error: // go connection errors, this is a 'subclass' of next error net.Error, that captures all go connection errors
+		return fail.NewErrorWithCause(cerr)
+	case net.Error: // also go connection errors
+		return fail.NewErrorWithCause(cerr)
 	}
 
 	return fail.ConvertError(err)

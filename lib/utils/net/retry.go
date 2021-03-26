@@ -30,9 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 )
 
-// WhileCommunicationUnsuccessful executes callback inside a retry loop with tolerance for communication errors (relative to net package),
-// asking "waitor" to wait between each try, with a duration limit of 'timeout'.
-func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer, timeout time.Duration) fail.Error {
+// WhileUnsuccessfulButRetryable executes callback inside a retry loop with tolerance for communication errors (relative to net package),
+// or some fail.Error that are considered retryable: asking "waitor" to wait between each try, with a duration limit of 'timeout'.
+func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer, timeout time.Duration) fail.Error {
 	if waitor == nil {
 		return fail.InvalidParameterCannotBeNilError("waitor")
 	}
@@ -46,7 +46,9 @@ func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer
 
 	xerr := retry.Action(
 		func() error {
-			return normalizeError(callback())
+			callbackErr := callback()
+			actionErr := normalizeErrorAndCheckIfRetriable(callbackErr)
+			return actionErr
 		},
 		arbiter,
 		waitor,
@@ -74,13 +76,13 @@ func WhileCommunicationUnsuccessful(callback func() error, waitor *retry.Officer
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),
 // waiting 1 second between each try, with a limit of 'timeout'
 func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout time.Duration) fail.Error {
-	return WhileCommunicationUnsuccessful(callback, retry.Constant(1*time.Second), timeout)
+	return WhileUnsuccessfulButRetryable(callback, retry.Constant(1*time.Second), timeout)
 }
 
-// normalizeError analyzes the error passed as parameter and rewrite it to be more explicit
+// normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
 // If the error is not a communication error, do not let a chance to retry by returning a *retry.ErrAborted error
 // containing the causing error in it
-func normalizeError(in error) (err error) {
+func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
 	defer func() {
 		if err != nil {
@@ -97,22 +99,42 @@ func normalizeError(in error) (err error) {
 		switch realErr := in.(type) {
 		case *url.Error:
 			return normalizeURLError(realErr)
-		case fail.Error: // a fail.Error may contain a cause of type *url.Error; it's the way used to propagate an *url.Error received by drivers.
-			// In this case, normalize this url.Error accordingly
-			switch cause := realErr.Cause().(type) { // nolint
-			case *url.Error:
-				return normalizeURLError(cause)
+		case fail.Error: // a fail.Error may contain a cause of type net.Error, being *url.Error a special subcase.
+			// FIXME: net.Error, and by extension url.Error have methods to check if the error is temporary -Temporary()-, or it's a timeout -Timeout()-, we should use the information to make decisions
+
+			// In this case, handle those net.Error accordingly
+			if realErr.Cause() != nil {
+				// FIXME: Cause might be nil unless using an accessor like the Cause function from v20.06, now missing in develop branch; look at cause use cases in develop branch and consider reintroducing it
+				switch cause := realErr.Cause().(type) { // nolint
+				case *url.Error:
+					return normalizeURLError(cause)
+				case net.Error:
+					return realErr
+				// If error is *fail.ErrNotAvailable, *fail.ErrOverflow or *fail.ErrOverload, leave a chance to retry
+				case *fail.ErrNotAvailable, fail.ErrNotAvailable, *fail.ErrOverflow, fail.ErrOverflow, *fail.ErrOverload, fail.ErrOverload:
+					return realErr
+				}
+			} else {
+				switch realErr.(type) { // nolint
+				// If error is *fail.ErrNotAvailable, *fail.ErrOverflow or *fail.ErrOverload, leave a chance to retry
+				case *fail.ErrNotAvailable, *fail.ErrOverflow, *fail.ErrOverload:
+					return realErr
+				case net.Error: // this also covers *url.Error, if the URL needs a specific error treatment, add a case BEFORE this line
+					return realErr
+				}
 			}
 			return retry.StopRetryError(in)
 		default:
+			// doing something based on error's Error() method is always dangerous, so a litte log here might help finding problems later
+			logrus.Tracef("trying to normalize based on Error() string of: (%s): %v", reflect.TypeOf(in).String(), in)
 			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
 			switch str {
 			case "not found": // stow may return that error message if it does not find something
 				return fail.NotFoundError("not found")
 			default: // stow may return an error containing "dial tcp:" for some HTTP errors
-				logrus.Tracef("encountered 'dial tcp' error")
 				if strings.Contains(str, "dial tcp:") {
+					logrus.Tracef("encountered 'dial tcp' error")
 					return fail.NotAvailableError(str)
 				}
 				if strings.Contains(str, "EOF") { // stow may return that error message if comm fails
