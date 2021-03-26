@@ -25,6 +25,7 @@ LINTER := golang.org/x/lint/golint
 ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
+GOVENDOR := github.com/kardianos/govendor
 
 # Default build tags
 BUILD_TAGS = 
@@ -93,7 +94,14 @@ coverdeps: begin ground
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading go2xunit...\n" && $(GO) install $(XUNIT)@v1.4.10 &>/dev/null || true; \
 	fi
 
+vendor: begin ground
+	@which govendor > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading govendor...\n" && $(GO) install $(GOVENDOR) &>/dev/null || true; \
+	fi
+
 getdevdeps: begin ground
+ifneq ($(STRICT),1)
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing with version tags. $(NO_COLOR)\n";
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@which rice > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) install $(RICE)@v1.0.2 &>/dev/null || true; \
@@ -127,6 +135,43 @@ getdevdeps: begin ground
     	printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.26.0 || true; \
 	fi
+else
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing without version tags. $(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@which rice > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) install $(RICE) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing rice module...$(NO_COLOR)\n" && $(GO) mod download github.com/GeertJohan/go.rice &>/dev/null || true; \
+	fi
+	@sleep 2
+	@which rice > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) install $(RICE) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing rice module...$(NO_COLOR)\n" && $(GO) mod download github.com/GeertJohan/go.rice &>/dev/null || true; \
+	fi
+	@sleep 2
+	@which protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) install github.com/golang/protobuf/protoc-gen-go &>/dev/null || true; \
+	fi
+	@which minimock > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) install $(MINIMOCK) &>/dev/null || true; \
+	fi
+	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) install $(ERRCHECK) &>/dev/null || true; \
+	fi
+	@which goconvey > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) install $(CONVEY) &>/dev/null || true; \
+	fi
+	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) install $(LINTER) &>/dev/null || true; \
+	fi
+	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) install $(STRINGER) &>/dev/null || true; \
+	fi
+	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.26.0 || true; \
+	fi
+	@git checkout go.mod
+endif
 
 ensure: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
