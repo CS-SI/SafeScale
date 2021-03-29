@@ -70,7 +70,7 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 		}
 		return xerr
 	}
-	return nil
+	return xerr
 }
 
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),
