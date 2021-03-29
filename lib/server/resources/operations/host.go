@@ -934,14 +934,12 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, xerr
 	}
 
-	if !hostReq.Isolated {
-		xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-		defer instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
+	xerr = instance.setSecurityGroups(ctx, hostReq, defaultSubnet)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
 	}
+	defer instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
 
 	logrus.Infof("Compute resource created: '%s'", instance.GetName())
 
