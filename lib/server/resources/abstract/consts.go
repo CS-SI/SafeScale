@@ -38,5 +38,5 @@ const (
 const (
 	// IsolatedHostNetworkName is the name to use to create the network owning single hosts (not attached to a named network)
 	IsolatedHostNetworkName = "safescale-isolated-hosts"
-	IsolatedHostNetworkCIDR = "10.0.0.0/9"
+	IsolatedHostNetworkCIDR = "10.42.0.0/16"
 )
