@@ -608,7 +608,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
-	// FIXME: not sure this is still necessary; even for isolated host, there is a Subnet created scpecifically by resource...
 	if len(request.Subnets) == 0 && !request.PublicIP {
 		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without --public flag and without attached Network/Subnet")
 	}

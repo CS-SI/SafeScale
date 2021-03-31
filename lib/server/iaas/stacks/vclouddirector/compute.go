@@ -571,7 +571,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 	//	hostNetworkV1 := clonable.(*propsv1.HostNetworking)
 	//	hostNetworkV1.DefaultSubnetID = defaultNetwork.ID
 	//
-	//	hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != abstract.IsolatedHostNetworkName
+	//	hostNetworkV1.IsGateway = request.DefaultGateway == nil && request.Networks[0].Name != abstract.SingleHostNetworkName
 	//	if request.DefaultGateway != nil {
 	//		hostNetworkV1.DefaultGatewayID = request.DefaultGateway.ID
 	//

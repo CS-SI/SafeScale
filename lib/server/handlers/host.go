@@ -200,7 +200,7 @@ func (handler *hostHandler) Create(
 	task := handler.job.GetTask()
 
 	var subnetName string
-	if !req.Isolated {
+	if !req.Single {
 		if len(req.Subnets) > 0 {
 			subnetName = req.Subnets[0].Name
 		} else {
