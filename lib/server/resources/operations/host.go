@@ -801,7 +801,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 		anon, ok := opts.Get("UseNATService")
 		useNATService := ok && anon.(bool)
-		if (!hostReq.Isolated && hostReq.PublicIP) || useNATService {
+		if hostReq.PublicIP || useNATService {
 			xerr = defaultSubnet.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
@@ -2079,14 +2079,6 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	if isolated {
-		// delete its dedicated Subnet
-		xerr = svc.DeleteSubnet(isolatedSubnetID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-	}
 	// Deletes metadata from Object Storage
 	xerr = instance.core.delete()
 	xerr = debug.InjectPlannedFail(xerr)
