@@ -168,7 +168,7 @@ type HostRequest struct {
 	SSHPort          uint32              // contains the port to use for SSH
 	Password         string              // Password contains the password of OperatorUsername account, usable on host console only
 	DiskSize         int                 // DiskSize allows to ask for a specific size for system disk (in GB)
-	Isolated         bool                // Isolated tells if the Host must be isolated (ie alone in a dedicated Subnet)
+	Single           bool                // Single tells if the Host is single
 	PublicIP         bool                // PublicIP a flag telling if the host must have a public IP
 	IsGateway        bool                // IsGateway tells if the host will act as a gateway
 	KeepOnFailure    bool                // KeepOnFailure tells if resource must be kept on failure

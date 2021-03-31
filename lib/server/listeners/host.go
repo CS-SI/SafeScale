@@ -311,12 +311,12 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		rs         resources.Subnet
 		subnets    []*abstract.Subnet
 	)
-	if in.GetIsolated() {
-		networkRef = abstract.IsolatedHostNetworkName
+	if in.GetSingle() {
+		networkRef = abstract.SingleHostNetworkName
 	} else {
 		networkRef = in.GetNetwork()
 	}
-	if networkRef == "" && len(in.GetSubnets()) == 0 && !in.GetIsolated() {
+	if networkRef == "" && len(in.GetSubnets()) == 0 && !in.GetSingle() {
 		return nil, fail.InvalidRequestError("no Network and no Subnet defined, cannot continue")
 	}
 
@@ -351,7 +351,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	hostReq := abstract.HostRequest{
 		ResourceName:  name,
 		HostName:      name + domain,
-		Isolated:      in.GetIsolated(),
+		Single:        in.GetSingle(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 		Subnets:       subnets,
 	}

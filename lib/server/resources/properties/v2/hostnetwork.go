@@ -35,7 +35,7 @@ type HostNetworking struct {
 	IPv4Addresses   map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
 	IPv6Addresses   map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Networking ID) allocated to the host
 	IsGateway       bool              `json:"is_gateway,omitempty"`     // Tells if host is a gateway of a Subnet
-	Isolated        bool              `json:"isolated,omitempty"`       // Tells if the Host is isolated (and then a gateway for its Subnet)
+	Single          bool              `json:"isolated,omitempty"`       // Tells if the Host is single
 }
 
 // NewHostNetworking ...

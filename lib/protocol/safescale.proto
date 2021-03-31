@@ -345,7 +345,7 @@ message HostDefinition {
 	string tenant_id = 18;
 	repeated string subnets = 19;
 	int32 ssh_port = 20;
-	bool isolated = 21;     // when an isolated Host must be created in a dedicated Subnet without metadata in isolated network
+	bool single = 21;     // when an Host must be created in a dedicated Subnet without metadata in net-safescale Subnet
 }
 
 enum HostState {

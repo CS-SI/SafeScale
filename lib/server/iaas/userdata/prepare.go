@@ -192,7 +192,7 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	ud.FinalPublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.FinalPrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces
-	ud.IsGateway = request.IsGateway /*&& request.Subnets[0].Name != abstract.IsolatedHostNetworkName*/
+	ud.IsGateway = request.IsGateway /*&& request.Subnets[0].Name != abstract.SingleHostNetworkName*/
 	ud.AddGateway = !request.IsGateway && !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
 	ud.CIDR = cidr
