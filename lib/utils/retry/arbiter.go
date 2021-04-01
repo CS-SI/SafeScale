@@ -130,6 +130,7 @@ func Successful() Arbiter {
 			// in the meantime, we keep the old code
 			return verdict.Done, nil
 		}
+
 		return verdict.Retry, nil
 	}
 }
@@ -151,6 +152,11 @@ func Timeout(limit time.Duration) Arbiter {
 				return verdict.Retry, nil
 			}
 		}
+
+		if time.Since(t.Start) >= limit {
+			return verdict.Abort, TimeoutError(t.Err, limit)
+		}
+
 		return verdict.Done, nil
 	}
 }
