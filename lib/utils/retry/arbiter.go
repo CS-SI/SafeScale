@@ -122,7 +122,7 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 func Successful() Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
-			return verdict.Done, nil // FIXME: Losing context
+			return verdict.Done, fail.ConvertError(t.Err)
 		}
 		return verdict.Retry, nil
 	}
