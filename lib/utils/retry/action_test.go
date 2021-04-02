@@ -538,6 +538,7 @@ func TestRetriesHitFirst(t *testing.T) {
 	}
 }
 
+// notice how this test and the next have the same results and it shouldn't
 func TestCustomActionWithTimeout(t *testing.T) {
 	begin := time.Now()
 	xerr := Action(
@@ -548,8 +549,33 @@ func TestCustomActionWithTimeout(t *testing.T) {
 		Constant(1*time.Second),
 		nil, nil, nil,
 	)
-	if xerr == nil {
+	if xerr == nil { // when timeout is fixed, the test must change
 		t.FailNow()
+	} else {
+		t.Errorf(xerr.Error())
+	}
+	delta := time.Since(begin)
+	if delta > 2*time.Second {
+		t.Errorf("There was a retry and it should have been none, timeout shoudn't be able to dictate when the retry finishes")
+		t.FailNow()
+	}
+}
+
+// notice how this test and the previous have the same results and it shouldn't
+func TestOtherCustomActionWithTimeout(t *testing.T) {
+	begin := time.Now()
+	xerr := Action(
+		func() error {
+			return genHappy()
+		},
+		PrevailRetry(Unsuccessful(), Timeout(6*time.Second)),
+		Constant(1*time.Second),
+		nil, nil, nil,
+	)
+	if xerr == nil { // when timeout is fixed, the test must change
+		t.FailNow()
+	} else {
+		t.Errorf(xerr.Error())
 	}
 	delta := time.Since(begin)
 	if delta > 2*time.Second {
