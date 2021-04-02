@@ -448,6 +448,12 @@ func genHandledPanic() error {
 	return endGame
 }
 
+func genAbortedError() error {
+	provErr := fail.NotFoundError("The resource %s is not there", "whatever")
+	endGame := fail.AbortedError(provErr, "we had to abort, we didn't know what to do without the resource")
+	return endGame
+}
+
 func TestErrCheckTimeout(t *testing.T) {
 	// This HAS to timeout after 5 seconds because genHappy never fails,
 	// so xerr at the end should be some kind of timeoutError
@@ -479,8 +485,44 @@ func TestErrCheckTimeout(t *testing.T) {
 	}
 }
 
-func TestErrCheckPanicNoTimeout(t *testing.T) {
+func TestErrCheckAbortedNoTimeout(t *testing.T) {
 	// This doesn't timeout, because we send a panic, but we should be able to track its origin...
+	xerr := WhileUnsuccessfulDelay1Second(
+		func() error {
+			innerXErr := genAbortedError()
+			return innerXErr
+		},
+		5*time.Second,
+	)
+	if xerr == nil {
+		t.Errorf("the while.. HAS to fail")
+		t.FailNow()
+	}
+	if _, ok := xerr.(*fail.ErrAborted); !ok {
+		t.Errorf("the error HAS to be an abortion")
+		t.FailNow()
+	}
+
+	reason := fail.RootCause(xerr)
+	if reason == nil {
+		t.Errorf("it MUST have a cause")
+		t.FailNow()
+	}
+	if _, ok := reason.(*fail.ErrNotFound); !ok {
+		t.Errorf("the cause MUST be a ErrNotFound")
+		t.FailNow()
+	}
+
+	// Now we even have the root reason, if any
+	if !strings.Contains(reason.Error(), "whatever") {
+		t.Errorf("the text MUST contain whatever")
+		t.FailNow()
+	}
+}
+
+func TestErrCheckPanicNoTimeout(t *testing.T) {
+	// This doesn't timeout, because we send an abortion, but we should be able to track its origin...
+	// previous test, TestErrCheckAbortedNoTimeout, works as expected, this does not
 	xerr := WhileUnsuccessfulDelay1Second(
 		func() error {
 			innerXErr := genHandledPanic()
