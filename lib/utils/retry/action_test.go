@@ -19,6 +19,7 @@ package retry
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,7 +150,7 @@ func TestVerifyErrorType(t *testing.T) {
 			t.Errorf("It should be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
-		if cause := fail.RootCause(recovered); cause != nil {
+		if cause := fail.Cause(recovered); cause != nil {
 			fmt.Println(cause.Error())
 		}
 	}
@@ -160,7 +161,7 @@ func TestVerifyErrorType(t *testing.T) {
 			t.Errorf("It should be a 'ErrTimeout', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
-		if cause := fail.RootCause(recovered); cause != nil {
+		if cause := fail.Cause(recovered); cause != nil {
 			if _, ok := cause.(*fail.ErrNotFound); !ok {
 				t.Errorf("It should be a 'fail.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
 			}
@@ -175,7 +176,7 @@ func TestSkipRetries(t *testing.T) {
 			t.Errorf("It should NOT be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
 		}
 
-		if cause := fail.RootCause(recovered); cause != nil {
+		if cause := fail.Cause(recovered); cause != nil {
 			if _, ok := cause.(*fail.ErrNotFound); ok {
 				fmt.Println(cause.Error())
 			} else {
@@ -278,7 +279,7 @@ func TestWhileUnsuccessfulDelay5Seconds(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * 10 * time.Millisecond}, false},
+		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * 10 * time.Millisecond}, true},
 		{"OneTimeSlowFails", args{sleepyFailure, time.Duration(15) * 10 * time.Millisecond}, true},
 		{"OneTimeQuickOK", args{quickSleepy, time.Duration(15) * 10 * time.Millisecond}, false},
 		{"UntilTimeouts", args{quickSleepyFailure, time.Duration(15) * 10 * time.Millisecond}, true},
@@ -303,7 +304,7 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 		wantErr   bool
 		wantTOErr bool
 	}{
-		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * 10 * time.Millisecond}, false, true},
+		{"OneTimeSlowOK", args{sleepy, time.Duration(15) * 10 * time.Millisecond}, true, true},
 		{"OneTimeSlowFails", args{sleepyFailure, time.Duration(15) * 10 * time.Millisecond}, true, true},
 		{"OneTimeQuickOK", args{quickSleepy, time.Duration(15) * 10 * time.Millisecond}, false, false},
 		{"UntilTimeouts", args{quickSleepyFailure, time.Duration(15) * 10 * time.Millisecond}, true, true},
@@ -426,5 +427,111 @@ func TestRefactorSwitch(t *testing.T) {
 		fmt.Println("Good enough")
 	default:
 		t.Error("Unexpected problem")
+	}
+}
+
+func genHappy() error {
+	return nil
+}
+
+func genSad() error {
+	provErr := fail.NotFoundError("The resource %s is not there", "whatever")
+	return fmt.Errorf("this is sad: %w", provErr)
+}
+
+func TestErrCheckTimeout(t *testing.T) {
+	// This HAS to timeout after 5 seconds because genHappy never fails,
+	// so xerr at the end should be some kind of timeoutError
+	xerr := WhileSuccessfulDelay1Second(
+		func() error {
+			innerXErr := genHappy()
+			return innerXErr
+		},
+		5*time.Second,
+	)
+	if xerr == nil {
+		t.Errorf("the while.. HAS to fail")
+		t.FailNow()
+	}
+	if _, ok := xerr.(*fail.ErrTimeout); !ok {
+		t.Errorf("the error HAS to be a timeout")
+		t.FailNow()
+	}
+	reason := fail.RootCause(xerr)
+	if reason == nil {
+		t.Errorf("it MUST have a cause")
+		t.FailNow()
+	}
+
+	// Now we even have the root reason, if any
+	if !strings.Contains(reason.Error(), "timed out after") {
+		t.Errorf("the text MUST contain 'timed out after'")
+		t.FailNow()
+	}
+}
+
+func TestErrCheckNoTimeout(t *testing.T) {
+	// This HAS to timeout after 5 seconds because genSad always fails,
+	// so xerr at the end should be some kind of timeoutError
+	xerr := WhileUnsuccessfulDelay1Second(
+		func() error {
+			innerXErr := genSad()
+			return innerXErr
+		},
+		5*time.Second,
+	)
+	if xerr == nil {
+		t.Errorf("the while.. HAS to fail")
+		t.FailNow()
+	}
+	if _, ok := xerr.(*fail.ErrTimeout); !ok {
+		t.Errorf("the error HAS to be a timeout")
+		t.FailNow()
+	}
+
+	reason := fail.RootCause(xerr)
+	if reason == nil {
+		t.Errorf("it MUST have a cause")
+		t.FailNow()
+	}
+	if _, ok := reason.(*fail.ErrNotFound); !ok {
+		t.Errorf("the cause MUST be a ErrNotFound")
+		t.FailNow()
+	}
+
+	// Now we even have the root reason, if any
+	if !strings.Contains(reason.Error(), "whatever") {
+		t.Errorf("the text MUST contain whatever")
+		t.FailNow()
+	}
+}
+
+func TestRetriesHitFirst(t *testing.T) {
+	// This HAS to timeout after 3 retries before we hit the timeout
+	// so xerr at the end should be some kind of OverflowError
+	xerr := WhileUnsuccessfulWithLimitedRetries(
+		func() error {
+			innerXErr := genSad()
+			return innerXErr
+		},
+		1*time.Second,
+		5*time.Second,
+		3,
+	)
+	if xerr == nil {
+		t.FailNow()
+	}
+	if _, ok := xerr.(*fail.ErrOverflow); !ok {
+		t.FailNow()
+	}
+
+	reason := fail.RootCause(xerr)
+	if reason == nil {
+		t.FailNow()
+	}
+
+	// Now we even have the root reason, if any
+	if !strings.Contains(reason.Error(), "whatever") {
+		t.FailNow()
 	}
 }
