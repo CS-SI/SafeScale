@@ -436,7 +436,9 @@ func genHappy() error {
 
 func genSad() error {
 	provErr := fail.NotFoundError("The resource %s is not there", "whatever")
-	return fmt.Errorf("this is sad: %w", provErr)
+	interlude := fail.AbortedError(provErr, "we had to abort")
+	endGame := fmt.Errorf("this is sad: %w", interlude)
+	return endGame
 }
 
 func TestErrCheckTimeout(t *testing.T) {
@@ -532,6 +534,26 @@ func TestRetriesHitFirst(t *testing.T) {
 
 	// Now we even have the root reason, if any
 	if !strings.Contains(reason.Error(), "whatever") {
+		t.FailNow()
+	}
+}
+
+func TestCustomActionWithTimeout(t *testing.T) {
+	begin := time.Now()
+	xerr := Action(
+		func() error {
+			return genHappy()
+		},
+		PrevailRetry(Successful(), Timeout(6*time.Second)),
+		Constant(1*time.Second),
+		nil, nil, nil,
+	)
+	if xerr == nil {
+		t.FailNow()
+	}
+	delta := time.Since(begin)
+	if delta > 2*time.Second {
+		t.Errorf("There was a retry and it should have been none, timeout shoudn't be able to dictate when the retry finishes")
 		t.FailNow()
 	}
 }
