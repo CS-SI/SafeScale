@@ -7,7 +7,7 @@ generate:
 	@(mkdir -p api/mocks) || true
 
 vet:
-	@$(GO) vet $($(GO) list ./... | grep -v libvirt | grep -v vclouddirector)
+	@$(GO) vet $($(GO) list ./...)
 
 clean:
 	@$(RM) ./mocks/*.go || true
