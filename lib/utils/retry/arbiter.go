@@ -154,10 +154,10 @@ func Timeout(limit time.Duration) Arbiter {
 		}
 
 		if time.Since(t.Start) >= limit {
-			return verdict.Abort, TimeoutError(t.Err, limit)
+			return verdict.Abort, TimeoutError(nil, limit)
 		}
 
-		return verdict.Done, nil
+		return verdict.Retry, nil
 	}
 }
 
