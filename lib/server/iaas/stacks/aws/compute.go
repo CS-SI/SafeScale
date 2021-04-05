@@ -472,7 +472,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		}
 		return request.Subnets[0], request.Subnets[0].ID
 	}()
-	isGateway := request.IsGateway // && defaultNet != nil && defaultNet.Name != abstract.SingleHostNetworkName
+	publicIP := request.IsGateway || request.Single
 
 	if defaultSubnet == nil {
 		if !request.PublicIP {
@@ -524,7 +524,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Core.Password = request.Password
 
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
-	ahf.Networking.IsGateway = isGateway
+	ahf.Networking.IsGateway = request.IsGateway
 
 	// Adds IPAddress property SizingV1
 	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
@@ -557,9 +557,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				innerXErr fail.Error
 			)
 			if request.Preemptible {
-				server, innerXErr = s.buildAwsSpotMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), isGateway, template)
+				server, innerXErr = s.buildAwsSpotMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), publicIP, template)
 			} else {
-				server, innerXErr = s.buildAwsMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), isGateway, template)
+				server, innerXErr = s.buildAwsMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), publicIP, template)
 			}
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -632,7 +632,7 @@ func (s stack) buildAwsSpotMachine(
 	zone string,
 	netID string,
 	data string,
-	isGateway bool,
+	publicIP bool,
 	template abstract.HostTemplate,
 ) (*abstract.HostCore, fail.Error) {
 
@@ -644,7 +644,7 @@ func (s stack) buildAwsSpotMachine(
 	lastPrice := resp[len(resp)-1]
 	logrus.Warnf("Last price detected %s", aws.StringValue(lastPrice.SpotPrice))
 
-	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(isGateway), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), []byte(data))
+	instance, xerr := s.rpcRequestSpotInstance(lastPrice.SpotPrice, aws.String(zone), aws.String(netID), aws.Bool(publicIP), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), []byte(data))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -665,11 +665,11 @@ func (s stack) buildAwsMachine(
 	zone string,
 	subnetID string,
 	data string,
-	isGateway bool,
+	publicIP bool,
 	template abstract.HostTemplate,
 ) (*abstract.HostCore, fail.Error) {
 
-	instance, xerr := s.rpcRunInstance(aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), aws.Bool(isGateway), []byte(data))
+	instance, xerr := s.rpcRunInstance(aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), aws.String(keypairName), aws.Bool(publicIP), []byte(data))
 	if xerr != nil {
 		return nil, xerr
 	}
