@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 
 	"github.com/sirupsen/logrus"
@@ -1631,6 +1632,7 @@ func (instance *host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 
 // getOrCreateSingleNetworking gets Subnet for isolated hosts or create it if necessary
 func getOrCreateSingleNetworking(ctx context.Context, svc iaas.Service, hostName string) (_ *abstract.Subnet, xerr fail.Error) {
+	// -- check if Network exists
 	an, xerr := svc.InspectNetworkByName(abstract.SingleHostNetworkName)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1639,12 +1641,10 @@ func getOrCreateSingleNetworking(ctx context.Context, svc iaas.Service, hostName
 		default:
 			return nil, xerr
 		}
-	} else {
-		hostInstance.Released()
-		return nil, fail.DuplicateError("host '%s' already exists", hostName)
 	}
 
 	if an == nil || an.ID == "" {
+		// Network has to be created
 		networkReq := abstract.NetworkRequest{
 			Name: abstract.SingleHostNetworkName,
 			CIDR: abstract.SingleHostNetworkCIDR,
@@ -1666,6 +1666,7 @@ func getOrCreateSingleNetworking(ctx context.Context, svc iaas.Service, hostName
 		}()
 	}
 
+	// -- check if Subnet exists
 	as, xerr := svc.InspectSubnetByName(an.ID, abstract.SingleHostNetworkName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1680,7 +1681,7 @@ func getOrCreateSingleNetworking(ctx context.Context, svc iaas.Service, hostName
 		return as, nil
 	}
 
-	// Subnet has to be created
+	// -- Subnet has to be created
 	_, networkNet, err := net.ParseCIDR(abstract.SingleHostNetworkCIDR)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
@@ -1720,6 +1721,45 @@ func getOrCreateSingleNetworking(ctx context.Context, svc iaas.Service, hostName
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	// -- default Security Group has to be amended to allow SSH and ping
+	defaultSGName := svc.GetDefaultSecurityGroupName()
+	asg, xerr := svc.InspectSecurityGroupByName(an.ID, defaultSGName)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// allow SSH
+	rule := abstract.NewSecurityGroupRule()
+	rule.Direction = securitygroupruledirection.Ingress
+	rule.Protocol = "tcp"
+	rule.PortFrom = 22
+	rule.Sources = []string{"0.0.0.0/0"}
+	asg, xerr = svc.AddRuleToSecurityGroup(asg, rule)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrDuplicate:
+			// continue
+		default:
+			return nil, xerr
+		}
+	}
+
+	// allow ping
+	rule.Protocol = "icmp"
+	rule.PortFrom = 0
+	rule.Sources = []string{"0.0.0.0/0"}
+	asg, xerr = svc.AddRuleToSecurityGroup(asg, rule)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrDuplicate:
+			// continue
+		default:
+			return nil, xerr
+		}
 	}
 
 	return as, nil
