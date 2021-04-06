@@ -459,44 +459,44 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 	return nullAS, abstract.ResourceNotFoundError("subnet", name)
 }
 
-// InspectSubnet returns the subnet identified by id
-func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
-	nullAS := abstract.NewSubnet()
-	if s.IsNull() {
-		return nullAS, fail.InvalidInstanceError()
-	}
-	if id == "" {
-		return nullAS, fail.InvalidParameterError("id", "cannot be empty string")
-	}
-
-	r := subnetGetResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets/" + id
-	opts := gophercloud.RequestOpts{
-		JSONResponse: &r.Body,
-		OkCodes:      []int{200, 201},
-	}
-	var resp *subnetEx
-	xerr := stacks.RetryableRemoteCall(
-		func() error {
-			_, innerErr := s.Stack.Driver.Request("GET", url, &opts)
-			r.Err = innerErr
-			resp, innerErr = r.Extract()
-			return innerErr
-		},
-		normalizeError,
-	)
-	if xerr != nil {
-		return nullAS, xerr
-	}
-
-	as := abstract.NewSubnet()
-	as.ID = resp.Subnet.ID
-	as.Name = resp.Subnet.Name
-	as.CIDR = resp.Subnet.CIDR
-	as.Network = resp.VpcID
-	as.IPVersion = fromIntIPVersion(resp.IPVersion)
-	return as, nil
-}
+//// InspectSubnet returns the subnet identified by id
+//func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
+//	nullAS := abstract.NewSubnet()
+//	if s.IsNull() {
+//		return nullAS, fail.InvalidInstanceError()
+//	}
+//	if id == "" {
+//		return nullAS, fail.InvalidParameterError("id", "cannot be empty string")
+//	}
+//
+//	r := subnetGetResult{}
+//	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets/" + id
+//	opts := gophercloud.RequestOpts{
+//		JSONResponse: &r.Body,
+//		OkCodes:      []int{200, 201},
+//	}
+//	var resp *subnetEx
+//	xerr := stacks.RetryableRemoteCall(
+//		func() error {
+//			_, innerErr := s.Stack.Driver.Request("GET", url, &opts)
+//			r.Err = innerErr
+//			resp, innerErr = r.Extract()
+//			return innerErr
+//		},
+//		normalizeError,
+//	)
+//	if xerr != nil {
+//		return nullAS, xerr
+//	}
+//
+//	as := abstract.NewSubnet()
+//	as.ID = resp.Subnet.ID
+//	as.Name = resp.Subnet.Name
+//	as.CIDR = resp.Subnet.CIDR
+//	as.Network = resp.VpcID
+//	as.IPVersion = fromIntIPVersion(resp.IPVersion)
+//	return as, nil
+//}
 
 // ListSubnets lists networks
 func (s stack) ListSubnets(networkRef string) ([]*abstract.Subnet, fail.Error) {
