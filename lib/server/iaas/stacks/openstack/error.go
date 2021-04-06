@@ -39,7 +39,7 @@ func NormalizeError(err error) fail.Error {
 		return nil
 	}
 
-	tracer := debug.NewTracer(nil, true/*debug.ShouldTrace("stacks") || debug.ShouldTrace("stack.openstack")*/, "Normalizing error").Entering()
+	tracer := debug.NewTracer(nil, true /*debug.ShouldTrace("stacks") || debug.ShouldTrace("stack.openstack")*/, " Normalizing error").Entering()
 	defer tracer.Exiting()
 
 	switch e := err.(type) {
@@ -134,7 +134,7 @@ func NormalizeError(err error) fail.Error {
 		tracer.Trace("received '*url.Error', normalized to 'fail.Error' with cause")
 		return fail.NewErrorWithCause(e)
 	case net.Error: // also go connection errors
-        tracer.Trace("received 'net.Error', normalized to 'fail.Error' with cause")
+		tracer.Trace("received 'net.Error', normalized to 'fail.Error' with cause")
 		return fail.NewErrorWithCause(e)
 	default:
 		switch err.Error() {
@@ -167,7 +167,7 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 	}()
 	defer fail.OnPanic(&xerr)
 
-	tracer := debug.NewTracer(nil, true/*debug.ShouldTrace("stacks") || debug.ShouldTrace("stack.openstack")*/, "Normalizing error").Entering()
+	tracer := debug.NewTracer(nil, true /*debug.ShouldTrace("stacks") || debug.ShouldTrace("stack.openstack")*/, " Normalizing error").Entering()
 	defer tracer.Exiting()
 
 	fn, ok := errorFuncMap[errorName]
