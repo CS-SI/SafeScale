@@ -127,6 +127,7 @@ func (c *core) GetID() string {
 	if !ok {
 		return ""
 	}
+
 	return id
 }
 
@@ -141,6 +142,7 @@ func (c *core) GetName() string {
 	if !ok {
 		return ""
 	}
+
 	return name
 }
 
@@ -493,13 +495,23 @@ func (c *core) write() fail.Error {
 			return xerr
 		}
 
-		xerr = c.folder.Write(byNameFolderName, c.name.Load().(string), jsoned)
+		name, ok := c.name.Load().(string)
+		if !ok {
+			return fail.InconsistentError("field 'name' is not set with string")
+		}
+
+		xerr = c.folder.Write(byNameFolderName, name, jsoned)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
 
-		xerr = c.folder.Write(byIDFolderName, c.id.Load().(string), jsoned)
+		id, ok := c.id.Load().(string)
+		if !ok {
+			return fail.InconsistentError("field 'id' is not set with string")
+		}
+
+		xerr = c.folder.Write(byIDFolderName, id, jsoned)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -532,9 +544,15 @@ func (c *core) reload() (xerr fail.Error) {
 		return fail.InconsistentError("cannot reload a not committed data")
 	}
 
+	id, ok := c.id.Load().(string)
+	if !ok {
+		return fail.InconsistentError("field 'id' is not set with string")
+	}
+
 	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
-			if innerXErr := c.readByID(c.id.Load().(string)); innerXErr != nil {
+
+			if innerXErr := c.readByID(id); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound: // If not found, stop immediately
 					return retry.StopRetryError(innerXErr)
@@ -550,11 +568,11 @@ func (c *core) reload() (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, c.id)
+			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
 		case *retry.ErrStopRetry:
-			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, c.id)
+			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
 		default:
-			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, c.id)
+			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, id)
 		}
 	}
 
@@ -600,7 +618,12 @@ func (c *core) delete() (xerr fail.Error) {
 	)
 
 	// Checks entries exist in Object Storage
-	xerr = c.folder.Lookup(byIDFolderName, c.id.Load().(string))
+	id, ok := c.id.Load().(string)
+	if !ok {
+		return fail.InconsistentError("field 'id' is not set with string")
+	}
+
+	xerr = c.folder.Lookup(byIDFolderName, id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -614,7 +637,12 @@ func (c *core) delete() (xerr fail.Error) {
 		idFound = true
 	}
 
-	xerr = c.folder.Lookup(byNameFolderName, c.name.Load().(string))
+	name, ok := c.name.Load().(string)
+	if !ok {
+		return fail.InconsistentError("field 'name' is not set with string")
+	}
+
+	xerr = c.folder.Lookup(byNameFolderName, name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -630,14 +658,14 @@ func (c *core) delete() (xerr fail.Error) {
 
 	// Deletes entries found
 	if idFound {
-		xerr = c.folder.Delete(byIDFolderName, c.id.Load().(string))
+		xerr = c.folder.Delete(byIDFolderName, id)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errors = append(errors, xerr)
 		}
 	}
 	if nameFound {
-		xerr = c.folder.Delete(byNameFolderName, c.name.Load().(string))
+		xerr = c.folder.Delete(byNameFolderName, name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errors = append(errors, xerr)
@@ -807,8 +835,14 @@ func (c *core) Released() {
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: must be called after locking the instance
 func (c *core) released() {
+	id, ok := c.id.Load().(string)
+	if !ok {
+		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
+		return
+	}
+
 	for _, v := range c.observers {
-		v.MarkAsFreed(c.id.Load().(string))
+		v.MarkAsFreed(id)
 	}
 }
 
@@ -830,8 +864,14 @@ func (c *core) Destroyed() {
 // Note: Does nothing for now, prepared for future use
 // Note: must be called after locking the instance
 func (c *core) destroyed() {
+	id, ok := c.id.Load().(string)
+	if !ok {
+		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
+		return
+	}
+
 	for _, v := range c.observers {
-		v.MarkAsDeleted(c.id.Load().(string))
+		v.MarkAsDeleted(id)
 	}
 }
 
@@ -874,8 +914,13 @@ func (c *core) NotifyObservers() error {
 // notifyObservers sends a signal to all registered Observers to notify change
 // Note: must be called after locking the instance
 func (c *core) notifyObservers() error {
+	id, ok := c.id.Load().(string)
+	if !ok {
+		return fail.InconsistentError("field 'id' is not set with string")
+	}
+
 	for _, v := range c.observers {
-		v.SignalChange(c.id.Load().(string))
+		v.SignalChange(id)
 	}
 	return nil
 }
