@@ -178,10 +178,18 @@ func qualifyGophercloudResponseCode(err *gophercloud.ErrUnexpectedResponseCode) 
 
 	var newError error
 	switch err.Actual {
+	case 401:
+		newError = &gophercloud.ErrDefault401{ErrUnexpectedResponseCode: *err}
+	case 403:
+		newError = &gophercloud.ErrDefault403{ErrUnexpectedResponseCode: *err}
+	case 404:
+		newError = &gophercloud.ErrDefault404{ErrUnexpectedResponseCode: *err}
 	case 408:
 		newError = &gophercloud.ErrDefault408{ErrUnexpectedResponseCode: *err}
-	case 429:
+	case 409:
 		newError = &gophercloud.ErrDefault409{ErrUnexpectedResponseCode: *err}
+	case 429:
+		newError = &gophercloud.ErrDefault429{ErrUnexpectedResponseCode: *err}
 	case 500:
 		newError = &gophercloud.ErrDefault500{ErrUnexpectedResponseCode: *err}
 	case 503:

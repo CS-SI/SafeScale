@@ -107,6 +107,38 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 	}.loopWithSoftTimeout()
 }
 
+func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, timeout time.Duration, retries uint) fail.Error {
+	if delay > timeout {
+		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
+	}
+
+	if delay <= 0 {
+		delay = time.Second
+	}
+	var arbiter Arbiter
+	if timeout <= 0 {
+		if retries >= 1 {
+			arbiter = PrevailDone(Unsuccessful(), Max(retries))
+		} else {
+			arbiter = Unsuccessful()
+		}
+	} else {
+		if retries >= 1 {
+			arbiter = PrevailDone(Unsuccessful(), Timeout(timeout), Max(retries))
+		} else {
+			arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
+		}
+	}
+	return action{
+		Arbiter: arbiter,
+		Officer: Constant(delay),
+		Run:     run,
+		First:   nil,
+		Last:    nil,
+		Notify:  nil,
+	}.loopWithSoftTimeout()
+}
+
 // WhileUnsuccessfulWithHardTimeout retries every 'delay' while 'run' is unsuccessful with a 'timeout'
 func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
 	if delay > timeout {

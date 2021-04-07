@@ -20,14 +20,13 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gojuno/minimock/v3 v3.0.8
 	github.com/golang/protobuf v1.4.3
-	github.com/gophercloud/gophercloud v0.16.0
+	github.com/gophercloud/gophercloud v0.15.0
 	github.com/gopherjs/gopherjs v0.0.0-20210202160940-bed99a852dfe // indirect
 	github.com/gregoryv/gocyclo v0.1.0
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/jcelliott/lumber v0.0.0-20160324203708-dd349441af25 // indirect
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
-	github.com/kr/pretty v0.2.0 // indirect
 	github.com/libvirt/libvirt-go v4.8.0+incompatible
 	github.com/libvirt/libvirt-go-xml v4.8.0+incompatible
 	github.com/magiconair/properties v1.8.1
@@ -53,7 +52,7 @@ require (
 	github.com/spf13/viper v1.6.2
 	github.com/stretchr/testify v1.5.1
 	github.com/urfave/cli/v2 v2.1.1
-	github.com/vmware/go-vcloud-director v2.0.0+incompatible // indirect
+	github.com/vmware/go-vcloud-director v2.0.0+incompatible
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
 	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4

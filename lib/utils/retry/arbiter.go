@@ -122,8 +122,15 @@ func UnsuccessfulWhereRetcode255() Arbiter {
 func Successful() Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		if t.Err != nil {
-			return verdict.Done, nil // FIXME: Losing context
+			// FIXME: Don't hide the errors
+			// This hides the error of a Try, and the calling code has a Done without knowing why it happened
+			// it has to change, however a few UT are needed to make sure it doesn't impact the callers
+			// and the callers keep the information from the Try
+			// return verdict.Done, fail.ConvertError(t.Err)
+			// in the meantime, we keep the old code
+			return verdict.Done, nil
 		}
+
 		return verdict.Retry, nil
 	}
 }
@@ -145,7 +152,12 @@ func Timeout(limit time.Duration) Arbiter {
 				return verdict.Retry, nil
 			}
 		}
-		return verdict.Done, nil
+
+		if time.Since(t.Start) >= limit {
+			return verdict.Abort, TimeoutError(nil, limit)
+		}
+
+		return verdict.Retry, nil
 	}
 }
 
