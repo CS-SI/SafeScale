@@ -194,7 +194,13 @@ func SecurityGroupRuleFromProtocolToAbstract(in *protocol.SecurityGroupRule) (*a
 	out.EtherType = ipversion.Enum(in.EtherType)
 	out.PortFrom = in.PortFrom
 	out.PortTo = in.PortTo
-	out.Targets = in.Involved
+
+	switch out.Direction {
+	case securitygroupruledirection.Ingress:
+		out.Sources = in.Involved
+	case securitygroupruledirection.Egress:
+		out.Targets = in.Involved
+	}
 	return out, nil
 }
 

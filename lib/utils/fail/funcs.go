@@ -147,21 +147,34 @@ func Wrap(cause error, msg ...interface{}) Error {
 	}
 }
 
-// RootCause returns the root cause of an error, or nil if there no root cause
-func RootCause(err error) (resp error) {
-	resp = err
-	for err != nil {
-		realErr, ok := err.(Error)
+func lastUnwrap(in error) (err error) {
+	if in == nil {
+		return nil
+	}
+
+	last := in
+	for {
+		err = last
+		u, ok := last.(interface {
+			Unwrap() error
+		})
 		if !ok {
 			break
 		}
-		cause := realErr.Cause()
-		if cause != nil {
-			resp = cause
+		tmpLast := u.Unwrap()
+		if tmpLast != nil {
+			last = tmpLast
+		} else {
+			break
 		}
-		err = cause
 	}
-	return resp
+
+	return err
+}
+
+// RootCause follows the chain of causes / wrapped errors and returns the last not-nil error
+func RootCause(err error) (resp error) {
+	return lastUnwrap(err)
 }
 
 // Cause returns the first immediate cause of an error, or nil if there no cause

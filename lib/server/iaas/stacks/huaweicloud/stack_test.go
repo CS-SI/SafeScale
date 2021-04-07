@@ -21,6 +21,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -55,6 +57,13 @@ func getService() (iaas.Service, error) {
 	}
 
 	return service, nil
+}
+
+func Test_Stack(t *testing.T) {
+	sta := *huaweicloud.NullStack()
+	if _, ok := interface{}(sta).(api.Stack); !ok {
+		t.FailNow()
+	}
 }
 
 func Test_Images(t *testing.T) {
