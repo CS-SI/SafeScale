@@ -27,9 +27,12 @@ import (
 )
 
 const (
+	// BucketNamePrefix is the beginning of the name of the bucket for Metadata
+	BucketNamePrefix = "0.safescale"
+)
+
+const (
 	maxBucketNameLength = 63
-	// bucketNamePrefix is the beginning of the name of the bucket for Metadata
-	bucketNamePrefix = "0.safescale"
 	suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
 )
 
@@ -42,7 +45,7 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 		return "", fail.ConvertError(herr)
 	}
 	hashed := hex.EncodeToString(hash.Sum(nil))
-	name = bucketNamePrefix + "-" + hashed
+	name = BucketNamePrefix + "-" + hashed
 
 	nameLen := len(name)
 	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
