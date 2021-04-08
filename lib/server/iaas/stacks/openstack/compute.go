@@ -716,7 +716,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					if derr := s.DeleteHost(ahc.ID); derr != nil {
 						logrus.Debugf(derr.Error())
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
-
 						return
 					}
 					logrus.Debugf("unresponsive server '%s' deleted", request.ResourceName)
