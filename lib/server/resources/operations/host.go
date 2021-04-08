@@ -17,8 +17,8 @@
 package operations
 
 import (
+	"context"
 	"fmt"
-	"net"
 	"os"
 	"os/user"
 	"reflect"
@@ -27,21 +27,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
@@ -709,44 +706,6 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)
 	}
 
-	// identify default Subnet
-	var (
-		defaultSubnet   resources.Subnet
-		defaultSubnetID string
-	)
-	if len(hostReq.Subnets) > 0 {
-		// By convention, default subnet is the first of the list
-		as := hostReq.Subnets[0]
-		defaultSubnet, xerr = LoadSubnet(svc, "", as.ID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		if hostReq.DefaultRouteIP == "" {
-			hostReq.DefaultRouteIP = func() string { out, _ := defaultSubnet.(*subnet).unsafeGetDefaultRouteIP(); return out }()
-		}
-
-		defaultSubnetID = defaultSubnet.GetID()
-	} else {
-		if hostReq.Single {
-			singleAS, singleASG, xerr := getOrCreateSingleNetworking(ctx, svc, hostReq.ResourceName)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			hostReq.Subnets = append(hostReq.Subnets, singleAS)
-			hostReq.PublicIP = true
-			defaultSubnetID = singleAS.ID
-			if singleASG != nil {
-				hostReq.SecurityGroupIDs = map[string]struct{}{singleASG.ID: {}}
-			}
-		} else {
-			return nil, fail.InvalidRequestError("cannot create a Host if there are no Network/Subnet and without --public flag")
-		}
-	}
-
 	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
 	if hostReq.TemplateID == "" {
 		if hostDef.Template != "" {
@@ -818,39 +777,95 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 	}
 
-	// list IDs of Security Groups to apply to Host
-	if !hostReq.Single && len(hostReq.SecurityGroupIDs) == 0 {
-		hostReq.SecurityGroupIDs = make(map[string]struct{}, len(hostReq.Subnets)+1)
-		for _, v := range hostReq.Subnets {
-			hostReq.SecurityGroupIDs[v.InternalSecurityGroupID] = struct{}{}
-		}
+	if !hostReq.Single && len(hostReq.Subnets) == 0 {
+		return nil, fail.InvalidRequestError("cannot create a Host if there are no Network/Subnet and without --public flag")
+	}
 
-		opts, xerr := svc.GetConfigurationOptions()
+	var (
+		defaultSubnet                  resources.Subnet
+		undoCreateSingleHostNetworking func() fail.Error
+	)
+	if hostReq.Single {
+		defaultSubnet, undoCreateSingleHostNetworking, xerr = createSingleHostNetworking(ctx, svc, hostReq)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		anon, ok := opts.Get("UseNATService")
-		useNATService := ok && anon.(bool)
-		if hostReq.PublicIP || useNATService {
-			xerr = defaultSubnet.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				as, ok := clonable.(*abstract.Subnet)
-				if !ok {
-					return fail.InconsistentError("*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		defer func() {
+			if xerr != nil && !hostReq.KeepOnFailure {
+				derr := undoCreateSingleHostNetworking()
+				if derr != nil {
+					_ = xerr.AddConsequence(derr)
 				}
+			}
+		}()
 
-				if as.PublicIPSecurityGroupID != "" {
-					hostReq.SecurityGroupIDs[as.PublicIPSecurityGroupID] = struct{}{}
-				}
-				return nil
-			})
+		xerr = defaultSubnet.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			hostReq.Subnets = append(hostReq.Subnets, as)
+			hostReq.SecurityGroupIDs = map[string]struct{}{
+				as.PublicIPSecurityGroupID: {},
+				as.GWSecurityGroupID:       {},
+			}
+			hostReq.PublicIP = true
+			return nil
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+	} else {
+		// By convention, default subnet is the first of the list
+		as := hostReq.Subnets[0]
+		defaultSubnet, xerr = LoadSubnet(svc, "", as.ID)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if hostReq.DefaultRouteIP == "" {
+			hostReq.DefaultRouteIP = func() string { out, _ := defaultSubnet.(*subnet).unsafeGetDefaultRouteIP(); return out }()
+		}
+
+		// list IDs of Security Groups to apply to Host
+		if len(hostReq.SecurityGroupIDs) == 0 {
+			hostReq.SecurityGroupIDs = make(map[string]struct{}, len(hostReq.Subnets)+1)
+			for _, v := range hostReq.Subnets {
+				hostReq.SecurityGroupIDs[v.InternalSecurityGroupID] = struct{}{}
+			}
+
+			opts, xerr := svc.GetConfigurationOptions()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
+				return nil, xerr
+			}
+
+			anon, ok := opts.Get("UseNATService")
+			useNATService := ok && anon.(bool)
+			if hostReq.PublicIP || useNATService {
+				xerr = defaultSubnet.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					as, ok := clonable.(*abstract.Subnet)
+					if !ok {
+						return fail.InconsistentError("*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					if as.PublicIPSecurityGroupID != "" {
+						hostReq.SecurityGroupIDs[as.PublicIPSecurityGroupID] = struct{}{}
+					}
+					return nil
+				})
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
+				}
 			}
 		}
 	}
+	defaultSubnetID := defaultSubnet.GetID()
 
 	ahf, userdataContent, xerr := svc.CreateHost(hostReq)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1593,10 +1608,10 @@ func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
-	// if host is not a gateway or is single (ie a gateway in a dedicated Subnet created without metadata), executes userdata.PHASE4/5 scripts
+	// if host is not a gateway, executes userdata.PHASE4/5 scripts
 	// to fix possible system issues and finalize host creation.
 	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations/subnet.go)
-	if single || !userdataContent.IsGateway {
+	if !userdataContent.IsGateway {
 		// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
 		xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1672,166 +1687,147 @@ func (instance *host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 	return instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, timeout)
 }
 
-// getOrCreateSingleNetworking gets Subnet for isolated hosts or create it if necessary
-func getOrCreateSingleNetworking(ctx context.Context, svc iaas.Service, hostName string) (_ *abstract.Subnet, _ *abstract.SecurityGroup, xerr fail.Error) {
-	// -- check if Network exists
-	an, xerr := svc.InspectNetworkByName(abstract.SingleHostNetworkName)
+// createSingleHostNetwork creates Single-Host Network and Subnet
+func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, xerr fail.Error) {
+	// Build network name
+	cfg, xerr := svc.GetConfigurationOptions()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+	bucketName := cfg.GetString("MetadataBucketName")
+	if bucketName == "" {
+		return nil, nil, fail.InconsistentError("missing service configuration option 'MetadataBucketName'")
+	}
+	networkName := fmt.Sprintf("net-safescale.%s", strings.Trim(bucketName, objectstorage.BucketNamePrefix+"-"))
+
+	// Create network if needed
+	networkInstance, xerr := LoadNetwork(svc, networkName)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// continue
+			networkInstance, xerr = NewNetwork(svc)
+			if xerr != nil {
+				return nil, nil, xerr
+			}
+
+			request := abstract.NetworkRequest{
+				Name:          networkName,
+				CIDR:          abstract.SingleHostNetworkCIDR,
+				KeepOnFailure: true,
+			}
+			xerr = networkInstance.Create(ctx, request)
+			if xerr != nil {
+				return nil, nil, xerr
+			}
 		default:
 			return nil, nil, xerr
 		}
 	}
+	defer networkInstance.Released()
 
-	if an == nil || an.ID == "" {
-		// Network has to be created
-		networkReq := abstract.NetworkRequest{
-			Name:          abstract.SingleHostNetworkName,
-			CIDR:          abstract.SingleHostNetworkCIDR,
-			KeepOnFailure: true,
-		}
-		an, xerr = svc.CreateNetwork(networkReq)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, nil, xerr
-		}
-
-		defer func() {
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				if derr := svc.DeleteNetwork(an.ID); derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", abstract.SingleHostNetworkName))
-				}
-			}
-		}()
-	}
-
-	// -- check if Subnet exists
-	as, xerr := svc.InspectSubnetByName(an.ID, abstract.SingleHostNetworkName)
-	xerr = debug.InjectPlannedFail(xerr)
+	// Check if Subnet exists
+	var (
+		subnetRequest abstract.SubnetRequest
+		cidrIndex  uint
+	)
+	subnetInstance, xerr := LoadSubnet(svc, networkInstance.GetID(), singleHostRequest.ResourceName)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// continue
-		default:
-			return nil, nil, xerr
-		}
-	}
-
-	if as == nil || as.ID == "" {
-		// -- Subnet has to be created
-		_, networkNet, err := net.ParseCIDR(abstract.SingleHostNetworkCIDR)
-		err = debug.InjectPlannedError(err)
-		if err != nil {
-			return nil, nil, fail.Wrap(err, "failed to convert CIDR to net.IPNet")
-		}
-
-		subnetCIDR, xerr := netretry.FirstIncludedSubnet(*networkNet, 1)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, nil, xerr
-		}
-
-		var dnsServers []string
-		opts, xerr := svc.GetConfigurationOptions()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-			default:
+			subnetInstance, xerr = NewSubnet(svc)
+			if xerr != nil {
 				return nil, nil, xerr
 			}
-		} else {
-			if servers := strings.TrimSpace(opts.GetString("DNSServers")); servers != "" {
-				dnsServers = strings.Split(servers, ",")
-			}
-		}
 
-		subnetReq := abstract.SubnetRequest{
-			Name:       abstract.SingleHostNetworkName,
-			NetworkID:  an.ID,
-			IPVersion:  ipversion.IPv4,
-			CIDR:       subnetCIDR.String(),
-			DNSServers: dnsServers,
-			HA:         false,
-		}
-		as, xerr = svc.CreateSubnet(subnetReq)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, nil, xerr
-		}
+			var (
+				subnetCIDR string
+			)
 
-		defer func() {
+			subnetCIDR, cidrIndex, xerr = reserveCIDRForSingleHost(networkInstance)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				if derr := svc.DeleteSubnet(as.ID); derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", abstract.SingleHostNetworkName))
-				}
-			}
-		}()
-	}
-
-	as.Network = an.ID
-
-	// -- check if Security Group exists
-	// forced to test the Cloud Provider here, GCP does not have Security Group feature...
-	switch svc.GetName() {
-	case "gcp":
-		// leave GCP handle this
-		return as, nil, nil
-	default:
-		subnetSGName := fmt.Sprintf("safescale-sg_subnet_%s.%s", abstract.SingleHostNetworkName, abstract.SingleHostNetworkName)
-		asg, xerr := svc.InspectSecurityGroupByName(an.ID, subnetSGName)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound, *fail.ErrNotAvailable:
-				// continue
-			default:
 				return nil, nil, xerr
 			}
-		}
 
-		if asg == nil || asg.ID == "" {
-			// There is no default Security Group, so create one with all egress access allowed
-			var rules []*abstract.SecurityGroupRule
-			rule := abstract.NewSecurityGroupRule()
-			rule.Direction = securitygroupruledirection.Egress
-			rule.Sources = []string{as.CIDR}
-			rule.Targets = []string{"0.0.0.0/0"}
-			rules = append(rules, rule)
-
-			// allow SSH
-			rule = abstract.NewSecurityGroupRule()
-			rule.Direction = securitygroupruledirection.Ingress
-			rule.Protocol = "tcp"
-			rule.PortFrom = 22
-			rule.Sources = []string{"0.0.0.0/0"}
-			rules = append(rules, rule)
-
-			// allow ping
-			rule = abstract.NewSecurityGroupRule()
-			rule.Direction = securitygroupruledirection.Ingress
-			rule.Protocol = "icmp"
-			rule.PortFrom = 0
-			rule.Sources = []string{"0.0.0.0/0"}
-			rules = append(rules, rule)
-
-			asg, xerr = svc.CreateSecurityGroup(an.ID, subnetSGName, fmt.Sprintf("Default Security Group for Subnet %s in Network %s", abstract.SingleHostNetworkName, abstract.SingleHostNetworkName), rules)
+			var dnsServers []string
+			opts, xerr := svc.GetConfigurationOptions()
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
-				case *fail.ErrDuplicate:
-					// ignore duplicate error
+				case *fail.ErrNotFound:
 				default:
 					return nil, nil, xerr
 				}
+			} else {
+				if servers := strings.TrimSpace(opts.GetString("DNSServers")); servers != "" {
+					dnsServers = strings.Split(servers, ",")
+				}
+			}
+
+			subnetRequest.Name = singleHostRequest.ResourceName
+			subnetRequest.NetworkID = networkInstance.GetID()
+			subnetRequest.IPVersion = ipversion.IPv4
+			subnetRequest.CIDR = subnetCIDR
+			subnetRequest.DNSServers = dnsServers
+			subnetRequest.HA = false
+
+			subnetInstance.(*subnet).lock.Lock()
+			xerr = subnetInstance.(*subnet).createSubnetWithoutGateway(ctx, subnetRequest)
+			subnetInstance.(*subnet).lock.Unlock()
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, nil, xerr
+			}
+
+			defer func() {
+				if xerr != nil && !singleHostRequest.KeepOnFailure {
+					derr := subnetInstance.Delete(ctx)
+					if derr != nil {
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", singleHostRequest.ResourceName))
+					}
+				}
+			}()
+
+			// Sets the CIDR index in instance metadata
+			xerr = subnetInstance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, ok := clonable.(*abstract.Subnet)
+				if !ok {
+					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				as.SingleHostCIDRIndex = cidrIndex
+				return nil
+			})
+			if xerr != nil {
+				return nil, nil, xerr
+			}
+		default:
+			return nil, nil, xerr
+		}
+	} else {
+		subnetInstance.Released()
+		return nil, nil, fail.DuplicateError("there is already a Subnet named '%s'", singleHostRequest.ResourceName)
+	}
+
+	undoFunc := func() fail.Error {
+		var errors []error
+		if !singleHostRequest.KeepOnFailure {
+			derr := subnetInstance.Delete(ctx)
+			if derr != nil {
+				errors = append(errors, fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", singleHostRequest.ResourceName))
+			}
+			derr = freeCIDRForSingleHost(networkInstance, cidrIndex)
+			if derr != nil {
+				errors = append(errors, fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot in Network '%s'", networkInstance.GetName()))
 			}
 		}
-
-		return as, asg, nil
+		if len(errors) > 0 {
+			return fail.NewErrorList(errors)
+		}
+		return nil
 	}
+
+	return subnetInstance, undoFunc, nil
 }
 
 // Delete deletes a host with its metadata and updates subnet links
@@ -1948,8 +1944,8 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 	}
 
 	var (
-		single bool
-		//singleSubnetID string
+		single         bool
+		singleSubnetID string
 	)
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// If Host has mounted shares, unmounts them before anything else
@@ -2047,9 +2043,9 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 			// hostName := instance.GetName()
 
 			single = hostNetworkV2.Single
-			//if single {
-			//	singleSubnetID = hostNetworkV2.DefaultSubnetID
-			//}
+			if single {
+				singleSubnetID = hostNetworkV2.DefaultSubnetID
+			}
 
 			if !single {
 				var errors []error
@@ -2082,43 +2078,41 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		}
 
 		// Unbind Security Groups from Host
-		if !single {
-			innerXErr = props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-				hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				// Unbind Security Groups from Host
-				var errors []error
-				for _, v := range hsgV1.ByID {
-					rsg, derr := LoadSecurityGroup(svc, v.ID)
-					if derr == nil {
-						//goland:noinspection ALL
-						defer func(sgInstance resources.SecurityGroup) {
-							sgInstance.Released()
-						}(rsg)
-
-						derr = rsg.UnbindFromHost(ctx, instance)
-					}
-					if derr != nil {
-						switch derr.(type) {
-						case *fail.ErrNotFound:
-							// Consider that a Security Group that cannot be loaded or is not bound as a success
-						default:
-							errors = append(errors, derr)
-						}
-					}
-				}
-				if len(errors) > 0 {
-					return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
-				}
-
-				return nil
-			})
-			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
+		innerXErr = props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
+			// Unbind Security Groups from Host
+			var errors []error
+			for _, v := range hsgV1.ByID {
+				rsg, derr := LoadSecurityGroup(svc, v.ID)
+				if derr == nil {
+					//goland:noinspection ALL
+					defer func(sgInstance resources.SecurityGroup) {
+						sgInstance.Released()
+					}(rsg)
+
+					derr = rsg.UnbindFromHost(ctx, instance)
+				}
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// Consider that a Security Group that cannot be loaded or is not bound as a success
+					default:
+						errors = append(errors, derr)
+					}
+				}
+			}
+			if len(errors) > 0 {
+				return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
+			}
+
+			return nil
+		})
+		if innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
 		}
 
 		// Delete host
@@ -2186,6 +2180,21 @@ func (instance *host) relaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
+	}
+
+	if single {
+		// delete its dedicated Subnet
+		singleSubnetInstance, xerr := LoadSubnet(svc, "", singleSubnetID)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		xerr = singleSubnetInstance.Delete(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	// Deletes metadata from Object Storage
