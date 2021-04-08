@@ -772,6 +772,43 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 	}
 
+	// identify default Subnet
+	var defaultSubnet resources.Subnet
+	if len(hostReq.Subnets) > 0 {
+		// By convention, default subnet is the first of the list
+		as := hostReq.Subnets[0]
+		defaultSubnet, xerr = LoadSubnet(svc, "", as.ID)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
+		if hostReq.DefaultRouteIP == "" {
+			hostReq.DefaultRouteIP = func() string { out, _ := defaultSubnet.(*subnet).unsafeGetDefaultRouteIP(); return out }()
+		}
+	} else if hostReq.PublicIP {
+		defaultSubnet, _, xerr = getOrCreateDefaultSubnet(ctx, svc)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		xerr = defaultSubnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			hostReq.Subnets = append(hostReq.Subnets, as)
+			return nil
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
+		}
+	} else {
+		return nil, fail.InvalidRequestError("missing --network, --subnet or --publicip parameter to define valid networking for Host")
+	}
+
 	// If hostReq.ImageID is not explicitly defined, find an image ID corresponding to the content of hostDef.Image
 	if hostReq.ImageID == "" {
 		hostReq.ImageID, xerr = instance.findImageID(&hostDef)
