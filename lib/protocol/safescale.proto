@@ -183,7 +183,7 @@ message NetworkCreateRequest{
 	bool keep_on_failure = 7;
 	string tenant_id = 8;
 	repeated string dns_servers = 9;
-	bool no_subnet = 10;
+	bool no_subnet = 10;            // tells not to create Subnet if set to true
 }
 
 enum NetworkState {
@@ -334,7 +334,7 @@ message HostDefinition {
 	float ram = 6;          // Deprecated: replaced by 'sizing_as_string' field
 	int32 disk = 7;         // Deprecated: replaced by 'sizing_as_string' field
 	string image_id = 9;
-	bool public = 10;
+	bool public = 10;       // tells if a public IP must be set to the Host
 	int32 gpu_count = 11;   // Deprecated: replaced by 'sizing_as_string' field
 	float cpu_freq = 12;    // Deprecated: replaced by 'sizing_as_string' field
 	bool force = 13;
@@ -345,6 +345,7 @@ message HostDefinition {
 	string tenant_id = 18;
 	repeated string subnets = 19;
 	int32 ssh_port = 20;
+	bool single = 21;     // when an Host must be created in a dedicated Subnet without metadata in net-safescale Subnet
 }
 
 enum HostState {

@@ -23,7 +23,7 @@ import (
 )
 
 // NetworkSubnets contains additional information describing the subnets in a network, in V1
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type NetworkSubnets struct {

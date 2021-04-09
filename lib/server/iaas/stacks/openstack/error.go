@@ -28,6 +28,7 @@ import (
 
 	"github.com/gophercloud/gophercloud"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -38,72 +39,107 @@ func NormalizeError(err error) fail.Error {
 		return nil
 	}
 
+	tracer := debug.NewTracer(nil, true /*debug.ShouldTrace("stacks") || debug.ShouldTrace("stack.openstack")*/, " Normalizing error").Entering()
+	defer tracer.Exiting()
+
 	switch e := err.(type) {
 	case fail.Error:
+		tracer.Trace("received 'fail.Error', throwing it as-is")
 		return e
 	case gophercloud.ErrDefault400: // bad request
+		tracer.Trace("received 'gophercloud.ErrDefault400', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("BadRequest", e.Body)
 	case *gophercloud.ErrDefault400: // bad request
+		tracer.Trace("received '*gophercloud.ErrDefault400', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("BadRequest", e.Body)
 	case gophercloud.ErrDefault401: // unauthorized
+		tracer.Trace("received 'gophercloud.ErrDefault401', normalized to '*fail.NotAuthenticated'")
 		return fail.NotAuthenticatedError(string(e.Body))
 	case *gophercloud.ErrDefault401: // unauthorized
+		tracer.Trace("received '*gophercloud.ErrDefault401', normalized to '*fail.NotAuthenticated'")
 		return fail.NotAuthenticatedError(string(e.Body))
 	case gophercloud.ErrDefault403: // forbidden
+		tracer.Trace("received 'gophercloud.ErrDefault403', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("Forbidden", e.Body)
 	case *gophercloud.ErrDefault403: // forbidden
+		tracer.Trace("received '*gophercloud.ErrDefault403', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("Forbidden", e.Body)
 	case gophercloud.ErrDefault404: // not found
+		tracer.Trace("received 'gophercloud.ErrDefault404', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("NotFound", e.Body)
 	case *gophercloud.ErrDefault404: // not found
+		tracer.Trace("received '*gophercloud.ErrDefault404', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("NotFound", e.Body)
 	case gophercloud.ErrDefault408: // request timeout
+		tracer.Trace("received 'gophercloud.ErrDefault408', normalized to '*fail.ErrOverflow'")
 		return fail.OverflowError(nil, 0, string(e.Body))
 	case *gophercloud.ErrDefault408: // request timeout
+		tracer.Trace("received 'gophercloud.ErrDefault408', normalized to '*fail.ErrOverflow'")
 		return fail.OverflowError(nil, 0, string(e.Body))
 	case gophercloud.ErrDefault409: // conflict
+		tracer.Trace("received 'gophercloud.ErrDefault409', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("Duplicate", e.Body)
 	case *gophercloud.ErrDefault409: // conflict
+		tracer.Trace("received '*gophercloud.ErrDefault409', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("Duplicate", e.Body)
 	case gophercloud.ErrDefault429: // too many requests
+		tracer.Trace("received 'gophercloud.ErrDefault429', normalized to '*fail.ErrOverload'")
 		return fail.OverloadError(string(e.Body))
 	case *gophercloud.ErrDefault429: // too many requests
+		tracer.Trace("received '*gophercloud.ErrDefault429', normalized to '*fail.ErrOverload'")
 		return fail.OverloadError(string(e.Body))
 	case gophercloud.ErrDefault500: // internal server error
+		tracer.Trace("received 'gophercloud.ErrDefault500', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("Execution", e.Body)
 	case *gophercloud.ErrDefault500: // internal server error
+		tracer.Trace("received '*gophercloud.ErrDefault500', forwarding to reduceOpenstackError()...")
 		return reduceOpenstackError("Execution", e.Body)
 	case gophercloud.ErrDefault503: // service unavailable
+		tracer.Trace("received 'gophercloud.ErrDefault503', normalized to '*fail.ErrNotAvailable'")
 		return fail.NotAvailableError(string(e.Body))
 	case *gophercloud.ErrDefault503: // service unavailable
+		tracer.Trace("received 'gophercloud.ErrDefault503', normalized to '*fail.ErrNotAvailable'")
 		return fail.NotAvailableError(string(e.Body))
 	case gophercloud.ErrResourceNotFound:
+		tracer.Trace("received 'gophercloud.ErrResourceNotFound', normalized to '*fail.ErrNotFound'")
 		return fail.NotFoundError(e.Error())
 	case *gophercloud.ErrResourceNotFound:
+		tracer.Trace("received '*gophercloud.ErrResourceNotFound', normalized to '*fail.ErrNotFound'")
 		return fail.NotFoundError(e.Error())
 	case gophercloud.ErrMultipleResourcesFound:
+		tracer.Trace("received 'gophercloud.ErrMultipleResourcesFound', normalized to '*fail.ErrDuplicate'")
 		return fail.DuplicateError(e.Error())
 	case *gophercloud.ErrMultipleResourcesFound:
+		tracer.Trace("received '*gophercloud.ErrMultipleResourcesFound', normalized to '*fail.ErrDuplicate'")
 		return fail.DuplicateError(e.Error())
 	case gophercloud.ErrUnexpectedResponseCode:
+		tracer.Trace("received 'gophercloud.ErrUnexpectedResponseCode', requalifying based on error code...")
 		return qualifyGophercloudResponseCode(&e)
 	case *gophercloud.ErrUnexpectedResponseCode:
+		tracer.Trace("received '*gophercloud.ErrUnexpectedResponseCode', requalifying based on error code...")
 		return qualifyGophercloudResponseCode(e)
 	case gophercloud.ErrMissingInput:
+		tracer.Trace("received 'gophercloud.ErrMissingInput', normalized to '*fail.ErrInvalidRequest'")
 		return fail.InvalidRequestError(e.Error())
 	case *gophercloud.ErrMissingInput:
+		tracer.Trace("received '*gophercloud.ErrMissingInput', normalized to '*fail.ErrInvalidRequest'")
 		return fail.InvalidRequestError(e.Error())
 	case gophercloud.ErrEndpointNotFound:
+		tracer.Trace("received 'gophercloud.ErrEndpointNotFound', normalized to '*fail.ErrNotAvailable'")
 		return fail.NotAvailableError(e.Error())
 	case *gophercloud.ErrEndpointNotFound:
+		tracer.Trace("received '*gophercloud.ErrEndpointNotFound', normalized to '*fail.ErrNotAvailable'")
 		return fail.NotAvailableError(e.Error())
 	case *url.Error: // go connection errors, this is a 'subclass' of next error net.Error, that captures all go connection errors
+		tracer.Trace("received '*url.Error', normalized to 'fail.Error' with cause")
 		return fail.NewErrorWithCause(e)
 	case net.Error: // also go connection errors
+		tracer.Trace("received 'net.Error', normalized to 'fail.Error' with cause")
 		return fail.NewErrorWithCause(e)
 	default:
 		switch err.Error() {
 		case "EOF":
+			tracer.Trace("received 'EOF', normalized to '*fail.ErrNotFound'")
 			return fail.NotFoundError("EOF")
 		default:
 			logrus.Debugf(callstack.DecorateWith("", "", fmt.Sprintf("Unhandled error (%s) received from provider: %s", reflect.TypeOf(err).String(), err.Error()), 0))
@@ -130,6 +166,9 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 		}
 	}()
 	defer fail.OnPanic(&xerr)
+
+	tracer := debug.NewTracer(nil, true /*debug.ShouldTrace("stacks") || debug.ShouldTrace("stack.openstack")*/, " Normalizing error").Entering()
+	defer tracer.Exiting()
 
 	fn, ok := errorFuncMap[errorName]
 	if !ok {
@@ -167,6 +206,7 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 		}
 	}
 
+	tracer.Trace("normalized error to '*fail.Err%s'", errorName)
 	return fn(msg)
 }
 
