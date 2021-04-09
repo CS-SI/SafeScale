@@ -1130,8 +1130,8 @@ func (instance *subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-			return xerr
-		}
+		return xerr
+	}
 
 	// Starting from here, remove Subnet from Network metadata if exiting with error
 	defer func() {
@@ -2449,7 +2449,7 @@ func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 		// 4st free CIDR index if the Subnet has been created for a single Host
 		if as.SingleHostCIDRIndex > 0 {
-			networkInstance, innerXErr := instance.InspectNetwork()
+			networkInstance, innerXErr := instance.unsafeInspectNetwork()
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -3194,17 +3194,17 @@ func (instance *subnet) createSubnetWithoutGateway(ctx context.Context, req abst
 
 	// Note: do not use .isNull() here
 	if instance == nil {
-			return fail.InvalidInstanceError()
-		}
+		return fail.InvalidInstanceError()
+	}
 	if ctx == nil {
-			return fail.InvalidParameterCannotBeNilError("ctx")
-		}
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-			return xerr
-		}
+		return xerr
+	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
