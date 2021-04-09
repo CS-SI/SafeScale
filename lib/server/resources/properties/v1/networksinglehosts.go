@@ -26,7 +26,8 @@ import (
 
 const (
 	// SingleHostsCIDRMaskAddition contains the bits added as network part for single Host CIDR
-	SingleHostsCIDRMaskAddition = 13
+	// Note: AWS limits netmask from /8 to /28, hence the 12...
+	SingleHostsCIDRMaskAddition = 12
 )
 
 var (
