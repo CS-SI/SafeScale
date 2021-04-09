@@ -1660,7 +1660,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 		return nil, nil, fail.InconsistentError("missing service configuration option 'MetadataBucketName'")
 	}
 
-	networkName := fmt.Sprintf("net-safescale.%s", strings.Trim(bucketName, objectstorage.BucketNamePrefix+"-"))
+	networkName := fmt.Sprintf("sfnet-%s", strings.Trim(bucketName, objectstorage.BucketNamePrefix+"-"))
 
 	// Create network if needed
 	networkInstance, xerr := LoadNetwork(svc, networkName)

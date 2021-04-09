@@ -406,7 +406,7 @@ func (s stack) buildGcpMachine(
 ) (*abstract.HostFull, fail.Error) {
 
 	nullAHF := abstract.NewHostFull()
-	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata, isPublic, securityGroups)
+	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata, isPublic, securityGroups)
 	if xerr != nil {
 		return nullAHF, xerr
 	}
