@@ -576,15 +576,18 @@ func (s stack) rpcGetRouteByName(name string) (*compute.Route, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcCreateRoute(networkName, subnetName string) (*compute.Route, fail.Error) {
+func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*compute.Route, fail.Error) {
 	if networkName == "" {
 		return nil, fail.InvalidParameterError("networkName", "cannot be empty string")
 	}
+	if subnetID == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetID")
+	}
 	if subnetName == "" {
-		return nil, fail.InvalidParameterError("subnetName", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetName")
 	}
 
-	routeName := fmt.Sprintf(natRouteNameFormat, networkName, subnetName)
+	routeName := fmt.Sprintf(natRouteNameFormat, subnetID)
 
 	request := compute.Route{
 		DestRange:       "0.0.0.0/0",
@@ -592,7 +595,7 @@ func (s stack) rpcCreateRoute(networkName, subnetName string) (*compute.Route, f
 		Network:         fmt.Sprintf("%s/global/networks/%s", s.selfLinkPrefix, networkName),
 		NextHopInstance: fmt.Sprintf("%s/zones/%s/instances/gw-%s", s.selfLinkPrefix, s.GcpConfig.Zone, subnetName),
 		Priority:        800,
-		Tags:            []string{fmt.Sprintf(natRouteTagFormat, networkName, subnetName)},
+		Tags:            []string{fmt.Sprintf(natRouteTagFormat, subnetID)},
 	}
 	var opp *compute.Operation
 	xerr := stacks.RetryableRemoteCall(
@@ -768,7 +771,7 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, xerr fail.Error) {
+func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, xerr fail.Error) {
 	var tags []string
 	for k := range sgs {
 		tags = append(tags, k)
@@ -777,7 +780,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, im
 	// Add nat route name as tag to host that has a public IP
 	var publicIP *compute.Address
 	if hasPublicIP {
-		tags = append(tags, fmt.Sprintf(natRouteNameFormat, networkName, subnetName))
+		tags = append(tags, fmt.Sprintf(natRouteNameFormat, subnetID))
 
 		// Create static regional external address
 		publicIP, xerr = s.rpcCreateExternalAddress("publicip-"+name, false)
@@ -785,7 +788,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetName, templateName, im
 			return &compute.Instance{}, fail.Wrap(xerr, "failed to create public IP of instance")
 		}
 	} else {
-		tags = append(tags, fmt.Sprintf(natRouteTagFormat, networkName, subnetName))
+		tags = append(tags, fmt.Sprintf(natRouteTagFormat, subnetID))
 	}
 
 	request := compute.Instance{
