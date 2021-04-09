@@ -2279,7 +2279,7 @@ func (instance *host) GetVolumes() (_ *propertiesv1.HostVolumes, xerr fail.Error
 		return nil, fail.InvalidInstanceError()
 	}
 
-	instance.lock.Lock()
+	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
 	return instance.unsafeGetVolumes()

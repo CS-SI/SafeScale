@@ -196,7 +196,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error)
 	}
 
 	instance.lock.RLock()
-	defer instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	var res string
 	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
