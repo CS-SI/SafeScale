@@ -25,6 +25,8 @@ LINTER := golang.org/x/lint/golint
 ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
+RULES := github.com/quasilyte/go-ruleguard/cmd/ruleguard
+RULES_DSL := github.com/quasilyte/go-ruleguard/dsl
 
 # Default build tags
 BUILD_TAGS = 
@@ -134,6 +136,10 @@ ifneq ($(STRICT),1)
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get $(LINTER)@v0.0.0-20201208152925-83fdc39ff7b5 &>/dev/null || true; \
 		$(GO) install $(LINTER)@v0.0.0-20201208152925-83fdc39ff7b5 &>/dev/null || true; \
+	fi
+	@which ruleguard > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ruleguard...\n" && $(GO) get $(RULES)@v0.3.4 && $(GO) get $(RULES_DSL)@v0.3.2 &>/dev/null || true; \
+		$(GO) install $(RULES)@v0.3.4 &>/dev/null || true; \
 	fi
 	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get $(STRINGER)@v0.1.0 &>/dev/null || true; \
@@ -263,6 +269,11 @@ vet: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running vet checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(GO) list ./... | grep -v mock | grep -v cli | xargs $(GO) vet | $(TEE) vet_results.log
 	@if [ -s ./vet_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) vet FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
+
+semgrep: begin generate
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running semgrep checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@ruleguard -c=0 -rules build/rules/ruleguard.rules.go . | $(TEE) semgrep_results.log
+	@if [ -s ./semgrep_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) semgrep FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
 minimock:
 	@$(GO) generate -run minimock ./... 2>&1 | $(TEE) -a generation_results.log
