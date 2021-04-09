@@ -173,10 +173,12 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 			if err != nil {
 				return NullService(), err
 			}
+
 			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
 			if err != nil {
 				return NullService(), fail.Wrap(err, "error connecting to Object Storage location to store metadata")
 			}
+
 			anon, found := serviceCfg.Get("MetadataBucketName")
 			if !found {
 				return NullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
@@ -189,6 +191,7 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 			if err != nil {
 				return NullService(), fail.Wrap(err, "error accessing metadata location: %s")
 			}
+
 			if found {
 				metadataBucket, err = metadataLocation.InspectBucket(bucketName)
 				if err != nil {

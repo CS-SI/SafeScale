@@ -65,7 +65,7 @@ type Content struct {
 	ConfIF bool
 	// IsGateway, if set to true, activate IP forwarding
 	IsGateway bool
-	// getPublicIP contains a public IP binded to the host
+	// PublicIP contains a public IP binded to the host
 	PublicIP string
 	// AddGateway, if set to true, configure default gateway
 	AddGateway bool
@@ -192,7 +192,7 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	ud.FinalPublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.FinalPrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
 	// ud.ConfIF = !autoHostNetworkInterfaces
-	ud.IsGateway = request.IsGateway && request.Subnets[0].Name != abstract.SingleHostNetworkName
+	ud.IsGateway = request.IsGateway /*&& request.Subnets[0].Name != abstract.SingleHostNetworkName*/
 	ud.AddGateway = !request.IsGateway && !request.PublicIP && !useLayer3Networking && ip != "" && !useNATService
 	ud.DNSServers = dnsList
 	ud.CIDR = cidr
@@ -278,14 +278,17 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 		if err != nil {
 			return nil, fail.ConvertError(err)
 		}
+
 		tmplString, err := box.String(fmt.Sprintf("userdata%s.%s.sh", provider, string(phase)))
 		if err != nil {
 			return nil, fail.Wrap(err, "error loading script template for phase 'init'")
 		}
+
 		tmpl, err = template.Parse("userdata."+string(phase), tmplString)
 		if err != nil {
 			return nil, fail.Wrap(err, "error parsing script template for phase 'init'")
 		}
+
 		userdataPhaseTemplates[phase] = new(atomic.Value)
 		userdataPhaseTemplates[phase].Store(tmpl)
 	}

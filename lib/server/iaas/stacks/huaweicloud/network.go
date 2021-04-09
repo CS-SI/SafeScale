@@ -454,7 +454,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 			entry = s.(map[string]interface{})
 			id = entry["id"].(string)
 		}
-		return s.InspectSubnet(id)
+		return s.Stack.InspectSubnet(id)
 	}
 	return nullAS, abstract.ResourceNotFoundError("subnet", name)
 }

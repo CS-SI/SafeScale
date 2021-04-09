@@ -609,7 +609,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached network")
+		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without --public flag and without attached Network/Subnet")
 	}
 
 	// The Default Networking is the first of the provided list, by convention
@@ -670,7 +670,12 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 			hostNets, hostPorts, createdPorts, innerXErr = s.identifyOpenstackSubnetsAndPorts(request, defaultSubnet)
 			if innerXErr != nil {
-				return fail.Wrap(xerr, "failed to construct list of Subnets for the Host")
+				switch innerXErr.(type) {
+				case *fail.ErrDuplicate:	// This kind of error means actually there is no more Ip address available
+					return retry.StopRetryError(innerXErr)
+				default:
+					return fail.Wrap(xerr, "failed to construct list of Subnets for the Host")
+				}
 			}
 
 			// Starting from here, delete created ports if exiting with error
@@ -707,7 +712,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 
 			ahc.ID = server.ID
-			ahc.Name = server.Name
+			ahc.Name = request.ResourceName
 
 			// Starting from here, delete host if exiting with error
 			defer func() {
@@ -716,7 +721,6 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					if derr := s.DeleteHost(ahc.ID); derr != nil {
 						logrus.Debugf(derr.Error())
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
-
 						return
 					}
 					logrus.Debugf("unresponsive server '%s' deleted", request.ResourceName)
