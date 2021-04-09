@@ -45,6 +45,7 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -731,43 +732,6 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 	}
 
-	// identify default Subnet
-	var defaultSubnet resources.Subnet
-	if len(hostReq.Subnets) > 0 {
-		// By convention, default subnet is the first of the list
-		as := hostReq.Subnets[0]
-		defaultSubnet, xerr = LoadSubnet(svc, "", as.ID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-		if hostReq.DefaultRouteIP == "" {
-			hostReq.DefaultRouteIP = func() string { out, _ := defaultSubnet.(*subnet).unsafeGetDefaultRouteIP(); return out }()
-		}
-	} else if hostReq.PublicIP {
-		defaultSubnet, _, xerr = getOrCreateDefaultSubnet(ctx, svc)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		xerr = defaultSubnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			hostReq.Subnets = append(hostReq.Subnets, as)
-			return nil
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to consult details of Subnet '%s'", defaultSubnet.GetName())
-		}
-	} else {
-		return nil, fail.InvalidRequestError("missing --network, --subnet or --publicip parameter to define valid networking for Host")
-	}
-
 	// If hostReq.ImageID is not explicitly defined, find an image ID corresponding to the content of hostDef.Image
 	if hostReq.ImageID == "" {
 		hostReq.ImageID, xerr = instance.findImageID(&hostDef)
@@ -777,10 +741,7 @@ func (instance *host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 	}
 
-	if !hostReq.Single && len(hostReq.Subnets) == 0 {
-		return nil, fail.InvalidRequestError("cannot create a Host if there are no Network/Subnet and without --public flag")
-	}
-
+	// identify default Subnet
 	var (
 		defaultSubnet                  resources.Subnet
 		undoCreateSingleHostNetworking func() fail.Error
@@ -1391,14 +1352,13 @@ func (instance *host) findImageID(hostDef *abstract.HostSizingRequirements) (str
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
 func (instance *host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) fail.Error {
-	// execute userdata 'final' (phase4) script to final install/configure of the host (no need to reboot)
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	file := fmt.Sprintf("/opt/safescale/var/tmp/user_data.%s.sh", phase)
+	file := fmt.Sprintf("%s/user_data.%s.sh", utils.TempFolder, phase)
 	xerr = instance.unsafePushStringToFile(ctx, string(content), file)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1567,14 +1527,14 @@ func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
-	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure subnet and security
+	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure networking and security
 	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	// Update Keypair of the Host with the one set in HostRequest
+	// Update Keypair of the Host with the final one
 	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		ah, ok := clonable.(*abstract.HostCore)
 		if !ok {
@@ -1694,10 +1654,12 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 	if xerr != nil {
 		return nil, nil, xerr
 	}
+
 	bucketName := cfg.GetString("MetadataBucketName")
 	if bucketName == "" {
 		return nil, nil, fail.InconsistentError("missing service configuration option 'MetadataBucketName'")
 	}
+
 	networkName := fmt.Sprintf("net-safescale.%s", strings.Trim(bucketName, objectstorage.BucketNamePrefix+"-"))
 
 	// Create network if needed
@@ -1728,7 +1690,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 	// Check if Subnet exists
 	var (
 		subnetRequest abstract.SubnetRequest
-		cidrIndex  uint
+		cidrIndex     uint
 	)
 	subnetInstance, xerr := LoadSubnet(svc, networkInstance.GetID(), singleHostRequest.ResourceName)
 	if xerr != nil {

@@ -311,7 +311,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		subnetInstance resources.Subnet
 		subnets        []*abstract.Subnet
 	)
-	if !in.GetPublic() {
+	if !in.GetSingle() {
 		networkRef = in.GetNetwork()
 	}
 	if len(in.GetSubnets()) > 0 {
@@ -356,7 +356,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 			return nil, xerr
 		}
 	}
-	if len(subnets) == 0 && !in.GetPublic() {
+	if len(subnets) == 0 && !in.GetSingle() {
 		return nil, fail.InvalidRequestError("insufficient use of --network and/or --subnet or missing --single")
 	}
 
