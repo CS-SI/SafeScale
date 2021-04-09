@@ -39,8 +39,8 @@ func TestNetworkSingleHosts_ReserveSlot(t *testing.T) {
 
 	ct.FreeSlot(2)
 	expected := []FreeCIDRSlot{
-		{ First: 2, Last: 2},
-		{ First: 4, Last: SingleHostsMaxCIDRSlotValue},
+		{First: 2, Last: 2},
+		{First: 4, Last: SingleHostsMaxCIDRSlotValue},
 	}
 	areEqual := reflect.DeepEqual(ct.FreeSlots, expected)
 	if !areEqual {
@@ -52,7 +52,7 @@ func TestNetworkSingleHosts_ReserveSlot(t *testing.T) {
 	assert.Equal(t, index, uint(2))
 
 	expected = []FreeCIDRSlot{
-		{ First: 4, Last: SingleHostsMaxCIDRSlotValue},
+		{First: 4, Last: SingleHostsMaxCIDRSlotValue},
 	}
 	areEqual = reflect.DeepEqual(ct.FreeSlots, expected)
 	if !areEqual {

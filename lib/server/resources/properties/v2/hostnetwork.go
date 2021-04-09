@@ -30,12 +30,12 @@ type HostNetworking struct {
 	DefaultSubnetID string            `json:"default_subnet_id,omitempty"` // contains the ID of the default subnet
 	PublicIPv4      string            `json:"public_ip_v4,omitempty"`
 	PublicIPv6      string            `json:"public_ip_v6,omitempty"`
-	SubnetsByID     map[string]string `json:"subnet_by_id,omitempty"`      // contains the name of each subnet bound to the host (indexed by ID)
-	SubnetsByName   map[string]string `json:"subnet_by_name,omitempty"`    // contains the ID of each subnet bound to the host (indexed by Name)
-	IPv4Addresses   map[string]string `json:"ipv4_addresses,omitempty"`    // contains ipv4 (indexed by network ID) allocated to the host
-	IPv6Addresses   map[string]string `json:"ipv6_addresses,omitempty"`    // contains ipv6 (indexed by Networking ID) allocated to the host
-	IsGateway       bool              `json:"is_gateway,omitempty"`        // Tells if host is a gateway of a Subnet
-	Single          bool              `json:"single,omitempty"`            // Tells if the Host is single
+	SubnetsByID     map[string]string `json:"subnet_by_id,omitempty"`   // contains the name of each subnet bound to the host (indexed by ID)
+	SubnetsByName   map[string]string `json:"subnet_by_name,omitempty"` // contains the ID of each subnet bound to the host (indexed by Name)
+	IPv4Addresses   map[string]string `json:"ipv4_addresses,omitempty"` // contains ipv4 (indexed by network ID) allocated to the host
+	IPv6Addresses   map[string]string `json:"ipv6_addresses,omitempty"` // contains ipv6 (indexed by Networking ID) allocated to the host
+	IsGateway       bool              `json:"is_gateway,omitempty"`     // Tells if host is a gateway of a Subnet
+	Single          bool              `json:"single,omitempty"`         // Tells if the Host is single
 }
 
 // NewHostNetworking ...

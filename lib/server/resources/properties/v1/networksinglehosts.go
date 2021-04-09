@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	// SingleHostsMaxCIDRSlotValue
+	// SingleHostsMaxCIDRSlotValue contains the max index usable in function lib/utils/net.NthIncludedSubnet() to build CIDR
 	SingleHostsMaxCIDRSlotValue uint = uint(math.Pow(2, SingleHostsCIDRMaskAddition) - 1)
 )
 
