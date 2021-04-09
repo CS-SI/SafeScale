@@ -62,7 +62,7 @@ type Host interface {
 	IsClusterMember() (bool, fail.Error)                                                                                                         // returns true if the host is member of a cluster
 	IsFeatureInstalled(f string) (bool, fail.Error)                                                                                              // tells if a feature is installed on Host, using only metadata
 	IsGateway() (bool, fail.Error)                                                                                                               // tells of  the host acts as a gateway
-	IsSingle() (bool, fail.Error)                                                                                                               // tells of  the host acts as a gateway
+	IsSingle() (bool, fail.Error)                                                                                                                // tells of  the host acts as a gateway
 	ListSecurityGroups(state securitygroupstate.Enum) ([]*propertiesv1.SecurityGroupBond, fail.Error)                                            // returns a slice of properties.SecurityGroupBond corresponding to bound Security Group of the host
 	Pull(ctx context.Context, target, source string, timeout time.Duration) (int, string, string, fail.Error)                                    // downloads a file from host
 	Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error)                       // uploads a file to host

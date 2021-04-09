@@ -39,6 +39,7 @@ require (
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/quasilyte/go-ruleguard v0.3.4 // indirect
 	github.com/quasilyte/go-ruleguard/dsl v0.3.2 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sanity-io/litter v1.3.0

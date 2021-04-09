@@ -278,14 +278,17 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 		if err != nil {
 			return nil, fail.ConvertError(err)
 		}
+
 		tmplString, err := box.String(fmt.Sprintf("userdata%s.%s.sh", provider, string(phase)))
 		if err != nil {
 			return nil, fail.Wrap(err, "error loading script template for phase 'init'")
 		}
+
 		tmpl, err = template.Parse("userdata."+string(phase), tmplString)
 		if err != nil {
 			return nil, fail.Wrap(err, "error parsing script template for phase 'init'")
 		}
+
 		userdataPhaseTemplates[phase] = new(atomic.Value)
 		userdataPhaseTemplates[phase].Store(tmpl)
 	}
