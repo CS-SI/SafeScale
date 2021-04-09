@@ -33,7 +33,7 @@ const (
 
 const (
 	maxBucketNameLength = 63
-	suffixEnvName    = "SAFESCALE_METADATA_SUFFIX"
+	suffixEnvName       = "SAFESCALE_METADATA_SUFFIX"
 )
 
 // BuildMetadataBucketName builds the name of the bucket/stowContainer that will store metadata

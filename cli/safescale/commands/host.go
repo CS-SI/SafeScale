@@ -253,9 +253,9 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 			Usage: "Image name for the host",
 		},
 		&cli.BoolFlag{
-			Name:  "single",
+			Name:    "single",
 			Aliases: []string{"public"},
-			Usage: "Create single Host without network but with public IP",
+			Usage:   "Create single Host without network but with public IP",
 		},
 		&cli.StringFlag{
 			Name:  "domain",

@@ -129,7 +129,20 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, xerr
 	}
 
-	if !single {
+	if single {
+		xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			ahc, ok := clonable.(*abstract.HostCore)
+			if !ok {
+				return fail.InconsistentError("")
+			}
+
+			sshConfig.PrivateKey = ahc.PrivateKey
+			return nil
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+	} else {
 		var rs resources.Subnet
 		xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			ahc, ok := clonable.(*abstract.HostCore)
