@@ -109,7 +109,7 @@ func (c *core) isNull() bool {
 
 // GetService returns the iaas.GetService used to create/load the persistent object
 func (c *core) GetService() iaas.Service {
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return nil
 	}
 
@@ -119,7 +119,7 @@ func (c *core) GetService() iaas.Service {
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
 func (c *core) GetID() string {
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return "<NullCore>"
 	}
 
@@ -134,8 +134,8 @@ func (c *core) GetID() string {
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
 func (c *core) GetName() string {
-	if c.isNull() {
-		return "<NullCore>"
+	if c == nil || (c != nil && c.isNull()) {
+		return "<NullCore>" // FIXME: It should be a constant
 	}
 
 	name, ok := c.name.Load().(string)
@@ -150,7 +150,7 @@ func (c *core) GetName() string {
 func (c *core) Inspect(callback resources.Callback) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -181,7 +181,7 @@ func (c *core) Inspect(callback resources.Callback) (xerr fail.Error) {
 func (c *core) Review(callback resources.Callback) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -205,7 +205,7 @@ func (c *core) Review(callback resources.Callback) (xerr fail.Error) {
 func (c *core) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -282,7 +282,7 @@ func (c *core) Alter(callback resources.Callback, options ...data.ImmutableKeyVa
 func (c *core) carry(clonable data.Clonable) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if clonable == nil {
@@ -344,7 +344,7 @@ func (c *core) updateIdentity() fail.Error {
 func (c *core) Read(ref string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
@@ -373,7 +373,7 @@ func (c *core) Read(ref string) (xerr fail.Error) {
 func (c *core) ReadByID(id string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
@@ -398,15 +398,15 @@ func (c *core) ReadByID(id string) (xerr fail.Error) {
 			}
 			return nil
 		},
-		temporal.GetMinDelay(),
+		temporal.GetContextTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, id)
 		case *retry.ErrStopRetry:
-			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, id)
 		default:
 			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, id)
 		}
@@ -464,9 +464,9 @@ func (c *core) readByReference(ref string) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "failed to read metadata of %s '%s' after %s", c.kind, ref, temporal.FormatDuration(timeout))
+			xerr = fail.Wrap(fail.RootCause(xerr), "failed to read metadata of %s '%s' after %s", c.kind, ref, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
-			xerr = fail.Wrap(xerr.Cause(), "failed to read metadata of %s '%s'", c.kind, ref)
+			xerr = fail.Wrap(fail.RootCause(xerr), "failed to read metadata of %s '%s'", c.kind, ref)
 		case *fail.ErrNotFound:
 			xerr = fail.Wrap(xerr, "failed to find metadata of %s '%s'", c.kind, ref)
 		default:
@@ -525,7 +525,7 @@ func (c *core) write() fail.Error {
 
 // Reload reloads the content from the Object Storage
 func (c *core) Reload() (xerr fail.Error) {
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -562,17 +562,17 @@ func (c *core) reload() (xerr fail.Error) {
 			}
 			return nil
 		},
-		temporal.GetMinDelay(),
+		temporal.GetContextTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, c.id)
 		case *retry.ErrStopRetry:
-			return fail.Wrap(xerr.Cause(), "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, c.id)
 		default:
-			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, id)
+			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, c.id)
 		}
 	}
 
@@ -586,7 +586,7 @@ func (c *core) reload() (xerr fail.Error) {
 func (c *core) BrowseFolder(callback func(buf []byte) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -605,7 +605,7 @@ func (c *core) BrowseFolder(callback func(buf []byte) fail.Error) (xerr fail.Err
 func (c *core) delete() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -628,7 +628,7 @@ func (c *core) delete() (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// If entry not found, consider it not an error
+			// If entry not found, consider operation not an error
 			logrus.Tracef("folder not found by id, maybe not an error")
 		default:
 			errors = append(errors, xerr)
@@ -647,7 +647,7 @@ func (c *core) delete() (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// If entry not found, consider it not an error
+			// If entry not found, consider operation not an error
 			logrus.Tracef("folder not found by name, maybe not an error")
 		default:
 			errors = append(errors, xerr)
@@ -685,7 +685,7 @@ func (c *core) delete() (xerr fail.Error) {
 
 // Serialize serializes instance into bytes (output json code)
 func (c *core) Serialize() (_ []byte, xerr fail.Error) {
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -750,7 +750,7 @@ func (c *core) serialize() (_ []byte, xerr fail.Error) {
 func (c *core) Deserialize(buf []byte) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -821,8 +821,8 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
 func (c *core) Released() {
-	if c.isNull() {
-		return
+	if c == nil || (c != nil && c.isNull()) {
+		return // FIXME: Missing log ?
 	}
 
 	c.lock.RLock()
@@ -850,8 +850,8 @@ func (c *core) released() {
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
 func (c *core) Destroyed() {
-	if c.isNull() {
-		return
+	if c == nil || (c != nil && c.isNull()) {
+		return // FIXME: Missing log ?
 	}
 
 	c.lock.RLock()
@@ -878,7 +878,7 @@ func (c *core) destroyed() {
 // AddObserver ...
 // satisfies interface data.Observable
 func (c *core) AddObserver(o observer.Observer) error {
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if o == nil {
@@ -901,7 +901,7 @@ func (c *core) AddObserver(o observer.Observer) error {
 // NotifyObservers sends a signal to all registered Observers to notify change
 // Satisfies interface data.Observable
 func (c *core) NotifyObservers() error {
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -927,7 +927,7 @@ func (c *core) notifyObservers() error {
 
 // RemoveObserver ...
 func (c *core) RemoveObserver(name string) error {
-	if c.isNull() {
+	if c == nil || (c != nil && c.isNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {
