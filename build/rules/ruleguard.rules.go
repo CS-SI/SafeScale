@@ -1,19 +1,3 @@
-/*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 // +build ignore
 
 package gorules
@@ -150,28 +134,26 @@ func ifreturn(m dsl.Matcher) {
 }
 
 func oddifsequence(m dsl.Matcher) {
-	/*
-		m.Match("if $x { $*_ }; if $x {$*_ }").Report("odd sequence of if test")
+	m.Match("if $x { $*_ }; if $x {$*_ }").Report("odd sequence of if test")
 
-		m.Match("if $x == $y { $*_ }; if $y == $x {$*_ }").Report("odd sequence of if tests")
-		m.Match("if $x != $y { $*_ }; if $y != $x {$*_ }").Report("odd sequence of if tests")
+	m.Match("if $x == $y { $*_ }; if $y == $x {$*_ }").Report("odd sequence of if tests")
+	m.Match("if $x != $y { $*_ }; if $y != $x {$*_ }").Report("odd sequence of if tests")
 
-		m.Match("if $x < $y { $*_ }; if $y > $x {$*_ }").Report("odd sequence of if tests")
-		m.Match("if $x <= $y { $*_ }; if $y >= $x {$*_ }").Report("odd sequence of if tests")
+	m.Match("if $x < $y { $*_ }; if $y > $x {$*_ }").Report("odd sequence of if tests")
+	m.Match("if $x <= $y { $*_ }; if $y >= $x {$*_ }").Report("odd sequence of if tests")
 
-		m.Match("if $x > $y { $*_ }; if $y < $x {$*_ }").Report("odd sequence of if tests")
-		m.Match("if $x >= $y { $*_ }; if $y <= $x {$*_ }").Report("odd sequence of if tests")
-	*/
+	m.Match("if $x > $y { $*_ }; if $y < $x {$*_ }").Report("odd sequence of if tests")
+	m.Match("if $x >= $y { $*_ }; if $y <= $x {$*_ }").Report("odd sequence of if tests")
 }
 
 // odd sequence of nested if tests
 func nestedifsequence(m dsl.Matcher) {
-	/*
-		m.Match("if $x < $y { if $x >= $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
-		m.Match("if $x <= $y { if $x > $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
-		m.Match("if $x > $y { if $x <= $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
-		m.Match("if $x >= $y { if $x < $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
-	*/
+
+	m.Match("if $x < $y { if $x >= $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
+	m.Match("if $x <= $y { if $x > $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
+	m.Match("if $x > $y { if $x <= $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
+	m.Match("if $x >= $y { if $x < $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
+
 }
 
 // odd sequence of assignments
@@ -283,6 +265,16 @@ func urlredacted(m dsl.Matcher) {
 	).
 		Where(m["x"].Type.Is("*url.URL")).
 		Report("consider $x.Redacted() when outputting URLs")
+}
+
+func removeDebugCode(m dsl.Matcher) {
+	m.Match(
+		"logrus.Warningf($*_, $*_)",
+		"logrus.Warning($*_, $x)",
+		"logrus.Warningf($*_)",
+		"logrus.Warning($*_)",
+	).
+		Report("REMOVE debug code before a release")
 }
 
 func sprinterr(m dsl.Matcher) {
@@ -438,4 +430,44 @@ func wrongerrcall(m dsl.Matcher) {
 		`if $x.Err() != nil { return $*_, err }`,
 	).
 		Report(`maybe returning wrong error after Err() call`)
+}
+
+func BucketDanger(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/server/resources")
+	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.Bucket")).Report(`panic danger`)
+}
+
+func ClusterDanger(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/server/resources")
+	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.Cluster")).Report(`panic danger`)
+}
+
+func HostDanger(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/server/resources")
+	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.Host")).Report(`panic danger`)
+}
+
+func NetworkDanger(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/server/resources")
+	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.Network")).Report(`panic danger`)
+}
+
+func SGDanger(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/server/resources")
+	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.SecurityGroup")).Report(`panic danger`)
+}
+
+func ShareDanger(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/server/resources")
+	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.Share")).Report(`panic danger`)
+}
+
+func SubnetDanger(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/server/resources")
+	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.Subnet")).Report(`panic danger`)
+}
+
+func VolumeDanger(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/server/resources")
+	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.Volume")).Report(`panic danger`)
 }
