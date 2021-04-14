@@ -20,6 +20,9 @@ sed -i "s#\(.*\)develop#\1${BRANCH_NAME}#" common.mk
 # Compile
 # ----------------------
 
+echo "mod"
+make mod
+
 echo "All"
 make all
 [ $? -ne 0 ] && echo "Build failure" && exit 1
