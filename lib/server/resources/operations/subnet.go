@@ -624,359 +624,9 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	if xerr != nil {
 		return xerr
 	}
-	//
-	// if gwSizing == nil {
-	// 	gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
-	// }
-	// template, xerr := svc.FindTemplateBySizing(*gwSizing)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return fail.Wrap(xerr, "failed to find appropriate template")
-	// }
-	//
-	// // define image...
-	// if gwSizing.Image == "" {
-	// 	gwSizing.Image = req.Image
-	// }
-	// if gwSizing.Image == "" {
-	// 	cfg, xerr := svc.GetConfigurationOptions()
-	// 	xerr = debug.InjectPlannedFail(xerr)
-	// 	if xerr != nil {
-	// 		return xerr
-	// 	}
-	// 	gwSizing.Image = cfg.GetString("DefaultImage")
-	// }
-	// if gwSizing.Image == "" {
-	// 	gwSizing.Image = "Ubuntu 18.04"
-	// }
-	// if req.Image == "" {
-	// 	req.Image = gwSizing.Image
-	// }
-	//
-	// img, xerr := svc.SearchImage(gwSizing.Image)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return fail.Wrap(xerr, "failed to find image '%s'", gwSizing.Image)
-	// }
-	//
-	// subnetName := instance.GetName()
-	// var primaryGatewayName, secondaryGatewayName string
-	// if failover || gwname == "" {
-	// 	primaryGatewayName = "gw-" + subnetName
-	// } else {
-	// 	primaryGatewayName = gwname
-	// }
-	// if failover {
-	// 	secondaryGatewayName = "gw2-" + subnetName
-	// }
-	//
-	// domain := strings.Trim(req.Domain, ".")
-	// if domain != "" {
-	// 	domain = "." + domain
-	// }
-	//
-	// keepalivedPassword, err := utils.GeneratePassword(16)
-	// err = debug.InjectPlannedError(err)
-	// if err != nil {
-	// 	return fail.ConvertError(err)
-	// }
-	//
-	// gwRequest := abstract.HostRequest{
-	// 	ImageID: img.ID,
-	// 	Subnets: []*abstract.Subnet{as},
-	// 	// KeyPair:          keypair,
-	// 	SSHPort:          req.DefaultSSHPort,
-	// 	TemplateID:       template.ID,
-	// 	KeepOnFailure:    req.KeepOnFailure,
-	// 	SecurityGroupIDs: sgs,
-	// }
-	//
-	// var (
-	// 	primaryGateway, secondaryGateway   *host
-	// 	primaryUserdata, secondaryUserdata *userdata.Content
-	// 	primaryTask, secondaryTask         concurrency.Task
-	// 	// secondaryErr                       fail.Error
-	// 	// secondaryResult                    concurrency.TaskResult
-	// )
-	//
-	// tg, xerr := concurrency.NewTaskGroupWithContext(ctx)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	//
-	// // Starts primary gateway creation
-	// primaryRequest := gwRequest
-	// primaryRequest.ResourceName = primaryGatewayName
-	// primaryRequest.HostName = primaryGatewayName + domain
-	// primaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
-	// 	request: primaryRequest,
-	// 	sizing:  *gwSizing,
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	//
-	// // Starts secondary gateway creation if asked for
-	// if failover {
-	// 	secondaryRequest := gwRequest
-	// 	secondaryRequest.ResourceName = secondaryGatewayName
-	// 	secondaryRequest.HostName = secondaryGatewayName
-	// 	if req.Domain != "" {
-	// 		secondaryRequest.HostName = secondaryGatewayName + domain
-	// 	}
-	// 	secondaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
-	// 		request: secondaryRequest,
-	// 		sizing:  *gwSizing,
-	// 	})
-	// 	xerr = debug.InjectPlannedFail(xerr)
-	// 	if xerr != nil {
-	// 		return xerr
-	// 	}
-	// }
-	//
-	// results, groupXErr := tg.WaitGroup()
-	// if results == nil && groupXErr != nil {
-	// 	return groupXErr
-	// }
-	//
-	// id, xerr := primaryTask.GetID()
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	if groupXErr == nil {
-	// 		groupXErr = xerr
-	// 	} else {
-	// 		_ = groupXErr.AddConsequence(xerr)
-	// 	}
-	// } else {
-	// 	if _, ok := results[id]; !ok {
-	// 		return fail.InconsistentError("task results does not contain %s", id)
-	// 	}
-	//
-	// 	result, ok := results[id].(data.Map)
-	// 	if !ok {
-	// 		xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
-	// 		if groupXErr == nil {
-	// 			groupXErr = xerr
-	// 		} else {
-	// 			_ = groupXErr.AddConsequence(xerr)
-	// 		}
-	// 	} else {
-	// 		primaryGateway = result["host"].(*host)
-	// 		primaryUserdata = result["userdata"].(*userdata.Content)
-	// 		primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
-	//
-	// 		// Starting from here, deletes the primary gateway if exiting with error
-	// 		defer func() {
-	// 			if xerr != nil && !req.KeepOnFailure {
-	// 				logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
-	// 				derr := primaryGateway.relaxedDeleteHost(context.Background())
-	// 				derr = debug.InjectPlannedFail(derr)
-	// 				if derr != nil {
-	// 					switch derr.(type) {
-	// 					case *fail.ErrTimeout:
-	// 						logrus.Warnf("We should have waited more...") // FIXME: Wait until gateway no longer exists
-	// 					default:
-	// 					}
-	// 					_ = xerr.AddConsequence(derr)
-	// 				} else {
-	// 					logrus.Debugf("Cleaning up on failure, gateway '%s' deleted", primaryGateway.GetName())
-	// 				}
-	// 				if failover {
-	// 					if derr := instance.unbindHostFromVIP(as.VIP, primaryGateway); derr != nil {
-	// 						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
-	// 					}
-	// 				}
-	// 			}
-	// 		}()
-	//
-	// 		// Bind Internal Security Group to gateway
-	// 		xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway)
-	// 		xerr = debug.InjectPlannedFail(xerr)
-	// 		if xerr != nil {
-	// 			return xerr
-	// 		}
-	// 		defer instance.undoBindInternalSecurityGroupToGateway(ctx, primaryGateway, req.KeepOnFailure, &xerr)
-	// 	}
-	// }
-	//
-	// if failover {
-	// 	id, xerr := secondaryTask.GetID()
-	// 	xerr = debug.InjectPlannedFail(xerr)
-	// 	if xerr != nil {
-	// 		if groupXErr == nil {
-	// 			groupXErr = xerr
-	// 		} else {
-	// 			_ = groupXErr.AddConsequence(xerr)
-	// 		}
-	// 	}
-	//
-	// 	if _, ok := results[id]; !ok {
-	// 		return fail.InconsistentError("task results doesn't contain %s", id)
-	// 	}
-	//
-	// 	result, ok := results[id].(data.Map)
-	// 	if !ok {
-	// 		xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
-	// 		if groupXErr == nil {
-	// 			groupXErr = xerr
-	// 		} else {
-	// 			_ = groupXErr.AddConsequence(xerr)
-	// 		}
-	// 	} else {
-	// 		secondaryGateway = result["host"].(*host)
-	// 		secondaryUserdata = result["userdata"].(*userdata.Content)
-	// 		secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
-	//
-	// 		// Starting from here, deletes the secondary gateway if exiting with error
-	// 		defer func() {
-	// 			if xerr != nil && !req.KeepOnFailure {
-	// 				derr := secondaryGateway.relaxedDeleteHost(ctx)
-	// 				derr = debug.InjectPlannedFail(derr)
-	// 				if derr != nil {
-	// 					switch derr.(type) {
-	// 					case *fail.ErrTimeout:
-	// 						logrus.Warnf("We should have waited more") // FIXME: Wait until gateway no longer exists
-	// 					default:
-	// 					}
-	// 					_ = xerr.AddConsequence(derr)
-	// 				}
-	// 				derr = instance.unbindHostFromVIP(as.VIP, secondaryGateway)
-	// 				derr = debug.InjectPlannedFail(derr)
-	// 				if derr != nil {
-	// 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind VIP from gateway", actionFromError(xerr)))
-	// 				}
-	// 			}
-	// 		}()
-	//
-	// 		// Bind Internal Security Group to gateway
-	// 		xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway)
-	// 		xerr = debug.InjectPlannedFail(xerr)
-	// 		if xerr != nil {
-	// 			return xerr
-	// 		}
-	// 		defer instance.undoBindInternalSecurityGroupToGateway(ctx, secondaryGateway, req.KeepOnFailure, &xerr)
-	// 	}
-	// }
-	// if groupXErr != nil {
-	// 	return groupXErr
-	// }
-	//
-	// // Update userdata of gateway(s)
-	// xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) (innerXErr fail.Error) {
-	// 	as, ok := clonable.(*abstract.Subnet)
-	// 	if !ok {
-	// 		return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 	}
-	//
-	// 	// Updates userdatas to use later
-	// 	primaryUserdata.PrimaryGatewayPrivateIP, innerXErr = primaryGateway.GetPrivateIP()
-	// 	if innerXErr != nil {
-	// 		return innerXErr
-	// 	}
-	//
-	// 	primaryUserdata.PrimaryGatewayPublicIP, innerXErr = primaryGateway.GetPublicIP()
-	// 	if innerXErr != nil {
-	// 		return innerXErr
-	// 	}
-	//
-	// 	primaryUserdata.IsPrimaryGateway = true
-	// 	if as.VIP != nil {
-	// 		primaryUserdata.DefaultRouteIP = as.VIP.PrivateIP
-	// 		primaryUserdata.EndpointIP = as.VIP.PublicIP
-	// 	} else {
-	// 		primaryUserdata.DefaultRouteIP = primaryUserdata.PrimaryGatewayPrivateIP
-	// 		primaryUserdata.EndpointIP = primaryUserdata.PrimaryGatewayPublicIP
-	// 	}
-	//
-	// 	if secondaryGateway != nil {
-	// 		// as.SecondaryGatewayID = secondaryGateway.GetID()
-	// 		primaryUserdata.SecondaryGatewayPrivateIP, innerXErr = secondaryGateway.GetPrivateIP()
-	// 		if innerXErr != nil {
-	// 			return innerXErr
-	// 		}
-	//
-	// 		secondaryUserdata.PrimaryGatewayPrivateIP = primaryUserdata.PrimaryGatewayPrivateIP
-	// 		secondaryUserdata.SecondaryGatewayPrivateIP = primaryUserdata.SecondaryGatewayPrivateIP
-	// 		primaryUserdata.SecondaryGatewayPublicIP, innerXErr = secondaryGateway.GetPublicIP()
-	// 		if innerXErr != nil {
-	// 			return innerXErr
-	// 		}
-	// 		secondaryUserdata.PrimaryGatewayPublicIP = primaryUserdata.PrimaryGatewayPublicIP
-	// 		secondaryUserdata.SecondaryGatewayPublicIP = primaryUserdata.SecondaryGatewayPublicIP
-	// 		secondaryUserdata.IsPrimaryGateway = false
-	// 	}
-	// 	return nil
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	//
-	// // As hosts are marked as gateways, the configuration stopped on phase 2 'netsec', the remaining 3 phases have to be run explicitly
-	// xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-	// 	as, ok := clonable.(*abstract.Subnet)
-	// 	if !ok {
-	// 		return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 	}
-	//
-	// 	as.State = subnetstate.GatewayConfiguration
-	// 	return nil
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	//
-	// tg, xerr = concurrency.NewTaskGroupWithContext(ctx)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	//
-	// _, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
-	// 	host:     primaryGateway,
-	// 	userdata: primaryUserdata,
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// if failover {
-	// 	_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
-	// 		host:     secondaryGateway,
-	// 		userdata: secondaryUserdata,
-	// 	})
-	// 	xerr = debug.InjectPlannedFail(xerr)
-	// 	if xerr != nil {
-	// 		return xerr
-	// 	}
-	// }
-	//
-	// _, xerr = tg.Wait()
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return xerr
-	// }
 
 	// --- Updates subnet state in metadata ---
 	return instance.unsafeFinalizeSubnetCreation()
-	// xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-	// 	as, ok := clonable.(*abstract.Subnet)
-	// 	if !ok {
-	// 		return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-	// 	}
-	//
-	// 	as.State = subnetstate.Ready
-	// 	return nil
-	// })
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	//
-	// return instance.updateCachedInformation()
 }
 
 func (instance *subnet) unsafeCreateSubnet(ctx context.Context, req abstract.SubnetRequest) fail.Error {
@@ -1366,13 +1016,17 @@ func (instance *subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			_ = groupXErr.AddConsequence(xerr)
 		}
 	} else {
-		if _, ok := results[id]; !ok {
-			return fail.InconsistentError("task results does not contain %s", id)
+		var (
+			anon interface{}
+			ok bool
+		)
+		if anon, ok = results[id]; !ok || anon == nil {
+			return fail.InconsistentError("task result missing for id %s", id)
 		}
 
-		result, ok := results[id].(data.Map)
+		result, ok := anon.(data.Map)
 		if !ok {
-			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(anon).String())
 			if groupXErr == nil {
 				groupXErr = xerr
 			} else {
@@ -1428,11 +1082,15 @@ func (instance *subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			}
 		}
 
-		if _, ok := results[id]; !ok {
-			return fail.InconsistentError("task results doesn't contain %s", id)
+		var (
+			anon interface{}
+			ok bool
+		)
+		if anon, ok = results[id]; !ok || anon == nil {
+			return fail.InconsistentError("task result missing for id %s", id)
 		}
 
-		result, ok := results[id].(data.Map)
+		result, ok := anon.(data.Map)
 		if !ok {
 			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
 			if groupXErr == nil {
@@ -1470,8 +1128,8 @@ func (instance *subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return xerr
-			}
+					return xerr
+				}
 			defer instance.undoBindInternalSecurityGroupToGateway(ctx, secondaryGateway, req.KeepOnFailure, &xerr)
 		}
 	}
