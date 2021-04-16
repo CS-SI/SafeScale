@@ -305,9 +305,6 @@ var clusterCreateCommand = &cli.Command{
 			Usage: `Defines the sizing of the cluster: Small, Normal, Large
 	Default number of machines (#master, #nodes) depending of flavor are:
 		BOH: Small(1,1), Normal(3,3), Large(5,6)
-		SWARM: Small(1,1), Normal(3,3), Large(5,3)
-		OHPC: Small(1,1), Normal(1,3), Large(1,7)
-		DCOS: Small(1,2), Normal(3,4), Large(5,6)
 		K8S: Small(1,1), Normal(3,3), Large(5,6)
 	`,
 		},
@@ -318,9 +315,6 @@ var clusterCreateCommand = &cli.Command{
 			Usage: `Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S
 	Default sizing for each cluster type is:
 		BOH: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
-		SWARM: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[7-16], disk=[80]), nodes(cpu=[4-8], ram=[7-16], disk=[80])
-		OHPC: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[7-16], disk=[80])
-		DCOS: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[80]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
 		K8S: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[15-32], disk=[80])
 	`,
 		},
