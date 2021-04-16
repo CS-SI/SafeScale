@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/vmware/go-vcloud-director/types/v56"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"

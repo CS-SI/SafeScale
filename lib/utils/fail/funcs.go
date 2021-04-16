@@ -196,7 +196,7 @@ func ConvertError(err error) Error {
 		if casted, ok := err.(Error); ok {
 			return casted
 		}
-		return NewErrorWithCause(err)
+		return NewErrorWithCause(err, err.Error())
 	}
 	return nil
 }

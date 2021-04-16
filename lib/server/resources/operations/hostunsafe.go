@@ -95,8 +95,8 @@ func (instance *host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // In case of error, can return:
 // - *fail.ErrExecution: // FIXME: complete comment
 // - *fail.ErrNotAvailable: // FIXME: complete comment
-// - *fail.ErrTimeout: // FIXME: complete comment
-// - *fail.ErrAborted: // FIXME: complete comment
+// - *fail.ErrTimeout: execution has timed out
+// - *fail.ErrAborted: execution has been aborted by context
 func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// Create the command
 	sshCmd, xerr := ssh.NewCommand(ctx, cmd)
@@ -115,6 +115,11 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 		}
 	}()
 
+	// no timeout is unsafe, we set an upper limit
+	if timeout == 0 {
+		timeout = temporal.GetLongOperationTimeout()
+	}
+
 	var (
 		retcode        int
 		stdout, stderr string
@@ -124,9 +129,9 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 			var innerXErr fail.Error
 			retcode = -1
 			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout); innerXErr != nil {
-				switch innerXErr.(type) { //nolint
+				switch innerXErr.(type) {
 				case *fail.ErrExecution:
-					// Adds stdout annotation to xerr
+					// Adds stdout and stderr as annotations to innerXErr
 					_ = innerXErr.Annotate("stdout", stdout)
 					_ = innerXErr.Annotate("stderr", stderr)
 				default:

@@ -54,7 +54,7 @@ func (instance *securityGroup) taskUnbindFromHost(task concurrency.Task, params 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// if the security group is not binded to the host, consider as a success and continue
+			// if the security group is not bound to the host, consider as a success and continue
 		default:
 			return nil, xerr
 		}
@@ -105,44 +105,47 @@ func (instance *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 		default:
 			return nil, xerr
 		}
+	} else {
+		// Unbinds security group from hosts attached to subnet
+		xerr = rs.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			innerXErr := props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+				nsgV1, ok := clonable.(*propertiesv1.SubnetHosts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				tg, innerXErr := concurrency.NewTaskGroup(task)
+				if innerXErr != nil {
+					return fail.Wrap(innerXErr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", instance.GetName(), rs.GetName())
+				}
+				for _, v := range nsgV1.ByName {
+					_, innerXErr = tg.Start(instance.taskUnbindFromHost, v)
+					if innerXErr != nil {
+						break
+					}
+				}
+				_, innerXErr = tg.Wait()
+				return innerXErr
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			return props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+				ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				delete(ssgV1.ByID, sgID)
+				delete(ssgV1.ByName, sgName)
+				return nil
+			})
+		})
+
+		return nil, xerr
 	}
 
-	// Unbinds security group from hosts attached to subnet
-	xerr = rs.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		innerXErr := props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			nsgV1, ok := clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			tg, innerXErr := concurrency.NewTaskGroup(task)
-			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", instance.GetName(), rs.GetName())
-			}
-			for _, v := range nsgV1.ByName {
-				_, innerXErr = tg.Start(instance.taskUnbindFromHost, v)
-				if innerXErr != nil {
-					break
-				}
-			}
-			_, innerXErr = tg.Wait()
-			return innerXErr
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
-		return props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			delete(ssgV1.ByID, sgID)
-			delete(ssgV1.ByName, sgName)
-			return nil
-		})
-	})
-	return nil, xerr
+	return nil, nil
 }
 
 // taskEnableOnHost applies rules of security group on host
@@ -170,10 +173,10 @@ func (instance *securityGroup) taskEnableOnHost(task concurrency.Task, params co
 		default:
 			return nil, innerXErr
 		}
-	}
-
-	if rh != nil {
-		return nil, rh.EnableSecurityGroup(task.GetContext(), instance)
+	} else {
+		xerr := rh.EnableSecurityGroup(task.GetContext(), instance)
+		rh.Released()
+		return nil, xerr
 	}
 	return nil, nil
 }
@@ -205,10 +208,10 @@ func (instance *securityGroup) taskDisableOnHost(task concurrency.Task, params c
 		default:
 			return nil, innerXErr
 		}
-	}
-
-	if rh != nil {
-		return nil, rh.DisableSecurityGroup(task.GetContext(), instance)
+	} else {
+		xerr := rh.DisableSecurityGroup(task.GetContext(), instance)
+		rh.Released()
+		return nil, xerr
 	}
 	return nil, nil
 }

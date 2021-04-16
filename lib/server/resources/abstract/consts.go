@@ -38,4 +38,5 @@ const (
 const (
 	// SingleHostNetworkName is the name to use to create the network owning single hosts (not attached to a named network)
 	SingleHostNetworkName = "net-safescale"
+	SingleHostNetworkCIDR = "10.42.0.0/16"
 )

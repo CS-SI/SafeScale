@@ -200,28 +200,29 @@ func (handler *hostHandler) Create(
 	task := handler.job.GetTask()
 
 	var subnetName string
-	if !req.PublicIP {
+	if !req.Single {
 		if len(req.Subnets) > 0 {
 			subnetName = req.Subnets[0].Name
 		} else {
 			return nil, fail.InvalidParameterError("req.Subnets", "must contain at least one Subnet if req.PublicIP is false")
 		}
 	} else {
-		subnetName = abstract.SingleHostNetworkName
+		subnetName = req.ResourceName
 	}
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, subnetName, req.ImageID, req.PublicIP, force).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)
 
-	objh, xerr := hostfactory.New(handler.job.GetService())
+	hostInstance, xerr := hostfactory.New(handler.job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
-	if _, xerr = objh.Create(task, req, sizing); xerr != nil {
+
+	if _, xerr = hostInstance.Create(task, req, sizing); xerr != nil {
 		return nil, xerr
 	}
-	return objh, nil
+	return hostInstance, nil
 }
 
 // List returns the host list

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,8 +33,8 @@ import (
 )
 
 const (
-	natRouteNameFormat = "%s-%s-nat-allowed"
-	natRouteTagFormat  = "%s-%s-nat-needed"
+	natRouteNameFormat = "sfsnet-%s-nat-allowed"
+	natRouteTagFormat  = "sfsnet-%s-nat-needed"
 )
 
 // ------ network methods ------
@@ -346,7 +346,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, xer
 	as.Network = req.NetworkID
 
 	var route *compute.Route
-	if route, xerr = s.rpcCreateRoute(an.Name, as.Name); xerr != nil {
+	if route, xerr = s.rpcCreateRoute(an.Name, as.ID, as.Name); xerr != nil {
 		return nil, xerr
 	}
 
@@ -480,26 +480,24 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			return nil
+			// consider a missing Subnet as a successful removal
 		default:
 			return xerr
 		}
-	}
-
-	// Delete Subnet
-	if xerr = s.rpcDeleteSubnetByName(subn.Name); xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrTimeout:
-			return fail.Wrap(xerr.Cause(), "timeout waiting for Subnet deletion")
-		default:
-			return xerr
+	} else {
+		// Delete Subnet
+		if xerr = s.rpcDeleteSubnetByName(subn.Name); xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrTimeout:
+				return fail.Wrap(xerr.Cause(), "timeout waiting for Subnet deletion")
+			default:
+				return xerr
+			}
 		}
 	}
 
 	// Delete NAT route
-	tmp := strings.Split(subn.Network, "/")
-	networkName := tmp[len(tmp)-1]
-	natRuleName := fmt.Sprintf(natRouteNameFormat, networkName, subn.Name)
+	natRuleName := fmt.Sprintf(natRouteNameFormat, id)
 	if xerr = s.rpcDeleteRoute(natRuleName); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -508,5 +506,6 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 			return xerr
 		}
 	}
+
 	return nil
 }
