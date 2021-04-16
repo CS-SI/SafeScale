@@ -116,6 +116,15 @@ func (instance *cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 
 	// Define the sizing requirements for cluster hosts
+	if req.GatewaysDef.Image == "" {
+		req.GatewaysDef.Image = req.OS
+	}
+	if req.MastersDef.Image == "" {
+		req.MastersDef.Image = req.OS
+	}
+	if req.NodesDef.Image == "" {
+		req.NodesDef.Image = req.OS
+	}
 	gatewaysDef, mastersDef, nodesDef, xerr := instance.determineSizingRequirements(req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
