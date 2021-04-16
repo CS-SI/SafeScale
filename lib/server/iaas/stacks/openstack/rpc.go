@@ -83,8 +83,7 @@ func (s Stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	switch len(resp) {
 	case 0:
 		return nullServer, fail.NotFoundError("failed to find a Host named '%s'", name)
-	case 1:
-		return resp[0], nil
+	default:
 	}
 
 	var (

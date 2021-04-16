@@ -674,9 +674,9 @@ func (svc service) SearchImage(osname string) (*abstract.Image, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	imgs, err := svc.ListImages(false)
-	if err != nil {
-		return nil, err
+	imgs, xerr := svc.ListImages(false)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	maxscore := 0.0
@@ -691,8 +691,8 @@ func (svc service) SearchImage(osname string) (*abstract.Image, fail.Error) {
 			maxscore = score
 			maxi = i
 		}
-
 	}
+
 	// fmt.Println(fields, len(fields))
 	// fmt.Println(len(fields))
 	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {

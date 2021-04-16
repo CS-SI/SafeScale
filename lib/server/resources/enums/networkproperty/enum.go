@@ -23,4 +23,5 @@ const (
 	DescriptionV1 = "1" // contains optional additional info describing Networking (purpose, ...)
 	HostsV1       = "2" // OBSOLETE: moved to subnetproperty: contains list of hosts attached to the network
 	SubnetsV1     = "3" // contains the subnets created in the network
+	SingleHostsV1 = "4" // contains the CIDRs usable for single Hosts
 )

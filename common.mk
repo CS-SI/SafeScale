@@ -1,4 +1,4 @@
-VERSION=21.03.0-alpha
+VERSION=21.04.0-alpha
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
@@ -57,32 +57,34 @@ AWK?=awk
 SED?=sed
 TEE?=tee
 EXT?=
+WHICH?=which
 
 ifeq ($(OS),Windows_NT)
 EXT=.exe
+WHICH=where
 endif
 
-ifeq (, $(shell which $(GREP)))
+ifeq (, $(shell $(WHICH) $(GREP)))
 $(error "No grep in your PATH: [$(PATH)], you must have grep installed and available through your PATH")
 endif
 
-ifeq (, $(shell which $(CAT)))
+ifeq (, $(shell $(WHICH) $(CAT)))
 $(error "No cat in your PATH: [$(PATH)], you must have cat installed and available through your PATH")
 endif
 
-ifeq (, $(shell which $(TEE)))
+ifeq (, $(shell $(WHICH) $(TEE)))
 $(error "No tee in your PATH: [$(PATH)], you must have tee installed and available through your PATH")
 endif
 
 ifneq ($(OS),Windows_NT)
-ifeq (, $(shell which $(EGREP)))
+ifeq (, $(shell $(WHICH) $(EGREP)))
 $(error "No egrep in your PATH: [$(PATH)], you must have egrep installed and available through your PATH")
 endif
 endif
 
 ifeq ($(OS),Windows_NT)
 HOME := $(shell printf "%b" "$(HOME)" 2>/dev/null | tr '\' '/' > .tmpfile 2>/dev/null && $(CAT) .tmpfile && $(RM) .tmpfile)
-ifeq (, $(shell which rm))
+ifeq (, $(shell $(WHICH) rm))
 RM = del /Q
 endif
 endif
@@ -113,7 +115,7 @@ else
 STRICT=1
 endif
 
-ifeq (, $(shell which git))
+ifeq (, $(shell $(WHICH) git))
 $(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
 endif
 

@@ -307,39 +307,57 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	// Because of legacy, the subnet can be fully identified by network+subnet, or can be identified by network+network,
 	// because previous release of SafeScale created network AND subnet with the same name
 	var (
-		networkRef string
-		rs         resources.Subnet
-		subnets    []*abstract.Subnet
+		networkRef     string
+		subnetInstance resources.Subnet
+		subnets        []*abstract.Subnet
 	)
-	if in.GetPublic() {
-		networkRef = abstract.SingleHostNetworkName
-	} else {
+	if !in.GetSingle() {
 		networkRef = in.GetNetwork()
 	}
-	if networkRef == "" && len(in.GetSubnets()) == 0 {
-		return nil, fail.InvalidRequestError("no Network and no Subnet defined, cannot continue")
-	}
-
 	if len(in.GetSubnets()) > 0 {
 		for _, v := range in.GetSubnets() {
-			rs, xerr = subnetfactory.Load(job.GetService(), networkRef, v)
+			subnetInstance, xerr = subnetfactory.Load(job.GetService(), networkRef, v)
 			if xerr != nil {
 				return nil, xerr
 			}
+			defer subnetInstance.Released()
 
-			xerr = rs.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				as, ok := clonable.(*abstract.Subnet)
 				if !ok {
 					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				subnets = append(subnets, as.Clone().(*abstract.Subnet))
+				subnets = append(subnets, as)
 				return nil
 			})
 			if xerr != nil {
 				return nil, xerr
 			}
 		}
+	}
+	if len(subnets) == 0 && networkRef != "" {
+		subnetInstance, xerr = subnetfactory.Load(job.GetService(), networkRef, networkRef)
+		if xerr != nil {
+			return nil, xerr
+		}
+		defer subnetInstance.Released()
+
+		xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			as, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			subnets = append(subnets, as)
+			return nil
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+	if len(subnets) == 0 && !in.GetSingle() {
+		return nil, fail.InvalidRequestError("insufficient use of --network and/or --subnet or missing --single")
 	}
 
 	domain := in.Domain
@@ -351,22 +369,22 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	hostReq := abstract.HostRequest{
 		ResourceName:  name,
 		HostName:      name + domain,
-		PublicIP:      in.GetPublic(),
+		Single:        in.GetSingle(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 		Subnets:       subnets,
 	}
 
-	objh, xerr := hostfactory.New(job.GetService())
+	hostInstance, xerr := hostfactory.New(job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if _, xerr = objh.Create(task.GetContext(), hostReq, *sizing); xerr != nil {
+	if _, xerr = hostInstance.Create(task.GetContext(), hostReq, *sizing); xerr != nil {
 		return nil, xerr
 	}
 
 	// logrus.Infof("Host '%s' created", name)
-	return objh.ToProtocol()
+	return hostInstance.ToProtocol()
 }
 
 // Resize an host

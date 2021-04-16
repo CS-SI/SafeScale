@@ -283,6 +283,7 @@ func (s ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHConf
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
+
 	return converters.SSHConfigFromProtocolToSystem(sshConfig), nil
 }
 

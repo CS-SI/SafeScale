@@ -18,6 +18,7 @@ package operations
 
 import (
 	"fmt"
+	"net"
 	"reflect"
 	"strings"
 	"sync"
@@ -36,7 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/net"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -230,7 +231,7 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	// Verify the CIDR is not routable
 	if req.CIDR != "" {
-		routable, xerr := net.IsCIDRRoutable(req.CIDR)
+		routable, xerr := netretry.IsCIDRRoutable(req.CIDR)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to determine if CIDR is not routable")
@@ -662,6 +663,61 @@ func (instance *network) AbandonSubnet(ctx context.Context, subnetID string) (xe
 
 			delete(nsV1.ByID, id)
 			delete(nsV1.ByName, name)
+			return nil
+		})
+	})
+}
+
+// reserveCIDRForSingleHost returns the first available CIDR and its index inside the Network 'network'
+func reserveCIDRForSingleHost(network resources.Network) (string, uint, fail.Error) {
+	var index uint
+	xerr := network.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(networkproperty.SingleHostsV1, func(clonable data.Clonable) fail.Error {
+			nshV1, ok := clonable.(*propertiesv1.NetworkSingleHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSingleHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			index = nshV1.ReserveSlot()
+			return nil
+		})
+	})
+	if xerr != nil {
+		return "", 0, xerr
+	}
+
+	defer func() {
+		if xerr != nil {
+			derr := freeCIDRForSingleHost(network, index)
+			if derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, network.GetName()))
+			}
+		}
+	}()
+
+	_, networkNet, err := net.ParseCIDR(abstract.SingleHostNetworkCIDR)
+	err = debug.InjectPlannedError(err)
+	if err != nil {
+		return "", 0, fail.Wrap(err, "failed to convert CIDR to net.IPNet")
+	}
+
+	result, xerr := netretry.NthIncludedSubnet(*networkNet, propertiesv1.SingleHostsCIDRMaskAddition, index)
+	if xerr != nil {
+		return "", 0, xerr
+	}
+	return result.String(), index, nil
+}
+
+// freeCIDRForSingleHost frees the CIDR index inside the Network 'network'
+func freeCIDRForSingleHost(network resources.Network, index uint) fail.Error {
+	return network.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(networkproperty.SingleHostsV1, func(clonable data.Clonable) fail.Error {
+			nshV1, ok := clonable.(*propertiesv1.NetworkSingleHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSingleHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			nshV1.FreeSlot(index)
 			return nil
 		})
 	})

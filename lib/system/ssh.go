@@ -542,15 +542,16 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		return -1, "", "", xerr
 	}
 
-	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{ /*stdout: stdoutPipe, stderr: stderrPipe, */ collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
+	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
 		return -1, "", "", xerr
 	}
 
 	r, xerr := subtask.Wait()
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			xerr = fail.Wrap(xerr.Cause(), "reached timeout of %s", temporal.FormatDuration(timeout))
+		default:
 		}
 		tracer.Trace("run failed: %v", xerr)
 		return -1, "", "", xerr
@@ -652,8 +653,8 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 
 	var pbcErr error
 	runErr := scmd.Wait()
-	_ = stdoutPipe.Close() /*params.stdout.Close()*/
-	_ = stderrPipe.Close() /*params.stderr.Close()*/
+	_ = stdoutPipe.Close()
+	_ = stderrPipe.Close()
 
 	if runErr == nil {
 		result["retcode"] = 0

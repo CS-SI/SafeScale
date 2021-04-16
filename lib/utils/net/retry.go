@@ -55,9 +55,10 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
-			switch v { //nolint
+			switch v {
 			case verdict.Retry:
 				logrus.Warningf("communication failed (%s), retrying", t.Err.Error())
+			default:
 			}
 		},
 	)
@@ -68,9 +69,8 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 		case *retry.ErrTimeout:
 			xerr = fail.ConvertError(realErr.Cause())
 		}
-		return xerr
 	}
-	return nil
+	return xerr
 }
 
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),
@@ -87,10 +87,9 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 	defer func() {
 		if err != nil {
 			switch err.(type) {
-			case fail.ErrInvalidRequest:
+			case fail.ErrInvalidRequest, *fail.ErrInvalidRequest:
 				logrus.Warning(err.Error())
-			case *fail.ErrInvalidRequest:
-				logrus.Warning(err.Error())
+			default:
 			}
 		}
 	}()
@@ -123,7 +122,14 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 					return realErr
 				}
 			}
-			return retry.StopRetryError(in)
+
+			// If error is *fail.ErrNotAvailable, *fail.ErrOverflow or *fail.ErrOverload, leave a chance to retry
+			switch realErr.(type) {
+			case *fail.ErrNotAvailable, *fail.ErrOverflow, *fail.ErrOverload:
+				return realErr
+			default:
+				return retry.StopRetryError(realErr)
+			}
 		default:
 			// doing something based on error's Error() method is always dangerous, so a litte log here might help finding problems later
 			logrus.Tracef("trying to normalize based on Error() string of: (%s): %v", reflect.TypeOf(in).String(), in)
