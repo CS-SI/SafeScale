@@ -240,6 +240,12 @@ function ensure_network_connectivity() {
     op=-1
     CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
     [ $op -ne 0 ] && echo "ensure_network_connectivity finished WITHOUT network..." || echo "ensure_network_connectivity finished WITH network..."
+
+    if [[ $op -ne 0 ]]; then
+        return 1
+    fi
+
+    return 0
 }
 
 function configure_dns() {
@@ -605,7 +611,7 @@ export -f check_for_ip
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 function check_for_network() {
-    NETROUNDS=24
+    NETROUNDS=12
     REACHED=0
 
     for i in $(seq $NETROUNDS); do
@@ -749,9 +755,42 @@ EOF
     echo "done"
 }
 
-function early_packages_update() {
-    ensure_network_connectivity
+function is_network_reachable() {
+    NETROUNDS=2
+    REACHED=0
+    TRIED=0
 
+    for i in $(seq ${NETROUNDS}); do
+        if which curl; then
+            TRIED=1
+            curl -s -I www.google.com -m 4 | grep "200 OK" && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            continue
+        fi
+
+        if which wget; then
+            TRIED=1
+            wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+        fi
+
+        if [[ ${TRIED} -eq 1 ]]; then
+            continue
+        fi
+
+        ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
+    done
+
+    if [[ ${REACHED} -eq 0 ]]; then
+        echo "Unable to reach network"
+        return 1
+    fi
+
+    return 0
+}
+
+function early_packages_update() {
     # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
     cat >/etc/gai.conf <<-EOF
 precedence ::ffff:0:0/96 100
@@ -886,12 +925,15 @@ function update_credentials() {
 update_credentials
 configure_locale
 configure_dns
-ensure_network_connectivity
-add_common_repos
-early_packages_update
+ensure_network_connectivity || true
+is_network_reachable && add_common_repos
+is_network_reachable && early_packages_update
 
 identify_nics
 configure_network
+
+is_network_reachable && add_common_repos
+is_network_reachable && early_packages_update
 
 install_packages
 
