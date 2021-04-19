@@ -191,16 +191,9 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 
 	// intermediate gateway reboot
-	logrus.Debugf("Rebooting gateway '%s'", gwname)
+	logrus.Infof("Rebooting gateway '%s'", gwname)
 	command := "sudo systemctl reboot"
-	retcode, _, _, xerr := objgw.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if retcode != 0 {
-		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
-	}
+	_, _, _, _ = objgw.Run(task.GetContext(), command, outputs.COLLECT, 10*time.Second, 30*time.Second)
 
 	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, 0)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -215,17 +208,10 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		return nil, xerr
 	}
 
-	// Final gatewqay reboot
-	logrus.Debugf("Rebooting gateway '%s'", gwname)
+	// Final gateway reboot
+	logrus.Infof("Rebooting gateway '%s'", gwname)
 	command = "sudo systemctl reboot"
-	retcode, _, _, xerr = objgw.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if retcode != 0 {
-		logrus.Warnf("Unexpected problem rebooting (retcode=%d)...", retcode)
-	}
+	_, _, _, xerr = objgw.Run(task.GetContext(), command, outputs.COLLECT, 10*time.Second, 30*time.Second)
 
 	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, time.Duration(0))
 	xerr = debug.InjectPlannedFail(xerr)

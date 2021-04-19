@@ -1554,13 +1554,10 @@ func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
+	logrus.Infof("finalizing host provisioning of '%s': rebooting", instance.GetName())
 	// Reboot host
 	command := "sudo systemctl reboot"
-	_, _, _, xerr = instance.unsafeRun(ctx, command, outputs.COLLECT, temporal.GetContextTimeout(), temporal.GetHostTimeout())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+	_, _, _, _ = instance.unsafeRun(ctx, command, outputs.COLLECT, 10*time.Second, 30*time.Second)
 
 	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 0)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1580,12 +1577,9 @@ func (instance *host) finalizeProvisioning(ctx context.Context, userdataContent 
 		}
 
 		// Reboot host
+		logrus.Infof("finalizing host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
 		command = "sudo systemctl reboot"
-		_, _, _, xerr = instance.unsafeRun(ctx, command, outputs.COLLECT, 0, 0)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
+		_, _, _, _ = instance.unsafeRun(ctx, command, outputs.COLLECT, 10*time.Second, 30*time.Second)
 
 		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, 0)
 		xerr = debug.InjectPlannedFail(xerr)

@@ -1003,35 +1003,26 @@ func (instance *subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	}
 
 	results, groupXErr := tg.WaitGroup()
-	if results == nil && groupXErr != nil {
+	if groupXErr != nil {
 		return groupXErr
+	}
+	if results == nil {
+		return fail.InconsistentError("task results shouldn't be nil")
 	}
 
 	id, xerr := primaryTask.GetID()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if groupXErr == nil {
-			groupXErr = xerr
-		} else {
-			_ = groupXErr.AddConsequence(xerr)
-		}
+		groupXErr = xerr
 	} else {
-		var (
-			anon interface{}
-			ok bool
-		)
-		if anon, ok = results[id]; !ok || anon == nil {
-			return fail.InconsistentError("task result missing for id %s", id)
+		if _, ok := results[id]; !ok {
+			return fail.InconsistentError("task results doesn't contain %s", id)
 		}
 
-		result, ok := anon.(data.Map)
+		result, ok := results[id].(data.Map)
 		if !ok {
-			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(anon).String())
-			if groupXErr == nil {
-				groupXErr = xerr
-			} else {
-				_ = groupXErr.AddConsequence(xerr)
-			}
+			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
+			groupXErr = xerr
 		} else {
 			primaryGateway = result["host"].(*host)
 			primaryUserdata = result["userdata"].(*userdata.Content)
@@ -1082,15 +1073,11 @@ func (instance *subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			}
 		}
 
-		var (
-			anon interface{}
-			ok bool
-		)
-		if anon, ok = results[id]; !ok || anon == nil {
-			return fail.InconsistentError("task result missing for id %s", id)
+		if _, ok := results[id]; !ok {
+			return fail.InconsistentError("task results doesn't contain %s", id)
 		}
 
-		result, ok := anon.(data.Map)
+		result, ok := results[id].(data.Map)
 		if !ok {
 			xerr = fail.InconsistentError("'data.Map' expected, '%s' provided", reflect.TypeOf(results[id]).String())
 			if groupXErr == nil {
@@ -1128,8 +1115,8 @@ func (instance *subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			xerr = instance.bindInternalSecurityGroupToGateway(ctx, secondaryGateway)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-					return xerr
-				}
+				return xerr
+			}
 			defer instance.undoBindInternalSecurityGroupToGateway(ctx, secondaryGateway, req.KeepOnFailure, &xerr)
 		}
 	}
