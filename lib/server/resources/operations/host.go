@@ -293,7 +293,7 @@ func (instance *host) updateCachedInformation() fail.Error {
 				}
 
 				// Secondary gateway may not exist...
-				rgw, xerr = subnetInstance.InspectGateway(false)
+				rgw, xerr = subnetInstance.(*subnet).unsafeInspectGateway(false)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
