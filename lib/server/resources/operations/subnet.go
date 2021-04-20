@@ -1015,8 +1015,12 @@ func (instance *subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	if xerr != nil {
 		groupXErr = xerr
 	} else {
-		if _, ok := results[id]; !ok {
+		if content, ok := results[id]; !ok {
 			return fail.InconsistentError("task results doesn't contain %s", id)
+		} else {
+			if content == nil {
+				return fail.InconsistentError("task result with %s shouldn't be nil", id)
+			}
 		}
 
 		result, ok := results[id].(data.Map)
@@ -1073,8 +1077,12 @@ func (instance *subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			}
 		}
 
-		if _, ok := results[id]; !ok {
+		if content, ok := results[id]; !ok {
 			return fail.InconsistentError("task results doesn't contain %s", id)
+		} else {
+			if content == nil {
+				return fail.InconsistentError("task result with %s shouldn't be nil", id)
+			}
 		}
 
 		result, ok := results[id].(data.Map)
