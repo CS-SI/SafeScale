@@ -149,7 +149,7 @@ ${GOPATH}/bin/safescaled &
 It should display in your terminal something like this:
 
 ```bash
-Safescaled version: 19.03.0, build f3973fb5a642b7d93b0f20417631e2706a86c211 (2019/02/25-14:49)
+Safescaled version: 21.03.0, build f3973fb5a642b7d93b0f20417631e2706a86c211 (2021/03/25-14:49)
 Ready to serve :-)
 ```
 
@@ -158,11 +158,23 @@ By default, ```safescaled``` displays only warnings and errors messages. To have
 
 #### Options
 
-option | description
------ | -----
-`--verbose, -v` | Increase the verbosity.<br><br>ex: `safescale -v host create ...`
-`--debug, -d` | Displays debugging information.<br><br>ex: `safescale -d host create ...`
-`--listen, -l` | defines on what interface and what port safescaled will listen; default is `localhost:50051`
+<table cellpadding="4" cellspacing="0">
+<thead><tr><th align="left">Option</th><th align="left">description</th></tr></thead>
+<tbody>
+<tr valign="top">
+  <td><code>--verbose, -v</code>code></td>
+  <td>Increase the verbosity.<br><br>ex: <code>safescale -v host create ...</code></td>
+</tr>
+<tr valign="top">
+  <td><code>--debug, -d</code></td>
+  <td>Displays debugging information.<br><br>ex: <code>safescale -d host create ...</code></td></td>
+</tr>
+<tr valign="top">
+  <td><code>--listen, -l</code></td>
+  <td>defines on what interface and what port safescaled will listen; default is <code>localhost:50051</code></td>
+</tr>
+</tbody>
+</table>
 
 Examples:
 ```bash
@@ -179,7 +191,7 @@ will start the daemon, listening on all interfaces and on port `50000` (instead 
 Note: `-d -v` will display far more debugging information than simply `-d` (used to trace what is going on in details)
 
 You can also set some parameters of `safescaled` using environment variables, which are :
-- SAFESCALED_LISTEN: equivalent to `--listen`, allows to tell `safescaled` on what interface and/or what port to listen on
+- SAFESCALED_LISTEN: equivalent to `--listen`, allows to define on what interface and/or what port ``afescaled` has to listen on; used also by `safescale` to reach the daemon
 - SAFESCALE_METADATA_SUFFIX: allows to specify a suffix to add to the name of the Object Storage bucket used to store SafeScale metadata on the tenant.
   This allows to "isolate" metadata between different users of SafeScale (practical in development for example). There is no equivalent command line parameter.
  
@@ -204,14 +216,17 @@ The commands are presented in logical order as if the user wanted to create some
 
 ``safescale`` accepts global_options just before the subcommand, which are :
 
-option | description
------ | -----
-`-v` | Increase the verbosity.<br><br>ex: `safescale -v host create ...`
-`-d` | Displays debugging information.<br><br>ex: `safescale -d host create ...`
+<table>
+<thead><tr><td>Option</td><td>Description</td></tr></thead>
+<tbody>
+<tr><td valign="top"><code>-v</code></td><td>Increase the verbosity.<br><br>ex: <code>safescale -v host create ...</code></td></tr>
+<tr><td valign="top"><code>-d</code>+</td><td>Displays debugging information.<br><br>ex: <code>`safescale -d host create ...</code></td></tr>
+</tbody>
+</table>
 
 Example:
 ```bash
-$ safescale -v network create mynetwork --cidr 192.168.1.0/24
+$ safescale -v network create --cidr 192.168.1.0/24 mynetwork 
 ```
 <br>
 
@@ -228,42 +243,50 @@ A tenant must be set before using any other command as it indicates to SafeScale
 <!-- A storage tenant represents the credentials needed to connect an object storage they are used to select one or several object storage for [data](#safecale_data) commands<br> -->
 The following actions are proposed:
 
-| <div style="width:350px">actions</div> | description |
-| --- | --- |
-| `safescale tenant list` | List available tenants |
-| `safescale tenant get` | Display the current tenant used for action commands. |
-| `safescale tenant set <tenant_name>` | Set the tenant to use by the next commands |
-| `safescale tenant scan <tenant_name>` | Scan the given tenant's templates. (See [scanner doc.](SCANNER.md)) |
-<br>
+<table>
+<thead><td><div style="width:350px">Action</div></td><td><div style="min-width: 650px">Description</div></td></thead>
+<tbody>
+<tr>
+  <td valign="top"><code>safescale tenant list</code></td>
+  <td>List available tenants i.e. those found in the <code>tenants.toml</code>code> file.<br><br>
+      example:
+      <pre>$ safescale tenant list</pre>
+      response:
+      <pre>{"result":[{"name":"TestOVH"}],"status":"success"}]</pre>
+  </td>
+</tr>
+<tr>
+  <td valign="top"><code>safescale tenant get</code></td>
+  <td>Display the current tenant used for action commands.<br><br>
+      example:
+      <pre>$ safescale tenant get</pre>
+      response when tenant set:
+      <pre>{"result":{"name":"TestOVH"},"status":"success"}</pre>
+      response when tenant not set:
+      <pre>{"error":{"exitcode":6,"message":"Cannot get tenant: no tenant set"},"result":null,"status":"failure"}</pre>
+  </td>
+</tr>
+<tr>
+  <td><code>safescale tenant set &lt;tenant_name&gt;</code></td>
+  <td>Set the tenant to use by the next commands. The <code>&lt;tenant_name&gt;</code> must match one of those present in
+      the <code>tenants.toml</code> file, from key <code>name</code>). The name is case sensitive.<br><br>
+      Example:
+      <div class="highlight highlight-source-bash">
+      <pre>$ safescale tenant set TestOvh</pre>
+      </div>
+      response on success:
+      <pre>{"result":null,"status":"success"}</pre>
+      response on failure:
+      <pre>{"error":{"exitcode":6,"message":"Unable to set tenant 'TestOVH': tenant 'TestOVH' not found in configuration"},"result":null,"status":"failure"}</pre>
+  </td>
+</tr>
+<tr>
+  <td><code>safescale tenant scan &lt;tenant_name&gt;</code></td>
+  <td>REVIEW_ME: Scan the given tenant's templates. (See <a href="SCANNER.md">scanner</a> doc)</td>
+</tr>
+</tbody>
+</table>
 
-##### safescale tenant list
-List available tenants i.e. those found in the `tenants.toml` file.<br><br>example:<br><br>`$ safescale tenant list`<br>`{"result":[{"name":"TestOVH"}],"status":"success"}]`
-
-<br>
-
-##### safescale tenant get
-Display the current tenant used for action commands.<br><br>example:<br><br>`$ safescale tenant get`<br>response when tenant set:<br>`{"result":{"name":"TestOVH"},"status":"success"}`<br>reponse when tenant not set:<br>`{"error":{"exitcode":6,"message":"Cannot get tenant: no tenant set"},"result":null,"status":"failure"}`
-
-<br>
-
-##### safescale tenant set <tenant_name>
-Set the tenant to use by the next commands. The 'tenant_name' must match one of those present in the `tenants.toml` file (key 'name'). The name is case sensitive.
-
-Example of use:
-
-```bash
-$ safescale tenant set TestOvh
-```
-response on success:
-```json
-{"result":null,"status":"success"}
-```
-response on failure:
-```json
-{"error":{"exitcode":6,"message":"Unable to set tenant 'TestOVH': tenant 'TestOVH' not found in configuration"},"result":null,"status":"failure"}
-```
-
-<br>
 ---
 #### template
 
@@ -271,96 +294,175 @@ A tenant must be set before using any other command as it indicates to SafeScale
 <!-- A storage tenant represents the credentials needed to connect an object storage they are used to select one or several object storage for [data](#safecale_data) commands<br> -->
 The following actions are proposed:
 
-| <div style="width:350px">actions</div> | description |
-| --- | --- |
-| `safescale template list` | List available templates |
-| `safescale template inspect` | Display templates with scanned information |
-| `safescale template match <sizing>` | List templates that match the given sizing |
+<table>
+<thead><td><div style="width:350px">Action</div></td><td><div style="min-width:650px">Description</div>div></td></thead>
+<tbody>
+<tr>
+  <td><code>safescale template list</code></td>
+  <td>List available templates from the current tenant.<br><br>
+      example:
+      <pre>$ safescale template list</pre>
+      response:
+      <pre>{"result": [{"cores": 16, "disk": 400, "id": "0526e13e-dad5-473f-ad61-2f15e0db2a15", "ram": 240}],"status": "success"}</pre>
+  <td>
+</tr>
+<tr>
+  <td><code>safescale template inspect</code></td>
+  <td>Display templates with scanned information</td>
+</tr>
+</tbody>
+</table>
 <br>
-
-##### safescale tenant list
-List available templates from the current tenant.<br><br>example:<br><br>`$ safescale template list`<br>
-```json
-{"result": [{"cores": 16, "disk": 400, "id": "0526e13e-dad5-473f-ad61-2f15e0db2a15", "ram": 240}],"status": "success"}
-```
-<br>
-
 
 --- 
 #### network
 
-This command manages Networks on the provider side, in which subnets may be created. In some Cloud Providers terminology, Network can be called VPC (FlexibleEngine, AWS, ...).
+This command manages `Networks`, `Subnets`and `SecurityGroups` on the provider side. In some Cloud Providers terminology, `Network` can be called **VPC** (FlexibleEngine, AWS, ...).
 
-Before release v20.09, Cloud Provider networks and subnets were melted into a SafeScale Network. Since release v20.09, Subnets are introduced.
-For compatibility reason, default behavior of `safescale network` has been maintain as before, creating by default a Subnet named as the Network with a CIDR derived from the one of the Network.
-For example, `safescale network create --cidr 172.16.0.0/16 my-net` will create a Network with a CIDR of 172.16.0.0/16 AND a Subnet inside the Network with a CIDR of 172.16.0.0/17 (this allows to create additional subnets if needed).
+Before release v21.03, Cloud Provider networks and subnets were melted into a SafeScale `Network`. Since release v21.03, Subnets are introduced.
+For compatibility reason, default behavior of `safescale network` has been maintained as before, creating by default a `Subnet` named as the `Network` with a CIDR derived from the one of the Network.
+For example, `safescale network create --cidr 172.16.0.0/16 my-net` will create a `Network` with a CIDR of 172.16.0.0/16 <u>and</u> a `Subnet` inside the `Network` with a CIDR of 172.16.0.0/17.
 
-Since v20.09, it's now possible to create a Network empty of Subnet, using `--empty` flag, leaving the responsibility of Subnet creation to the user. If `--empty` is used, the flags `--gwname`, `--os`, `--gw-sizing` and `--failover` are meaningless.
+Since v21.03, it's now possible to create a `Network` without default `Subnet`, using `--empty` flag, leaving the responsibility of `Subnet` creation to the user. If `--empty` is used, the flags `--gwname`, `--os`, `--gw-sizing` and `--failover` are meaningless.
+
+A `Network` being the owner of a `SecurityGroup`, the commands relative to `SecurityGroup` resides inside `safescale network security group`.
 
 The following actions are proposed:
 
-| <div style="width:350px">actions</div> | description |
-| ----- | ----- |
-| `safescale network create [command_options] <network_name>`|<br>Creates a network with the given name.<br>`command_options`:<ul><li>`--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")</li><li>`--empty` do not create a default Subnet in the Network</li><li>`--gwname <name>` name of the gateway (`gw-<network_name>` by default)</li><li>`--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")</li><li>`-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:<ul><li>`<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`</li><li>`<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):<ul><li>`=` means exactly `<value>`</li><li>`~` means between `<value>` and 2x`<value>`</li><li>`<` means strictly lower than `<value>`</li><li>`<=` means lower or equal to `<value>`</li><li>`>` means strictly greater than `<value>`</li><li>`>=` means greater or equal to `<value>`</li></ul></li><li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`</li><li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li><li>`<cpufreq>` is expecting an integer as minimum cpu frequency in MHz</li><li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li><li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li><li>`<disk>` is expecting an integer as system disk size in GB</li>examples:<ul><li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li><li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li><li>--sizing "cpu <= 8, ram ~ 16"</li></ul></ul></li><li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li></ul>example:<br><br>`$ safescale network create example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}` |
-| `safescale network list [command_options]` | List networks created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}` |
-| `safescale network inspect <network_name_or_id>`| Get info of a network<br><br>example:<br><br>`$ safescale network inspect example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}` |
-| `safescale network delete <network_name_or_id>`| Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}` |
+<table>
+<thead><td><div style="width:350px">Action</div></td><td><div style="min-width:650px">Description</div></td></thead>
+<tbody>
+<tr>
+  <td valign="top"><code>safescale network create [command_options] &lt;network_name&gt;</code></td>
+  <td>Creates a network with the given name.<br><br>
+      <code>command_options</code>:
+      <ul>
+        <li><code>--cidr &lt;cidr&gt;</code><br>
+            CIDR of the network (default: "192.168.0.0/24")</li>
+        <li><code>--empty</code><br>
+            do not create a default Subnet in the Network</li>
+        <li><code>--gwname &lt;host_name&gt;</code><br>
+            Name of the gateway (<code>gw-&lt;subnet_name&gt;</code> by default)</li>
+        <li><code>--os "&lt;os_name&gt;"</code><br>
+            Image name for the gateway (default: "Ubuntu 18.04")</li>
+        <li><code>--failover</code><br>
+            creates 2 gateways for the network with a VIP used as internal default route for the <code>Subnet</code> (when <code>--empty</code> is not used)</li>
+        <li><code>-S|--sizing &lt;sizing&gt;</code><br>
+            describes sizing of gateway in format <code>"&lt;component&gt;&lt;operator&gt;&lt;value&gt;[,...]"</code> (when <code>--empty</code> is not used) where:
+          <ul>
+            <li><code>&lt;component&gt;</code> can be:
+              <ul>
+                <li><code>cpu</code></li>
+                <li><code>cpufreq</code> (<a href="SCANNER.md">scanner</a> needed)</li>
+                <li><code>gpu</code> (<a href="SCANNER.md">scanner</a> needed)</li>
+                <li><code>ram</code></li>
+                <li><code>disk</code>
+              </ul>
+            </li><br>
+            <li><code>&lt;operator&gt;</code> can be:
+              <ul>
+                <li><code>=</code> means exactly <code>&lt;value&gt;</code></li>
+                <li><code>~</code> means between <code>&lt;value&gt;</code> and 2x<code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
+                <li><code>&lt;</code> means strictly lower than <code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
+                <li><code>&lt;=</code> means lower or equal to <code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
+                <li><code>&gt;</code> means strictly greater than <code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
+                <li><code>&gt;=</code> means greater or equal to <code>&lt;value&gt;</code></li>
+              </ul>
+            </li><br>
+            <li><code>&lt;value&gt;</code> can be:
+              <ul>
+                <li>an integer
+                <li>a float
+                <li>an including interval <code>[&lt;lower_value&gt;-&lt;upper_value&gt;]</code></li>
+              </ul>
+            </li><br>
+            <li><code>&lt;cpu&gt;</code> is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li>
+            <li><code>&lt;cpufreq&gt;</code> is expecting an integer as minimum cpu frequency in MHz</li>
+            <li><code>&lt;gpu&gt;</code> is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li>
+            <li><code>&lt;ram&gt;</code> is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li>
+            <li><code>&lt;disk&gt;</code> is expecting an integer as system disk size in GB</li>
+          </ul><br>
+          examples:
+          <ul>
+            <li><code>--sizing "cpu <= 4, ram <= 10, disk >= 100"</code></li>
+            <li><code>--sizing "cpu ~ 4, ram = [14-32]"</code> (is identical to <code>--sizing "cpu=[4-8], ram=[14-32]"</code>)</li>
+            <li><code>--sizing "cpu <= 8, ram ~ 16"</code></li>
+          </ul>
+        </li>
+      </ul><br>
+      example:
+        <pre>$ safescale network create example_network</pre>
+        response on success:
+        <pre>{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`</pre>
+        response on failure:
+        <pre>{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}</pre>
+  </td>
+</tr>
+<tr>
+  <td valign="top">
+    <code>safescale network list [command_options]</code>
+  </td>
+  <td>List networks created by SafeScale<br><br>
+    <code>command_options</code>:
+    <ul>
+      <li><code>--all</code> List all network existing on the current tenant (not only those created by SafeScale)</li>
+    </ul>
+    examples:
+    <ul>
+      <li><pre>$ safescale network list</pre>
+          response:
+          <pre>{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}</pre>
+      </li>
+      <li>
+       <pre>safescale network list --all</pre>
+       response:
+       <pre>{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}</pre>
+      </li>
+    </ul>
+  </td>
+</tr>
+<tr>
+  <td valign="top"><code>safescale network inspect &lt;network_name_or_id&gt;</code></td>
+  <td>Get info of a <code>Network</code>code><br><br>
+      example:
+      <div class="highlight highlight-source-bash"><pre>$ safescale network inspect example_network</pre></div>
+      response on success:
+      <pre>{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}</pre>
+      response on failure
+      <pre>{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}</pre>
+  </td>
+</tr>
+<tr>
+  <td valign="top"><code>safescale network delete &lt;network_name_or_id&gt;</code></td>
+  <td>Delete the network whose name or id is given<br><br>
+      example:
+      <pre>$ safescale network delete example_network</pre>
+      response on success:
+      <pre>{"result":null,"status":"success"}</pre>
+      response on failure (network does not exist):
+      <pre>{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`</pre>
+      response on failure (hosts still attached to network):
+      REVIEW_ME:<pre>{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</pre>
+  </td>
+</tr>
+<tr><td valign="top"><code>safescale network subnet create [command_options] &lt;network_name_or_id&gt; &lt;subnet_name></code></td><td>REVIEW_ME: <br>Creates a `Subnet` with the given name.<br>`command_options`:<ul><li>`--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")</li><li>`--empty` do not create a default Subnet in the Network</li><li>`--gwname <name>` name of the gateway (`gw-<network_name>` by default)</li><li>`--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")</li><li>`-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:<ul><li>`<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`</li><li>`<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):<ul><li>`=` means exactly `<value>`</li><li>`~` means between `<value>` and 2x`<value>`</li><li>`<` means strictly lower than `<value>`</li><li>`<=` means lower or equal to `<value>`</li><li>`>` means strictly greater than `<value>`</li><li>`>=` means greater or equal to `<value>`</li></ul></li><li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`</li><li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li><li>`<cpufreq>` is expecting an integer as minimum cpu frequency in MHz</li><li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li><li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li><li>`<disk>` is expecting an integer as system disk size in GB</li>examples:<ul><li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li><li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li><li>--sizing "cpu <= 8, ram ~ 16"</li></ul></ul></li><li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li></ul>example:<br><br>`$ safescale network create example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}` |
+<tr><td valign="top"><code>safescale network subnet list [command_options] &lt;network_name_or_id&gt;</code></td><td>REVIEW_ME: List `Subnets` created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}`</td></tr>
+<tr><td valign="top"><code>safescale network subnet inspect &lt;network_name_or_id&gt; &lt;subnet_name_or_id&gt;</code></td><td>REVIEW_ME: Get info about a `Subnet`<br><br>example:<br><br>`$ safescale network inspect example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}`</td></tr>
+<tr><td valign="top"><code>safescale network subnet delete &lt;network_name_or_id&gt; &lt;subnet_name_or_id&gt;</code></td><td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}`</td></tr>
+<td><td valign="top"><code>safescale network security group create [command_options] &lt;network_name_or_id&gt; &lt;security_group_name&gt;</code></td><td>REVIEW_ME: <br>Creates a network with the given name.<br>`command_options`:<ul><li>`--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")</li><li>`--empty` do not create a default Subnet in the Network</li><li>`--gwname <name>` name of the gateway (`gw-<network_name>` by default)</li><li>`--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")</li><li>`-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:<ul><li>`<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`</li><li>`<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):<ul><li>`=` means exactly `<value>`</li><li>`~` means between `<value>` and 2x`<value>`</li><li>`<` means strictly lower than `<value>`</li><li>`<=` means lower or equal to `<value>`</li><li>`>` means strictly greater than `<value>`</li><li>`>=` means greater or equal to `<value>`</li></ul></li><li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`</li><li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li><li>`<cpufreq>` is expecting an integer as minimum cpu frequency in MHz</li><li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li><li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li><li>`<disk>` is expecting an integer as system disk size in GB</li>examples:<ul><li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li><li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li><li>--sizing "cpu <= 8, ram ~ 16"</li></ul></ul></li><li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li></ul>example:<br><br>`$ safescale network create example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}` |
+<td><td valign="top"><code>safescale network security group list [command_options] &lt;network_name_or_id&gt;</code></td><td>REVIEW_ME: List networks created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}` |
+<td><td valign="top"><code>safescale network security group inspect &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td><td>REVIEW_ME: Get info of a network<br><br>example:<br><br>`$ safescale network inspect example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}` |
+<td><td valign="top"><code>safescale network security group delete &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td><td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}` |
+<td><td valign="top"><code>safescale network security group clear &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td><td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}` |
+<td><td valign="top"><code>safescale network security group bonds &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td><td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}` |
+<td><td valign="top"><code>safescale network security group rule add [command_options] &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td><td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}` |
+<td><td valign="top"><code>safescale network security group rule delete [command_options] &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td><td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</code></td>
+</tbody>
+</table>
+
+Note: if <code>&lt;subnet_name_or_id&gt;</code> or <code>&lt;security_group_name_od_id&gt;</code> contain an ID, value can be empty string ("" or CHECK_THIS:`-`); the ID is sufficient to locate what resource is concerned.
 
 <br><br>
-
-#### subnet
-
-This command manages Subnets of Network on the provider side, on which hosts may be attached to (**may** because it's also possible to create a host without attached Subnet but with a public IP address).
-In SafeScale, a Host is automatically created to act as the gateway for the Subnet. If not given, default values are used to size this gateway.
-The following actions are proposed:
-
-| <div style="width:350px">actions</div> | description |
-| ----- | ----- |
-| `safescale network create [command_options] <network_name>`|<br>Creates a network with the given name.|
-| `safescale network list [command_options]` | List networks created by SafeScale|
-| `safescale network inspect <network_name_or_id>`| Get info of a network|
-| `safescale network delete <network_name_or_id>`| Delete the network whose name or id is given|
-<br>
-
-##### `safescale network create [command_options] <network_name>`
-
-Creates a network with the given name.
-
-`command_options`:
-  - `--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")
-  
-  - `--empty` do not create a default Subnet in Network (default: creates a Subnet named like the Network with a CIDR included in the one provided for the Network)
-      <br><br>The options below are meaningful only without the use of `--empty`:
-  - `--gwname <name>` name of the gateway (`gw-<network_name>` by default)
-  - `--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")
-  
-  - `-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:
-    - `<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`
-    - `<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):
-      - `=` means exactly `<value>`
-      - `~` means between `<value>` and 2x`<value>`
-      - `<` means strictly lower than `<value>`
-      - `<=` means lower or equal to `<value>`
-      - `>` means strictly greater than `<value>`
-      - `>=` means greater or equal to `<value>`
-    - `<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`
-      - `<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores
-      - `<cpufreq>` is expecting an integer as minimum cpu frequency in MHz
-      - `<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
-      - `<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size
-      - `<disk>` is expecting an integer as system disk size in GB
-      
-    examples:<br>
-    
-        --sizing "cpu <= 4, ram <= 10, disk >= 100"
-        --sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
-        --sizing "cpu <= 8, ram ~ 16"
-  - `--failover` creates 2 gateways for the network with a VIP used as internal default route
-<br><br>
-
-##### `safescale network list [command_options]`
- 
-List networks created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}` |
 
 ##### `safescale network inspect <network_name_or_id>`
 Inspect a Network, returning meaningful information about it.
@@ -402,9 +504,9 @@ response on failure (subnets still attached to network):
 <br><br>
 --- 
 
-##### `safescale network create [command_options] <network_name>`
+##### `safescale network subnet create [command_options] <network_name> <subnet_name>`
 
-Creates a network with the given name.
+Creates a `Subnet` with the given name.
 
 `command_options`:
   - `--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")
@@ -432,21 +534,21 @@ Creates a network with the given name.
         - --sizing "cpu <= 8, ram ~ 16"
   - `--failover` creates 2 gateways for the network with a VIP used as internal default route
 
-##### `safescale network list [command_options]`
+##### `safescale network subnet list [command_options] <network_name_or_id>`
  
 List networks created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}` |
 
-##### `safescale network inspect <network_name_or_id>`
-Inspect a Network, returning meaningful information about it.
+##### `safescale network subnet inspect <network_name_or_id> <subnet_name_or_id>`
+Inspect a `Subnet`, returning meaningful information about it.
 
 example:
     
 ```bash
-$ safescale network inspect example_network
+$ safescale network subnet inspect example_network example_subnet
 ```
 response on success:
 ```json
-{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}
+REVIEW_ME: {"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_subnet"},"status":"success"}
 ```
     
 response on failure:
@@ -454,24 +556,37 @@ response on failure:
 {"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}
 ```
 
-##### `safescale network delete <network_name_or_id>`
-Delete the network whose name or id is given. If the Network was created with a default Subnet, this Subnet will be deleted also. Otherwise, if the Network still has Subnets in it, deletion will fail.
+##### `safescale network subnet delete <network_name_or_id> <subnet_name_or_id>`
+Delete the `Subnet` whose name or id is given.
 
 example:
 
-    `$ safescale network delete example_network`
+    `$ safescale network subnet delete example_network example_subnet`
     
 response on success:
 
     `{"result":null,"status":"success"}`
     
-response on failure (network does not exist):
+response on failure (`Subnet` does not exist):
 
-    `{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`
-    
-response on failure (subnets still attached to network):
+REVIEW_ME:    `{"error":{"exitcode":6,"message":"Failed to find 'subnets/byName/example_subnet'"},"result":null,"status":"failure"}`
 
-    `{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 Subnet is still attached to it"},"result":null,"status":"failure"}`
+##### `safescale network security group create <network_name_or_id> <security_group_name>`
+TODO
+##### `safescale network security group delete <network_name_or_id> <security_group_name_or_id>`
+TODO
+##### `safescale network security group inspect <network_name_or_id> <security_group_name_or_id>`
+TODO
+##### `safescale network security group list <network_name_or_id>`
+TODO
+##### `safescale network security group clear <network_name_or_id> <security_group_name_or_id>`
+TODO
+##### `safescale network security group bonds <network_name_or_id> <security_group_name_or_id>`
+TODO
+##### `safescale network security group rule add <network_name_or_id> <security_group_name_or_id>`
+TODO
+##### `safescale network security group rule delete <network_name_or_id> <security_group_name_or_id>`
+TODO
 
 <br><br>
 --- 
@@ -579,10 +694,24 @@ The following actions are proposed:
 | `safescale [global_options] cluster create <cluster_name> [command_options]`|Creates a new cluster.<br><br>`command_options`:<ul><li>`-F\|--flavor <flavor>` defines the "flavor" of the cluster. `<flavor>` can be `BOH` (Bunch Of Hosts, without any cluster management layer), `SWARM` (Docker Swarm cluster), `K8S` (Kubernetes, default)</li><li>`-N\|--cidr <network_CIDR>` defines the CIDR of the network for the cluster.</li><li>`-C\|--complexity <complexity>` defines the "complexity" of the cluster, ie how many masters/nodes will be created (depending of cluster flavor). Valid values are `small`, `normal`, `large`.</li><li>`--disable <value>` Allows to disable addition of default features (must be used several times to disable several features)<br>Accepted `<value>`s are:<ul><li>`remotedesktop` (all flavors)</li><li>`reverseproxy` (all flavors)</li><li>`gateway-failover` (all flavors with Normal or Large complexity)</li><li>`hardening` (flavor K8S)</li><li>`helm` (flavor K8S)</li></ul></li><li>`--os value` Image name for the servers (default: "Ubuntu 18.04", may be overriden by a cluster flavor)</li><li>`-k` keeps infrastructure created on failure; default behavior is to delete resources<li>`-S|--sizing <sizing>` describes sizing of all hosts in format `"<component><operator><value>[,...]"` where:<ul><li>`<component>` can be `cpu`, `cpufreq`, `gpu`, `ram`, `disk`</li><li>`<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):<ul><li>`=` means exactly `<value>`</li><li>`~` means between `<value>` and 2x`<value>`</li><li>`<` means strictly lower than `<value>`</li><li>`<=` means lower or equal to `<value>`</li><li>`>` means strictly greater than `<value>`</li><li>`>=` means greater or equal to `<value>`</li></ul></li><li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`</li><li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li><li>`<cpufreq>` is expecting an integer of CPU frequency in MHz</li><li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li><li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li><li>`<disk>` is expecting an integer as system disk size in GB</li>examples:<ul><li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li><li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li><li>--sizing "cpu <= 8, ram ~ 16"</li></ul></ul></li><li>`--gw-sizing <sizing>` Describes gateway sizing specifically (following `--sizing` format)</li><li>`--master-sizing <sizing>` Describes master sizing specifically (following `--sizing` format)</li><li>`--node-sizing <sizing>` Describes node sizing specifically (following `--sizing` format)</li></ul>! DEPRECATED ! use `--sizing`, `--gw-sizing`, `--master-sizing` and `--node-sizing` instead<ul><li>`--cpu <value>` Number of CPU for masters and nodes (default depending of cluster flavor)</li><li>`--ram value` RAM for the host (default: 1 Go)</li><li>`--disk value` Disk space for the host (default depending of cluster flavor)</li></ul><br>Example:<br><br>`$ safescale cluster create mycluster -F k8s -C small -N 192.168.22.0/24`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"vpl-k8s-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"vpl-k8s-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"vpl-k8s-master-1":["https://51.83.34.144/_platform/remotedesktop/vpl-k8s-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure (cluster already exists):<br>`{"error":{"exitcode":8,"message":"Cluster 'mycluster' already exists.\n"},"result":null,"status":"failure"}` |
 | `safescale [global_options] cluster list` | List clusters<br><br>Example:<br><br>`$ safescale cluster list`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","flavor":2,"flavor_label":"K8S","last_state":5,"last_state_label":"Created","name":"mycluster","primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"}],"status":"success"}` |
 | `safescale [global_options] cluster inspect <cluster_name>`| Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster state <cluster_name>`| REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
 | `safescale [global_options] cluster delete <cluster_name> [command_options]`| Delete a cluster. By default, ask for user confirmation before doing anything<br><br>`command_options`:<ul><li>`-y` disables the confirmation</li></ul>Example:<br><br>`$ safescale cluster delete mycluster -y`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
-| `safescale [global_options] cluster check-feature <cluster_name> <feature_name> [command_options]`|Check if a feature is present on the cluster<br><br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li></ul>Example:<br>`$ safescale cluster check-feature mycluster docker`<br>response on success:<br>`{"result":"Feature 'docker' found on cluster 'mycluster'","status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Feature 'docker' not found on cluster 'mcluster'"},"result":null,"status":"failure"}` |
-| `safescale [global_options] cluster add-feature <cluster_name> <feature_name> [command_options]`|Adds a feature to the cluster<br><br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li><li>`--skip-proxy` disables the application of (optional) reverse proxy rules inside the feature</ul>Example:<br><br>`$ safescale cluster add-feature mycluster remotedesktop`<br>response on success: `{"result":null,"status":"success"}`<br>response on failure may vary |
-| `safescale [global_options] cluster delete-feature <cluster_name> <feature_name> [command_options]`|Deletes a feature from a cluster<br><br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li></ul>Example:<br><br>`$ safescale cluster delete-feature my-cluster remote-desktop`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure may vary |
+| `safescale [global_options] cluster feature check <cluster_name> <feature_name> [command_options]`|Check if a feature is present on the cluster<br><br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li></ul>Example:<br>`$ safescale cluster check-feature mycluster docker`<br>response on success:<br>`{"result":"Feature 'docker' found on cluster 'mycluster'","status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Feature 'docker' not found on cluster 'mcluster'"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster feature add <cluster_name> <feature_name> [command_options]`|Adds a feature to the cluster<br><br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li><li>`--skip-proxy` disables the application of (optional) reverse proxy rules inside the feature</ul>Example:<br><br>`$ safescale cluster add-feature mycluster remotedesktop`<br>response on success: `{"result":null,"status":"success"}`<br>response on failure may vary |
+| `safescale [global_options] cluster feature delete <cluster_name> <feature_name> [command_options]`|Deletes a feature from a cluster<br><br>`command_options`:<ul><li>`-p "<PARAM>=<VALUE>"` Sets the value of a parameter required by the feature</li></ul>Example:<br><br>`$ safescale cluster delete-feature my-cluster remote-desktop`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure may vary |
+| `safescale [global_options] cluster expand [command_options] <cluster_name>`| REVIEW_ME:Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster shrink [command_options] <cluster_name>`| REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster stop [command_options] <cluster_name>`| REVIEW_ME:Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster start [command_options] <cluster_name>`| REVIEW_ME:Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster kubectl [command_options] <cluster_name> -- <kubectl_parameters>` | REVIEW_ME:Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster helm [command_options] <cluster_name> -- <helm_parameters` | REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster master list [command_options] <cluster_name>` | REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster node list [command_options] <cluster_name>` | REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster node inspect [command_options] <cluster_name> <node_name_or_id>` | REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster node state [command_options] <cluster_name> <node_name_or_id>` | REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster node stop [command_options] <cluster_name> <node_name_or_id>` | REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster node start [command_options] <cluster_name> <node_name_or_id>` | REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
+| `safescale [global_options] cluster node delete [command_options] <cluster_name> <node_name_or_id>` | REVIEW_ME: Get info about a cluster<br><br>Example:<br><br>`$ safescale cluster inspect mycluster`<br>response on success:<br>`{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}` |
 
 <br><br>
 

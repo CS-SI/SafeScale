@@ -2,7 +2,7 @@
 ## To get binaries :
 1. Get on github : https://github.com/CS-SI/SafeScale/releases  
 2. Compil : https://github.com/CS-SI/SafeScale/blob/master/doc/build
-3. Compil with docker : After git checkout, run ./create-docker.sh -f (for that you need to install `docker.io`)
+3. Compil with docker : After git checkout, run ./create-docker.sh -f (for that you need to install `docker-ce`)
 
 # Steps to launch daemon safescaled :
 1. Copie binaries on your client
