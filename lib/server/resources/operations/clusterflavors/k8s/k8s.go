@@ -104,6 +104,18 @@ func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 		logrus.Errorf("[cluster %s] failed to add feature 'kubernetes': %s", clusterName, xerr.Error())
 		return xerr
 	}
+
+	results, xerr = c.AddFeature(ctx, "helm3", data.Map{}, resources.FeatureSettings{})
+	if xerr != nil {
+		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'helm3'", clusterName)
+	}
+
+	if !results.Successful() {
+		xerr = fail.NewError(fmt.Errorf(results.AllErrorMessages()), nil, "failed to add feature 'helm3' to cluster '%s'", clusterName)
+		logrus.Errorf("[cluster %s] failed to add feature 'helm3': %s", clusterName, xerr.Error())
+		return xerr
+	}
+
 	logrus.Infof("[cluster %s] feature 'kubernetes' addition successful.", clusterName)
 
 	return nil
