@@ -477,7 +477,7 @@ func (instance *host) Browse(ctx context.Context, callback func(*abstract.HostCo
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
-	defer instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	return instance.core.BrowseFolder(func(buf []byte) (innerXErr fail.Error) {
 		if task.Aborted() {
@@ -2315,7 +2315,7 @@ func (instance *host) GetShare(shareRef string) (_ *propertiesv1.HostShare, xerr
 	}
 
 	instance.lock.RLock()
-	defer instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	var (
 		hostShare *propertiesv1.HostShare
