@@ -11,6 +11,7 @@
       - [Options](#safescaled_options)
       - [Environment variables](#safescaled_env)
   - [safescale](#safescale)
+      - [Host sizing definition](#safescale_sizing)
       - [Global options](#safescale_globals)
       - [Commands](#commands)
          - [tenant](#tenant)
@@ -40,7 +41,7 @@ The purpose of this daemon is to execute requests ordered by `safescale` client 
 <br>
 It is composed internally of 2 layers:
 - `Infra` which manages Cloud Provider resources with an abstraction layer
-- `Platform` which allows to create and manage clusters
+- `Platform` which allows creating and managing clusters
 
 #### <a name="safescaled_config">Configuration</a>
 
@@ -211,7 +212,7 @@ ___
 
 `safescale` is the client part of SafeScale. It consists of a CLI to interact with the SafeScale daemon to manage cloud infrastructures.
 
-The different available commands can be obtained via the **`--help`** option on each command and are listed hereafter. _Note that, despite our efforts, the help displayed by the CLI might be more accurate and up-to-date than the following descriptions._
+The different available commands can be obtained via the **`--help`** option on each command and are listed hereafter. Note that, despite our efforts, the help displayed by the CLI might be more accurate and up-to-date than the following descriptions.
 
 Each command returns its results on the standard output in 2 forms according to the expected result type:
 
@@ -223,20 +224,77 @@ Each command has an exit status which is 0 if it succeeded, and !=0 if failed. I
 
 <br>
 
+#### <a name="safescale_sizing">Host sizing definition</a>
+
+In multiple occasions, it will be necessary to define the Host sizing required. This sizing allows to find the Host templates that match on Cloud Provider side.
+
+The format used by this string representation is: <pre>&lt;component&gt;&lt;operator&gt;&lt;value&gt;[,...]</pre>
+
+where:
+<ul>
+  <li><code>&lt;component&gt;</code> can be:
+      <ul>
+        <li><code>cpu</code></li>
+        <li><code>cpufreq</code> (<a href="SCANNER.md">scanner</a> needed)</li>
+        <li><code>gpu</code> (<a href="SCANNER.md">scanner</a> needed)</li>
+        <li><code>ram</code></li>
+        <li><code>disk</code>
+      </ul>
+  </li><br>
+  <li><code>&lt;operator&gt;</code> can be:
+      <ul>
+        <li><code>=</code> means exactly <code>&lt;value&gt;</code></li>
+        <li><code>~</code> means between <code>&lt;value&gt;</code> and 2x<code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
+        <li><code>&lt;</code> means strictly lower than <code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
+        <li><code>&lt;=</code> means lower or equal to <code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
+        <li><code>&gt;</code> means strictly greater than <code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
+        <li><code>&gt;=</code> means greater or equal to <code>&lt;value&gt;</code></li>
+      </ul>
+  </li><br>
+  <li><code>&lt;value&gt;</code> can be:
+      <ul>
+        <li>an integer
+        <li>a float
+        <li>an including interval <code>[&lt;lower_value&gt;-&lt;upper_value&gt;]</code></li>
+      </ul>
+  </li>
+</ul>
+Each <code>&lt;component&gt;</code> accepts <code>&lt;value&gt;</code> following these rules:
+<ul>
+  <li><code>&lt;cpu&gt;</code> is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li>
+  <li><code>&lt;cpufreq&gt;</code> is expecting an integer as minimum cpu frequency in MHz</li>
+  <li><code>&lt;gpu&gt;</code> is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li>
+  <li><code>&lt;ram&gt;</code> is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li>
+  <li><code>&lt;disk&gt;</code> is expecting an integer as system disk size in GB</li>
+</ul>
+<u>examples</u>:
+<ul>
+  <li><code>"cpu <= 4, ram <= 10, disk >= 100"</code><br>Match any Host template with at most 4 cores,at most 10 GB of ram  and at least 100 GB of system disk</li>
+  <li><code>"cpu ~ 4, ram = [14-32]"</code><br>Match any Host template with between 4 and 4x2=8 cores, between 14 and 32 GB of ram (it's identical to <code>"cpu=[4-8], ram=[14-32]"</code>)</li>
+  <li><code>"cpu <= 8, ram ~ 16"</code><br>Match any Host template with at most 8 cores and between 16 and 16x2=32 GB of ram</li>
+</ul>
+
+Every time you will see <code>&lt;sizing&gt;</code> in this document, you will have to refer to this format.
+<br><br>
+
 #### <a name="safescale_globals">Global options</a>
 
-``safescale`` accepts global_options just before the subcommand, which are :
+`safescale` accepts global options just before the subcommand, which are:
 
 <table>
 <thead><tr><td style="min-width:350px">Option</td><td style="width:650px">Description</td></tr></thead>
 <tbody>
 <tr>
-  <td valign="top"><code>-v</code></td>
-  <td>Increase the verbosity.<br><br>ex: <code>safescale -v host create ...</code></td>
+  <td valign="top"><code>--verbose|-v</code></td>
+  <td>Increase the verbosity.<br><br>
+      example: <code>safescale -v host create ...</code>
+  </td>
 </tr>
 <tr>
-  <td valign="top"><code>-d</code></td>
-  <td>Displays debugging information.<br><br>ex: <code>`safescale -d host create ...</code></td>
+  <td valign="top"><code>--debug|-d</code></td>
+  <td>Displays debugging information.<br><br>
+      <u>example</u>: <code>safescale -d host create ...</code>
+  </td>
 </tr>
 </tbody>
 </table>
@@ -262,21 +320,25 @@ A tenant must be set before using any other command as it indicates to SafeScale
 The following actions are proposed:
 
 <table>
-<thead><td><div style="width:350px">Action</div></td><td><div style="min-width: 650px">Description</div></td></thead>
+<thead><td><div style="width:350px"><b>Action</b></div></td><td><div style="min-width: 650px"><b>Description</b></div></td></thead>
 <tbody>
 <tr>
   <td valign="top"><code>safescale tenant list</code></td>
   <td>List available tenants i.e. those found in the <code>tenants.toml</code>code> file.<br><br>
-      example:
+      <u>example</u>:
+      <div class="highlight highlight-source-shell">
       <pre>$ safescale tenant list</pre>
+      </div>
       response:
+      <div class="highlight highlight-source-perl">
       <pre>{"result":[{"name":"TestOVH"}],"status":"success"}]</pre>
+      </div>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale tenant get</code></td>
   <td>Display the current tenant used for action commands.<br><br>
-      example:
+      <u>example</u>:
       <pre>$ safescale tenant get</pre>
       response when tenant set:
       <pre>{"result":{"name":"TestOVH"},"status":"success"}</pre>
@@ -288,10 +350,8 @@ The following actions are proposed:
   <td valign="top"><code>safescale tenant set &lt;tenant_name&gt;</code></td>
   <td>Set the tenant to use by the next commands. The <code>&lt;tenant_name&gt;</code> must match one of those present in
       the <code>tenants.toml</code> file, from key <code>name</code>). The name is case sensitive.<br><br>
-      Example:
-      <div class="highlight highlight-source-bash">
+      <u>example</u>:
       <pre>$ safescale tenant set TestOvh</pre>
-      </div>
       response on success:
       <pre>{"result":null,"status":"success"}</pre>
       response on failure:
@@ -312,12 +372,12 @@ A template represents a predefined host sizing proposed by Cloud Provider.
 The following actions are available:
 
 <table>
-<thead><td><div style="width:350px">Action</div></td><td><div style="min-width:650px">Description</div></td></thead>
+<thead><td><div style="width:350px"><b>Action</b></div></td><td><div style="min-width:650px"><b>Description</b></div></td></thead>
 <tbody>
 <tr>
   <td valign="top"><code>safescale template list</code></td>
   <td>List available templates from the current tenant.<br><br>
-      example:
+      <u>example</u>:
       <pre>$ safescale template list</pre>
       response:
       <pre>{"result": [{"cores": 16, "disk": 400, "id": "0526e13e-dad5-473f-ad61-2f15e0db2a15", "ram": 240}],"status": "success"}</pre>
@@ -326,7 +386,7 @@ The following actions are available:
 <tr>
   <td valign="top"><code>safescale template inspect</code></td>
   <td>Display templates with scanned information (if available).<br><br>
-      example: REVIEW_ME
+      <u>example</u>: REVIEW_ME
       <pre>safescale template inspect xxx</pre>
       response on success (without scan):
       <pre>{"result":{</pre>
@@ -356,67 +416,26 @@ A `Network` being the owner of a `SecurityGroup`, the commands relative to `Secu
 The following actions are proposed:
 
 <table>
-<thead><td><div style="width:350px">Action</div></td><td><div style="min-width:650px">Description</div></td></thead>
+<thead><td><div style="width:350px"><b>Action</b></div></td><td><div style="min-width:650px"><b>Description</b></div></td></thead>
 <tbody>
 <tr>
   <td valign="top"><code>safescale network create [command_options] &lt;network_name&gt;</code></td>
   <td>Creates a network with the given name.<br><br>
       <code>command_options</code>:
       <ul>
-        <li><code>--cidr &lt;cidr&gt;</code><br>
+        <li><code>--cidr &lt;cidr&gt;</code>
             CIDR of the network (default: "192.168.0.0/24")</li>
-        <li><code>--empty</code><br>
+        <li><code>--empty</code>
             do not create a default Subnet in the Network</li>
-        <li><code>--gwname &lt;host_name&gt;</code><br>
+        <li><code>--gwname &lt;host_name&gt;</code>
             Name of the gateway (<code>gw-&lt;subnet_name&gt;</code> by default)</li>
-        <li><code>--os "&lt;os_name&gt;"</code><br>
+        <li><code>--os "&lt;os_name&gt;"</code>
             Image name for the gateway (default: "Ubuntu 18.04")</li>
-        <li><code>--failover</code><br>
+        <li><code>--failover</code>
             creates 2 gateways for the network with a VIP used as internal default route for the <code>Subnet</code> (when <code>--empty</code> is not used)</li>
-        <li><code>-S|--sizing &lt;sizing&gt;</code><br>
-            describes sizing of gateway in format <code>"&lt;component&gt;&lt;operator&gt;&lt;value&gt;[,...]"</code> (when <code>--empty</code> is not used) where:
-          <ul>
-            <li><code>&lt;component&gt;</code> can be:
-              <ul>
-                <li><code>cpu</code></li>
-                <li><code>cpufreq</code> (<a href="SCANNER.md">scanner</a> needed)</li>
-                <li><code>gpu</code> (<a href="SCANNER.md">scanner</a> needed)</li>
-                <li><code>ram</code></li>
-                <li><code>disk</code>
-              </ul>
-            </li><br>
-            <li><code>&lt;operator&gt;</code> can be:
-              <ul>
-                <li><code>=</code> means exactly <code>&lt;value&gt;</code></li>
-                <li><code>~</code> means between <code>&lt;value&gt;</code> and 2x<code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
-                <li><code>&lt;</code> means strictly lower than <code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
-                <li><code>&lt;=</code> means lower or equal to <code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
-                <li><code>&gt;</code> means strictly greater than <code>&lt;value&gt;</code> (not available for component <code>&lt;disk&gt;</code>)</li>
-                <li><code>&gt;=</code> means greater or equal to <code>&lt;value&gt;</code></li>
-              </ul>
-            </li><br>
-            <li><code>&lt;value&gt;</code> can be:
-              <ul>
-                <li>an integer
-                <li>a float
-                <li>an including interval <code>[&lt;lower_value&gt;-&lt;upper_value&gt;]</code></li>
-              </ul>
-            </li><br>
-            <li><code>&lt;cpu&gt;</code> is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li>
-            <li><code>&lt;cpufreq&gt;</code> is expecting an integer as minimum cpu frequency in MHz</li>
-            <li><code>&lt;gpu&gt;</code> is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li>
-            <li><code>&lt;ram&gt;</code> is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li>
-            <li><code>&lt;disk&gt;</code> is expecting an integer as system disk size in GB</li>
-          </ul><br>
-          examples:
-          <ul>
-            <li><code>--sizing "cpu <= 4, ram <= 10, disk >= 100"</code></li>
-            <li><code>--sizing "cpu ~ 4, ram = [14-32]"</code> (is identical to <code>--sizing "cpu=[4-8], ram=[14-32]"</code>)</li>
-            <li><code>--sizing "cpu <= 8, ram ~ 16"</code></li>
-          </ul>
-        </li>
+        <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of gateway (refer to <a href="#safescale_sizing">Host sizing definition</a>a> paragraph for details)</li>
       </ul><br>
-      example:
+      <u>example</u>:
         <pre>$ safescale network create example_network</pre>
         response on success:
         <pre>{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`</pre>
@@ -433,7 +452,7 @@ The following actions are proposed:
     <ul>
       <li><code>--all</code> List all network existing on the current tenant (not only those created by SafeScale)</li>
     </ul>
-    examples:
+    <u>examples</u>:
     <ul>
       <li><pre>$ safescale network list</pre>
           response:
@@ -450,7 +469,7 @@ The following actions are proposed:
 <tr>
   <td valign="top"><code>safescale network inspect &lt;network_name_or_id&gt;</code></td>
   <td>Get info of a <code>Network</code>code><br><br>
-      example:
+      <u>example</u>:
       <div class="highlight highlight-source-bash"><pre>$ safescale network inspect example_network</pre></div>
       response on success:
       <pre>{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}</pre>
@@ -461,7 +480,7 @@ The following actions are proposed:
 <tr>
   <td valign="top"><code>safescale network delete &lt;network_name_or_id&gt;</code></td>
   <td>Delete the network whose name or id is given<br><br>
-      example:
+      <u>example</u>:
       <pre>$ safescale network delete example_network</pre>
       response on success:
       <pre>{"result":null,"status":"success"}</pre>
@@ -473,7 +492,22 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet create [command_options] &lt;network_name_or_id&gt; &lt;subnet_name></code></td>
-  <td>REVIEW_ME: <br>Creates a `Subnet` with the given name.<br>`command_options`:<ul><li>`--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")</li><li>`--empty` do not create a default Subnet in the Network</li><li>`--gwname <name>` name of the gateway (`gw-<network_name>` by default)</li><li>`--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")</li><li>`-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:<ul><li>`<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`</li><li>`<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):<ul><li>`=` means exactly `<value>`</li><li>`~` means between `<value>` and 2x`<value>`</li><li>`<` means strictly lower than `<value>`</li><li>`<=` means lower or equal to `<value>`</li><li>`>` means strictly greater than `<value>`</li><li>`>=` means greater or equal to `<value>`</li></ul></li><li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`</li><li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li><li>`<cpufreq>` is expecting an integer as minimum cpu frequency in MHz</li><li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li><li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li><li>`<disk>` is expecting an integer as system disk size in GB</li>examples:<ul><li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li><li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li><li>--sizing "cpu <= 8, ram ~ 16"</li></ul></ul></li><li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li></ul>example:<br><br>`$ safescale network create example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}`</td> |
+  <td>Creates a `Subnet` with the given name.<br><br>
+      <code>command_options</code>:
+      <ul>
+        <li><code>--cidr &lt;cidr&gt;</code> CIDR of the network (default: "192.168.0.0/24")</li>
+        <li><code>--gwname &lt;name&gt;</code> name of the gateway (default: <code>gw-&lt;subnet_name&gt;</code>)</li>
+        <li><code>--os "&lt;os name&gt;"</code> Image name for the gateway (default: "Ubuntu 18.04")</li>
+        <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of gateway (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details)</li>
+        <li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li>
+      </ul>
+      <u>example</U>: REVIEW_ME
+      <pre>$ safescale network subnet create example_network example_subnet</pre>
+      response on success:
+      <pre>{"result":</pre>
+      response on failure:
+      <pre>{"error":{</pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet list [command_options] &lt;network_name_or_id&gt;</code></td>
@@ -1058,44 +1092,10 @@ The following actions are proposed:
         </li>
         <li><code>--os value</code> Image name for the servers (default: "Ubuntu 18.04", may be overriden by a cluster flavor)</li>
         <li><code>-k</code> Keeps infrastructure created on failure; default behavior is to delete resources</li>
-        <li><code>-S|--sizing &lt;sizing&gt;</code> Describes sizing of all hosts in format <code>"&lt;component&gt;&lt;operator&gt;&lt;value&gt;[,...]"</code> where:
-            <ul>
-              <li><code>&lt;component&gt;</code> can be:
-                  <ul>
-                    <li><code>cpu</code></li>
-                    <li><code>cpufreq</code></li>
-                    <li><code>gpu</code></li>
-                    <li><code>ram</code></li>
-                    <li><code>disk</code></li>
-                  </ul>
-              </li>
-              <li><code>&lt;operator&gt;</code> can be:
-                  <ul>
-                    <li><code>=</code> Means exactly <code>&lt;value&gt;</code></li>
-                    <li><code>~</code> means between <code>&lt;value&gt;</code> and 2x<code>&lt;value&gt;</code></li>
-                    <li><code>&lt;</code> means strictly lower than <code>&lt;value&gt;</code></li>
-                    <li><code>&lt;=</code> means lower or equal to <code>&lt;value&gt;</code></li>
-                    <li><code>&gt;</code> means strictly greater than <code>&lt;value&gt;</code></li>
-                    <li><code>&gt;=</code> means greater or equal to <code>&lt;value&gt;</code></li>
-                  </ul>
-              </li>
-              <li><code>&lt;value&gt;</code> can be an integer (for <code>cpu</code>, <code>cpufreq</code>, <code>gpu</code> and <code>disk</code>) or a float (for <code>ram</code>code>) or an including interval <code>[&lt;lower value&gt;-&lt;upper value&gt;]</code></li>
-              <li><code>&lt;cpu&gt;</code> is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li>
-              <li><code>&lt;cpufreq&gt;</code> is expecting an integer of CPU frequency in MHz</li>
-              <li><code>&lt;gpu&gt;</code> is expecting an integer as number of GPU (<code>safescale tenant scan</code> should have been run first to be able to determine which template proposes GPU)</li>
-              <li><code>&lt;ram&gt;</code> is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li>
-              <li><code>&lt;disk&gt;</code> is expecting an integer as system disk size in GB</li>
-              examples:
-              <ul>
-                <li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li>
-                <li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li>
-                <li>--sizing "cpu <= 8, ram ~ 16"</li>
-              </ul>
-            </ul>
-        </li>
-        <li><code>--gw-sizing &lt;sizing&gt;</code> Describes gateway sizing specifically (following <code>--sizing</code> format)</li>
-        <li><code>--master-sizing &lt;sizing&gt;</code> Describes master sizing specifically (following <code>--sizing</code>code> format); takes precedence over <code>--sizing</code></li>
-        <li><code>--node-sizing &lt;sizing&gt;</code> Describes node sizing specifically (following <code>--sizing</code>code> format); takes precedence over <code>--sizing</code></li>
+        <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of all hosts (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details)</li>
+        <li><code>--gw-sizing &lt;sizing&gt;</code> Describes gateway sizing specifically (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details); takes precedence over <code>--sizing</code></li>
+        <li><code>--master-sizing &lt;sizing&gt;</code> Describes master sizing specifically (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details); takes precedence over <code>--sizing</code></li>
+        <li><code>--node-sizing &lt;sizing&gt;</code> Describes node sizing specifically (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details); takes precedence over <code>--sizing</code></li>
       </ul>
       <b>! DEPRECATED !</b> use <code>--sizing</code>, <code>--gw-sizing</code>, <code>--master-sizing</code> and <code>--node-sizing</code> instead
       <ul>
@@ -1243,7 +1243,7 @@ The following actions are proposed:
   <td valign="top"><code>safescale [global_options] cluster kubectl [command_options] &lt;cluster_name&gt; -- &lt;kubectl_parameters&gt;</code></td>
   <td>Executes <code>kubectl</code> command on Cluster<br><br>
       example:
-      <pre>$  safescale cluster kubectl vpl-net -- get nodes</pre>
+      <pre>$  safescale cluster kubectl mycluster -- get nodes</pre>
       response on success:
       <pre>NAME               STATUS   ROLES    AGE   VERSION
 gw-mycluster         Ready    &lt;none&gt;   11m   v1.18.5
