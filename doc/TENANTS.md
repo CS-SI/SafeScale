@@ -4,7 +4,7 @@
 
 The tenant file contains the list of credentials and configuration used to access providers.
 
-Here is an example of a TOML encoded configuration file :
+Here is an example of a TOML encoded configuration file:
 
 ```toml
 [[tenants]]
@@ -51,7 +51,7 @@ Here is an example of a TOML encoded configuration file :
 
 The same configuration can be provided in JSON or in YAML.
 
-Here is the JSON equivalent of the example TOML configuration file :
+Here is the JSON equivalent of the TOML configuration file example:
 
 ```json
 {
@@ -95,7 +95,7 @@ Here is the JSON equivalent of the example TOML configuration file :
 }
 ```
 
-Here is the YAML equivalent of the example TOML configuration file :
+Here is the YAML equivalent of the TOML configuration file example:
 
 ```yaml
 tenants:
