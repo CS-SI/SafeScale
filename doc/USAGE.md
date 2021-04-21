@@ -314,6 +314,8 @@ There are 3 categories of commands:
 
 The commands are presented in logical order as if the user wanted to create some servers with a shared storage space.
 
+<u>Note</u>: for clarity, the json results are beautified (as if the example is called with `| jq`); real outputs are one-liners.
+
 #### <a name="tenant">tenant</a>
 
 A tenant must be set before using any other command as it indicates to SafeScale which tenant the command must be executed on. _Note that if only one tenant is defined in the `tenants.toml`, it will be automatically selected while invoking any other command.<br>
@@ -330,9 +332,14 @@ The following actions are proposed:
       <pre>$ safescale tenant list</pre>
       </div>
       response:
-      <div class="highlight highlight-source-perl">
-      <pre>{"result":[{"name":"TestOVH"}],"status":"success"}]</pre>
-      </div>
+      <div class="highlight highlight-source-perl"><pre>
+{
+    "result": {
+        "name": "TestOVH"
+    },
+    "status":"success"
+}
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -341,9 +348,25 @@ The following actions are proposed:
       <u>example</u>:
       <pre>$ safescale tenant get</pre>
       response when tenant set:
-      <pre>{"result":{"name":"TestOVH"},"status":"success"}</pre>
+      <div class="highlight highlight-source-perl"><pre>
+{
+    "result": {
+        "name":"TestOVH"
+    },
+    "status": "success"
+}
+      </pre></div>
       response when tenant not set:
-      <pre>{"error":{"exitcode":6,"message":"Cannot get tenant: no tenant set"},"result":null,"status":"failure"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{
+    "error": {
+        "exitcode": 6,
+        "message": "Cannot get tenant: no tenant set"
+    },
+    "result": null,
+    "status": "failure"
+}
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -353,9 +376,23 @@ The following actions are proposed:
       <u>example</u>:
       <pre>$ safescale tenant set TestOvh</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{
+  "result": null,
+  "status": "success"
+}
+      </pre></div>
       response on failure:
-      <pre>{"error":{"exitcode":6,"message":"Unable to set tenant 'TestOVH': tenant 'TestOVH' not found in configuration"},"result":null,"status":"failure"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Unable to set tenant 'TestOvh': tenant 'TestOvh' not found in configuration"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -380,7 +417,9 @@ The following actions are available:
       <u>example</u>:
       <pre>$ safescale template list</pre>
       response:
-      <pre>{"result": [{"cores": 16, "disk": 400, "id": "0526e13e-dad5-473f-ad61-2f15e0db2a15", "ram": 240}],"status": "success"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result": [{"cores": 16, "disk": 400, "id": "0526e13e-dad5-473f-ad61-2f15e0db2a15", "ram": 240}],"status": "success"}
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -389,11 +428,17 @@ The following actions are available:
       <u>example</u>: REVIEW_ME
       <pre>safescale template inspect xxx</pre>
       response on success (without scan):
-      <pre>{"result":{</pre>
+      <div class="highlight highlight-source-js"><pre>
+      {"result":{
+      </pre></div>
       response on success (with scan):
-      <pre>{"result":{</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":{
+</pre></div>
       response on failure:
-      <pre>{"result":{</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":{
+      </pre></div>
   </td>
 </tr>
 </tbody>
@@ -438,9 +483,13 @@ The following actions are proposed:
       <u>example</u>:
         <pre>$ safescale network create example_network</pre>
         response on success:
-        <pre>{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`</pre>
+        <div class="highlight highlight-source-js"><pre>
+{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`
+        </pre></div>
         response on failure:
-        <pre>{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}</pre>
+        <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}
+        </pre></div>
   </td>
 </tr>
 <tr>
@@ -456,12 +505,16 @@ The following actions are proposed:
     <ul>
       <li><pre>$ safescale network list</pre>
           response:
-          <pre>{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}</pre>
+          <div class="highlight highlight-source-js"><pre>
+{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}
+          </pre></div>
       </li>
       <li>
-       <pre>safescale network list --all</pre>
-       response:
-       <pre>{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}</pre>
+        <pre>safescale network list --all</pre>
+        response:
+        <div class="highlight highlight-source-js"><pre>
+{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}
+        </pre></div>
       </li>
     </ul>
   </td>
@@ -472,9 +525,13 @@ The following actions are proposed:
       <u>example</u>:
       <div class="highlight highlight-source-bash"><pre>$ safescale network inspect example_network</pre></div>
       response on success:
-      <pre>{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}</pre>
-      response on failure
-      <pre>{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}
+      </pre></div>
+      response on failure:
+      <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -483,11 +540,15 @@ The following actions are proposed:
       <u>example</u>:
       <pre>$ safescale network delete example_network</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":null,"status":"success"}
+      </pre></div>
       response on failure (network does not exist):
-      <pre>{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`</pre>
       response on failure (hosts still attached to network):
-      REVIEW_ME:<pre>{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</pre>
+      REVIEW_ME:<pre>{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -504,18 +565,44 @@ The following actions are proposed:
       <u>example</U>: REVIEW_ME
       <pre>$ safescale network subnet create example_network example_subnet</pre>
       response on success:
-      <pre>{"result":</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":
+      </pre></div>
       response on failure:
-      <pre>{"error":{</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{
+      </pre></div>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet list [command_options] &lt;network_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: List `Subnets` created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}`</td>
+  <td>REVIEW_ME: List `Subnets` created by SafeScale<br>
+      <code>command_options</code>:
+      <ul>
+        <li><code>--all</code> List all network existing on the current tenant (not only those created by SafeScale)</li>
+      </ul>
+      <u>example</u>:
+      <div class="highlight highlight-source-shell"><pre>
+$ safescale network list
+      </pre></div>
+      response on success:
+      <div class="highlight highlight-source-js"><pre>
+{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}
+      </pre></div>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet inspect &lt;network_name_or_id&gt; &lt;subnet_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Get info about a `Subnet`<br><br>example:<br><br>`$ safescale network inspect example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}`</td>
+  <td>REVIEW_ME: Get info about a `Subnet`<br><br>
+      <u>example</u>:
+      <div class="highlight highlight-source-js"><pre>
+$ safescale network inspect example_network
+      </pre></div>
+      response on success:
+      <div class="highlight highlight-source-js"><pre>
+{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}
+      </pre></div>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet delete &lt;network_name_or_id&gt; &lt;subnet_name_or_id&gt;</code></td>
@@ -526,22 +613,36 @@ The following actions are proposed:
       <ul>
         <li><pre>$ safescale network subnet delete example_network example_subnet</pre>
             response on success:
-            <pre>{"result":</pre>
+            <div class="highlight highlight-source-js"><pre>
+{"result":
+            </pre></div>
             response on failure (Network not found):
-            <pre>{"error":{</pre>
+            <div class="highlight highlight-source-js"><pre>
+{"error":{
+            </pre></div>
             response on failure (Subnet not found):
-            <pre>{"error":{</pre>
+            <div class="highlight highlight-source-js"><pre>
+{"error":{
+            </pre></div>
             response on failure (hosts still attached to Subnet):
-            <pre>{"error":{"exitcode":6,"message":"Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</pre>
+            <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
+            </pre></div>
         </li>
         <li><pre>$ safescale network subnet delete example_network 48112419-3bc3-46f5-a64d-3634dd8bb1be</pre>
             response on success:
-            <pre>{"result":</pre>
+            <div class="highlight highlight-source-js"><pre>
+{"result":
+            </pre></div>
             response on failure (Subnet not found):
-            <pre>{"error":{</pre>
+            <div class="highlight highlight-source-js"><pre>
+{"error":{
+            </pre></div>
             response on failure (hosts still attached to Subnet):
-            <pre>{"error":{"exitcode":6,"message":"Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</pre>
-            <u>note</u>: <code>example_network</code> will not be used in this case, the Subnet ID is sufficient to locate the concerned Subnet.
+            <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
+            </pre></div>
+            <u>note</u>: <code>example_network</code> will not be used in this case, the `Subnet` ID is sufficient to locate the concerned Subnet.
         </li>
       </ul>
   </td>
@@ -556,9 +657,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale network security group create --description "sg for hosts in example_network" example_network sg-example-hosts</pre>
       response on success:
-      <pre>{"result":{</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":{
+      </pre></div>
       response on failure:
-      <pre>{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -572,11 +677,15 @@ The following actions are proposed:
       <ul>
         <li><pre>$ safescale network security group list</pre>
             response on success:
-            <pre>{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}</pre>
+            <div class="highlight highlight-source-js"><pre>
+{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}
+            </pre></div>
         </li>
         <li><pre>$ safescale network security group list --all</pre>
             response on success:
-            <pre>{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}</pre>
+            <div class="highlight highlight-source-js"><pre>
+{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}
+            </pre></div>
         </li>
       </ul>
   </td>
@@ -587,9 +696,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale network security group inspect example_network sg-example-hosts</pre>
       response on success:
-      <pre>`{"result":{</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":{
+      </pre></div>
       response on failure:
-      <pre>{"error":{</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -598,9 +711,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale network security group delete example_network sg-example-hosts</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":null,"status":"success"}
+      </pre></div>
       response on failure:
-      <pre>{"error":{</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -609,9 +726,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale network security group clear example_network sg-example-hosts</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}
+      <div class="highlight highlight-source-js"><pre>
+{"result":null,"status":"success"}
+      </pre></div>
       response on failure:
-      <pre>{"error":{</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -620,9 +741,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale network security group bonds example_network sg-example-hosts</pre>
       response on success:
-      <pre>{"result":</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":
+      </pre></div>
       response on failure:
-      <pre>{"error":{"exitcode":6,"message":</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -631,11 +756,17 @@ The following actions are proposed:
       example:
       <pre>$ safescale network delete example_network</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":null,"status":"success"}
+      </pre></div>
       response on failure (network does not exist):
-      <pre>{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}
+      </pre></div>
       response on failure (hosts still attached to network):
-      <pre>{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
+      </pre></div>
   </td>
 </tr>
 <tr>
@@ -646,11 +777,18 @@ The following actions are proposed:
            --direction ingress --protocol tcp --from-port 80 --sources 0.0.0.0/0 \
            example_network sg-example-hosts</pre>pre>
       response on success:
-      <pre>{"result":null,"status":"success"}`</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"result":null,"status":"success"}
+      </pre></div>
       response on failure (network does not exist):
-      <pre>{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`</pre>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}
+      </pre></div>
       response on failure (hosts still attached to network):
-      <pre>{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</pre></td>
+      <div class="highlight highlight-source-js"><pre>
+{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
+      </pre></div>
+  </td>
 </tr>
 </tbody>
 </table>
