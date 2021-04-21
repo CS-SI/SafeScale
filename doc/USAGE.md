@@ -328,20 +328,16 @@ The following actions are proposed:
   <td valign="top"><code>safescale tenant list</code></td>
   <td>List available tenants i.e. those found in the <code>tenants.toml</code>code> file.<br><br>
       <u>example</u>:
-      <div class="highlight highlight-source-shell">
       <pre>$ safescale tenant list</pre>
-      </div>
       response:
-<!--      <div class="highlight highlight-source-perl"><pre> -->
-```javascript
+      <pre>
 {
     "result": {
         "name": "TestOVH"
     },
     "status":"success"
 }
-```
-<!--      </pre></div> -->
+      </pre>>
   </td>
 </tr>
 <tr>
@@ -350,16 +346,16 @@ The following actions are proposed:
       <u>example</u>:
       <pre>$ safescale tenant get</pre>
       response when tenant set:
-      <div class="highlight highlight-source-perl"><pre>
+      <pre>
 {
     "result": {
         "name":"TestOVH"
     },
     "status": "success"
 }
-      </pre></div>
+      </pre>
       response when tenant not set:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {
     "error": {
         "exitcode": 6,
@@ -368,7 +364,7 @@ The following actions are proposed:
     "result": null,
     "status": "failure"
 }
-      </pre></div>
+      </pre>
   </td>
 </tr>
 <tr>
@@ -378,14 +374,14 @@ The following actions are proposed:
       <u>example</u>:
       <pre>$ safescale tenant set TestOvh</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {
   "result": null,
   "status": "success"
 }
-      </pre></div>
+      </pre>
       response on failure:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {
   "error": {
     "exitcode": 6,
@@ -394,7 +390,7 @@ The following actions are proposed:
   "result": null,
   "status": "failure"
 }
-      </pre></div>
+      </pre>
   </td>
 </tr>
 <tr>
@@ -419,28 +415,77 @@ The following actions are available:
       <u>example</u>:
       <pre>$ safescale template list</pre>
       response:
-      <div class="highlight highlight-source-js"><pre>
-{"result": [{"cores": 16, "disk": 400, "id": "0526e13e-dad5-473f-ad61-2f15e0db2a15", "ram": 240}],"status": "success"}
-      </pre></div>
+      <pre>
+{
+  "result": [
+    {
+      "cores": 16,
+      "disk": 400,
+      "id": "0526e13e-dad5-473f-ad61-2f15e0db2a15",
+      "ram": 240
+    }
+  ],
+  "status": "success"
+}
+      </pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale template inspect</code></td>
   <td>Display templates with scanned information (if available).<br><br>
       <u>example</u>: REVIEW_ME
-      <pre>safescale template inspect xxx</pre>
-      response on success (without scan):
-      <div class="highlight highlight-source-js"><pre>
-      {"result":{
-      </pre></div>
-      response on success (with scan):
-      <div class="highlight highlight-source-js"><pre>
+      <pre>safescale template inspect s1-4</pre>
+      response on success (without scan):<pre>
+{
+  "result": [
+    {
+      "cores": 1,
+      "disk": 20,
+      "id": "cbef4222-84ff-4f8b-ba40-e5ba85cfbb53",
+      "name": "s1-4",
+      "ram": 4,
+    }
+  ],
+  "status": "success"
+}
+      </pre>
+      response on success (after scan):<pre>
+{
+  "result": [
+    {
+      "cores": 1,
+      "disk": 20,
+      "id": "cbef4222-84ff-4f8b-ba40-e5ba85cfbb53",
+      "name": "s1-4",
+      "ram": 4,
+      "scanned": {
+        "cpu_arch": "x86_64",
+        "cpu_frequency_Ghz": 2.39998,
+        "cpu_model": "Intel Core Processor (Haswell, no TSX)",
+        "disk_size_Gb": 20,
+        "hypervisor": "KVM",
+        "image_id": "c48cd747-14be-4e73-9a8b-6c9a1bec6ceb",
+        "image_name": "Ubuntu 18.04",
+        "last_updated": "Wednesday, 24-Feb-21 18:53:22 CET",
+        "main_disk_speed_MBps": 228.61,
+        "main_disk_type": "HDD",
+        "number_of_core": 1,
+        "number_of_cpu": 1,
+        "number_of_socket": 1,
+        "ram_size_Gb": 3.75,
+        "sample_net_speed_KBps": 17.827375,
+        "template_id": "c48cd747-14be-4e73-9a8b-6c9a1bec6ceb",
+        "template_name": "s1-4",
+        "tenant_name": "ovh"
+      }
+    }
+  ],
+  "status": "success"
+}
+      </pre>
+      response on failure:<pre>
 {"result":{
-</pre></div>
-      response on failure:
-      <div class="highlight highlight-source-js"><pre>
-{"result":{
-      </pre></div>
+      </pre>
   </td>
 </tr>
 </tbody>
@@ -485,13 +530,29 @@ The following actions are proposed:
       <u>example</u>:
         <pre>$ safescale network create example_network</pre>
         response on success:
-        <div class="highlight highlight-source-js"><pre>
-{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`
-        </pre></div>
+        <pre>
+{
+  "result": {
+    "cidr": "192.168.0.0/24",
+    "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
+    "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
+    "name": "example_network",
+    "virtual_ip": {}
+  },
+  "status": "success"
+}
+        </pre>
         response on failure:
-        <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}
-        </pre></div>
+        <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Network 'example_network' already exists"
+  },
+  "result": null,
+  "status": "failure"
+}
+        </pre>
   </td>
 </tr>
 <tr>
@@ -507,16 +568,43 @@ The following actions are proposed:
     <ul>
       <li><pre>$ safescale network list</pre>
           response:
-          <div class="highlight highlight-source-js"><pre>
-{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}
-          </pre></div>
+          <pre>
+{
+  "result": [
+    {
+      "cidr": "192.168.0.0/24",
+      "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
+      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
+      "name": "example_network",
+      "virtual_ip": {}
+    }
+  ],
+  "status": "success"
+}
+          </pre>
       </li>
       <li>
         <pre>safescale network list --all</pre>
-        response:
-        <div class="highlight highlight-source-js"><pre>
-{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}
-        </pre></div>
+        response on success:
+        <pre>
+{
+  "result": [
+    {
+      "cidr": "192.168.0.0/24",
+      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
+      "name": "example_network",
+      "virtual_ip": {}
+    },
+    {
+      "cidr": "10.0.0.0/16",
+      "id": "eb5979e8-6ac6-4436-88d6-c36e3a949083",
+      "name": "not_managed_by_safescale",
+      "virtual_ip": {}
+    }
+  ],
+  "status": "success"
+}
+        </pre>
       </li>
     </ul>
   </td>
@@ -525,15 +613,29 @@ The following actions are proposed:
   <td valign="top"><code>safescale network inspect &lt;network_name_or_id&gt;</code></td>
   <td>Get info of a <code>Network</code>code><br><br>
       <u>example</u>:
-      <div class="highlight highlight-source-bash"><pre>$ safescale network inspect example_network</pre></div>
-      response on success:
-      <div class="highlight highlight-source-js"><pre>
-{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}
-      </pre></div>
-      response on failure:
-      <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}
-      </pre></div>
+      <pre>$ safescale network inspect example_network</pre>
+      response on success:<pre>
+{
+  "result": {
+    "cidr": "192.168.0.0/24",
+    "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
+    "gateway_name": "gw-example_network",
+    "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
+    "name": "example_network"
+  },
+  "status": "success"
+}
+      </pre>
+      response on failure:<pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find 'networks/byName/fake_network'"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -542,15 +644,35 @@ The following actions are proposed:
       <u>example</u>:
       <pre>$ safescale network delete example_network</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
-{"result":null,"status":"success"}
-      </pre></div>
+      <pre>
+{
+  "result": null,
+  "status": "success"
+}
+      </pre>
       response on failure (network does not exist):
-      <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`</pre>
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find 'networks/byName/example_network'"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
       response on failure (hosts still attached to network):
-      REVIEW_ME:<pre>{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
-      </pre></div>
+      REVIEW_ME:
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete network 'example_network': 1 host is still attached to it: myhost"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -567,13 +689,13 @@ The following actions are proposed:
       <u>example</U>: REVIEW_ME
       <pre>$ safescale network subnet create example_network example_subnet</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {"result":
-      </pre></div>
+      </pre>
       response on failure:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {"error":{
-      </pre></div>
+      </pre>
   </td>
 </tr>
 <tr>
@@ -583,27 +705,81 @@ The following actions are proposed:
       <ul>
         <li><code>--all</code> List all network existing on the current tenant (not only those created by SafeScale)</li>
       </ul>
-      <u>example</u>:
-      <div class="highlight highlight-source-shell"><pre>
-$ safescale network list
-      </pre></div>
-      response on success:
-      <div class="highlight highlight-source-js"><pre>
-{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}
-      </pre></div>
+      <u>examples</u>:
+      <ul>
+        <li>
+          <pre>$ safescale network list</pre>
+          response on success:
+          <pre>
+{
+  "result": [
+    {
+      "cidr": "192.168.0.0/24",
+      "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
+      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
+      "name": "example_network",
+      "virtual_ip": {}
+    }
+  ],
+  "status": "success"
+}
+          </pre>
+        </li>
+        <li>
+          <pre>$ safescale network list --all</pre>
+          response:
+          <pre>
+{
+  "result": [
+    {
+      "cidr": "192.168.0.0/24",
+      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
+      "name": "example_network",
+      "virtual_ip": {}
+    },
+    {
+      "cidr": "10.0.0.0/16",
+      "id": "eb5979e8-6ac6-4436-88d6-c36e3a949083",
+      "name": "not_managed_by_safescale",
+      "virtual_ip": {}
+    }
+  ],
+  "status": "success"
+}
+          </pre>
+        </li>
+      </ul>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet inspect &lt;network_name_or_id&gt; &lt;subnet_name_or_id&gt;</code></td>
   <td>REVIEW_ME: Get info about a `Subnet`<br><br>
       <u>example</u>:
-      <div class="highlight highlight-source-js"><pre>
-$ safescale network inspect example_network
-      </pre></div>
+      <pre>$ safescale network inspect example_network</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
-{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}
-      </pre></div>
+      <pre>
+{
+  "result": {
+    "cidr": "192.168.0.0/24",
+    "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
+    "gateway_name": "gw-example_network",
+    "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
+    "name": "example_network"
+  },
+  "status": "success"
+}
+      </pre>
+      response on failure:
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find 'networks/byName/fake_network'"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -615,36 +791,50 @@ $ safescale network inspect example_network
       <ul>
         <li><pre>$ safescale network subnet delete example_network example_subnet</pre>
             response on success:
-            <div class="highlight highlight-source-js"><pre>
+            <pre>
 {"result":
-            </pre></div>
+            </pre>
             response on failure (Network not found):
-            <div class="highlight highlight-source-js"><pre>
+            <pre>
 {"error":{
-            </pre></div>
+            </pre>
             response on failure (Subnet not found):
-            <div class="highlight highlight-source-js"><pre>
+            <pre>
 {"error":{
-            </pre></div>
+            </pre>
             response on failure (hosts still attached to Subnet):
-            <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
-            </pre></div>
+            <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"
+  },
+  "result": null,
+  "status": "failure"
+}
+            </pre>
         </li>
         <li><pre>$ safescale network subnet delete example_network 48112419-3bc3-46f5-a64d-3634dd8bb1be</pre>
             response on success:
-            <div class="highlight highlight-source-js"><pre>
+            <pre>
 {"result":
-            </pre></div>
+            </pre>
             response on failure (Subnet not found):
-            <div class="highlight highlight-source-js"><pre>
+            <pre>
 {"error":{
-            </pre></div>
+            </pre>
             response on failure (hosts still attached to Subnet):
-            <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
-            </pre></div>
-            <u>note</u>: <code>example_network</code> will not be used in this case, the `Subnet` ID is sufficient to locate the concerned Subnet.
+            <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"
+  },
+  "result": null,
+  "status": "failure"
+}
+            </pre>
+            <u>note</u>: <code>example_network</code> will not be used in this case, the `Subnet` ID is sufficient to locate the concerned `Subnet`.
         </li>
       </ul>
   </td>
@@ -654,18 +844,25 @@ $ safescale network inspect example_network
   <td>REVIEW_ME: <br>Creates a Security Group in a Network.<br>
       <code>command_options</code>:
       <ul>
-        <li><code>[--description]</code> Describes the usage of the Security Group (optional)</li>
+        <li><code>--description</code> Describes the usage of the Security Group (optional)</li>
       </ul>
       example:
       <pre>$ safescale network security group create --description "sg for hosts in example_network" example_network sg-example-hosts</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {"result":{
-      </pre></div>
+      </pre>
       response on failure:
-      <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}
-      </pre></div>
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Network 'example_network' already exists"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -673,21 +870,48 @@ $ safescale network inspect example_network
   <td>REVIEW_ME: List Security Groups<br>
       <code>command_options</code>:
       <ul>
-        <li><code>--all</code> List all Security Groups existing on the current tenant (not only those created by SafeScale)</li>
+        <li><code>--all</code> List all Security Groups existing on the current tenant (not only those created by SafeScale) (optional)</li>
       </ul>
-      examples:
+      <u>examples</u>:
       <ul>
         <li><pre>$ safescale network security group list</pre>
             response on success:
-            <div class="highlight highlight-source-js"><pre>
-{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}
-            </pre></div>
+            <pre>
+{
+  "result": [
+    {
+      "cidr": "192.168.0.0/24",
+      "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
+      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
+      "name": "example_network",
+      "virtual_ip": {}
+    }
+  ],
+  "status": "success"
+}
+            </pre>
         </li>
         <li><pre>$ safescale network security group list --all</pre>
             response on success:
-            <div class="highlight highlight-source-js"><pre>
-{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}
-            </pre></div>
+            <pre>
+{
+  "result": [
+    {
+      "cidr": "192.168.0.0/24",
+      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
+      "name": "example_network",
+      "virtual_ip": {}
+    },
+    {
+      "cidr": "10.0.0.0/16",
+      "id": "eb5979e8-6ac6-4436-88d6-c36e3a949083",
+      "name": "not_managed_by_safescale",
+      "virtual_ip": {}
+    }
+  ],
+  "status": "success"
+}
+            </pre>
         </li>
       </ul>
   </td>
@@ -698,13 +922,13 @@ $ safescale network inspect example_network
       example:
       <pre>$ safescale network security group inspect example_network sg-example-hosts</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {"result":{
-      </pre></div>
+      </pre>
       response on failure:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {"error":{
-      </pre></div>
+      </pre>
   </td>
 </tr>
 <tr>
@@ -713,13 +937,16 @@ $ safescale network inspect example_network
       example:
       <pre>$ safescale network security group delete example_network sg-example-hosts</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
-{"result":null,"status":"success"}
-      </pre></div>
+      <pre>
+{
+  "result": null,
+  "status": "success"
+}
+      </pre>
       response on failure:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {"error":{
-      </pre></div>
+      </pre>
   </td>
 </tr>
 <tr>
@@ -728,13 +955,16 @@ $ safescale network inspect example_network
       example:
       <pre>$ safescale network security group clear example_network sg-example-hosts</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
-{"result":null,"status":"success"}
-      </pre></div>
+      <pre>
+{
+  "result": null,
+  "status": "success"
+}
+      </pre>
       response on failure:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {"error":{
-      </pre></div>
+      </pre>
   </td>
 </tr>
 <tr>
@@ -743,13 +973,13 @@ $ safescale network inspect example_network
       example:
       <pre>$ safescale network security group bonds example_network sg-example-hosts</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {"result":
-      </pre></div>
+      </pre>
       response on failure:
-      <div class="highlight highlight-source-js"><pre>
+      <pre>
 {"error":{
-      </pre></div>
+      </pre>
   </td>
 </tr>
 <tr>
@@ -758,17 +988,34 @@ $ safescale network inspect example_network
       example:
       <pre>$ safescale network delete example_network</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
-{"result":null,"status":"success"}
-      </pre></div>
+      <pre>
+{
+  "result": null,
+  "status": "success"
+}
+      </pre>
       response on failure (network does not exist):
-      <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}
-      </pre></div>
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find 'networks/byName/example_network'"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
       response on failure (hosts still attached to network):
-      <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
-      </pre></div>
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete network 'example_network': 1 host is still attached to it: myhost"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -777,19 +1024,36 @@ $ safescale network inspect example_network
       example:
       <pre>$ safescale network security group rule delete \
            --direction ingress --protocol tcp --from-port 80 --sources 0.0.0.0/0 \
-           example_network sg-example-hosts</pre>pre>
+           example_network sg-example-hosts</pre>
       response on success:
-      <div class="highlight highlight-source-js"><pre>
-{"result":null,"status":"success"}
-      </pre></div>
+      <pre>
+{
+  "result":null,
+  "status":"success"
+}
+      </pre>
       response on failure (network does not exist):
-      <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}
-      </pre></div>
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete network 'example_network': 1 host is still attached to it: myhost"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
       response on failure (hosts still attached to network):
-      <div class="highlight highlight-source-js"><pre>
-{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}
-      </pre></div>
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete network 'example_network': 1 host is still attached to it: myhost"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
   </td>
 </tr>
 </tbody>
@@ -799,132 +1063,6 @@ Note: if <code>&lt;subnet_name_or_id&gt;</code> or <code>&lt;security_group_name
 
 <br><br>
 
-<!--
-##### `safescale network inspect <network_name_or_id>`
-Inspect a Network, returning meaningful information about it.
-
-example:
-
-```bash
-$ safescale network inspect example_network
-```
-response on success:
-```json
-{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}
-```
-response on failure:
-```json
-{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}
-```
-
-##### `safescale network delete <network_name_or_id>`
-Delete the network whose name or id is given. If the Network was created with a default Subnet, this Subnet will be deleted also. Otherwise, if the Network still has Subnets in it, deletion will fail.
-
-example:
-
-    `$ safescale network delete example_network`
-    
-response on success:
-
-    `{"result":null,"status":"success"}`
-    
-response on failure (network does not exist):
-
-    `{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`
-    
-response on failure (subnets still attached to network):
-
-    `{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 Subnet is still attached to it"},"result":null,"status":"failure"}`
-
-<br><br>
---- 
-
-##### `safescale network subnet create [command_options] <network_name> <subnet_name>`
-
-Creates a `Subnet` with the given name.
-
-`command_options`:
-  - `--cidr <cidr>` cidr of the network (default: "192.168.0.0/24")
-  - `--gwname <name>` name of the gateway (`gw-<network_name>` by default)
-  - `--os "<os name>"` Image name for the gateway (default: "Ubuntu 18.04")
-  - `-S <sizing>, --sizing <sizing>` describes sizing of gateway in format `"<component><operator><value>[,...]"` where:
-    - `<component>` can be `cpu`, `cpufreq` ([scanner](SCANNER.md) needed), `gpu` ([scanner](SCANNER.md) needed), `ram`, `disk`
-    - `<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):
-      - `=` means exactly `<value>`
-      - `~` means between `<value>` and 2x`<value>`
-      - `<` means strictly lower than `<value>`
-      - `<=` means lower or equal to `<value>`
-      - `>` means strictly greater than `<value>`
-      - `>=` means greater or equal to `<value>`
-    - `<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`
-      - `<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores
-      - `<cpufreq>` is expecting an integer as minimum cpu frequency in MHz
-      - `<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)
-      - `<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size
-      - `<disk>` is expecting an integer as system disk size in GB
-      
-      examples:
-        - --sizing "cpu <= 4, ram <= 10, disk >= 100"
-        - --sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")
-        - --sizing "cpu <= 8, ram ~ 16"
-  - `--failover` creates 2 gateways for the network with a VIP used as internal default route
-
-##### `safescale network subnet list [command_options] <network_name_or_id>`
- 
-List networks created by SafeScale<br>`command_options`:<ul><li>`--all` List all network existing on the current tenant (not only those created by SafeScale)</li></ul>examples:<br><br>`$ safescale network list`<br>response:<br> `{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}`<br><br>`safescale network list --all`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}` |
-
-##### `safescale network subnet inspect <network_name_or_id> <subnet_name_or_id>`
-Inspect a `Subnet`, returning meaningful information about it.
-
-example:
-    
-```bash
-$ safescale network subnet inspect example_network example_subnet
-```
-response on success:
-```json
-REVIEW_ME: {"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_subnet"},"status":"success"}
-```
-    
-response on failure:
-```json
-{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}
-```
-
-##### `safescale network subnet delete <network_name_or_id> <subnet_name_or_id>`
-Delete the `Subnet` whose name or id is given.
-
-example:
-
-    `$ safescale network subnet delete example_network example_subnet`
-    
-response on success:
-
-    `{"result":null,"status":"success"}`
-    
-response on failure (`Subnet` does not exist):
-
-REVIEW_ME:    `{"error":{"exitcode":6,"message":"Failed to find 'subnets/byName/example_subnet'"},"result":null,"status":"failure"}`
-
-##### `safescale network security group create <network_name_or_id> <security_group_name>`
-TODO
-##### `safescale network security group delete <network_name_or_id> <security_group_name_or_id>`
-TODO
-##### `safescale network security group inspect <network_name_or_id> <security_group_name_or_id>`
-TODO
-##### `safescale network security group list <network_name_or_id>`
-TODO
-##### `safescale network security group clear <network_name_or_id> <security_group_name_or_id>`
-TODO
-##### `safescale network security group bonds <network_name_or_id> <security_group_name_or_id>`
-TODO
-##### `safescale network security group rule add <network_name_or_id> <security_group_name_or_id>`
-TODO
-##### `safescale network security group rule delete <network_name_or_id> <security_group_name_or_id>`
-TODO
-
-<br><br>
--->
 --- 
 #### <a name="host">host</a>
 
@@ -936,7 +1074,66 @@ REVIEW_ME:
 <thead><td><div style="width:350px">Action</div></td><td><div style="min-width: 650px">description</div></td></thead>
 <tbody>
 <tr>
-  <td valign="top"><code>safescale [global_options] host create [command_options] &lt;host_name&gt;</code></td><td>Creates a new host. This host will be attached on the given network. Note that by default this host is created with a private IP address.<br>`command_options`:<ul><li>`--net <network_name>` specifies the network to connect the host to. Can't be used with `--public`.</li><li>`--public` creates the host with public IP; cannot be used with `--net`.</li><li>`-S <sizing>, --sizing <sizing>` describes sizing of host in format `"<component><operator><value>[,...]"` where:<ul><li>`<component>` can be `cpu`, `cpufreq`, `gpu`, `ram`, `disk`</li><li>`<operator>` can be `=`,`~`,`<`,`<=`,`>`,`>=` (except for disk where valid operators are only `=` or `>=`):<ul><li>`=` means exactly `<value>`</li><li>`~` means between `<value>` and 2x`<value>`</li><li>`<` means strictly lower than `<value>`</li><li>`<=` means lower or equal to `<value>`</li><li>`>` means strictly greater than `<value>`</li><li>`>=` means greater or equal to `<value>`</li></ul></li><li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value> - <upper value>]`</li><li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li><li>`<cpufreq>` is expecting an integer as minimum cpu frequency in MHz</li><li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li><li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li><li>`<disk>` is expecting an integer as system disk size in GB</li>examples:<ul><li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li><li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li><li>--sizing "cpu <= 8, ram ~ 16"</li></ul></ul></li><li>`--os value` Image name for the host (default: "Ubuntu 18.04")</li></ul>! DEPRECATED ! use `--sizing` instead<ul><li>`--cpu value` Number of CPU for the host (default: 1)</li><li>`--cpu-freq value` CPU frequence (default :0)  -----  [scanner](SCANNER.md) needed</li><li>`--ram value` RAM for the host (default: 1 Go)</li><li>`--disk value` Disk space for the host (default: 100 Mo)</li><li>`--gpu value` Number of GPU for the host (default :0)  ----- [scanner](SCANNER.md) needed</li></ul>Example:<br><br>`safescale host create --net example_network myhost`<br>response on success:<br>`{"result":{"cpu":1,"disk":10,"gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"8afd43aa-1747-4f7b-a0a5-1fc89a4ac7e3","name":"myhost","password":"xxxxxxxxxx","private_ip":"192.168.0.196","private_key":"-----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----\n","ram":2,"state":2},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":1,"message":"Failed to create host 'example_host': name is already used","result":null,"status":"failure"}`</td></tr>
+  <td valign="top"><code>safescale [global_options] host create [command_options] &lt;host_name&gt;</code></td>
+  <td>Creates a new host. This host will be attached to the requested `Subnet`. Note that by default this host is created with a private IP address.<br><br>
+      <code>command_options</code>:
+      <ul>
+        <li><code>--network &lt;network_name&gt;</code> Specifies the `Network` in which the `Subnet` to connect the host to resides. Cannot be used with <code>--public</code>.</li>
+        <li><code>--subnet &lt;subnet_name&gt;</code> Specifies the `Subnet` to connect the `Host` to. Can't be used with <code>--public</code>.</li>
+        <li><code>--single|--public</code> Creates a **single** `Host` with public IP; cannot be used with <code>--network</code>/<code>--subnet</code>.</li>
+        <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of Host (refer to [Host sizing](#safescale_sizing) paragraph)</li>
+        <li><code>--keep-on-failure|-k</code> Do not destroy `Host` in case of failure (for post-mortem debugging)</li>
+      </ul>
+      <u>examples</u>:
+      <ul>
+        <li>
+          Create an Host inside a Network (with a Subnet named as the Network):
+          <pre>$ safescale host create --network example_network myhost</pre>
+          response on success:
+          <pre>
+{
+  "result": {
+    "cpu": 1,
+    "disk": 10,
+    "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
+    "id": "8afd43aa-1747-4f7b-a0a5-1fc89a4ac7e3",
+    "name": "myhost",
+    "password": "xxxxxxxxxx",
+    "private_ip": "192.168.0.196",
+    "private_key": "-----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----\n",
+    "ram": 2,
+    "state": 2
+  },
+  "status": "success"
+}
+          </pre>
+          response on failure:
+          <pre>
+{
+  "error": {
+    "exitcode": 1,
+    "message": "Failed to create host 'example_host': name is already used"
+  },
+  "result": null,
+  "status": "failure"
+}
+          </pre>
+        </li>
+        <li>
+          Create a Host inside a specific Subnet of a Network:
+          <pre>$ safescale host create --network example_network --subnet example_subnet --sizing "cpu=4,ram=[7-14],disk>=100" myhost</pre>
+          response on success:
+          <pre>
+{"result":{
+          </pre>
+          response on failure:
+          <pre>
+{"error": {
+          </pre>
+        </li>
+      </ul>
+  </td>
+</tr>
 <tr>
   <td valign="top"><code>safescale [global_options] host list [options]</code></td>
   <td>List hosts<br>
@@ -944,17 +1141,50 @@ REVIEW_ME:
       <ul>
         <li><code>--all</code>code> List all existing hosts on the current tenant (not only those created by SafeScale)</li>
       </ul>
-      examples:
+      <u>examples</u>:
       <ul>
         <li>
           <pre>$ safescale host list</pre>
           response:
-          <pre>{"result":[{"cpu":1,"disk":10,"id":"39a5043a-1790-4a4f-bb87-788bb7252d13","name":"gw-example_network","password":"xxxxxx</pre>
+          <pre>
+{
+  "result": [
+    {
+      "id": "425bfe96-a902-4bb4-8f4e-f8c928700f08",
+      "name": "gw-reclaim"
+    },
+    {
+      "id": "49658036-55c0-4fb7-9f5f-1cf4c2054967",
+      "name": "gw-basictest-network-1"
+    }
+  ],
+  "status": "success"
+}
+          </pre>
         </li>
         <li>
           <pre>$ safescale host list --all</pre>
           response:
-          <pre>{"result":[{"id":"39b1706d-e2a1-4ecf-aa23-f2c990a5d5f1","name":"b2-7-sbg5"},{"id":"abcaa3df-6f86-4533-9a29-6e20e16fd957","name":"myhost"},{"id":"39a5043a-1790-4a4f-bb87-788bb7252d13","name":"gw-example_network","public_ip":"51.83.34.22"}],"status":"success"}</pre>
+          <pre>
+{
+  "result": [
+    {
+      "id": "425bfe96-a902-4bb4-8f4e-f8c928700f08",
+      "name": "gw-reclaim"
+    },
+    {
+      "id": "49658036-55c0-4fb7-9f5f-1cf4c2054967",
+      "name": "gw-basictest-network-1"
+    },
+    {
+      "id": "abcaa3df-6f86-4533-9a29-6e20e16fd957",
+      "name": "myhost"
+    }
+  ],
+  "status": "success"
+}
+          </pre>
+          <u>note</u>: `Host` `myhost` was not created by SafeScale, but appears anyway.
         </li>
       </ul>
   </td>
@@ -965,9 +1195,34 @@ REVIEW_ME:
       example:
       <pre>$ safescale host inspect example_host</pre>
       response on success:
-      <pre>{"result":{"cpu":1,"disk":10,"gateway_id":"39a5043a-1790-4a4f-bb87-788bb7252d13","id":"abcaa3df-6f86-4533-9a29-6e20e16fd957","name":"myhost","password":"xxxxxxxxxxxx","private_ip":"192.168.0.169","private_key":"-----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----\n","ram":2,"state":2},"status":"success"}</pre>
+      <pre>
+{
+  "result": {
+    "cpu": 1,
+    "disk": 10,
+    "gateway_id": "39a5043a-1790-4a4f-bb87-788bb7252d13",
+    "id": "abcaa3df-6f86-4533-9a29-6e20e16fd957",
+    "name": "myhost",
+    "password": "xxxxxxxxxxxx",
+    "private_ip": "192.168.0.169",
+    "private_key": "-----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----\n",
+    "ram": 2,
+    "state": 2
+  },
+  "status": "success"
+}
+      </pre>
       response on failure:
-      <pre>>`{"error":{"exitcode":6,"message":"Cannot inspect host: failed to find host 'myhost'"},"result":null,"status":"failure"}</pre>
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot inspect host: failed to find host 'myhost'"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -980,9 +1235,36 @@ REVIEW_ME:
       example:
       <pre>$ safescale host ssh myhost</pre>
       response on success:
-      <pre>{"result":{"GatewayConfig":{"GatewayConfig":null,"Host":"51.83.34.22","LocalPort":0,"Port":22,"PrivateKey":"-----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----\n","User":"safescale"},"Host":"192.168.0.169","LocalPort":0,"Port":22,"PrivateKey":"-----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----\n","User":"safescale"},"status":"success"}</pre>
+      <pre>
+{
+  "result": {
+    "GatewayConfig": {
+      "GatewayConfig": null,
+      "Host": "51.83.34.22",
+      "LocalPort": 0,
+      "Port": 22,
+      "PrivateKey": "-----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----\n",
+      "User": "safescale"
+    },
+    "Host": "192.168.0.169",
+    "LocalPort": 0,
+    "Port": 22,
+    "PrivateKey": "-----BEGIN RSA PRIVATE KEY----- ... -----END RSA PRIVATE KEY-----\n",
+    "User": "safescale"
+  },
+  "status": "success"
+}
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":6,"message":"Failed to find 'hosts/byName/myhost'"},"result":null,"status":"failure"}</pre>
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find 'hosts/byName/myhost'"
+  },
+  "result": null,
+  "status": "failure"
+}      </pre>
   </td>
 </tr>
 <tr>
@@ -991,9 +1273,22 @@ REVIEW_ME:
       example:
       <pre>$ safescale host delete myhost</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{
+  "result": null,
+  "status": "success"
+}
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":6,"message":"Failed to find host 'myhost'"},"result":null,"status":"failure"}</pre>
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find host 'myhost'"
+  },
+  "result": null,
+  "status": "failure"
+}      </pre>
   </td>
 </tr>
 <tr>
@@ -1006,9 +1301,23 @@ REVIEW_ME:
       example:
       <pre>$ safescale host check-feature myhost docker</pre>
       response if feature is present:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{
+  "result": null,
+  "status": "success"
+}
+      </pre>
       response if feature is not present:
-      <pre>{"error":{"exitcode":4,"message":"Feature 'docker' not found on host 'myhost'"},"result":null,"status":"failure"}</pre>
+      <pre>
+{
+  "error": {
+    "exitcode": 4,
+    "message": "Feature 'docker' not found on host 'myhost'"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1022,7 +1331,12 @@ REVIEW_ME:
       example:
       <pre>$ safescale host feature add -p Username=&lt;username&gt; -p Password=&lt;password&gt; myhost remotedesktop </pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{
+  "result": null,
+  "status": "success"
+}
+      </pre>
       response on failure may vary.
   </td>
 </tr>
@@ -1036,7 +1350,12 @@ REVIEW_ME:
       example:
       <pre>$ safescale host feature delete -p Username=&lt;username&gt; -p Password=&lt;password&gt; myhost remotedesktop</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{
+  "result": null,
+  "status": "success"
+}
+      </pre>
       response on failure may vary.
   </td>
 </tr>
