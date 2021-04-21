@@ -4,6 +4,7 @@
 ## Content
 
 - [SafeScale usage](#content)
+  - [Introduction](#intro)
   - [safescaled](#safescaled)
       - [Configuration](#safescaled_config)
       - [Usage](#safescaled_usage)
@@ -25,6 +26,7 @@
 
 ___
 
+## <a name="intro">Introduction</a>
 SafeScale is composed of 2 parts:
 
  - a daemon working in background, called [`safescaled`](#safescaled)
@@ -159,12 +161,12 @@ Safescaled version: 21.03.0, build f3973fb5a642b7d93b0f20417631e2706a86c211 (202
 Ready to serve :-)
 ```
 
-By default, `safescaled` displays only warnings and errors messages. To have more information, you can use ```-v``` to increase verbosity, and ```-d``` to use debug mode (```-d -v``` will produce A LOT of messages, it's for debug purposes).
+By default, `safescaled` displays only warnings and errors messages. To have more information, you can use `-v` to increase verbosity, and `-d` to use debug mode (`-d -v` will produce A LOT of messages, it's for debug purposes).
 <br><br>
 
 #### <a name="safescaled_options">Options</a>
 
-<table cellpadding="4" cellspacing="0">
+<table>
 <thead><tr><th align="left" style="width: 350px">Option</th><th align="left" style="min-width:650px">Description</th></tr></thead>
 <tbody>
 <tr valign="top">
@@ -226,10 +228,16 @@ Each command has an exit status which is 0 if it succeeded, and !=0 if failed. I
 ``safescale`` accepts global_options just before the subcommand, which are :
 
 <table>
-<thead><tr><td>Option</td><td>Description</td></tr></thead>
+<thead><tr><td style="min-width:350px">Option</td><td style="width:650px">Description</td></tr></thead>
 <tbody>
-<tr><td valign="top"><code>-v</code></td><td>Increase the verbosity.<br><br>ex: <code>safescale -v host create ...</code></td></tr>
-<tr><td valign="top"><code>-d</code></td><td>Displays debugging information.<br><br>ex: <code>`safescale -d host create ...</code></td></tr>
+<tr>
+  <td valign="top"><code>-v</code></td>
+  <td>Increase the verbosity.<br><br>ex: <code>safescale -v host create ...</code></td>
+</tr>
+<tr>
+  <td valign="top"><code>-d</code></td>
+  <td>Displays debugging information.<br><br>ex: <code>`safescale -d host create ...</code></td>
+</tr>
 </tbody>
 </table>
 
@@ -251,7 +259,6 @@ The commands are presented in logical order as if the user wanted to create some
 #### <a name="tenant">tenant</a>
 
 A tenant must be set before using any other command as it indicates to SafeScale which tenant the command must be executed on. _Note that if only one tenant is defined in the `tenants.toml`, it will be automatically selected while invoking any other command.<br>
-<!-- A storage tenant represents the credentials needed to connect an object storage they are used to select one or several object storage for [data](#safecale_data) commands<br> -->
 The following actions are proposed:
 
 <table>
@@ -292,8 +299,8 @@ The following actions are proposed:
   </td>
 </tr>
 <tr>
-  <td valign="top"><code>safescale tenant scan &lt;tenant_name&gt;</code></td>
-  <td>REVIEW_ME: Scan the given tenant's templates. (See <a href="SCANNER.md">scanner</a> doc)</td>
+  <td valign="top"><a name="tenant_scan"><code>safescale tenant scan &lt;tenant_name&gt;</code></a></td>
+  <td>REVIEW_ME: Scan the given tenant <code>&lt;tenant_name&gt;</code> for templates (see <a href="SCANNER.md">scanner documentation</a> for more details)</td>
 </tr>
 </tbody>
 </table>
@@ -318,7 +325,7 @@ The following actions are available:
 </tr>
 <tr>
   <td valign="top"><code>safescale template inspect</code></td>
-  <td>Display templates with scanned information.<br><br>
+  <td>Display templates with scanned information (if available).<br><br>
       example: REVIEW_ME
       <pre>safescale template inspect xxx</pre>
       response on success (without scan):
@@ -478,76 +485,62 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet delete &lt;network_name_or_id&gt; &lt;subnet_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}`</td>
+  <td>REVIEW_ME: Delete a Subnet identified by name or id<br><br>
+      If <code>&lt;subnet_name_or_id&gt;</code> contains a name, <code>&lt;network_name_or_id&gt;</code> is mandatory.<br>
+      If <code>&lt;subnet_name_or_id&gt;</code> contains an ID, <code>&lt;network_name_or_id&gt;</code> can be omitted using <code>""</code> or <code>-</code>.<br><br>
+      examples:
+      <ul>
+        <li><pre>$ safescale network subnet delete example_network example_subnet</pre>
+            response on success:
+            <pre>{"result":</pre>
+            response on failure (Network not found):
+            <pre>{"error":{</pre>
+            response on failure (Subnet not found):
+            <pre>{"error":{</pre>
+            response on failure (hosts still attached to Subnet):
+            <pre>{"error":{"exitcode":6,"message":"Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</pre>
+        </li>
+        <li><pre>$ safescale network subnet delete example_network 48112419-3bc3-46f5-a64d-3634dd8bb1be</pre>
+            response on success:
+            <pre>{"result":</pre>
+            response on failure (Subnet not found):
+            <pre>{"error":{</pre>
+            response on failure (hosts still attached to Subnet):
+            <pre>{"error":{"exitcode":6,"message":"Cannot delete Subnet 'example_subnet': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</pre>
+            <u>note</u>: <code>example_network</code> will not be used in this case, the Subnet ID is sufficient to locate the concerned Subnet.
+        </li>
+      </ul>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group create [command_options] &lt;network_name_or_id&gt; &lt;security_group_name&gt;</code></td>
-  <td>REVIEW_ME: <br>Creates a network with the given name.<br>
+  <td>REVIEW_ME: <br>Creates a Security Group in a Network.<br>
       <code>command_options</code>:
       <ul>
-        <li><code>--cidr &lt;cidr&gt;</code> CIDR of the network (default: "192.168.0.0/24")</li>
-        <li><code>--empty</code> Instruct not to create a default Subnet in the Network</li>
-        <li><code>--gwname &lt;name&gt;</code> Name of the gateway (<code>gw-&lt;network_name&gt;</code> by default)</li>
-        <li><code>--os "&lt;os_name&gt;"</code> Image name for the gateway (default: <code>"Ubuntu 18.04"</code>)</li>
-        <li><code>-S|--sizing &lt;sizing&gt;</code> Describes sizing of gateway in format <code>"&lt;component&gt;&lt;operator&gt;&lt;value&gt;[,...]"</code> where:
-            <ul>
-              <li><code>&lt;componentgt;</code> can be:
-                  <ul>
-                    <li>`cpu`</li>li>
-                    <li><code>cpufreq</code> ([scanner](SCANNER.md) needed)</li>
-                    <li><code>gpu</code> ([scanner](SCANNER.md) needed)</li>
-                    <li><code>ram</code></li>
-                    <li><code>disk</code></li>
-                  </ul>
-              </li>
-              <li><code>&lt;operator&gt;</code> can be:
-                  <ul>
-                    <li>`=` means exactly `<value>`</li>
-                    <li>`~` means between `<value>` and 2x`<value>`</li>
-                    <li>`<` means strictly lower than `<value>`</li>
-                    <li>`<=` means lower or equal to `<value>`</li>
-                    <li>`>` means strictly greater than `<value>`</li>
-                    <li>`>=` means greater or equal to `<value>`</li>
-                  </ul>
-              </li>
-              <li>`<value>` can be an integer (for `cpu`, `cpufreq`, `gpu` and `disk`) or a float (for `ram`) or an including interval `[<lower value>-<upper value>]`</li>
-              <li>`<cpu>` is expecting an integer as number of cpu cores, or an interval with minimum and maximum number of cpu cores</li>
-              <li>`<cpufreq>` is expecting an integer as minimum cpu frequency in MHz</li>
-              <li>`<gpu>` is expecting an integer as number of GPU (scanner would have been run first to be able to determine which template proposes GPU)</li>
-              <li>`<ram>` is expecting a float as memory size in GB, or an interval with minimum and maximum memory size</li>
-              <li>`<disk>` is expecting an integer as system disk size in GB</li>
-                  examples:
-                  <ul>
-                    <li>--sizing "cpu <= 4, ram <= 10, disk >= 100"</li>
-                    <li>--sizing "cpu ~ 4, ram = [14-32]" (is identical to --sizing "cpu=[4-8], ram=[14-32]")</li>
-                    <li>--sizing "cpu <= 8, ram ~ 16"</li>
-                  </ul>
-            </ul>
-        </li>
-        <li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li>
+        <li><code>[--description]</code> Describes the usage of the Security Group (optional)</li>
       </ul>
       example:
-      <pre>$ safescale network create example_network`
+      <pre>$ safescale network security group create --description "sg for hosts in example_network" example_network sg-example-hosts</pre>
       response on success:
-      <pre>{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},"status":"success"}`
+      <pre>{"result":{</pre>
       response on failure:
       <pre>{"error":{"exitcode":6,"message":"Network 'example_network' already exists"},"result":null,"status":"failure"}</pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group list [command_options] &lt;network_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: List networks created by SafeScale<br>
+  <td>REVIEW_ME: List Security Groups<br>
       <code>command_options</code>:
       <ul>
-        <li><code>--all</code> List all network existing on the current tenant (not only those created by SafeScale)</li>
+        <li><code>--all</code> List all Security Groups existing on the current tenant (not only those created by SafeScale)</li>
       </ul>
       examples:
       <ul>
-        <li><pre>$ safescale network list</pre>
+        <li><pre>$ safescale network security group list</pre>
             response on success:
             <pre>{"result":[{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}}],"status":"success"}</pre>
         </li>
-        <li><pre>$ safescale network list --all</pre>
+        <li><pre>$ safescale network security group list --all</pre>
             response on success:
             <pre>{"result":[{"cidr":"192.168.0.0/24","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network","virtual_ip":{}},{"cidr":"10.0.0.0/16","id":"eb5979e8-6ac6-4436-88d6-c36e3a949083","name":"not_managed_by_safescale","virtual_ip":{}}],"status":"success"}</pre>
         </li>
@@ -556,28 +549,68 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group inspect &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Get info of a network<br><br>example:<br><br>`$ safescale network inspect example_network`<br>response on success:<br>`{"result":{"cidr":"192.168.0.0/24","gateway_id":"48112419-3bc3-46f5-a64d-3634dd8bb1be","gateway_name":"gw-example_network","id":"76ee12d6-e0fa-4286-8da1-242e6e95844e","name":"example_network"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/fake_network'"},"result":null,"status":"failure"}`</td>
+  <td>REVIEW_ME: Get information about a Security Group<br><br>
+      example:
+      <pre>$ safescale network security group inspect example_network sg-example-hosts</pre>
+      response on success:
+      <pre>`{"result":{</pre>
+      response on failure:
+      <pre>{"error":{</pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group delete &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}`</td>
+  <td>REVIEW_ME: Deletes a Security Group<br><br>
+      example:
+      <pre>$ safescale network security group delete example_network sg-example-hosts</pre>
+      response on success:
+      <pre>{"result":null,"status":"success"}</pre>
+      response on failure:
+      <pre>{"error":{</pre>
+  </td>
 </tr>
 <tr>
-  <td valign="top"><code>safescale network security group clear &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td><td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}`</td>
+  <td valign="top"><code>safescale network security group clear &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Removes rules from a Security Group<br><br>
+      example:
+      <pre>$ safescale network security group clear example_network sg-example-hosts</pre>
+      response on success:
+      <pre>{"result":null,"status":"success"}
+      response on failure:
+      <pre>{"error":{</pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group bonds &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}`</td>
+  <td>REVIEW_ME: Lists Security Groups bonds<br><br>
+      example:
+      <pre>$ safescale network security group bonds example_network sg-example-hosts</pre>
+      response on success:
+      <pre>{"result":</pre>
+      response on failure:
+      <pre>{"error":{"exitcode":6,"message":</pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group rule add [command_options] &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Delete the network whose name or id is given<br><br>example:<br><br> `$ safescale network delete example_network`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (network does not exist):<br>`{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}`<br>response on failure (hosts still attached to network):<br>`{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}`</td>
+  <td>REVIEW_ME: Delete the network whose name or id is given<br><br>
+      example:
+      <pre>$ safescale network delete example_network</pre>
+      response on success:
+      <pre>{"result":null,"status":"success"}</pre>
+      response on failure (network does not exist):
+      <pre>{"error":{"exitcode":6,"message":"Failed to find 'networks/byName/example_network'"},"result":null,"status":"failure"}</pre>
+      response on failure (hosts still attached to network):
+      <pre>{"error":{"exitcode":6,"message":"Cannot delete network 'example_network': 1 host is still attached to it: myhost"},"result":null,"status":"failure"}</pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group rule delete [command_options] &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
   <td>REVIEW_ME: Delete the network whose name or id is given<br><br>
       example:
-      <pre>$ safescale network delete example_network</pre>pre>
+      <pre>$ safescale network security group rule delete \
+           --direction ingress --protocol tcp --from-port 80 --sources 0.0.0.0/0 \
+           example_network sg-example-hosts</pre>pre>
       response on success:
       <pre>{"result":null,"status":"success"}`</pre>
       response on failure (network does not exist):
@@ -985,7 +1018,12 @@ The following actions are proposed:
 <tbody>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster list</code></td>
-  <td>List clusters<br><br>Example:<br><br>`$ safescale cluster list`<br>response:<br>`{"result":[{"cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","flavor":2,"flavor_label":"K8S","last_state":5,"last_state_label":"Created","name":"mycluster","primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"}],"status":"success"}`</td>
+  <td>List clusters<br><br>
+      example:
+      <pre>$ safescale cluster list</pre>
+      response on success:
+      <pre>{"result":[{"cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","flavor":2,"flavor_label":"K8S","last_state":5,"last_state_label":"Created","name":"mycluster","primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"}],"status":"success"}</pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster create [command_options] &lt;cluster_name&gt;</code></td>
@@ -1020,7 +1058,7 @@ The following actions are proposed:
         </li>
         <li><code>--os value</code> Image name for the servers (default: "Ubuntu 18.04", may be overriden by a cluster flavor)</li>
         <li><code>-k</code> Keeps infrastructure created on failure; default behavior is to delete resources</li>
-        <li><code>-S|--sizing &lt;sizing&gt;</code> Describes sizing of all hosts in format <code>"&lt;<component&gt;&lt;operator&gt;&lt;alue&gt;[,...]"</code> where:
+        <li><code>-S|--sizing &lt;sizing&gt;</code> Describes sizing of all hosts in format <code>"&lt;component&gt;&lt;operator&gt;&lt;value&gt;[,...]"</code> where:
             <ul>
               <li><code>&lt;component&gt;</code> can be:
                   <ul>
@@ -1068,7 +1106,7 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster create -F k8s -C small -N 192.168.22.0/24 mycluster</pre>
       response on success:
-      <pre>{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"vpl-k8s-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"vpl-k8s-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"vpl-k8s-master-1":["https://51.83.34.144/_platform/remotedesktop/vpl-k8s-master-1/"]},"tenant":"TestOVH"},"status":"success"}</pre>
+      <pre>{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"XXXX"},"status":"success"}</pre>
       response on failure (cluster already exists):
       <pre>{"error":{"exitcode":8,"message":"Cluster 'mycluster' already exists.\n"},"result":null,"status":"failure"}</pre>
   </td>
@@ -1079,7 +1117,7 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster inspect mycluster</pre>
       response on success:
-      <pre>{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}</pre>
+      <pre>{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"XXXX"},"status":"success"}</pre>
       response on failure:
       <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
   </td>
@@ -1181,33 +1219,37 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster stop [command_options] &lt;cluster_name&gt;</code></td>
-  <td>REVIEW_ME:Stop all Hosts composing a Cluster<br><br>
+  <td>Stop all Hosts composing a Cluster<br><br>
       example:
       <pre>$ safescale cluster stop mycluster</pre>
       response on success:
-      <pre>{"result":</pre>
+      <pre>{"result":null,"status":"success"}</pre>
       response on failure:
       <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster start [command_options] &lt;cluster_name&gt;</code></td>
-  <td>REVIEW_ME:Start all Hosts composing a Cluster<br><br>
+  <td>Start all Hosts composing a Cluster<br><br>
       example:
       <pre>$ safescale cluster start mycluster</pre>
       response on success:
-      <pre>{"result":</pre>
+      <pre>{"result":null,"status":"success"}</pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>{"error":{"exitcode":6,"message":"Cannot start cluster: failed to find Cluster 'mycluster'"},"result":null,"status":"failure"}</pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster kubectl [command_options] &lt;cluster_name&gt; -- &lt;kubectl_parameters&gt;</code></td>
-  <td>REVIEW_ME:Executes <code>kubectl</code> command on Cluster<br><br>
+  <td>Executes <code>kubectl</code> command on Cluster<br><br>
       example:
-      <pre>$ safescale cluster kubectl mycluster -- get pods -n all</pre>
+      <pre>$  safescale cluster kubectl vpl-net -- get nodes</pre>
       response on success:
-      <pre></pre>
+      <pre>NAME               STATUS   ROLES    AGE   VERSION
+gw-mycluster         Ready    &lt;none&gt;   11m   v1.18.5
+mycluster-master-1   Ready    master   11m   v1.18.5
+mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
+      </pre>
       response on failure:
       <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
   </td>
@@ -1225,16 +1267,16 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster master list [command_options] &lt;cluster_name&gt;</code></td>
-  <td>REVIEW_ME: List the masters of a cluster<br><br>
+  <td>List the masters of a cluster<br><br>
       example:
       <pre>$ safescale cluster master list mycluster</pre>
       response on success:
-      <pre>{"result":</pre>
+      <pre>{"result":[{"id":"53c56611-5d96-4019-b012-354de282dd33","name":"mycluster-master-1"}],"status":"success"}</pre>
       response on failure:
       <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
   </td>
 </tr>
-<tr>
+<!-- <tr>
   <td valign="top"><code>safescale [global_options] cluster master inspect [command_options] &lt;cluster_name&gt; &lt;master_name&gt;</code></td>
   <td>REVIEW_ME: List the masters of a cluster<br><br>
       example:
@@ -1244,25 +1286,29 @@ The following actions are proposed:
       response on failure (cluster not found):
       <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
   </td>
-</tr>
+</tr> -->
 <tr>
   <td valign="top"><code>safescale [global_options] cluster node list [command_options] &lt;cluster_name&gt;</code></td>
-  <td>REVIEW_ME: List nodes in a Cluster<br><br>
+  <td>List nodes in a Cluster<br><br>
       example:
       <pre>$ safescale cluster node list mycluster</pre>
       response on success:
-      <pre>{"result":</pre>
-      response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}`</td>
+      <pre>{"result":[{"id":"7bb5bb44-9c7f-4ec3-9b19-435095c610c6","name":"mycluster-node-1"}],"status":"success"}</pre>
+      response on failure: <!-- note for dev: simplify this error message -->
+      <pre>{"error":{"exitcode":1,"message":"rpc error: code = NotFound desc = cannot list cluster nodes: failed to find Cluster 'mycluster': rpc error: code = NotFound desc = cannot list cluster nodes: failed to find Cluster 'mycluster'"},"result":null,"status":"failure"}</pre>
+  </td>
 </tr>
-<tr>
+<!-- <tr>
   <td valign="top"><code>safescale [global_options] cluster node inspect [command_options] &lt;cluster_name&gt; &lt;node_name_or_id&gt;</code></td>
   <td>REVIEW_ME: Get info about a specific Cluster Node<br><br>
       example:
       <pre>$ safescale cluster node inspect mycluster mycluster-node-4</pre>
       response on success:
-      <pre>{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"},"status":"success"}</pre>
-      response on failure:
+      <pre>{"result":{"cpu":4,"disk":100,"id":"7bb5bb44-9c7f-4ec3-9b19-435095c610c6","name":"mycluster-node-1","password":"XXXXXXXXXX","private_ip":"192.168.3.145","private_key":"-----BEGIN RSA PRIVATE KEY-----\nXXXXXXXXX\n-----END RSA PRIVATE KEY-----","ram":15,"state":2},"status":"success"}
+</pre>
+      response on failure (node not found):
+      <pre>{"error":{"exitcode":6,"message":"rpc error: code = NotFound desc = cannot inspect host: failed to find host 'vpl-net-node-2'"},"result":null,"status":"failure"}</pre>
+      response on failure (cluster not found):
       <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
   </td>
 </tr>
@@ -1305,19 +1351,22 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster node delete [command_options] &lt;cluster_name&gt; &lt;node_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Delete a specific node from Cluster.<br><br>
+  <td>Delete a specific node from Cluster. By default, ask confirmation to the user.<br><br>
       <code>command aliases</code>: <code>remove</code>, <code>destroy</code>, <code>rm</code><br><br>
       <code>command_options</code>:
       <ul>
+        <li><code>-y|--yes|--assume-yes</code>Respond yes to all questions (default: no)</li>
+        <li><code>-f|--force</code> Force node deletion no matter what (ie. metadata inconsistency) (default: no)</li>
       </ul>
       example:
-      <pre>$ safescale cluster node delete mycluster mycluster-node-4</pre>
+      <pre>$ safescale cluster node delete -y mycluster mycluster-node-4</pre>
       response on success:
-      <pre>{"result":</pre>
+      <pre>{"result":null,"status":"success"}</pre>
       response on failure:
-      <pre>{"result":</pre>
+      <pre>{"error":{"exitcode":6,"message":"rpc error: code = NotFound desc = cannot inspect host: failed to find host 'mycluster-node-4'"},"result":null,"status":"failure"}
+</pre>
   </td>
-</tr>
+</tr> -->
 </tbody>
 </table>
 
