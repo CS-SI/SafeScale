@@ -332,14 +332,16 @@ The following actions are proposed:
       <pre>$ safescale tenant list</pre>
       </div>
       response:
-      <div class="highlight highlight-source-perl"><pre>
+<!--      <div class="highlight highlight-source-perl"><pre> -->
+```javascript
 {
     "result": {
         "name": "TestOVH"
     },
     "status":"success"
 }
-      </pre></div>
+```
+<!--      </pre></div> -->
   </td>
 </tr>
 <tr>
