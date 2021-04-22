@@ -395,9 +395,13 @@ func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
 	return userName, nil
 }
 
+func (instance *host) IsNull() bool {
+	return instance == nil || instance.core == nil || instance.core.isNull()
+}
+
 // isNull tests if instance is nil or empty
 func (instance *host) isNull() bool {
-	return instance == nil || instance.core.isNull()
+	return instance == nil || instance.core == nil || instance.core.isNull()
 }
 
 // carry ...

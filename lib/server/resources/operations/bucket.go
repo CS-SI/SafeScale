@@ -122,9 +122,14 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 	return b, nil
 }
 
+// IsNull tells if the instance corresponds to null value
+func (instance *bucket) IsNull() bool {
+	return instance == nil || instance.core == nil || instance.core.isNull()
+}
+
 // isNull tells if the instance corresponds to null value
 func (instance *bucket) isNull() bool {
-	return instance == nil || instance.core.isNull()
+	return instance == nil || instance.core == nil || instance.core.isNull()
 }
 
 // carry ...
