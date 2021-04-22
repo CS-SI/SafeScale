@@ -19,6 +19,9 @@ feature:
     suitableFor:
         cluster: boh
 
+    requirements:
+        - docker-swarm
+
     parameters:
         - Version=1.5
 
