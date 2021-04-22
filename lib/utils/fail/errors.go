@@ -512,6 +512,12 @@ func SyntaxError(msg ...interface{}) *ErrSyntax {
 	return &ErrSyntax{r}
 }
 
+func SyntaxErrorWithCause(cause error, msg ...interface{}) *ErrSyntax {
+	r := newError(cause, nil, msg...)
+	r.grpcCode = codes.Internal
+	return &ErrSyntax{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrSyntax) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
