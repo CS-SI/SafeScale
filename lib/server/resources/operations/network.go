@@ -172,9 +172,14 @@ func (instance *network) upgradeNetworkPropertyIfNeeded() fail.Error {
 	})
 }
 
+// IsNull tells if the instance corresponds to subnet Null Value
+func (instance *network) IsNull() bool {
+	return instance == nil || instance.core == nil || instance.core.isNull()
+}
+
 // isNull tells if the instance corresponds to subnet Null Value
 func (instance *network) isNull() bool {
-	return instance == nil || instance.core.isNull()
+	return instance == nil || instance.core == nil || instance.core.isNull()
 }
 
 // Create creates a network

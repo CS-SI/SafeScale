@@ -145,9 +145,14 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 	return rv, nil
 }
 
+// IsNull tells if the instance is a null value
+func (instance *volume) IsNull() bool {
+	return instance == nil || instance.core == nil || instance.core.isNull()
+}
+
 // isNull tells if the instance is a null value
 func (instance *volume) isNull() bool {
-	return instance == nil || instance.core.isNull()
+	return instance == nil || instance.core == nil || instance.core.isNull()
 }
 
 // carry overloads rv.core.Carry() to add Volume to service cache

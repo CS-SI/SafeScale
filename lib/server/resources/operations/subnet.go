@@ -349,9 +349,13 @@ func (instance *subnet) updateCachedInformation() fail.Error {
 	return nil
 }
 
+func (instance *subnet) IsNull() bool {
+	return instance == nil || (instance != nil && ((instance.core == nil) || (instance.core != nil && instance.core.isNull())))
+}
+
 // isNull tells if the instance corresponds to subnet Null Value
 func (instance *subnet) isNull() bool {
-	return instance == nil || instance.core.isNull()
+	return instance == nil || (instance.core != nil && instance.core.isNull())
 }
 
 // carry wraps rv.core.Carry() to add Volume to service cache

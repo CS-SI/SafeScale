@@ -104,7 +104,7 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 
 // isNull returns true if the core instance represents the null value for core
 func (c *core) isNull() bool {
-	return c == nil || c.kind == "" || c.kind == "nil" || c.folder.IsNull()
+	return c == nil || (c != nil && (c.kind == "" || c.kind == "nil" || c.folder.IsNull()))
 }
 
 // GetService returns the iaas.GetService used to create/load the persistent object

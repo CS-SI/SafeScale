@@ -175,6 +175,9 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 
 // updateClusterNodesPropertyIfNeeded upgrades current Nodes property to last Nodes property (currently NodesV2)
 func (instance *cluster) updateClusterNodesPropertyIfNeeded() fail.Error {
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
+	}
 	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.NodesV3) {
 			return nil
@@ -298,6 +301,9 @@ func (instance *cluster) updateClusterNodesPropertyIfNeeded() fail.Error {
 
 // updateClusterNetworkPropertyIfNeeded creates a clusterproperty.NetworkV3 property if previous versions are found
 func (instance *cluster) updateClusterNetworkPropertyIfNeeded() fail.Error {
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
+	}
 	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(clusterproperty.NetworkV3) {
 			return fail.AlteredNothingError()
@@ -384,6 +390,9 @@ func (instance *cluster) updateClusterNetworkPropertyIfNeeded() fail.Error {
 
 // updateClusterDefaultsPropertyIfNeeded ...
 func (instance *cluster) updateClusterDefaultsPropertyIfNeeded() fail.Error {
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
+	}
 	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.DefaultsV2) {
 			return fail.AlteredNothingError()
@@ -461,9 +470,14 @@ func convertDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, def
 	}
 }
 
+// IsNull tells if the instance should be considered as a null value
+func (instance *cluster) IsNull() bool {
+	return instance == nil || instance.core == nil || instance.core.isNull()
+}
+
 // isNull tells if the instance should be considered as a null value
 func (instance *cluster) isNull() bool {
-	return instance == nil || instance.core.isNull()
+	return instance == nil || instance.core == nil || instance.core.isNull()
 }
 
 // carry ...
@@ -2136,6 +2150,10 @@ func (instance *cluster) deleteMaster(ctx context.Context, host resources.Host) 
 		return fail.AbortedError(nil, "aborted")
 	}
 
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
+	}
+
 	var master *propertiesv3.ClusterNode
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -2227,6 +2245,10 @@ func (instance *cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	nodeRef := node.ID
 	if nodeRef == "" {
 		nodeRef = node.Name
+	}
+
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
 	}
 
 	// Identify the node to delete and remove it preventive from metadata
@@ -2359,6 +2381,10 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	var cleaningErrors []error
+
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
+	}
 
 	defer func() {
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2546,7 +2572,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if rs != nil {
+	if rs != nil && !rs.IsNull() {
 		subnetName := rs.GetName()
 		logrus.Debugf("Cluster Deleting Subnet '%s'", subnetName)
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
@@ -2589,7 +2615,7 @@ func (instance *cluster) delete(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if rn != nil && deleteNetwork {
+	if rn != nil && !rn.IsNull() && deleteNetwork {
 		networkName := rn.GetName()
 		logrus.Debugf("Deleting Network '%s'...", networkName)
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(

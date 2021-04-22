@@ -194,9 +194,14 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 	return rs, nil
 }
 
+// IsNull tells if the instance should be considered as a null value
+func (instance *share) IsNull() bool {
+	return instance == nil || instance.core == nil || instance.core.isNull()
+}
+
 // isNull tells if the instance should be considered as a null value
 func (instance *share) isNull() bool {
-	return instance == nil || instance.core.isNull()
+	return instance == nil || instance.core == nil || instance.core.isNull()
 }
 
 // carry creates metadata and add Volume to service cache

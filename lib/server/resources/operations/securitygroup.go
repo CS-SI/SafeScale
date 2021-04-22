@@ -169,8 +169,25 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (rsg resources.SecurityGrou
 }
 
 // isNull tests if instance is nil or empty
+func (instance *securityGroup) IsNull() bool {
+	if instance == nil {
+		return true
+	}
+
+	if instance.core == nil {
+		return true
+	}
+
+	return instance.core.isNull()
+}
+
+// isNull tests if instance is nil or empty
 func (instance *securityGroup) isNull() bool {
 	if instance == nil {
+		return true
+	}
+
+	if instance.core == nil {
 		return true
 	}
 

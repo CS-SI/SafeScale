@@ -31,6 +31,7 @@ type Callback = func(data.Clonable, *serialize.JSONProperties) fail.Error
 type Metadata interface {
 	cache.Cacheable
 
+	IsNull() bool
 	Alter(callback Callback, options ...data.ImmutableKeyValue) fail.Error // protects the data for exclusive write
 	BrowseFolder(callback func(buf []byte) fail.Error) fail.Error          // walks through host folder and executes a callback for each entries
 	Deserialize(buf []byte) fail.Error                                     // Transforms a slice of bytes in struct
