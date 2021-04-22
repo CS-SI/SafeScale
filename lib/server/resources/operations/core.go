@@ -120,7 +120,7 @@ func (c *core) GetService() iaas.Service {
 // satisfies interface data.Identifiable
 func (c *core) GetID() string {
 	if c == nil || (c != nil && c.isNull()) {
-		return "<NullCore>"
+		return "<NullCore>" // FIXME: It should be a constant
 	}
 
 	id, ok := c.id.Load().(string)
@@ -309,7 +309,13 @@ func (c *core) carry(clonable data.Clonable) (xerr fail.Error) {
 
 	c.committed = false
 
-	return c.write()
+	xerr = c.write()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // updateIdentity updates instance cached identity
@@ -715,8 +721,7 @@ func (c *core) serialize() (_ []byte, xerr fail.Error) {
 	err := json.Unmarshal(shieldedJSONed, &shieldedMapped)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed shielded into map failed!")
-		return nil, fail.NewError(err.Error())
+		return nil, fail.NewErrorWithCause(err, "*core.Serialize(): Unmarshalling JSONed shielded into map failed!")
 	}
 
 	if c.properties.Count() > 0 {
@@ -781,7 +786,7 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 		err := json.Unmarshal(buf, &mapped)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
-			return fail.SyntaxError("unmarshalling JSON to map failed: %s", err.Error())
+			return fail.SyntaxErrorWithCause(err, "unmarshalling JSON to map failed")
 		}
 		if props, ok = mapped["properties"].(map[string]interface{}); ok {
 			delete(mapped, "properties")
@@ -791,7 +796,7 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 	jsoned, err := json.Marshal(mapped)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return fail.SyntaxError("failed to marshal core to JSON: %s", err.Error())
+		return fail.SyntaxErrorWithCause(err, "failed to marshal core to JSON")
 	}
 
 	xerr = c.shielded.Deserialize(jsoned)
@@ -804,7 +809,7 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 		jsoned, err = json.Marshal(props)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
-			return fail.SyntaxError("failed to marshal properties to JSON: %s", err.Error())
+			return fail.SyntaxErrorWithCause(err, "failed to marshal properties to JSON")
 		}
 
 		xerr = c.properties.Deserialize(jsoned)
