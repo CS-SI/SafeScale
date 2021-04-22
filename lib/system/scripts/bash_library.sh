@@ -743,6 +743,27 @@ sfSubnetOfDockerNetwork() {
 }
 export -f sfSubnetOfDockerNetwork
 
+# Tells if the node is registered as swarm node
+sfIsDockerSwarmInit() {
+    STATE="$(docker info --format '{{.Swarm.LocalNodeState}}')"
+    case $STATE in
+        inactive|pending)
+            echo "{{ .HostName }} is not in a Swarm cluster";;
+            return 1
+            ;;
+        active|locked)
+            return 0
+            ;;
+        error)
+            echo "{{ .HostName }} is in a Swarm error state"
+            return 2
+            ;;
+    esac
+    echo "Unknown Swarm state $STATE on host {{ .HostName }}"
+    return 3
+}
+export -f sfIsDockerSwarmInit
+
 # tells if a container using a specific image (and optionnaly name) is running in standalone mode
 sfDoesDockerRunContainer() {
     [ $# -eq 0 ] && return 1
