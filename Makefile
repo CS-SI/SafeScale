@@ -27,8 +27,12 @@ XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
 RULES := github.com/quasilyte/go-ruleguard/cmd/ruleguard
 RULES_DSL := github.com/quasilyte/go-ruleguard/dsl
-GURU := golang.org/x/tools/cmd/guru
 GOGREP := mvdan.cc/gogrep
+
+# CI tools
+GOJQ := github.com/itchyny/gojq/cmd/gojq
+GRON := github.com/tomnomnom/gron
+JSONTOML := github.com/pelletier/go-toml
 
 # Default build tags
 BUILD_TAGS = 
@@ -95,6 +99,20 @@ ground:
 	@command -v $(GO) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) go is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v protoc >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) protoc is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 
+cideps: begin ground
+	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...\n" && $(GO) get $(GOJQ)@v0.12.3 &>/dev/null || true; \
+	fi
+	@$(WHICH) gron > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...\n" && $(GO) get $(GRON)@v0.6.1 &>/dev/null || true; \
+	fi
+	@$(WHICH) jsontoml > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...\n" && $(GO) get $(JSONTOML)/cmd/jsontoml@v1.9.0 &>/dev/null || true; \
+	fi
+	@$(WHICH) tomljson > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...\n" && $(GO) get $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
+	fi
+
 coverdeps: begin ground
 	@$(WHICH) cover > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading cover...\n" && $(GO) install $(COVER)@v0.1.0 &>/dev/null || true; \
@@ -142,10 +160,6 @@ ifneq ($(STRICT),1)
 	@$(WHICH) ruleguard > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ruleguard...\n" && $(GO) get $(RULES)@v0.3.4 && $(GO) get $(RULES_DSL)@v0.3.2 &>/dev/null || true; \
 		$(GO) install $(RULES)@v0.3.4 &>/dev/null || true; \
-	fi
-	@$(WHICH) guru > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading guru...\n" && $(GO) get $(GURU)@v0.1.0 &>/dev/null || true; \
-		$(GO) install $(GURU)@v0.1.0 &>/dev/null || true; \
 	fi
 	@$(WHICH) gogrep > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gogrep...\n" && $(GO) get $(GOGREP)@v0.0.0-20210331191051-e50df5835157 &>/dev/null || true; \
@@ -282,7 +296,7 @@ vet: begin generate
 
 semgrep: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running semgrep checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@ruleguard -c=0 -rules build/rules/ruleguard.rules.go ./... | $(TEE) semgrep_results.log
+	@ruleguard -c=0 -rules build/rules/ruleguard.rules.$(CERR).go ./... | $(TEE) semgrep_results.log
 	@if [ -s ./semgrep_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) semgrep FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
 minimock:
