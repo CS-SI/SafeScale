@@ -745,21 +745,21 @@ export -f sfSubnetOfDockerNetwork
 
 # Tells if the node is registered as swarm node
 sfIsDockerSwarmInit() {
-    STATE="$(docker info --format '{{.Swarm.LocalNodeState}}')"
-    case $STATE in
-        inactive|pending)
-            echo "{{ .HostName }} is not in a Swarm cluster";;
+    STATE="$(docker info {{ "--format '{{.Swarm.LocalNodeState}}'" }})"
+    case "$STATE" in
+        "inactive"|"pending")
+            echo "{{ .Hostname }} is not in a Swarm cluster"
             return 1
             ;;
-        active|locked)
+        "active"|"locked")
             return 0
             ;;
-        error)
-            echo "{{ .HostName }} is in a Swarm error state"
+        "error")
+            echo "{{ .Hostname }} is in a Swarm error state"
             return 2
             ;;
     esac
-    echo "Unknown Swarm state $STATE on host {{ .HostName }}"
+    echo "Unknown Swarm state '$STATE' on host {{ .Hostname }}"
     return 3
 }
 export -f sfIsDockerSwarmInit

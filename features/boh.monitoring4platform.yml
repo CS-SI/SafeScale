@@ -18,12 +18,13 @@
 feature:
     suitableFor:
         host: no
-        cluster: swarm
+        cluster: boh
 
     requirements:
         features:
-            - consul4platform
-            - postgresql4platform
+            - boh.docker-swarm
+            - boh.consul4platform
+            - boh.postgresql4platform
 
     parameters:
         - PrometheusVersion=v2.11.1

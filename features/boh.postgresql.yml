@@ -18,7 +18,10 @@
 feature:
     suitableFor:
         host: no
-        cluster: yes
+        cluster: BOH
+
+    requirements:
+        - docker-swarm
 
     parameters:
         - PurgeOnRemoval=no
