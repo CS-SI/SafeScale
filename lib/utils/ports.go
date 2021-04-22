@@ -77,11 +77,3 @@ func Check(port int) (status bool, err error) {
 	return true, nil
 
 }
-
-// func runAway(site string, port string) {
-// 	timeout := time.Second
-// 	_, err := net.DialTimeout("tcp", site+":"+port, timeout)
-// 	if err != nil {
-// 		log.Println("Site unreachable, error: ", err)
-// 	}
-// }

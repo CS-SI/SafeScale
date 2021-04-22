@@ -88,7 +88,8 @@ func UserConfirmed(msg string) bool {
 }
 
 // ExtractRetCode extracts info from the error
-func ExtractRetCode(err error) (string, int, fail.Error) {
+func ExtractRetCode(err error) (_ string, _ int, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	retCode := -1
 	msg := "__ NO MESSAGE __"
 	if ee, ok := err.(*exec.ExitError); ok {
