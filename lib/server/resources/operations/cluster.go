@@ -1290,7 +1290,11 @@ func (instance *cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		if err != nil {
 			errors = append(errors, err.Error())
 		} else {
-			hosts = append(hosts, res.(resources.Host))
+			if res != nil {
+				hosts = append(hosts, res.(resources.Host))
+			} else {
+				errors = append(errors, "unknown error creating a node") // FIXME: This is a Task issue
+			}
 		}
 	}
 
