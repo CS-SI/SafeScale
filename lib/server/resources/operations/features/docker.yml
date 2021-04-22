@@ -19,6 +19,7 @@ feature:
     suitableFor:
         host: yes
         cluster: all
+
     parameters:
         - DockerComposeVersion=1.27.4
 

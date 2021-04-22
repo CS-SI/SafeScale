@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        cluster: all
+        cluster: boh
 
     parameters:
         - Version=1.5

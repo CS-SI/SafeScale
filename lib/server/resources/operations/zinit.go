@@ -28,11 +28,12 @@ func init() {
 
 	allEmbeddedFeatures = []*feature{
 		dockerFeature(),
+		dockerSwarmFeature(),
 		ntpServerFeature(),
 		ntpClientFeature(),
 		ansibleFeature(),
 		certificateAuthorityFeature(),
-		postgresql4platformFeature(),
+		// postgresql4platformFeature(),
 		nVidiaDockerFeature(),
 		// mpichOsPkgFeature(),
 		// mpichBuildFeature(),
@@ -41,7 +42,7 @@ func init() {
 		remoteDesktopFeature(),
 		postgres4gatewayFeature(),
 		edgeproxy4subnetFeature(),
-		keycloak4platformFeature(),
+		// keycloak4platformFeature(),
 		kubernetesFeature(),
 		proxycacheServerFeature(),
 		proxycacheClientFeature(),
@@ -53,10 +54,10 @@ func init() {
 		// kibanaFeature(),
 		helm2Feature(),
 		helm3Feature(),
-		sparkmaster4platformFeature(),
+		// sparkmaster4platformFeature(),
 		// elassandraFeature(),
 		// consul4platformFeature(),
-		monitoring4platformFeature(),
+		// monitoring4platformFeature(),
 		// geoserverFeature(),
 	}
 

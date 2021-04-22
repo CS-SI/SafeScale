@@ -544,8 +544,8 @@ feature:
                             kubeadm reset --force
                             $cp_join_cmd --control-plane --certificate-key $cert_key --apiserver-bind-port $LOCAL_PORT
                             EOF
-                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 213
-                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 214
+                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || sFail 213
+                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 214
                             for ip in {{range .ClusterMasterIPs}}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
                                 sfDropzoneSync $ip || sfFail 215

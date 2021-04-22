@@ -95,6 +95,22 @@ func dockerFeature() *feature {
 	}
 }
 
+// dockerSwarmFeature ...
+func dockerSwarmFeature() *feature {
+	name := "docker-swarm"
+	filename, specs, err := loadSpecFile(name)
+	err = debug.InjectPlannedError(err)
+	if err != nil {
+		panic(err.Error())
+	}
+	return &feature{
+		displayName: name,
+		fileName:    filename,
+		embedded:    true,
+		specs:       specs,
+	}
+}
+
 // ntpServerFeature ...
 func ntpServerFeature() *feature {
 	name := "ntpserver"
