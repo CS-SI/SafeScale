@@ -127,6 +127,46 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		delete(config, "nodes")
 		delete(config, "ssh_private_key")
 		delete(config, "last_state")
+	} else {
+		remotedesktopInstalled := true
+		disabledFeatures, ok := config["disabled_features"].(map[string]struct{})
+		if ok {
+			for k := range disabledFeatures {
+				if k == "remotedesktop" {
+					remotedesktopInstalled = false
+					break
+				}
+			}
+		}
+		if !remotedesktopInstalled {
+			remotedesktopInstalled = false
+			installedFeatures, ok := config["installed_features"].(map[string]interface{})
+			if ok {
+				for k := range installedFeatures {
+					if k == "remotedesktop" {
+						remotedesktopInstalled = true
+						break
+					}
+				}
+			}
+		}
+		if remotedesktopInstalled {
+			nodes := config["nodes"].(map[string][]*protocol.Host)
+			masters := nodes["masters"]
+			if len(masters) > 0 {
+				urls := make(map[string]string, len(masters))
+				endpointIP := config["endpoint_ip"].(string)
+				for _, v := range masters {
+					urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
+				}
+				config["remotedesktop"] = urls
+			} else {
+				remotedesktopInstalled = false
+			}
+		}
+		if !remotedesktopInstalled {
+			config["remotedesktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
+		}
 	}
 	return config
 }
