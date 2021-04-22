@@ -351,22 +351,6 @@ func keycloak4platformFeature() *feature {
 	}
 }
 
-// consul4platformFeature ...
-func consul4platformFeature() *feature {
-	name := "consul4platform"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
 // monitoring4platformFeature ...
 func monitoring4platformFeature() *feature {
 	name := "monitoring4platform"

@@ -17,7 +17,7 @@
 ---
 feature:
     suitableFor:
-        cluster: swarm
+        cluster: all
 
     parameters:
         - Version=1.5
@@ -318,7 +318,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            sfStandardRetry sfDoesDockerRunStack consul4platform || sfFail 197
+                            sfRetry 5m 5 sfDoesDockerRunStack consul4platform || sfFail 197
                             sfExit
 
             remove:

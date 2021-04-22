@@ -55,7 +55,7 @@ func init() {
 		helm3Feature(),
 		sparkmaster4platformFeature(),
 		// elassandraFeature(),
-		consul4platformFeature(),
+		// consul4platformFeature(),
 		monitoring4platformFeature(),
 		// geoserverFeature(),
 	}
