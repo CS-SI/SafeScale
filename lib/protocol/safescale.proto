@@ -15,7 +15,7 @@
  */
 
 syntax = "proto3";
-option go_package = ".;protocol";
+option go_package = "./;protocol";
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
@@ -439,18 +439,18 @@ message ScannedInfo{
 	int64 number_of_cpu = 7;
 	int64 number_of_core = 8;
 	int64 number_of_socket = 9;
-	double cpu_frequency_Ghz = 10;
+	double cpu_frequency_ghz = 10;
 	string cpu_arch = 11;
 	string hypervisor = 12;
 	string cpu_model = 13;
-	double ram_size_Gb = 14;
+	double ram_size_gb = 14;
 	double ram_freq = 15;
 	int64 gpu = 16;
 	string gpu_model = 17;
-	int64 disk_size_Gb = 18;
+	int64 disk_size_gb = 18;
 	string main_disk_type = 19;
-	double main_disk_speed_MBps = 20;
-	double sample_net_speed_KBps = 21;
+	double main_disk_speed_mbps = 20;
+	double sample_net_speed_kbps = 21;
 	int64 eph_disk_size_Gb = 22;
 	double price_in_dollars_second = 23;
 	double price_in_dollars_hour = 24;
@@ -473,6 +473,7 @@ message TemplateList {
 message TemplateListRequest {
 	bool all = 1;
 	string tenant_id = 2;
+	bool scanned_only = 3;
 }
 
 message TemplateMatchRequest {
@@ -481,15 +482,13 @@ message TemplateMatchRequest {
 }
 
 message TemplateInspectRequest {
-	bool all = 1;
-	string tenant_id = 2;
-	bool only_scanned = 3;
+	Reference template = 1;
 }
 
 service TemplateService {
 	rpc List(TemplateListRequest) returns (TemplateList){}
 	rpc Match(TemplateMatchRequest) returns (TemplateList){}
-	rpc Inspect(TemplateInspectRequest) returns (TemplateList){}
+	rpc Inspect(TemplateInspectRequest) returns (HostTemplate){}
 }
 
 // safescale volume create v1 --speed="SSD" --size=2000 (par default HDD, possible SSD, HDD, COLD)

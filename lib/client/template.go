@@ -30,7 +30,7 @@ type template struct {
 }
 
 // List returns the list of availble templates on the current tenant
-func (t template) List(all bool, timeout time.Duration) (*protocol.TemplateList, error) {
+func (t template) List(all, scannedOnly bool, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -40,10 +40,10 @@ func (t template) List(all bool, timeout time.Duration) (*protocol.TemplateList,
 	}
 
 	service := protocol.NewTemplateServiceClient(t.session.connection)
-	return service.List(ctx, &protocol.TemplateListRequest{All: all})
+	return service.List(ctx, &protocol.TemplateListRequest{All: all, ScannedOnly: scannedOnly})
 }
 
-// Match returns the list of templates that match the sizinf
+// Match returns the list of templates that match the sizing
 func (t template) Match(sizing string, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
@@ -57,8 +57,8 @@ func (t template) Match(sizing string, timeout time.Duration) (*protocol.Templat
 	return service.Match(ctx, &protocol.TemplateMatchRequest{Sizing: sizing})
 }
 
-// Inspect return the list of available template information on the current tenant
-func (t template) Inspect(all bool, onlyScanned bool, timeout time.Duration) (*protocol.TemplateList, error) {
+// Inspect returns details of a template identified by name of ID
+func (t template) Inspect(name string, timeout time.Duration) (*protocol.HostTemplate, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -69,5 +69,5 @@ func (t template) Inspect(all bool, onlyScanned bool, timeout time.Duration) (*p
 
 	service := protocol.NewTemplateServiceClient(t.session.connection)
 
-	return service.Inspect(ctx, &protocol.TemplateInspectRequest{All: all, OnlyScanned: onlyScanned})
+	return service.Inspect(ctx, &protocol.TemplateInspectRequest{Template: &protocol.Reference{Name: name}})
 }
