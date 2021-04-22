@@ -126,7 +126,7 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 
 // isNull ...
 func (tg *taskGroup) isNull() bool {
-	return tg == nil || tg.task.IsNull()
+	return tg == nil || tg.task == nil || tg.task.IsNull()
 }
 
 // GetID returns an unique id for the task
