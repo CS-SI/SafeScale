@@ -17,11 +17,12 @@
 ---
 feature:
     suitableFor:
-        cluster: all
+        cluster: boh
 
     requirements:
         features:
-            - postgresql4platform
+            - docker-swarm
+            - boh.postgresql
 
     parameters:
         - KeycloakAdminPassword

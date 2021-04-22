@@ -22,9 +22,9 @@ feature:
 
     requirements:
         features:
-            - boh.docker-swarm
-            - boh.consul4platform
-            - boh.postgresql4platform
+            - docker-swarm
+            - boh.consul
+            - boh.postgresql
 
     parameters:
         - PrometheusVersion=v2.11.1
