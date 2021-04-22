@@ -37,7 +37,7 @@ type Provider interface {
 	ListImages(all bool) ([]abstract.Image, fail.Error)
 
 	// ListTemplates lists available host templates
-	// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
+	// Host templates are sorted using Dominant Resource Fairness Algorithm
 	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 
 	// GetAuthenticationOptions returns authentication options as a Config
