@@ -44,7 +44,7 @@ var HostCommand = &cli.Command{
 	Subcommands: []*cli.Command{
 		hostList,
 		hostCreate,
-		hostResize,
+//		hostResize,
 		hostDelete,
 		hostInspect,
 		hostStatus,
@@ -472,14 +472,14 @@ var hostListFeaturesCommand = &cli.Command{
 var hostAddFeatureCommand = &cli.Command{
 	Name:      "add-feature",
 	Aliases:   []string{"install-feature"},
-	Usage:     "add-feature HOSTNAME FEATURENAME",
+	Usage:     "!DEPRECATED!See safescale host feature add instead! Add a feature to an Host",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow defining content of feature parameters",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -494,14 +494,14 @@ var hostAddFeatureCommand = &cli.Command{
 var hostCheckFeatureCommand = &cli.Command{
 	Name:      "check-feature",
 	Aliases:   []string{"verify-feature"},
-	Usage:     "check-feature HOSTNAME FEATURENAME",
+	Usage:     "!DEPRECATED!See safescale host feature check instead! Check if a feature is installed",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow defining content of feature parameters",
 		},
 	},
 
@@ -512,7 +512,7 @@ var hostCheckFeatureCommand = &cli.Command{
 var hostRemoveFeatureCommand = &cli.Command{
 	Name:      "remove-feature",
 	Aliases:   []string{"rm-feature", "delete-feature", "uninstall-feature"},
-	Usage:     "Remove a feature from host.",
+	Usage:     "!DEPRECATED!See safescale host feature delete instead! Remove a feature from host.",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
