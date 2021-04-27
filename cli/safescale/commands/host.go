@@ -44,7 +44,7 @@ var HostCommand = &cli.Command{
 	Subcommands: []*cli.Command{
 		hostList,
 		hostCreate,
-//		hostResize,
+		//		hostResize,
 		hostDelete,
 		hostInspect,
 		hostStatus,
