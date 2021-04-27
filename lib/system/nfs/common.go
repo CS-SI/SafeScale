@@ -171,15 +171,16 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		return "", xerr
 	}
 
-	sshcmd, xerr := sshconfig.NewSudoCommand(ctx, "which scp")
-	if xerr != nil {
-		return "", xerr
-	}
 	// if k != nil {
 	xerr = retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			var innerXErr fail.Error
-			_, _, _, innerXErr = sshcmd.RunWithTimeout(ctx, outputs.COLLECT, temporal.GetBigDelay())
+			sshCmd, innerXErr := sshconfig.NewSudoCommand(ctx, "which scp")
+			if innerXErr != nil {
+				return innerXErr
+			}
+			defer func() { _ = sshCmd.Close() }()
+
+			_, _, _, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, temporal.GetBigDelay())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
@@ -204,14 +205,13 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		cmd = fmt.Sprintf("chmod u+rwx %s; captf=$(mktemp); export BASH_XTRACEFD=7; bash -c %s 7>$captf 2>&1; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}", filename, filename)
 	}
 
-	sshCmd, xerr := sshconfig.NewSudoCommand(ctx, cmd)
-	if xerr != nil {
-		return "", fail.ExecutionError(xerr)
-	}
-
 	xerr = retry.Action(
 		func() error {
-			var innerXErr fail.Error
+			sshCmd, innerXErr := sshconfig.NewSudoCommand(ctx, cmd)
+			if innerXErr != nil {
+				return fail.ExecutionError(xerr)
+			}
+			defer func() { _ = sshCmd.Close() }()
 
 			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, temporal.GetBigDelay()); innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")

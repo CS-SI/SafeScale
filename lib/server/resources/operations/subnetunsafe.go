@@ -47,12 +47,13 @@ func (instance *subnet) unsafeInspectGateway(primary bool) (_ resources.Host, xe
 	return out, nil
 }
 
-// unsafeInspectNetwork returns the Network instance owning the Subnet
-func (instance *subnet) unsafeInspectNetwork() (rn resources.Network, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	return instance.parentNetwork, nil
-}
+// // unsafeInspectNetwork returns the Network instance owning the Subnet
+// func (instance *subnet) unsafeInspectNetwork() (rn resources.Network, xerr fail.Error) {
+// 	defer fail.OnPanic(&xerr)
+//
+//
+// 	return instance.parentNetwork, nil
+// }
 
 // unsafeGetDefaultRouteIP ...
 func (instance *subnet) unsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {

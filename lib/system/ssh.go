@@ -516,6 +516,9 @@ func (scmd *SSHCommand) Run(ctx context.Context, outs outputs.Enum) (int, string
 // - xerr fail.Error
 //   . *fail.ErrNotAvailable if remote SSH is not available
 //   . *fail.ErrTimeout if 'timeout' is reached
+// Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
+//       you risk to call twice os/exec.Wait, which may panic
+// FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
 func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	if scmd == nil {
 		return -1, "", "", fail.InvalidInstanceError()
