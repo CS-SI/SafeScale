@@ -43,9 +43,9 @@ type SubNetwork struct {
 
 // Network represents a virtual network
 type Network struct {
-	ID         string   `json:"id,omitempty"`          // ID for the network (from provider)
-	Name       string   `json:"name,omitempty"`        // name of the network
-	CIDR       string   `json:"mask,omitempty"`        // network in CIDR notation (if it has a meaning...)
+	ID         string   `json:"id"`                    // ID for the network (from provider)
+	Name       string   `json:"name"`                  // name of the network
+	CIDR       string   `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
 	DNSServers []string `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
 
 	Domain             string         `json:"domain,omitempty"`               // DEPRECATED: contains the domain used to define host FQDN
