@@ -27,8 +27,13 @@ const (
 	// DefaultContextTimeout default timeout for grpc command invocation
 	DefaultContextTimeout = 1 * time.Minute
 
+	// MetadataTimeout default timeout to handle object storage issues
+	DefaultMetadataTimeout = 150 * time.Second
+
+	DefaultOperationTimeout = 120 * time.Second
+
 	// HostTimeout timeout for grpc command relative to host creation
-	HostTimeout = 5 * time.Minute
+	HostTimeout = 6 * time.Minute
 
 	// LongHostOperationTimeout is a Long timeout
 	LongHostOperationTimeout = 12 * time.Minute
@@ -46,7 +51,7 @@ const (
 	defaultCommunicationTimeout = 3 * time.Minute
 
 	// DefaultExecutionTimeout is the default linux command operation timeout
-	DefaultExecutionTimeout = 5 * time.Minute
+	DefaultExecutionTimeout = 6 * time.Minute
 
 	// DefaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
 	DefaultMetadataReadAfterWriteTimeout = 1 * time.Minute
@@ -98,9 +103,18 @@ func GetContextTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_CONTEXT_TIMEOUT", DefaultContextTimeout)
 }
 
+// GetContextTimeout ...
+func GetMetadataTimeout() time.Duration {
+	return GetTimeoutFromEnv("SAFESCALE_METADATA_TIMEOUT", DefaultMetadataTimeout)
+}
+
 // GetHostTimeout ...
 func GetHostTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_HOST_TIMEOUT", HostTimeout)
+}
+
+func GetOperationTimeout() time.Duration {
+	return GetTimeoutFromEnv("SAFESCALE_OP_TIMEOUT", DefaultOperationTimeout)
 }
 
 // GetHostCreationTimeout ...
@@ -126,6 +140,13 @@ func GetConnectionTimeout() time.Duration {
 // GetExecutionTimeout ...
 func GetExecutionTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", DefaultExecutionTimeout)
+}
+
+func MaxTimeout(a time.Duration, b time.Duration) time.Duration {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 // GetCommunicationTimeout ...
