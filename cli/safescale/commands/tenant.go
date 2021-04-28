@@ -50,7 +50,7 @@ var tenantList = &cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "ErrorList available tenants",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -71,7 +71,7 @@ var tenantGet = &cli.Command{
 	Aliases: []string{"current"},
 	Usage:   "Get current tenant",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -96,7 +96,7 @@ var tenantSet = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -122,7 +122,7 @@ var tenantInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -147,7 +147,7 @@ var tenantCleanup = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -176,7 +176,7 @@ var tenantScan = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
