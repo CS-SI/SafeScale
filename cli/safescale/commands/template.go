@@ -100,9 +100,9 @@ var templateMatch = &cli.Command{
 }
 
 var templateInspect = &cli.Command{
-	Name:    "inspect",
-	Aliases: []string{"show"},
-	Usage:   "Display available template information",
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "Display available template information",
 	ArgsUsage: "NAME",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", templateCmdName, c.Command.Name, c.Args())

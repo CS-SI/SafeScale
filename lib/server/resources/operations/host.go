@@ -1224,13 +1224,15 @@ func (instance *host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 		}
 
 		var an *abstract.Network
-		rn, xerr := defaultSubnet.(*subnet).unsafeInspectNetwork()
+		//		networkInstance, xerr := defaultSubnet.(*subnet).unsafeInspectNetwork()
+		networkInstance, xerr := defaultSubnet.InspectNetwork()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
+		defer networkInstance.Released()
 
-		innerXErr = rn.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		innerXErr = networkInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			var ok bool
 			an, ok = clonable.(*abstract.Network)
 			if !ok {

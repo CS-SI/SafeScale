@@ -68,19 +68,15 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	}
 
 	// Create the command
-	sshCmd, xerr := sshCfg.NewCommand(ctx, command)
-	if xerr != nil {
-		return -1, "", "", xerr
-	}
-
-	defer func() { _ = sshCmd.Close() }()
-
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			var (
-				innerXErr fail.Error
-				// ready     bool
-			)
+			sshCmd, innerXErr := sshCfg.NewCommand(ctx, command)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			defer func() { _ = sshCmd.Close() }()
+
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, executionTimeout)
 			if innerXErr != nil {
 				switch innerXErr.(type) {

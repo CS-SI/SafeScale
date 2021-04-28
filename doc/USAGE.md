@@ -614,7 +614,8 @@ The following actions are proposed:
   <td>Get info of a <code>Network</code>code><br><br>
       <u>example</u>:
       <pre>$ safescale network inspect example_network</pre>
-      response on success:<pre>
+      response on success:
+      <pre>
 {
   "result": {
     "cidr": "192.168.0.0/24",
@@ -626,7 +627,8 @@ The following actions are proposed:
   "status": "success"
 }
       </pre>
-      response on failure:<pre>
+      response on failure:
+      <pre>
 {
   "error": {
     "exitcode": 6,
@@ -655,19 +657,18 @@ The following actions are proposed:
 {
   "error": {
     "exitcode": 6,
-    "message": "Failed to find 'networks/byName/example_network'"
+    "message": "Cannot delete network: failed to find Network 'example_network'"
   },
   "result": null,
   "status": "failure"
 }
       </pre>
       response on failure (hosts still attached to network):
-      REVIEW_ME:
       <pre>
 {
   "error": {
     "exitcode": 6,
-    "message": "Cannot delete network 'example_network': 1 host is still attached to it: myhost"
+    "message": "Cannot delete network: failed to delete Subnet 'example_network': cannot delete subnet 'example_network': 1 host is still attached to it: example-host"
   },
   "result": null,
   "status": "failure"
@@ -686,21 +687,39 @@ The following actions are proposed:
         <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of gateway (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details)</li>
         <li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li>
       </ul>
-      <u>example</U>: REVIEW_ME
-      <pre>$ safescale network subnet create example_network example_subnet</pre>
+      <u>example</U>:
+      <pre>$ safescale network subnet create --cidr 192.168.1.0/24 example_network example_subnet</pre>
       response on success:
       <pre>
-{"result":
+{
+  "result": {
+    "cidr": "192.168.1.0/24",
+    "gateway_ids": [
+      "8fd9b241-f4fe-4f80-a162-def3858053ee"
+    ],
+    "id": "acca6c3c-f17b-4132-a8a3-cef147fde464",
+    "name": "example_subnet",
+    "state": 3
+  },
+  "status": "success"
+}
       </pre>
       response on failure:
       <pre>
-{"error":{
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot create Subnet: subnet 'example_subnet' already exists"
+  },
+  "result": null,
+  "status": "failure"
+}
       </pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet list [command_options] &lt;network_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: List `Subnets` created by SafeScale<br>
+  <td>List `Subnets` created by SafeScale<br>
       <code>command_options</code>:
       <ul>
         <li><code>--all</code> List all network existing on the current tenant (not only those created by SafeScale)</li>
@@ -708,17 +727,20 @@ The following actions are proposed:
       <u>examples</u>:
       <ul>
         <li>
-          <pre>$ safescale network list</pre>
+          <pre>$ safescale network subnet list example_network</pre>
           response on success:
           <pre>
 {
   "result": [
     {
       "cidr": "192.168.0.0/24",
-      "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
-      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
-      "name": "example_network",
-      "virtual_ip": {}
+      "id": "05a662a3-3801-4a82-af86-c15956de19a9",
+      "name": "example_network"
+    },
+    {
+      "cidr": "192.168.1.0/24",
+      "id": "acca6c3c-f17b-4132-a8a3-cef147fde464",
+      "name": "example_subnet"
     }
   ],
   "status": "success"
@@ -726,22 +748,78 @@ The following actions are proposed:
           </pre>
         </li>
         <li>
-          <pre>$ safescale network list --all</pre>
+          <pre>$ safescale network subnet list --all example_network</pre>
           response:
           <pre>
 {
   "result": [
     {
-      "cidr": "192.168.0.0/24",
-      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
-      "name": "example_network",
-      "virtual_ip": {}
+      "id": "05a662a3-3801-4a82-af86-c15956de19a9",
+      "name": "example_network"
     },
     {
-      "cidr": "10.0.0.0/16",
-      "id": "eb5979e8-6ac6-4436-88d6-c36e3a949083",
-      "name": "not_managed_by_safescale",
-      "virtual_ip": {}
+      "id": "3e545f60-44fc-4687-a1db-b7a7cd5cdc71",
+      "name": "mycluster"
+    },
+    {
+      "id": "634a92e0-8066-4234-bf89-553ff62bbcdc"
+    },
+    {
+      "id": "acca6c3c-f17b-4132-a8a3-cef147fde464",
+      "name": "example_subnet"
+    },
+  ],
+  "status": "success"
+}
+          </pre>
+        </li>
+        <li>
+          <pre>$ safescale network subnet list --all -</pre>
+          response:
+          <pre>
+{
+  "result": [
+    {
+      "id": "05a662a3-3801-4a82-af86-c15956de19a9",
+      "name": "example_network"
+    },
+    {
+      "id": "3e545f60-44fc-4687-a1db-b7a7cd5cdc71",
+      "name": "mycluster"
+    },
+    {
+      "id": "634a92e0-8066-4234-bf89-553ff62bbcdc"
+    },
+    {
+      "id": "831f226e-bca3-4d5a-b713-5c85a9179298",
+      "name": "Ext-Net"
+    },
+    {
+      "id": "98de7b3b-bb78-4890-8d66-101d43cbb428"
+    },
+    {
+      "id": "acca6c3c-f17b-4132-a8a3-cef147fde464",
+      "name": "example_subnet"
+    },
+    {
+      "id": "ae3d806b-8ef9-4ec8-b573-ab7c4facd4c6",
+      "name": "Ext-Net"
+    },
+    {
+      "id": "c05ecaaf-9c22-430c-8571-4bcc29b4be8d",
+      "name": "Ext-Net"
+    },
+    {
+      "id": "c49a8ef1-f6fb-4ece-babc-bbefc8721349",
+      "name": "Ext-Net"
+    },
+    {
+      "id": "d55f9a90-b45d-4735-8f12-562575438d93",
+      "name": "Ext-Net"
+    },
+    {
+      "id": "f1a368d8-d221-45cc-bc50-7df8a589795f",
+      "name": "Ext-Net"
     }
   ],
   "status": "success"
@@ -753,18 +831,24 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet inspect &lt;network_name_or_id&gt; &lt;subnet_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Get info about a `Subnet`<br><br>
+  <td>Get info about a `Subnet`<br><br>
       <u>example</u>:
-      <pre>$ safescale network inspect example_network</pre>
+      <pre>$ safescale network subnet inspect example_network example_subnet</pre>
       response on success:
       <pre>
 {
   "result": {
-    "cidr": "192.168.0.0/24",
-    "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
-    "gateway_name": "gw-example_network",
-    "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
-    "name": "example_network"
+    "cidr": "192.168.1.0/24",
+    "gateway_ids": [
+      "8fd9b241-f4fe-4f80-a162-def3858053ee"
+    ],
+    "gateway_name": "gw-example_subnet",
+    "gateways": [
+      "gw-example_subnet"
+    ],
+    "id": "acca6c3c-f17b-4132-a8a3-cef147fde464",
+    "name": "example_subnet",
+    "state": 3
   },
   "status": "success"
 }
@@ -774,7 +858,7 @@ The following actions are proposed:
 {
   "error": {
     "exitcode": 6,
-    "message": "Failed to find 'networks/byName/fake_network'"
+    "message": "Cannot inspect Subnet: failed to find a subnet referenced by 'example_subnet' in network 'example_network'"
   },
   "result": null,
   "status": "failure"
@@ -792,17 +876,12 @@ The following actions are proposed:
         <li><pre>$ safescale network subnet delete example_network example_subnet</pre>
             response on success:
             <pre>
-{"result":
+{
+  "result": null,
+  "status": "success"
+}
             </pre>
-            response on failure (Network not found):
-            <pre>
-{"error":{
-            </pre>
-            response on failure (Subnet not found):
-            <pre>
-{"error":{
-            </pre>
-            response on failure (hosts still attached to Subnet):
+            response on failure (Hosts still attached to Subnet):
             <pre>
 {
   "error": {
@@ -813,15 +892,24 @@ The following actions are proposed:
   "status": "failure"
 }
             </pre>
+            response on failure (subnets still present in Network):
+            <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete network: failed to delete Network 'vpl-net', 2 Subnets still inside"
+  },
+  "result": null,
+  "status": "failure"
+}</pre>
         </li>
         <li><pre>$ safescale network subnet delete example_network 48112419-3bc3-46f5-a64d-3634dd8bb1be</pre>
             response on success:
             <pre>
-{"result":
-            </pre>
-            response on failure (Subnet not found):
-            <pre>
-{"error":{
+{
+  "result": null,
+  "status": "success"
+}
             </pre>
             response on failure (hosts still attached to Subnet):
             <pre>
@@ -834,7 +922,7 @@ The following actions are proposed:
   "status": "failure"
 }
             </pre>
-            <u>note</u>: <code>example_network</code> will not be used in this case, the `Subnet` ID is sufficient to locate the concerned `Subnet`.
+            <u>note</u>: <code>example_network</code> will not be used in this case, the `Subnet` ID is sufficient to locate the concerned resource.
         </li>
       </ul>
   </td>
@@ -856,18 +944,12 @@ The following actions are proposed:
       <pre>
 {
   "error": {
-    "exitcode": 6,
-    "message": "Network 'example_network' already exists"
-  },
-  "result": null,
-  "status": "failure"
-}
       </pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group list [command_options] &lt;network_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: List Security Groups<br>
+  <td>List Security Groups<br>
       <code>command_options</code>:
       <ul>
         <li><code>--all</code> List all Security Groups existing on the current tenant (not only those created by SafeScale) (optional)</li>
@@ -880,16 +962,24 @@ The following actions are proposed:
 {
   "result": [
     {
-      "cidr": "192.168.0.0/24",
-      "gateway_id": "48112419-3bc3-46f5-a64d-3634dd8bb1be",
-      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
-      "name": "example_network",
-      "virtual_ip": {}
-    }
+      "description": "SG for gateways in Subnet vpl-net of Network vpl-net",
+      "id": "0be8c7bd-fec3-4ca3-b7bc-0f5cf012b6ca",
+      "name": "safescale-sg_subnet_gateways.example_network.example_network"
+    },
+    {
+      "description": "SG for internal access in Subnet vpl-net of Network vpl-net",
+      "id": "411e237a-7659-46ee-a3e8-051d8653edf1",
+      "name": "safescale-sg_subnet_internals.example_network.example_network"
+    },
+    {
+      "description": "SG for hosts with public IP in Subnet vpl-net of Network vpl-net",
+      "id": "ad3b5701-45cc-4da3-92d4-589900bb45f0",
+      "name": "safescale-sg_subnet_publicip.example_network.example_network"
+    },
   ],
   "status": "success"
 }
-            </pre>
+          </pre>
         </li>
         <li><pre>$ safescale network security group list --all</pre>
             response on success:
@@ -897,17 +987,25 @@ The following actions are proposed:
 {
   "result": [
     {
-      "cidr": "192.168.0.0/24",
-      "id": "76ee12d6-e0fa-4286-8da1-242e6e95844e",
-      "name": "example_network",
-      "virtual_ip": {}
+      "description": "SG for gateways in Subnet vpl-net of Network vpl-net",
+      "id": "0be8c7bd-fec3-4ca3-b7bc-0f5cf012b6ca",
+      "name": "safescale-sg_subnet_gateways.example_network.example_network"
     },
     {
-      "cidr": "10.0.0.0/16",
-      "id": "eb5979e8-6ac6-4436-88d6-c36e3a949083",
-      "name": "not_managed_by_safescale",
-      "virtual_ip": {}
-    }
+      "description": "SG for internal access in Subnet vpl-net of Network vpl-net",
+      "id": "411e237a-7659-46ee-a3e8-051d8653edf1",
+      "name": "safescale-sg_subnet_internals.example_network.example_network"
+    },
+    {
+      "description": "SG for hosts with public IP in Subnet vpl-net of Network vpl-net",
+      "id": "ad3b5701-45cc-4da3-92d4-589900bb45f0",
+      "name": "safescale-sg_subnet_publicip.example_network.example_network"
+    },
+    {
+      "description": "Default security group",
+      "id": "a81a28a5-3925-4ae7-bdee-69ee6c24f335",
+      "name": "default"
+    },
   ],
   "status": "success"
 }
@@ -920,14 +1018,28 @@ The following actions are proposed:
   <td valign="top"><code>safescale network security group inspect &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
   <td>REVIEW_ME: Get information about a Security Group<br><br>
       example:
-      <pre>$ safescale network security group inspect example_network sg-example-hosts</pre>
+      <pre>$ safescale network security group inspect example_network safescale-sg_subnet_publicip.example_network.example_network</pre>
       response on success:
       <pre>
-{"result":{
+{
+  "result": {
+    "description": "SG for hosts with public IP in Subnet vpl-cluster of Network vpl-cluster",
+    "id": "d1eaabcd-765b-49e9-883a-2f34d273bec0",
+    "name": "safescale-sg_subnet_publicip.example_network.example_network"
+  },
+  "status": "success"
+}
       </pre>
       response on failure:
       <pre>
-{"error":{
+{
+  "error": {
+    "exitcode": 6,
+    "message": "cannot inspect security group: failed to find Security Group 'safescale-sg_subnet_publicip.example_network.example_network'"
+  },
+  "result": null,
+  "status": "failure"
+}
       </pre>
   </td>
 </tr>
@@ -984,9 +1096,25 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group rule add [command_options] &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Delete the network whose name or id is given<br><br>
+  <td>REVIEW_ME: Add a Security Group rule<br><br>
+      <code>command_options</code>:
+      <ul>
+        <li><code>--direction ingress|egress</code>code> Defines the direction of the rule (optional, default: ingress)</li>
+        <li><code>--protocol tcp|udp|icmp|all</code> Defines the protocol for the rule (optional, default: tcp)</li>
+        <li><code>--from-port &lt;port_number&gt;</code> Defines the first port of a port range (default: none)</li>
+        <li><code>--to-port &lt;port_number&gt;</code> Defines the last port of a port range (default: none)<br>
+            If there is one port, just set <code>--from-port</code>
+        </li>
+        <li><code>--source &lt;CIDR&gt;</code> Defines source CIDR (meaningful with <code>--direction ingress</code><br>
+            Can be used multiple times to define many sources
+        </li>
+        <li><code>--target &lt;CIDR&gt;</code> Defines target CIDR (meaningful with <code>--direction egress</code><br>
+            Can be used multiple times to define many sources
+        </li>
+        <li><code>--description &lt;text&gt;</code> Sets a description to the rule (optional)
+      </ul>
       example:
-      <pre>$ safescale network delete example_network</pre>
+      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example_network sg-for-some-hosts</pre>
       response on success:
       <pre>
 {
@@ -994,37 +1122,33 @@ The following actions are proposed:
   "status": "success"
 }
       </pre>
-      response on failure (network does not exist):
+      response on failure:
       <pre>
 {
-  "error": {
-    "exitcode": 6,
-    "message": "Failed to find 'networks/byName/example_network'"
-  },
-  "result": null,
-  "status": "failure"
-}
-      </pre>
-      response on failure (hosts still attached to network):
-      <pre>
-{
-  "error": {
-    "exitcode": 6,
-    "message": "Cannot delete network 'example_network': 1 host is still attached to it: myhost"
-  },
-  "result": null,
-  "status": "failure"
-}
+  "error":
       </pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group rule delete [command_options] &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Delete the network whose name or id is given<br><br>
+  <td>REVIEW_ME: Delete a rule from a Security Group<br><br>
+      <code>command_options</code>:
+      <ul>
+        <li><code>--direction ingress|egress</code>code> Defines the direction of the rule (optional, default: ingress)</li>
+        <li><code>--protocol tcp|udp|icmp|all</code> Defines the protocol for the rule (optional, default: tcp)</li>
+        <li><code>--from-port &lt;port_number&gt;</code> Defines the first port of a port range (default: none)</li>
+        <li><code>--to-port &lt;port_number&gt;</code> Defines the last port of a port range (default: none)<br>
+            If there is one port, just set <code>--from-port</code>
+        </li>
+        <li><code>--source &lt;CIDR&gt;</code> Defines source CIDR (meaningful with <code>--direction ingress</code><br>
+            Can be used multiple times to define many sources
+        </li>
+        <li><code>--target &lt;CIDR&gt;</code> Defines target CIDR (meaningful with <code>--direction egress</code><br>
+            Can be used multiple times to define many sources
+        </li>
+      </ul>
       example:
-      <pre>$ safescale network security group rule delete \
-           --direction ingress --protocol tcp --from-port 80 --sources 0.0.0.0/0 \
-           example_network sg-example-hosts</pre>
+      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example_network sg-for-some-hosts</pre>
       response on success:
       <pre>
 {
@@ -1032,27 +1156,10 @@ The following actions are proposed:
   "status":"success"
 }
       </pre>
-      response on failure (network does not exist):
+      response on failure:
       <pre>
 {
   "error": {
-    "exitcode": 6,
-    "message": "Cannot delete network 'example_network': 1 host is still attached to it: myhost"
-  },
-  "result": null,
-  "status": "failure"
-}
-      </pre>
-      response on failure (hosts still attached to network):
-      <pre>
-{
-  "error": {
-    "exitcode": 6,
-    "message": "Cannot delete network 'example_network': 1 host is still attached to it: myhost"
-  },
-  "result": null,
-  "status": "failure"
-}
       </pre>
   </td>
 </tr>
@@ -1226,12 +1333,8 @@ REVIEW_ME:
   </td>
 </tr>
 <tr>
-  <td valign="top"><code>safescale [global_options] host ssh [command_options] &lt;host_name_or_id&gt;</code></td>
+  <td valign="top"><code>safescale [global_options] host ssh &lt;host_name_or_id&gt;</code></td>
   <td>Get SSH configuration to connect to host (for use without SafeScale for example)<br><br>
-      <code>command_options</code>
-      <ul>
-        <li><code>-u &lt;user_name&;gt;</code> Allow to define a particular user to connect with (by default, uses <code>OPERATOR_USERNAME</code> from tenant file)</li>
-      </ul><br>
       example:
       <pre>$ safescale host ssh myhost</pre>
       response on success:
@@ -1279,7 +1382,7 @@ REVIEW_ME:
   "status": "success"
 }
       </pre>
-      response on failure:
+      response on failure: REVIEW_ME
       <pre>
 {
   "error": {
@@ -1292,6 +1395,67 @@ REVIEW_ME:
   </td>
 </tr>
 <tr>
+  <td><code>safescale [global_options] host start &lt;host_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Starts a Host.<br><br>
+      example:
+      <pre>$ safescale host start example_host</pre>
+      response on success:
+      <pre>
+{
+      </pre>
+      response on failure:
+      <pre>
+{
+      </pre>
+  </td>
+</tr>
+<tr>
+  <td><code>safescale [global_options] host stop &lt;host_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Stop a Host.<br><br>
+      example:
+      <pre>$ safescale host stop example_host</pre>
+      response on success:
+      <pre>
+{
+      </pre>
+      response on failure:
+      <pre>
+{
+      </pre>
+  </td>
+</tr>
+<tr>
+  <td><code>safescale [global_options] host reboot &lt;host_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Reboots an Host.<br><br>
+      example:
+      <pre>$ safescale host reboot example_host</pre>
+      response on success:
+      <pre>
+{
+      </pre>
+      response on failure:
+      <pre>
+{
+      </pre>
+  </td>
+</tr>
+<tr>
+  <td><code>safescale [global_options] host status &lt;host_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Displays the current status of an Host.<br><br>
+      example:
+      <pre>$ safescale host status example_host</pre>
+      response on success:
+      <pre>
+{
+      </pre>
+      response on failure:
+      <pre>
+{
+      </pre>
+  </td>
+</tr>
+
+<tr>
   <td valign="top"><code>safescale [global_options] host feature check [command_options] &lt;host_name_or_id&gt; &lt;feature_name&gt;</code></td>
   <td>Check if a feature is present on the host<br>
       <code>command_options</code>:
@@ -1300,7 +1464,7 @@ REVIEW_ME:
       </ul>
       example:
       <pre>$ safescale host check-feature myhost docker</pre>
-      response if feature is present:
+      response if feature is present: REVIEW_ME
       <pre>
 {
   "result": null,
@@ -1325,7 +1489,7 @@ REVIEW_ME:
   <td>Adds the feature to the host<br>
       <code>command_options</code>:
       <ul>
-        <li><code>-p "&lt;PARAM&gt;=&lt;VALUE&gt;"</code>code> Sets the value of a parameter required by the feature</li>
+        <li><code>--param|-p "&lt;PARAM&gt;=&lt;VALUE&gt;"</code> Sets the value of a parameter required by the feature</li>
         <li><code>--skip-proxy</code> Disables the application of (optional) reverse proxy rules defined in the feature</li>
       </ul>
       example:
@@ -1357,6 +1521,81 @@ REVIEW_ME:
 }
       </pre>
       response on failure may vary.
+  </td>
+</tr>
+<tr>
+  <td><code>safescale [global_options] host security group list &lt;host_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Lists the Security Groups bound to an Host.<br><br>
+      example:
+      <pre>$ safescale host security group list example_host</pre>
+      response on success:
+      <pre>
+{
+      </pre>
+      response on failure:
+      <pre>
+{
+      </pre>
+  </td>
+</tr>
+<tr>
+  <td><code>safescale [global_options] host security group bind &lt;host_name_or_id&gt; &lt;securitygroup_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Links a Security Group to an Host.<br><br>
+      example:
+      <pre>$ safescale host security group bind example_host sg-for-some-hosts</pre>
+      response on success:
+      <pre>
+{
+      </pre>
+      response on failure:
+      <pre>
+{
+      </pre>
+  </td>
+</tr>
+<tr>
+  <td><code>safescale [global_options] host security group unbind &lt;host_name_or_id&gt; &lt;securitygroup_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Unlinks a Security Group from an Host.<br><br>
+      example:
+      <pre>$ safescale host security group bind example_host sg-for-some-hosts</pre>
+      response on success:
+      <pre>
+{
+      </pre>
+      response on failure:
+      <pre>
+{
+      </pre>
+  </td>
+</tr>
+<tr>
+  <td><code>safescale [global_options] host security group disable &lt;host_name_or_id&gt; &lt;securitygroup_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Disables a Security Group bound to an Host, the rules of the Security Group are then not being appliedd.<br><br>
+      example:
+      <pre>$ safescale host security group disable example_host sg-for-some-hosts</pre>
+      response on success:
+      <pre>
+{
+      </pre>
+      response on failure:
+      <pre>
+{
+      </pre>
+  </td>
+</tr>
+<tr>
+  <td><code>safescale [global_options] host security group enable &lt;host_name_or_id&gt; &lt;securitygroup_name_or_id&gt;</code></td>
+  <td>REVIEW_ME: Enables a Security Group bound to an Host, the rules of the Security Group are then being applied.<br><br>
+      example:
+      <pre>$ safescale host security group enable example_host sg-for-some-hosts</pre>
+      response on success:
+      <pre>
+{
+      </pre>
+      response on failure:
+      <pre>
+{
+      </pre>
   </td>
 </tr>
 </tbody>

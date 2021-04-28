@@ -213,7 +213,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 // Inspect returns infos on a network
 func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.Network, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect networkInstance")
+	defer fail.OnExitWrapError(&err, "cannot inspect network")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
