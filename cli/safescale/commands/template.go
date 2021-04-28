@@ -59,7 +59,7 @@ var templateList = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", templateCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -80,7 +80,7 @@ var templateMatch = &cli.Command{
 	Usage:     "List templates that match the SIZING",
 	ArgsUsage: "SIZING",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s with args %s", templateCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -105,7 +105,7 @@ var templateInspect = &cli.Command{
 	Usage:     "Display available template information",
 	ArgsUsage: "NAME",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", templateCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {

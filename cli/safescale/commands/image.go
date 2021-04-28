@@ -49,7 +49,7 @@ var imageList = &cli.Command{
 			Usage: "ErrorList all available images in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", imageCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", imageCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {

@@ -202,7 +202,7 @@ var shareMount = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Nas_name> and/or <Host_name>."))
@@ -270,7 +270,7 @@ var shareInspect = &cli.Command{
 	Usage:     "inspect the Share information and clients connected to it",
 	ArgsUsage: "SHARE_REF",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", shareCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", shareCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument SHARE_REF."))
