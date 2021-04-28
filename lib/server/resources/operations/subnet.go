@@ -74,9 +74,9 @@ const (
 type subnet struct {
 	*core
 
-	lock          sync.RWMutex
-	gateways      [2]*host
-	parentNetwork resources.Network
+	lock     sync.RWMutex
+	gateways [2]*host
+	// parentNetwork resources.Network
 }
 
 func nullSubnet() *subnet {
@@ -297,14 +297,14 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Su
 
 // updateCachedInformation updates the information cached in instance because will be frequently used and will not changed over time
 func (instance *subnet) updateCachedInformation() fail.Error {
-	var networkID, primaryGatewayID, secondaryGatewayID string
+	var /*networkID, */ primaryGatewayID, secondaryGatewayID string
 	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		networkID = as.Network
+		// networkID = as.Network
 		if len(as.GatewayIDs) > 0 {
 			primaryGatewayID = as.GatewayIDs[0]
 		}
@@ -337,14 +337,14 @@ func (instance *subnet) updateCachedInformation() fail.Error {
 		instance.gateways[1] = hostInstance.(*host)
 	}
 
-	if instance.parentNetwork == nil {
-		networkInstance, xerr := LoadNetwork(instance.GetService(), networkID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
-		instance.parentNetwork = networkInstance.(*network)
-	}
+	// if instance. == nil {
+	// 	networkInstance, xerr := LoadNetwork(instance.GetService(), networkID)
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		return xerr
+	// 	}
+	// 	instance.parentNetwork = networkInstance.(*network)
+	// }
 
 	return nil
 }
@@ -388,7 +388,6 @@ func (instance *subnet) carry(clonable data.Clonable) (xerr fail.Error) {
 		}
 	}()
 
-	// Note: do not validate parameters, this call will do it
 	xerr = instance.core.carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -450,6 +449,10 @@ func (instance *subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 }
 
 func (instance *subnet) unsafeCreateSubnet(ctx context.Context, req abstract.SubnetRequest) fail.Error {
+	if req.CIDR == "" {
+		return fail.InvalidRequestError("invalid empty string value for 'req.CIDR'")
+	}
+
 	rn, an, xerr := instance.validateNetwork(&req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1922,7 +1925,8 @@ func (instance *subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 		// 4st free CIDR index if the Subnet has been created for a single Host
 		if as.SingleHostCIDRIndex > 0 {
-			networkInstance, innerXErr := instance.unsafeInspectNetwork()
+			// networkInstance, innerXErr := instance.unsafeInspectNetwork()
+			networkInstance, innerXErr := instance.InspectNetwork()
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1986,7 +1990,7 @@ func (instance *subnet) Released() {
 		return
 	}
 
-	instance.parentNetwork.Released()
+	// instance.parentNetwork.Released()
 	instance.core.Released()
 }
 
@@ -1998,10 +2002,19 @@ func (instance *subnet) InspectNetwork() (rn resources.Network, xerr fail.Error)
 		return nil, fail.InvalidInstanceError()
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
-
-	return instance.parentNetwork, nil
+	var as *abstract.Subnet
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		var ok bool
+		as, ok = clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		return nil
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+	return LoadNetwork(instance.GetService(), as.Network)
 }
 
 // deleteGateways deletes all the gateways of the subnet

@@ -19,6 +19,7 @@ package abstract
 import (
 	"encoding/json"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -34,12 +35,25 @@ type NetworkRequest struct {
 	KeepOnFailure bool     // KeepOnFailure tells if resources have to be kept in case of failure (default behavior is to delete them)
 }
 
+// SubNetwork --DEPRECATED--
+type SubNetwork struct {
+	CIDR string `json:"subnetmask,omitempty"`
+	ID   string `json:"subnetid,omitempty"`
+}
+
 // Network represents a virtual network
 type Network struct {
 	ID         string   `json:"id,omitempty"`          // ID for the network (from provider)
 	Name       string   `json:"name,omitempty"`        // name of the network
 	CIDR       string   `json:"mask,omitempty"`        // network in CIDR notation (if it has a meaning...)
 	DNSServers []string `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
+
+	Domain             string         `json:"domain,omitempty"`               // DEPRECATED: contains the domain used to define host FQDN
+	GatewayID          string         `json:"gateway_id,omitempty"`           // DEPRECATED: contains the id of the host acting as primary gateway for the network
+	SecondaryGatewayID string         `json:"secondary_gateway_id,omitempty"` // DEPRECATED: contains the id of the host acting as secondary gateway for the network
+	VIP                *VirtualIP     `json:"vip,omitempty"`                  // DEPRECATED: contains the VIP of the network if created with HA
+	IPVersion          ipversion.Enum `json:"ip_version,omitempty"`           // DEPRECATED: IPVersion is IPv4 or IPv6 (see IPVersion)
+	Subnetworks        []SubNetwork   `json:"subnetworks,omitempty"`          // DEPRECATED
 }
 
 // NewNetwork initializes a new instance of Network

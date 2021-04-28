@@ -28,6 +28,20 @@ The metadata for network informations are stored in `<SAFESCALE>/networks`.
 Inside this folder, the metadata of a network are stored in an object named with its ID in subfolder ``byID``,
 and in an object named with its name in subfolder ``byName``.
 
+### SafeScale Subnets
+
+The metadata for subnet informations are stored in `<SAFESCALE>/subnets`.
+
+Inside this folder, the metadata of a subnet are stored in an object named with its ID in subfolder ``byID``,
+and in an object named with its name in subfolder ``byName``.
+
+### SafeScale Security Groups
+
+The metadata for security group  informations are stored in `<SAFESCALE>/security-groups`.
+
+Inside this folder, the metadata of a security group are stored in an object named with its ID in subfolder ``byID``,
+and in an object named with its name in subfolder ``byName``.
+
 ### SafeScale Shares
 
 The metadata for Shares informations are stored in `<SAFESCALE>/shares`.
@@ -78,6 +92,34 @@ Inside this folder, the metadata are stored in an object named as the cluster na
 |  +- byName (dir)
 |     |
 |     +- net-dev (obj)
+|     |
+|     +- ...
+|
++- subnets (dir)
+|  |
+|  +- byID (dir)
+|  |  |
+|  |  +- e019445f-4d17-de45-b746-9ab0805008a7 (obj)
+|  |  |
+|  |  +- ...
+|  |
+|  +- byName (dir)
+|     |
+|     +- subnet-dev (obj)
+|     |
+|     +- ...
+|
++- security-groups (dir)
+|  |
+|  +- byID (dir)
+|  |  |
+|  |  +- 22854344-8b97-ddfc-b35e-f441d990b004 (obj)
+|  |  |
+|  |  +- ...
+|  |
+|  +- byName (dir)
+|     |
+|     +- sg-dev-hosts (obj)
 |     |
 |     +- ...
 |

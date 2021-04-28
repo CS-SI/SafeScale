@@ -24,6 +24,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud"
@@ -39,7 +40,7 @@ func NormalizeError(err error) fail.Error {
 		return nil
 	}
 
-	tracer := debug.NewTracer(nil, true /*debug.ShouldTrace("stacks") || debug.ShouldTrace("stack.openstack")*/, " Normalizing error").Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), " Normalizing error").Entering()
 	defer tracer.Exiting()
 
 	switch e := err.(type) {

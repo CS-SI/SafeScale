@@ -98,23 +98,6 @@ func (instance *host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
 func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
-	// Create the command
-	sshCmd, xerr := ssh.NewCommand(ctx, cmd)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return 0, "", "", xerr
-	}
-
-	defer func() {
-		if derr := sshCmd.Close(); derr != nil {
-			if xerr == nil {
-				xerr = derr
-			} else {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSHCommand"))
-			}
-		}
-	}()
-
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
 		timeout = temporal.GetLongOperationTimeout()
@@ -124,9 +107,25 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 		retcode        int
 		stdout, stderr string
 	)
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			var innerXErr fail.Error
+			// Create the command
+			sshCmd, innerXErr := ssh.NewCommand(ctx, cmd)
+			innerXErr = debug.InjectPlannedFail(innerXErr)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			defer func() {
+				if derr := sshCmd.Close(); derr != nil {
+					if innerXErr == nil {
+						innerXErr = derr
+					} else {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSHCommand"))
+					}
+				}
+			}()
+
 			retcode = -1
 			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout); innerXErr != nil {
 				switch innerXErr.(type) {
