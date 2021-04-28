@@ -46,18 +46,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/sirupsen/logrus"
 )
 
 // taskCreateCluster is the TaskAction that creates a cluster
 func (instance *cluster) taskCreateCluster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer func() {
-		if xerr != nil {
-			if derr := task.Abort(); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort task"))
-			}
-		}
-	}()
-
 	req := params.(abstract.ClusterRequest)
 	ctx := task.GetContext()
 
@@ -506,13 +499,13 @@ func (instance *cluster) determineSizingRequirements(req abstract.ClusterRequest
 
 // createNetworkingResources creates the network and subnet for the cluster
 func (instance *cluster) createNetworkingResources(task concurrency.Task, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, xerr fail.Error) {
-	defer func() {
-		if xerr != nil {
-			if derr := task.Abort(); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort task"))
-			}
-		}
-	}()
+	// defer func() {
+	// 	if xerr != nil {
+	// 		if derr := task.Abort(); derr != nil {
+	// 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort task"))
+	// 		}
+	// 	}
+	// }()
 
 	if task.Aborted() {
 		return nil, nil, fail.AbortedError(nil, "aborted")
@@ -739,14 +732,14 @@ func (instance *cluster) createHostResources(
 	keepOnFailure bool,
 ) (xerr fail.Error) {
 
-	// In case of failure, abort task to stop running subtasks
-	defer func() {
-		if xerr != nil {
-			if derr := task.Abort(); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort task"))
-			}
-		}
-	}()
+	// // In case of failure, abort task to stop running subtasks
+	// defer func() {
+	// 	if xerr != nil {
+	// 		if derr := task.Abort(); derr != nil {
+	// 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort task"))
+	// 		}
+	// 	}
+	// }()
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -816,7 +809,7 @@ func (instance *cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-	// defer onFailureAbortTask(primaryGatewayTask, &xerr)
+	defer onFailureAbortTask(primaryGatewayTask, &xerr)
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -828,7 +821,7 @@ func (instance *cluster) createHostResources(
 		if xerr != nil {
 			return xerr
 		}
-		// defer onFailureAbortTask(secondaryGatewayTask, &xerr)
+		defer onFailureAbortTask(secondaryGatewayTask, &xerr)
 	}
 
 	if task.Aborted() {
@@ -844,7 +837,7 @@ func (instance *cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-	// defer onFailureAbortTask(mastersTask, &xerr)
+	defer onFailureAbortTask(mastersTask, &xerr)
 
 	// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
 	defer func() {
@@ -887,9 +880,7 @@ func (instance *cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-	// defer func() {
-	// 	onFailureAbortTask(privateNodesTask, &xerr)
-	// }()
+	defer onFailureAbortTask(privateNodesTask, &xerr)
 
 	// Starting from here, if exiting with error, delete nodes
 	defer func() {
@@ -947,7 +938,7 @@ func (instance *cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-	// defer onFailureAbortTask(primaryGatewayConfigTask, &xerr)
+	defer onFailureAbortTask(primaryGatewayConfigTask, &xerr)
 
 	if haveSecondaryGateway {
 		secondaryGatewayConfigTask, xerr = task.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway})
@@ -955,7 +946,7 @@ func (instance *cluster) createHostResources(
 		if xerr != nil {
 			return xerr
 		}
-		// defer onFailureAbortTask(secondaryGatewayConfigTask, &xerr)
+		defer onFailureAbortTask(secondaryGatewayConfigTask, &xerr)
 	}
 
 	if _, primaryGatewayStatus = primaryGatewayConfigTask.Wait(); primaryGatewayStatus != nil {
@@ -988,6 +979,15 @@ func (instance *cluster) createHostResources(
 	}
 
 	return nil
+}
+
+func onFailureAbortTask(task concurrency.Task, xerr *fail.Error) {
+	if xerr != nil && *xerr != nil {
+		derr := task.Abort()
+		if derr != nil {
+			_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort running task"))
+		}
+	}
 }
 
 // complementSizingRequirements complements req with default values if needed
