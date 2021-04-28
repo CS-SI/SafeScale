@@ -83,9 +83,11 @@ func (instance *cluster) taskCreateCluster(task concurrency.Task, params concurr
 		return nil, xerr
 	}
 
+	cleanFailure := false
 	// Starting from here, delete metadata if exiting with error
+	// but if the next cleaning steps fail, we must keep the metadata to try again, so we have the cleanFailure flag to detect that issue
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if xerr != nil && !req.KeepOnFailure && !cleanFailure {
 			logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", actionFromError(xerr), req.Name)
 			if derr := instance.core.delete(); derr != nil {
 				logrus.Errorf("cleaning up on %s, failed to delete metadata of Cluster '%s'", actionFromError(xerr), req.Name)
@@ -142,6 +144,7 @@ func (instance *cluster) taskCreateCluster(task concurrency.Task, params concurr
 		if xerr != nil && !req.KeepOnFailure {
 			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", rs.GetName())
 			if derr := rs.Delete(context.Background()); derr != nil {
+				cleanFailure = true
 				logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", actionFromError(xerr), rs.GetName())
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", actionFromError(xerr)))
 			} else {
@@ -149,6 +152,7 @@ func (instance *cluster) taskCreateCluster(task concurrency.Task, params concurr
 				if req.NetworkID == "" {
 					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", actionFromError(xerr), rn.GetName())
 					if derr := rn.Delete(context.Background()); derr != nil {
+						cleanFailure = true
 						logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", actionFromError(xerr), rn.GetName())
 						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", actionFromError(xerr)))
 					} else {
@@ -193,12 +197,14 @@ func (instance *cluster) taskCreateCluster(task concurrency.Task, params concurr
 				} else {
 					for _, v := range list {
 						if _, derr = tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
+							cleanFailure = true
 							_ = xerr.AddConsequence(derr)
 						}
 					}
 				}
 
 				if _, _, tgerr = tg.WaitGroupFor(temporal.GetLongOperationTimeout()); tgerr != nil {
+					cleanFailure = true
 					_ = xerr.AddConsequence(tgerr)
 				}
 			}
