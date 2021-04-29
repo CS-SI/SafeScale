@@ -309,6 +309,45 @@ func (e *errorCore) prependToMessage(msg string) {
 	e.message = msg + ": " + e.message
 }
 
+// ErrWarning defines a ErrWarning error
+type ErrWarning struct {
+	*errorCore
+}
+
+// WarningError returns an ErrWarning instance
+func WarningError(cause error, msg ...interface{}) *ErrWarning {
+	r := newError(cause, nil, msg...)
+	r.grpcCode = codes.DeadlineExceeded
+	return &ErrWarning{
+		errorCore: r,
+	}
+}
+
+// IsNull tells if the instance is null
+func (e *ErrWarning) IsNull() bool {
+	return e == nil || e.errorCore.IsNull()
+}
+
+// AddConsequence ...
+func (e *ErrWarning) AddConsequence(err error) Error {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null instance", 0))
+		return &ErrWarning{}
+	}
+	_ = e.errorCore.AddConsequence(err)
+	return e
+}
+
+// Annotate ...
+func (e *ErrWarning) Annotate(key string, value data.Annotation) data.Annotatable {
+	if e.IsNull() {
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrWarning.Annotate()", "from null instance", 0))
+		return e
+	}
+	_ = e.errorCore.Annotate(key, value)
+	return e
+}
+
 // ErrTimeout defines a ErrTimeout error
 type ErrTimeout struct {
 	*errorCore
@@ -362,6 +401,12 @@ func NotFoundError(msg ...interface{}) *ErrNotFound {
 	return &ErrNotFound{r}
 }
 
+func NotFoundErrorWithCause(cause error, msg ...interface{}) *ErrNotFound {
+	r := newError(cause, nil, msg...)
+	r.grpcCode = codes.NotFound
+	return &ErrNotFound{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrNotFound) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -395,6 +440,12 @@ type ErrNotAvailable struct {
 // NotAvailableError creates a ErrNotAvailable error
 func NotAvailableError(msg ...interface{}) *ErrNotAvailable {
 	r := newError(nil, nil, msg...)
+	r.grpcCode = codes.Unavailable
+	return &ErrNotAvailable{r}
+}
+
+func NotAvailableErrorWithCause(cause error, msg ...interface{}) *ErrNotAvailable {
+	r := newError(cause, nil, msg...)
 	r.grpcCode = codes.Unavailable
 	return &ErrNotAvailable{r}
 }
@@ -797,8 +848,8 @@ type ErrRuntimePanic struct {
 }
 
 // RuntimePanicError creates a ErrRuntimePanic error
-func RuntimePanicError(msg ...interface{}) *ErrRuntimePanic {
-	r := newError(nil, nil, callstack.DecorateWith(strprocess.FormatStrings(msg...), "", "", 0))
+func RuntimePanicError(pattern string, msg ...interface{}) *ErrRuntimePanic {
+	r := newError(fmt.Errorf(pattern, msg...), nil, callstack.DecorateWith(strprocess.FormatStrings(msg...), "", "", 0))
 	r.grpcCode = codes.Internal
 	// This error is systematically logged
 	logrus.Error(r.Error())
