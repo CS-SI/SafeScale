@@ -782,7 +782,12 @@ func (t *task) Abort() (err fail.Error) {
 	logrus.Debugf("task %s aborted", t.getSignature())
 
 	if previousErr != nil && previousStatus != TIMEOUT {
-		return fail.AbortedError(previousErr)
+		switch previousErr.(type) {
+		case *fail.ErrAborted:
+			return previousErr
+		default:
+			return fail.AbortedError(previousErr)
+		}
 	}
 
 	return nil

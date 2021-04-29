@@ -652,7 +652,7 @@ func AbortedError(err error, msg ...interface{}) *ErrAborted {
 	} else {
 		message = strprocess.FormatStrings(msg...)
 	}
-	r := newError(err, nil, callstack.DecorateWith("", message, "", 0))
+	r := newError(err, nil, message)
 	r.grpcCode = codes.Aborted
 	return &ErrAborted{r}
 }

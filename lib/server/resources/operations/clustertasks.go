@@ -1984,7 +1984,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 			hostInstance.Released()
 		}(host)
 
-		_, xerr = task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
+		_, xerr = tg.Start(instance.taskConfigureNode, taskConfigureNodeParameters{
 			Index: i + 1,
 			Host:  host,
 		})
@@ -1992,15 +1992,13 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		// subtasks = append(subtasks, subtask)
 	}
 
+	_, xerr = tg.Wait()
+	xerr = debug.InjectPlannedFail(xerr)
 	if len(errs) > 0 {
 		return nil, fail.NewErrorList(errs)
 	}
-	_, xerr = tg.Wait()
-	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
