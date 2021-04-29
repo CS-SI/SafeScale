@@ -150,7 +150,7 @@ var hostList = &cli.Command{
 			Usage:   "ErrorList all hosts on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args().)
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
