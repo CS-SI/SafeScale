@@ -46,7 +46,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/sirupsen/logrus"
 )
 
 // taskCreateCluster is the TaskAction that creates a cluster
