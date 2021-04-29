@@ -450,7 +450,12 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				traceR.trace("receiving signal from context, aborting task...")
 				t.mu.Lock()
 				t.status = ABORTED
-				t.err = fail.AbortedError(t.err)
+				switch t.err.(type) {
+				case *fail.ErrAborted:
+					// continue
+				default:
+					t.err = fail.AbortedError(t.err)
+				}
 				t.finishCh <- struct{}{}
 				finish = true
 				t.mu.Unlock() // Avoid defer in loop
@@ -468,7 +473,12 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					if t.status != TIMEOUT {
 						t.status = ABORTED
 					}
-					t.err = fail.AbortedError(t.err)
+					switch t.err.(type) {
+					case *fail.ErrAborted:
+						// do nothing
+					default:
+						t.err = fail.AbortedError(t.err)
+					}
 					t.finishCh <- struct{}{}
 					finish = true
 				} else {
@@ -492,7 +502,12 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				traceR.trace("receiving signal from context, aborting task...")
 				t.mu.Lock()
 				t.status = ABORTED
-				t.err = fail.AbortedError(t.err)
+				switch t.err.(type) {
+				case *fail.ErrAborted:
+					// continue
+				default:
+					t.err = fail.AbortedError(t.err)
+				}
 				t.finishCh <- struct{}{}
 				finish = true
 				t.mu.Unlock() // Avoid defer in loop
@@ -513,7 +528,12 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					if t.status != TIMEOUT {
 						t.status = ABORTED
 					}
-					t.err = fail.AbortedError(t.err)
+					switch t.err.(type) {
+					case *fail.ErrAborted:
+						// continue
+					default:
+						t.err = fail.AbortedError(t.err)
+					}
 					t.finishCh <- struct{}{}
 					finish = true
 				} else {
@@ -722,7 +742,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 
 // Abort aborts the task execution if running and marks it as ABORTED unless it's already DONE
 // A call of this method does not actually stop the running task if there is one; a subsequent
-// call of Wait() may still be needed, it's still the responsability of the executed code in task to stop
+// call of Wait() may still be needed, it's still the responsibility of the executed code in task to stop
 // early on Abort.
 func (t *task) Abort() (err fail.Error) {
 	if t.IsNull() {
@@ -745,8 +765,8 @@ func (t *task) Abort() (err fail.Error) {
 		t.abortCh <- true
 		close(t.abortCh)
 
-		// Tell context to cancel
-		defer t.cancel()
+		// // Tell context to cancel
+		// defer t.cancel()
 
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
@@ -762,7 +782,12 @@ func (t *task) Abort() (err fail.Error) {
 	logrus.Debugf("task %s aborted", t.getSignature())
 
 	if previousErr != nil && previousStatus != TIMEOUT {
-		return fail.AbortedError(previousErr)
+		switch previousErr.(type) {
+		case *fail.ErrAborted:
+			return previousErr
+		default:
+			return fail.AbortedError(previousErr)
+		}
 	}
 
 	return nil

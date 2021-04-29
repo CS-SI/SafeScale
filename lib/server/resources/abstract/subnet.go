@@ -52,10 +52,10 @@ type SubnetRequest struct {
 
 // Subnet represents a subnet
 type Subnet struct {
-	ID                      string           `json:"id,omitempty"`                         // ID of the subnet (from provider)
-	Name                    string           `json:"name,omitempty"`                       // Name of the subnet
+	ID                      string           `json:"id"`                                   // ID of the subnet (from provider)
+	Name                    string           `json:"name"`                                 // Name of the subnet
 	Network                 string           `json:"network"`                              // parent Network of the subnet
-	CIDR                    string           `json:"mask,omitempty"`                       // ip network in CIDR notation
+	CIDR                    string           `json:"mask"`                                 // ip network in CIDR notation
 	Domain                  string           `json:"domain,omitempty"`                     // contains the domain used to define host FQDN
 	DNSServers              []string         `json:"dns_servers,omitempty"`                // contains the DNSServers used on the subnet
 	GatewayIDs              []string         `json:"gateway_id,omitempty"`                 // contains the id of the host(s) acting as gateway(s) for the subnet

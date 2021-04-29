@@ -67,7 +67,7 @@ var sshRun = &cli.Command{
 			Usage: "timeout in minutes",
 		}},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", sshCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
@@ -115,7 +115,7 @@ var sshCopy = &cli.Command{
 			Usage: "timeout in minutes",
 		}},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", sshCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("2 arguments (from and to) are required."))
@@ -163,7 +163,7 @@ var sshConnect = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", sshCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return fmt.Errorf("missing mandatory argument <Host_name>")
@@ -215,7 +215,7 @@ var sshTunnel = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", sshCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
@@ -271,7 +271,7 @@ var sshClose = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", sshCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", sshCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Host_name>."))
