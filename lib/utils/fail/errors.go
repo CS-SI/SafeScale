@@ -51,6 +51,8 @@ type Error interface {
 	consequencer
 	error
 
+	UnformattedError() string
+
 	AnnotationFormatter(func(data.Annotations) string)
 
 	ForceSetCause(error) Error // set the cause of the error
@@ -129,14 +131,20 @@ func defaultCauseFormatter(e Error) string {
 	errCore := e.(*errorCore)
 	if errCore.cause != nil {
 		msgFinal += ": "
-		msgFinal += errCore.cause.Error()
+		switch cerr := errCore.cause.(type) {
+		case Error:
+			msgFinal += cerr.UnformattedError()
+		default:
+			msgFinal += cerr.Error()
+		}
+		// msgFinal += errCore.cause.Error()
 	}
 
 	lenConseq := uint(len(errCore.consequences))
 	if lenConseq > 0 {
 		msgFinal += fmt.Sprintf("\nwith consequence%s:\n", strprocess.Plural(lenConseq))
 		for ind, con := range errCore.consequences {
-			msgFinal += "- " + con.Error()
+			msgFinal += "- " + con.(Error).UnformattedError()
 			if uint(ind+1) < lenConseq {
 				msgFinal += "\n"
 			}
@@ -195,7 +203,7 @@ func (e errorCore) Cause() error {
 }
 
 // RootCause returns the initial error's cause
-func (e errorCore) RootCause() error {
+func (e *errorCore) RootCause() error {
 	return RootCause(e)
 }
 
@@ -276,12 +284,25 @@ func (e errorCore) Consequences() []error {
 
 // Error returns a human-friendly error explanation
 // satisfies interface error
-func (e errorCore) Error() string {
+func (e* errorCore) Error() string {
 	msgFinal := e.message
 
 	if e.causeFormatter != nil {
-		msgFinal += e.causeFormatter(&e)
+		msgFinal += e.causeFormatter(e)
 	}
+
+	if len(e.annotations) > 0 {
+		msgFinal += "\nWith annotations: "
+		msgFinal += e.annotationFormatter(e.annotations)
+	}
+
+	return msgFinal
+}
+
+// UnformattedError returns a human-friendly error explanation
+// satisfies interface error
+func (e* errorCore) UnformattedError() string {
+	msgFinal := e.message
 
 	if len(e.annotations) > 0 {
 		msgFinal += "\nWith annotations: "

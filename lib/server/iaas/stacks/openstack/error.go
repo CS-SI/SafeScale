@@ -24,14 +24,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	"github.com/sirupsen/logrus"
-
-	"github.com/gophercloud/gophercloud"
-
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/gophercloud/gophercloud"
+	"github.com/sirupsen/logrus"
 )
 
 // NormalizeError translates gophercloud or openstack error to SafeScale error
@@ -168,7 +166,7 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 	}()
 	defer fail.OnPanic(&xerr)
 
-	tracer := debug.NewTracer(nil, true /*debug.ShouldTrace("stacks") || debug.ShouldTrace("stack.openstack")*/, " Normalizing error").Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), ": Normalizing error").Entering()
 	defer tracer.Exiting()
 
 	fn, ok := errorFuncMap[errorName]

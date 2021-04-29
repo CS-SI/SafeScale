@@ -337,7 +337,7 @@ The following actions are proposed:
     },
     "status":"success"
 }
-      </pre>>
+      </pre>
   </td>
 </tr>
 <tr>
@@ -431,9 +431,9 @@ The following actions are available:
   </td>
 </tr>
 <tr>
-  <td valign="top"><code>safescale template inspect</code></td>
-  <td>Display templates with scanned information (if available).<br><br>
-      <u>example</u>: REVIEW_ME
+  <td valign="top"><code>safescale template inspect &lt;template_name&gt;</code></td>
+  <td>Display information about a template.<br><br>
+      <u>example</u>:
       <pre>safescale template inspect s1-4</pre>
       response on success (without scan):<pre>
 {
@@ -484,7 +484,14 @@ The following actions are available:
 }
       </pre>
       response on failure:<pre>
-{"result":{
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot inspect tenant: template named 's1-4' not found"
+  },
+  "result": null,
+  "status": "failure"
+}
       </pre>
   </td>
 </tr>
@@ -518,13 +525,15 @@ The following actions are proposed:
         <li><code>--cidr &lt;cidr&gt;</code>
             CIDR of the network (default: "192.168.0.0/24")</li>
         <li><code>--empty</code>
-            do not create a default Subnet in the Network</li>
+            do not create a default Subnet in the Network<br>
+        </li>
+        <u>Note</u>: following options are meaningful only if <code>--empty</code> is not used
         <li><code>--gwname &lt;host_name&gt;</code>
             Name of the gateway (<code>gw-&lt;subnet_name&gt;</code> by default)</li>
         <li><code>--os "&lt;os_name&gt;"</code>
             Image name for the gateway (default: "Ubuntu 18.04")</li>
         <li><code>--failover</code>
-            creates 2 gateways for the network with a VIP used as internal default route for the <code>Subnet</code> (when <code>--empty</code> is not used)</li>
+            creates 2 gateways for the network and a Virtual IP used as internal default route for the automatically created <code>Subnet</code></li>
         <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of gateway (refer to <a href="#safescale_sizing">Host sizing definition</a>a> paragraph for details)</li>
       </ul><br>
       <u>example</u>:
@@ -559,7 +568,7 @@ The following actions are proposed:
   <td valign="top">
     <code>safescale network list [command_options]</code>
   </td>
-  <td>List networks created by SafeScale<br><br>
+  <td>List <code>Networks</code> created by SafeScale<br><br>
     <code>command_options</code>:
     <ul>
       <li><code>--all</code> List all network existing on the current tenant (not only those created by SafeScale)</li>
@@ -611,7 +620,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network inspect &lt;network_name_or_id&gt;</code></td>
-  <td>Get info of a <code>Network</code>code><br><br>
+  <td>Get information about a <code>Network</code> created by SafeScale.<br><br>
       <u>example</u>:
       <pre>$ safescale network inspect example_network</pre>
       response on success:
@@ -642,7 +651,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network delete &lt;network_name_or_id&gt;</code></td>
-  <td>Delete the network whose name or id is given<br><br>
+  <td>Delete a <code>Network</code> created by SafeScale.<br><br>
       <u>example</u>:
       <pre>$ safescale network delete example_network</pre>
       response on success:
@@ -652,7 +661,7 @@ The following actions are proposed:
   "status": "success"
 }
       </pre>
-      response on failure (network does not exist):
+      response on failure (<code>Network</code> does not exist):
       <pre>
 {
   "error": {
@@ -678,14 +687,15 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet create [command_options] &lt;network_name_or_id&gt; &lt;subnet_name></code></td>
-  <td>Creates a `Subnet` with the given name.<br><br>
+  <td>Creates a <code>Subnet</code> with the given name.<br><br>
       <code>command_options</code>:
       <ul>
         <li><code>--cidr &lt;cidr&gt;</code> CIDR of the network (default: "192.168.0.0/24")</li>
         <li><code>--gwname &lt;name&gt;</code> name of the gateway (default: <code>gw-&lt;subnet_name&gt;</code>)</li>
         <li><code>--os "&lt;os name&gt;"</code> Image name for the gateway (default: "Ubuntu 18.04")</li>
         <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of gateway (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details)</li>
-        <li>`--failover` creates 2 gateways for the network with a VIP used as internal default route</li>
+        <li><code>--failover</code>creates 2 gateways for the network with a VIP used as internal default route. The names of the gateways cannot be changed, and will be <code>gw-&lt;subnet_name&gt;</code> and <code>gw2-&lt;subnet_name&gt;</code>
+        </li>
       </ul>
       <u>example</U>:
       <pre>$ safescale network subnet create --cidr 192.168.1.0/24 example_network example_subnet</pre>
@@ -719,7 +729,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet list [command_options] &lt;network_name_or_id&gt;</code></td>
-  <td>List `Subnets` created by SafeScale<br>
+  <td>List <code>Subnets</code> created by SafeScale.<br><br>
       <code>command_options</code>:
       <ul>
         <li><code>--all</code> List all network existing on the current tenant (not only those created by SafeScale)</li>
@@ -831,7 +841,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet inspect &lt;network_name_or_id&gt; &lt;subnet_name_or_id&gt;</code></td>
-  <td>Get info about a `Subnet`<br><br>
+  <td>Get information about a <code>Subnet</code> created by SafeScale.`<br><br>
       <u>example</u>:
       <pre>$ safescale network subnet inspect example_network example_subnet</pre>
       response on success:
@@ -868,7 +878,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network subnet delete &lt;network_name_or_id&gt; &lt;subnet_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Delete a Subnet identified by name or id<br><br>
+  <td>Delete a <code>Subnet</code> created by SafeScale.<br><br>
       If <code>&lt;subnet_name_or_id&gt;</code> contains a name, <code>&lt;network_name_or_id&gt;</code> is mandatory.<br>
       If <code>&lt;subnet_name_or_id&gt;</code> contains an ID, <code>&lt;network_name_or_id&gt;</code> can be omitted using <code>""</code> or <code>-</code>.<br><br>
       examples:
@@ -903,7 +913,7 @@ The following actions are proposed:
   "status": "failure"
 }</pre>
         </li>
-        <li><pre>$ safescale network subnet delete example_network 48112419-3bc3-46f5-a64d-3634dd8bb1be</pre>
+        <li><pre>$ safescale network subnet delete - 48112419-3bc3-46f5-a64d-3634dd8bb1be</pre>
             response on success:
             <pre>
 {
@@ -929,7 +939,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group create [command_options] &lt;network_name_or_id&gt; &lt;security_group_name&gt;</code></td>
-  <td>REVIEW_ME: <br>Creates a Security Group in a Network.<br>
+  <td>REVIEW_ME: <br>Creates a <code>SecurityGroup</code> in a <code>Network</code>.<br>
       <code>command_options</code>:
       <ul>
         <li><code>--description</code> Describes the usage of the Security Group (optional)</li>
@@ -949,10 +959,10 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group list [command_options] &lt;network_name_or_id&gt;</code></td>
-  <td>List Security Groups<br>
+  <td>List <code>SecurityGroups</code> available in a <code>Network</code><br>
       <code>command_options</code>:
       <ul>
-        <li><code>--all</code> List all Security Groups existing on the current tenant (not only those created by SafeScale) (optional)</li>
+        <li><code>--all</code> List all Security Groups (not only those created by SafeScale) (optional)</li>
       </ul>
       <u>examples</u>:
       <ul>
@@ -1016,7 +1026,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group inspect &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Get information about a Security Group<br><br>
+  <td>REVIEW_ME: Get information about a <code>SecurityGroup</code><br><br>
       example:
       <pre>$ safescale network security group inspect example_network safescale-sg_subnet_publicip.example_network.example_network</pre>
       response on success:
