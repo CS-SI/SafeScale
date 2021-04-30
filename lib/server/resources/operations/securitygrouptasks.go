@@ -123,7 +123,7 @@ func (instance *securityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 						break
 					}
 				}
-				_, innerXErr = tg.Wait()
+				_, innerXErr = tg.WaitGroup()
 				return innerXErr
 			})
 			if innerXErr != nil {

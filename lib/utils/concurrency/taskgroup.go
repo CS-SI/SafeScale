@@ -345,6 +345,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			if taskStatus == ABORTED {
 				instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup aborted")
 			} else {
+				// FIXME: If nobody asked for Abort, we should return the fail.NewErrorList instead
 				instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
 			}
 		} else {

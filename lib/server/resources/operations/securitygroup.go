@@ -465,7 +465,7 @@ func (instance *securityGroup) unbindFromHosts(ctx context.Context, in *properti
 			break
 		}
 	}
-	_, xerr = tg.Wait()
+	_, xerr = tg.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -510,7 +510,7 @@ func (instance *securityGroup) unbindFromSubnets(ctx context.Context, in *proper
 			break
 		}
 	}
-	_, xerr = tg.Wait()
+	_, xerr = tg.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1163,7 +1163,7 @@ func (instance *securityGroup) enableOnHostsAttachedToSubnet(task concurrency.Ta
 					break
 				}
 			}
-			_, innerXErr := tg.Wait()
+			_, innerXErr := tg.WaitGroup()
 			return innerXErr
 		})
 	})
@@ -1189,7 +1189,7 @@ func (instance *securityGroup) disableOnHostsAttachedToSubnet(task concurrency.T
 					break
 				}
 			}
-			_, innerXErr := tg.Wait()
+			_, innerXErr := tg.WaitGroup()
 			return innerXErr
 		})
 	})

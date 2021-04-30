@@ -1571,7 +1571,7 @@ func (instance *cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 		return nil, fail.NewErrorList(taskErrors)
 	}
 
-	_, xerr = tg.Wait()
+	_, xerr = tg.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1993,7 +1993,7 @@ func (instance *cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 		}
 	}
 
-	_, xerr = tg.Wait()
+	_, xerr = tg.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
 	if len(errs) > 0 {
 		return nil, fail.NewErrorList(errs)
