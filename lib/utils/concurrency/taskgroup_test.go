@@ -29,8 +29,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// FIXME: The whole file taskgroup_test.go MUST pass UT flawlessly before using it confidently
-
 func TestChildrenWaitingGame(t *testing.T) {
 	overlord, err := NewTaskGroup(nil)
 	require.NotNil(t, overlord)

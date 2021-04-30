@@ -29,6 +29,14 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
+func problemsHappens(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
+	return heavyDutyTaskThatFails(40*time.Millisecond, true, true)
+}
+
+func happyPath(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
+	return heavyDutyTaskThatFails(40*time.Millisecond, true, false)
+}
+
 // this function performs sequentially 3 huge time consuming operations 'heavyDutyTask' and checks if abortion is requested between operations
 func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
 	var iRes int
@@ -139,6 +147,63 @@ func heavyDutyTask(duration time.Duration, wantedResult bool) (bool, fail.Error)
 	time.Sleep(duration * 2)
 
 	return wantedResult, nil
+}
+
+func heavyDutyTaskThatFails(duration time.Duration, wantedResult bool, withError bool) (bool, fail.Error) {
+	time.Sleep(duration * 2)
+
+	if withError {
+		return wantedResult, fail.NewError("An error !!, damn !!")
+	}
+
+	return wantedResult, nil
+}
+
+func TestSomethingFails(t *testing.T) {
+	overlord, xerr := NewTaskGroup(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, xerr)
+
+	theID, xerr := overlord.GetID()
+	require.Nil(t, xerr)
+	require.NotEmpty(t, theID)
+
+	fmt.Println("Begin")
+
+	numChild := 10
+	for ind := 0; ind < numChild; ind++ {
+		_, xerr := overlord.Start(happyPath, nil)
+		if xerr != nil {
+			t.Errorf("Unexpected: %s", xerr)
+		}
+	}
+	_, xerr = overlord.Start(problemsHappens, nil)
+	if xerr != nil {
+		t.Errorf("Unexpected: %s", xerr)
+	}
+	_, xerr = overlord.Start(problemsHappens, nil)
+	if xerr != nil {
+		t.Errorf("Unexpected: %s", xerr)
+	}
+
+	_, xerr = overlord.WaitGroup()
+	require.NotNil(t, xerr)
+	if xerr != nil {
+		if eab, ok := xerr.(*fail.ErrAborted); ok {
+			cause := eab.Cause()
+			if causes, ok := cause.(*fail.ErrorList); ok {
+				errList := causes.ToErrorSlice()
+
+				if len(errList) != 2 {
+					t.Fail()
+				}
+			} else {
+				t.FailNow()
+			}
+		} else {
+			t.FailNow()
+		}
+	}
 }
 
 func TestGoodTaskActionCitizen(t *testing.T) {
