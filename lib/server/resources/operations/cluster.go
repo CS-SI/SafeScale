@@ -3209,7 +3209,7 @@ func (instance *cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 			errors = append(errors, xerr)
 		}
 	}
-	_, xerr = tg.Wait()
+	_, xerr = tg.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		errors = append(errors, xerr)

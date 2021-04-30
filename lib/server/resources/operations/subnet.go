@@ -1047,7 +1047,7 @@ func (instance *subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		}
 	}
 
-	_, xerr = tg.Wait()
+	_, xerr = tg.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
 	return xerr
 }
