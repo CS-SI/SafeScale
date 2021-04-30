@@ -35,7 +35,8 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            [ -f /usr/local/bin/helm ] || sfFail 192
+                            [ -f /usr/local/bin/helm ] || sfFail 192 "Helm binary not found"
+                            /usr/local/bin/helm version | grep v2 || sfFail 192 "Wrong helm version (not 2.X)"
                             sfExit
 
             add:
