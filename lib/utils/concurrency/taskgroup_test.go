@@ -128,7 +128,8 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	require.NotNil(t, err)
 	require.NotEmpty(t, res)
 
-	ct := err.Error()
+	cause := fail.RootCause(err)
+	ct := cause.Error()
 	if !strings.Contains(ct, "Panic protection") {
 		t.Errorf("Expected to catch a Panic here...")
 	}
@@ -218,7 +219,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	for ind := 0; ind < 2800; ind++ {
 		rt, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := tools.RandomInt(5, 25)
-			if rint > 16 {
+			if rint > 8 {
 				rint += 1000
 			}
 			fmt.Printf("sleeping %dms...\n", rint)
@@ -393,23 +394,21 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 		}()
 
 		if _, xerr := overlord.WaitGroup(); xerr != nil {
-			t.Fail()
-		}
-
-		if _, xerr := overlord.WaitGroup(); xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrAborted:
 				// Wanted situation, continue
 			default:
-				t.Fail()
+				t.FailNow()
 			}
+		} else {
+			t.FailNow()
 		}
 
 		end := time.Since(begin)
 
 		fmt.Println("Here we are")
 
-		if end >= (time.Millisecond * 400) {
+		if end >= (time.Millisecond * 500) {
 			t.Errorf("It should have finished near 350 ms but it didn't, it was %v !!", end)
 		}
 	}()
