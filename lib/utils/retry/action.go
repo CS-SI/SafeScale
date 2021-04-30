@@ -20,6 +20,7 @@ package retry
 // delays and stop conditions
 
 import (
+	"os"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -82,6 +83,27 @@ func Action(
 	}.loopWithSoftTimeout()
 }
 
+func BackoffSelector() Backoff {
+	if delayAlgo := os.Getenv("SAFESCALE_ALGO_DELAY"); delayAlgo != "" {
+		switch delayAlgo {
+		case "Constant":
+			return Constant
+		case "Incremental":
+			return Incremental
+		case "Linear":
+			return Linear
+		case "Exponential":
+			return Exponential
+		case "Fibonacci":
+			return Fibonacci
+		default:
+			return Constant
+		}
+	}
+
+	return Constant
+}
+
 // WhileUnsuccessful retries every 'delay' while 'run' is unsuccessful with a 'timeout'
 func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Duration) fail.Error {
 	if delay > timeout {
@@ -99,7 +121,7 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -131,7 +153,7 @@ func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, 
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -156,7 +178,7 @@ func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, tim
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -204,7 +226,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -235,7 +257,7 @@ func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Dur
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -283,7 +305,7 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -327,7 +349,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 	}
 	return action{
 		Arbiter: arbiter,
-		Officer: Constant(delay),
+		Officer: BackoffSelector()(delay),
 		Run:     run,
 		First:   nil,
 		Last:    nil,
@@ -432,7 +454,9 @@ func (a action) loopWithHardTimeout(timeout time.Duration) fail.Error {
 		}
 	}
 
-	// FIXME: comment! what is the purpose of 'desist' ?
+	// the time.After inside the for bucle (16 lines below), is evaluated each time we enter the bucle, if we want a timeout for
+	// the whole bucle, we need to define it outside the bucle, this is the desist timeout
+	// ideally, the timeout inside the bucle and the timeout ouside should be different, something like: outsideTimeout = #maxAllowedIterations * insideTimeout
 	desist := time.After(timeout)
 	for count := uint(1); ; count++ {
 		var err error
