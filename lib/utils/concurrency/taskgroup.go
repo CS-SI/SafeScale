@@ -252,7 +252,7 @@ func (tg *taskGroup) Wait() (TaskResult, fail.Error) {
 //       a subtask not responding; if a subtask is designed to run forever, it will never end.
 //       It's highly recommended to use task.Aborted() in the body of a task to check
 //       for abortion signal and quit the go routine accordingly to reduce the risk (a taskgroup remains abortable with
-//       this recommandation).
+//       this recommendation).
 func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	if tg.isNull() {
 		return nil, fail.InvalidInstanceError()
@@ -279,25 +279,6 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		results = tg.result
 		return results, tg.task.err
 
-	//case ABORTED:
-	//	var errors []error
-	//
-	//	tg.task.mu.Lock()
-	//	if tg.task.err != nil {
-	//		errors = append(errors, tg.task.err)
-	//	}
-	//	tg.task.mu.Unlock()
-	//
-	//	tg.children.lock.RLock()
-	//	defer tg.children.lock.RUnlock()
-	//
-	//	for _, s := range tg.children.tasks {
-	//		if lerr, _ := s.task.GetLastError(); lerr != nil {
-	//			errors = append(errors, lerr)
-	//		}
-	//	}
-	//	return nil, fail.AbortedError(fail.NewErrorList(errors), "taskgroup was already aborted")
-	//}
 	case RUNNING, READY, ABORTED:
 		doneWaitSize := len(tg.children.tasks)
 		doneWaitStates := make(map[int]bool, doneWaitSize)
@@ -362,7 +343,9 @@ func (tg *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		tg.task.result = results
 		if len(errors) > 0 {
 			if taskStatus == ABORTED {
-				tg.task.err = fail.AbortedError(fail.NewErrorList(errors), "aborted")
+				tg.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup aborted")
+			} else {
+				tg.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
 			}
 		} else {
 			tg.task.err = nil

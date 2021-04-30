@@ -284,7 +284,7 @@ func (e errorCore) Consequences() []error {
 
 // Error returns a human-friendly error explanation
 // satisfies interface error
-func (e* errorCore) Error() string {
+func (e *errorCore) Error() string {
 	msgFinal := e.message
 
 	if e.causeFormatter != nil {
@@ -301,7 +301,7 @@ func (e* errorCore) Error() string {
 
 // UnformattedError returns a human-friendly error explanation
 // satisfies interface error
-func (e* errorCore) UnformattedError() string {
+func (e *errorCore) UnformattedError() string {
 	msgFinal := e.message
 
 	if len(e.annotations) > 0 {
