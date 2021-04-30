@@ -246,10 +246,12 @@ func TestBadTaskActionCitizen(t *testing.T) {
 				}
 
 				if !errFound {
+					t.Errorf("no message checking for status !!")
 					t.Fail()
 				}
 
-				if len(errList) != (numChild + 1) {
+				if len(errList) != numChild {
+					t.Errorf("didn't wait for all the children !!: %d", len(errList))
 					t.Fail()
 				}
 			}
