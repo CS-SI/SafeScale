@@ -678,13 +678,13 @@ sfKeycloakDeleteGroup() {
 export -f sfKeycloakDeleteGroup
 
 # sfService abstract the command to use to manipulate services
-sfService() {
+function sfService() {
     [ $# -ne 2 ] && return 1
 
     local use_systemd=$(sfGetFact "use_systemd")
     local redhat_like=$(sfGetFact "redhat_like")
 
-    # Preventively run daemon-reload in case of changes
+    # Preemptively run daemon-reload in case of changes
     [ "$use_systemd" = "1" ] && systemctl daemon-reload
 
     case $1 in
