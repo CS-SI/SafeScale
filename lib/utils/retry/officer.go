@@ -18,6 +18,7 @@ package retry
 
 import (
 	"math"
+	mrand "math/rand"
 	"time"
 )
 
@@ -27,6 +28,8 @@ type Officer struct {
 
 	variables interface{}
 }
+
+type Backoff func(duration time.Duration) *Officer
 
 // Constant sleeps for duration duration
 func Constant(duration time.Duration) *Officer {
@@ -89,5 +92,20 @@ func Fibonacci(base time.Duration) *Officer {
 		time.Sleep(base * time.Duration(cur))
 	}
 
+	return &o
+}
+
+func randomInt(min, max int) int {
+	mrand.Seed(time.Now().Unix())
+	return mrand.Intn(max-min) + min
+}
+
+func Randomized(bottom time.Duration, top time.Duration) *Officer { // FIXME: OPP Implement this
+	o := Officer{
+		Block: func(t Try) {
+			sleepTime := time.Duration(randomInt(int(bottom.Milliseconds()), int(top.Milliseconds()))) * time.Millisecond
+			time.Sleep(sleepTime)
+		},
+	}
 	return &o
 }
