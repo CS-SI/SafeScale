@@ -20,146 +20,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func problemsHappens(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
-	return heavyDutyTaskThatFails(40*time.Millisecond, true, true)
-}
-
-func happyPath(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
-	return heavyDutyTaskThatFails(40*time.Millisecond, true, false)
-}
-
-// this function performs sequentially 3 huge time consuming operations 'heavyDutyTask' and checks if abortion is requested between operations
-func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
-	var iRes int
-
-	defer func(err *fail.Error) {
-		if st, _ := t.GetStatus(); st == ABORTED {
-			if iRes > 1 {
-				*err = fail.NewError("failure: the action must check the status from time to time")
-			}
-		}
-	}(&xerr)
-
-	if st, _ := t.GetStatus(); st == ABORTED {
-		fmt.Println("Exiting before real execution")
-		return iRes, nil
-	}
-
-	_, xerr = heavyDutyTask(10*time.Millisecond, true)
-	if xerr != nil {
-		return nil, xerr
-	}
-	iRes++
-
-	if st, _ := t.GetStatus(); st == ABORTED {
-		fmt.Println("Exiting before 2nd execution")
-		return iRes, nil
-	}
-
-	_, xerr = heavyDutyTask(10*time.Millisecond, true)
-	if xerr != nil {
-		return nil, xerr
-	}
-	iRes++
-
-	if st, _ := t.GetStatus(); st == ABORTED {
-		fmt.Println("Exiting before 3rd execution")
-		return iRes, nil
-	}
-
-	_, xerr = heavyDutyTask(10*time.Millisecond, true)
-	if xerr != nil {
-		return nil, xerr
-	}
-	iRes++
-
-	if st, _ := t.GetStatus(); st == ABORTED {
-		fmt.Println("Exiting before function return")
-		return iRes, nil
-	}
-
-	return result, xerr
-}
-
-// this function performs sequentially 3 huge time consuming operations 'heavyDutyTask' but doesn't care checking for abortion
-func badTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
-	var iRes int
-
-	defer func(err *fail.Error) {
-		if st, _ := t.GetStatus(); st == ABORTED {
-			if iRes > 1 {
-				*err = fail.NewError("failure: the action must check the status from time to time")
-			}
-		}
-	}(&xerr)
-
-	_, xerr = heavyDutyTask(10*time.Millisecond, true)
-	if xerr != nil {
-		return nil, xerr
-	}
-	iRes++
-
-	_, xerr = heavyDutyTask(10*time.Millisecond, true)
-	if xerr != nil {
-		return nil, xerr
-	}
-	iRes++
-
-	_, xerr = heavyDutyTask(10*time.Millisecond, true)
-	if xerr != nil {
-		return nil, xerr
-	}
-	iRes++
-
-	return result, xerr
-}
-
-// this function never returns, it just leaks
-func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
-	var iRes int
-
-	defer func(err *fail.Error) {
-		if st, _ := t.GetStatus(); st == ABORTED {
-			if iRes > 1 {
-				*err = fail.NewError("failure: the action must check the status from time to time")
-			}
-		}
-	}(&xerr)
-
-	theCh := parameters.(chan string)
-
-	for {
-		theCh <- "Living forever"
-		_, _ = heavyDutyTask(10*time.Millisecond, true)
-	}
-}
-
-func heavyDutyTask(duration time.Duration, wantedResult bool) (bool, fail.Error) {
-	time.Sleep(duration * 2)
-
-	return wantedResult, nil
-}
-
-func heavyDutyTaskThatFails(duration time.Duration, wantedResult bool, withError bool) (bool, fail.Error) {
-	time.Sleep(duration * 2)
-
-	if withError {
-		return wantedResult, fail.NewError("An error !!, damn !!")
-	}
-
-	return wantedResult, nil
-}
-
-func TestSomethingFails(t *testing.T) {
+func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
 	overlord, xerr := NewTaskGroup(nil)
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
@@ -168,52 +35,7 @@ func TestSomethingFails(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	fmt.Println("Begin")
-
-	numChild := 10
-	for ind := 0; ind < numChild; ind++ {
-		_, xerr := overlord.Start(happyPath, nil)
-		if xerr != nil {
-			t.Errorf("Unexpected: %s", xerr)
-		}
-	}
-	_, xerr = overlord.Start(problemsHappens, nil)
-	if xerr != nil {
-		t.Errorf("Unexpected: %s", xerr)
-	}
-	_, xerr = overlord.Start(problemsHappens, nil)
-	if xerr != nil {
-		t.Errorf("Unexpected: %s", xerr)
-	}
-
-	_, xerr = overlord.WaitGroup()
-	require.NotNil(t, xerr)
-	if xerr != nil {
-		if eab, ok := xerr.(*fail.ErrAborted); ok {
-			cause := eab.Cause()
-			if causes, ok := cause.(*fail.ErrorList); ok {
-				errList := causes.ToErrorSlice()
-
-				if len(errList) != 2 {
-					t.Fail()
-				}
-			} else {
-				t.FailNow()
-			}
-		} else {
-			t.FailNow()
-		}
-	}
-}
-
-func TestGoodTaskActionCitizen(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
-	require.NotNil(t, overlord)
-	require.Nil(t, xerr)
-
-	theID, xerr := overlord.GetID()
-	require.Nil(t, xerr)
-	require.NotEmpty(t, theID)
+	overlord.DisarmAbortSignal()
 
 	fmt.Println("Begin")
 
@@ -227,9 +49,14 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 
 	begin := time.Now()
 	time.Sleep(12 * time.Millisecond)
-	xerr = overlord.Abort()
-	if xerr != nil {
-		t.Fail()
+	if itis, err := overlord.Abortable(); err != nil {
+		if itis {
+			xerr = overlord.Abort()
+			if xerr != nil {
+				t.Errorf("Failure aborting: %v", xerr)
+				t.Fail()
+			}
+		}
 	}
 
 	end := time.Since(begin)
@@ -237,28 +64,7 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 	time.Sleep(12 * time.Millisecond)
 
 	_, xerr = overlord.WaitGroup()
-	if xerr != nil {
-		if eab, ok := xerr.(*fail.ErrAborted); ok {
-			cause := eab.Cause()
-			if causes, ok := cause.(*fail.ErrorList); ok {
-				errList := causes.ToErrorSlice()
-				errFound := false
-				for _, err := range errList {
-					if strings.Contains(err.Error(), "must check the status") {
-						errFound = true
-					}
-				}
-
-				if errFound {
-					t.Fail()
-				}
-
-				if len(errList) != 1 {
-					t.Fail()
-				}
-			}
-		}
-	}
+	require.Nil(t, xerr)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -267,7 +73,7 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 	}
 }
 
-func TestBadTaskActionCitizen(t *testing.T) {
+func TestBadTaskActionCitizenDisengaged(t *testing.T) {
 	overlord, xerr := NewTaskGroup(nil)
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
@@ -276,6 +82,7 @@ func TestBadTaskActionCitizen(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
+	overlord.DisarmAbortSignal()
 	fmt.Println("Begin")
 
 	numChild := 10
@@ -288,9 +95,14 @@ func TestBadTaskActionCitizen(t *testing.T) {
 
 	begin := time.Now()
 	time.Sleep(10 * time.Millisecond)
-	xerr = overlord.Abort()
-	if xerr != nil {
-		t.Fail()
+	if itis, err := overlord.Abortable(); err != nil {
+		if itis {
+			xerr = overlord.Abort()
+			if xerr != nil {
+				t.Errorf("Failure aborting: %v", xerr)
+				t.Fail()
+			}
+		}
 	}
 
 	end := time.Since(begin)
@@ -298,30 +110,7 @@ func TestBadTaskActionCitizen(t *testing.T) {
 	time.Sleep(60 * time.Millisecond)
 
 	_, xerr = overlord.WaitGroup()
-	if xerr != nil {
-		if eab, ok := xerr.(*fail.ErrAborted); ok {
-			cause := eab.Cause()
-			if causes, ok := cause.(*fail.ErrorList); ok {
-				errList := causes.ToErrorSlice()
-				errFound := false
-				for _, err := range errList {
-					if strings.Contains(err.Error(), "must check the status") {
-						errFound = true
-					}
-				}
-
-				if !errFound {
-					t.Errorf("no message checking for status !!")
-					t.Fail()
-				}
-
-				if len(errList) != numChild {
-					t.Errorf("didn't wait for all the children !!: %d", len(errList))
-					t.Fail()
-				}
-			}
-		}
-	}
+	require.Nil(t, xerr)
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -330,7 +119,7 @@ func TestBadTaskActionCitizen(t *testing.T) {
 	}
 }
 
-func TestAwfulTaskActionCitizen(t *testing.T) {
+func TestAwfulTaskActionCitizenDisengaged(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
@@ -343,6 +132,7 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
+	overlord.DisarmAbortSignal()
 	fmt.Println("Begin")
 
 	stCh := make(chan string, 100)
@@ -356,16 +146,25 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 	}
 
 	time.Sleep(10 * time.Millisecond)
-	xerr = overlord.Abort()
-	if xerr != nil {
-		t.Fail()
+	if itis, err := overlord.Abortable(); err != nil {
+		if itis {
+			xerr = overlord.Abort()
+			if xerr != nil {
+				t.Errorf("Failure aborting: %v", xerr)
+				t.Fail()
+			}
+		}
 	}
 
 	time.Sleep(60 * time.Millisecond)
 
-	_, xerr = overlord.WaitGroup()
+	// task cannot be aborted, subtasks never return, a WaitGroup here would wait forever
+	ended, _, xerr := overlord.WaitGroupFor(3 * time.Second)
 	if xerr == nil { // It should fail because it's an aborted task...
-		t.Fail()
+		t.FailNow()
+	}
+	if ended { // it didn't, it is a timeout
+		t.FailNow()
 	}
 
 	time.Sleep(1000 * time.Millisecond)
