@@ -279,21 +279,6 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		return nil, fail.ConvertError(cerr)
 	}
 
-	/*
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			if runCmdString != "" {
-				logrus.Debugf("[TRACE] %s", runCmdString)
-			}
-			_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", scfg.IPAddress)), 0777)
-			partials := strings.Split(f.Name(), "/")
-			dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/%s.sshkey", scfg.IPAddress, partials[len(partials)-1]))
-			err = ioutil.WriteFile(dumpName, []byte(scfg.GatewayConfig.PrivateKey), 0644)
-			if err != nil {
-				logrus.Warnf("[TRACE] Failure storing key in %s", dumpName)
-			}
-		}
-	*/
-
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
 		time.Sleep(10 * time.Millisecond)
 	}
