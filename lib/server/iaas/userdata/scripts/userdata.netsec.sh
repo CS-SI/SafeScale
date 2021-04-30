@@ -90,28 +90,28 @@ function reset_fw() {
 	# Attach Internet interface or source IP to zone public if host is gateway
 	[ ! -z $PU_IF ] && {
 		# sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
-		firewall-offline-cmd --zone=public --add-interface=$PU_IF || return 1
+		firewall-offline-cmd --zone=public --add-interface=$PU_IF || (echo "firewall-offline-cmd failed with $?" && return 1)
 	}
 	{{- if or .PublicIP .IsGateway }}
 	[[ -z ${PU_IF} ]] && {
 		# sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
-		firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || return 1
+		firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || (echo "firewall-offline-cmd failed with $?" && return 1)
 	}
 	{{- end }}
 
 	# Sets the default target of packets coming from public interface to DROP
-	firewall-offline-cmd --zone=public --set-target=DROP || return 1
+	firewall-offline-cmd --zone=public --set-target=DROP || (echo "firewall-offline-cmd failed with $?" && return 1)
 
 	# Attach LAN interfaces to zone trusted
 	[[ ! -z ${PR_IFs} ]] && {
 		for i in $PR_IFs; do
 			# sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
-			firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || return 1
+			firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || (echo "firewall-offline-cmd failed with $?" && return 1)
 		done
 	}
 	# Attach lo interface to zone trusted
 	# sfFirewallAdd --zone=trusted --add-interface=lo || return 1
-	firewall-offline-cmd --zone=trusted --add-interface=lo || return 1
+	firewall-offline-cmd --zone=trusted --add-interface=lo || (echo "firewall-offline-cmd failed with $?" && return 1)
 
 	# Allow service ssh on public zone
 	op=-1
@@ -125,22 +125,24 @@ function reset_fw() {
 	fi
 
 	if [[ $op -ne 0 ]]; then
+		echo "firewall-offline-cmd failed with $op"
 		return 1
 	fi
 
-	sfService enable firewalld &>/dev/null || return 1
-	sfService start firewalld &>/dev/null || return 1
+	sfService enable firewalld &>/dev/null || (echo "service firewalld enable failed with $?" && return 1)
+	sfService start firewalld &>/dev/null || (echo "service firewalld start failed with $?" && return 1)
 
 	sop=-1
 	firewall-cmd --runtime-to-permanent && sop=$? || sop=$?
 	if [[ $sop -ne 0 ]]; then
 		if [[ $sop -ne 31 ]]; then
+			echo "saving rules with firewall-cmd failed with $sop"
 			return 1
 		fi
 	fi
 
 	# Save current fw settings as permanent
-	sfFirewallReload || return 1
+	sfFirewallReload || (echo "reloading firewall failed with $?" && return 1)
 
 	firewall-cmd --list-all --zone=trusted >/tmp/firewall-trusted.cfg || true
 	firewall-cmd --list-all --zone=public >/tmp/firewall-public.cfg || true
