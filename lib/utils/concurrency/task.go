@@ -322,10 +322,6 @@ func (t *task) GetStatus() (TaskStatus, fail.Error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	//if t.status == ABORTED {
-	//	return t.status, fail.AbortedError(nil, "aborted")
-	//}
-
 	return t.status, nil
 }
 
@@ -666,13 +662,15 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		return true, t.result, t.err
-	//case ABORTED:
-	//	t.mu.Lock()
-	//	defer t.mu.Unlock()
-	//	return false, nil, t.err
-	case RUNNING, ABORTED:
+	case ABORTED:
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		return true, nil, t.err
+	case RUNNING:
 		if len(t.finishCh) == 1 {
 			_, err := t.Wait()
+			//	t.mu.Lock()
+			//	defer t.mu.Unlock()
 			return true, t.result, err
 		}
 		return false, nil, nil
@@ -765,8 +763,8 @@ func (t *task) Abort() (err fail.Error) {
 		t.abortCh <- true
 		close(t.abortCh)
 
-		// // Tell context to cancel
-		// defer t.cancel()
+		// Tell context to cancel
+		defer t.cancel()
 
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
@@ -822,21 +820,6 @@ func (t *task) Abortable() (bool, fail.Error) {
 	return !t.abortDisengaged, nil
 }
 
-// // IgnoreAbortSignal can be use to disable the effect of Abort()
-// // Typically,it is advised to call this inside a defer statementuised to cleanup things (cleanup has to terminate; if abort signal is not disengaged, any
-// // call with task as parameter may abort before the end.
-// // By design, this function panics if t is null value. fail.OnPanic() may be used to catch this panic if needed.
-// func (t *task) IgnoreAbortSignal(ignore bool) {
-// 	if t.isNull() {
-// 		panic("task.IgnoreAbortSignal() called from null value of task; ignored.")
-// 	}
-//
-// 	t.mu.Lock()
-// 	defer t.mu.Unlock()
-//
-// 	t.abortDisengaged = ignore
-// }
-
 // DisarmAbortSignal can be use to disable the effect of Abort()
 // Typically, it is advised to call this inside a defer statement when cleanup things (cleanup has to terminate; if abort signal is not disarmed, any
 // call with task as parameter may abort before the end.
@@ -844,7 +827,7 @@ func (t *task) Abortable() (bool, fail.Error) {
 // If on call the abort signal is already disarmed, does nothing and returned function does nothing also.
 // If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
 
-func (t *task) DisarmAbortSignal() func() {
+func (t *task) DisarmAbortSignal() func() { // FIXME: Untested
 	if t.IsNull() {
 		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.")
 		return func() {}
