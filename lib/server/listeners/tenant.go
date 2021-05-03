@@ -26,6 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/metadataupgrade"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -54,7 +56,7 @@ func getCurrentTenant() *Tenant {
 		// Set unique tenant as selected
 		logrus.Println("Unique tenant set")
 		for name := range tenants {
-			service, err := iaas.UseService(name)
+			service, err := iaas.UseService(name, "")
 			if err != nil {
 				return nil
 			}
@@ -154,7 +156,7 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 		return empty, nil
 	}
 
-	service, xerr := iaas.UseService(in.GetName())
+	service, xerr := iaas.UseService(in.GetName(), operations.MinimumMetadataVersion)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -185,7 +187,7 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "tenant cleanup")
+	job, xerr := PrepareJob(ctx, "", "tenant metadata delete")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -200,7 +202,8 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 		return empty, nil
 	}
 
-	service, xerr := iaas.UseService(in.GetName())
+	// no need to set metadataVersion in UseService, we will remove content...
+	service, xerr := iaas.UseService(in.GetName(), "")
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -272,4 +275,62 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	return nil, fail.NotImplementedError("tenant inspect not yet implemented")
+}
+
+// Upgrade upgrades metadata of a tenant if needed
+func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, xerr error) {
+	defer fail.OnExitConvertToGRPCStatus(&xerr)
+	defer fail.OnExitWrapError(&xerr, "cannot inspect tenant")
+
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	job, xerr := PrepareJob(ctx, "", "tenant metadata upgrade")
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	name := in.GetName()
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	// Not setting metadataVersion prevents to overwrite current version file if it exists...
+	svc, xerr := iaas.UseService(name, "")
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	currentVersion := "v20.06.0"
+	if !in.Force {
+		currentVersion, xerr = operations.CheckMetadataVersion(svc)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrForbidden:
+				// continue
+			default:
+				return nil, xerr
+			}
+		}
+	}
+
+	xerr = metadataupgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return nil, nil
 }

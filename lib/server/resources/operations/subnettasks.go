@@ -39,9 +39,12 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
+	if instance == nil || instance.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -148,13 +151,16 @@ func (instance *subnet) taskCreateGateway(task concurrency.Task, params concurre
 }
 
 type taskFinalizeGatewayConfigurationParameters struct {
-	host     *host
+	host     *Host
 	userdata *userdata.Content
 }
 
-func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
+	if instance == nil || instance.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
@@ -163,7 +169,7 @@ func (instance *subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 
 	objgw := params.(taskFinalizeGatewayConfigurationParameters).host
-	if objgw.isNull() {
+	if objgw == nil || objgw.IsNull() {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
 	}
 	userData := params.(taskFinalizeGatewayConfigurationParameters).userdata

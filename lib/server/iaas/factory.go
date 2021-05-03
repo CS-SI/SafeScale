@@ -17,6 +17,7 @@
 package iaas
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -69,7 +70,7 @@ func GetTenants() ([]interface{}, fail.Error) {
 
 // UseService return the service referenced by the given name.
 // If necessary, this function try to load service from configuration file
-func UseService(tenantName string) (newService Service, xerr fail.Error) {
+func UseService(tenantName, metadataVersion string) (newService Service, xerr fail.Error) {
 	defer fail.OnExitLogError(&xerr)
 	defer fail.OnPanic(&xerr)
 
@@ -198,9 +199,19 @@ func UseService(tenantName string) (newService Service, xerr fail.Error) {
 					return NullService(), err
 				}
 			} else {
+				// create bucket
 				metadataBucket, err = metadataLocation.CreateBucket(bucketName)
 				if err != nil {
 					return NullService(), err
+				}
+
+				// Creates metadata version file
+				if metadataVersion != "" {
+					content := bytes.NewBuffer([]byte(metadataVersion))
+					_, xerr := metadataLocation.WriteObject(bucketName, "/version", content, int64(content.Len()), nil)
+					if xerr != nil {
+						return NullService(), fail.Wrap(xerr, "failed to create version object in metadata Bucket")
+					}
 				}
 			}
 			if metadataConfig, ok := tenant["metadata"].(map[string]interface{}); ok {

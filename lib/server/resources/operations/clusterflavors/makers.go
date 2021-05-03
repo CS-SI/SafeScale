@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package flavors
+package clusterflavors
 
 import (
 	"sync/atomic"
@@ -62,7 +62,7 @@ func getTemplateBox() (*rice.Box, fail.Error) { //nolint
 	anon := templateBox.Load()
 	if anon == nil {
 		// Note: path MUST be literal for rice to work
-		b, err := rice.FindBox("../clusterflavors/scripts")
+		b, err := rice.FindBox("../flavors/scripts")
 		if err != nil {
 			return nil, fail.ConvertError(err)
 		}

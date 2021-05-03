@@ -36,8 +36,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// folder describes a metadata folder
-type folder struct {
+// MetadataFolder describes a metadata MetadataFolder
+type MetadataFolder struct {
 	// path contains the base path where to read/write record in Object Storage
 	path     string
 	service  iaas.Service
@@ -48,13 +48,13 @@ type folder struct {
 // folderDecoderCallback is the prototype of the function that will decode data read from Metadata
 type folderDecoderCallback func([]byte) fail.Error
 
-// newFolder creates a new Metadata Folder object, ready to help access the metadata inside it
-func newFolder(svc iaas.Service, path string) (folder, fail.Error) {
+// NewMetadataFolder creates a new Metadata MetadataFolder object, ready to help access the metadata inside it
+func NewMetadataFolder(svc iaas.Service, path string) (MetadataFolder, fail.Error) {
 	if svc == nil {
-		return folder{}, fail.InvalidInstanceError()
+		return MetadataFolder{}, fail.InvalidInstanceError()
 	}
 
-	f := folder{
+	f := MetadataFolder{
 		path:    strings.Trim(path, "/"),
 		service: svc,
 	}
@@ -63,7 +63,7 @@ func newFolder(svc iaas.Service, path string) (folder, fail.Error) {
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
-			return folder{}, xerr
+			return MetadataFolder{}, xerr
 		}
 	} else {
 		f.crypt = cryptKey != nil && len(cryptKey) > 0
@@ -74,21 +74,21 @@ func newFolder(svc iaas.Service, path string) (folder, fail.Error) {
 	return f, nil
 }
 
-// IsNull tells if the folder instance should be considered as a null value
-func (f *folder) IsNull() bool {
+// IsNull tells if the MetadataFolder instance should be considered as a null value
+func (f *MetadataFolder) IsNull() bool {
 	return f == nil || f.service == nil
 }
 
-// GetService returns the service used by the folder
-func (f folder) GetService() iaas.Service {
+// GetService returns the service used by the MetadataFolder
+func (f MetadataFolder) GetService() iaas.Service {
 	if f.IsNull() {
 		return iaas.NullService()
 	}
 	return f.service
 }
 
-// GetBucket returns the bucket used by the folder to store Object Storage
-func (f folder) GetBucket() abstract.ObjectStorageBucket {
+// GetBucket returns the bucket used by the MetadataFolder to store Object Storage
+func (f MetadataFolder) GetBucket() abstract.ObjectStorageBucket {
 	if f.IsNull() {
 		return abstract.ObjectStorageBucket{}
 	}
@@ -96,20 +96,20 @@ func (f folder) GetBucket() abstract.ObjectStorageBucket {
 }
 
 // getBucket is the same than GetBucket without instance validation (for internal use)
-func (f folder) getBucket() abstract.ObjectStorageBucket {
+func (f MetadataFolder) getBucket() abstract.ObjectStorageBucket {
 	return f.service.GetMetadataBucket()
 }
 
-// Path returns the base path of the folder
-func (f folder) Path() string {
+// Path returns the base path of the MetadataFolder
+func (f MetadataFolder) Path() string {
 	if f.IsNull() {
 		return ""
 	}
 	return f.path
 }
 
-// absolutePath returns the fullpath to reach the 'path'+'name' starting from the folder path
-func (f folder) absolutePath(path ...string) string {
+// absolutePath returns the fullpath to reach the 'path'+'name' starting from the MetadataFolder path
+func (f MetadataFolder) absolutePath(path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
 	}
@@ -122,8 +122,8 @@ func (f folder) absolutePath(path ...string) string {
 	return strings.Join([]string{f.path, strings.Trim(relativePath, "/")}, "/")
 }
 
-// Lookup tells if the object named 'name' is inside the ObjectStorage folder
-func (f folder) Lookup(path string, name string) fail.Error {
+// Lookup tells if the object named 'name' is inside the ObjectStorage MetadataFolder
+func (f MetadataFolder) Lookup(path string, name string) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -148,7 +148,7 @@ func (f folder) Lookup(path string, name string) fail.Error {
 }
 
 // Delete removes metadata passed as parameter
-func (f folder) Delete(path string, name string) fail.Error {
+func (f MetadataFolder) Delete(path string, name string) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -165,7 +165,7 @@ func (f folder) Delete(path string, name string) fail.Error {
 // returns true, nil if the object has been found
 // returns false, fail.Error if an error occured (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (f folder) Read(path string, name string, callback func([]byte) fail.Error) fail.Error {
+func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -211,7 +211,7 @@ func (f folder) Read(path string, name string, callback func([]byte) fail.Error)
 // Returns nil on success (with assurance the write has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (f folder) Write(path string, name string, content []byte) fail.Error {
+func (f MetadataFolder) Write(path string, name string, content []byte) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -303,7 +303,7 @@ func (f folder) Write(path string, name string, content []byte) fail.Error {
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'callback' on each entry
-func (f folder) Browse(path string, callback folderDecoderCallback) fail.Error {
+func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -317,7 +317,7 @@ func (f folder) Browse(path string, callback folderDecoderCallback) fail.Error {
 		return xerr
 	}
 
-	// If there is a single entry equals to absolute path, then there is nothing, it's an empty folder
+	// If there is a single entry equals to absolute path, then there is nothing, it's an empty MetadataFolder
 	if len(list) == 1 && list[0] == absPath {
 		return nil
 	}

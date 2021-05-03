@@ -44,13 +44,13 @@ import (
 
 const (
 	bucketKind = "bucket"
-	// bucketsFolderName is the name of the object storage folder used to store buckets info
+	// bucketsFolderName is the name of the object storage MetadataFolder used to store buckets info
 	bucketsFolderName = "buckets"
 )
 
 // bucket describes a bucket and satisfies interface resources.ObjectStorageBucket
 type bucket struct {
-	*core
+	*MetadataCore
 
 	lock sync.RWMutex
 }
@@ -61,14 +61,14 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := newCore(svc, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
+	coreInstance, xerr := NewCore(svc, bucketKind, bucketsFolderName, &abstract.ObjectStorageBucket{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	instance := &bucket{
-		core: coreInstance,
+		MetadataCore: coreInstance,
 	}
 	return instance, nil
 }
@@ -124,12 +124,7 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 
 // IsNull tells if the instance corresponds to null value
 func (instance *bucket) IsNull() bool {
-	return instance == nil || instance.core == nil || instance.core.isNull()
-}
-
-// isNull tells if the instance corresponds to null value
-func (instance *bucket) isNull() bool {
-	return instance == nil || instance.core == nil || instance.core.isNull()
+	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
 }
 
 // carry ...
@@ -142,7 +137,7 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
+	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -157,14 +152,14 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 
 		}
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.core.carry(clonable)
+	xerr = instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -183,7 +178,7 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 
 // GetHost ...
 func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error) {
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -223,7 +218,7 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error)
 
 // GetMountPoint ...
 func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) {
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -263,7 +258,7 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -312,7 +307,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 
 // Delete a bucket
 func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -334,7 +329,7 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 
 // Mount a bucket on an host on the given mount point
 func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr fail.Error) {
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -421,7 +416,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 
 // Unmount a bucket
 func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail.Error) {
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
