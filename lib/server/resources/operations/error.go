@@ -20,7 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func actionFromError(err error) string {
+func ActionFromError(err error) string {
 	if err == nil {
 		return ""
 	}
