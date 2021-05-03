@@ -19,13 +19,13 @@ package k8s
 import (
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/cluster/flavors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )

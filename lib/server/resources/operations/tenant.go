@@ -19,6 +19,7 @@ package operations
 import (
 	"sync/atomic"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -48,7 +49,8 @@ func CurrentTenant() *Tenant {
 		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
 		for _, anon := range tenants {
 			name := anon.(string)
-			service, xerr := iaas.UseService(name)
+
+			service, xerr := loadTenant(name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil
@@ -62,14 +64,14 @@ func CurrentTenant() *Tenant {
 	return anon.(*Tenant)
 }
 
-// SetCurrentTenant sets  the tenant to use for upcoming commands
+// SetCurrentTenant sets the tenant to use for upcoming commands
 func SetCurrentTenant(tenantName string) error {
 	tenant := CurrentTenant()
 	if tenant != nil && tenant.Name == tenantName {
 		return nil
 	}
 
-	service, xerr := iaas.UseService(tenantName)
+	service, xerr := loadTenant(tenantName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -78,4 +80,20 @@ func SetCurrentTenant(tenantName string) error {
 	tenant = &Tenant{Name: tenantName, Service: service}
 	currentTenant.Store(tenant)
 	return nil
+}
+
+func loadTenant(tenantName string) (iaas.Service, fail.Error) {
+	service, xerr := iaas.UseService(tenantName, MinimumMetadataVersion)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	_, xerr = CheckMetadataVersion(service)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to set tenant '%s'", tenantName)
+	}
+
+	return service, nil
 }

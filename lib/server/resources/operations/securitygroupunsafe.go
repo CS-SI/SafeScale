@@ -40,7 +40,7 @@ import (
 )
 
 // delete effectively remove a Security Group
-func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fail.Error {
+func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -66,7 +66,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 					return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				// Do not remove a securityGroup used on hosts
+				// Do not remove a SecurityGroup used on hosts
 				hostCount := len(hostsV1.ByName)
 				if hostCount > 0 {
 					keys := make([]string, 0, hostCount)
@@ -78,17 +78,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 				// Do not remove a Security Group marked as default for a host
 				if hostsV1.DefaultFor != "" {
-					_, xerr := LoadHost(svc, hostsV1.DefaultFor)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrNotFound:
-							hostsV1.DefaultFor = ""
-							// clear the field and continue, the host does not exist anymore
-						default:
-							return xerr
-						}
-					}
+					return fail.InvalidRequestError("failed to delete Security Group '%s': is default for host identified by %s", hostsV1.DefaultFor)
 				}
 				return nil
 			})
@@ -107,7 +97,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 					return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				// Do not remove a securityGroup used on subnet(s)
+				// Do not remove a SecurityGroup used on subnet(s)
 				subnetCount := len(subnetsV1.ByID)
 				if subnetCount > 0 {
 					keys := make([]string, subnetCount)
@@ -123,19 +113,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 				// Do not remove a Security Group marked as default for a subnet
 				if subnetsV1.DefaultFor != "" {
-					subnetInstance, xerr := LoadSubnet(svc, "", subnetsV1.DefaultFor)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						switch xerr.(type) {
-						case *fail.ErrNotFound:
-							// clear the field and continue, the subnet does not exist anymore
-							subnetsV1.DefaultFor = ""
-						default:
-							return xerr
-						}
-					} else {
-						subnetInstance.Released()
-					}
+					return fail.InvalidRequestError("failed to delete SecurityGroup '%s': is default for Subnet identifyed by '%s'", asg.Name, subnetsV1.DefaultFor)
 				}
 				return nil
 			})
@@ -175,7 +153,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 			return innerXErr
 		}
 
-		// Conditions are met, delete securityGroup
+		// Conditions are met, delete SecurityGroup
 		// FIXME: communication failure handled at service level, not necessary anymore to retry here
 		return netretry.WhileCommunicationUnsuccessfulDelay1Second(
 			func() error {
@@ -214,7 +192,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 	// defer task.DisarmAbortSignal()()
 
 	// Deletes metadata from Object Storage
-	xerr = instance.core.delete()
+	xerr = instance.MetadataCore.Delete()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		// If entry not found, considered as a success
@@ -232,7 +210,7 @@ func (instance *securityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 // unsafeClear is the non goroutine-safe implementation for Clear, that does the real work faster (no locking, less if no parameter validations)
 // Note: must be used wisely
-func (instance *securityGroup) unsafeClear(task concurrency.Task) fail.Error {
+func (instance *SecurityGroup) unsafeClear(task concurrency.Task) fail.Error {
 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
@@ -245,7 +223,7 @@ func (instance *securityGroup) unsafeClear(task concurrency.Task) fail.Error {
 }
 
 // unsafeAddRule adds a rule to a security group
-func (instance *securityGroup) unsafeAddRule(task concurrency.Task, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *SecurityGroup) unsafeAddRule(task concurrency.Task, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if rule.IsNull() {

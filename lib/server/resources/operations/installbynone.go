@@ -29,10 +29,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// noneInstaller is an installer using script to add and remove a feature
+// noneInstaller is an installer using script to add and remove a Feature
 type noneInstaller struct{}
 
-// Check checks if the feature is installed
+// Check checks if the Feature is installed
 func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&xerr)
@@ -56,7 +56,7 @@ func (i *noneInstaller) Check(_ context.Context, f resources.Feature, t resource
 	return out, nil
 }
 
-// Add installs the feature using the install script in Specs
+// Add installs the Feature using the install script in Specs
 // 'values' contains the values associated with parameters as defined in specification file
 func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
@@ -94,7 +94,7 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 	return r, xerr
 }
 
-// Remove uninstalls the feature
+// Remove uninstalls the Feature
 func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&xerr)

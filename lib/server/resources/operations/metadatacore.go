@@ -38,14 +38,14 @@ import (
 )
 
 const (
-	// byIDFolderName tells in what folder to put 'byID' information
+	// byIDFolderName tells in what MetadataFolder to put 'byID' information
 	byIDFolderName = "byID"
-	// byNameFolderName tells in what folder to store 'byName' information
+	// byNameFolderName tells in what MetadataFolder to store 'byName' information
 	byNameFolderName = "byName"
 )
 
-// core contains the core functions of a persistent object
-type core struct {
+// MetadataCore contains the core functions of a persistent object
+type MetadataCore struct {
 	id   atomic.Value
 	name atomic.Value
 
@@ -57,42 +57,42 @@ type core struct {
 	observers  map[string]observer.Observer
 
 	kind      string
-	folder    folder
+	folder    MetadataFolder
 	loaded    bool
 	committed bool
 }
 
-func nullCore() *core {
-	return &core{kind: "nil"}
+func NullCore() *MetadataCore {
+	return &MetadataCore{kind: "nil"}
 }
 
-// newCore creates an instance of core
-func newCore(svc iaas.Service, kind string, path string, instance data.Clonable) (_ *core, xerr fail.Error) {
+// NewCore creates an instance of MetadataCore
+func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable) (_ *MetadataCore, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
-		return nullCore(), fail.InvalidParameterCannotBeNilError("svc")
+		return NullCore(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if kind == "" {
-		return nullCore(), fail.InvalidParameterError("kind", "cannot be empty string")
+		return NullCore(), fail.InvalidParameterError("kind", "cannot be empty string")
 	}
 	if path == "" {
-		return nullCore(), fail.InvalidParameterError("path", "cannot be empty string")
+		return NullCore(), fail.InvalidParameterError("path", "cannot be empty string")
 	}
 
-	fld, xerr := newFolder(svc, path)
+	fld, xerr := NewMetadataFolder(svc, path)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nullCore(), xerr
+		return NullCore(), xerr
 	}
 
 	props, err := serialize.NewJSONProperties("resources." + kind)
 	err = debug.InjectPlannedFail(err)
 	if err != nil {
-		return nullCore(), err
+		return NullCore(), err
 	}
 
-	c := core{
+	c := MetadataCore{
 		kind:       kind,
 		folder:     fld,
 		properties: props,
@@ -102,14 +102,14 @@ func newCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 	return &c, nil
 }
 
-// isNull returns true if the core instance represents the null value for core
-func (c *core) isNull() bool {
+// IsNull returns true if the MetadataCore instance represents the null value for MetadataCore
+func (c *MetadataCore) IsNull() bool {
 	return c == nil || (c != nil && (c.kind == "" || c.kind == "nil" || c.folder.IsNull()))
 }
 
 // GetService returns the iaas.GetService used to create/load the persistent object
-func (c *core) GetService() iaas.Service {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) GetService() iaas.Service {
+	if c == nil || (c != nil && c.IsNull()) {
 		return nil
 	}
 
@@ -118,8 +118,8 @@ func (c *core) GetService() iaas.Service {
 
 // GetID returns the id of the data protected
 // satisfies interface data.Identifiable
-func (c *core) GetID() string {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) GetID() string {
+	if c == nil || (c != nil && c.IsNull()) {
 		return "<NullCore>" // FIXME: It should be a constant
 	}
 
@@ -133,8 +133,8 @@ func (c *core) GetID() string {
 
 // GetName returns the name of the data protected
 // satisfies interface data.Identifiable
-func (c *core) GetName() string {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) GetName() string {
+	if c == nil || (c != nil && c.IsNull()) {
 		return "<NullCore>" // FIXME: It should be a constant
 	}
 
@@ -146,11 +146,19 @@ func (c *core) GetName() string {
 	return name
 }
 
+// GetKind returns the kind of object served
+func (c *MetadataCore) GetKind() string {
+	if c == nil {
+		return "<unknown>"
+	}
+	return c.kind
+}
+
 // Inspect protects the data for shared read
-func (c *core) Inspect(callback resources.Callback) (xerr fail.Error) {
+func (c *MetadataCore) Inspect(callback resources.Callback) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c == nil || (c != nil && c.isNull()) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -178,10 +186,10 @@ func (c *core) Inspect(callback resources.Callback) (xerr fail.Error) {
 // Review allows to access data contained in the instance, without reloading from the Object Storage; it's intended
 // to speed up operations that accept data is not up-to-date (for example, SSH configuration to access host should not
 // change thru time).
-func (c *core) Review(callback resources.Callback) (xerr fail.Error) {
+func (c *MetadataCore) Review(callback resources.Callback) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c == nil || (c != nil && c.isNull()) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -202,10 +210,10 @@ func (c *core) Review(callback resources.Callback) (xerr fail.Error) {
 // Alter protects the data for exclusive write
 // Valid keyvalues for options are :
 // - "Reload": bool = allow to disable reloading from Object Storage if set to false (default is true)
-func (c *core) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (xerr fail.Error) {
+func (c *MetadataCore) Alter(callback resources.Callback, options ...data.ImmutableKeyValue) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c == nil || (c != nil && c.isNull()) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -272,17 +280,17 @@ func (c *core) Alter(callback resources.Callback, options ...data.ImmutableKeyVa
 	return fail.ConvertError(c.notifyObservers())
 }
 
-// carry links metadata with real data
+// Carry links metadata with real data
 // If c is already carrying a shielded data, returns fail.NotAvailableError
 //
 // errors returned :
 // - fail.ErrInvalidInstance
 // - fail.ErrInvalidParameter
-// - fail.ErrNotAvailable if the core instance already carries a data
-func (c *core) carry(clonable data.Clonable) (xerr fail.Error) {
+// - fail.ErrNotAvailable if the MetadataCore instance already carries a data
+func (c *MetadataCore) Carry(clonable data.Clonable) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c == nil || (c != nil && c.isNull()) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if clonable == nil {
@@ -319,7 +327,7 @@ func (c *core) carry(clonable data.Clonable) (xerr fail.Error) {
 }
 
 // updateIdentity updates instance cached identity
-func (c *core) updateIdentity() fail.Error {
+func (c *MetadataCore) updateIdentity() fail.Error {
 	if c.loaded {
 		return c.shielded.Inspect(func(clonable data.Clonable) fail.Error {
 			ident, ok := clonable.(data.Identifiable)
@@ -347,10 +355,10 @@ func (c *core) updateIdentity() fail.Error {
 }
 
 // Read gets the data from Object Storage
-func (c *core) Read(ref string) (xerr fail.Error) {
+func (c *MetadataCore) Read(ref string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c == nil || (c != nil && c.isNull()) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if ref = strings.TrimSpace(ref); ref == "" {
@@ -376,10 +384,10 @@ func (c *core) Read(ref string) (xerr fail.Error) {
 }
 
 // ReadByID reads a metadata identified by ID from Object Storage
-func (c *core) ReadByID(id string) (xerr fail.Error) {
+func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c == nil || (c != nil && c.isNull()) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if id = strings.TrimSpace(id); id == "" {
@@ -425,7 +433,7 @@ func (c *core) ReadByID(id string) (xerr fail.Error) {
 }
 
 // readByID reads a metadata identified by ID from Object Storage
-func (c *core) readByID(id string) fail.Error {
+func (c *MetadataCore) readByID(id string) fail.Error {
 	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
 		if innerXErr := c.deserialize(buf); innerXErr != nil {
 			switch innerXErr.(type) {
@@ -441,7 +449,7 @@ func (c *core) readByID(id string) fail.Error {
 
 // readByReference gets the data from Object Storage
 // First read using 'ref' as an ID; if *fail.ErrNotFound occurs, read using 'ref' as a name
-func (c *core) readByReference(ref string) (xerr fail.Error) {
+func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
 	timeout := temporal.GetCommunicationTimeout()
 	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
@@ -483,7 +491,7 @@ func (c *core) readByReference(ref string) (xerr fail.Error) {
 }
 
 // readByName reads a metadata identified by name
-func (c *core) readByName(name string) fail.Error {
+func (c *MetadataCore) readByName(name string) fail.Error {
 	return c.folder.Read(byNameFolderName, name, func(buf []byte) fail.Error {
 		if innerXErr := c.deserialize(buf); innerXErr != nil {
 			return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
@@ -493,7 +501,7 @@ func (c *core) readByName(name string) fail.Error {
 }
 
 // write updates the metadata corresponding to the host in the Object Storage
-func (c *core) write() fail.Error {
+func (c *MetadataCore) write() fail.Error {
 	if !c.committed {
 		jsoned, xerr := c.serialize()
 		xerr = debug.InjectPlannedFail(xerr)
@@ -530,8 +538,8 @@ func (c *core) write() fail.Error {
 }
 
 // Reload reloads the content from the Object Storage
-func (c *core) Reload() (xerr fail.Error) {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) Reload() (xerr fail.Error) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -543,7 +551,7 @@ func (c *core) Reload() (xerr fail.Error) {
 
 // reload reloads the content from the Object Storage
 // Note: must be called after locking the instance
-func (c *core) reload() (xerr fail.Error) {
+func (c *MetadataCore) reload() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if c.loaded && !c.committed {
@@ -588,11 +596,11 @@ func (c *core) reload() (xerr fail.Error) {
 	return fail.ConvertError(c.notifyObservers())
 }
 
-// BrowseFolder walks through folder and executes a callback for each entries
-func (c *core) BrowseFolder(callback func(buf []byte) fail.Error) (xerr fail.Error) {
+// BrowseFolder walks through MetadataFolder and executes a callback for each entries
+func (c *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c == nil || (c != nil && c.isNull()) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if callback == nil {
@@ -607,11 +615,11 @@ func (c *core) BrowseFolder(callback func(buf []byte) fail.Error) (xerr fail.Err
 	})
 }
 
-// delete deletes the metadata
-func (c *core) delete() (xerr fail.Error) {
+// Delete deletes the metadata
+func (c *MetadataCore) Delete() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c == nil || (c != nil && c.isNull()) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -635,7 +643,7 @@ func (c *core) delete() (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If entry not found, consider operation not an error
-			logrus.Tracef("folder not found by id, maybe not an error")
+			logrus.Tracef("MetadataFolder not found by id, maybe not an error")
 		default:
 			errors = append(errors, xerr)
 		}
@@ -654,7 +662,7 @@ func (c *core) delete() (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If entry not found, consider operation not an error
-			logrus.Tracef("folder not found by name, maybe not an error")
+			logrus.Tracef("MetadataFolder not found by name, maybe not an error")
 		default:
 			errors = append(errors, xerr)
 		}
@@ -690,8 +698,8 @@ func (c *core) delete() (xerr fail.Error) {
 }
 
 // Serialize serializes instance into bytes (output json code)
-func (c *core) Serialize() (_ []byte, xerr fail.Error) {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) Serialize() (_ []byte, xerr fail.Error) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -703,7 +711,7 @@ func (c *core) Serialize() (_ []byte, xerr fail.Error) {
 
 // serialize serializes instance into bytes (output json code)
 // Note: must be called after locking the instance
-func (c *core) serialize() (_ []byte, xerr fail.Error) {
+func (c *MetadataCore) serialize() (_ []byte, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	var (
@@ -721,7 +729,7 @@ func (c *core) serialize() (_ []byte, xerr fail.Error) {
 	err := json.Unmarshal(shieldedJSONed, &shieldedMapped)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return nil, fail.NewErrorWithCause(err, "*core.Serialize(): Unmarshalling JSONed shielded into map failed!")
+		return nil, fail.NewErrorWithCause(err, "*MetadataCore.Serialize(): Unmarshalling JSONed shielded into map failed!")
 	}
 
 	if c.properties.Count() > 0 {
@@ -733,7 +741,7 @@ func (c *core) serialize() (_ []byte, xerr fail.Error) {
 
 		if len(propsJSONed) > 0 && string(propsJSONed) != `"{}"` {
 			if jserr := json.Unmarshal(propsJSONed, &propsMapped); jserr != nil {
-				// logrus.Tracef("*core.Serialize(): Unmarshalling JSONed properties into map failed!")
+				// logrus.Tracef("*MetadataCore.Serialize(): Unmarshalling JSONed properties into map failed!")
 				return nil, fail.ConvertError(jserr)
 			}
 		}
@@ -752,10 +760,10 @@ func (c *core) serialize() (_ []byte, xerr fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates
-func (c *core) Deserialize(buf []byte) (xerr fail.Error) {
+func (c *MetadataCore) Deserialize(buf []byte) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if c == nil || (c != nil && c.isNull()) {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -767,7 +775,7 @@ func (c *core) Deserialize(buf []byte) (xerr fail.Error) {
 
 // deserialize reads json code and reinstantiates
 // Note: must be called after locking the instance
-func (c *core) deserialize(buf []byte) (xerr fail.Error) {
+func (c *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 	if c.properties == nil {
 		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -796,13 +804,13 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 	jsoned, err := json.Marshal(mapped)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return fail.SyntaxErrorWithCause(err, "failed to marshal core to JSON")
+		return fail.SyntaxErrorWithCause(err, "failed to marshal MetadataCore to JSON")
 	}
 
 	xerr = c.shielded.Deserialize(jsoned)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.Wrap(xerr, "deserializing core failed")
+		return fail.Wrap(xerr, "deserializing MetadataCore failed")
 	}
 
 	if len(props) > 0 {
@@ -825,8 +833,8 @@ func (c *core) deserialize(buf []byte) (xerr fail.Error) {
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (c *core) Released() {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) Released() {
+	if c == nil || (c != nil && c.IsNull()) {
 		return // FIXME: Missing log ?
 	}
 
@@ -839,7 +847,7 @@ func (c *core) Released() {
 // released is used to tell cache that the instance has been used and will not be anymore.
 // Helps the cache handler to know when a cached item can be removed from cache (if needed)
 // Note: must be called after locking the instance
-func (c *core) released() {
+func (c *MetadataCore) released() {
 	id, ok := c.id.Load().(string)
 	if !ok {
 		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
@@ -854,8 +862,8 @@ func (c *core) released() {
 // Destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
 // Note: Does nothing for now, prepared for future use
 // satisfies interface data.Cacheable
-func (c *core) Destroyed() {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) Destroyed() {
+	if c == nil || (c != nil && c.IsNull()) {
 		return // FIXME: Missing log ?
 	}
 
@@ -868,7 +876,7 @@ func (c *core) Destroyed() {
 // destroyed is used to tell cache that the instance has been deleted and MUST be removed from cache.
 // Note: Does nothing for now, prepared for future use
 // Note: must be called after locking the instance
-func (c *core) destroyed() {
+func (c *MetadataCore) destroyed() {
 	id, ok := c.id.Load().(string)
 	if !ok {
 		logrus.Error(fail.InconsistentError("field 'id' is not set with string").Error())
@@ -882,8 +890,8 @@ func (c *core) destroyed() {
 
 // AddObserver ...
 // satisfies interface data.Observable
-func (c *core) AddObserver(o observer.Observer) error {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) AddObserver(o observer.Observer) error {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if o == nil {
@@ -905,8 +913,8 @@ func (c *core) AddObserver(o observer.Observer) error {
 
 // NotifyObservers sends a signal to all registered Observers to notify change
 // Satisfies interface data.Observable
-func (c *core) NotifyObservers() error {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) NotifyObservers() error {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 
@@ -918,7 +926,7 @@ func (c *core) NotifyObservers() error {
 
 // notifyObservers sends a signal to all registered Observers to notify change
 // Note: must be called after locking the instance
-func (c *core) notifyObservers() error {
+func (c *MetadataCore) notifyObservers() error {
 	id, ok := c.id.Load().(string)
 	if !ok {
 		return fail.InconsistentError("field 'id' is not set with string")
@@ -931,8 +939,8 @@ func (c *core) notifyObservers() error {
 }
 
 // RemoveObserver ...
-func (c *core) RemoveObserver(name string) error {
-	if c == nil || (c != nil && c.isNull()) {
+func (c *MetadataCore) RemoveObserver(name string) error {
+	if c == nil || (c != nil && c.IsNull()) {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {

@@ -79,14 +79,14 @@ func getTemplateBox() (*rice.Box, error) {
 // TargetType returns the type of the target
 //
 // satisfies resources.Targetable interface
-func (instance *cluster) TargetType() featuretargettype.Enum {
+func (instance *Cluster) TargetType() featuretargettype.Enum {
 	return featuretargettype.Cluster
 }
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies resources.Targetable interface
-func (instance *cluster) InstallMethods() map[uint8]installmethod.Enum {
-	if instance.isNull() {
+func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
+	if instance == nil || instance.IsNull() {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return nil
 	}
@@ -95,16 +95,16 @@ func (instance *cluster) InstallMethods() map[uint8]installmethod.Enum {
 }
 
 // InstalledFeatures returns a list of installed features
-func (instance *cluster) InstalledFeatures() []string {
+func (instance *Cluster) InstalledFeatures() []string {
 	var list []string
 	return list
 }
 
-// ComplementFeatureParameters FIXME: include the cluster part of setImplicitParameters() from feature
+// ComplementFeatureParameters FIXME: include the Cluster part of setImplicitParameters() from feature
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
-func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error {
-	if instance == nil {
+func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -165,7 +165,7 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
-		master, xerr := instance.unsafeFindAvailableMaster(ctx)
+		master, xerr := instance.UnsafeFindAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -179,7 +179,7 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	v["ClusterMasters"], xerr = instance.unsafeListMasters()
+	v["ClusterMasters"], xerr = instance.UnsafeListMasters()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -197,7 +197,7 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 	v["ClusterMasterIDs"] = list
 
-	v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs()
+	v["ClusterMasterIPs"], xerr = instance.UnsafeListMasterIPs()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -233,10 +233,10 @@ func (instance *cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (instance *cluster) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
+func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if feat == nil {
@@ -261,7 +261,7 @@ func (instance *cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 				item.Requires = requirements
 				featuresV1.Installed[feat.GetName()] = item
 			}
-			if rf, ok := requiredBy.(*feature); ok && !rf.isNull() {
+			if rf, ok := requiredBy.(*Feature); ok && rf != nil && !rf.IsNull() {
 				item.RequiredBy[rf.GetName()] = struct{}{}
 			}
 			return nil
@@ -271,10 +271,10 @@ func (instance *cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
 // satisfies interface resources.Targetable
-func (instance *cluster) UnregisterFeature(feat string) (xerr fail.Error) {
+func (instance *Cluster) UnregisterFeature(feat string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if feat == "" {
@@ -298,9 +298,9 @@ func (instance *cluster) UnregisterFeature(feat string) (xerr fail.Error) {
 }
 
 // ListInstalledFeatures returns a slice of installed features
-func (instance *cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, xerr fail.Error) {
+func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, xerr fail.Error) {
 	var emptySlice []resources.Feature
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
@@ -337,9 +337,9 @@ func (instance *cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	return out, nil
 }
 
-// AddFeature installs a feature on the cluster
-func (instance *cluster) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if instance.isNull() {
+// AddFeature installs a feature on the Cluster
+func (instance *Cluster) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -358,9 +358,9 @@ func (instance *cluster) AddFeature(ctx context.Context, name string, vars data.
 	return feat.Add(ctx, instance, vars, settings)
 }
 
-// CheckFeature tells if a feature is installed on the cluster
-func (instance *cluster) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if instance.isNull() {
+// CheckFeature tells if a feature is installed on the Cluster
+func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -379,9 +379,9 @@ func (instance *cluster) CheckFeature(ctx context.Context, name string, vars dat
 	return feat.Check(ctx, instance, vars, settings)
 }
 
-// RemoveFeature uninstalls a feature from the cluster
-func (instance *cluster) RemoveFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
-	if instance.isNull() {
+// RemoveFeature uninstalls a feature from the Cluster
+func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if name == "" {
@@ -401,10 +401,10 @@ func (instance *cluster) RemoveFeature(ctx context.Context, name string, vars da
 }
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return -1, "", "", fail.InvalidInstanceError()
 	}
 	if tmplName == "" {
@@ -420,7 +420,7 @@ func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 		return -1, "", "", xerr
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "('%s')", host.GetName()).Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
@@ -484,7 +484,7 @@ func (instance *cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 }
 
 // installNodeRequirements ...
-func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
 	netCfg, xerr := instance.GetNetworkConfig()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -504,7 +504,7 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 		}
 		params["reserved_TenantJSON"] = string(jsoned)
 
-		// Finds the folder where the current binary resides
+		// Finds the MetadataFolder where the current binary resides
 		var (
 			binaryDir string
 			path      string
@@ -604,7 +604,7 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	params["MasterIPs"], xerr = instance.unsafeListMasterIPs()
+	params["MasterIPs"], xerr = instance.UnsafeListMasterIPs()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -634,7 +634,7 @@ func (instance *cluster) installNodeRequirements(ctx context.Context, nodeType c
 }
 
 // Installs reverseproxy
-func (instance *cluster) installReverseProxy(ctx context.Context) (xerr fail.Error) {
+func (instance *Cluster) installReverseProxy(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	identity, xerr := instance.unsafeGetIdentity()
@@ -661,7 +661,7 @@ func (instance *cluster) installReverseProxy(ctx context.Context) (xerr fail.Err
 	}
 
 	if !disabled {
-		logrus.Debugf("[cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
+		logrus.Debugf("[Cluster %s] adding feature 'edgeproxy4subnet'", clusterName)
 		feat, xerr := NewFeature(instance.GetService(), "edgeproxy4subnet")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -676,18 +676,18 @@ func (instance *cluster) installReverseProxy(ctx context.Context) (xerr fail.Err
 
 		if !results.Successful() {
 			msg := results.AllErrorMessages()
-			return fail.NewError("[cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)
+			return fail.NewError("[Cluster %s] failed to add '%s': %s", clusterName, feat.GetName(), msg)
 		}
-		logrus.Debugf("[cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
+		logrus.Debugf("[Cluster %s] feature '%s' added successfully", clusterName, feat.GetName())
 		return nil
 	}
 
-	logrus.Infof("[cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
+	logrus.Infof("[Cluster %s] reverseproxy (feature 'edgeproxy4subnet' not installed because disabled", clusterName)
 	return nil
 }
 
-// installRemoteDesktop installs feature remotedesktop on all masters of the cluster
-func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Error) {
+// installRemoteDesktop installs feature remotedesktop on all masters of the Cluster
+func (instance *Cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	identity, xerr := instance.unsafeGetIdentity()
@@ -714,7 +714,7 @@ func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 	}
 
 	if !disabled {
-		logrus.Debugf("[cluster %s] adding feature 'remotedesktop'", identity.Name)
+		logrus.Debugf("[Cluster %s] adding feature 'remotedesktop'", identity.Name)
 
 		feat, xerr := NewFeature(instance.GetService(), "remotedesktop")
 		xerr = debug.InjectPlannedFail(xerr)
@@ -722,7 +722,7 @@ func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 			return xerr
 		}
 
-		// Adds remotedesktop feature on cluster (ie masters)
+		// Adds remotedesktop feature on Cluster (ie masters)
 		vars := data.Map{
 			"Username": "cladm",
 			"Password": identity.AdminPassword,
@@ -735,15 +735,15 @@ func (instance *cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 
 		if !r.Successful() {
 			msg := r.AllErrorMessages()
-			return fail.NewError("[cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
+			return fail.NewError("[Cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
 		}
-		logrus.Debugf("[cluster %s] feature 'remotedesktop' added successfully", identity.Name)
+		logrus.Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
 	}
 	return nil
 }
 
 // install proxycache-client feature if not disabled
-func (instance *cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if host == nil {
@@ -789,7 +789,7 @@ func (instance *cluster) installProxyCacheClient(ctx context.Context, host resou
 }
 
 // install proxycache-server feature if not disabled
-func (instance *cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if host == nil {
@@ -837,7 +837,7 @@ func (instance *cluster) installProxyCacheServer(ctx context.Context, host resou
 }
 
 // intallDocker installs docker and docker-compose
-func (instance *cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
 	// uses NewFeature() to let a chance to the user to use it's own docker feature
 	feat, xerr := NewFeature(instance.GetService(), "docker")
 	xerr = debug.InjectPlannedFail(xerr)

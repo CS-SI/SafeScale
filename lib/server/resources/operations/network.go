@@ -18,13 +18,10 @@ package operations
 
 import (
 	"fmt"
-	"net"
 	"reflect"
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -46,36 +43,37 @@ import (
 )
 
 const (
-	networkKind = "network"
+	networkKind = "Network"
 	// networksFolderName is the technical name of the container used to store networks info
 	networksFolderName = "networks"
 )
 
-// network links Object Storage folder and Networking
-type network struct {
-	*core
+// Network links Object Storage MetadataFolder and Networking
+type Network struct {
+	*MetadataCore
 
 	lock sync.RWMutex
 }
 
-func nullNetwork() resources.Network {
-	return &network{core: nullCore()}
+// ShareNullValue returns a *Network representing a null value
+func NullValue() *Network {
+	return &Network{MetadataCore: NullCore()}
 }
 
 // NewNetwork creates an instance of Networking
 func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 	if svc == nil {
-		return nullNetwork(), fail.InvalidParameterCannotBeNilError("svc")
+		return NullValue(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := newCore(svc, networkKind, networksFolderName, &abstract.Network{})
+	coreInstance, xerr := NewCore(svc, networkKind, networksFolderName, &abstract.Network{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nullNetwork(), xerr
+		return NullValue(), xerr
 	}
 
-	instance := &network{
-		core: coreInstance,
+	instance := &Network{
+		MetadataCore: coreInstance,
 	}
 	return instance, nil
 }
@@ -107,17 +105,18 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 				return nil, innerXErr
 			}
 
-			// Deal with legacy
-			xerr = rn.(*network).upgradeNetworkMetadataIfNeeded()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrAlteredNothing:
-					// ignore
-				default:
-					return nil, fail.Wrap(xerr, "failed to upgrade Network properties")
-				}
-			}
+			// VPL: moved to metadata/upgraders/v2.go
+			// // Deal with legacy
+			// xerr = rn.(*Network).upgradeNetworkMetadataIfNeeded()
+			// xerr = debug.InjectPlannedFail(xerr)
+			// if xerr != nil {
+			// 	switch xerr.(type) {
+			// 	case *fail.ErrAlteredNothing:
+			// 		// ignore
+			// 	default:
+			// 		return nil, fail.Wrap(xerr, "failed to upgrade Network properties")
+			// 	}
+			// }
 
 			return rn, nil
 		}),
@@ -148,83 +147,78 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 	return rn, nil
 }
 
-// upgradeNetworkMetadatasIfNeeded upgrades properties to most recent version
-func (instance *network) upgradeNetworkMetadataIfNeeded() fail.Error {
-	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		abstractNetwork, ok := clonable.(*abstract.Network)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		if !props.Lookup(networkproperty.SubnetsV1) {
-			svc := instance.GetService()
-
-			// -- creates Subnet in metadata --
-			rs, xerr := NewSubnet(svc)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-			abstractSubnet, xerr := svc.InspectSubnetByName(instance.GetName(), instance.GetName())
-			if xerr != nil {
-				return xerr
-			}
-
-			abstractSubnet.Network = abstractNetwork.ID
-			abstractSubnet.IPVersion = ipversion.IPv4
-			abstractSubnet.DNSServers = abstractNetwork.DNSServers
-			abstractSubnet.Domain = abstractNetwork.Domain
-			abstractSubnet.VIP = abstractNetwork.VIP
-			abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.GatewayID)
-			if abstractNetwork.SecondaryGatewayID != "" {
-				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.SecondaryGatewayID)
-			}
-			abstractSubnet.State = subnetstate.Ready
-			xerr = rs.(*subnet).carry(abstractSubnet)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-
-			// -- add reference to subnet in network properties --
-			xerr = props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
-				}
-				subnetsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
-				subnetsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
-				return nil
-			})
-
-			// -- finally clear deprecated field of abstractNetwork --
-			abstractNetwork.VIP = nil
-			abstractNetwork.GatewayID, abstractNetwork.SecondaryGatewayID = "", ""
-			abstractNetwork.Domain = ""
-			return nil
-		}
-
-		// called when nothing has been changed, to prevent useless metadata update
-		return fail.AlteredNothingError()
-	})
-	return xerr
-}
+// // upgradeNetworkMetadatasIfNeeded upgrades properties to most recent version
+// func (instance *Network) upgradeNetworkMetadataIfNeeded() fail.Error {
+// 	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+// 		abstractNetwork, ok := clonable.(*abstract.Network)
+// 		if !ok {
+// 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+// 		}
+//
+// 		if !props.Lookup(networkproperty.SubnetsV1) {
+// 			svc := instance.GetService()
+//
+// 			// -- creates Subnet in metadata --
+// 			rs, xerr := NewSubnet(svc)
+// 			xerr = debug.InjectPlannedFail(xerr)
+// 			if xerr != nil {
+// 				return xerr
+// 			}
+// 			abstractSubnet, xerr := svc.InspectSubnetByName(instance.GetName(), instance.GetName())
+// 			if xerr != nil {
+// 				return xerr
+// 			}
+//
+// 			abstractSubnet.Network = abstractNetwork.ID
+// 			abstractSubnet.IPVersion = ipversion.IPv4
+// 			abstractSubnet.DNSServers = abstractNetwork.DNSServers
+// 			abstractSubnet.Domain = abstractNetwork.Domain
+// 			abstractSubnet.VIP = abstractNetwork.VIP
+// 			abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.GatewayID)
+// 			if abstractNetwork.SecondaryGatewayID != "" {
+// 				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.SecondaryGatewayID)
+// 			}
+// 			abstractSubnet.State = subnetstate.Ready
+// 			xerr = rs.(*subnet).Carry(abstractSubnet)
+// 			xerr = debug.InjectPlannedFail(xerr)
+// 			if xerr != nil {
+// 				return xerr
+// 			}
+//
+// 			// -- add reference to subnet in Network properties --
+// 			xerr = props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+// 				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+// 				if !ok {
+// 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
+// 				}
+// 				subnetsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
+// 				subnetsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
+// 				return nil
+// 			})
+//
+// 			// -- finally clear deprecated field of abstractNetwork --
+// 			abstractNetwork.VIP = nil
+// 			abstractNetwork.GatewayID, abstractNetwork.SecondaryGatewayID = "", ""
+// 			abstractNetwork.Domain = ""
+// 			return nil
+// 		}
+//
+// 		// called when nothing has been changed, to prevent useless metadata update
+// 		return fail.AlteredNothingError()
+// 	})
+// 	return xerr
+// }
 
 // IsNull tells if the instance corresponds to subnet Null Value
-func (instance *network) IsNull() bool {
-	return instance == nil || instance.core == nil || instance.core.isNull()
+func (instance *Network) IsNull() bool {
+	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
 }
 
-// isNull tells if the instance corresponds to subnet Null Value
-func (instance *network) isNull() bool {
-	return instance == nil || instance.core == nil || instance.core.isNull()
-}
-
-// Create creates a network
-func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest) (xerr fail.Error) {
+// Create creates a Network
+func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -251,7 +245,7 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 	svc := instance.GetService()
 	if existing, xerr := LoadNetwork(svc, req.Name); xerr == nil {
 		existing.Released()
-		return fail.DuplicateError("network '%s' already exists", req.Name)
+		return fail.DuplicateError("Network '%s' already exists", req.Name)
 	}
 
 	if task.Aborted() {
@@ -269,7 +263,7 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 			return xerr
 		}
 	} else {
-		return fail.DuplicateError("network '%s' already exists (not managed by SafeScale)", req.Name)
+		return fail.DuplicateError("Network '%s' already exists (not managed by SafeScale)", req.Name)
 	}
 
 	// Verify the CIDR is not routable
@@ -289,8 +283,8 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	// Create the network
-	logrus.Debugf("Creating network '%s' with CIDR '%s'...", req.Name, req.CIDR)
+	// Create the Network
+	logrus.Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
 	an, xerr := svc.CreateNetwork(req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -317,13 +311,13 @@ func (instance *network) Create(ctx context.Context, req abstract.NetworkRequest
 }
 
 // carry registers clonable as core value and deals with cache
-func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *Network) carry(clonable data.Clonable) (xerr fail.Error) {
 	identifiable, ok := clonable.(data.Identifiable)
 	if !ok {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
+	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -338,13 +332,13 @@ func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.core.carry(clonable)
+	xerr = instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -362,7 +356,7 @@ func (instance *network) carry(clonable data.Clonable) (xerr fail.Error) {
 }
 
 // Browse walks through all the metadata objects in subnet
-func (instance *network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
+func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if ctx == nil {
@@ -385,7 +379,7 @@ func (instance *network) Browse(ctx context.Context, callback func(*abstract.Net
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.core.BrowseFolder(func(buf []byte) fail.Error {
+	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}
@@ -402,10 +396,10 @@ func (instance *network) Browse(ctx context.Context, callback func(*abstract.Net
 }
 
 // Delete deletes subnet
-func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
+func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -452,7 +446,7 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 		subnetsLen := len(subnets)
 		switch subnetsLen {
 		case 0:
-			// no subnet, continue to delete the network
+			// no subnet, continue to delete the Network
 		case 1:
 			var found bool
 			for k, v := range subnets {
@@ -462,7 +456,7 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 
 				if k == instance.GetName() {
 					found = true
-					// the single subnet present is a subnet named like the network, delete it first
+					// the single subnet present is a subnet named like the Network, delete it first
 					rs, xerr := LoadSubnet(svc, "", v)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
@@ -529,14 +523,14 @@ func (instance *network) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// Remove metadata
-	return instance.core.delete()
+	return instance.MetadataCore.Delete()
 }
 
 // GetCIDR returns the CIDR of the subnet
-func (instance *network) GetCIDR() (cidr string, xerr fail.Error) {
+func (instance *Network) GetCIDR() (cidr string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
 
@@ -557,10 +551,10 @@ func (instance *network) GetCIDR() (cidr string, xerr fail.Error) {
 }
 
 // ToProtocol converts resources.Network to protocol.Network
-func (instance *network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
+func (instance *Network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -602,10 +596,10 @@ func (instance *network) ToProtocol() (_ *protocol.Network, xerr fail.Error) {
 
 // InspectSubnet returns the instance of resources.Subnet corresponding to the subnet referenced by 'ref' attached to
 // the subnet
-func (instance *network) InspectSubnet(ref string) (_ resources.Subnet, xerr fail.Error) {
+func (instance *Network) InspectSubnet(ref string) (_ resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -613,10 +607,10 @@ func (instance *network) InspectSubnet(ref string) (_ resources.Subnet, xerr fai
 }
 
 // AdoptSubnet registers a Subnet to the Network metadata
-func (instance *network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (xerr fail.Error) {
+func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subnet) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -667,10 +661,10 @@ func (instance *network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 }
 
 // AbandonSubnet unregisters a Subnet from the Network (does not imply the Subnet is deleted)
-func (instance *network) AbandonSubnet(ctx context.Context, subnetID string) (xerr fail.Error) {
+func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -712,48 +706,8 @@ func (instance *network) AbandonSubnet(ctx context.Context, subnetID string) (xe
 	})
 }
 
-// reserveCIDRForSingleHost returns the first available CIDR and its index inside the Network 'network'
-func reserveCIDRForSingleHost(network resources.Network) (string, uint, fail.Error) {
-	var index uint
-	xerr := network.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(networkproperty.SingleHostsV1, func(clonable data.Clonable) fail.Error {
-			nshV1, ok := clonable.(*propertiesv1.NetworkSingleHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkSingleHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			index = nshV1.ReserveSlot()
-			return nil
-		})
-	})
-	if xerr != nil {
-		return "", 0, xerr
-	}
-
-	defer func() {
-		if xerr != nil {
-			derr := freeCIDRForSingleHost(network, index)
-			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, network.GetName()))
-			}
-		}
-	}()
-
-	_, networkNet, err := net.ParseCIDR(abstract.SingleHostNetworkCIDR)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return "", 0, fail.Wrap(err, "failed to convert CIDR to net.IPNet")
-	}
-
-	result, xerr := netretry.NthIncludedSubnet(*networkNet, propertiesv1.SingleHostsCIDRMaskAddition, index)
-	if xerr != nil {
-		return "", 0, xerr
-	}
-	return result.String(), index, nil
-}
-
-// freeCIDRForSingleHost frees the CIDR index inside the Network 'network'
-func freeCIDRForSingleHost(network resources.Network, index uint) fail.Error {
+// FreeCIDRForSingleHost frees the CIDR index inside the Network 'Network'
+func FreeCIDRForSingleHost(network resources.Network, index uint) fail.Error {
 	return network.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SingleHostsV1, func(clonable data.Clonable) fail.Error {
 			nshV1, ok := clonable.(*propertiesv1.NetworkSingleHosts)

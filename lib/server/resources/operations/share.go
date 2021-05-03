@@ -44,26 +44,26 @@ import (
 )
 
 const (
-	shareKind = "share"
+	shareKind = "Share"
 	// nasFolderName is the technical name of the container used to store nas info
 	sharesFolderName = "shares"
 )
 
-// ShareIdentity contains information about a share
+// ShareIdentity contains information about a Share
 type ShareIdentity struct {
-	HostID    string `json:"host_id"`    // contains the ID of the host serving the share
-	HostName  string `json:"host_name"`  // contains the name of the host serving the share
-	ShareID   string `json:"share_id"`   // contains the ID of the share
-	ShareName string `json:"share_name"` // contains the name of the share
+	HostID    string `json:"host_id"`    // contains the ID of the host serving the Share
+	HostName  string `json:"host_name"`  // contains the name of the host serving the Share
+	ShareID   string `json:"share_id"`   // contains the ID of the Share
+	ShareName string `json:"share_name"` // contains the name of the Share
 }
 
-// GetID returns the ID of the share
+// GetID returns the ID of the Share
 // satisfies interface data.Identifiable
 func (si ShareIdentity) GetID() string {
 	return si.ShareID
 }
 
-// GetName returns the name of the share
+// GetName returns the name of the Share
 // satisfies interface data.Identifiable
 func (si ShareIdentity) GetName() string {
 	return si.ShareName
@@ -103,36 +103,37 @@ func (si *ShareIdentity) Replace(src data.Clonable) data.Clonable {
 	return si
 }
 
-// share contains information to maintain in Object Storage a list of shared folders
-type share struct {
-	*core
+// Share contains information to maintain in Object Storage a list of shared folders
+type Share struct {
+	*MetadataCore
 
 	lock sync.RWMutex
 }
 
-func nullShare() *share {
-	return &share{core: nullCore()}
+// ShareNullValue returns a *Share representing a null value
+func ShareNullValue() *Share {
+	return &Share{MetadataCore: NullCore()}
 }
 
 // NewShare creates an instance of Share
 func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 	if svc == nil {
-		return nullShare(), fail.InvalidParameterCannotBeNilError("svc")
+		return ShareNullValue(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := newCore(svc, shareKind, sharesFolderName, &ShareIdentity{})
+	coreInstance, xerr := NewCore(svc, shareKind, sharesFolderName, &ShareIdentity{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nullShare(), xerr
+		return ShareNullValue(), xerr
 	}
 
-	instance := &share{
-		core: coreInstance,
+	instance := &Share{
+		MetadataCore: coreInstance,
 	}
 	return instance, nil
 }
 
-// LoadShare returns the name of the host owing the share 'ref', read from Object Storage
+// LoadShare returns the name of the host owing the Share 'ref', read from Object Storage
 // logic: try to read until success.
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
@@ -141,10 +142,10 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
-		return nullShare(), fail.InvalidParameterCannotBeNilError("svc")
+		return ShareNullValue(), fail.InvalidParameterCannotBeNilError("svc")
 	}
 	if ref == "" {
-		return nullShare(), fail.InvalidParameterError("ref", "cannot be empty string")
+		return ShareNullValue(), fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
 	shareCache, xerr := svc.GetCache(shareKind)
@@ -174,14 +175,14 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// rewrite NotFoundError, user does not bother about metadata stuff
-			return nullShare(), fail.NotFoundError("failed to find a Share '%s'", ref)
+			return ShareNullValue(), fail.NotFoundError("failed to find a Share '%s'", ref)
 		default:
-			return nullShare(), xerr
+			return ShareNullValue(), xerr
 		}
 	}
 
 	if rs = cacheEntry.Content().(resources.Share); rs == nil {
-		return nullShare(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
+		return ShareNullValue(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
@@ -195,17 +196,12 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 }
 
 // IsNull tells if the instance should be considered as a null value
-func (instance *share) IsNull() bool {
-	return instance == nil || instance.core == nil || instance.core.isNull()
-}
-
-// isNull tells if the instance should be considered as a null value
-func (instance *share) isNull() bool {
-	return instance == nil || instance.core == nil || instance.core.isNull()
+func (instance *Share) IsNull() bool {
+	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
 }
 
 // carry creates metadata and add Volume to service cache
-func (instance *share) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *Share) carry(clonable data.Clonable) (xerr fail.Error) {
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
@@ -214,7 +210,7 @@ func (instance *share) carry(clonable data.Clonable) (xerr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.core.kind)
+	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -229,14 +225,14 @@ func (instance *share) carry(clonable data.Clonable) (xerr fail.Error) {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.core.kind, identifiable.GetID()))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 
 		}
 	}()
 
 	// Note: do not validate parameters, this call will do it
-	xerr = instance.core.carry(clonable)
+	xerr = instance.MetadataCore.Carry(clonable)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -253,8 +249,8 @@ func (instance *share) carry(clonable data.Clonable) (xerr fail.Error) {
 	return nil
 }
 
-// Browse walks through shares folder and executes a callback for each entry
-func (instance *share) Browse(ctx context.Context, callback func(string, string) fail.Error) (xerr fail.Error) {
+// Browse walks through shares MetadataFolder and executes a callback for each entry
+func (instance *Share) Browse(ctx context.Context, callback func(string, string) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Browse is intended to be callable from null value, so do not validate instance
@@ -278,7 +274,7 @@ func (instance *share) Browse(ctx context.Context, callback func(string, string)
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.core.BrowseFolder(func(buf []byte) fail.Error {
+	return instance.MetadataCore.BrowseFolder(func(buf []byte) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}
@@ -298,8 +294,8 @@ func (instance *share) Browse(ctx context.Context, callback func(string, string)
 	})
 }
 
-// Create creates a share on host
-func (instance *share) Create(
+// Create creates a Share on host
+func (instance *Share) Create(
 	ctx context.Context,
 	shareName string,
 	server resources.Host, path string,
@@ -309,7 +305,7 @@ func (instance *share) Create(
 
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -335,7 +331,7 @@ func (instance *share) Create(
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	// Check if a share already exists with the same name
+	// Check if a Share already exists with the same name
 	_, xerr = server.GetShare(shareName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -356,7 +352,7 @@ func (instance *share) Create(
 
 	// -- make some validations --
 	xerr = server.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// Check if the path to share isn't a remote mount or contains a remote mount
+		// Check if the path to Share isn't a remote mount or contains a remote mount
 		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			serverMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -364,7 +360,7 @@ func (instance *share) Create(
 			}
 
 			if _, found := serverMountsV1.RemoteMountsByPath[path]; found {
-				return fail.InvalidRequestError(fmt.Sprintf("path to export '%s' is a mounted share", sharePath))
+				return fail.InvalidRequestError(fmt.Sprintf("path to export '%s' is a mounted Share", sharePath))
 			}
 
 			for k := range serverMountsV1.RemoteMountsByPath {
@@ -373,7 +369,7 @@ func (instance *share) Create(
 				}
 
 				if strings.Index(sharePath, k) == 0 {
-					return fail.InvalidRequestError("export path '%s' contains a share mounted in '%s'", sharePath, k)
+					return fail.InvalidRequestError("export path '%s' contains a Share mounted in '%s'", sharePath, k)
 				}
 			}
 			return nil
@@ -458,7 +454,7 @@ func (instance *share) Create(
 		}
 	}
 
-	// Starting from here, remove share from host if exiting with error
+	// Starting from here, remove Share from host if exiting with error
 	defer func() {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -466,7 +462,7 @@ func (instance *share) Create(
 			defer task.DisarmAbortSignal()()
 
 			if derr := nfsServer.RemoveShare(ctx, sharePath); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove share '%s' from Host", sharePath))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Share '%s' from Host", sharePath))
 			}
 		}
 	}()
@@ -485,7 +481,7 @@ func (instance *share) Create(
 			shareID, err := uuid.NewV4()
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return fail.Wrap(err, "Error creating UUID for share")
+				return fail.Wrap(err, "Error creating UUID for Share")
 			}
 
 			hostShare.ID = shareID.String()
@@ -502,7 +498,7 @@ func (instance *share) Create(
 		return xerr
 	}
 
-	// Starting from here, delete share reference in server if exiting with error
+	// Starting from here, delete Share reference in server if exiting with error
 	defer func() {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -534,12 +530,12 @@ func (instance *share) Create(
 	return instance.carry(&si)
 }
 
-// GetServer returns the Host acting as share server, with error handling
+// GetServer returns the Host acting as Share server, with error handling
 // Note: do not forget to call .Released() on returned host when you do not use it anymore
-func (instance *share) GetServer() (_ resources.Host, xerr fail.Error) {
+func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -576,12 +572,12 @@ func (instance *share) GetServer() (_ resources.Host, xerr fail.Error) {
 	return server, nil
 }
 
-// Mount mounts a share on a local directory of an host
+// Mount mounts a Share on a local directory of an host
 // returns a clone of the propertiesv1.HostRemoteMount created on success
-func (instance *share) Mount(ctx context.Context, target resources.Host, path string, withCache bool) (_ *propertiesv1.HostRemoteMount, xerr fail.Error) {
+func (instance *Share) Mount(ctx context.Context, target resources.Host, path string, withCache bool) (_ *propertiesv1.HostRemoteMount, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -614,7 +610,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 		shareName, shareID   string
 	)
 
-	// Retrieve info about the share
+	// Retrieve info about the Share
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {
@@ -634,7 +630,10 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 
 	// serverID = rhServer.GetID()
 	// serverName = rhServer.GetName()
-	serverPrivateIP := rhServer.(*host).privateIP
+	serverPrivateIP, xerr := rhServer.GetPrivateIP()
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	xerr = rhServer.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
@@ -667,7 +666,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 	targetID = target.GetID()
 	targetName = target.GetName()
 	xerr = target.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// Check if share is already mounted
+		// Check if Share is already mounted
 		// Check if there is already volume mounted in the path (or in subpath)
 		innerXErr := props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			targetMountsV1, ok := clonable.(*propertiesv1.HostMounts)
@@ -685,7 +684,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 				}
 
 				if i.Path == path {
-					// cannot mount a share in place of a volume (by convention, nothing technically preventing it)
+					// cannot mount a Share in place of a volume (by convention, nothing technically preventing it)
 					return fail.InvalidRequestError(fmt.Sprintf("there is already a volume in path '%s:%s'", targetName, path))
 				}
 			}
@@ -695,8 +694,8 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 				}
 
 				if strings.Index(path, i.Path) == 0 {
-					// cannot mount a share inside another share (at least by convention, if not technically)
-					return fail.InvalidRequestError("there is already a share mounted in '%s:%s'", targetName, i.Path)
+					// cannot mount a Share inside another Share (at least by convention, if not technically)
+					return fail.InvalidRequestError("there is already a Share mounted in '%s:%s'", targetName, i.Path)
 				}
 			}
 
@@ -720,7 +719,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 		return nil, xerr
 	}
 
-	// -- Mount the share on host --
+	// -- Mount the Share on host --
 	xerr = rhServer.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -730,7 +729,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 
 			_, found := hostSharesV1.ByID[hostSharesV1.ByName[shareName]]
 			if !found {
-				return fail.NotFoundError(fmt.Sprintf("failed to find metadata about share '%s'", shareName))
+				return fail.NotFoundError(fmt.Sprintf("failed to find metadata about Share '%s'", shareName))
 			}
 
 			shareID := hostSharesV1.ByName[shareName]
@@ -771,7 +770,7 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 		return nil, xerr
 	}
 
-	// Starting from here, remove share mount from server share when exiting with error
+	// Starting from here, remove Share mount from server Share when exiting with error
 	defer func() {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -836,11 +835,11 @@ func (instance *share) Mount(ctx context.Context, target resources.Host, path st
 	return mount.Clone().(*propertiesv1.HostRemoteMount), nil
 }
 
-// Unmount unmounts a share from local directory of an host
-func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr fail.Error) {
+// Unmount unmounts a Share from local directory of an host
+func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -870,7 +869,7 @@ func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr
 		hostShare *propertiesv1.HostShare
 	)
 
-	// Retrieve info about the share
+	// Retrieve info about the Share
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {
@@ -931,7 +930,7 @@ func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr
 				return fail.NotFoundError("not mounted on host '%s'", targetName)
 			}
 
-			// Unmount share from client
+			// Unmount Share from client
 			sshConfig, inErr := target.GetSSHConfig()
 			if inErr != nil {
 				return inErr
@@ -960,7 +959,7 @@ func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr
 		return xerr
 	}
 
-	// Remove host from client lists of the share
+	// Remove host from client lists of the Share
 	xerr = rhServer.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -981,11 +980,11 @@ func (instance *share) Unmount(ctx context.Context, target resources.Host) (xerr
 	return nil
 }
 
-// Delete deletes a share from server
-func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
+// Delete deletes a Share from server
+func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -1010,7 +1009,7 @@ func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
 		hostShare          *propertiesv1.HostShare
 	)
 
-	// -- Retrieve info about the share --
+	// -- Retrieve info about the Share --
 	// Note: we do not use GetName() and GetID() to avoid 2 consecutive instance.Inspect()
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
@@ -1088,12 +1087,12 @@ func (instance *share) Delete(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	// FIXME: we should have a defer statement to restore share in case of failure...
+	// FIXME: we should have a defer statement to restore Share in case of failure...
 
 	defer task.DisarmAbortSignal()()
 
-	// Remove share metadata
-	return instance.core.delete()
+	// Remove Share metadata
+	return instance.MetadataCore.Delete()
 }
 
 func sanitize(in string) (string, fail.Error) {
@@ -1105,10 +1104,10 @@ func sanitize(in string) (string, fail.Error) {
 	return sanitized, nil
 }
 
-func (instance *share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error) {
+func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
@@ -1137,7 +1136,7 @@ func (instance *share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 			Path:            share.Path,
 			Type:            share.Type,
 			OptionsAsString: share.ShareOptions,
-			// SecurityModes: share.ShareAcls,
+			// SecurityModes: Share.ShareAcls,
 		},
 	}
 	for k := range share.ClientsByName {
@@ -1160,12 +1159,12 @@ func (instance *share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 		}
 		sharePath, ok := mounts.RemoteMountsByShareID[shareID]
 		if !ok {
-			logrus.Error(fail.InconsistentError("failed to find the sharePath on host '%s' where share '%s' is mounted", h.GetName(), shareName).Error())
+			logrus.Error(fail.InconsistentError("failed to find the sharePath on host '%s' where Share '%s' is mounted", h.GetName(), shareName).Error())
 			continue
 		}
 		mount, ok := mounts.RemoteMountsByPath[sharePath]
 		if !ok {
-			logrus.Error(fail.InconsistentError("failed to find a mount associated to share path '%s' for host '%s'", sharePath, h.GetName()).Error())
+			logrus.Error(fail.InconsistentError("failed to find a mount associated to Share path '%s' for host '%s'", sharePath, h.GetName()).Error())
 			continue
 		}
 		psmd := &protocol.ShareMountDefinition{

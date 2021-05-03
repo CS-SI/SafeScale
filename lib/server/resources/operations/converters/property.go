@@ -183,3 +183,35 @@ func ClusterNodeFromPropertyToProtocol(in propertiesv3.ClusterNode) *protocol.Ho
 		PrivateIp: in.PrivateIP,
 	}
 }
+
+// ClusterDefaultsPropertyV1ToV2 converts propertiesv1.ClusterDefaults to propertiesv2.ClusterDefaults
+func ClusterDefaultsPropertyV1ToV2(in *propertiesv1.ClusterDefaults) *propertiesv2.ClusterDefaults{
+	out := &propertiesv2.ClusterDefaults{
+		Image: in.Image,
+		GatewaySizing: propertiesv1.HostSizingRequirements{
+			MinCores:    in.GatewaySizing.Cores,
+			MinCPUFreq:  in.GatewaySizing.CPUFreq,
+			MinGPU:      in.GatewaySizing.GPUNumber,
+			MinRAMSize:  in.GatewaySizing.RAMSize,
+			MinDiskSize: in.GatewaySizing.DiskSize,
+			Replaceable: in.GatewaySizing.Replaceable,
+		},
+		MasterSizing: propertiesv1.HostSizingRequirements{
+			MinCores:    in.MasterSizing.Cores,
+			MinCPUFreq:  in.MasterSizing.CPUFreq,
+			MinGPU:      in.MasterSizing.GPUNumber,
+			MinRAMSize:  in.MasterSizing.RAMSize,
+			MinDiskSize: in.MasterSizing.DiskSize,
+			Replaceable: in.MasterSizing.Replaceable,
+		},
+		NodeSizing: propertiesv1.HostSizingRequirements{
+			MinCores:    in.NodeSizing.Cores,
+			MinCPUFreq:  in.NodeSizing.CPUFreq,
+			MinGPU:      in.NodeSizing.GPUNumber,
+			MinRAMSize:  in.NodeSizing.RAMSize,
+			MinDiskSize: in.NodeSizing.DiskSize,
+			Replaceable: in.NodeSizing.Replaceable,
+		},
+	}
+	return out
+}
