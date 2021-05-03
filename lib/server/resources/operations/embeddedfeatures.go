@@ -18,11 +18,14 @@ package operations
 
 import (
 	"bytes"
-
-	rice "github.com/GeertJohan/go.rice"
-	"github.com/spf13/viper"
+	"crypto/md5"
+	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	rice "github.com/GeertJohan/go.rice"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -41,6 +44,18 @@ var (
 	allEmbeddedFeatures          []*feature
 )
 
+func getMD5Hash(text string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(text))
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func getSHA256Hash(text string) string {
+	hasher := sha256.New()
+	hasher.Write([]byte(text))
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
 // loadSpecFile returns the content of the spec file of the feature named 'name'
 func loadSpecFile(name string) (string, *viper.Viper, error) {
 	if templateBox == nil {
@@ -57,6 +72,8 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 	if err != nil {
 		return "", nil, fail.Wrap(err, "failed to read embedded feature speficication file '%s'", name)
 	}
+
+	logrus.Infof("loaded feature %s:SHA256:%s", name, getSHA256Hash(tmplString))
 
 	v := viper.New()
 	v.SetConfigType("yaml")
