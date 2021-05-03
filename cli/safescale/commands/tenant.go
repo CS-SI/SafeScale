@@ -29,28 +29,29 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-var tenantCmdName = "tenant"
+var tenantCmdLabel = "tenant"
 
 // TenantCommand command
 var TenantCommand = &cli.Command{
-	Name:  "tenant",
-	Usage: "tenant COMMAND",
+	Name:  tenantCmdLabel,
+	Usage: "manages tenants",
 	Subcommands: []*cli.Command{
-		tenantList,
-		tenantGet,
-		tenantSet,
-		tenantInspect,
-		tenantCleanup,
-		tenantScan,
+		tenantListCommand,
+		tenantGetCommand,
+		tenantSetCommand,
+		tenantInspectCommand,
+		tenantScanCommand,
+		tenantMetadataCommands,
 	},
 }
 
-var tenantList = &cli.Command{
+// tenantListCommand handles 'safescale tenant list'
+var tenantListCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available tenants",
+	Usage:   "List available tenants",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -66,12 +67,13 @@ var tenantList = &cli.Command{
 	},
 }
 
-var tenantGet = &cli.Command{
+// tenantGetCommand handles 'safescale tenant get'
+var tenantGetCommand = &cli.Command{
 	Name:    "get",
 	Aliases: []string{"current"},
 	Usage:   "Get current tenant",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -87,7 +89,8 @@ var tenantGet = &cli.Command{
 	},
 }
 
-var tenantSet = &cli.Command{
+// tenantSetCommand handles 'safescale tenant set'
+var tenantSetCommand = &cli.Command{
 	Name:  "set",
 	Usage: "Set tenant to work with",
 	Action: func(c *cli.Context) error {
@@ -96,7 +99,7 @@ var tenantSet = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -112,7 +115,8 @@ var tenantSet = &cli.Command{
 	},
 }
 
-var tenantInspect = &cli.Command{
+// tenantInspectCommand handles 'safescale tenant inspect'
+var tenantInspectCommand = &cli.Command{
 	Name:    "inspect",
 	Aliases: []string{"show"},
 	Usage:   "Inspect tenant",
@@ -122,7 +126,7 @@ var tenantInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -138,32 +142,8 @@ var tenantInspect = &cli.Command{
 	},
 }
 
-var tenantCleanup = &cli.Command{
-	Name:  "cleanup",
-	Usage: "Cleanup tenant by removing SafeScale metadata",
-	Action: func(c *cli.Context) error {
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-		}
-
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
-
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-		}
-
-		err := clientSession.Tenant.Cleanup(c.Args().First(), temporal.GetExecutionTimeout())
-		if err != nil {
-			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
-		}
-		return clitools.SuccessResponse(nil)
-	},
-}
-
-var tenantScan = &cli.Command{
+// tenantScanCommand handles 'safescale tenant scan' command
+var tenantScanCommand = &cli.Command{
 	Name:  "scan",
 	Usage: "Scan tenant's templates [--dry-run] [--template <template name>]",
 	Flags: []cli.Flag{
@@ -176,7 +156,7 @@ var tenantScan = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
 		}
 
-		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdName, c.Command.Name, c.Args())
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -189,5 +169,75 @@ var tenantScan = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
 		}
 		return clitools.SuccessResponse(results.GetResults())
+	},
+}
+
+const tenantMetadataCmdLabel = "metadata"
+
+// tenantMetadataCommands handles 'safescale tenant metadata' commands
+var tenantMetadataCommands = &cli.Command{
+	Name:      tenantMetadataCmdLabel,
+	Usage:     "manage tenant metadata",
+	ArgsUsage: "COMMAND",
+
+	Subcommands: []*cli.Command{
+		tenantMetadataUpgradeCommand,
+		// tenantMetadataBackupCommand,
+		// tenantMetadataRestoreCommand,
+		tenantMetadataDeleteCommand,
+	},
+}
+
+const tenantMetadataUpgradeLabel = "upgrade"
+
+var tenantMetadataUpgradeCommand = &cli.Command{
+	Name:  tenantMetadataUpgradeLabel,
+	Usage: "Upgrade tenant metadata if needed",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+		}
+
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", tenantCmdLabel, tenantMetadataCmdLabel, c.Command.Name, c.Args())
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		results, err := clientSession.Tenant.Upgrade(c.Args().First(), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
+		}
+		return clitools.SuccessResponse(results)
+	},
+}
+
+const tenantMetadataDeleteCmdLabel = "delete"
+var tenantMetadataDeleteCommand = &cli.Command{
+	Name:  tenantMetadataDeleteCmdLabel,
+	Aliases: []string{"remove", "rm", "destroy", "cleanup"},
+	Usage: "Remove SafeScale metadata of",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+		}
+
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err := clientSession.Tenant.Cleanup(c.Args().First(), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }

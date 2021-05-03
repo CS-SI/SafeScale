@@ -42,7 +42,7 @@ type genericPackager struct {
 	removeCommand alterCommandCB
 }
 
-// Check checks if the feature is installed
+// Check checks if the Feature is installed
 func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(xerr)
@@ -57,9 +57,9 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	yamlKey := "feature.install." + g.keyword + ".check"
-	if !f.(*feature).Specs().IsSet(yamlKey) {
-		msg := `syntax error in feature '%s' specification file (%s):
+	yamlKey := "Feature.install." + g.keyword + ".check"
+	if !f.(*Feature).Specs().IsSet(yamlKey) {
+		msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
 	}
@@ -86,7 +86,7 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 	return r, xerr
 }
 
-// Add installs the feature using apt
+// Add installs the Feature using apt
 func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&xerr)
@@ -101,9 +101,9 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	yamlKey := "feature.install." + g.keyword + ".add"
-	if !f.(*feature).Specs().IsSet(yamlKey) {
-		msg := `syntax error in feature '%s' specification file (%s):
+	yamlKey := "Feature.install." + g.keyword + ".add"
+	if !f.(*Feature).Specs().IsSet(yamlKey) {
+		msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
 	}
@@ -131,7 +131,7 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 	return r, xerr
 }
 
-// Remove uninstalls the feature using the RemoveScript script
+// Remove uninstalls the Feature using the RemoveScript script
 func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t resources.Targetable, v data.Map, s resources.FeatureSettings) (r resources.Results, xerr fail.Error) {
 	r = nil
 	defer fail.OnPanic(&xerr)
@@ -146,9 +146,9 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	yamlKey := "feature.install." + g.keyword + ".remove"
-	if !f.(*feature).Specs().IsSet(yamlKey) {
-		msg := `syntax error in feature '%s' specification file (%s):
+	yamlKey := "Feature.install." + g.keyword + ".remove"
+	if !f.(*Feature).Specs().IsSet(yamlKey) {
+		msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
 		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
 	}
@@ -174,7 +174,7 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 	return r, xerr
 }
 
-// aptInstaller is an installer using script to add and remove a feature
+// aptInstaller is an installer using script to add and remove a Feature
 type aptInstaller struct {
 	genericPackager
 }
@@ -198,7 +198,7 @@ func NewAptInstaller() Installer {
 	}
 }
 
-// yumInstaller is an installer using yum to add and remove a feature
+// yumInstaller is an installer using yum to add and remove a Feature
 type yumInstaller struct {
 	genericPackager
 }
@@ -222,7 +222,7 @@ func NewYumInstaller() Installer {
 	}
 }
 
-// dnfInstaller is an installer using yum to add and remove a feature
+// dnfInstaller is an installer using yum to add and remove a Feature
 type dnfInstaller struct {
 	genericPackager
 }

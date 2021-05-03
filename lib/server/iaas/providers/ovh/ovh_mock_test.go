@@ -47,7 +47,7 @@ func GetMockService(t *testing.T, tenant string) (iaas.Service, error) {
 			Provider: mci,
 		}, nil
 	}
-	return iaas.UseService(tenant)
+	return iaas.UseService(tenant, "")
 }
 
 func getMockableService(t *testing.T) (*tests.ServiceTester, *mocks.MockProvider, error) {

@@ -50,25 +50,25 @@ func TestGetService(t *testing.T) {
 	iaas.Register("cloudferro", cloudferro.New())
 	iaas.Register("flexibleEngine", flexibleengine.New())
 	iaas.Register("opentelekom", opentelekom.New())
-	ovhService, err := iaas.UseService("TestOvh")
+	ovhService, err := iaas.UseService("TestOvh", "")
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	_, err = iaas.UseService("TestCloudferro")
+	_, err = iaas.UseService("TestCloudferro", "")
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	// _, err := iaas.UseService("TestAws")
+	// _, err := iaas.UseService("TestAws", "")
 	// require.Nil(t, err)
 	require.Nil(t, err)
-	_, err = iaas.UseService("TestFlexibleEngine")
+	_, err = iaas.UseService("TestFlexibleEngine", "")
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Nil(t, err)
-	_, err = iaas.UseService("TestOpenTelekom")
+	_, err = iaas.UseService("TestOpenTelekom", "")
 	if err != nil {
 		t.Skip(err)
 	}
@@ -81,12 +81,12 @@ func TestGetServiceErr(t *testing.T) {
 	createTenantFile()
 	defer deleteTenantFile()
 	iaas.Register("ovh", ovh.New())
-	_, err := iaas.UseService("TestOhvehache")
+	_, err := iaas.UseService("TestOhvehache", "")
 	if err != nil {
 		t.Skip(err)
 	}
 	require.Error(t, err)
-	_, err = iaas.UseService("UnknownService")
+	_, err = iaas.UseService("UnknownService", "")
 	if err != nil {
 		t.Skip(err)
 	}
