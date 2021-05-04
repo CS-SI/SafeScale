@@ -44,7 +44,7 @@ import (
 )
 
 const (
-	shareKind = "Share"
+	shareKind = "share"
 	// nasFolderName is the technical name of the container used to store nas info
 	sharesFolderName = "shares"
 )

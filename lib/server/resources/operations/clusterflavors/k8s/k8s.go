@@ -19,13 +19,13 @@ package k8s
 import (
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/cluster/flavors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -33,7 +33,7 @@ import (
 var (
 
 	// Makers initializes a control.Makers struct to construct a BOH Cluster
-	Makers = flavors.Makers{
+	Makers = clusterflavors.Makers{
 		MinimumRequiredServers: minimumRequiredServers,
 		DefaultGatewaySizing:   gatewaySizing,
 		DefaultMasterSizing:    nodeSizing,
