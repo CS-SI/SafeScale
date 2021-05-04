@@ -33,11 +33,13 @@ sfFail() {
     elif [ $# -eq 2 -a $1 -ne 0 ]; then
         echo "Exiting with error $1: $2"
     fi
+    (sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
     exit $1
 }
 export -f sfFail
 
 function sfExit() {
+	(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
     exit 0
 }
 export -f sfExit
@@ -676,6 +678,27 @@ sfKeycloakDeleteGroup() {
     sfKeycloakRun delete clients/$clientID "$@"
 }
 export -f sfKeycloakDeleteGroup
+
+function sfSystemctl-exists() {
+  [ $(systemctl list-unit-files "${1}*" | wc -l) -gt 3 ]
+}
+export -f sfSystemctl-exists
+
+function sfServiceRuns() {
+	[ $# -ne 1 ] && return 1
+
+    local use_systemd=$(sfGetFact "use_systemd")
+    local redhat_like=$(sfGetFact "redhat_like")
+
+    # Preemptively run daemon-reload in case of changes
+    [ "$use_systemd" = "1" ] && systemctl daemon-reload
+
+	[ "$use_systemd" = "1" ] && systemctl status $2 && systemctl status $2 | grep active | grep running && return $?
+	[ "$redhat_like" = "1" ] && service $2 status && service $2 status | grep running && return $?
+
+    return 1
+}
+export -f sfServiceRuns
 
 # sfService abstract the command to use to manipulate services
 function sfService() {

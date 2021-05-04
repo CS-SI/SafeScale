@@ -28,6 +28,7 @@ trap print_error ERR
 function fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.init.done
+    (sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
     exit $1
 }
 
@@ -186,5 +187,8 @@ create_user
 touch /etc/cloud/cloud-init.disabled
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.init.done
+
+(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+
 set +x
 exit 0

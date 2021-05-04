@@ -28,7 +28,7 @@ trap print_error ERR
 function fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.final.done
-
+	(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
     # For compatibility with previous user_data implementation (until v19.03.x)...
     ln -s ${SF_VARDIR}/state/user_data.final.done /var/tmp/user_data.done
     exit $1
@@ -120,6 +120,8 @@ install_python3
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.final.done
 # For compatibility with previous user_data implementation (until v19.03.x)...
 ln -s ${SF_VARDIR}/state/user_data.final.done /var/tmp/user_data.done
+
+(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
 
 set +x
 exit 0
