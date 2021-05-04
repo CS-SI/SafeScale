@@ -52,11 +52,13 @@ import (
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
-	// CreateHostWithKeyPair --- from service ---
+	// --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
 	FilterImages(string) ([]abstract.Image, fail.Error)
 	FindTemplateBySizing(abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
 	FindTemplateByName(string) (*abstract.HostTemplate, fail.Error)
+	GetName() string
+	GetProviderName() string
 	GetMetadataBucket() abstract.ObjectStorageBucket
 	GetMetadataKey() (*crypt.Key, fail.Error)
 	InspectHostByName(string) (*abstract.HostFull, fail.Error)
@@ -83,6 +85,8 @@ type Service interface {
 type service struct {
 	providers.Provider
 	objectstorage.Location
+
+	tenantName string
 
 	//	metadataBucket objectstorage.GetBucket
 	metadataBucket abstract.ObjectStorageBucket
@@ -132,13 +136,22 @@ func (svc *service) IsNull() bool {
 	return svc == nil || svc.Provider == nil
 }
 
+// GetProviderName ...
+func (svc service) GetProviderName() string {
+	if svc.IsNull() {
+		return ""
+	}
+	return svc.Provider.GetName()
+}
+
 // GetName ...
 // Satisfies interface data.Identifiable
 func (svc service) GetName() string {
 	if svc.IsNull() {
 		return ""
 	}
-	return svc.Provider.GetName()
+
+	return svc.tenantName
 }
 
 // GetID ...
@@ -147,7 +160,7 @@ func (svc service) GetID() string {
 	if svc.IsNull() {
 		return ""
 	}
-	return svc.Provider.GetName()
+	return svc.GetName()
 }
 
 // GetCache returns the data.Cache instance corresponding to the name passed as parameter

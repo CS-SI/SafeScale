@@ -132,7 +132,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		_, tenantMetadataFound := tenant["metadata"]
 
 		// Initializes Provider
-		providerInstance, xerr := svc.Build( /*tenantClient*/ tenant)
+		providerInstance, xerr := svc.Build(tenant)
 		if xerr != nil {
 			return NullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
 		}
@@ -236,6 +236,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 			metadataKey:    metadataCryptKey,
 			cache:          serviceCache{map[string]*ResourceCache{}},
 			cacheLock:      &sync.Mutex{},
+			tenantName:     tenantName,
 		}
 		return newS, validateRegexps(newS /*tenantClient*/, tenant)
 	}

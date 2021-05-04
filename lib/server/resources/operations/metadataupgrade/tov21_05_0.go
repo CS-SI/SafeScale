@@ -40,14 +40,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type toV21_05_0 struct {}
+type toV21_05_0 struct{}
 
 func (tv toV21_05_0) Upgrade(svc iaas.Service, from string) fail.Error {
 	if svc == nil {
 		return fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	logrus.Infof("Upgrading metadata from version '%s' to version 'v21.05.0", from)
+	logrus.Infof("Upgrading metadata from version '%s' to version 'v21.05.0'", from)
 
 	xerr := tv.upgradeNetworks(svc)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -97,14 +97,17 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 		}
 
 		if !props.Lookup(networkproperty.SubnetsV1) {
+			logrus.Tracef("Upgrading metadata of Network '%s'", instance.GetName())
+
 			svc := instance.GetService()
 
 			// -- creates Subnet in metadata --
-			rs, xerr := operations.NewSubnet(svc)
+			subnetInstance, xerr := operations.NewSubnet(svc)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
+			defer subnetInstance.Released()
 
 			abstractSubnet, xerr := svc.InspectSubnetByName(instance.GetName(), instance.GetName())
 			if xerr != nil {
@@ -121,7 +124,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.SecondaryGatewayID)
 			}
 			abstractSubnet.State = subnetstate.Ready
-			xerr = rs.(*operations.Subnet).Carry(abstractSubnet)
+			xerr = subnetInstance.(*operations.Subnet).Carry(abstractSubnet)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -143,6 +146,8 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 			abstractNetwork.GatewayID, abstractNetwork.SecondaryGatewayID = "", ""
 			abstractNetwork.Domain = ""
 			return nil
+		} else {
+			logrus.Tracef("metadata of Network '%s' is up to date", instance.GetName())
 		}
 
 		// called when nothing has been changed, to prevent useless metadata update
@@ -152,7 +157,12 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 }
 
 func (tv toV21_05_0) upgradeHosts(svc iaas.Service) fail.Error {
-	return (&operations.Host{}).Browse(context.Background(), func(ahc *abstract.HostCore) fail.Error {
+	instance, xerr := operations.NewHost(svc)
+	if xerr != nil {
+		return xerr
+	}
+
+	return instance.Browse(context.Background(), func(ahc *abstract.HostCore) fail.Error {
 		hostInstance, innerXErr := operations.LoadHost(svc, ahc.Name)
 		if innerXErr != nil {
 			return innerXErr
@@ -166,6 +176,8 @@ func (tv toV21_05_0) upgradeHosts(svc iaas.Service) fail.Error {
 func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail.Error {
 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if !props.Lookup(hostproperty.NetworkV2) {
+			logrus.Tracef("Upgrading metadata of Host '%s'", instance.GetName())
+
 			// upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2
 			var hnV1 *propertiesv1.HostNetwork
 			innerXErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
@@ -201,6 +213,8 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 			}
 
 			// FIXME: clean old property or leave it ? will differ from v2 through time if Subnets are added for example
+		} else {
+			logrus.Tracef("Host '%s' is up to date", instance.GetName())
 		}
 
 		return fail.AlteredNothingError()
@@ -208,7 +222,11 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 }
 
 func (tv toV21_05_0) upgradeClusters(svc iaas.Service) fail.Error {
-	return (&operations.Cluster{}).Browse(context.Background(), func(aci *abstract.ClusterIdentity) fail.Error {
+	instance, xerr := operations.NewCluster(svc)
+	if xerr != nil {
+		return xerr
+	}
+	return instance.Browse(context.Background(), func(aci *abstract.ClusterIdentity) fail.Error {
 		clusterInstance, xerr := operations.LoadCluster(svc, aci.Name)
 		if xerr != nil {
 			return xerr
@@ -228,6 +246,8 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidParameterCannotBeNilError("instance")
 	}
+
+	logrus.Tracef("Upgrading metadata of Cluster '%s'", instance.GetName())
 
 	xerr := tv.upgradeClusterNodesPropertyIfNeeded(instance)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -250,8 +270,11 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 func (tv toV21_05_0) upgradeClusterNodesPropertyIfNeeded(instance *operations.Cluster) fail.Error {
 	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.NodesV3) {
+			logrus.Tracef("metadata of Cluster '%s' is up to date", instance.GetName())
 			return nil
 		}
+
+		logrus.Tracef("Upgrading metadata of Cluster '%s'", instance.GetName())
 
 		if props.Lookup(clusterproperty.NodesV2) {
 			var (

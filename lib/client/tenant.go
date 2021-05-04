@@ -23,7 +23,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // tenant is the part of safescale client handling tenants
@@ -73,7 +72,7 @@ func (t tenant) Set(name string, timeout time.Duration) error {
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	_, err := service.Set(ctx, &protocol.TenantName{Name: name})
-	return fail.ConvertError(err)
+	return err
 }
 
 // Inspect ...

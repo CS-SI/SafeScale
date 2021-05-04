@@ -39,7 +39,7 @@ var (
 	mutators = map[string]mutator{
 		"v20.06.0": {
 			upgrader: toV21_05_0{},
-			next:     "",
+			next:     "v21.05.0",
 		},
 	}
 )
@@ -49,9 +49,11 @@ func GetMutatorFor(version string) (Mutator, string, fail.Error) {
 	if version == "" {
 		return nil, "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
+
 	item, ok := mutators[version]
 	if ok {
 		return item.upgrader, item.next, nil
 	}
+
 	return nil, "", fail.NotFoundError("failed to find a mutator for version '%s'", version)
 }
