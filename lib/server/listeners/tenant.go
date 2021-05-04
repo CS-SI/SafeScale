@@ -33,38 +33,38 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Tenant structure to handle name and clientAPI for a tenant
-type Tenant struct {
-	name    string
-	Service iaas.Service
-}
+//// Tenant structure to handle name and clientAPI for a tenant
+//type Tenant struct {
+//	name    string
+//	Service iaas.Service
+//}
+//
+//var (
+//	currentTenant *Tenant
+//)
 
-var (
-	currentTenant *Tenant
-)
+//// GetCurrentTenant contains the current tenant
+//var GetCurrentTenant = getCurrentTenant
 
-// GetCurrentTenant contains the current tenant
-var GetCurrentTenant = getCurrentTenant
-
-// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
-func getCurrentTenant() *Tenant {
-	if currentTenant == nil {
-		tenants, err := iaas.GetTenantNames()
-		if err != nil || len(tenants) != 1 {
-			return nil
-		}
-		// Set unique tenant as selected
-		logrus.Println("Unique tenant set")
-		for name := range tenants {
-			service, err := iaas.UseService(name, "")
-			if err != nil {
-				return nil
-			}
-			currentTenant = &Tenant{name: name, Service: service}
-		}
-	}
-	return currentTenant
-}
+//// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
+//func getCurrentTenant() *operations.Tenant {
+//	if currentTenant == nil {
+//		tenants, err := iaas.GetTenantNames()
+//		if err != nil || len(tenants) != 1 {
+//			return nil
+//		}
+//		// Set unique tenant as selected
+//		logrus.Println("Unique tenant set")
+//		for name := range tenants {
+//			service, err := iaas.UseService(name, "")
+//			if err != nil {
+//				return nil
+//			}
+//			currentTenant = &Tenant{name: name, Service: service}
+//		}
+//	}
+//	return currentTenant
+//}
 
 // TenantListener server is used to implement SafeScale.safescale.
 type TenantListener struct{}
@@ -121,11 +121,11 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 
 	defer fail.OnExitLogError(&err)
 
-	getCurrentTenant()
+	currentTenant := operations.CurrentTenant()
 	if currentTenant == nil {
 		return nil, fail.NotFoundError("no tenant set")
 	}
-	return &protocol.TenantName{Name: currentTenant.name}, nil
+	return &protocol.TenantName{Name: currentTenant.Name}, nil
 }
 
 // Set the the tenant to use for each command
@@ -152,15 +152,16 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 
 	defer fail.OnExitLogError(&err)
 
-	if currentTenant != nil && currentTenant.name == in.GetName() {
-		return empty, nil
-	}
-
-	service, xerr := iaas.UseService(in.GetName(), operations.MinimumMetadataVersion)
+	xerr := operations.SetCurrentTenant(in.GetName())
 	if xerr != nil {
 		return empty, xerr
 	}
-	currentTenant = &Tenant{name: in.GetName(), Service: service}
+	currentTenant := operations.CurrentTenant()
+	_, xerr = operations.CheckMetadataVersion(currentTenant.Service)
+	if xerr != nil {
+		return empty, xerr
+	}
+
 	return empty, nil
 }
 
@@ -198,7 +199,8 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	if currentTenant != nil && currentTenant.name == in.GetName() {
+	currentTenant := operations.CurrentTenant()
+	if currentTenant != nil && currentTenant.Name == in.GetName() {
 		return empty, nil
 	}
 
@@ -297,7 +299,7 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, "", "tenant metadata upgrade")
+	job, xerr := PrepareJobWithoutService(ctx, "tenant metadata upgrade")
 	if xerr != nil {
 		return nil, xerr
 	}

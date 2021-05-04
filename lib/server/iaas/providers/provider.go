@@ -46,7 +46,7 @@ type Provider interface {
 	// GetConfigurationOptions returns configuration options as a Config
 	GetConfigurationOptions() (Config, fail.Error)
 
-	// GetName returns the provider name
+	// GetName returns the tenant name
 	GetName() string
 
 	GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp

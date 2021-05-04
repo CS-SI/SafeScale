@@ -63,7 +63,7 @@ import (
 )
 
 const (
-	hostKind = "Host"
+	hostKind = "host"
 	// hostsFolderName is the technical name of the container used to store networks info
 	hostsFolderName = "hosts"
 
@@ -108,7 +108,7 @@ func HostNullValue() *Host {
 }
 
 // LoadHost ...
-func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error) {
+func LoadHost(svc iaas.Service, ref string) (hostInstance resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
@@ -136,19 +136,7 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 				return nil, innerXErr
 			}
 
-			// // deal with legacy
-			// xerr = rh.upgradeIfNeeded()
-			// xerr = debug.InjectPlannedFail(xerr)
-			// if xerr != nil {
-			// 	switch xerr.(type) {
-			// 	case *fail.ErrAlteredNothing:
-			// 		// nothing changed, continue
-			// 	default:
-			// 		return nil, fail.Wrap(xerr, "failed to upgrade Host metadata")
-			// 	}
-			// }
-
-			return rh, rh.updateCachedInformation()
+			return rh, nil
 		}),
 	}
 
@@ -163,7 +151,7 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 		}
 	}
 
-	if rh = ce.Content().(resources.Host); rh == nil {
+	if hostInstance = ce.Content().(resources.Host); hostInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
 	}
 	_ = ce.LockContent()
@@ -174,53 +162,8 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 		}
 	}()
 
-	return rh, nil
+	return hostInstance, hostInstance.(*Host).updateCachedInformation()
 }
-
-// // upgradeIfNeeded upgrades Host properties if needed
-// func (instance *Host) upgradeIfNeeded() fail.Error {
-// 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-// 		if !props.Lookup(hostproperty.NetworkV2) {
-// 			// upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2
-// 			var hnV1 *propertiesv1.HostNetwork
-// 			innerXErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-// 				var ok bool
-// 				hnV1, ok = clonable.(*propertiesv1.HostNetwork)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv1.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-// 				return nil
-// 			})
-// 			if innerXErr != nil {
-// 				return innerXErr
-// 			}
-//
-// 			innerXErr = props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-// 				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-//
-// 				hnV2.DefaultSubnetID = hnV1.DefaultNetworkID
-// 				hnV2.IPv4Addresses = hnV1.IPv4Addresses
-// 				hnV2.IPv6Addresses = hnV1.IPv6Addresses
-// 				hnV2.IsGateway = hnV1.IsGateway
-// 				hnV2.PublicIPv4 = hnV1.PublicIPv4
-// 				hnV2.PublicIPv6 = hnV1.PublicIPv6
-// 				hnV2.SubnetsByID = hnV1.NetworksByID
-// 				hnV2.SubnetsByName = hnV1.NetworksByName
-// 				return nil
-// 			})
-// 			if innerXErr != nil {
-// 				return innerXErr
-// 			}
-//
-// 			// FIXME: clean old property or leave it ? will differ from v2 through time if Subnets are added for example
-// 		}
-//
-// 		return fail.AlteredNothingError()
-// 	})
-// }
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
 func (instance *Host) updateCachedInformation() fail.Error {
@@ -262,7 +205,9 @@ func (instance *Host) updateCachedInformation() fail.Error {
 				instance.accessIP = instance.privateIP
 			}
 
-			if !hnV2.Single && !hnV2.IsGateway {
+			// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
+			// Do not execute neither if Host is single or is a gateway
+			if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
 				subnetInstance, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {

@@ -44,6 +44,7 @@ func (r propertyTypeRegistry) ZeroValue(module, key string) data.Clonable {
 	if zeroValue, found := r[module][key]; found {
 		return zeroValue.Clone()
 	}
+
 	panic(fmt.Sprintf("Missing match for key '%s' in module '%s' and go type! Please use PropertyTypeRegistry.Register!", key, module))
 }
 
