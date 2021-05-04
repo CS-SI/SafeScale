@@ -333,6 +333,7 @@ func (p provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network,
 	return p.Stack.CreateNetwork(req)
 }
 
+// GetName returns the name of the driver
 func (p provider) GetName() string {
 	return "ovh"
 }

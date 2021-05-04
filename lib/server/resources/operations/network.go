@@ -43,7 +43,7 @@ import (
 )
 
 const (
-	networkKind = "Network"
+	networkKind = "network"
 	// networksFolderName is the technical name of the container used to store networks info
 	networksFolderName = "networks"
 )

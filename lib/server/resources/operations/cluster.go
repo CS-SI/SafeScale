@@ -62,7 +62,7 @@ import (
 )
 
 const (
-	clusterKind = "Cluster"
+	clusterKind = "cluster"
 	// Path is the path to use to reach Cluster Definitions/Metadata
 	clustersFolderName = "clusters"
 )

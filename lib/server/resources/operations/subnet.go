@@ -56,7 +56,7 @@ import (
 )
 
 const (
-	subnetKind = "Subnet"
+	subnetKind = "subnet"
 	// networksFolderName is the technical name of the container used to store networks info
 	subnetsFolderName = "subnets"
 
@@ -398,7 +398,7 @@ func (instance *Subnet) Carry(clonable data.Clonable) (xerr fail.Error) {
 
 	cacheEntry.LockContent()
 
-	return instance.updateCachedInformation()
+	return nil
 }
 
 // Create creates a Subnet
@@ -505,6 +505,11 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 			}
 		}
 	}()
+	xerr = instance.updateCachedInformation()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
 
 	subnetGWSG, subnetInternalSG, subnetPublicIPSG, xerr := instance.createSecurityGroups(ctx, req, *an)
 	xerr = debug.InjectPlannedFail(xerr)
