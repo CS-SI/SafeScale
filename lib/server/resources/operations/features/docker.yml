@@ -37,15 +37,15 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    dpkg -l | grep docker-ce &>/dev/null || sfFail 194
+                                    dpkg -l | grep docker-ce &>/dev/null || sfFail 194 "package docker-ce not found"
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
                                 centos|redhat|rhel)
-                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 194
+                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 194 "package docker-ce not found"
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
                                 fedora)
-                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 194
+                                    rpm -qa | grep docker-ce &>/dev/null || sfFail 194 "package docker-ce not found"
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     ;;
                                 *)
@@ -69,11 +69,11 @@ feature:
                                     export DEBIAN_FRONTEND=noninteractive
                                     sfStandardRetry "sfApt update"
                                     sfStandardRetry "sfApt install -y gnupg2 || sfApt install -y gnupg"
-                                    sfStandardRetry "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || sfFail 192
+                                    sfStandardRetry "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || sfFail $? "error installing apt tools"
                                     sfStandardRetry "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 193
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
                                     sfStandardRetry "sfApt update"
-                                    sfStandardRetry "sfApt install -qqy docker-ce" || sfFail 194
+                                    sfStandardRetry "sfApt install -qqy docker-ce" || sfFail $? "error installing docker-ce"
                                     ;;
                                 centos|redhat|rhel)
                                     sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 195
@@ -84,9 +84,9 @@ feature:
                                     if [ $op -ne 0 ]; then
                                         sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y curl &>/dev/null" && op=$? || true
                                         if [ $op -ne 0 ]; then
-                                            sfFail 197
+                                            sfFail 197 "error installing curl"
                                         else
-                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce" || sfFail 198
+                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce" || sfFail $? "error installing docker-ce"
                                         fi
                                     else
                                         sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce --nobest" || sfFail 199
@@ -199,10 +199,13 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            # Makes sure firewalld is running, starting first its dependency dbus...
-                            sfService start dbus
-                            # then firewalld  itself
-                            sfService restart firewalld
+                            # If firewalld doesn't run, start it
+                            sfService status firewalld | grep running || {
+                                # Makes sure firewalld is running, starting first its dependency dbus...
+                                sfService start dbus
+                                # then firewalld  itself
+                                sfService restart firewalld
+                            }
 
                             # If a zone named 'docker' is created and activated, we do not need to add interfaces to trusted zone
                             # FIXME: it should be better to create a configuration identical to the one created by docker 20.10+...
