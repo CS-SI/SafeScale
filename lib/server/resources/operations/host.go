@@ -2294,7 +2294,7 @@ func (instance *Host) Push(ctx context.Context, source, target, owner, mode stri
 		return 0, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner, mode).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner, mode).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -2379,7 +2379,7 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -2443,7 +2443,7 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -2508,7 +2508,7 @@ func (instance *Host) Reboot(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	xerr = instance.Stop(ctx)
@@ -2537,7 +2537,7 @@ func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRe
 		return xerr
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return fail.NotImplementedError("Host.Resize() not yet implemented")
@@ -2779,7 +2779,7 @@ func (instance *Host) PushStringToFileWithOwnership(ctx context.Context, content
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host"), "(content, filename='%s', ownner=%s, mode=%s", filename, owner, mode).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(content, filename='%s', ownner=%s, mode=%s", filename, owner, mode).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -2894,7 +2894,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host"), "(rsg='%s', enable=%v", rsg.GetName(), enable).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s', enable=%v", rsg.GetName(), enable).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -2961,7 +2961,7 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 	}
 
 	sgName := sg.GetName()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host"), "(sg='%s')", sgName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -3064,7 +3064,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 	}
 
 	sgName := sg.GetName()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host"), "(sg='%s')", sgName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -3160,7 +3160,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 	}
 
 	sgName := rsg.GetName()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host"), "(rsg='%s')", sgName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
