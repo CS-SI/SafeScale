@@ -47,7 +47,7 @@ func (i *bashInstaller) Check(ctx context.Context, f resources.Feature, t resour
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	yamlKey := "Feature.install.bash.check"
+	yamlKey := "feature.install.bash.check"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
 		msg := `syntax error in Feature '%s' specification file (%s): no key '%s' found`
 		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
@@ -92,9 +92,9 @@ func (i *bashInstaller) Add(ctx context.Context, f resources.Feature, t resource
 	}
 
 	// Determining if install script is defined in specification file
-	if !f.(*Feature).Specs().IsSet("Feature.install.bash.add") {
+	if !f.(*Feature).Specs().IsSet("feature.install.bash.add") {
 		msg := `syntax error in Feature '%s' specification file (%s):
-				no key 'Feature.install.bash.add' found`
+				no key 'feature.install.bash.add' found`
 		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename())
 	}
 
@@ -141,9 +141,9 @@ func (i *bashInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	if !f.(*Feature).Specs().IsSet("Feature.install.bash.remove") {
+	if !f.(*Feature).Specs().IsSet("feature.install.bash.remove") {
 		msg := `syntax error in Feature '%s' specification file (%s):
-				no key 'Feature.install.bash.remove' found`
+				no key 'feature.install.bash.remove' found`
 		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename())
 	}
 

@@ -78,10 +78,10 @@ print_error() {
 trap print_error ERR
 
 set +x
-rm -f %s/Feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 1<&-
 exec 2<&-
-exec 1<>%s/Feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 2>&1
 set -x
 
@@ -148,7 +148,7 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 	}
 
 	if m != installmethod.None {
-		w.rootKey = "Feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
+		w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
 		if !f.(*Feature).Specs().IsSet(w.rootKey) {
 			msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
@@ -542,7 +542,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		// 	rgw, xerr := w.identifyAvailableGateway()
 		// 	if xerr == nil {
 		// 		var found bool
-		// 		if found, xerr = rgw.IsFeatureInstalled(w.Feature.task, "edgeproxy4subnet"); xerr == nil && found {
+		// 		if found, xerr = rgw.IsFeatureInstalled(w.feature.task, "edgeproxy4subnet"); xerr == nil && found {
 		// 			xerr = w.unsetReverseProxy()
 		// 		}
 		// 	}
@@ -827,7 +827,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 }
 
 // validateContextForCluster checks if the flavor of the cluster is listed in Feature specification
-// 'Feature.suitableFor.cluster'.
+// 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommended)
 func (w *worker) validateContextForCluster() fail.Error {
 	clusterFlavor, xerr := w.cluster.UnsafeGetFlavor()
@@ -836,7 +836,7 @@ func (w *worker) validateContextForCluster() fail.Error {
 		return xerr
 	}
 
-	const yamlKey = "Feature.suitableFor.cluster"
+	const yamlKey = "feature.suitableFor.cluster"
 	if w.feature.specs.IsSet(yamlKey) {
 		yamlFlavors := strings.Split(w.feature.specs.GetString(yamlKey), ",")
 		for _, k := range yamlFlavors {
@@ -858,7 +858,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 	}
 
 	ok := false
-	const yamlKey = "Feature.suitableFor.host"
+	const yamlKey = "feature.suitableFor.host"
 	if w.feature.specs.IsSet(yamlKey) {
 		value := strings.ToLower(w.feature.specs.GetString(yamlKey))
 		ok = value == "ok" || value == "yes" || value == "true" || value == "1"
@@ -876,7 +876,7 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	yamlKey := "Feature.requirements.clusterSizing." + strings.ToLower(clusterFlavor.String())
+	yamlKey := "feature.requirements.clusterSizing." + strings.ToLower(clusterFlavor.String())
 	if !w.feature.specs.IsSet(yamlKey) {
 		return nil
 	}
@@ -945,8 +945,8 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	const yamlKey = "Feature.proxy.rules"
-	// rules, ok := w.Feature.specs.Get(yamlKey).(map[string]map[string]interface{})
+	const yamlKey = "feature.proxy.rules"
+	// rules, ok := w.feature.specs.Get(yamlKey).(map[string]map[string]interface{})
 	rules, ok := w.feature.specs.Get(yamlKey).([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
@@ -1241,7 +1241,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 	return hostsList, nil
 }
 
-// normalizeScript envelops the script with log redirection to /opt/safescale/var/log/Feature.<name>.<action>.log
+// normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
 func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 	var (
@@ -1304,7 +1304,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	const yamlKey = "Feature.security.networking"
+	const yamlKey = "feature.security.networking"
 	if ok := w.feature.specs.IsSet(yamlKey); !ok {
 		return nil
 	}
@@ -1444,13 +1444,13 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 	// 	}
 	//
 	// 	for _, h := range hosts {
-	// 		if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.Feature.task); xerr != nil {
+	// 		if primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
 	// 			return xerr
 	// 		}
 	// 		primaryGatewayVariables["ShortHostname"] = h.GetName()
 	// 		domain := ""
-	// 		xerr = h.Inspect(w.Feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 			return props.Inspect(w.Feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+	// 		xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 			return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 	// 				hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 	// 				if !ok {
 	// 					return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1468,7 +1468,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 	//
 	// 		primaryGatewayVariables["Hostname"] = h.GetName() + domain
 	//
-	// 		tP, xerr := w.Feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
+	// 		tP, xerr := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
 	// 			"ctrl": primaryKongController,
 	// 			"rule": rule,
 	// 			"vars": &primaryGatewayVariables,
@@ -1479,13 +1479,13 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 	//
 	// 		var errS fail.Error
 	// 		if secondaryKongController != nil {
-	// 			if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.Feature.task); xerr != nil {
+	// 			if secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP(w.feature.task); xerr != nil {
 	// 				return xerr
 	// 			}
 	// 			secondaryGatewayVariables["ShortHostname"] = h.GetName()
 	// 			domain = ""
-	// 			xerr = h.Inspect(w.Feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-	// 				return props.Inspect(w.Feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+	// 			xerr = h.Inspect(w.feature.task, func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 				return props.Inspect(w.feature.task, hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
 	// 					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
 	// 					if !ok {
 	// 						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1502,7 +1502,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 	// 			}
 	// 			secondaryGatewayVariables["Hostname"] = h.GetName() + domain
 	//
-	// 			tS, errOp := w.Feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
+	// 			tS, errOp := w.feature.task.StartInSubtask(taskApplyProxyRule, data.Map{
 	// 				"ctrl": secondaryKongController,
 	// 				"rule": rule,
 	// 				"vars": &secondaryGatewayVariables,

@@ -57,7 +57,7 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	yamlKey := "Feature.install." + g.keyword + ".check"
+	yamlKey := "feature.install." + g.keyword + ".check"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
 		msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
@@ -101,7 +101,7 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	yamlKey := "Feature.install." + g.keyword + ".add"
+	yamlKey := "feature.install." + g.keyword + ".add"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
 		msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
@@ -146,7 +146,7 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 		return nil, fail.InvalidParameterCannotBeNilError("t")
 	}
 
-	yamlKey := "Feature.install." + g.keyword + ".remove"
+	yamlKey := "feature.install." + g.keyword + ".remove"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
 		msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
