@@ -352,6 +352,7 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
+	failure := false
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -396,10 +397,14 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 			case *fail.ErrAborted:
 				// Wanted situation, continue
 			default:
-				t.FailNow()
+				t.Errorf("waitgroup failed with an unexpected error: %v", xerr)
+				failure = true
+				return
 			}
 		} else {
-			t.FailNow()
+			t.Errorf("waitgroup didn't fail and it should")
+			failure = true
+			return
 		}
 
 		end := time.Since(begin)
@@ -413,7 +418,13 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 
 	runOutOfTime := waitTimeout(&wg, time.Duration(15*time.Second))
 	if runOutOfTime {
+		if failure {
+			t.FailNow()
+		}
 		t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
+		t.FailNow()
+	}
+	if failure {
 		t.FailNow()
 	}
 }
