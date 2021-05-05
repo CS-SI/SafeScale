@@ -71,9 +71,6 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	if cancel == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("cancel")
 	}
-	if svc == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("svc")
-	}
 
 	var (
 		md metadata.MD
@@ -117,8 +114,10 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		task:        task,
 		cancel:      cancel,
 		service:     svc,
-		tenant:      svc.GetName(),
 		startTime:   time.Now(),
+	}
+	if svc != nil {
+		nj.tenant = svc.GetName()
 	}
 	if xerr = register(&nj); xerr != nil {
 		return nil, xerr

@@ -40,10 +40,10 @@ import (
 )
 
 // AddFeature handles 'safescale host feature add <host name or id> <feature name>'
-func (instance *host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
+func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -106,10 +106,10 @@ func (instance *host) AddFeature(ctx context.Context, name string, vars data.Map
 }
 
 // CheckFeature ...
-func (instance *host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -142,10 +142,10 @@ func (instance *host) CheckFeature(ctx context.Context, name string, vars data.M
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
-func (instance *host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
+func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
@@ -202,8 +202,8 @@ func (instance *host) DeleteFeature(ctx context.Context, name string, vars data.
 
 // TargetType returns the type of the target.
 // satisfies install.Targetable interface.
-func (instance *host) TargetType() featuretargettype.Enum {
-	if instance.isNull() {
+func (instance *Host) TargetType() featuretargettype.Enum {
+	if instance == nil || instance.IsNull() {
 		return featuretargettype.Unknown
 	}
 
@@ -212,9 +212,9 @@ func (instance *host) TargetType() featuretargettype.Enum {
 
 // InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
-func (instance *host) InstallMethods() map[uint8]installmethod.Enum {
+func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 	// FIXME: Return error
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return map[uint8]installmethod.Enum{}
 	}
@@ -223,10 +223,10 @@ func (instance *host) InstallMethods() map[uint8]installmethod.Enum {
 }
 
 // RegisterFeature registers an installed Feature in metadata of Host
-func (instance *host) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
+func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if feat == nil {
@@ -252,7 +252,7 @@ func (instance *host) RegisterFeature(feat resources.Feature, requiredBy resourc
 				item.HostContext = !clusterContext
 				featuresV1.Installed[feat.GetName()] = item
 			}
-			if rf, ok := requiredBy.(*feature); ok && !rf.isNull() {
+			if rf, ok := requiredBy.(*Feature); ok && !rf.IsNull() {
 				item.RequiredBy[rf.GetName()] = struct{}{}
 			}
 			return nil
@@ -261,10 +261,10 @@ func (instance *host) RegisterFeature(feat resources.Feature, requiredBy resourc
 }
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
-func (instance *host) UnregisterFeature(feat string) (xerr fail.Error) {
+func (instance *Host) UnregisterFeature(feat string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if feat == "" {
@@ -289,17 +289,17 @@ func (instance *host) UnregisterFeature(feat string) (xerr fail.Error) {
 
 // InstalledFeatures returns a list of installed features
 // satisfies interface install.Targetable
-func (instance *host) InstalledFeatures() []string {
+func (instance *Host) InstalledFeatures() []string {
 	var list []string
 	return list
 }
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target
 // satisfies interface install.Targetable
-func (instance *host) ComplementFeatureParameters(_ context.Context, v data.Map) (xerr fail.Error) {
+func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if v == nil {
@@ -349,9 +349,16 @@ func (instance *host) ComplementFeatureParameters(_ context.Context, v data.Map)
 	}
 	defer rgw.Released()
 
-	v["PrimaryGatewayIP"] = rgw.(*host).privateIP
+	v["PrimaryGatewayIP"], xerr = rgw.GetPrivateIP()
+	if xerr != nil {
+		return xerr
+	}
+
 	v["GatewayIP"] = v["PrimaryGatewayIP"] // legacy
-	v["PrimaryPublicIP"] = rgw.(*host).publicIP
+	v["PrimaryPublicIP"], xerr = rgw.GetPublicIP()
+	if xerr != nil {
+		return xerr
+	}
 
 	rgw, xerr = rs.InspectGateway(false)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -365,8 +372,15 @@ func (instance *host) ComplementFeatureParameters(_ context.Context, v data.Map)
 	} else {
 		defer rgw.Released()
 
-		v["SecondaryGatewayIP"] = rgw.(*host).privateIP
-		v["SecondaryPublicIP"] = rgw.(*host).publicIP
+		v["SecondaryGatewayIP"], xerr = rgw.GetPrivateIP()
+		if xerr != nil {
+			return xerr
+		}
+
+		v["SecondaryPublicIP"], xerr = rgw.GetPublicIP()
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	v["EndpointIP"], xerr = rs.GetEndpointIP()
@@ -386,11 +400,11 @@ func (instance *host) ComplementFeatureParameters(_ context.Context, v data.Map)
 }
 
 // IsFeatureInstalled ...
-func (instance *host) IsFeatureInstalled(name string) (found bool, xerr fail.Error) {
+func (instance *Host) IsFeatureInstalled(name string) (found bool, xerr fail.Error) {
 	found = false
 	defer fail.OnPanic(&xerr)
 
-	if instance.isNull() {
+	if instance == nil || instance.IsNull() {
 		return false, fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {

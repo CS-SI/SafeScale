@@ -130,25 +130,20 @@ func OnExitWrapError(err interface{}, msg ...interface{}) {
 }
 
 // OnExitConvertToGRPCStatus converts err to GRPC Status.
-func OnExitConvertToGRPCStatus(err interface{}) {
-	if err != nil {
+func OnExitConvertToGRPCStatus(err *error) {
+	if err != nil && *err != nil {
 		var newErr error
-		switch v := err.(type) {
-		case *Error:
-			if *v != nil {
-				newErr = (*v).ToGRPCStatus()
-			}
-		case *error:
-			if *v != nil {
-				newErr = ToGRPCStatus(*v)
-			}
+		switch v := (*err).(type) {
+		case Error:
+			newErr = v.ToGRPCStatus()
+		case error:
+			newErr = ToGRPCStatus(v)
 		default:
 			logrus.Errorf("fail.OnExitConvertToGRPCStatus(): invalid parameter 'err': unexpected type '%s'", reflect.TypeOf(err).String())
 			return
 		}
 		if newErr != nil {
-			targetErr := err.(*error)
-			*targetErr = newErr
+			*err = newErr
 		}
 	}
 }

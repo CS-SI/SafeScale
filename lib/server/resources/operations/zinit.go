@@ -26,7 +26,7 @@ import (
 
 func init() {
 
-	allEmbeddedFeatures = []*feature{
+	allEmbeddedFeatures = []*Feature{
 		dockerFeature(),
 		dockerSwarmFeature(),
 		ntpServerFeature(),
@@ -79,7 +79,7 @@ func init() {
 				continue
 			}
 			if _, found := availableEmbeddedFeaturesMap[meth]; !found {
-				availableEmbeddedFeaturesMap[meth] = map[string]*feature{
+				availableEmbeddedFeaturesMap[meth] = map[string]*Feature{
 					itemName: item,
 				}
 			} else {

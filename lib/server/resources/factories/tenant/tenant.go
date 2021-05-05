@@ -19,6 +19,7 @@ package tenant
 import (
 	"sync/atomic"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -46,7 +47,7 @@ func GetCurrentTenant() *Tenant {
 		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
 		for _, anon := range tenants {
 			name := anon.(string)
-			service, err := iaas.UseService(name)
+			service, err := iaas.UseService(name, operations.MinimumMetadataVersion)
 			if err != nil {
 				return nil
 			}
@@ -65,7 +66,7 @@ func SetCurrentTenant(tenantName string) error {
 		return nil
 	}
 
-	service, err := iaas.UseService(tenantName)
+	service, err := iaas.UseService(tenantName, operations.MinimumMetadataVersion)
 	if err != nil {
 		return err
 	}

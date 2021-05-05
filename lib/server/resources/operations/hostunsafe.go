@@ -42,8 +42,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// unsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
-func (instance *host) unsafeRun(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+// UnsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
+func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if cmd == "" {
@@ -159,9 +159,9 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 	return retcode, stdout, stderr, xerr
 }
 
-// unsafePush is the non goroutine-safe version of Push, with less parameter validation, that do the real work
+// UnsafePush is the non goroutine-safe version of Push, with less parameter validation, that do the real work
 // Note: must be used with wisdom
-func (instance *host) unsafePush(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if source == "" {
@@ -233,16 +233,16 @@ func (instance *host) unsafePush(ctx context.Context, source, target, owner, mod
 	return retcode, stdout, stderr, xerr
 }
 
-// unsafeGetVolumes is the not goroutine-safe version of GetVolumes, without parameter validation, that does the real work
+// UnsafeGetVolumes is the not goroutine-safe version of GetVolumes, without parameter validation, that does the real work
 // Note: must be used with wisdom
-func (instance *host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error) {
+func (instance *Host) UnsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error) {
 	var hvV1 *propertiesv1.HostVolumes
 	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.unsafeGetVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.UnsafeGetVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			return nil
@@ -256,9 +256,9 @@ func (instance *host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error)
 	return hvV1, nil
 }
 
-// unsafeGetMounts returns the information about the mounts of the host
+// UnsafeGetMounts returns the information about the mounts of the host
 // Intended to be used when objh is notoriously not nil (because previously checked)
-func (instance *host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Error) {
+func (instance *Host) UnsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Error) {
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
@@ -277,12 +277,12 @@ func (instance *host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr f
 	return mounts, nil
 }
 
-func (instance *host) unsafePushStringToFile(ctx context.Context, content string, filename string) (xerr fail.Error) {
+func (instance *Host) unsafePushStringToFile(ctx context.Context, content string, filename string) (xerr fail.Error) {
 	return instance.unsafePushStringToFileWithOwnership(ctx, content, filename, "", "")
 }
 
 // unsafePushStringToFileWithOwnership is the non goroutine-safe version of PushStringToFIleWithOwnership, that does the real work
-func (instance *host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (xerr fail.Error) {
+func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if content == "" {
@@ -313,7 +313,7 @@ func (instance *host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	deleted := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
+			retcode, _, _, innerXErr := instance.UnsafePush(ctx, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -321,7 +321,7 @@ func (instance *host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
 				if retcode == 1 && !deleted {
 					// File may exist on target, try to remove it
-					if _, _, _, innerXErr = instance.unsafeRun(ctx, "sudo rm -f "+filename, outputs.COLLECT, temporal.GetConnectSSHTimeout(), temporal.GetExecutionTimeout()); innerXErr == nil {
+					if _, _, _, innerXErr = instance.UnsafeRun(ctx, "sudo rm -f "+filename, outputs.COLLECT, temporal.GetConnectSSHTimeout(), temporal.GetExecutionTimeout()); innerXErr == nil {
 						deleted = true
 					}
 					switch innerXErr.(type) {
@@ -364,7 +364,7 @@ func (instance *host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	if cmd != "" {
 		retryErr = retry.WhileUnsuccessful(
 			func() error {
-				retcode, stdout, _, innerXErr := instance.unsafeRun(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+				retcode, stdout, _, innerXErr := instance.UnsafeRun(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrAborted:
@@ -401,7 +401,7 @@ func (instance *host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 }
 
 // unsafeGetDefaultSubnet returns the Networking instance corresponding to host default subnet
-func (instance *host) unsafeGetDefaultSubnet() (rs resources.Subnet, xerr fail.Error) {
+func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
@@ -432,7 +432,7 @@ func (instance *host) unsafeGetDefaultSubnet() (rs resources.Subnet, xerr fail.E
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nullSubnet(), xerr
+		return NullSubnet(), xerr
 	}
 
 	return rs, nil

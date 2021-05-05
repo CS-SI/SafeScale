@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server"
@@ -38,15 +39,16 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	var tenant *Tenant
+	var tenant *operations.Tenant
 	if tenantID != "" {
-		service, xerr := iaas.UseService(tenantID)
+		service, xerr := iaas.UseService(tenantID, "")
 		if xerr != nil {
 			return nil, xerr
 		}
-		tenant = &Tenant{name: tenantID, Service: service}
+
+		tenant = &operations.Tenant{Name: tenantID, Service: service}
 	} else {
-		tenant = GetCurrentTenant()
+		tenant = operations.CurrentTenant()
 		if tenant == nil {
 			return nil, fail.NotFoundError("no tenant set")
 		}
@@ -57,6 +59,24 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 	if xerr != nil {
 		return nil, xerr
 	}
+	return job, nil
+}
+
+// PrepareJobWithoutService creates a new job without service instanciation (for example to be used with metadata upgrade)
+func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ server.Job, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	newctx, cancel := context.WithCancel(ctx)
+
+	job, xerr := server.NewJob(newctx, cancel, nil, jobDescription)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	return job, nil
 }
 
