@@ -67,9 +67,9 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewImageHandler(job)
-	images, err := handler.List(in.GetAll())
-	if err != nil {
-		return nil, err
+	images, xerr := handler.List(in.GetAll())
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Build response mapping abstract.Image to protocol.Image

@@ -23,7 +23,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // tenant is the part of safescale client handling tenants
@@ -73,7 +72,7 @@ func (t tenant) Set(name string, timeout time.Duration) error {
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	_, err := service.Set(ctx, &protocol.TenantName{Name: name})
-	return fail.ConvertError(err)
+	return err
 }
 
 // Inspect ...
@@ -118,4 +117,22 @@ func (t tenant) Scan(name string, dryRun bool, templates []string, timeout time.
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	results, err := service.Scan(ctx, &protocol.TenantScanRequest{Name: name, DryRun: dryRun, Templates: templates})
 	return results, err
+}
+
+// Upgrade ...
+func (t tenant) Upgrade(name string, timeout time.Duration) ([]string, error) {
+	t.session.Connect()
+	defer t.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewTenantServiceClient(t.session.connection)
+	results, err := service.Upgrade(ctx, &protocol.TenantUpgradeRequest{Name: name, Force: false})
+	if results == nil && len(results.Actions) > 0 {
+		return results.Actions, err
+	}
+	return nil, err
 }

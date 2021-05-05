@@ -30,9 +30,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// unsafeInspectGateway returns the gateway related to subnet
+// UnsafeInspectGateway returns the gateway related to Subnet
 // Note: a write lock of the instance (instance.lock.Lock() ) must have been called before calling this method
-func (instance *subnet) unsafeInspectGateway(primary bool) (_ resources.Host, xerr fail.Error) {
+func (instance *Subnet) UnsafeInspectGateway(primary bool) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	gwIdx := 0
@@ -48,15 +48,15 @@ func (instance *subnet) unsafeInspectGateway(primary bool) (_ resources.Host, xe
 }
 
 // // unsafeInspectNetwork returns the Network instance owning the Subnet
-// func (instance *subnet) unsafeInspectNetwork() (rn resources.Network, xerr fail.Error) {
+// func (instance *Subnet) unsafeInspectNetwork() (rn resources.Network, xerr fail.Error) {
 // 	defer fail.OnPanic(&xerr)
 //
 //
 // 	return instance.parentNetwork, nil
 // }
 
-// unsafeGetDefaultRouteIP ...
-func (instance *subnet) unsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {
+// UnsafeGetDefaultRouteIP ...
+func (instance *Subnet) UnsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {
 	ip = ""
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
@@ -75,7 +75,10 @@ func (instance *subnet) unsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {
 			}
 			defer rh.Released()
 
-			ip = rh.(*host).privateIP
+			ip, xerr = rh.GetPrivateIP()
+			if xerr != nil {
+				return xerr
+			}
 			return nil
 		}
 
@@ -86,7 +89,7 @@ func (instance *subnet) unsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {
 }
 
 // unsafeGetVirtualIP returns an abstract.VirtualIP used by gateway HA
-func (instance *subnet) unsafeGetVirtualIP() (vip *abstract.VirtualIP, xerr fail.Error) {
+func (instance *Subnet) unsafeGetVirtualIP() (vip *abstract.VirtualIP, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -100,11 +103,11 @@ func (instance *subnet) unsafeGetVirtualIP() (vip *abstract.VirtualIP, xerr fail
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, fail.Wrap(xerr, "cannot get subnet virtual IP")
+		return nil, fail.Wrap(xerr, "cannot get Subnet virtual IP")
 
 	}
 	if vip == nil {
-		return nil, fail.NotFoundError("failed to find Virtual IP binded to gateways for subnet '%s'", instance.GetName())
+		return nil, fail.NotFoundError("failed to find Virtual IP binded to gateways for Subnet '%s'", instance.GetName())
 	}
 
 	return vip, nil
@@ -112,7 +115,7 @@ func (instance *subnet) unsafeGetVirtualIP() (vip *abstract.VirtualIP, xerr fail
 
 // unsafeGetCIDR returns the CIDR of the network
 // Intended to be used when instance is notoriously not nil (because previously checked)
-func (instance *subnet) unsafeGetCIDR() (cidr string, xerr fail.Error) {
+func (instance *Subnet) unsafeGetCIDR() (cidr string, xerr fail.Error) {
 	cidr = ""
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
@@ -128,7 +131,7 @@ func (instance *subnet) unsafeGetCIDR() (cidr string, xerr fail.Error) {
 
 // unsafeGetState returns the state of the network
 // Intended to be used when rs is notoriously not null (because previously checked)
-func (instance *subnet) unsafeGetState() (state subnetstate.Enum, xerr fail.Error) {
+func (instance *Subnet) unsafeGetState() (state subnetstate.Enum, xerr fail.Error) {
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -143,7 +146,7 @@ func (instance *subnet) unsafeGetState() (state subnetstate.Enum, xerr fail.Erro
 
 // unsafeAbandonHost is the non goroutine-safe version of UnbindHost, without paramter validation, that does the real work
 // Note: must be used wisely
-func (instance *subnet) unsafeAbandonHost(props *serialize.JSONProperties, hostID string) fail.Error {
+func (instance *Subnet) unsafeAbandonHost(props *serialize.JSONProperties, hostID string) fail.Error {
 	return props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 		shV1, ok := clonable.(*propertiesv1.SubnetHosts)
 		if !ok {
@@ -159,8 +162,8 @@ func (instance *subnet) unsafeAbandonHost(props *serialize.JSONProperties, hostI
 	})
 }
 
-// unsafeHasVirtualIP tells if the subnet uses a VIP a default route
-func (instance *subnet) unsafeHasVirtualIP() (bool, fail.Error) {
+// unsafeHasVirtualIP tells if the Subnet uses a VIP a default route
+func (instance *Subnet) unsafeHasVirtualIP() (bool, fail.Error) {
 	var found bool
 	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)

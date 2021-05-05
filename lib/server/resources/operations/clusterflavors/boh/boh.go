@@ -24,13 +24,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
-	flavors "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 var (
 	// Makers returns a configured Makers to construct a BOH Cluster
-	Makers = flavors.Makers{
+	Makers = clusterflavors.Makers{
 		MinimumRequiredServers: minimumRequiredServers,
 		DefaultGatewaySizing:   gatewaySizing,
 		DefaultMasterSizing:    nodeSizing,
