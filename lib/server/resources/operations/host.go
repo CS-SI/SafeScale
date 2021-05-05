@@ -136,20 +136,7 @@ func LoadHost(svc iaas.Service, ref string) (hostInstance resources.Host, xerr f
 				return nil, innerXErr
 			}
 
-			// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
-			// // deal with legacy
-			// xerr = rh.(*host).upgradeIfNeeded()
-			// xerr = debug.InjectPlannedFail(xerr)
-			// if xerr != nil {
-			// 	switch xerr.(type) {
-			// 	case *fail.ErrAlteredNothing:
-			// 		// nothing changed, continue
-			// 	default:
-			// 		return nil, fail.Wrap(xerr, "failed to upgrade Host metadata")
-			// 	}
-			// }
-
-			return rh, rh.(*host).updateCachedInformation()
+			return rh, nil
 		}),
 	}
 

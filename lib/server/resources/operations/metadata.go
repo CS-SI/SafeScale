@@ -33,7 +33,8 @@ const (
 	// FirstMetadataVersion corresponds to the first metadata format version
 	FirstMetadataVersion = "v20.06.0"
 
-	MustUpgradeMessage  = "the current version of SafeSale binaries cannot use safely the current tenant metadata; you should consider to upgrade the metadata using the command 'safescale tenant metadata upgrade %s'. Note however previous version of binaries would not be able to read safely the newly upgraded metadata and should be upgraded everywhere to at least version %s."
+	// MustUpgradeMessage  = "the current version of SafeSale binaries cannot use safely the current tenant metadata; you should consider to upgrade the metadata using the command 'safescale tenant metadata upgrade %s'. Note however previous version of binaries would not be able to read safely the newly upgraded metadata and should be upgraded everywhere to at least version %s."
+	MustUpgradeMessage  = "the current version of SafeSale binaries cannot use safely the current tenant metadata; you should consider to upgrade the metadata using the command 'safescale tenant metadata upgrade %s'. !!!NOT AVAILABLE WITH THIS RELEASE CANDIDATE!!!"
 	MustUpgradeBinaries = "the current version of SafeScale binaries requires the use of at least release %s to work correctly. Please upgrade your binaries"
 )
 
@@ -67,7 +68,8 @@ func CheckMetadataVersion(svc iaas.Service) (string, fail.Error) {
 	result := strings.Compare(currentMetadataVersion, MinimumMetadataVersion)
 	switch result {
 	case -1:
-		return currentMetadataVersion, fail.ForbiddenError(MustUpgradeMessage, svc.GetName(), MinimumMetadataVersion)
+		//return currentMetadataVersion, fail.ForbiddenError(MustUpgradeMessage, svc.GetName(), MinimumMetadataVersion)
+		return currentMetadataVersion, fail.ForbiddenError(MustUpgradeMessage, svc.GetName())
 	case 1:
 		return currentMetadataVersion, fail.ForbiddenError(MustUpgradeBinaries, MinimumMetadataVersion)
 	}
