@@ -208,7 +208,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 				// Creates metadata version file
 				if metadataVersion != "" {
 					content := bytes.NewBuffer([]byte(metadataVersion))
-					_, xerr := metadataLocation.WriteObject(bucketName, "/version", content, int64(content.Len()), nil)
+					_, xerr := metadataLocation.WriteObject(bucketName, "version", content, int64(content.Len()), nil)
 					if xerr != nil {
 						return NullService(), fail.Wrap(xerr, "failed to create version object in metadata Bucket")
 					}

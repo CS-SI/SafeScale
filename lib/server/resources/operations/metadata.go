@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -50,7 +51,8 @@ func CheckMetadataVersion(svc iaas.Service) (string, fail.Error) {
 	xerr = folder.Read("", "version", func(data []byte) fail.Error {
 		currentMetadataVersion = string(data)
 		return nil
-	})
+	}, data.NewImmutableKeyValue("doNotCrypt", true),
+	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
