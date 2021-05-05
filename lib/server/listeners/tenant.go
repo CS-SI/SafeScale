@@ -27,7 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/metadataupgrade"
+	// "github.com/CS-SI/SafeScale/lib/server/resources/operations/metadataupgrade"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -124,11 +124,6 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 	if xerr != nil {
 		return empty, xerr
 	}
-	// currentTenant := operations.CurrentTenant()
-	// _, xerr = operations.CheckMetadataVersion(currentTenant.Service)
-	// if xerr != nil {
-	// 	return empty, xerr
-	// }
 
 	return empty, nil
 }
@@ -252,56 +247,57 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot upgrade tenant")
 
-	if s == nil {
-		return nil, fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-	}
-
-	job, xerr := PrepareJobWithoutService(ctx, "tenant metadata upgrade")
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-
-	name := in.GetName()
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
-
-	// Not setting metadataVersion prevents to overwrite current version file if it exists...
-	svc, xerr := iaas.UseService(name, "")
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	var currentVersion string
-	if !in.Force {
-		currentVersion, xerr = operations.CheckMetadataVersion(svc)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrForbidden, *fail.ErrNotFound:
-				// continue
-			default:
-				return nil, xerr
-			}
-		}
-	}
-
-	xerr = metadataupgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return nil, nil
+	return nil, fail.NotImplementedError("metadata upgrade coming soon")
+	// if s == nil {
+	// 	return nil, fail.InvalidInstanceError()
+	// }
+	// if ctx == nil {
+	// 	return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	// }
+	// if in == nil {
+	// 	return nil, fail.InvalidParameterError("in", "cannot be nil")
+	// }
+	//
+	// ok, err := govalidator.ValidateStruct(in)
+	// if err != nil || !ok {
+	// 	logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	// }
+	//
+	// job, xerr := PrepareJobWithoutService(ctx, "tenant metadata upgrade")
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	// defer job.Close()
+	//
+	// name := in.GetName()
+	// tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	// defer tracer.Exiting()
+	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	//
+	// // Not setting metadataVersion prevents to overwrite current version file if it exists...
+	// svc, xerr := iaas.UseService(name, "")
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// var currentVersion string
+	// if !in.Force {
+	// 	currentVersion, xerr = operations.CheckMetadataVersion(svc)
+	// 	if xerr != nil {
+	// 		switch xerr.(type) {
+	// 		case *fail.ErrForbidden, *fail.ErrNotFound:
+	// 			// continue
+	// 		default:
+	// 			return nil, xerr
+	// 		}
+	// 	}
+	// }
+	//
+	// xerr = metadataupgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// return nil, nil
 }
