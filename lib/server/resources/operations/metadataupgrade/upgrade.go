@@ -87,7 +87,7 @@ func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
 	}
 
 	// -- at last, update version entry in metadata --
-	folder, xerr := operations.NewMetadataFolder(svc, "/")
+	folder, xerr := operations.NewMetadataFolder(svc, "")
 	if xerr != nil {
 		return xerr
 	}
