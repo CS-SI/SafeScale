@@ -27,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
@@ -139,6 +140,30 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 				subnetsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
 				subnetsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
 				return nil
+			})
+
+			// -- move Hosts attached to Network to Subnet --
+			xerr = props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+				networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
+				}
+
+				return subnetInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+						subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
+						if !ok {
+							return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
+						for k, v := range networkHostsV1.ByName {
+							subnetHostsV1.ByName[k] = v
+						}
+						for k, v := range networkHostsV1.ByID {
+							subnetHostsV1.ByID[k] = v
+						}
+						return nil
+					})
+				})
 			})
 
 			// -- finally clear deprecated field of abstractNetwork --

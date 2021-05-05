@@ -131,7 +131,7 @@ func OnExitWrapError(err interface{}, msg ...interface{}) {
 
 // OnExitConvertToGRPCStatus converts err to GRPC Status.
 func OnExitConvertToGRPCStatus(err *error) {
-	if err != nil {
+	if err != nil && *err != nil {
 		var newErr error
 		switch v := (*err).(type) {
 		case Error:

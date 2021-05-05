@@ -33,38 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//// Tenant structure to handle name and clientAPI for a tenant
-//type Tenant struct {
-//	name    string
-//	Service iaas.Service
-//}
-//
-//var (
-//	currentTenant *Tenant
-//)
-
-//// GetCurrentTenant contains the current tenant
-//var GetCurrentTenant = getCurrentTenant
-
-//// getCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
-//func getCurrentTenant() *operations.Tenant {
-//	if currentTenant == nil {
-//		tenants, err := iaas.GetTenantNames()
-//		if err != nil || len(tenants) != 1 {
-//			return nil
-//		}
-//		// Set unique tenant as selected
-//		logrus.Println("Unique tenant set")
-//		for name := range tenants {
-//			service, err := iaas.UseService(name, "")
-//			if err != nil {
-//				return nil
-//			}
-//			currentTenant = &Tenant{name: name, Service: service}
-//		}
-//	}
-//	return currentTenant
-//}
 
 // TenantListener server is used to implement SafeScale.safescale.
 type TenantListener struct{}
@@ -156,11 +124,11 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 	if xerr != nil {
 		return empty, xerr
 	}
-	currentTenant := operations.CurrentTenant()
-	_, xerr = operations.CheckMetadataVersion(currentTenant.Service)
-	if xerr != nil {
-		return empty, xerr
-	}
+	// currentTenant := operations.CurrentTenant()
+	// _, xerr = operations.CheckMetadataVersion(currentTenant.Service)
+	// if xerr != nil {
+	// 	return empty, xerr
+	// }
 
 	return empty, nil
 }
@@ -280,9 +248,9 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 }
 
 // Upgrade upgrades metadata of a tenant if needed
-func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, xerr error) {
-	defer fail.OnExitConvertToGRPCStatus(&xerr)
-	defer fail.OnExitWrapError(&xerr, "cannot inspect tenant")
+func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgradeRequest) (_ *protocol.TenantUpgradeResponse, err error) {
+	defer fail.OnExitConvertToGRPCStatus(&err)
+	defer fail.OnExitWrapError(&err, "cannot upgrade tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -316,12 +284,12 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 		return nil, xerr
 	}
 
-	currentVersion := "v20.06.0"
+	var currentVersion string
 	if !in.Force {
 		currentVersion, xerr = operations.CheckMetadataVersion(svc)
 		if xerr != nil {
 			switch xerr.(type) {
-			case *fail.ErrForbidden:
+			case *fail.ErrForbidden, *fail.ErrNotFound:
 				// continue
 			default:
 				return nil, xerr
@@ -330,6 +298,7 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 	}
 
 	xerr = metadataupgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}

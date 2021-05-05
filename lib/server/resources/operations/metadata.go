@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -29,6 +30,9 @@ const (
 	// By convention, it corresponds to the SafeScale release that introduced the new format
 	MinimumMetadataVersion = "v21.05.0"
 
+	// FirstMetadataVersion corresponds to the first metadata format version
+	FirstMetadataVersion = "v20.06.0"
+
 	MustUpgradeMessage  = "the current version of SafeSale binaries cannot use safely the current tenant metadata; you should consider to upgrade the metadata using the command 'safescale tenant metadata upgrade %s'. Note however previous version of binaries would not be able to read safely the newly upgraded metadata and should be upgraded everywhere to at least version %s."
 	MustUpgradeBinaries = "the current version of SafeScale binaries requires the use of at least release %s to work correctly. Please upgrade your binaries"
 )
@@ -37,6 +41,27 @@ const (
 func CheckMetadataVersion(svc iaas.Service) (string, fail.Error) {
 	// Read file /version in metadata
 	var currentMetadataVersion string
+	folder, xerr := NewMetadataFolder(svc, "")
+	if xerr != nil {
+		return "", xerr
+	}
+
+	xerr = folder.Read("", "version", func(data []byte) fail.Error {
+		currentMetadataVersion = string(data)
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+		default:
+			return "", fail.Wrap(xerr, "failed to read content of 'version' file in metadata bucket")
+		}
+	}
+	if currentMetadataVersion == "" {
+		currentMetadataVersion = FirstMetadataVersion
+	}
 
 	// If version read is different than MetadataVersion, error
 	result := strings.Compare(currentMetadataVersion, MinimumMetadataVersion)
@@ -47,6 +72,6 @@ func CheckMetadataVersion(svc iaas.Service) (string, fail.Error) {
 		return currentMetadataVersion, fail.ForbiddenError(MustUpgradeBinaries, MinimumMetadataVersion)
 	}
 
-	// everything is on-par
+	// everything is ok
 	return currentMetadataVersion, nil
 }
