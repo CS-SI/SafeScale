@@ -94,7 +94,7 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 	for _, feat := range features {
 		switch suitableFor {
 		case "host":
-			yamlKey := "Feature.suitableFor.host"
+			yamlKey := "feature.suitableFor.host"
 			if feat.Specs().IsSet(yamlKey) {
 				value := strings.ToLower(feat.Specs().GetString(yamlKey))
 				if value == "ok" || value == "yes" || value == "true" || value == "1" {
@@ -102,12 +102,12 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 				}
 			}
 		case "cluster":
-			yamlKey := "Feature.suitableFor.cluster"
+			yamlKey := "feature.suitableFor.cluster"
 			if feat.Specs().IsSet(yamlKey) {
 				values := strings.Split(strings.ToLower(feat.Specs().GetString(yamlKey)), ",")
 				if values[0] == "all" || values[0] == "dcos" || values[0] == "k8s" || values[0] == "boh" || values[0] == "swarm" || values[0] == "ohpc" {
 					cfg := struct {
-						FeatureName    string   `json:"Feature"`
+						FeatureName    string   `json:"feature"`
 						ClusterFlavors []string `json:"available-cluster-flavors"`
 					}{feat.displayName, []string{}}
 
@@ -163,7 +163,7 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 		default:
 			xerr = fail.SyntaxError("failed to read the specification file of Feature called '%s': %s", name, err.Error())
 		}
-	} else if v.IsSet("Feature") {
+	} else if v.IsSet("feature") {
 		casted = &Feature{
 			fileName:        v.ConfigFileUsed(),
 			displayFileName: v.ConfigFileUsed(),
@@ -362,7 +362,7 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 // findInstallerForTarget isolates the available installer to use for target (one that is define in the file and applicable on target)
 func (f *Feature) findInstallerForTarget(target resources.Targetable, action string) (installer Installer, xerr fail.Error) {
 	methods := target.InstallMethods()
-	w := f.specs.GetStringMap("Feature.install")
+	w := f.specs.GetStringMap("feature.install")
 	for i := uint8(1); i <= uint8(len(methods)); i++ {
 		meth := methods[i]
 		if _, ok := w[strings.ToLower(meth.String())]; ok {
@@ -379,8 +379,8 @@ func (f *Feature) findInstallerForTarget(target resources.Targetable, action str
 
 // Check if required parameters defined in specification file have been set in 'v'
 func checkParameters(f Feature, v data.Map) fail.Error {
-	if f.specs.IsSet("Feature.parameters") {
-		params := f.specs.GetStringSlice("Feature.parameters")
+	if f.specs.IsSet("feature.parameters") {
+		params := f.specs.GetStringSlice("feature.parameters")
 		for _, k := range params {
 			splitted := strings.Split(k, "=")
 			if _, ok := v[splitted[0]]; !ok {
@@ -562,7 +562,7 @@ func (f *Feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	return results, target.UnregisterFeature(f.GetName())
 }
 
-const yamlKey = "Feature.requirements.features"
+const yamlKey = "feature.requirements.features"
 
 // GetRequirements returns a list of features needed as requirements
 func (f *Feature) GetRequirements() (map[string]struct{}, fail.Error) {
