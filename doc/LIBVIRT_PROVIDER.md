@@ -1,4 +1,4 @@
-# Libvirt Provider (currently broken in V21.03)
+# Libvirt Provider (currently unavailable in V21.05)
 
 For testing purposes it's possible to emulate a cloud provider locally with Libvirt/Qemu-KVM. SafeScale will work the same way except that all the hosts will be created on your own computer. The driver is designed to work with Ubuntu18.04, Debian9 and Centos7
 
