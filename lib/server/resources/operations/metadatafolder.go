@@ -119,7 +119,11 @@ func (f MetadataFolder) absolutePath(path ...string) string {
 			relativePath += "/" + item
 		}
 	}
-	return strings.Join([]string{f.path, strings.Trim(relativePath, "/")}, "/")
+	relativePath = strings.Trim(relativePath, "/")
+	if f.path != "" {
+		return strings.Join([]string{f.path, relativePath}, "/")
+	}
+	return relativePath
 }
 
 // Lookup tells if the object named 'name' is inside the ObjectStorage MetadataFolder
