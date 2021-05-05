@@ -56,10 +56,11 @@ type MetadataCore struct {
 	properties *serialize.JSONProperties
 	observers  map[string]observer.Observer
 
-	kind      string
-	folder    MetadataFolder
-	loaded    bool
-	committed bool
+	kind              string
+	folder            MetadataFolder
+	loaded            bool
+	committed         bool
+	kindSplittedStore bool // tells if data read/write is done directly from/to folder (when false) or from/to subfolders (when true)
 }
 
 func NullCore() *MetadataCore {
@@ -98,6 +99,12 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		properties: props,
 		shielded:   concurrency.NewShielded(instance),
 		observers:  map[string]observer.Observer{},
+	}
+	switch kind {
+	case clusterKind:
+		c.kindSplittedStore = false
+	default:
+		c.kindSplittedStore = true
 	}
 	return &c, nil
 }
@@ -335,8 +342,13 @@ func (c *MetadataCore) updateIdentity() fail.Error {
 				return fail.InconsistentError("'data.Identifiable' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
+			if c.kindSplittedStore {
+				c.id.Store(ident.GetID())
+			} else {
+				c.id.Store(ident.GetName())
+			}
 			c.name.Store(ident.GetName())
-			c.id.Store(ident.GetID())
+
 			return nil
 		})
 	}
@@ -400,20 +412,37 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	xerr = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			if innerXErr := c.readByID(id); innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound: // If not found, stop immediately
-					return retry.StopRetryError(innerXErr)
-				default:
-					return innerXErr
+	if c.kindSplittedStore {
+		xerr = retry.WhileUnsuccessfulDelay1Second(
+			func() error {
+				if innerXErr := c.readByID(id); innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound: // If not found, stop immediately
+						return retry.StopRetryError(innerXErr)
+					default:
+						return innerXErr
+					}
 				}
-			}
-			return nil
-		},
-		temporal.GetContextTimeout(),
-	)
+				return nil
+			},
+			temporal.GetContextTimeout(),
+		)
+	} else {
+		xerr = retry.WhileUnsuccessfulDelay1Second(
+			func() error {
+				if innerXErr := c.readByName(id); innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound: // If not found, stop immediately
+						return retry.StopRetryError(innerXErr)
+					default:
+						return innerXErr
+					}
+				}
+				return nil
+			},
+			temporal.GetContextTimeout(),
+		)
+	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -451,6 +480,7 @@ func (c *MetadataCore) readByID(id string) fail.Error {
 // First read using 'ref' as an ID; if *fail.ErrNotFound occurs, read using 'ref' as a name
 func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
 	timeout := temporal.GetCommunicationTimeout()
+
 	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			if innerXErr := c.readByID(ref); innerXErr != nil {
@@ -492,9 +522,13 @@ func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
 
 // readByName reads a metadata identified by name
 func (c *MetadataCore) readByName(name string) fail.Error {
-	return c.folder.Read(byNameFolderName, name, func(buf []byte) fail.Error {
+	var path string
+	if c.kindSplittedStore {
+		path = byNameFolderName
+	}
+	return c.folder.Read(path, name, func(buf []byte) fail.Error {
 		if innerXErr := c.deserialize(buf); innerXErr != nil {
-			return fail.Wrap(innerXErr, "failed to deserialize %s resource", c.kind)
+			return fail.Wrap(innerXErr, "failed to deserialize %s '%s'", c.kind, name)
 		}
 		return nil
 	})
@@ -514,21 +548,29 @@ func (c *MetadataCore) write() fail.Error {
 			return fail.InconsistentError("field 'name' is not set with string")
 		}
 
-		xerr = c.folder.Write(byNameFolderName, name, jsoned)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
-		}
+		if c.kindSplittedStore {
+			xerr = c.folder.Write(byNameFolderName, name, jsoned)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
 
-		id, ok := c.id.Load().(string)
-		if !ok {
-			return fail.InconsistentError("field 'id' is not set with string")
-		}
+			id, ok := c.id.Load().(string)
+			if !ok {
+				return fail.InconsistentError("field 'id' is not set with string")
+			}
 
-		xerr = c.folder.Write(byIDFolderName, id, jsoned)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
+			xerr = c.folder.Write(byIDFolderName, id, jsoned)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+		} else {
+			xerr = c.folder.Write("", name, jsoned)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
 		}
 
 		c.loaded = true
@@ -558,35 +600,63 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 		return fail.InconsistentError("cannot reload a not committed data")
 	}
 
-	id, ok := c.id.Load().(string)
-	if !ok {
-		return fail.InconsistentError("field 'id' is not set with string")
-	}
+	if c.kindSplittedStore {
+		id, ok := c.id.Load().(string)
+		if !ok {
+			return fail.InconsistentError("field 'id' is not set with string")
+		}
 
-	xerr = retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-
-			if innerXErr := c.readByID(id); innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound: // If not found, stop immediately
-					return retry.StopRetryError(innerXErr)
-				default:
-					return innerXErr
+		xerr = retry.WhileUnsuccessfulDelay1Second(
+			func() error {
+				if innerXErr := c.readByID(id); innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound: // If not found, stop immediately
+						return retry.StopRetryError(innerXErr)
+					default:
+						return innerXErr
+					}
 				}
+				return nil
+			},
+			temporal.GetContextTimeout(),
+		)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *retry.ErrTimeout, *retry.ErrStopRetry:
+				return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, id)
+			default:
+				return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, c.id)
 			}
-			return nil
-		},
-		temporal.GetContextTimeout(),
-	)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrTimeout:
-			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, c.id)
-		case *retry.ErrStopRetry:
-			return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, c.id)
-		default:
-			return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, c.id)
+		}
+	} else {
+		name, ok := c.name.Load().(string)
+		if !ok {
+			return fail.InconsistentError("field 'name' is not set with string")
+		}
+
+		xerr = retry.WhileUnsuccessfulDelay1Second(
+			func() error {
+				if innerXErr := c.readByName(name); innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound: // If not found, stop immediately
+						return retry.StopRetryError(innerXErr)
+					default:
+						return innerXErr
+					}
+				}
+				return nil
+			},
+			temporal.GetContextTimeout(),
+		)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *retry.ErrTimeout, *retry.ErrStopRetry:
+				return fail.Wrap(fail.RootCause(xerr), "failed to read %s '%s'", c.kind, name)
+			default:
+				return fail.Wrap(xerr, "failed to read %s '%s'", c.kind, name)
+			}
 		}
 	}
 
@@ -610,7 +680,12 @@ func (c *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (xerr 
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
-	return c.folder.Browse(byIDFolderName, func(buf []byte) fail.Error {
+	if c.kindSplittedStore {
+		return c.folder.Browse(byIDFolderName, func(buf []byte) fail.Error {
+			return callback(buf)
+		})
+	}
+	return c.folder.Browse("", func(buf []byte) fail.Error {
 		return callback(buf)
 	})
 }
@@ -632,57 +707,85 @@ func (c *MetadataCore) Delete() (xerr fail.Error) {
 	)
 
 	// Checks entries exist in Object Storage
-	id, ok := c.id.Load().(string)
-	if !ok {
-		return fail.InconsistentError("field 'id' is not set with string")
-	}
-
-	xerr = c.folder.Lookup(byIDFolderName, id)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// If entry not found, consider operation not an error
-			logrus.Tracef("MetadataFolder not found by id, maybe not an error")
-		default:
-			errors = append(errors, xerr)
+	if c.kindSplittedStore {
+		id, ok := c.id.Load().(string)
+		if !ok {
+			return fail.InconsistentError("field 'id' is not set with string")
 		}
-	} else {
-		idFound = true
-	}
 
-	name, ok := c.name.Load().(string)
-	if !ok {
-		return fail.InconsistentError("field 'name' is not set with string")
-	}
-
-	xerr = c.folder.Lookup(byNameFolderName, name)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// If entry not found, consider operation not an error
-			logrus.Tracef("MetadataFolder not found by name, maybe not an error")
-		default:
-			errors = append(errors, xerr)
-		}
-	} else {
-		nameFound = true
-	}
-
-	// Deletes entries found
-	if idFound {
-		xerr = c.folder.Delete(byIDFolderName, id)
+		xerr = c.folder.Lookup(byIDFolderName, id)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			errors = append(errors, xerr)
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// If entry not found, consider operation not an error
+				logrus.Tracef("MetadataFolder not found by id, maybe not an error")
+			default:
+				errors = append(errors, xerr)
+			}
+		} else {
+			idFound = true
 		}
-	}
-	if nameFound {
-		xerr = c.folder.Delete(byNameFolderName, name)
+
+		name, ok := c.name.Load().(string)
+		if !ok {
+			return fail.InconsistentError("field 'name' is not set with string")
+		}
+
+		xerr = c.folder.Lookup(byNameFolderName, name)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			errors = append(errors, xerr)
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// If entry not found, consider operation not an error
+				logrus.Tracef("MetadataFolder not found by name, maybe not an error")
+			default:
+				errors = append(errors, xerr)
+			}
+		} else {
+			nameFound = true
+		}
+
+		// Deletes entries found
+		if idFound {
+			xerr = c.folder.Delete(byIDFolderName, id)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				errors = append(errors, xerr)
+			}
+		}
+		if nameFound {
+			xerr = c.folder.Delete(byNameFolderName, name)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				errors = append(errors, xerr)
+			}
+		}
+	} else {
+		name, ok := c.name.Load().(string)
+		if !ok {
+			return fail.InconsistentError("field 'name' is not set with string")
+		}
+
+		xerr = c.folder.Lookup("", name)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// If entry not found, consider operation not an error
+				logrus.Tracef("MetadataFolder not found by name, maybe not an error")
+			default:
+				errors = append(errors, xerr)
+			}
+		} else {
+			nameFound = true
+		}
+		if nameFound {
+			xerr = c.folder.Delete("", name)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				errors = append(errors, xerr)
+			}
 		}
 	}
 
