@@ -541,7 +541,7 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 		return xerr
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 	defer temporal.NewStopwatch().OnExitLogInfo(
 		fmt.Sprintf("Starting creation of infrastructure of Cluster '%s'...", req.Name),
@@ -666,7 +666,7 @@ func (instance *Cluster) GetFlavor() (flavor clusterflavor.Enum, xerr fail.Error
 		return 0, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -683,7 +683,7 @@ func (instance *Cluster) GetComplexity() (_ clustercomplexity.Enum, xerr fail.Er
 		return 0, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	return instance.unsafeGetComplexity()
@@ -698,7 +698,7 @@ func (instance *Cluster) GetAdminPassword() (adminPassword string, xerr fail.Err
 		return "", fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	aci, xerr := instance.GetIdentity()
@@ -736,7 +736,7 @@ func (instance *Cluster) GetNetworkConfig() (config *propertiesv3.ClusterNetwork
 		return nullConfig, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -779,7 +779,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	// make sure no other parallel actions interferes
@@ -992,7 +992,7 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	// make sure no other parallel actions interferes
@@ -1227,7 +1227,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(%d)", count)
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", count)
 	defer tracer.Entering().Exiting()
 
 	// make sure no other parallel actions interferes
@@ -1409,7 +1409,7 @@ func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	// make sure no other parallel actions interferes
@@ -1485,7 +1485,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(hostID=%s)", hostID).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(hostID=%s)", hostID).Entering()
 	defer tracer.Exiting()
 
 	// make sure no other parallel actions interferes
@@ -1748,7 +1748,7 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	// make sure no other parallel actions interferes
@@ -1960,7 +1960,7 @@ func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	// make sure no other parallel actions interferes
@@ -2100,7 +2100,7 @@ func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostIn
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(%s)", hostID)
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%s)", hostID)
 	defer tracer.Entering().Exiting()
 
 	// make sure no other parallel actions interferes
@@ -2237,7 +2237,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	nodeRef := node.ID
@@ -2727,7 +2727,7 @@ func (instance *Cluster) configureCluster(ctx context.Context) (xerr fail.Error)
 		return xerr
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	if task.Aborted() {
@@ -2812,7 +2812,7 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 
 // configureNodesFromList configures nodes from a list
 func (instance *Cluster) configureNodesFromList(task concurrency.Task, hosts []resources.Host) (xerr fail.Error) {
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
 	if task.Aborted() {

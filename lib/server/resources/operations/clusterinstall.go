@@ -420,7 +420,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 		return -1, "", "", xerr
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "('%s')", host.GetName()).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
