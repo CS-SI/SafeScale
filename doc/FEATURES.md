@@ -42,7 +42,7 @@ Each .yaml file in one of these folder will be treated as a feature.
 _Note 1_: Any _external feature_ named as an _embedded feature_ will take precedence over the _embedded feature_.
 _Note 2_: it's possible to use subfolder(s) inside ```features``` folder, by including the relative path from ```features``` in the name of the feature.
 
-### Feature.yaml file
+### feature.yaml file
 
 Features are provided as a yaml file which is detailing where, how and which code should be exectuted to check installation, install or remove the tool
 The file have to follow this struture.
