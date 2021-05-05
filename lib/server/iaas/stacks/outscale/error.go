@@ -88,11 +88,13 @@ func qualifyFromCode(code, details string) fail.Error {
 	case "9011":
 		return fail.DuplicateError("a keypair with this name already exists")
 	case "9029":
-		return fail.NotAvailableError("the Network is still in use")
+		return fail.NotAvailableError("the network is still in use")
 	case "9044":
 		return fail.InvalidRequestError("not included in VPC Targets")
 	case "9058":
 		return fail.DuplicateError("network already exist")
+	case "10022":
+		return fail.OverloadError("VPC quota exceeded")
 	case "10042":
 		return fail.OverloadError("memory quota exceeded")
 	}
