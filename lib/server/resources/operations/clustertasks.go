@@ -1122,7 +1122,7 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), params).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	p, ok := params.(taskInstallGatewayParameters)
@@ -1195,7 +1195,7 @@ func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params conc
 		return result, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(%v)", params).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	logrus.Debugf("[%s] starting configuration...", p.Host.GetName())
@@ -1234,7 +1234,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(%v)", params).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Convert and validate parameters
@@ -1309,7 +1309,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(%v)", params).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
 	defer tracer.Exiting()
 
 	// Convert and validate parameters
@@ -1511,7 +1511,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	logrus.Debugf("[Cluster %s] Configuring masters...", instance.GetName())
@@ -1601,7 +1601,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(%v)", params).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Convert and validate params
@@ -1677,7 +1677,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 		return nil, fail.InvalidParameterError("params.count", "cannot be an integer less than 1")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	clusterName := instance.GetName()
@@ -1751,7 +1751,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(%d)", p.index).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	hostLabel := fmt.Sprintf("node #%d", p.index)
@@ -1938,7 +1938,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 
 	clusterName := instance.GetName()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	list, err := instance.unsafeListNodes()
@@ -2039,7 +2039,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Cluster"), "(%d, %s)", p.Index, p.Host.GetName()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Host.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", p.Index, p.Host.GetName())

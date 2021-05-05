@@ -466,7 +466,7 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -508,7 +508,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 		return state, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	xerr = instance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
@@ -663,7 +663,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -1629,7 +1629,7 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -1802,7 +1802,7 @@ func (instance *Host) Delete(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host")).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -2202,7 +2202,7 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 		return 0, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host"), "(cmd='%s', outs=%s)", outs.String()).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(cmd='%s', outs=%s)", outs.String()).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -2238,7 +2238,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 		return 0, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Host"), "(target=%s,source=%s)", target, source).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(target=%s,source=%s)", target, source).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()

@@ -420,7 +420,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		return xerr
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Subnet"),
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -1641,7 +1641,7 @@ func (instance *Subnet) AbandonHost(ctx context.Context, hostID string) (xerr fa
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.Subnet"), "('"+hostID+"')").Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.subnet"), "('"+hostID+"')").Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -1673,7 +1673,7 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	defer debug.NewTracer(task, tracing.ShouldTrace("resources.Subnet")).Entering().Exiting()
+	defer debug.NewTracer(task, tracing.ShouldTrace("resources.subnet")).Entering().Exiting()
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
@@ -2292,7 +2292,7 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sg resources.Secu
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Subnet"), "(%s)", sg.GetID()).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -2353,7 +2353,7 @@ func (instance *Subnet) UnbindSecurityGroup(ctx context.Context, sg resources.Se
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Subnet"), "(%s)", sg.GetID()).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -2416,7 +2416,7 @@ func (instance *Subnet) ListSecurityGroups(ctx context.Context, state securitygr
 		return nullList, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Subnet"), "(%s)", state.String()).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", state.String()).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -2459,7 +2459,7 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, rsg resources.S
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Subnet"), "(%s)", rsg.GetID()).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", rsg.GetID()).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -2548,7 +2548,7 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sg resources.S
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Subnet"), "(%s)", sg.GetID()).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", sg.GetID()).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -2693,7 +2693,7 @@ func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abst
 		return xerr
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.Subnet"),
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
 		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
