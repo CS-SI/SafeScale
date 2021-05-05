@@ -23,8 +23,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -107,17 +105,18 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 				return nil, innerXErr
 			}
 
-			// Deal with legacy
-			xerr = rn.(*network).upgradeNetworkMetadataIfNeeded()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrAlteredNothing:
-					// ignore
-				default:
-					return nil, fail.Wrap(xerr, "failed to upgrade Network properties")
-				}
-			}
+			// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
+			// // Deal with legacy
+			// xerr = rn.(*network).upgradeNetworkMetadataIfNeeded()
+			// xerr = debug.InjectPlannedFail(xerr)
+			// if xerr != nil {
+			// 	switch xerr.(type) {
+			// 	case *fail.ErrAlteredNothing:
+			// 		// ignore
+			// 	default:
+			// 		return nil, fail.Wrap(xerr, "failed to upgrade Network properties")
+			// 	}
+			// }
 
 			return rn, nil
 		}),
@@ -148,67 +147,68 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 	return rn, nil
 }
 
-// upgradeNetworkMetadatasIfNeeded upgrades properties to most recent version
-func (instance *network) upgradeNetworkMetadataIfNeeded() fail.Error {
-	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		abstractNetwork, ok := clonable.(*abstract.Network)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		if !props.Lookup(networkproperty.SubnetsV1) {
-			svc := instance.GetService()
-
-			// -- creates Subnet in metadata --
-			rs, xerr := NewSubnet(svc)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-			abstractSubnet, xerr := svc.InspectSubnetByName(instance.GetName(), instance.GetName())
-			if xerr != nil {
-				return xerr
-			}
-
-			abstractSubnet.Network = abstractNetwork.ID
-			abstractSubnet.IPVersion = ipversion.IPv4
-			abstractSubnet.DNSServers = abstractNetwork.DNSServers
-			abstractSubnet.Domain = abstractNetwork.Domain
-			abstractSubnet.VIP = abstractNetwork.VIP
-			abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.GatewayID)
-			if abstractNetwork.SecondaryGatewayID != "" {
-				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.SecondaryGatewayID)
-			}
-			abstractSubnet.State = subnetstate.Ready
-			xerr = rs.(*subnet).carry(abstractSubnet)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-
-			// -- add reference to subnet in network properties --
-			xerr = props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
-				}
-				subnetsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
-				subnetsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
-				return nil
-			})
-
-			// -- finally clear deprecated field of abstractNetwork --
-			abstractNetwork.VIP = nil
-			abstractNetwork.GatewayID, abstractNetwork.SecondaryGatewayID = "", ""
-			abstractNetwork.Domain = ""
-			return nil
-		}
-
-		// called when nothing has been changed, to prevent useless metadata update
-		return fail.AlteredNothingError()
-	})
-	return xerr
-}
+// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
+// // upgradeNetworkMetadatasIfNeeded upgrades properties to most recent version
+// func (instance *network) upgradeNetworkMetadataIfNeeded() fail.Error {
+// 	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+// 		abstractNetwork, ok := clonable.(*abstract.Network)
+// 		if !ok {
+// 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+// 		}
+//
+// 		if !props.Lookup(networkproperty.SubnetsV1) {
+// 			svc := instance.GetService()
+//
+// 			// -- creates Subnet in metadata --
+// 			rs, xerr := NewSubnet(svc)
+// 			xerr = debug.InjectPlannedFail(xerr)
+// 			if xerr != nil {
+// 				return xerr
+// 			}
+// 			abstractSubnet, xerr := svc.InspectSubnetByName(instance.GetName(), instance.GetName())
+// 			if xerr != nil {
+// 				return xerr
+// 			}
+//
+// 			abstractSubnet.Network = abstractNetwork.ID
+// 			abstractSubnet.IPVersion = ipversion.IPv4
+// 			abstractSubnet.DNSServers = abstractNetwork.DNSServers
+// 			abstractSubnet.Domain = abstractNetwork.Domain
+// 			abstractSubnet.VIP = abstractNetwork.VIP
+// 			abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.GatewayID)
+// 			if abstractNetwork.SecondaryGatewayID != "" {
+// 				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.SecondaryGatewayID)
+// 			}
+// 			abstractSubnet.State = subnetstate.Ready
+// 			xerr = rs.(*subnet).carry(abstractSubnet)
+// 			xerr = debug.InjectPlannedFail(xerr)
+// 			if xerr != nil {
+// 				return xerr
+// 			}
+//
+// 			// -- add reference to subnet in network properties --
+// 			xerr = props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+// 				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+// 				if !ok {
+// 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
+// 				}
+// 				subnetsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
+// 				subnetsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
+// 				return nil
+// 			})
+//
+// 			// -- finally clear deprecated field of abstractNetwork --
+// 			abstractNetwork.VIP = nil
+// 			abstractNetwork.GatewayID, abstractNetwork.SecondaryGatewayID = "", ""
+// 			abstractNetwork.Domain = ""
+// 			return nil
+// 		}
+//
+// 		// called when nothing has been changed, to prevent useless metadata update
+// 		return fail.AlteredNothingError()
+// 	})
+// 	return xerr
+// }
 
 // IsNull tells if the instance corresponds to subnet Null Value
 func (instance *network) IsNull() bool {

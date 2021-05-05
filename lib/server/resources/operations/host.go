@@ -133,17 +133,18 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 				return nil, innerXErr
 			}
 
-			// deal with legacy
-			xerr = rh.(*host).upgradeIfNeeded()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrAlteredNothing:
-					// nothing changed, continue
-				default:
-					return nil, fail.Wrap(xerr, "failed to upgrade Host metadata")
-				}
-			}
+			// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
+			// // deal with legacy
+			// xerr = rh.(*host).upgradeIfNeeded()
+			// xerr = debug.InjectPlannedFail(xerr)
+			// if xerr != nil {
+			// 	switch xerr.(type) {
+			// 	case *fail.ErrAlteredNothing:
+			// 		// nothing changed, continue
+			// 	default:
+			// 		return nil, fail.Wrap(xerr, "failed to upgrade Host metadata")
+			// 	}
+			// }
 
 			return rh, rh.(*host).updateCachedInformation()
 		}),
@@ -174,50 +175,51 @@ func LoadHost(svc iaas.Service, ref string) (rh resources.Host, xerr fail.Error)
 	return rh, nil
 }
 
-// upgradeIfNeeded upgrades Host properties if needed
-func (instance *host) upgradeIfNeeded() fail.Error {
-	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		if !props.Lookup(hostproperty.NetworkV2) {
-			// upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2
-			var hnV1 *propertiesv1.HostNetwork
-			innerXErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-				var ok bool
-				hnV1, ok = clonable.(*propertiesv1.HostNetwork)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				return nil
-			})
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			innerXErr = props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				hnV2.DefaultSubnetID = hnV1.DefaultNetworkID
-				hnV2.IPv4Addresses = hnV1.IPv4Addresses
-				hnV2.IPv6Addresses = hnV1.IPv6Addresses
-				hnV2.IsGateway = hnV1.IsGateway
-				hnV2.PublicIPv4 = hnV1.PublicIPv4
-				hnV2.PublicIPv6 = hnV1.PublicIPv6
-				hnV2.SubnetsByID = hnV1.NetworksByID
-				hnV2.SubnetsByName = hnV1.NetworksByName
-				return nil
-			})
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			// FIXME: clean old property or leave it ? will differ from v2 through time if Subnets are added for example
-		}
-
-		return fail.AlteredNothingError()
-	})
-}
+// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
+// // upgradeIfNeeded upgrades Host properties if needed
+// func (instance *host) upgradeIfNeeded() fail.Error {
+// 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+// 		if !props.Lookup(hostproperty.NetworkV2) {
+// 			// upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2
+// 			var hnV1 *propertiesv1.HostNetwork
+// 			innerXErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
+// 				var ok bool
+// 				hnV1, ok = clonable.(*propertiesv1.HostNetwork)
+// 				if !ok {
+// 					return fail.InconsistentError("'*propertiesv1.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+// 				}
+// 				return nil
+// 			})
+// 			if innerXErr != nil {
+// 				return innerXErr
+// 			}
+//
+// 			innerXErr = props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+// 				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+// 				if !ok {
+// 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+// 				}
+//
+// 				hnV2.DefaultSubnetID = hnV1.DefaultNetworkID
+// 				hnV2.IPv4Addresses = hnV1.IPv4Addresses
+// 				hnV2.IPv6Addresses = hnV1.IPv6Addresses
+// 				hnV2.IsGateway = hnV1.IsGateway
+// 				hnV2.PublicIPv4 = hnV1.PublicIPv4
+// 				hnV2.PublicIPv6 = hnV1.PublicIPv6
+// 				hnV2.SubnetsByID = hnV1.NetworksByID
+// 				hnV2.SubnetsByName = hnV1.NetworksByName
+// 				return nil
+// 			})
+// 			if innerXErr != nil {
+// 				return innerXErr
+// 			}
+//
+// 			// FIXME: clean old property or leave it ? will differ from v2 through time if Subnets are added for example
+// 		}
+//
+// 		return fail.AlteredNothingError()
+// 	})
+// }
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
 func (instance *host) updateCachedInformation() fail.Error {
