@@ -22,6 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -92,7 +93,7 @@ func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
 		return xerr
 	}
 
-	xerr = folder.Write("", "version", []byte(to))
+	xerr = folder.Write("", "version", []byte(to), data.NewImmutableKeyValue("doNotCrypt", "true"),)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to update content of '/version' file in metadata bucket")

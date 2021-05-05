@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -169,7 +170,7 @@ func (f MetadataFolder) Delete(path string, name string) fail.Error {
 // returns true, nil if the object has been found
 // returns false, fail.Error if an error occured (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error) fail.Error {
+func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options... data.ImmutableKeyValue) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -192,8 +193,29 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 		return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)
 	}
 
+	doCrypt := f.crypt
+	for _, v := range options {
+		switch v.Key() {
+		case "doNotCrypt":
+			anon := v.Value()
+			if anon != nil {
+				switch c := anon.(type) {
+				case bool:
+					doCrypt = !c
+				case string:
+					switch c {
+					case "true", "yes":
+						doCrypt = false
+					case "false", "no":
+						doCrypt = true
+					}
+				}
+			}
+		default:
+		}
+	}
 	data := buffer.Bytes()
-	if f.crypt {
+	if doCrypt {
 		var err error
 		data, err = crypt.Decrypt(data, f.cryptKey)
 		err = debug.InjectPlannedError(err)
@@ -215,7 +237,7 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 // Returns nil on success (with assurance the write has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (f MetadataFolder) Write(path string, name string, content []byte) fail.Error {
+func (f MetadataFolder) Write(path string, name string, content []byte, options ...data.ImmutableKeyValue) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -223,8 +245,16 @@ func (f MetadataFolder) Write(path string, name string, content []byte) fail.Err
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
+	doCrypt := f.crypt
+	for _, v := range options {
+		switch v.Key() {
+		case "doNotCrypt":
+			doCrypt = !v.Value().(bool)
+		default:
+		}
+	}
 	var data []byte
-	if f.crypt {
+	if doCrypt {
 		var err error
 		data, err = crypt.Encrypt(content, f.cryptKey)
 		err = debug.InjectPlannedError(err)
