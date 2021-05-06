@@ -65,9 +65,9 @@ feature:
                             masters: all
                         timeout: 15
                         run: |
-                            ###########################################################
-                            # Install xfce + tigervnc                                 #
-                            ###########################################################
+                            ########################
+                            # Install xfce Desktop #
+                            ########################
                             case $LINUX_KIND in
                                 centos|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
@@ -105,7 +105,7 @@ feature:
                             masters: all
                         timeout: 15
                         run: |
-                            URL="https://sourceforge.net/projects/tigervnc/files/stable/1.11.0/tigervnc-1.11.0.x86_64.tar.gz/download"
+                            URL="https://sourceforge.net/projects/tigervnc/files/stable/1.10.1/tigervnc-1.10.1.x86_64.tar.gz/download"
                             sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || sfFail 194
                             tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || sfFail 195
                             rm -rf ${SF_TMPDIR}/tigervnc.tgz
