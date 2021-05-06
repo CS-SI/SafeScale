@@ -1618,33 +1618,230 @@ REVIEW_ME:
 This command family deals with volume (i.e. block storage) management: creation, list, attachment to a host, deletion...
 The following actions are proposed:
 
-REVIEW_ME:
 <table>
 <thead><td><div style="width:350px">Action</div></td><td><div style="min-width: 650px">description</div></td></thead>
 <tbody>
 <tr>
   <td><code>safescale volume create [command_options] &lt;volume_name&gt;></code></td>
-  <td>Create a volume with the given name on the current tenant using default sizing values.<br>`command_options`:<br><ul><li>`--size value` Size of the volume (in Go) (default: 10)</li><li>`--speed value` Allowed values: SSD, HDD, COLD (default: "HDD")</li></ul>Example:<br><br>`$ safescale volume create myvolume`<br>response on success:<br>`{"result":{"ID":"c409033f-e569-42f5-927a-5b1c35029500","Name":"myvolume","Size":10,"Speed":"HDD"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Volume 'myvolume' already exists"},"result":null,"status":"failure"}`</td>
+  <td>
+    Create a volume with the given name on the current tenant using default sizing values.<br><br>
+    <code>command_options</code>:<br>
+    <ul>
+      <li><code>--size value</code> Size of the volume (in Go) (default: 10)</li>
+      <li><code>--speed value</code> Allowed values: <code>SSD</code>, <code>HDD</code>, <code>COLD</code> (default: <code>HDD</code>)</li>
+    </ul>
+    example:
+    <pre>$ safescale volume create myvolume</pre>
+    response on success:REVIEW_ME
+    <pre>
+{
+  "result": {
+    "ID": "c409033f-e569-42f5-927a-5b1c35029500",
+    "Name": "myvolume",
+    "Size": 10,
+    "Speed": "HDD"
+  },
+  "status": "success"
+}
+    </pre>
+    response on failure:
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Volume myvolume already exists"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td><code>safescale volume list</code></td>
-  <td>List available volumes<br><br>Example:<br><br>`$ safescale volume list`<br>response:<br>`{"result":[{"id":"4463647d-035b-4e16-8ea9-b3c29acd1887","name":"myvolume","size":10,"speed":1}],"status":"success"}`</td>
+  <td>
+    List available volumes<br><br>
+    example:
+    <pre>$ safescale volume list</pre>
+    response:
+    <pre>
+{
+  "result": [
+    {
+      "id": "4463647d-035b-4e16-8ea9-b3c29acd1887",
+      "name": "myvolume",
+      "size": 10,
+      "speed": 1
+    }
+  ],
+  "status": "success"
+}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td><code>safescale volume inspect &lt;volume_name_or_id&gt;</code></td>
-  <td>Get info about a volume.<br><br>Example:<br><br>`$ safescale volume inspect myvolume`<br>response on success:<br>`{"result":{"Device":"03f6d07b-f0b1-47f5-9dce-6063ed0865da","Format":"nfs","Host":"myhost","ID":"4463647d-035b-4e16-8ea9-b3c29acd1887","MountPath":"/data/myvolume","Name":"myvolume","Size":10,"Speed":"HDD"},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Failed to find volume 'myvolume'"},"result":null,"status":"failure"}`</td>
+  <td>
+    Get info about a volume.<br><br>
+    example:
+    <pre>$ safescale volume inspect myvolume</pre>
+    response on success:
+    <pre>
+{
+  "result": {
+    "Device": "03f6d07b-f0b1-47f5-9dce-6063ed0865da",
+    "Format": "nfs",
+    "Host": "myhost",
+    "ID": "4463647d-035b-4e16-8ea9-b3c29acd1887",
+    "MountPath": "/data/myvolume",
+    "Name": "myvolume",
+    "Size": 10,
+    "Speed": "HDD"
+  },
+  "status": "success"
+}
+    </pre>
+    response on failure:
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find volume myvolume"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td><code>safescale volume attach [command_options] &lt;volume_name_or_id&gt; &lt;host_name_or_id&gt;</code></td>
-  <td>Attach the volume to a host. It mounts the volume on a directory of the host. The directory is created if it does not already exists. The volume is formatted by default.<br>`command_options`:<ul><li>`--path value` Mount point of the volume (default: "/shared/<volume_name>)</li><li>`--format value` Filesystem format (default: "ext4")</li><li>`--do-not-format` instructs not to format the volume.</li></ul>Example:<br><br>`$ safescale volume attach myvolume myhost`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (volume not found):<br>`{"error":{"exitcode":6,"message":"Failed to find volume 'myvolume'"},"result":null,"status":"failure"}`<br>response on failure (host not found):<br>`{"error":{"exitcode":6,"message":"Failed to find host 'myhost2'"},"result":null,"status":"failure"}`</td>
+  <td>
+    Attach the Volume to a Host. It mounts the volume in a directory of the Host. The directory is created if it does not already exists.
+    The Volume is formatted by default.<br><br>
+    <code>command_options</code>:
+    <ul>
+      <li><code>--path value</code> Mountpoint of the Volume (default: <code>/shared/&lt;volume_name&gt;</code>)</li>
+      <li><code>--format value</code> Filesystem format (default: <code>ext4</code>)</li>
+      <li><code>--do-not-format</code> Instructs not to format the Volume.</li>
+    </ul>
+    example:
+    <pre>$ safescale volume attach myvolume myhost</pre>
+    response on success:
+    <pre>
+{
+  "result": null,
+  "status": "success"
+}
+    </pre>
+    response on failure (Volume not found):
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find volume myvolume"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+    response on failure (Host not found):
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find host myhost2"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td><code>safescale volume detach &lt;volume_name_or_id&gt; &lt;host_name_or_id&gt;</code></td>
-  <td>Detach a Volume from a Host<br><br>Example:<br><br>`$ safescale volume detach myvolume myhost`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (volume not found):<br>`{"error":{"exitcode":6,"message":"Failed to find volume 'myvolume'"},"result":null,"status":"failure"}`<br>response on failure (host not found):<br>`{"error":{"exitcode":6,"message":"Failed to find host 'myhost'"},"result":null,"status":"failure"}`<br>response on failure (volume not attached to host):<br>`{"error":{"exitcode":6,"message":"Cannot detach volume 'myvolume': not attached to host 'myhost'"},"result":null,"status":"failure"}`</td>
+  <td>
+    Detach a Volume from a Host<br><br>
+    example:
+    <pre>$ safescale volume detach myvolume myhost</pre>
+    response on success:
+    <pre>
+{
+  "result": null,
+  "status": "success"
+}
+    </pre>
+    response on failure (Volume not found):
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find volume myvolume"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+    response on failure (Host not found):
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Failed to find host myhost"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+    response on failure (Volume not attached to Host):
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot detach volume myvolume: not attached to host myhost"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td><code>safescale volume delete &lt;volume_name_or_id&gt;</code></td>
-  <td>Delete the Volume with the given name or ID.<br><br>Example:<br><br>`$ safescale volume delete myvolume`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (volume attached):<br>`{"error":{"exitcode":6,"message":"Cannot delete volume 'myvolume': still attached to 1 host: myhost"},"result":null,"status":"failure"}`<br>response on failure (volume not found):<br>`{"error":{"exitcode":6,"message":"Cannot delete volume 'myvolume': failed to find volume 'myvolume'"},"result":null,"status":"failure"}`</td>
+  <td>
+    Delete the Volume with the given name or ID.<br><br>
+    example:
+    <pre>$ safescale volume delete myvolume</pre>
+    response on success:
+    <pre>
+{
+  "result": null,
+  "status": "success"
+}
+    </pre>
+    response on failure (Volume attached):
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete volume myvolume: still attached to 1 host: myhost"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+    response on failure (Volume not found):
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete volume myvolume: failed to find volume myvolume"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+  </td>
 </tr>
 </tbody>
 </table>
@@ -1661,27 +1858,151 @@ The following actions are proposed:
 <tbody>
 <tr>
   <td valign="top"><code>safescale [global_options] share list</code></td>
-  <td>List existing shares<br><br>Example:<br><br>`$ safescale share list`<br>response:<br>`{"result":[{"host":{"name":"myhost"},"id":"d8eed474-dc3b-4a4d-91e6-91dd03cd98dd","name":"myshare","path":"/shared/data","type":"nfs"}],"status":"success"}`</td>
+  <td>
+    List existing shares<br><br>
+    example:
+    <pre>$ safescale share list</pre>
+    response:
+    <pre>
+{
+  "result": [
+    {
+      "host": {
+        "name": "myhost"
+      },
+      "id": "d8eed474-dc3b-4a4d-91e6-91dd03cd98dd",
+      "name": "myshare",
+      "path": "/shared/data",
+      "type": "nfs"
+    }
+  ],
+  "status": "success"
+}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] share inspect &lt;share_name&gt;</code></td>
-  <td>Get detailed information about the share.<br><br>Example:<br><br>`$ safescale share inspect myshare`<br>response on success:<br>`{"result":{"mount_list":[{"host":{"name":"myclient"},"path":"/shared","share":{"name":"myshare"},"type":"nfs"}],"share":{"host":{"name":"myhost"},"id":"d8eed474-dc3b-4a4d-91e6-91dd03cd98dd","name":"myshare","path":"/shared/data","type":"nfs"}},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"cannot inspect share 'myshare' [caused by {failed to find share 'myshare'}]"},"result":null,"status":"failure"}`</td>
+  <td>
+    Get detailed information about the share.<br><br>
+    example:
+    <pre>$ safescale share inspect myshare</pre>
+    response on success: REVIEW_ME
+    <pre>
+{
+  "result": {
+    "mount_list": [
+      {
+        "host": {
+          "name": "myclient"
+        },
+        "path": "/shared",
+        "share": {
+          "name": "myshare"
+        },
+        "type": "nfs"
+      }
+    ],
+    "share": {
+      "host": {
+        "name": "myhost"
+      },
+      "id": "d8eed474-dc3b-4a4d-91e6-91dd03cd98dd",
+      "name": "myshare",
+      "path": "/shared/data",
+      "type": "nfs"
+    }
+  },
+  "status": "success"
+}
+    </pre>
+    response on failure:REVIEW_ME
+    <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "cannot inspect share myshare [caused by {failed to find share myshare}]"
+  },
+  "result": null,
+  "status": "failure"
+}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] share create [command_options] &lt;share_name&gt; &lt;host_name_or_id&gt;</code></td>
-  <td>Create a share on a host and export the corresponding folder<br>`command_options`:<ul><li>`--path value` Path to be exported (default: "/shared/data")</li></ul>Example:<br><br>`$ safescale share create myshare myhost`<br>response on success:<br>`{"result":null,"status":"success"}`<br>reponse on failure:<br>`{"error":{"exitcode":6,"message":"cannot create share 'myshare' [caused by {share 'myshare' already exists}]"},"result":null,"status":"failure"}`</td>
+  <td>
+    Create a Share on a Host and export the corresponding folder<br><br>
+    <code>command_options</code>:
+    <ul>
+      <li><code>--path value</code> Path to be exported (default: <code>/shared/data</code>)</li>
+    </ul>
+    example:<br><br>`$ safescale share create myshare myhost`<br>response on success:<br>`{"result":null,"status":"success"}`<br>reponse on failure:<br>`{"error":{"exitcode":6,"message":"cannot create share 'myshare' [caused by {share 'myshare' already exists}]"},"result":null,"status":"failure"}`</td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] share mount [command_options] &lt;share_name&gt; &lt;host_name_or_id&gt;</code></td>
-  <td>Mount an exported nfs directory on a host<br>`command_options`:<ul><li>`--path value` Path to mount nfs directory on (default: /data)</li></ul>Example:<br><br>`$ safescale share mount myshare myclient`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (share not found):<br>`{"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find share 'myshare'}]"},"result":null,"status":"failure"}`<br>response on failure (host not found):<br>`{"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find host 'myclient'}]"},"result":null,"status":"failure"}`</td>
+  <td>
+    Mount a Share on a Host<br><br>
+    <code>command_options</code>:
+    <ul>
+      <li><code>--path value</code> Path to mount Share on (default: <code>/data</code>)</li>
+    </ul>
+    example:
+    <pre>$ safescale share mount myshare myclient</pre>
+    response on success:
+    <pre>
+{"result":null,"status":"success"}
+    </pre>
+    response on failure (Share not found): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find share 'myshare'}]"},"result":null,"status":"failure"}
+    </pre>
+    response on failure (hHost not found): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find host 'myclient'}]"},"result":null,"status":"failure"}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] share umount &lt;share_name&gt; &lt;host_name_or_id&gt;</code></td>
-  <td>Unmount an exported nfs directory on a host<br><br>Example:<br><br>`$ safescale share umount myshare myclient`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (host not found):<br>`{"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find host 'myclient'}]"},"result":null,"status":"failure"}`<br>response on failure (share not found):<br>`{"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find share 'myshare'}]"},"result":null,"status":"failure"}`</td>
+  <td>
+    Unmount a Share from an Host<br><br>
+    example:
+    <pre>$ safescale share umount myshare myclient</pre>
+    response on success:
+    <pre>
+{"result":null,"status":"success"}
+    </pre>
+    response on failure (Host not found): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find host 'myclient'}]"},"result":null,"status":"failure"}
+    </pre>
+    response on failure (Share not found): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"cannot unmount share 'myshare' [caused by {failed to find share 'myshare'}]"},"result":null,"status":"failure"}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] share delete &lt;share_name&gt;</code></td>
-  <td>Delete a nfs server by unexposing directory<br><br>Example:<br><br>`$ safescale share delete myshare`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (share still mounted):<br>`{"error":{"exitcode":6,"message":"error while deleting share myshare: Cannot delete share 'myshare' [caused by {still used by: 'myclient'}]"},"result":null,"status":"failure"}`<br>response on failure (share not found):<br>`{"error":{"exitcode":6,"message":"error while deleting share myshare: Failed to find share 'myshare'"},"result":null,"status":"failure"}`</td>
+  <td>
+    Delete a Share.<br>
+    <u>Note</u>: the content in itself of the Share is not deleted, it remains on the Host acting as server.<br><br>
+    example:
+    <pre>$ safescale share delete myshare</pre>
+    response on success:
+    <pre>
+{"result":null,"status":"success"}
+    </pre>
+    response on failure (Share still mounted):
+    <pre>
+{"error":{"exitcode":6,"message":"error while deleting share myshare: Cannot delete share 'myshare' [caused by {still used by: 'myclient'}]"},"result":null,"status":"failure"}
+    </pre>
+    response on failure (Share not found):
+    <pre>
+{"error":{"exitcode":6,"message":"error while deleting share myshare: Failed to find share 'myshare'"},"result":null,"status":"failure"}
+    </pre>
+  </td>
 </tr>
 </tbody>
 </table>
@@ -1698,26 +2019,111 @@ The following actions are proposed:
 <tbody>
 <tr>
   <td valign="top"><code>safescale [global_options] bucket create &lt;bucket_name&gt;</code></td>
-  <td>Create a bucket<br><br>Example:<br><br>`$ safescale bucket create mybucket`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Cannot create bucket [caused by {bucket 'mybucket' already exists}]"},"result":null,"status":"failure"}`</td>
+  <td>
+    Create a bucket<br><br>
+    example:
+    <pre>$ safescale bucket create mybucket</pre>
+    response on success: REVIEW_ME
+    <pre>
+{"result":null,"status":"success"}
+    </pre>
+    response on failure: REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"Cannot create bucket [caused by {bucket 'mybucket' already exists}]"},"result":null,"status":"failure"}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] bucket list</code></td>
-  <td>List buckets<br><br>Example:<br><br>`$ safescale bucket list`<br>response:<br> `{"result":{"buckets":[{"name":"0.safescale-96d245d7cf98171f14f4bc0abd8f8019"},{"name":"mybucket"}]},"status":"success"}`</td>
+  <td>
+    List buckets<br><br>
+    example:
+    <pre>$ safescale bucket list</pre>
+    response: REVIEW_ME
+    <pre>
+{"result":{"buckets":[{"name":"0.safescale-96d245d7cf98171f14f4bc0abd8f8019"},{"name":"mybucket"}]},"status":"success"}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] bucket inspect &lt;bucket_name&gt;</code></td>
-  <td>Get info about a bucket<br><br>Example:<br><br>`$ safescale bucket inspect mybucket`<br>response on success:<br>`{"result":{"bucket":"mybucket","host":{}},"status":"success"}`<br>response on failure:<br>`{"error":{"exitcode":6,"message":"Cannot inspect bucket [caused by {failed to find bucket 'mybucket'}]"},"result":null,"status":"failure"}`</td>
+  <td>
+    Get info about a bucket<br><br>
+    example:
+    <pre>$ safescale bucket inspect mybucket</pre>
+    response on success:
+    <pre>
+{"result":{"bucket":"mybucket","host":{}},"status":"success"}
+    </pre>
+    response on failure: REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"Cannot inspect bucket [caused by {failed to find bucket 'mybucket'}]"},"result":null,"status":"failure"}
+    </pre>
+  </td>
 </tr>
 <tr>
-  <td valign="top"><code>safescale [global_options] bucket mount [command_options] &lt;bucket_name&gt; &lt;host_name_or_id&gt;</code></td><td>Mount a bucket as a filesystem on a host.<br>`command_options`:<ul><li>`--path value` Mount point of the bucket (default: "/buckets/<bucket_name>"</li></ul>Example:<br><br>`$ safescale bucket mount mybucket myhost`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (host not found):<br>`{"error":{"exitcode":6,"message":"No host found with name or id 'myhost2'"},"result":null,"status":"failure"}`<br><br>response on failure (bucket not found):<br>`{"error":{"exitcode":6,"message":"Not found"},"result":null,"status":"failure"}`</td>
+  <td valign="top"><code>safescale [global_options] bucket mount [command_options] &lt;bucket_name&gt; &lt;host_name_or_id&gt;</code></td>
+  <td>
+    Mount a Bucket as a filesystem on an Host.<br><br>
+    <code>command_options</code>:
+    <ul>
+      <li><code>--path value</code> Mount point of the Bucket (default: <code>/buckets/&lt;bucket_name&gt;</code></li>
+    </ul>
+    example:
+    <pre>$ safescale bucket mount mybucket myhost</pre>
+    response on success:
+    <pre>
+{"result":null,"status":"success"}
+    </pre>
+    response on failure (Host not found): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"No host found with name or id 'myhost2'"},"result":null,"status":"failure"}
+    </pre>
+    response on failure (Bucket not found): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"Not found"},"result":null,"status":"failure"}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] bucket umount &lt;bucket_name&gt; &lt;host_name_or_id&gt;</code></td>
-  <td>Umount a bucket from the filesystem of a host.<br><br>Example:<br><br>`$ safescale bucket umount mybucket myhost`<br>response on success:<br>`{"result":null,"status":"success"}`<br><br>response on failure (bucket not found):<br>`{"error":{"exitcode":6,"message":"Failed to find bucket 'mybucket'"},"result":null,"status":"failure"}`<br>response on failure (host not found):<br>`{"error":{"exitcode":6,"message":"Failed to find host 'myhost'"},"result":null,"status":"failure"}`</td>
+  <td>
+    Unmount a Bucket from the filesystem of an Host.<br><br>
+    example:
+    <pre>$ safescale bucket umount mybucket myhost</pre>
+    response on success:
+    <pre>
+{"result":null,"status":"success"}
+    </pre>
+    response on failure (Bucket not found): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"Failed to find bucket 'mybucket'"},"result":null,"status":"failure"}
+    </pre>
+    response on failure (Host not found): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"Failed to find host 'myhost'"},"result":null,"status":"failure"}
+    </pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] bucket delete &lt;bucket_name&gt;</code></td>
-  <td>Delete a bucket<br><br>Example:<br><br>`$ safescale bucket delete mybucket`<br>response on success:<br>`{"result":null,"status":"success"}`<br>response on failure (bucket not found):<br>`{"error":{"exitcode":6,"message":"cannot delete bucket [caused by {Container Not Found}]"},"result":null,"status":"failure"}`<br><br>response on failure (bucket mounted on hosts):<br>`{"error":{"exitcode":6,"message":"cannot delete bucket [caused by {Container Not Empty}]"},"result":null,"status":"failure"}`</td>
+  <td>
+    Delete a Bucket<br><br>
+    example:
+    <pre>$ safescale bucket delete mybucket</pre>
+    response on success:
+    <pre>
+{"result":null,"status":"success"}
+    </pre>
+    response on failure (Bucket not found): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"cannot delete bucket [caused by {Container Not Found}]"},"result":null,"status":"failure"}
+    </pre>
+    response on failure (Bucket mounted on Host(s)): REVIEW_ME
+    <pre>
+{"error":{"exitcode":6,"message":"cannot delete bucket [caused by {Container Not Empty}]"},"result":null,"status":"failure"}
+    </pre>
+  </td>
 </tr>
 </tbody>
 </table>
@@ -1734,15 +2140,45 @@ The following actions are proposed:
 <tbody>
 <tr>
   <td valign="top"><code>safescale [global_options] ssh run -c "&lt;command&gt;" &lt;host_name_or_id&gt;</code></td>
-  <td>Run a command on the host<br><br>`parameters`:<ul><li>`command` is the command to execute remotely.</li></ul>Example:<br><br>`$ safescale ssh run -c "ls -la ~" example_host`<br>response:<br>`total 32`<br>`drwxr-xr-x 4 safescale safescale 4096 Jun  5 13:25 .`<br>`drwxr-xr-x 4 root root 4096 Jun  5 13:00 ..`<br>`-rw------- 1 safescale safescale   15 Jun  5 13:25 .bash_history`<br>`-rw-r--r-- 1 safescale safescale  220 Aug 31  2015 .bash_logout`<br>`-rw-r--r-- 1 safescale safescale 3771 Aug 31  2015 .bashrc`<br>`drwx------ 2 safescale safescale 4096 Jun  5 13:01 .cache`<br>`-rw-r--r-- 1 safescale safescale    0 Jun  5 13:00 .hushlogin`<br>`-rw-r--r-- 1 safescale safescale  655 May 16  2017 .profile`<br>`drwx------ 2 safescale safescale 4096 Jun  5 13:00 .ssh`</td>
+  <td>
+    Run a command on the host<br><br>
+    <code>command</code> is the command to execute remotely.<br><br> REVIEW_ME
+    example:
+    <pre>$ safescale ssh run -c "ls -la ~" example_host</pre>
+    response on success:
+    <pre>
+total 32
+drwxr-xr-x 4 safescale safescale 4096 Jun  5 13:25 .
+drwxr-xr-x 4 root root 4096 Jun  5 13:00 ..
+-rw------- 1 safescale safescale   15 Jun  5 13:25 .bash_history
+-rw-r--r-- 1 safescale safescale  220 Aug 31  2015 .bash_logout
+-rw-r--r-- 1 safescale safescale 3771 Aug 31  2015 .bashrc
+drwx------ 2 safescale safescale 4096 Jun  5 13:01 .cache
+-rw-r--r-- 1 safescale safescale    0 Jun  5 13:00 .hushlogin
+-rw-r--r-- 1 safescale safescale  655 May 16  2017 .profile
+drwx------ 2 safescale safescale 4096 Jun  5 13:00 .ssh
+    </pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] ssh copy &lt;src&gt; &lt;dest&gt;</code></td>
-  <td>Copy a local file/directory to a host or copy from host to local<br><br>Example:<br><br>`$ safescale ssh copy /my/local/file example_host:/remote/path`</td>
+  <td>
+    Copy a local file/directory to an Host or copy from an Host to local<br><br>
+    example: REVIEW_ME
+    <pre>$ safescale ssh copy /my/local/file example_host:/remote/path</pre>
+  </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale [global_options] ssh connect &lt;host_name_or_id&gt;</code></td>
-  <td>Connect to the host with interactive shell<br><br>Example:<br><br> `$  safescale ssh connect example_host`<br>response:`safescale@example-Host:~$`</td>
+  <td>
+    REVIEW_ME: Connect to an Host with interactive shell<br><br>
+    example:
+    <pre>$ safescale ssh connect example_host</pre>
+    response on success:
+    <pre>
+safescale@example-Host:~$
+    </pre>
+  </td>
 </tr>
 </tbody>
 </table>
@@ -1760,11 +2196,14 @@ The following actions are proposed:
 <tbody>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster list</code></td>
-  <td>List clusters<br><br>
-      example:
-      <pre>$ safescale cluster list</pre>
-      response on success:
-      <pre>{"result":[{"cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","flavor":2,"flavor_label":"K8S","last_state":5,"last_state_label":"Created","name":"mycluster","primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"}],"status":"success"}</pre>
+  <td>
+    List clusters<br><br>
+    example:
+    <pre>$ safescale cluster list</pre>
+    response on success:
+    <pre>
+{"result":[{"cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","flavor":2,"flavor_label":"K8S","last_state":5,"last_state_label":"Created","name":"mycluster","primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"TestOVH"}],"status":"success"}
+    </pre>
   </td>
 </tr>
 <tr>
@@ -1814,9 +2253,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster create -F k8s -C small -N 192.168.22.0/24 mycluster</pre>
       response on success:
-      <pre>{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"XXXX"},"status":"success"}</pre>
+      <pre>
+{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"XXXX"},"status":"success"}
+      </pre>
       response on failure (cluster already exists):
-      <pre>{"error":{"exitcode":8,"message":"Cluster 'mycluster' already exists.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":8,"message":"Cluster 'mycluster' already exists.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1825,9 +2268,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster inspect mycluster</pre>
       response on success:
-      <pre>{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"XXXX"},"status":"success"}</pre>
+      <pre>
+{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"XXXX"},"status":"success"}
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1836,9 +2283,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster state mycluster</pre>
       response on success:
-      <pre>{"result":{</pre>
+      <pre>
+{"result":{
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1851,9 +2302,13 @@ The following actions are proposed:
       <u>example</u>:
       <pre>$ safescale cluster delete -y mycluster</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{"result":null,"status":"success"}
+</pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1866,9 +2321,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster feature check mycluster docker</pre>
       response on success:
-      <pre>{"result":"Feature 'docker' found on cluster 'mycluster'","status":"success"}</pre>
+      <pre>
+{"result":"Feature 'docker' found on cluster 'mycluster'","status":"success"}
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Feature 'docker' not found on cluster 'mycluster'"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Feature 'docker' not found on cluster 'mycluster'"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1882,7 +2341,9 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster feature add mycluster remotedesktop</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{"result":null,"status":"success"}
+      </pre>
       response on failure may vary.
   </td>
 </tr>
@@ -1897,7 +2358,9 @@ The following actions are proposed:
       <u>example</u>:
       <pre>$ safescale cluster feature delete my-cluster remote-desktop</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{"result":null,"status":"success"}
+      </pre>
       response on failure may vary</td>
 </tr>
 <tr>
@@ -1909,9 +2372,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster expand mycluster</pre>
       response on success:
-      <pre>{"result":{</pre>
+      <pre>
+{"result":{
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1920,9 +2387,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster shrink mycluster</pre>
       response on success:
-      <pre>{"result":{</pre>
+      <pre>
+{"result":{
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1931,9 +2402,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster stop mycluster</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{"result":null,"status":"success"}
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1942,9 +2417,13 @@ The following actions are proposed:
       example:
       <pre>$ safescale cluster start mycluster</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{"result":null,"status":"success"}
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":6,"message":"Cannot start cluster: failed to find Cluster 'mycluster'"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":6,"message":"Cannot start cluster: failed to find Cluster 'mycluster'"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1953,13 +2432,16 @@ The following actions are proposed:
       example:
       <pre>$  safescale cluster kubectl mycluster -- get nodes</pre>
       response on success:
-      <pre>NAME               STATUS   ROLES    AGE   VERSION
+      <pre>
+NAME                 STATUS   ROLES    AGE   VERSION
 gw-mycluster         Ready    &lt;none&gt;   11m   v1.18.5
 mycluster-master-1   Ready    master   11m   v1.18.5
 mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1968,9 +2450,13 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       example:
       <pre>$ safescale cluster helm mycluster -- install nginx</pre>
       response on success:
-      <pre>{"result":{</pre>
+      <pre>
+{"result":{
+      </pre>
       response on failure:
-     <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1979,9 +2465,13 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       example:
       <pre>$ safescale cluster master list mycluster</pre>
       response on success:
-      <pre>{"result":[{"id":"53c56611-5d96-4019-b012-354de282dd33","name":"mycluster-master-1"}],"status":"success"}</pre>
+      <pre>
+{"result":[{"id":"53c56611-5d96-4019-b012-354de282dd33","name":"mycluster-master-1"}],"status":"success"}
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <!-- <tr>
@@ -1990,9 +2480,13 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       example:
       <pre>$ safescale cluster master inspect mycluster mycluster-master-1</pre>
       response on success:
-      <pre>{"result":</pre>
+      <pre>
+{"result":
+      </pre>
       response on failure (cluster not found):
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr> -->
 <tr>
@@ -2001,9 +2495,13 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       example:
       <pre>$ safescale cluster node list mycluster</pre>
       response on success:
-      <pre>{"result":[{"id":"7bb5bb44-9c7f-4ec3-9b19-435095c610c6","name":"mycluster-node-1"}],"status":"success"}</pre>
+      <pre>
+{"result":[{"id":"7bb5bb44-9c7f-4ec3-9b19-435095c610c6","name":"mycluster-node-1"}],"status":"success"}
+      </pre>
       response on failure: <!-- note for dev: simplify this error message -->
-      <pre>{"error":{"exitcode":1,"message":"rpc error: code = NotFound desc = cannot list cluster nodes: failed to find Cluster 'mycluster': rpc error: code = NotFound desc = cannot list cluster nodes: failed to find Cluster 'mycluster'"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":1,"message":"rpc error: code = NotFound desc = cannot list cluster nodes: failed to find Cluster 'mycluster': rpc error: code = NotFound desc = cannot list cluster nodes: failed to find Cluster 'mycluster'"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <!-- <tr>
@@ -2012,12 +2510,17 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       example:
       <pre>$ safescale cluster node inspect mycluster mycluster-node-4</pre>
       response on success:
-      <pre>{"result":{"cpu":4,"disk":100,"id":"7bb5bb44-9c7f-4ec3-9b19-435095c610c6","name":"mycluster-node-1","password":"XXXXXXXXXX","private_ip":"192.168.3.145","private_key":"-----BEGIN RSA PRIVATE KEY-----\nXXXXXXXXX\n-----END RSA PRIVATE KEY-----","ram":15,"state":2},"status":"success"}
-</pre>
+      <pre>
+{"result":{"cpu":4,"disk":100,"id":"7bb5bb44-9c7f-4ec3-9b19-435095c610c6","name":"mycluster-node-1","password":"XXXXXXXXXX","private_ip":"192.168.3.145","private_key":"-----BEGIN RSA PRIVATE KEY-----\nXXXXXXXXX\n-----END RSA PRIVATE KEY-----","ram":15,"state":2},"status":"success"}
+      </pre>
       response on failure (node not found):
-      <pre>{"error":{"exitcode":6,"message":"rpc error: code = NotFound desc = cannot inspect host: failed to find host 'vpl-net-node-2'"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":6,"message":"rpc error: code = NotFound desc = cannot inspect host: failed to find host 'vpl-net-node-2'"},"result":null,"status":"failure"}  
+      </pre>
       response on failure (cluster not found):
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -2026,11 +2529,17 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       example:
       <pre>$ safescale cluster node state mycluster mycluster-node-4</pre>
       response on success:
-      <pre>{"result":{</pre>
+      <pre>
+{"result":{
+      </pre>
       response on failure (cluster not found):
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
       response on failure (node not found):
-      <pre>{"error":{"exitcode":4,"message":"failed to find node 'mycluster-node-4' in Cluster 'mycluster'.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"failed to find node 'mycluster-node-4' in Cluster 'mycluster'.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -2042,19 +2551,28 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       example:
       <pre>$ safescale cluster node stop mycluster mycluster-node-4</pre>
       response on success:
-      <pre>{"result":</pre>
+      <pre>
+{"result":
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
- </tr>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
+  </td>
+</tr>
 <tr>
   <td valign="top"><code>safescale [global_options] cluster node start [command_options] &lt;cluster_name&gt; &lt;node_name_or_id&gt;</code></td>
   <td>REVIEW_ME: Start a specific Cluster node and enable it for duty<br><br>
       example:
       <pre>$ safescale cluster node start mycluster mycluster-node-4</pre>
       response on success:
-      <pre>{"result":</pre>
+      <pre>
+{"result":
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}</pre>
+      <pre>
+{"error":{"exitcode":4,"message":"Cluster 'mycluster' not found.\n"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -2069,10 +2587,13 @@ mycluster-node-1     Ready    &lt;none&gt;   10m   v1.18.5
       example:
       <pre>$ safescale cluster node delete -y mycluster mycluster-node-4</pre>
       response on success:
-      <pre>{"result":null,"status":"success"}</pre>
+      <pre>
+{"result":null,"status":"success"}
+      </pre>
       response on failure:
-      <pre>{"error":{"exitcode":6,"message":"rpc error: code = NotFound desc = cannot inspect host: failed to find host 'mycluster-node-4'"},"result":null,"status":"failure"}
-</pre>
+      <pre>
+{"error":{"exitcode":6,"message":"rpc error: code = NotFound desc = cannot inspect host: failed to find host 'mycluster-node-4'"},"result":null,"status":"failure"}
+      </pre>
   </td>
 </tr> -->
 </tbody>
