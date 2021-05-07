@@ -1002,6 +1002,18 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, xerr
 	}
 
+	// Unbind default security group if needed
+	networkInstance, xerr := defaultSubnet.InspectNetwork()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = instance.unbindDefaultSecurityGroupIfNeeded(networkInstance.GetID())
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	logrus.Infof("Host '%s' created successfully", instance.GetName())
 	return userdataContent, nil
 }
@@ -1233,25 +1245,25 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				return fail.Wrap(innerXErr, "failed to query Network of Subnet '%s'", defaultSubnet.GetName())
 			}
 
-			// Unbind "default" Security Group from Host if it is bound
-			if sgName := svc.GetDefaultSecurityGroupName(); sgName != "" {
-				adsg, innerXErr := svc.InspectSecurityGroupByName(an.ID, sgName)
-				if innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// ignore this error
-					default:
-						return innerXErr
-					}
-				} else if innerXErr = svc.UnbindSecurityGroupFromHost(adsg, instance.GetID()); innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// Consider a security group not found as a successful unbind
-					default:
-						return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
-					}
-				}
-			}
+			// // Unbind "default" Security Group from Host if it is bound
+			// if sgName := svc.GetDefaultSecurityGroupName(); sgName != "" {
+			// 	adsg, innerXErr := svc.InspectSecurityGroupByName(an.ID, sgName)
+			// 	if innerXErr != nil {
+			// 		switch innerXErr.(type) {
+			// 		case *fail.ErrNotFound:
+			// 			// ignore this error
+			// 		default:
+			// 			return innerXErr
+			// 		}
+			// 	} else if innerXErr = svc.UnbindSecurityGroupFromHost(adsg, instance.GetID()); innerXErr != nil {
+			// 		switch innerXErr.(type) {
+			// 		case *fail.ErrNotFound:
+			// 			// Consider a security group not found as a successful unbind
+			// 		default:
+			// 			return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
+			// 		}
+			// 	}
+			// }
 
 			return nil
 		})
@@ -1298,6 +1310,30 @@ func (instance *Host) undoSetSecurityGroups(errorPtr *fail.Error, keepOnFailure 
 			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to cleanup Security Groups", ActionFromError(*errorPtr)))
 		}
 	}
+}
+
+// UnbindDefaultSecurityGroupIfNeeded unbinds "default" Security Group from Host if it is bound
+func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.Error {
+	svc := instance.GetService()
+	if sgName := svc.GetDefaultSecurityGroupName(); sgName != "" {
+		adsg, innerXErr := svc.InspectSecurityGroupByName(networkID, sgName)
+		if innerXErr != nil {
+			switch innerXErr.(type) {
+			case *fail.ErrNotFound:
+				// ignore this error
+			default:
+				return innerXErr
+			}
+		} else if innerXErr = svc.UnbindSecurityGroupFromHost(adsg, instance.GetID()); innerXErr != nil {
+			switch innerXErr.(type) {
+			case *fail.ErrNotFound:
+				// Consider a security group not found as a successful unbind
+			default:
+				return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
+			}
+		}
+	}
+	return nil
 }
 
 func (instance *Host) findTemplateID(hostDef abstract.HostSizingRequirements) (string, fail.Error) {

@@ -594,13 +594,13 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		KeepOnFailure: false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 	}
 
-	rs, xerr := NewSubnet(instance.GetService())
+	subnetInstance, xerr := NewSubnet(instance.GetService())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
-	xerr = rs.Create(ctx, subnetReq, "", gatewaysDef)
+	xerr = subnetInstance.Create(ctx, subnetReq, "", gatewaysDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -620,7 +620,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 				_ = xerr.AddConsequence(fail.Wrap(subXErr, "failed to compute subset of CIDR '%s'", req.CIDR))
 				return nil, nil, xerr
 			}
-			if subXErr := rs.Create(ctx, subnetReq, "", gatewaysDef); subXErr != nil {
+			if subXErr := subnetInstance.Create(ctx, subnetReq, "", gatewaysDef); subXErr != nil {
 				return nil, nil, fail.Wrap(subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)", subnetReq.Name, subnetReq.CIDR, rn.GetName(), req.CIDR)
 			}
 			logrus.Infof("CIDR '%s' used successfully for Subnet, there will be less available private IP Addresses than expected.", subnetReq.CIDR)
@@ -632,7 +632,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			if derr := rs.Delete(context.Background()); derr != nil {
+			if derr := subnetInstance.Delete(context.Background()); derr != nil {
 				_ = xerr.AddConsequence(derr)
 			}
 		}
@@ -649,27 +649,27 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			primaryGateway, innerXErr := rs.InspectGateway(true)
+			primaryGateway, innerXErr := subnetInstance.InspectGateway(true)
 			if innerXErr != nil {
 				return innerXErr
 			}
 
 			var secondaryGateway resources.Host
 			if !gwFailoverDisabled {
-				secondaryGateway, innerXErr = rs.InspectGateway(false)
+				secondaryGateway, innerXErr = subnetInstance.InspectGateway(false)
 				if innerXErr != nil {
 					return innerXErr
 				}
 			}
-			networkV3.SubnetID = rs.GetID()
+			networkV3.SubnetID = subnetInstance.GetID()
 			networkV3.GatewayID = primaryGateway.GetID()
 			if networkV3.GatewayIP, innerXErr = primaryGateway.GetPrivateIP(); innerXErr != nil {
 				return innerXErr
 			}
-			if networkV3.DefaultRouteIP, innerXErr = rs.GetDefaultRouteIP(); innerXErr != nil {
+			if networkV3.DefaultRouteIP, innerXErr = subnetInstance.GetDefaultRouteIP(); innerXErr != nil {
 				return innerXErr
 			}
-			if networkV3.EndpointIP, innerXErr = rs.GetEndpointIP(); innerXErr != nil {
+			if networkV3.EndpointIP, innerXErr = subnetInstance.GetEndpointIP(); innerXErr != nil {
 				return innerXErr
 			}
 			if networkV3.PrimaryPublicIP, innerXErr = primaryGateway.GetPublicIP(); innerXErr != nil {
@@ -693,7 +693,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	}
 
 	logrus.Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, rn.GetName(), req.Name)
-	return rn, rs, nil
+	return rn, subnetInstance, nil
 }
 
 // func onFailureAbortTask(task concurrency.Task, inErr *fail.Error) {
