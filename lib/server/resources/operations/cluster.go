@@ -125,7 +125,7 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 			if innerXErr != nil {
 				return nil, innerXErr
 			}
-			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
 			if innerXErr = rc.Read(name); innerXErr != nil {
 				return nil, innerXErr
 			}

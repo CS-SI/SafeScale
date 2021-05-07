@@ -62,7 +62,7 @@ type JSONProperties struct {
 // NewJSONProperties creates a new JSonProperties instance
 func NewJSONProperties(module string) (*JSONProperties, fail.Error) {
 	if module == "" {
-		return nil, fail.InvalidParameterError("module", "can't be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("module")
 	}
 	return &JSONProperties{
 		Properties: data.Map{},
