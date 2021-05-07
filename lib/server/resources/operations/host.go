@@ -821,6 +821,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}
 	defaultSubnetID := defaultSubnet.GetID()
 
+	// instruct Cloud Provider to create host
 	ahf, userdataContent, xerr := svc.CreateHost(hostReq)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -942,7 +943,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}
 	defer instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
 
-	logrus.Infof("Compute resource created: '%s'", instance.GetName())
+	logrus.Infof("Compute resource '%s' created", instance.GetName())
 
 	// A Host claimed ready by a Cloud provider is not necessarily ready
 	// to be used until ssh service is up and running. So we wait for it before
@@ -1082,7 +1083,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 			}
 
 			// Apply Security Group for hosts with public IP in default Subnet
-			if req.IsGateway {
+			if req.IsGateway || req.PublicIP {
 				if pubipsg, innerXErr = LoadSecurityGroup(svc, as.PublicIPSecurityGroupID); innerXErr != nil {
 					return fail.Wrap(innerXErr, "failed to query Subnet '%s' Security Group with ID %s", defaultSubnet.GetName(), as.PublicIPSecurityGroupID)
 				}
@@ -1111,110 +1112,107 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 			}
 
 			// Apply internal Security Group of each other subnets
-			if req.IsGateway {
-				defer func() {
-					if innerXErr != nil && !req.KeepOnFailure {
-						var (
-							sg     resources.SecurityGroup
-							derr   error
-							errors []error
-						)
-						for _, v := range req.Subnets {
-							if v.ID == defaultSubnetID {
-								continue
+			defer func() {
+				if innerXErr != nil && !req.KeepOnFailure {
+					var (
+						sg     resources.SecurityGroup
+						derr   error
+						errors []error
+					)
+					for _, v := range req.Subnets {
+						if v.ID == defaultSubnetID {
+							continue
+						}
+
+						subnetInstance, deeperXErr := LoadSubnet(svc, "", v.ID)
+						if deeperXErr != nil {
+							_ = innerXErr.AddConsequence(deeperXErr)
+							continue
+						}
+
+						//goland:noinspection ALL
+						defer func(item resources.Subnet) {
+							item.Released()
+						}(subnetInstance)
+
+						sgName := sg.GetName()
+						deeperXErr = subnetInstance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+							as, ok := clonable.(*abstract.Subnet)
+							if !ok {
+								return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 							}
 
-							subnetInstance, deeperXErr := LoadSubnet(svc, "", v.ID)
-							if deeperXErr != nil {
-								_ = innerXErr.AddConsequence(deeperXErr)
-								continue
+							if sg, derr = LoadSecurityGroup(svc, as.InternalSecurityGroupID); derr == nil {
+								derr = sg.UnbindFromHost(context.Background(), instance)
+								sg.Released()
 							}
-
-							//goland:noinspection ALL
-							defer func(item resources.Subnet) {
-								item.Released()
-							}(subnetInstance)
-
-							sgName := sg.GetName()
-							deeperXErr = subnetInstance.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-								as, ok := clonable.(*abstract.Subnet)
-								if !ok {
-									return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-								}
-
-								if sg, derr = LoadSecurityGroup(svc, as.InternalSecurityGroupID); derr == nil {
-									derr = sg.UnbindFromHost(context.Background(), instance)
-									sg.Released()
-								}
-								if derr != nil {
-									errors = append(errors, derr)
-								}
-								return nil
-							})
-							if deeperXErr != nil {
-								_ = innerXErr.AddConsequence(fail.Wrap(deeperXErr, "cleaning up on failure, failed to unbind Security Group '%s' from Host", sgName))
+							if derr != nil {
+								errors = append(errors, derr)
 							}
-						}
-						if len(errors) > 0 {
-							_ = innerXErr.AddConsequence(fail.Wrap(fail.NewErrorList(errors), "failed to unbind Subnets Security Group from Host '%s'", sg.GetName(), req.ResourceName))
+							return nil
+						})
+						if deeperXErr != nil {
+							_ = innerXErr.AddConsequence(fail.Wrap(deeperXErr, "cleaning up on failure, failed to unbind Security Group '%s' from Host", sgName))
 						}
 					}
-				}()
-
-				for _, v := range req.Subnets {
-					// Do not try to bind defaultSubnet on gateway, because this code is running under a lock on defaultSubnet in this case, and this will lead to deadlock
-					// (binding of gateway on defaultSubnet is done inside Subnet.Create() call)
-					if req.IsGateway && v.ID == defaultSubnetID {
-						continue
+					if len(errors) > 0 {
+						_ = innerXErr.AddConsequence(fail.Wrap(fail.NewErrorList(errors), "failed to unbind Subnets Security Group from Host '%s'", sg.GetName(), req.ResourceName))
 					}
-
-					subnetInstance, xerr := LoadSubnet(svc, "", v.ID)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return xerr
-					}
-					//goland:noinspection ALL
-					defer func(subnetInstance resources.Subnet) {
-						subnetInstance.Released()
-					}(subnetInstance)
-
-					xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-						as, ok := clonable.(*abstract.Subnet)
-						if !ok {
-							return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-						}
-
-						if lansg, innerXErr = LoadSecurityGroup(svc, as.InternalSecurityGroupID); innerXErr != nil {
-							return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
-						}
-						defer func(sgInstance resources.SecurityGroup) {
-							sgInstance.Released()
-						}(lansg)
-
-						if innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
-							return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", as.Name, lansg.GetName(), req.ResourceName)
-						}
-						return nil
-					})
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return xerr
-					}
-
-					// register security group in properties
-					item := &propertiesv1.SecurityGroupBond{
-						ID:         lansg.GetID(),
-						Name:       lansg.GetName(),
-						Disabled:   false,
-						FromSubnet: true,
-					}
-					hsgV1.ByID[item.ID] = item
-					hsgV1.ByName[item.Name] = item.ID
 				}
+			}()
+
+			for _, v := range req.Subnets {
+				// Do not try to bind defaultSubnet on gateway, because this code is running under a lock on defaultSubnet in this case, and this will lead to deadlock
+				// (binding of gateway on defaultSubnet is done inside Subnet.Create() call)
+				if req.IsGateway && v.ID == defaultSubnetID {
+					continue
+				}
+
+				subnetInstance, xerr := LoadSubnet(svc, "", v.ID)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return xerr
+				}
+				//goland:noinspection ALL
+				defer func(subnetInstance resources.Subnet) {
+					subnetInstance.Released()
+				}(subnetInstance)
+
+				xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					as, ok := clonable.(*abstract.Subnet)
+					if !ok {
+						return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					if lansg, innerXErr = LoadSecurityGroup(svc, as.InternalSecurityGroupID); innerXErr != nil {
+						return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", as.Name, as.InternalSecurityGroupID)
+					}
+					defer func(sgInstance resources.SecurityGroup) {
+						sgInstance.Released()
+					}(lansg)
+
+					if innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", as.Name, lansg.GetName(), req.ResourceName)
+					}
+					return nil
+				})
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return xerr
+				}
+
+				// register security group in properties
+				item := &propertiesv1.SecurityGroupBond{
+					ID:         lansg.GetID(),
+					Name:       lansg.GetName(),
+					Disabled:   false,
+					FromSubnet: true,
+				}
+				hsgV1.ByID[item.ID] = item
+				hsgV1.ByName[item.Name] = item.ID
 			}
 
 			var an *abstract.Network
-			//		networkInstance, xerr := defaultSubnet.(*subnet).unsafeInspectNetwork()
 			networkInstance, xerr := defaultSubnet.InspectNetwork()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
