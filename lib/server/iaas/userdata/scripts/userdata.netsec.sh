@@ -344,7 +344,7 @@ function configure_network() {
 
 	check_for_network || {
 		echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
-		failure 196
+		failure 195
 	}
 }
 
@@ -377,7 +377,7 @@ function configure_network_debian() {
 	echo "Looking for network..."
 	check_for_network || {
 		echo "PROVISIONING_ERROR: failed network cfg 0"
-		failure 197
+		failure 196
 	}
 
 	configure_dhclient
@@ -387,7 +387,7 @@ function configure_network_debian() {
 	echo "Looking for network..."
 	check_for_network || {
 		echo "PROVISIONING_ERROR: failed network cfg 1"
-		failure 198
+		failure 197
 	}
 
 	systemctl restart networking
@@ -525,13 +525,13 @@ function configure_network_systemd_networkd() {
 		}
 	fi
 
-	netplan generate && netplan apply || failure 198
+	netplan generate && netplan apply || failure 202
 
 	if [[ $AWS -eq 1 ]]; then
 		echo "Looking for network..."
 		check_for_network || {
 			echo "PROVISIONING_ERROR: failed networkd cfg 1"
-			failure 202
+			failure 203
 		}
 	fi
 
@@ -541,7 +541,7 @@ function configure_network_systemd_networkd() {
 		echo "Looking for network..."
 		check_for_network || {
 			echo "PROVISIONING_ERROR: failed networkd cfg 2"
-			failure 203
+			failure 204
 		}
 	fi
 
@@ -551,11 +551,11 @@ function configure_network_systemd_networkd() {
 		echo "Looking for network..."
 		check_for_network || {
 			echo "PROVISIONING_ERROR: failed networkd cfg 3"
-			failure 204
+			failure 205
 		}
 	fi
 
-	reset_fw || failure 205
+	reset_fw || failure 206
 
 	echo "done"
 }
@@ -634,7 +634,7 @@ function configure_network_redhat() {
 
 	echo "exclude=NetworkManager" >>/etc/yum.conf
 
-	reset_fw || failure 206
+	reset_fw || failure 207
 
 	echo "done"
 }
@@ -705,10 +705,8 @@ function configure_as_gateway() {
 	# Allows default services on public zone
 	firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
 
-	sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || failure 207
-	# VPL: moved in phase1 (init)
-	#    sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || failure 208
-	#    sed -i '/^.*ChallengeResponseAuthentication / s/^.*$/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config || failure 209
+	sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || failure 208
+
 	systemctl restart sshd
 
 	echo "done"
@@ -847,7 +845,7 @@ function early_packages_update() {
 
 		sfApt update
 		# Force update of systemd, pciutils
-		sfApt install -q -y systemd pciutils sudo || failure 210
+		sfApt install -q -y systemd pciutils sudo || failure 209
 		# systemd, if updated, is restarted, so we may need to ensure again network connectivity
 		ensure_network_connectivity
 		;;
@@ -861,9 +859,9 @@ function early_packages_update() {
 		sfApt update
 		# Force update of systemd, pciutils and netplan
 		if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-			sfApt install -y systemd pciutils netplan.io sudo || failure 211
+			sfApt install -y systemd pciutils netplan.io sudo || failure 210
 		else
-			sfApt install -y systemd pciutils sudo || failure 212
+			sfApt install -y systemd pciutils sudo || failure 211
 		fi
 		# systemd, if updated, is restarted, so we may need to ensure again network connectivity
 		ensure_network_connectivity
@@ -877,7 +875,7 @@ function early_packages_update() {
 		# echo "ip_resolve=4" >>/etc/yum.conf
 
 		# Force update of systemd and pciutils
-		yum install -q -y systemd pciutils yum-utils sudo || failure 213
+		yum install -q -y systemd pciutils yum-utils sudo || failure 212
 		# systemd, if updated, is restarted, so we may need to ensure again network connectivity
 		ensure_network_connectivity
 
@@ -891,14 +889,14 @@ function early_packages_update() {
 function install_packages() {
 	case $LINUX_KIND in
 	ubuntu | debian)
-		sfApt install -y -qq jq zip time &>/dev/null || failure 214
+		sfApt install -y -qq jq zip time &>/dev/null || failure 213
 		;;
 	redhat | centos)
-		yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || failure 215
+		yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || failure 214
 		;;
 	*)
 		echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-		failure 216
+		failure 215
 		;;
 	esac
 }
@@ -977,7 +975,7 @@ is_network_reachable && early_packages_update
 
 install_packages
 
-update_kernel_settings || failure 217
+update_kernel_settings || failure 216
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
 
