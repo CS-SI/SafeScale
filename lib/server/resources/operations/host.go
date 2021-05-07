@@ -1220,17 +1220,29 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					if innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
 					}
+					defer func(sgInstance resources.SecurityGroup) {
+						sgInstance.Released()
+					}(lansg)
 
-					// register security group in properties
-					item := &propertiesv1.SecurityGroupBond{
-						ID:         lansg.GetID(),
-						Name:       lansg.GetName(),
-						Disabled:   false,
-						FromSubnet: true,
+					if innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", as.Name, lansg.GetName(), req.ResourceName)
 					}
-					hsgV1.ByID[item.ID] = item
-					hsgV1.ByName[item.Name] = item.ID
+					return nil
+				})
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return xerr
 				}
+
+				// register security group in properties
+				item := &propertiesv1.SecurityGroupBond{
+					ID:         lansg.GetID(),
+					Name:       lansg.GetName(),
+					Disabled:   false,
+					FromSubnet: true,
+				}
+				hsgV1.ByID[item.ID] = item
+				hsgV1.ByName[item.Name] = item.ID
 			}
 
 			return nil
