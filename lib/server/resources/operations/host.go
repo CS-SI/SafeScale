@@ -1224,6 +1224,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				hsgV1.ByName[item.Name] = item.ID
 			}
 
+			var an *abstract.Network
 			networkInstance, xerr := defaultSubnet.InspectNetwork()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
