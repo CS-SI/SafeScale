@@ -253,7 +253,7 @@ func (h host) CheckFeature(hostRef, featureName string, params map[string]string
 	}
 	service := protocol.NewFeatureServiceClient(h.session.connection)
 	_, err := service.Check(ctx, req)
-	return fail.ConvertError(err)
+	return err
 }
 
 // AddFeature ...

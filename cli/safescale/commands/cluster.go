@@ -93,9 +93,9 @@ var clusterListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		list, xerr := clientSession.Cluster.List(temporal.DefaultExecutionTimeout)
-		if xerr != nil {
-			err := fail.FromGRPCStatus(xerr)
+		list, err := clientSession.Cluster.List(temporal.DefaultExecutionTimeout)
+		if err != nil {
+			err := fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "failed to get cluster list", false).Error())))
 		}
 
@@ -1155,9 +1155,9 @@ var clusterNodeListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		list, xerr := clientSession.Cluster.ListNodes(clusterName, temporal.GetExecutionTimeout())
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		list, err := clientSession.Cluster.ListNodes(clusterName, temporal.GetExecutionTimeout())
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 
 		for _, host := range list.Nodes {
