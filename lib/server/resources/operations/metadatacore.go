@@ -463,7 +463,11 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 
 // readByID reads a metadata identified by ID from Object Storage
 func (c *MetadataCore) readByID(id string) fail.Error {
-	return c.folder.Read(byIDFolderName, id, func(buf []byte) fail.Error {
+	var path string
+	if c.kindSplittedStore {
+		path = byIDFolderName
+	}
+	return c.folder.Read(path, id, func(buf []byte) fail.Error {
 		if innerXErr := c.deserialize(buf); innerXErr != nil {
 			switch innerXErr.(type) {
 			case *fail.ErrSyntax:
@@ -484,11 +488,15 @@ func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
 	xerr = retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			if innerXErr := c.readByID(ref); innerXErr != nil {
+				innerXErr = debug.InjectPlannedFail(innerXErr)
 				switch innerXErr.(type) {
-				case *fail.ErrNotFound: // If not found, stop immediately
-					xerr = c.readByName(ref)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
+				case *fail.ErrNotFound:
+					if c.kindSplittedStore {
+						// Try to read by name
+						innerXErr = c.readByName(ref)
+						innerXErr = debug.InjectPlannedFail(innerXErr)
+					}
+					if innerXErr != nil {
 						switch innerXErr.(type) {
 						case *fail.ErrNotFound:
 							return retry.StopRetryError(innerXErr)
