@@ -673,7 +673,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		gwSizing.Image = cfg.GetString("DefaultImage")
 	}
 	if gwSizing.Image == "" {
-		gwSizing.Image = "Ubuntu 18.04"
+		gwSizing.Image = "Ubuntu 20.04"
 	}
 	if req.Image == "" {
 		req.Image = gwSizing.Image
