@@ -249,7 +249,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 		},
 		&cli.StringFlag{
 			Name:  "os",
-			Value: "Ubuntu 18.04",
+			Value: "Ubuntu 20.04",
 			Usage: "Image name for the host",
 		},
 		&cli.BoolFlag{
