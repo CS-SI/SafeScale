@@ -70,10 +70,10 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 	tmplString, err := templateBox.String(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return "", nil, fail.Wrap(err, "failed to read embedded feature speficication file '%s'", name)
+		return "", nil, fail.Wrap(err, "failed to read embedded feature specification file '%s'", name)
 	}
 
-	logrus.Infof("loaded feature %s:SHA256:%s", name, getSHA256Hash(tmplString))
+	logrus.Debugf("loaded feature %s:SHA256:%s", name, getSHA256Hash(tmplString))
 
 	v := viper.New()
 	v.SetConfigType("yaml")

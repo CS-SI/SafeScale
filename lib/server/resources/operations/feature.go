@@ -173,6 +173,14 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 		xerr = nil
 	}
 
+	// if we can log the sha256 of the feature, do it
+	filename := v.ConfigFileUsed()
+	if filename != "" {
+		if content, err := ioutil.ReadFile(filename); err == nil {
+			logrus.Debugf("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
+		}
+	}
+
 	casted.svc = svc
 
 	return casted, xerr
@@ -194,7 +202,16 @@ func NewEmbeddedFeature(svc iaas.Service, name string) (_ resources.Feature, xer
 	}
 	casted = allEmbeddedFeaturesMap[name].Clone().(*Feature)
 	casted.svc = svc
+
+	// if we can log the sha256 of the feature, do it
+	if casted.fileName != "" {
+		if content, err := ioutil.ReadFile(casted.fileName); err == nil {
+			logrus.Debugf("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
+		}
+	}
+
 	casted.fileName += " [embedded]"
+
 	return casted, nil
 }
 
