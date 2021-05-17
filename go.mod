@@ -1,6 +1,6 @@
 module github.com/CS-SI/SafeScale
 
-go 1.14
+go 1.15
 
 require (
 	github.com/GeertJohan/go.rice v1.0.2
@@ -19,7 +19,6 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gojuno/minimock/v3 v3.0.8
-	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-cmp v0.5.2 // indirect
 	github.com/gophercloud/gophercloud v0.15.0
@@ -41,7 +40,6 @@ require (
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/quasilyte/go-ruleguard v0.3.4 // indirect
 	github.com/quasilyte/go-ruleguard/dsl v0.3.2
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sanity-io/litter v1.3.0
@@ -49,7 +47,6 @@ require (
 	github.com/sethvargo/go-password v0.1.1
 	github.com/sirupsen/logrus v1.5.0
 	github.com/smartystreets/assertions v1.2.0 // indirect
-	github.com/smartystreets/goconvey v1.6.4
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
@@ -67,10 +64,8 @@ require (
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.31.0
-	google.golang.org/protobuf v1.25.0
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	mvdan.cc/gogrep v0.0.0-20210331191051-e50df5835157 // indirect
 )
 
 replace gomodules.xyz/stow v0.2.4 => github.com/gomodules/stow v0.2.4
