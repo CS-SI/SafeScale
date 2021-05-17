@@ -205,7 +205,7 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 			MinDiskSize: 0,
 		}, false)
 		require.Nil(t, err)
-		img, err := tester.Service.SearchImage("Ubuntu 18.04")
+		img, err := tester.Service.SearchImage("Ubuntu 20.04")
 		require.Nil(t, err)
 		keypair, err := tester.Service.CreateKeyPair("kp_" + subnet.Name)
 		require.Nil(t, err)
@@ -235,7 +235,7 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstr
 		MinDiskSize: 10,
 	}, false)
 	assert.Nil(t, xerr)
-	img, xerr := tester.Service.SearchImage("Ubuntu 18.04")
+	img, xerr := tester.Service.SearchImage("Ubuntu 20.04")
 	assert.Nil(t, xerr)
 	hostRequest := abstract.HostRequest{
 		ResourceName:   name,
@@ -259,7 +259,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 		MinDiskSize: 10,
 	}, false)
 	assert.Nil(t, xerr)
-	img, xerr := tester.Service.SearchImage("Ubuntu 18.04")
+	img, xerr := tester.Service.SearchImage("Ubuntu 20.04")
 	assert.Nil(t, xerr)
 	gwRequest := abstract.HostRequest{
 		ImageID:      img.ID,
