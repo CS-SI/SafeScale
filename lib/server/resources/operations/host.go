@@ -1224,7 +1224,6 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				hsgV1.ByName[item.Name] = item.ID
 			}
 
-			var an *abstract.Network
 			networkInstance, xerr := defaultSubnet.InspectNetwork()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -1234,7 +1233,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 			innerXErr = networkInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
-				an, ok = clonable.(*abstract.Network)
+				_, ok = clonable.(*abstract.Network)
 				if !ok {
 					return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
