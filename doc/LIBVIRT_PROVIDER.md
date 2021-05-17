@@ -214,7 +214,7 @@ A List of images, each image is made up of :
                 "id"        : "1lQbL0I08_4vkOZKnksnTpYV9XBsQTA0Q"
             },
             "imagePath" : "/home/user/SafeScale/ubuntu1804_diskimage.qcow2",
-            "imageName" : "Ubuntu 18.04",
+            "imageName" : "Ubuntu 20.04",
             "imageID"   : "58390614-e8c1-442c-bbe8-5e8e7790a5aa",
             "disk"      : "/dev/sda2"
         }
