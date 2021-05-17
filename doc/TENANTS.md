@@ -22,7 +22,7 @@ Here is an example of a TOML encoded configuration file:
         ProjectID = "<Project ID>"
         Region = "<Region>"
         AvailabilityZone = "<Availability Zone>"
-        DefaultImage = "<OS Image Name to use as default, ex: Ubuntu 20.04>"
+        DefaultImage = "<OS Image Name to use as default, ex: Ubuntu 18.04>"
 
     # This part defines configuration specifically applied to network resources (optional)
     [tenants.network]
@@ -60,7 +60,7 @@ Here is the JSON equivalent of the TOML configuration file example:
       "name": "TenantName",
       "client": "ovh",
       "compute": {
-        "DefaultImage": "<OS Image Name to use as default, ex: Ubuntu 20.04>",
+        "DefaultImage": "<OS Image Name to use as default, ex: Ubuntu 18.04>",
         "ProjectID": "<Project ID>",
         "Region": "<Region>",
         "AvailabilityZone": "<Availability Zone>"
@@ -101,7 +101,7 @@ Here is the YAML equivalent of the TOML configuration file example:
 tenants:
 - client: ovh
   compute:
-    DefaultImage: '<OS Image Name to use as default, ex: Ubuntu 20.04>'
+    DefaultImage: '<OS Image Name to use as default, ex: Ubuntu 18.04>'
     ProjectID: <Project ID>
     Region: <Region>
     AvailabilityZone: <Availability Zone>
