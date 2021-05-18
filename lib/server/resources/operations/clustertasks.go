@@ -49,8 +49,12 @@ import (
 )
 
 // taskCreateCluster is the TaskAction that creates a Cluster
-func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *Cluster) taskCreateCluster(tc concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	req := params.(abstract.ClusterRequest)
+	task, xerr := concurrency.NewTaskGroupWithParent(tc)
+	if xerr != nil {
+		return nil, xerr
+	}
 	ctx := task.GetContext()
 
 	// Check if Cluster exists in metadata; if yes, error
