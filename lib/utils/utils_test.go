@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -63,18 +64,20 @@ func TestAbsPathify(t *testing.T) {
 		{"last", args{inPath: "/etc/safescale"}, "/etc/safescale"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			defer func() {
-				if r := recover(); r == nil {
-					fmt.Println("The code did not panic, :)")
-				} else {
-					t.Errorf("Horrible failure")
+		if !(runtime.GOOS != "linux" && (strings.Contains(tt.want, "home") || strings.Contains(tt.want, "etc"))) {
+			t.Run(tt.name, func(t *testing.T) {
+				defer func() {
+					if r := recover(); r == nil {
+						fmt.Println("The code did not panic, :)")
+					} else {
+						t.Errorf("Horrible failure")
+					}
+				}()
+				if got := AbsPathify(tt.args.inPath); got != tt.want {
+					t.Errorf("AbsPathify() = %v, want %v", got, tt.want)
 				}
-			}()
-			if got := AbsPathify(tt.args.inPath); got != tt.want {
-				t.Errorf("AbsPathify() = %v, want %v", got, tt.want)
-			}
-		})
+			})
+		}
 	}
 }
 
@@ -96,17 +99,19 @@ func TestOriginalAbsPathify(t *testing.T) {
 		{"last", args{inPath: "/etc/safescale"}, "/etc/safescale"},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			defer func() {
-				if r := recover(); r == nil {
-					fmt.Println("The code did not panic, :)")
-				} else {
-					t.Errorf("Horrible failure")
+		if !(runtime.GOOS != "linux" && (strings.Contains(tt.want, "home") || strings.Contains(tt.want, "etc"))) {
+			t.Run(tt.name, func(t *testing.T) {
+				defer func() {
+					if r := recover(); r == nil {
+						fmt.Println("The code did not panic, :)")
+					} else {
+						t.Errorf("Horrible failure")
+					}
+				}()
+				if got := OriginalAbsPathify(tt.args.inPath); got != tt.want {
+					t.Errorf("AbsPathify() = %v, want %v", got, tt.want)
 				}
-			}()
-			if got := OriginalAbsPathify(tt.args.inPath); got != tt.want {
-				t.Errorf("AbsPathify() = %v, want %v", got, tt.want)
-			}
-		})
+			})
+		}
 	}
 }
