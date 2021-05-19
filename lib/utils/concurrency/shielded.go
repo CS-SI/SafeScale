@@ -95,7 +95,7 @@ func (instance *Shielded) Alter( /*task Task, */ alterer func(data.Clonable) fai
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded) Serialize( /*task Task*/ ) ([]byte, fail.Error) {
+func (instance *Shielded) Serialize() ([]byte, fail.Error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}

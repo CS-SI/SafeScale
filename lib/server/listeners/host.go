@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -434,8 +434,8 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 
 	reduce := false
 	xerr = rh.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
-			nhs, ok := clonable.(*propertiesv1.HostSizing)
+		return props.Inspect(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
+			nhs, ok := clonable.(*propertiesv2.HostSizing)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}

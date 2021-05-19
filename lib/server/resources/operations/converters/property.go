@@ -67,7 +67,7 @@ func ShareMountListFromPropertyToProtocol(hostName string, share *propertiesv1.H
 }
 
 // HostSizingRequirementsFromPropertyToProtocol ...
-func HostSizingRequirementsFromPropertyToProtocol(in propertiesv1.HostSizingRequirements) *protocol.HostSizing {
+func HostSizingRequirementsFromPropertyToProtocol(in propertiesv2.HostSizingRequirements) *protocol.HostSizing {
 	return &protocol.HostSizing{
 		MinCpuCount: int32(in.MinCores),
 		MaxCpuCount: int32(in.MaxCores),
@@ -188,7 +188,7 @@ func ClusterNodeFromPropertyToProtocol(in propertiesv3.ClusterNode) *protocol.Ho
 func ClusterDefaultsPropertyV1ToV2(in *propertiesv1.ClusterDefaults) *propertiesv2.ClusterDefaults{
 	out := &propertiesv2.ClusterDefaults{
 		Image: in.Image,
-		GatewaySizing: propertiesv1.HostSizingRequirements{
+		GatewaySizing: propertiesv2.HostSizingRequirements{
 			MinCores:    in.GatewaySizing.Cores,
 			MinCPUFreq:  in.GatewaySizing.CPUFreq,
 			MinGPU:      in.GatewaySizing.GPUNumber,
@@ -196,7 +196,7 @@ func ClusterDefaultsPropertyV1ToV2(in *propertiesv1.ClusterDefaults) *properties
 			MinDiskSize: in.GatewaySizing.DiskSize,
 			Replaceable: in.GatewaySizing.Replaceable,
 		},
-		MasterSizing: propertiesv1.HostSizingRequirements{
+		MasterSizing: propertiesv2.HostSizingRequirements{
 			MinCores:    in.MasterSizing.Cores,
 			MinCPUFreq:  in.MasterSizing.CPUFreq,
 			MinGPU:      in.MasterSizing.GPUNumber,
@@ -204,7 +204,7 @@ func ClusterDefaultsPropertyV1ToV2(in *propertiesv1.ClusterDefaults) *properties
 			MinDiskSize: in.MasterSizing.DiskSize,
 			Replaceable: in.MasterSizing.Replaceable,
 		},
-		NodeSizing: propertiesv1.HostSizingRequirements{
+		NodeSizing: propertiesv2.HostSizingRequirements{
 			MinCores:    in.NodeSizing.Cores,
 			MinCPUFreq:  in.NodeSizing.CPUFreq,
 			MinGPU:      in.NodeSizing.GPUNumber,

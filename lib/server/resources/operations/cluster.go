@@ -125,7 +125,7 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 			if innerXErr != nil {
 				return nil, innerXErr
 			}
-			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement)
 			if innerXErr = rc.Read(name); innerXErr != nil {
 				return nil, innerXErr
 			}
@@ -447,7 +447,7 @@ func (instance *Cluster) updateCachedInformation() {
 // convertDefaultsV1ToDefaultsV2 converts propertiesv1.ClusterDefaults to propertiesv2.ClusterDefaults
 func convertClusterDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, defaultsV2 *propertiesv2.ClusterDefaults) {
 	defaultsV2.Image = defaultsV1.Image
-	defaultsV2.GatewaySizing = propertiesv1.HostSizingRequirements{
+	defaultsV2.GatewaySizing = propertiesv2.HostSizingRequirements{
 		MinCores:    defaultsV1.GatewaySizing.Cores,
 		MinCPUFreq:  defaultsV1.GatewaySizing.CPUFreq,
 		MinGPU:      defaultsV1.GatewaySizing.GPUNumber,
@@ -455,7 +455,7 @@ func convertClusterDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaul
 		MinDiskSize: defaultsV1.GatewaySizing.DiskSize,
 		Replaceable: defaultsV1.GatewaySizing.Replaceable,
 	}
-	defaultsV2.MasterSizing = propertiesv1.HostSizingRequirements{
+	defaultsV2.MasterSizing = propertiesv2.HostSizingRequirements{
 		MinCores:    defaultsV1.MasterSizing.Cores,
 		MinCPUFreq:  defaultsV1.MasterSizing.CPUFreq,
 		MinGPU:      defaultsV1.MasterSizing.GPUNumber,
@@ -463,7 +463,7 @@ func convertClusterDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaul
 		MinDiskSize: defaultsV1.MasterSizing.DiskSize,
 		Replaceable: defaultsV1.MasterSizing.Replaceable,
 	}
-	defaultsV2.NodeSizing = propertiesv1.HostSizingRequirements{
+	defaultsV2.NodeSizing = propertiesv2.HostSizingRequirements{
 		MinCores:    defaultsV1.NodeSizing.Cores,
 		MinCPUFreq:  defaultsV1.NodeSizing.CPUFreq,
 		MinGPU:      defaultsV1.NodeSizing.GPUNumber,
@@ -1247,7 +1247,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	var (
 		hostImage             string
-		nodeDefaultDefinition *propertiesv1.HostSizingRequirements
+		nodeDefaultDefinition *propertiesv2.HostSizingRequirements
 	)
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
@@ -1337,7 +1337,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 }
 
 // complementHostDefinition complements req with default values if needed
-func complementHostDefinition(req abstract.HostSizingRequirements, def propertiesv1.HostSizingRequirements) abstract.HostSizingRequirements {
+func complementHostDefinition(req abstract.HostSizingRequirements, def propertiesv2.HostSizingRequirements) abstract.HostSizingRequirements {
 	if def.MinCores > 0 && req.MinCores == 0 {
 		req.MinCores = def.MinCores
 	}
