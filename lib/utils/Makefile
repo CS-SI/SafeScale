@@ -12,6 +12,9 @@ generate:
 vet:
 	@$(GO) vet ./...
 
+test:
+	@$(GO) test $(RACE_CHECK_TEST) ./...
+
 clean:
 	@(find . | grep _string | xargs rm 2>/dev/null || true)
 

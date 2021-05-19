@@ -105,7 +105,7 @@ func CreateDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
 	defer func() {
 		if xerr != nil {
 			for loop := uint(0); loop < n; loop++ {
-				nerr := fmt.Errorf("random cleanup problem")
+				nerr := fail.NewError("random cleanup problem")
 				_ = xerr.AddConsequence(nerr)
 			}
 		}
