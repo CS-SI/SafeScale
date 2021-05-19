@@ -49,8 +49,12 @@ import (
 )
 
 // taskCreateCluster is the TaskAction that creates a Cluster
-func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *Cluster) taskCreateCluster(tc concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	req := params.(abstract.ClusterRequest)
+	task, xerr := concurrency.NewTaskGroupWithParent(tc)
+	if xerr != nil {
+		return nil, xerr
+	}
 	ctx := task.GetContext()
 
 	// Check if Cluster exists in metadata; if yes, error
@@ -498,14 +502,6 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 
 // createNetworkingResources creates the network and subnet for the Cluster
 func (instance *Cluster) createNetworkingResources(task concurrency.Task, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, xerr fail.Error) {
-	// defer func() {
-	// 	if xerr != nil {
-	// 		if derr := task.Abort(); derr != nil {
-	// 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort task"))
-	// 		}
-	// 	}
-	// }()
-
 	if task.Aborted() {
 		return nil, nil, fail.AbortedError(nil, "aborted")
 	}
@@ -696,31 +692,6 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	return rn, subnetInstance, nil
 }
 
-// func onFailureAbortTask(task concurrency.Task, inErr *fail.Error) {
-// 	if inErr != nil && *inErr != nil {
-// 		st, xerr := task.GetStatus()
-// 		xerr = debug.InjectPlannedFail(xerr)
-// 		if xerr != nil {
-// 			_ = (*inErr).AddConsequence(xerr)
-// 			return
-// 		}
-//
-// 		if st != concurrency.DONE {
-// 			xerr = task.Abort()
-// 			xerr = debug.InjectPlannedFail(xerr)
-// 			if xerr != nil {
-// 				_ = (*inErr).AddConsequence(xerr)
-// 				return
-// 			}
-// 			_, xerr = task.Wait()
-// 			xerr = debug.InjectPlannedFail(xerr)
-// 			if xerr != nil {
-// 				_ = (*inErr).AddConsequence(xerr)
-// 			}
-// 		}
-// 	}
-// }
-
 // createHostResources creates and configures hosts for the Cluster
 func (instance *Cluster) createHostResources(
 	task concurrency.Task,
@@ -730,21 +701,23 @@ func (instance *Cluster) createHostResources(
 	initialNodeCount uint,
 	keepOnFailure bool,
 ) (xerr fail.Error) {
-
-	// // In case of failure, abort task to stop running subtasks
-	// defer func() {
-	// 	if xerr != nil {
-	// 		if derr := task.Abort(); derr != nil {
-	// 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort task"))
-	// 		}
-	// 	}
-	// }()
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
-
 	ctx := task.GetContext()
+	startedTasks := []concurrency.Task{}
+	defer func() {
+		if xerr != nil {
+			for _, startedTask := range startedTasks {
+				if !startedTask.Aborted() {
+					cleanErr := startedTask.Abort()
+					if cleanErr != nil {
+						logrus.Warnf("error aborting tasks spawn by createHostResources: %s", cleanErr.Error())
+					}
+				}
+			}
+		}
+	}()
 
 	var (
 		primaryGateway, secondaryGateway             resources.Host
@@ -808,7 +781,7 @@ func (instance *Cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-	defer onFailureAbortTask(primaryGatewayTask, &xerr)
+	startedTasks = append(startedTasks, primaryGatewayTask)
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
@@ -820,7 +793,7 @@ func (instance *Cluster) createHostResources(
 		if xerr != nil {
 			return xerr
 		}
-		defer onFailureAbortTask(secondaryGatewayTask, &xerr)
+		startedTasks = append(startedTasks, secondaryGatewayTask)
 	}
 
 	if task.Aborted() {
@@ -836,7 +809,7 @@ func (instance *Cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-	defer onFailureAbortTask(mastersTask, &xerr)
+	startedTasks = append(startedTasks, mastersTask)
 
 	// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
 	defer func() {
@@ -879,7 +852,7 @@ func (instance *Cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-	defer onFailureAbortTask(privateNodesTask, &xerr)
+	startedTasks = append(startedTasks, privateNodesTask)
 
 	// Starting from here, if exiting with error, delete nodes
 	defer func() {
@@ -937,7 +910,7 @@ func (instance *Cluster) createHostResources(
 	if xerr != nil {
 		return xerr
 	}
-	defer onFailureAbortTask(primaryGatewayConfigTask, &xerr)
+	startedTasks = append(startedTasks, primaryGatewayConfigTask)
 
 	if haveSecondaryGateway {
 		secondaryGatewayConfigTask, xerr = task.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway})
@@ -945,7 +918,7 @@ func (instance *Cluster) createHostResources(
 		if xerr != nil {
 			return xerr
 		}
-		defer onFailureAbortTask(secondaryGatewayConfigTask, &xerr)
+		startedTasks = append(startedTasks, secondaryGatewayConfigTask)
 	}
 
 	if _, primaryGatewayStatus = primaryGatewayConfigTask.Wait(); primaryGatewayStatus != nil {

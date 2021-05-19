@@ -99,7 +99,7 @@ GOBIN?=$(GOPATH)/bin
 CIBIN?=/tmp
 
 ifneq ($(OS),Windows_NT)
-ARCH_DETECTS_RACES=$(shell $(GO) test -race ./lib/utils 2>&1 | egrep -c "ok")
+ARCH_DETECTS_RACES=$(shell $(GO) test -race ./lib/utils/empty 2>&1 | egrep -c "ok")
 
 ifeq ($(ARCH_DETECTS_RACES),1)
 RACE_CHECK=-race
