@@ -298,14 +298,13 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Su
 
 // updateCachedInformation updates the information cached in instance because will be frequently used and will not changed over time
 func (instance *Subnet) updateCachedInformation() fail.Error {
-	var /*networkID, */ primaryGatewayID, secondaryGatewayID string
+	var primaryGatewayID, secondaryGatewayID string
 	xerr := instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		// networkID = as.Network
 		if len(as.GatewayIDs) > 0 {
 			primaryGatewayID = as.GatewayIDs[0]
 		}
@@ -1585,8 +1584,8 @@ func (instance *Subnet) AdoptHost(ctx context.Context, host resources.Host) (xer
 			}
 
 			found := false
-			for _, v := range hnV2.SubnetsByID {
-				if v == instance.GetID() {
+			for k := range hnV2.SubnetsByID {
+				if k == instance.GetID() {
 					found = true
 					break
 				}

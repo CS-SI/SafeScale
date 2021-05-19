@@ -108,7 +108,7 @@ func HostNullValue() *Host {
 }
 
 // LoadHost ...
-func LoadHost(svc iaas.Service, ref string) (hostInstance resources.Host, xerr fail.Error) {
+func LoadHost(svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
@@ -126,17 +126,17 @@ func LoadHost(svc iaas.Service, ref string) (hostInstance resources.Host, xerr f
 
 	options := []data.ImmutableKeyValue{
 		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-			rh, innerXErr := NewHost(svc)
+			hostInstance, innerXErr := NewHost(svc)
 			if innerXErr != nil {
 				return nil, innerXErr
 			}
 
 			// TODO: MetadataCore.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = rh.Read(ref); innerXErr != nil {
+			if innerXErr = hostInstance.Read(ref); innerXErr != nil {
 				return nil, innerXErr
 			}
 
-			return rh, nil
+			return hostInstance, nil
 		}),
 	}
 
@@ -151,7 +151,8 @@ func LoadHost(svc iaas.Service, ref string) (hostInstance resources.Host, xerr f
 		}
 	}
 
-	if hostInstance = ce.Content().(resources.Host); hostInstance == nil {
+	hostInstance := ce.Content().(resources.Host)
+	if hostInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
 	}
 	_ = ce.LockContent()
@@ -228,86 +229,59 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		var primaryGatewayConfig, secondaryGatewayConfig *system.SSHConfig
-		innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			if len(hnV2.IPv4Addresses) > 0 {
-				instance.privateIP = hnV2.IPv4Addresses[hnV2.DefaultSubnetID]
-				if instance.privateIP == "" {
-					instance.privateIP = hnV2.IPv6Addresses[hnV2.DefaultSubnetID]
-				}
-			}
-			instance.publicIP = hnV2.PublicIPv4
-			if instance.publicIP == "" {
-				instance.publicIP = hnV2.PublicIPv6
-			}
-			if instance.publicIP != "" {
-				instance.accessIP = instance.publicIP
-			} else {
-				instance.accessIP = instance.privateIP
-			}
-
-			// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
-			// Do not execute neither if Host is single or is a gateway
-			if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
-				subnetInstance, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
+		// Do not try to cache hostproperty.NetworkV2 if it's not there; migration upgrade will take care of this
+		// when needed
+		if props.Lookup(hostproperty.NetworkV2) {
+			var primaryGatewayConfig, secondaryGatewayConfig *system.SSHConfig
+			innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				rgw, xerr := subnetInstance.(*Subnet).UnsafeInspectGateway(true)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
-				}
-
-				gwErr := rgw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-					gwahc, ok := clonable.(*abstract.HostCore)
-					if !ok {
-						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				if len(hnV2.IPv4Addresses) > 0 {
+					instance.privateIP = hnV2.IPv4Addresses[hnV2.DefaultSubnetID]
+					if instance.privateIP == "" {
+						instance.privateIP = hnV2.IPv6Addresses[hnV2.DefaultSubnetID]
 					}
-
-					ip := rgw.(*Host).accessIP
-					primaryGatewayConfig = &system.SSHConfig{
-						PrivateKey: gwahc.PrivateKey,
-						Port:       int(gwahc.SSHPort),
-						IPAddress:  ip,
-						Hostname:   gwahc.Name,
-						User:       opUser,
-					}
-					return nil
-				})
-				if gwErr != nil {
-					return gwErr
+				}
+				instance.publicIP = hnV2.PublicIPv4
+				if instance.publicIP == "" {
+					instance.publicIP = hnV2.PublicIPv6
+				}
+				if instance.publicIP != "" {
+					instance.accessIP = instance.publicIP
+				} else {
+					instance.accessIP = instance.privateIP
 				}
 
-				// Secondary gateway may not exist...
-				rgw, xerr = subnetInstance.(*Subnet).UnsafeInspectGateway(false)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					switch xerr.(type) {
-					case *fail.ErrNotFound:
-						// continue
-					default:
+				// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
+				// Do not execute neither if Host is single or is a gateway
+				if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
+					subnetInstance, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
 						return xerr
 					}
-				} else {
-					gwErr = rgw.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+
+					rgw, xerr := subnetInstance.(*Subnet).UnsafeInspectGateway(true)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						return xerr
+					}
+
+					gwErr := rgw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 						gwahc, ok := clonable.(*abstract.HostCore)
 						if !ok {
 							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
 
-						secondaryGatewayConfig = &system.SSHConfig{
+						ip := rgw.(*Host).accessIP
+						primaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
 							Port:       int(gwahc.SSHPort),
-							IPAddress:  rgw.(*Host).accessIP,
-							Hostname:   rgw.GetName(),
+							IPAddress:  ip,
+							Hostname:   gwahc.Name,
 							User:       opUser,
 						}
 						return nil
@@ -315,26 +289,57 @@ func (instance *Host) updateCachedInformation() fail.Error {
 					if gwErr != nil {
 						return gwErr
 					}
-				}
-			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
 
-		instance.sshProfile = &system.SSHConfig{
-			Port:                   int(ahc.SSHPort),
-			IPAddress:              instance.accessIP,
-			Hostname:               instance.GetName(),
-			User:                   opUser,
-			PrivateKey:             ahc.PrivateKey,
-			GatewayConfig:          primaryGatewayConfig,
-			SecondaryGatewayConfig: secondaryGatewayConfig,
+					// Secondary gateway may not exist...
+					rgw, xerr = subnetInstance.(*Subnet).UnsafeInspectGateway(false)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							// continue
+						default:
+							return xerr
+						}
+					} else {
+						gwErr = rgw.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+							gwahc, ok := clonable.(*abstract.HostCore)
+							if !ok {
+								return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							}
+
+							secondaryGatewayConfig = &system.SSHConfig{
+								PrivateKey: gwahc.PrivateKey,
+								Port:       int(gwahc.SSHPort),
+								IPAddress:  rgw.(*Host).accessIP,
+								Hostname:   rgw.GetName(),
+								User:       opUser,
+							}
+							return nil
+						})
+						if gwErr != nil {
+							return gwErr
+						}
+					}
+				}
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			instance.sshProfile = &system.SSHConfig{
+				Port:                   int(ahc.SSHPort),
+				IPAddress:              instance.accessIP,
+				Hostname:               instance.GetName(),
+				User:                   opUser,
+				PrivateKey:             ahc.PrivateKey,
+				GatewayConfig:          primaryGatewayConfig,
+				SecondaryGatewayConfig: secondaryGatewayConfig,
+			}
 		}
 
 		var index uint8
-		innerXErr = props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
 			systemV1, ok := clonable.(*propertiesv1.HostSystem)
 			if !ok {
 				logrus.Error(fail.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String()))
@@ -566,16 +571,16 @@ func (instance *Host) Reload() (xerr fail.Error) {
 			changed = true
 		}
 
-		innerXErr := props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
-			hostSizingV1, ok := clonable.(*propertiesv1.HostSizing)
+		innerXErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
+			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			allocated := converters.HostEffectiveSizingFromAbstractToPropertyV1(ahf.Sizing)
+			allocated := converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
 			// FIXME: how to compare the 2 structs ?
-			if allocated != hostSizingV1.AllocatedSize {
-				hostSizingV1.AllocatedSize = allocated
+			if allocated != hostSizingV2.AllocatedSize {
+				hostSizingV2.AllocatedSize = allocated
 				changed = true
 			}
 			return nil
@@ -863,14 +868,14 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}()
 
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		innerXErr := props.Alter(hostproperty.SizingV1, func(clonable data.Clonable) fail.Error {
-			hostSizingV1, ok := clonable.(*propertiesv1.HostSizing)
+		innerXErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
+			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hostSizingV1.AllocatedSize = converters.HostEffectiveSizingFromAbstractToPropertyV1(ahf.Sizing)
-			hostSizingV1.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV1(hostDef)
+			hostSizingV2.AllocatedSize = converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
+			hostSizingV2.RequestedSize = converters.HostSizingRequirementsFromAbstractToPropertyV2(hostDef)
 			return nil
 		})
 		if innerXErr != nil {
@@ -1223,47 +1228,6 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				hsgV1.ByID[item.ID] = item
 				hsgV1.ByName[item.Name] = item.ID
 			}
-
-			var an *abstract.Network
-			networkInstance, xerr := defaultSubnet.InspectNetwork()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
-			defer networkInstance.Released()
-
-			innerXErr = networkInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				var ok bool
-				_, ok = clonable.(*abstract.Network)
-				if !ok {
-					return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-
-				return nil
-			})
-			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to query Network of Subnet '%s'", defaultSubnet.GetName())
-			}
-
-			// // Unbind "default" Security Group from Host if it is bound
-			// if sgName := svc.GetDefaultSecurityGroupName(); sgName != "" {
-			// 	adsg, innerXErr := svc.InspectSecurityGroupByName(an.ID, sgName)
-			// 	if innerXErr != nil {
-			// 		switch innerXErr.(type) {
-			// 		case *fail.ErrNotFound:
-			// 			// ignore this error
-			// 		default:
-			// 			return innerXErr
-			// 		}
-			// 	} else if innerXErr = svc.UnbindSecurityGroupFromHost(adsg, instance.GetID()); innerXErr != nil {
-			// 		switch innerXErr.(type) {
-			// 		case *fail.ErrNotFound:
-			// 			// Consider a security group not found as a successful unbind
-			// 		default:
-			// 			return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
-			// 		}
-			// 	}
-			// }
 
 			return nil
 		})
