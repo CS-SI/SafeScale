@@ -91,11 +91,6 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		return nil, xerr
 	}
 
-	// Now we can react to failure on Host creation
-	if cerr != nil {
-		return nil, cerr
-	}
-
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
 		if xerr != nil && !hostReq.KeepOnFailure {
@@ -121,6 +116,11 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			_ = xerr.AddConsequence(derr)
 		}
 	}()
+
+	// Now we can react to failure on Host creation
+	if cerr != nil {
+		return nil, cerr
+	}
 
 	// Binds gateway to VIP if needed
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
