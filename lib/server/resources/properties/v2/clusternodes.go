@@ -35,13 +35,13 @@ type ClusterNode struct {
 // ClusterNodes contains all the nodes created in the cluster
 // !!! FROZEN !!!
 type ClusterNodes struct {
-	Masters          []*ClusterNode `json:"masters"`                 // Masters contains the ID of the masters
-	PublicNodes      []*ClusterNode `json:"public_nodes,omitempty"`  // PublicNodes is a slice of IDs of the public cluster nodes
-	PrivateNodes     []*ClusterNode `json:"private_nodes,omitempty"` // PrivateNodes is a slice of IDs of the private cluster nodes
-	MasterLastIndex  int            `json:"master_last_index"`       // MasterLastIndex
-	PrivateLastIndex int            `json:"private_last_index"`      // PrivateLastIndex
-	PublicLastIndex  int            `json:"public_last_index"`       // PublicLastIndex
-	GlobalLastIndex  uint           `json:"global_last_index"`       // GlobalLastIndes is used to keep of the index associated to the last created node
+	Masters          []*ClusterNode `json:"masters,omitempty"`            // Masters contains the ID of the masters
+	PublicNodes      []*ClusterNode `json:"public_nodes,omitempty"`       // PublicNodes is a slice of IDs of the public cluster nodes
+	PrivateNodes     []*ClusterNode `json:"private_nodes,omitempty"`      // PrivateNodes is a slice of IDs of the private cluster nodes
+	MasterLastIndex  int            `json:"master_last_index,omitempty"`  // MasterLastIndex
+	PrivateLastIndex int            `json:"private_last_index,omitempty"` // PrivateLastIndex
+	PublicLastIndex  int            `json:"public_last_index,omitempty"`  // PublicLastIndex
+	GlobalLastIndex  uint           `json:"global_last_index,omitempty"`  // is used to keep of the index associated to the last created node
 }
 
 func newClusterNodes() *ClusterNodes {

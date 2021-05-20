@@ -148,9 +148,9 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 			defer subnetInstance.Released()
 
 			// -- create Security groups --
-			gwSG, internalSG, publicSG, xerr := subnetInstance.(*operations.Subnet).UnsafeCreateSecurityGroups(context.Background(), instance, false)
-			if xerr != nil {
-				return xerr
+			gwSG, internalSG, publicSG, innerXErr := subnetInstance.(*operations.Subnet).UnsafeCreateSecurityGroups(context.Background(), instance, false)
+			if innerXErr != nil {
+				return innerXErr
 			}
 
 			defer func() {
