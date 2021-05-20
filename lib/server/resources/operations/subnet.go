@@ -32,9 +32,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
@@ -448,7 +446,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		return fail.InvalidRequestError("invalid empty string value for 'req.CIDR'")
 	}
 
-	rn, an, xerr := instance.validateNetwork(&req)
+	networkInstance, abstractNetwork, xerr := instance.validateNetwork(&req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -462,14 +460,14 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	}
 
 	// Verify the CIDR is not routable
-	xerr = instance.validateCIDR(&req, *an)
+	xerr = instance.validateCIDR(&req, *abstractNetwork)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
 
 	svc := instance.GetService()
-	as, xerr := svc.CreateSubnet(req)
+	abstractSubnet, xerr := svc.CreateSubnet(req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -482,15 +480,15 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
-		if xerr != nil && as != nil && !req.KeepOnFailure {
-			if derr := instance.deleteSubnetAndConfirm(as.ID); derr != nil {
+		if xerr != nil && abstractSubnet != nil && !req.KeepOnFailure {
+			if derr := instance.deleteSubnetAndConfirm(abstractSubnet.ID); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(xerr)))
 			}
 		}
 	}()
 
 	// Write Subnet object metadata and updates the service cache
-	xerr = instance.Carry(as)
+	xerr = instance.Carry(abstractSubnet)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -510,7 +508,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		return xerr
 	}
 
-	subnetGWSG, subnetInternalSG, subnetPublicIPSG, xerr := instance.createSecurityGroups(ctx, req, *an)
+	subnetGWSG, subnetInternalSG, subnetPublicIPSG, xerr := instance.UnsafeCreateSecurityGroups(ctx, networkInstance, req.KeepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -530,7 +528,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	// Creates VIP for gateways if asked for
 	var avip *abstract.VirtualIP
 	if failover {
-		avip, xerr = svc.CreateVIP(as.Network, as.ID, fmt.Sprintf(virtualIPNamePattern, as.Name, an.Name), []string{subnetGWSG.GetID()})
+		avip, xerr = svc.CreateVIP(abstractSubnet.Network, abstractSubnet.ID, fmt.Sprintf(virtualIPNamePattern, abstractSubnet.Name, networkInstance.GetName()), []string{subnetGWSG.GetID()})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to create VIP")
@@ -538,8 +536,8 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 
 		// Starting from here, delete VIP if exists with error
 		defer func() {
-			if xerr != nil && as != nil && as.VIP != nil && !req.KeepOnFailure {
-				if derr := svc.DeleteVIP(as.VIP); derr != nil {
+			if xerr != nil && abstractSubnet != nil && abstractSubnet.VIP != nil && !req.KeepOnFailure {
+				if derr := svc.DeleteVIP(abstractSubnet.VIP); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete VIP", ActionFromError(xerr)))
 				}
 			}
@@ -589,15 +587,15 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	}
 
 	// attach Subnet to Network
-	xerr = rn.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			nsV1.ByID[as.ID] = as.Name
-			nsV1.ByName[as.Name] = as.ID
+			nsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
+			nsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
 			return nil
 		})
 	})
@@ -609,15 +607,15 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	// Starting from here, remove Subnet from Network metadata if exiting with error
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			derr := rn.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			derr := networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 					nsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 					if !ok {
 						return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
-					delete(nsV1.ByID, as.ID)
-					delete(nsV1.ByName, as.Name)
+					delete(nsV1.ByID, abstractSubnet.ID)
+					delete(nsV1.ByName, abstractSubnet.Name)
 					return nil
 				})
 			})
@@ -648,49 +646,6 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation() fail.Error {
 	return instance.updateCachedInformation()
 }
 
-func (instance *Subnet) createSecurityGroups(ctx context.Context, req abstract.SubnetRequest, an abstract.Network) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, xerr fail.Error) {
-	subnetGWSG, xerr = instance.createGWSecurityGroup(ctx, req, an)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
-	}
-	defer instance.undoCreateSecurityGroup(&xerr, req.KeepOnFailure, subnetGWSG)
-
-	subnetPublicIPSG, xerr = instance.createPublicIPSecurityGroup(ctx, req, an)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
-	}
-	defer instance.undoCreateSecurityGroup(&xerr, req.KeepOnFailure, subnetPublicIPSG)
-
-	subnetInternalSG, xerr = instance.createInternalSecurityGroup(ctx, req, an)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
-	}
-	defer instance.undoCreateSecurityGroup(&xerr, req.KeepOnFailure, subnetInternalSG)
-
-	xerr = subnetGWSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
-	}
-	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
-			if derr := subnetGWSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateways from Subnet", ActionFromError(xerr)))
-			}
-		}
-	}()
-
-	xerr = subnetInternalSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsDefault)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, nil, xerr
-	}
-
-	return subnetGWSG, subnetInternalSG, subnetPublicIPSG, nil
-}
 
 func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) fail.Error {
 	svc := instance.GetService()
@@ -1268,220 +1223,6 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 	}
 
 	return rn, an, nil
-}
-
-// createGWSecurityGroup creates a Security Group to be applied to gateways of the Subnet
-func (instance *Subnet) createGWSecurityGroup(ctx context.Context, req abstract.SubnetRequest /*Subnet abstract.Subnet,*/, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	// Creates security group for hosts in Subnet to allow internal access
-	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, req.Name, network.Name)
-
-	var sg resources.SecurityGroup
-	sg, xerr = NewSecurityGroup(instance.GetService())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	description := fmt.Sprintf(subnetGWSecurityGroupDescriptionPattern, req.Name, network.Name)
-	xerr = sg.Create(ctx, network.ID, sgName, description, nil)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
-			if derr := sg.Delete(context.Background(), true); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(xerr), req.Name))
-			}
-		}
-	}()
-
-	rules := abstract.SecurityGroupRules{
-		{
-			Description: "[ingress][ipv4][tcp] Allow SSH",
-			Direction:   securitygroupruledirection.Ingress,
-			PortFrom:    22,
-			EtherType:   ipversion.IPv4,
-			Protocol:    "tcp",
-			Sources:     []string{"0.0.0.0/0"},
-			Targets:     []string{sg.GetID()},
-		},
-		{
-			Description: "[ingress][ipv6][tcp] Allow SSH",
-			Direction:   securitygroupruledirection.Ingress,
-			PortFrom:    22,
-			EtherType:   ipversion.IPv6,
-			Protocol:    "tcp",
-			Sources:     []string{"::/0"},
-			Targets:     []string{sg.GetID()},
-		},
-		{
-			Description: "[ingress][ipv4][icmp] Allow everything",
-			Direction:   securitygroupruledirection.Ingress,
-			EtherType:   ipversion.IPv4,
-			Protocol:    "icmp",
-			Sources:     []string{"0.0.0.0/0"},
-			Targets:     []string{sg.GetID()},
-		},
-		{
-			Description: "[ingress][ipv6][icmp] Allow everything",
-			Direction:   securitygroupruledirection.Ingress,
-			EtherType:   ipversion.IPv6,
-			Protocol:    "icmp",
-			Sources:     []string{"::/0"},
-			Targets:     []string{sg.GetID()},
-		},
-	}
-	xerr = sg.AddRules(ctx, rules)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return sg, nil
-}
-
-// createPublicIPSecurityGroup creates a Security Group to be applied to host of the Subnet with public IP that is not a gateway
-func (instance *Subnet) createPublicIPSecurityGroup(ctx context.Context, req abstract.SubnetRequest /* Subnet abstract.Subnet, */, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
-	// Creates security group for hosts in Subnet to allow internal access
-	sgName := fmt.Sprintf(subnetPublicIPSecurityGroupNamePattern, req.Name, network.Name)
-
-	var sg resources.SecurityGroup
-	sg, xerr = NewSecurityGroup(instance.GetService())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	description := fmt.Sprintf(subnetPublicIPSecurityGroupDescriptionPattern, req.Name, network.Name)
-	xerr = sg.Create(ctx, network.ID, sgName, description, nil)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
-			if derr := sg.Delete(context.Background(), true); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(xerr), req.Name))
-			}
-		}
-	}()
-
-	rules := abstract.SecurityGroupRules{
-		{
-			Description: "[egress][ipv4][all] Allow everything",
-			Direction:   securitygroupruledirection.Egress,
-			EtherType:   ipversion.IPv4,
-			Sources:     []string{sg.GetID()},
-			Targets:     []string{"0.0.0.0/0"},
-		},
-		{
-			Description: "[egress][ipv6][all] Allow everything",
-			Direction:   securitygroupruledirection.Egress,
-			EtherType:   ipversion.IPv6,
-			Sources:     []string{sg.GetID()},
-			Targets:     []string{"::0/0"},
-		},
-	}
-	xerr = sg.AddRules(ctx, rules)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return sg, nil
-}
-
-// Starting from here, delete the Security Group if exiting with error
-func (instance *Subnet) undoCreateSecurityGroup(errorPtr *fail.Error, keepOnFailure bool, sg resources.SecurityGroup) {
-	if errorPtr == nil {
-		logrus.Errorf("trying to cancel an action based on the content of a nil fail.Error; cancel cannot be run")
-		return
-	}
-	if *errorPtr != nil && !keepOnFailure {
-		sgName := sg.GetName()
-		if derr := sg.Delete(context.Background(), true); derr != nil {
-			_ = (*errorPtr).AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Subnet's Security Group for gateways '%s'", ActionFromError(*errorPtr), sgName))
-		}
-	}
-}
-
-// Creates a Security Group to be applied on Hosts in Subnet to allow internal access
-func (instance *Subnet) createInternalSecurityGroup(ctx context.Context, req abstract.SubnetRequest /*Subnet abstract.Subnet, */, network abstract.Network) (_ resources.SecurityGroup, xerr fail.Error) {
-	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, req.Name, network.Name)
-
-	var sg resources.SecurityGroup
-	sg, xerr = NewSecurityGroup(instance.GetService())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	description := fmt.Sprintf(subnetInternalSecurityGroupDescriptionPattern, req.Name, network.Name)
-	xerr = sg.Create(ctx, network.ID, sgName, description, nil)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
-			if derr := sg.Delete(context.Background(), true); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Subnet's Security Group for gateways '%s'", ActionFromError(xerr), req.Name))
-			}
-		}
-	}()
-
-	// adds rules that depends on Security Group ID
-	rules := abstract.SecurityGroupRules{
-		{
-			Description: fmt.Sprintf("[egress][ipv4][all] Allow LAN traffic in %s", req.CIDR),
-			EtherType:   ipversion.IPv4,
-			Direction:   securitygroupruledirection.Egress,
-			Sources:     []string{sg.GetID()},
-			Targets:     []string{sg.GetID()},
-		},
-		{
-			Description: fmt.Sprintf("[egress][ipv6][all] Allow LAN traffic in %s", req.CIDR),
-			EtherType:   ipversion.IPv6,
-			Direction:   securitygroupruledirection.Egress,
-			Sources:     []string{sg.GetID()},
-			Targets:     []string{sg.GetID()},
-		},
-		{
-			Description: fmt.Sprintf("[ingress][ipv4][all] Allow LAN traffic in %s", req.CIDR),
-			EtherType:   ipversion.IPv4,
-			Direction:   securitygroupruledirection.Ingress,
-			Sources:     []string{sg.GetID()},
-			Targets:     []string{sg.GetID()},
-		},
-		{
-			Description: fmt.Sprintf("[ingress][ipv6][all] Allow LAN traffic in %s", req.CIDR),
-			EtherType:   ipversion.IPv6,
-			Direction:   securitygroupruledirection.Ingress,
-			Sources:     []string{sg.GetID()},
-			Targets:     []string{sg.GetID()},
-		},
-	}
-	xerr = sg.AddRules(ctx, rules)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return sg, nil
 }
 
 // unbindHostFromVIP unbinds a VIP from IPAddress
