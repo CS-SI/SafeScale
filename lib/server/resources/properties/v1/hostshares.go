@@ -84,8 +84,8 @@ func (hs *HostShare) Replace(p data.Clonable) data.Clonable {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostShares struct {
-	ByID   map[string]*HostShare `json:"by_id"`
-	ByName map[string]string     `json:"by_name"`
+	ByID   map[string]*HostShare `json:"by_id,omitempty"`
+	ByName map[string]string     `json:"by_name,omitempty"`
 }
 
 // NewHostShares ...

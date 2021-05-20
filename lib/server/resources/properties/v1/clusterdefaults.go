@@ -28,13 +28,13 @@ import (
 // !!! DEPRECATED !!! superseded by propertiesv2.ClusterDefaults
 type ClusterDefaults struct {
 	// GatewaySizing keeps the default node definition
-	GatewaySizing abstract.HostEffectiveSizing `json:"gateway_sizing"`
+	GatewaySizing abstract.HostEffectiveSizing `json:"gateway_sizing,omitempty"`
 	// MasterSizing keeps the default node definition
-	MasterSizing abstract.HostEffectiveSizing `json:"master_sizing"`
+	MasterSizing abstract.HostEffectiveSizing `json:"master_sizing,omitempty"`
 	// NodeSizing keeps the default node definition
-	NodeSizing abstract.HostEffectiveSizing `json:"node_sizing"`
+	NodeSizing abstract.HostEffectiveSizing `json:"node_sizing,omitempty"`
 	// Image keeps the default Linux image to use
-	Image string `json:"image"`
+	Image string `json:"image,omitempty"`
 }
 
 func newClusterDefaults() *ClusterDefaults {
