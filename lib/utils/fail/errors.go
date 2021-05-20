@@ -369,6 +369,10 @@ func (e *ErrWarning) Annotate(key string, value data.Annotation) data.Annotatabl
 	return e
 }
 
+func (e *ErrWarning) UnformattedError() string {
+	return e.Error()
+}
+
 // ErrTimeout defines a ErrTimeout error
 type ErrTimeout struct {
 	*errorCore
@@ -410,6 +414,10 @@ func (e *ErrTimeout) Annotate(key string, value data.Annotation) data.Annotatabl
 	return e
 }
 
+func (e *ErrTimeout) UnformattedError() string {
+	return e.Error()
+}
+
 // ErrNotFound resource not found error
 type ErrNotFound struct {
 	*errorCore
@@ -447,10 +455,14 @@ func (e *ErrNotFound) AddConsequence(err error) Error {
 func (e *ErrNotFound) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotFound.Annotate()", "from null instance", 0))
-		return e.Annotate(key, value)
+		return e
 	}
 	_ = e.errorCore.Annotate(key, value)
 	return e
+}
+
+func (e *ErrNotFound) UnformattedError() string {
+	return e.Error()
 }
 
 // ErrNotAvailable resource not available error
@@ -496,6 +508,10 @@ func (e *ErrNotAvailable) Annotate(key string, value data.Annotation) data.Annot
 	return e
 }
 
+func (e *ErrNotAvailable) UnformattedError() string {
+	return e.Error()
+}
+
 // ErrDuplicate already exists error
 type ErrDuplicate struct {
 	*errorCore
@@ -521,6 +537,10 @@ func (e *ErrDuplicate) AddConsequence(err error) Error {
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
+}
+
+func (e *ErrDuplicate) UnformattedError() string {
+	return e.Error()
 }
 
 // Annotate ...
@@ -559,6 +579,10 @@ func (e *ErrInvalidRequest) AddConsequence(err error) Error {
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
+}
+
+func (e *ErrInvalidRequest) UnformattedError() string {
+	return e.Error()
 }
 
 // Annotate overloads errorCore.Annotate() to make sure the type returned is the same as the caller
@@ -605,6 +629,10 @@ func (e *ErrSyntax) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *ErrSyntax) UnformattedError() string {
+	return e.Error()
+}
+
 // Annotate ...
 func (e *ErrSyntax) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -642,6 +670,10 @@ func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *ErrNotAuthenticated) UnformattedError() string {
+	return e.Error()
+}
+
 // Annotate ...
 func (e *ErrNotAuthenticated) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -677,6 +709,10 @@ func (e *ErrForbidden) AddConsequence(err error) Error {
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
+}
+
+func (e *ErrForbidden) UnformattedError() string {
+	return e.Error()
 }
 
 // Annotate ...
@@ -721,6 +757,10 @@ func (e *ErrAborted) AddConsequence(err error) Error {
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
+}
+
+func (e *ErrAborted) UnformattedError() string {
+	return e.Error()
 }
 
 // Annotate ...
@@ -772,6 +812,10 @@ func (e *ErrOverflow) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *ErrOverflow) UnformattedError() string {
+	return e.Error()
+}
+
 // Annotate ...
 func (e *ErrOverflow) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -807,6 +851,10 @@ func (e *ErrOverload) AddConsequence(err error) Error {
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
+}
+
+func (e *ErrOverload) UnformattedError() string {
+	return e.Error()
 }
 
 // Annotate ...
@@ -853,6 +901,10 @@ func (e *ErrNotImplemented) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *ErrNotImplemented) UnformattedError() string {
+	return e.Error()
+}
+
 // Annotate ...
 func (e *ErrNotImplemented) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -892,6 +944,10 @@ func (e *ErrRuntimePanic) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *ErrRuntimePanic) UnformattedError() string {
+	return e.Error()
+}
+
 // Annotate ...
 func (e *ErrRuntimePanic) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -929,6 +985,10 @@ func (e *ErrInvalidInstance) AddConsequence(err error) Error {
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
+}
+
+func (e *ErrInvalidInstance) UnformattedError() string {
+	return e.Error()
 }
 
 // Annotate ...
@@ -984,6 +1044,10 @@ func (e *ErrInvalidParameter) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *ErrInvalidParameter) UnformattedError() string {
+	return e.Error()
+}
+
 // Annotate ...
 func (e *ErrInvalidParameter) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -1023,6 +1087,10 @@ func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *ErrInvalidInstanceContent) UnformattedError() string {
+	return e.Error()
+}
+
 // Annotate ...
 func (e *ErrInvalidInstanceContent) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -1058,6 +1126,10 @@ func (e *ErrInconsistent) AddConsequence(err error) Error {
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
+}
+
+func (e *ErrInconsistent) UnformattedError() string {
+	return e.Error()
 }
 
 // Annotate ...
@@ -1114,6 +1186,10 @@ func (e *ErrExecution) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *ErrExecution) UnformattedError() string {
+	return e.Error()
+}
+
 // Annotate ...
 func (e *ErrExecution) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -1151,6 +1227,10 @@ func (e *ErrAlteredNothing) AddConsequence(err error) Error {
 	return e
 }
 
+func (e *ErrAlteredNothing) UnformattedError() string {
+	return e.Error()
+}
+
 // Annotate ...
 func (e *ErrAlteredNothing) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -1186,6 +1266,10 @@ func (e *ErrUnknown) AddConsequence(err error) Error {
 	}
 	_ = e.errorCore.AddConsequence(err)
 	return e
+}
+
+func (e *ErrUnknown) UnformattedError() string {
+	return e.Error()
 }
 
 // Annotate ...
