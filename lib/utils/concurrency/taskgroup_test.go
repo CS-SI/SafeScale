@@ -271,6 +271,38 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	require.True(t, true)
 }
 
+func TestOneErrorOneOk(t *testing.T) {
+	overlord, err := NewTaskGroup(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = overlord.StartInSubtask(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			rint := tools.RandomInt(30, 50)
+			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
+
+			return "waiting game", nil
+		}, nil)
+	_, err = overlord.StartInSubtask(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			rint := tools.RandomInt(30, 50)
+			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
+
+			return nil, fail.NewError("Ouch")
+		}, nil)
+	_, err = overlord.WaitGroup()
+	if err != nil {
+		repr := err.Error()
+		if !strings.Contains(repr, "Ouch") {
+			t.FailNow()
+		}
+	}
+}
+
 func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	overlord, err := NewTaskGroup(nil)
 	require.NotNil(t, overlord)
