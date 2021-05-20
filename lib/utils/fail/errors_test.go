@@ -22,6 +22,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -526,6 +527,35 @@ func TestUncategorizedError(t *testing.T) {
 
 	if !strings.Contains(tk, "uncategorized error occurred:") {
 		t.Fail()
+	}
+}
+
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+}
+
+func TestRecursiveAnnotation(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err := &ErrNotFound{nil}
+		err.Annotate("key", "value")
+		return
+	}()
+	failed := waitTimeout(&wg, 1*time.Second)
+	if failed { // It never ended
+		t.FailNow()
 	}
 }
 
