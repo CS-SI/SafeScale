@@ -181,45 +181,46 @@ var tenantMetadataCommands = &cli.Command{
 	ArgsUsage: "COMMAND",
 
 	Subcommands: []*cli.Command{
-		// tenantMetadataUpgradeCommand,
+		tenantMetadataUpgradeCommand,
 		// tenantMetadataBackupCommand,
 		// tenantMetadataRestoreCommand,
 		tenantMetadataDeleteCommand,
 	},
 }
 
-// const tenantMetadataUpgradeLabel = "upgrade"
-//
-// var tenantMetadataUpgradeCommand = &cli.Command{
-// 	Name:  tenantMetadataUpgradeLabel,
-// 	Usage: "Upgrade tenant metadata if needed",
-// 	Action: func(c *cli.Context) error {
-// 		if c.NArg() != 1 {
-// 			_ = cli.ShowSubcommandHelp(c)
-// 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
-// 		}
-//
-// 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", tenantCmdLabel, tenantMetadataCmdLabel, c.Command.Name, c.Args())
-//
-// 		clientSession, xerr := client.New(c.String("server"))
-// 		if xerr != nil {
-// 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-// 		}
-//
-// 		results, err := clientSession.Tenant.Upgrade(c.Args().First(), temporal.GetExecutionTimeout())
-// 		if err != nil {
-// 			err = fail.FromGRPCStatus(err)
-// 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
-// 		}
-// 		return clitools.SuccessResponse(results)
-// 	},
-// }
+const tenantMetadataUpgradeLabel = "upgrade"
+
+var tenantMetadataUpgradeCommand = &cli.Command{
+	Name:  tenantMetadataUpgradeLabel,
+	Usage: "Upgrade tenant metadata if needed",
+	Action: func(c *cli.Context) error {
+		if c.NArg() != 1 {
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
+		}
+
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", tenantCmdLabel, tenantMetadataCmdLabel, c.Command.Name, c.Args())
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		results, err := clientSession.Tenant.Upgrade(c.Args().First(), temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
+		}
+		return clitools.SuccessResponse(results)
+	},
+}
 
 const tenantMetadataDeleteCmdLabel = "delete"
+
 var tenantMetadataDeleteCommand = &cli.Command{
-	Name:  tenantMetadataDeleteCmdLabel,
+	Name:    tenantMetadataDeleteCmdLabel,
 	Aliases: []string{"remove", "rm", "destroy", "cleanup"},
-	Usage: "Remove SafeScale metadata (making SafeScale unable to manage resources anymore); use with caution",
+	Usage:   "Remove SafeScale metadata (making SafeScale unable to manage resources anymore); use with caution",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)

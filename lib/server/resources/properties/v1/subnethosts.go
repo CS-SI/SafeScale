@@ -24,8 +24,8 @@ import (
 
 // SubnetHosts contains information about hosts attached to the subnet
 type SubnetHosts struct {
-	ByID   map[string]string `json:"by_id"`   // list of host names, indexed by host id
-	ByName map[string]string `json:"by_name"` // list of host IDs, indexed by host name
+	ByID   map[string]string `json:"by_id,omitempty"`   // list of host names, indexed by host id
+	ByName map[string]string `json:"by_name,omitempty"` // list of host IDs, indexed by host name
 }
 
 // NewSubnetHosts ...

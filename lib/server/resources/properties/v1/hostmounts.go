@@ -104,11 +104,11 @@ func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostMounts struct {
-	LocalMountsByDevice   map[string]string           `json:"local_mounts_by_device"`  // contains local mount path, indexed by devices
-	LocalMountsByPath     map[string]*HostLocalMount  `json:"local_mounts_by_path"`    // contains HostLocalMount structs, indexed by path
-	RemoteMountsByShareID map[string]string           `json:"remote_mounts_by_device"` // contains local mount path, indexed by Share ID
-	RemoteMountsByExport  map[string]string           `json:"remote_mounts_by_export"` // contains local mount path, indexed by export
-	RemoteMountsByPath    map[string]*HostRemoteMount `json:"remote_mounts_by_path"`   // contains HostRemoteMount, indexed by path
+	LocalMountsByDevice   map[string]string           `json:"local_mounts_by_device,omitempty"`  // contains local mount path, indexed by devices
+	LocalMountsByPath     map[string]*HostLocalMount  `json:"local_mounts_by_path,omitempty"`    // contains HostLocalMount structs, indexed by path
+	RemoteMountsByShareID map[string]string           `json:"remote_mounts_by_device,omitempty"` // contains local mount path, indexed by Share ID
+	RemoteMountsByExport  map[string]string           `json:"remote_mounts_by_export,omitempty"` // contains local mount path, indexed by export
+	RemoteMountsByPath    map[string]*HostRemoteMount `json:"remote_mounts_by_path,omitempty"`   // contains HostRemoteMount, indexed by path
 }
 
 // NewHostMounts ...

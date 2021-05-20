@@ -37,13 +37,13 @@ func List(ctx context.Context, svc iaas.Service) (list []abstract.ClusterIdentit
 		return emptyList, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	objc, xerr := New(svc)
+	instance, xerr := New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	list = []abstract.ClusterIdentity{}
-	xerr = objc.Browse(ctx, func(hc *abstract.ClusterIdentity) fail.Error {
+	xerr = instance.Browse(ctx, func(hc *abstract.ClusterIdentity) fail.Error {
 		list = append(list, *hc)
 		return nil
 	})

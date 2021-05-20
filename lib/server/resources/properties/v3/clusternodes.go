@@ -35,20 +35,20 @@ type ClusterNode struct {
 // ClusterNodes contains all the nodes created in the cluster
 // Not frozen yet
 type ClusterNodes struct {
-	Masters           []uint                `json:"masters"`
-	MasterByName      map[string]uint       `json:"master_by_name"`
-	MasterByID        map[string]uint       `json:"master_by_id"`
-	PrivateNodes      []uint                `json:"private_nodes"`
-	PrivateNodeByName map[string]uint       `json:"private_node_by_name"`
-	PrivateNodeByID   map[string]uint       `json:"private_node_by_id"`
-	PublicNodes       []uint                `json:"public_nodes"`
-	PublicNodeByName  map[string]uint       `json:"public_node_by_name"`
-	PublicNodeByID    map[string]uint       `json:"public_node_by_id"`
-	ByNumericalID     map[uint]*ClusterNode `json:"host_by_numeric_id"` // maps *ClusterNode with NumericalID
-	MasterLastIndex   int                   `json:"master_last_index"`  // is used to keep the index associated to the name of the last created master
-	PrivateLastIndex  int                   `json:"private_last_index"` // is used to keep the index associated to the name of the last created private node
-	PublicLastIndex   int                   `json:"public_last_index"`  // is used to keep the index associated to the name of the last created public node
-	GlobalLastIndex   uint                  `json:"global_last_index"`  // is used to keep the index associated to the last created ClusterNode (being master or node)
+	Masters           []uint                `json:"masters,omitempty"`
+	MasterByName      map[string]uint       `json:"master_by_name,omitempty"`
+	MasterByID        map[string]uint       `json:"master_by_id,omitempty"`
+	PrivateNodes      []uint                `json:"private_nodes,omitempty"`
+	PrivateNodeByName map[string]uint       `json:"private_node_by_name,omitempty"`
+	PrivateNodeByID   map[string]uint       `json:"private_node_by_id,omitempty"`
+	PublicNodes       []uint                `json:"public_nodes,omitempty"`
+	PublicNodeByName  map[string]uint       `json:"public_node_by_name,omitempty"`
+	PublicNodeByID    map[string]uint       `json:"public_node_by_id,omitempty"`
+	ByNumericalID     map[uint]*ClusterNode `json:"host_by_numeric_id,omitempty"` // maps *ClusterNode with NumericalID
+	MasterLastIndex   int                   `json:"master_last_index,omitempty"`  // is used to keep the index associated to the name of the last created master
+	PrivateLastIndex  int                   `json:"private_last_index,omitempty"` // is used to keep the index associated to the name of the last created private node
+	PublicLastIndex   int                   `json:"public_last_index,omitempty"`  // is used to keep the index associated to the name of the last created public node
+	GlobalLastIndex   uint                  `json:"global_last_index,omitempty"`  // is used to keep the index associated to the last created ClusterNode (being master or node)
 }
 
 func newClusterNodes() *ClusterNodes {

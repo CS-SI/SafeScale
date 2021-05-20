@@ -32,12 +32,12 @@ type ClusterNode struct {
 
 // ClusterNodes ...
 type ClusterNodes struct {
-	Masters          []*ClusterNode `json:"masters"`                 // Masters contains the ID of the masters
-	PublicNodes      []*ClusterNode `json:"public_nodes,omitempty"`  // PublicNodes is a slice of IDs of the public cluster nodes
-	PrivateNodes     []*ClusterNode `json:"private_nodes,omitempty"` // PrivateNodes is a slice of IDs of the private cluster nodes
-	MasterLastIndex  int            `json:"master_last_index"`       // MasterLastIndex
-	PrivateLastIndex int            `json:"private_last_index"`      // PrivateLastIndex
-	PublicLastIndex  int            `json:"public_last_index"`       // PublicLastIndex
+	Masters          []*ClusterNode `json:"masters,omitempty"`            // Masters contains the ID of the masters
+	PublicNodes      []*ClusterNode `json:"public_nodes,omitempty"`       // PublicNodes is a slice of IDs of the public cluster nodes
+	PrivateNodes     []*ClusterNode `json:"private_nodes,omitempty"`      // PrivateNodes is a slice of IDs of the private cluster nodes
+	MasterLastIndex  int            `json:"master_last_index,omitempty"`  // MasterLastIndex
+	PrivateLastIndex int            `json:"private_last_index,omitempty"` // PrivateLastIndex
+	PublicLastIndex  int            `json:"public_last_index,omitempty"`  // PublicLastIndex
 }
 
 func newClusterNodes() *ClusterNodes {

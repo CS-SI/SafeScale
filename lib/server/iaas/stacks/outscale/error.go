@@ -95,6 +95,8 @@ func qualifyFromCode(code, details string) fail.Error {
 		return fail.DuplicateError("network already exist")
 	case "10022":
 		return fail.OverloadError("VPC quota exceeded")
+	case "10029":
+		return fail.OverloadError("CPU quota exceeded")
 	case "10042":
 		return fail.OverloadError("memory quota exceeded")
 	}

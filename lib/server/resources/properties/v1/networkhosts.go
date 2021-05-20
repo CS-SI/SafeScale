@@ -24,8 +24,8 @@ import (
 
 // NetworkHosts contains information about hosts connected to the network
 type NetworkHosts struct {
-	ByID   map[string]string `json:"by_id"`   // list of host names, indexed by host id
-	ByName map[string]string `json:"by_name"` // list of host IDs, indexed by host name
+	ByID   map[string]string `json:"by_id,omitempty"`   // list of host names, indexed by host id
+	ByName map[string]string `json:"by_name,omitempty"` // list of host IDs, indexed by host name
 }
 
 // NewNetworkHosts ...

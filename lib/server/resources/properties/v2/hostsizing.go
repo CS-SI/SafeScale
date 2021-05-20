@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package propertiesv1
+package propertiesv2
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
@@ -27,12 +27,14 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostSizingRequirements struct {
-	Cores     int     `json:"cores,omitempty"`
-	RAMSize   float32 `json:"ram_size,omitempty"`
-	DiskSize  int     `json:"disk_size,omitempty"`
-	GPUNumber int     `json:"gpu_number,omitempty"`
-	GPUType   string  `json:"gpu_type,omitempty"`
-	CPUFreq   float32 `json:"cpu_freq,omitempty"`
+	MinCores    int     `json:"min_cores,omitempty"`
+	MaxCores    int     `json:"max_cores,omitempty"`
+	MinRAMSize  float32 `json:"min_ram_size,omitempty"`
+	MaxRAMSize  float32 `json:"max_ram_size,omitempty"`
+	MinDiskSize int     `json:"min_disk_size,omitempty"`
+	MinGPU      int     `json:"min_gpu,omitempty"`
+	MinCPUFreq  float32 `json:"min_freq,omitempty"`
+	Replaceable bool    `json:"replaceable,omitempty"` // Tells if we accept host that could be removed without notice (AWS proposes such kind of server knowned as SPOT)
 }
 
 // NewHostSizingRequirements ...
@@ -99,17 +101,13 @@ func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
 
 	src := p.(*HostSizing)
 	hs.RequestedSize = NewHostSizingRequirements()
-	if src.RequestedSize != nil {
-		*hs.RequestedSize = *src.RequestedSize
-	}
+	*hs.RequestedSize = *src.RequestedSize
 	hs.AllocatedSize = NewHostEffectiveSizing()
-	if src.AllocatedSize != nil {
-		*hs.AllocatedSize = *src.AllocatedSize
-	}
+	*hs.AllocatedSize = *src.AllocatedSize
 	hs.Template = src.Template
 	return hs
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", string(hostproperty.SizingV1), NewHostSizing())
+	serialize.PropertyTypeRegistry.Register("resources.host", string(hostproperty.SizingV2), NewHostSizing())
 }
