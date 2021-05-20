@@ -20,15 +20,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
-
 	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaults_Clone(t *testing.T) {
 	ct := newClusterDefaults()
 	ct.Image = "something"
-	ct.GatewaySizing = propertiesv1.HostSizingRequirements{
+	ct.GatewaySizing = HostSizingRequirements{
 		MinCores: 3,
 		MinGPU:   1,
 	}
