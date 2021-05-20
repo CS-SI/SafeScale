@@ -295,9 +295,9 @@ func (instance *Cluster) firstLight(req abstract.ClusterRequest) fail.Error {
 				return fail.InconsistentError("'*propertiesv2.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(req.GatewaysDef)
-			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(req.MastersDef)
-			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(req.NodesDef)
+			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.GatewaysDef)
+			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
+			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
 			defaultsV2.Image = req.NodesDef.Image
 			return nil
 		})
@@ -490,9 +490,9 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 				return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(*gatewaysDef)
-			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(*mastersDef)
-			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV1(*nodesDef)
+			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*gatewaysDef)
+			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*mastersDef)
+			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*nodesDef)
 			defaultsV2.Image = imageID
 			return nil
 		})

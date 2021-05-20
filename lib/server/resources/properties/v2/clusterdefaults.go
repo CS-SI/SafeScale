@@ -18,7 +18,6 @@ package propertiesv2
 
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -26,10 +25,10 @@ import (
 // ClusterDefaults ...
 // !!! FROZEN !!!
 type ClusterDefaults struct {
-	GatewaySizing propertiesv1.HostSizingRequirements `json:"gateway_sizing"` // GatewaySizing keeps the default node definition
-	MasterSizing  propertiesv1.HostSizingRequirements `json:"master_sizing"`  // MasterSizing keeps the default node definition
-	NodeSizing    propertiesv1.HostSizingRequirements `json:"node_sizing"`    // NodeSizing keeps the default node definition
-	Image         string                              `json:"image"`          // Image keeps the default Linux image to use
+	GatewaySizing HostSizingRequirements `json:"gateway_sizing,omitempty"` // GatewaySizing keeps the default node definition
+	MasterSizing  HostSizingRequirements `json:"master_sizing,omitempty"`  // MasterSizing keeps the default node definition
+	NodeSizing    HostSizingRequirements `json:"node_sizing,omitempty"`    // NodeSizing keeps the default node definition
+	Image         string                 `json:"image,omitempty"`          // Image keeps the default Linux image to use
 }
 
 func newClusterDefaults() *ClusterDefaults {

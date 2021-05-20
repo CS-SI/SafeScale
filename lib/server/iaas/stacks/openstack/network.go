@@ -217,7 +217,7 @@ func (s Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 
 	// At this point, no network has been found with given reference
 	errNotFound := abstract.ResourceNotFoundError("network", id)
-	logrus.Debug(errNotFound)
+	// logrus.Debug(errNotFound)
 	return nullAN, errNotFound
 }
 
@@ -262,6 +262,7 @@ func (s Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	if xerr != nil {
 		return emptySlice, xerr
 	}
+
 	return netList, nil
 }
 
@@ -403,8 +404,9 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 		if xerr != nil {
 			derr := s.DeleteSubnet(subnet.ID)
 			if derr != nil {
-				logrus.Warnf("Error deleting subnet: %v", derr)
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", subnet.Name))
+				wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", subnet.Name)
+				logrus.Error(wrapErr.Error())
+				_ = xerr.AddConsequence(wrapErr)
 			}
 		}
 	}()
@@ -423,8 +425,9 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 			if xerr != nil {
 				derr := s.deleteRouter(router.ID)
 				if derr != nil {
-					logrus.Warnf("Error deleting router: %v", derr)
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", router.Name))
+					wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", router.Name)
+					_ = xerr.AddConsequence(wrapErr)
+					logrus.Error(wrapErr.Error())
 				}
 			}
 		}()
@@ -556,9 +559,9 @@ func (s Stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 		msg := "more than one Subnet named '%s' found"
 		if an != nil {
 			msg += " in Network '%s'"
-			return nullAS, fail.NotFoundError(msg, name, an.Name)
+			return nullAS, fail.DuplicateError(msg, name, an.Name)
 		}
-		return nullAS, fail.NotFoundError(msg, name)
+		return nullAS, fail.DuplicateError(msg, name)
 	}
 }
 
@@ -689,7 +692,8 @@ func (s Stack) createRouter(req RouterRequest) (*Router, fail.Error) {
 	if xerr != nil {
 		return nil, xerr
 	}
-	logrus.Debugf("Router '%s' (%s) successfully created", router.Name, router.ID)
+
+	logrus.Debugf("Openstack router '%s' (%s) successfully created", router.Name, router.ID)
 	return &Router{
 		ID:        router.ID,
 		Name:      router.Name,

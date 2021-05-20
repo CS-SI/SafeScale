@@ -128,9 +128,9 @@ func HostSizingRequirementsFromAbstractToProtocol(src abstract.HostSizingRequire
 	}
 }
 
-// HostSizingRequirementsFromAbstractToPropertyV1 ...
-func HostSizingRequirementsFromAbstractToPropertyV1(src abstract.HostSizingRequirements) *propertiesv1.HostSizingRequirements {
-	return &propertiesv1.HostSizingRequirements{
+// HostSizingRequirementsFromAbstractToPropertyV2 ...
+func HostSizingRequirementsFromAbstractToPropertyV2(src abstract.HostSizingRequirements) *propertiesv2.HostSizingRequirements {
+	return &propertiesv2.HostSizingRequirements{
 		MinCores:    src.MinCores,
 		MaxCores:    src.MaxCores,
 		MinRAMSize:  src.MinRAMSize,
@@ -157,9 +157,9 @@ func VirtualIPFromAbstractToProtocol(in abstract.VirtualIP) *protocol.VirtualIp 
 	return &out
 }
 
-// HostEffectiveSizingFromAbstractToPropertyV1 ...
-func HostEffectiveSizingFromAbstractToPropertyV1(ahes *abstract.HostEffectiveSizing) *propertiesv1.HostEffectiveSizing {
-	phes := propertiesv1.NewHostEffectiveSizing()
+// HostEffectiveSizingFromAbstractToPropertyV2 ...
+func HostEffectiveSizingFromAbstractToPropertyV2(ahes *abstract.HostEffectiveSizing) *propertiesv2.HostEffectiveSizing {
+	phes := propertiesv2.NewHostEffectiveSizing()
 	phes.Cores = ahes.Cores
 	phes.RAMSize = ahes.RAMSize
 	phes.DiskSize = ahes.DiskSize

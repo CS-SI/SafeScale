@@ -19,6 +19,7 @@ package listeners
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/metadataupgrade"
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -32,7 +33,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
-
 
 // TenantListener server is used to implement SafeScale.safescale.
 type TenantListener struct{}
@@ -247,57 +247,59 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot upgrade tenant")
 
-	return nil, fail.NotImplementedError("metadata upgrade coming soon")
-	// if s == nil {
-	// 	return nil, fail.InvalidInstanceError()
-	// }
-	// if ctx == nil {
-	// 	return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	// }
-	// if in == nil {
-	// 	return nil, fail.InvalidParameterError("in", "cannot be nil")
-	// }
-	//
-	// ok, err := govalidator.ValidateStruct(in)
-	// if err != nil || !ok {
-	// 	logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-	// }
-	//
-	// job, xerr := PrepareJobWithoutService(ctx, "tenant metadata upgrade")
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	// defer job.Close()
-	//
-	// name := in.GetName()
-	// tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
-	// defer tracer.Exiting()
-	// defer fail.OnExitLogError(&err, tracer.TraceMessage())
-	//
-	// // Not setting metadataVersion prevents to overwrite current version file if it exists...
-	// svc, xerr := iaas.UseService(name, "")
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// var currentVersion string
-	// if !in.Force {
-	// 	currentVersion, xerr = operations.CheckMetadataVersion(svc)
-	// 	if xerr != nil {
-	// 		switch xerr.(type) {
-	// 		case *fail.ErrForbidden, *fail.ErrNotFound:
-	// 			// continue
-	// 		default:
-	// 			return nil, xerr
-	// 		}
-	// 	}
-	// }
-	//
-	// xerr = metadataupgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-	//
-	// return nil, nil
+	if s == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+	}
+	if in == nil {
+		return nil, fail.InvalidParameterError("in", "cannot be nil")
+	}
+
+	ok, err := govalidator.ValidateStruct(in)
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	}
+
+	job, xerr := PrepareJobWithoutService(ctx, "tenant metadata upgrade")
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer job.Close()
+
+	name := in.GetName()
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	// Not setting metadataVersion prevents to overwrite current version file if it exists...
+	svc, xerr := iaas.UseService(name, "")
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var currentVersion string
+	if !in.Force {
+		currentVersion, xerr = operations.CheckMetadataVersion(svc)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrForbidden, *fail.ErrNotFound:
+				// continue
+			default:
+				return nil, xerr
+			}
+		}
+	}
+
+	xerr = metadataupgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return &protocol.TenantUpgradeResponse{}, nil
 }
