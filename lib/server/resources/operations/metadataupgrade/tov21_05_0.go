@@ -118,13 +118,13 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 				return innerXErr
 			}
 
-			abstractSubnet, xerr := svc.InspectSubnetByName(networkName, subnetName)
-			if xerr != nil {
-				switch xerr.(type) {
+			abstractSubnet, innerXErr := svc.InspectSubnetByName(networkName, subnetName)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					return fail.NotFoundError("cannot create Subnet '%s' metadata: Subnet resource does not exist", subnetName)
 				default:
-					return fail.Wrap(xerr, "cannot create Subnet '%s' metadata", subnetName)
+					return fail.Wrap(innerXErr, "cannot create Subnet '%s' metadata", subnetName)
 				}
 			}
 
@@ -138,13 +138,80 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 			if abstractNetwork.SecondaryGatewayID != "" {
 				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.SecondaryGatewayID)
 			}
-			xerr = subnetInstance.(*operations.Subnet).Carry(abstractSubnet)
-			xerr = debug.InjectPlannedFail(xerr)
+
+			innerXErr = subnetInstance.(*operations.Subnet).Carry(abstractSubnet)
+			innerXErr = debug.InjectPlannedFail(innerXErr)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			defer subnetInstance.Released()
+
+			// -- create Security groups --
+			gwSG, internalSG, publicSG, xerr := subnetInstance.(*operations.Subnet).UnsafeCreateSecurityGroups(context.Background(), instance, false)
 			if xerr != nil {
 				return xerr
 			}
 
-			defer subnetInstance.Released()
+			defer func() {
+				if innerXErr != nil {
+					sgName := gwSG.GetName()
+					derr := gwSG.Delete(context.Background(), true)
+					if derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+					}
+
+					sgName = internalSG.GetName()
+					derr = internalSG.Delete(context.Background(), true)
+					if derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+					}
+
+					sgName = publicSG.GetName()
+					derr = publicSG.Delete(context.Background(), true)
+					if derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+					}
+				} else {
+					gwSG.Released()
+					internalSG.Released()
+					publicSG.Released()
+				}
+			}()
+
+			// -- register security groups in Subnet --
+			innerXErr = subnetInstance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				abstractSubnet, ok := clonable.(*abstract.Subnet)
+				if !ok {
+					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				abstractSubnet.GWSecurityGroupID = gwSG.GetID()
+				abstractSubnet.InternalSecurityGroupID = internalSG.GetID()
+				abstractSubnet.PublicIPSecurityGroupID = publicSG.GetID()
+				return nil
+			})
+			if innerXErr != nil {
+				sgName := gwSG.GetName()
+				derr := gwSG.Delete(context.Background(), true)
+				if derr != nil {
+					_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+				}
+
+				sgName = internalSG.GetName()
+				derr = internalSG.Delete(context.Background(), true)
+				if derr != nil {
+					_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+				}
+
+				sgName = publicSG.GetName()
+				derr = publicSG.Delete(context.Background(), true)
+				if derr != nil {
+					_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+				}
+
+				return innerXErr
+			}
 
 			// -- add reference to subnet in network properties --
 			innerXErr = props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -161,7 +228,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 			}
 
 			// -- transfer Hosts attached to Network to Subnet --
-			xerr = props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			innerXErr = props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 				networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
@@ -188,7 +255,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 			}
 
 			// --- Clear deprecated properties ---
-			xerr = props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			innerXErr = props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 				networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
@@ -198,6 +265,9 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) 
 				networkHostsV1.ByID = nil
 				return nil
 			})
+			if innerXErr != nil {
+				return innerXErr
+			}
 
 			// -- finally clear deprecated field of abstractNetwork --
 			abstractNetwork.VIP = nil
@@ -308,21 +378,21 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 
 				hostSizingV2.Template = hostSizingV1.Template
 				hostSizingV2.RequestedSize = &propertiesv2.HostSizingRequirements{
-					MinCores: hostSizingV1.RequestedSize.Cores,
-					MaxCores: hostSizingV1.RequestedSize.Cores*2-1,
-					MinRAMSize: hostSizingV1.RequestedSize.RAMSize,
-					MaxRAMSize: hostSizingV1.RequestedSize.RAMSize*2-1.0,
+					MinCores:    hostSizingV1.RequestedSize.Cores,
+					MaxCores:    hostSizingV1.RequestedSize.Cores*2 - 1,
+					MinRAMSize:  hostSizingV1.RequestedSize.RAMSize,
+					MaxRAMSize:  hostSizingV1.RequestedSize.RAMSize*2 - 1.0,
 					MinDiskSize: hostSizingV1.RequestedSize.DiskSize,
-					MinGPU: hostSizingV1.RequestedSize.GPUNumber,
-					MinCPUFreq: hostSizingV1.RequestedSize.CPUFreq,
+					MinGPU:      hostSizingV1.RequestedSize.GPUNumber,
+					MinCPUFreq:  hostSizingV1.RequestedSize.CPUFreq,
 				}
 				hostSizingV2.AllocatedSize = &propertiesv2.HostEffectiveSizing{
-					Cores: hostSizingV1.AllocatedSize.Cores,
-					RAMSize: hostSizingV1.AllocatedSize.RAMSize,
-					DiskSize: hostSizingV1.AllocatedSize.DiskSize,
+					Cores:     hostSizingV1.AllocatedSize.Cores,
+					RAMSize:   hostSizingV1.AllocatedSize.RAMSize,
+					DiskSize:  hostSizingV1.AllocatedSize.DiskSize,
 					GPUNumber: hostSizingV1.AllocatedSize.GPUNumber,
-					GPUType: hostSizingV1.AllocatedSize.GPUType,
-					CPUFreq: hostSizingV1.AllocatedSize.CPUFreq,
+					GPUType:   hostSizingV1.AllocatedSize.GPUType,
+					CPUFreq:   hostSizingV1.AllocatedSize.CPUFreq,
 				}
 				return nil
 			})
