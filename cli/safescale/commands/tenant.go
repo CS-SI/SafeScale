@@ -216,10 +216,11 @@ var tenantMetadataUpgradeCommand = &cli.Command{
 }
 
 const tenantMetadataDeleteCmdLabel = "delete"
+
 var tenantMetadataDeleteCommand = &cli.Command{
-	Name:  tenantMetadataDeleteCmdLabel,
+	Name:    tenantMetadataDeleteCmdLabel,
 	Aliases: []string{"remove", "rm", "destroy", "cleanup"},
-	Usage: "Remove SafeScale metadata (making SafeScale unable to manage resources anymore); use with caution",
+	Usage:   "Remove SafeScale metadata (making SafeScale unable to manage resources anymore); use with caution",
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)

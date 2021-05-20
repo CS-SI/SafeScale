@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-
 // TenantListener server is used to implement SafeScale.safescale.
 type TenantListener struct{}
 
