@@ -84,6 +84,11 @@ func (el *ErrorList) Error() string {
 	return r
 }
 
+// FIXME: All other errors MUST also override UnformattedError
+func (el *ErrorList) UnformattedError() string {
+	return el.Error()
+}
+
 // ToErrorSlice transforms ErrorList to []error
 func (el *ErrorList) ToErrorSlice() []error {
 	if el.IsNull() {
