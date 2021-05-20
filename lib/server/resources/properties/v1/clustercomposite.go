@@ -25,7 +25,7 @@ import (
 // ClusterComposite ...
 type ClusterComposite struct {
 	// Array of tenants hosting a multi-tenant cluster (multi starting from 1)
-	Tenants []string `json:"tenants"`
+	Tenants []string `json:"tenants,omitempty"`
 }
 
 func newClusterComposite() *ClusterComposite {

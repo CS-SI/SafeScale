@@ -26,11 +26,11 @@ import (
 // !!! FROZEN !!!
 // !!! DEPRECATED !!! superseded by propertiesv2.ClusterNetwork
 type ClusterNetwork struct {
-	NetworkID string `json:"network_id"` // contains the ID of the network
-	GatewayID string `json:"gateway_id"` // DEPRECATED
-	GatewayIP string `json:"gateway_ip"` // DEPRECATED
-	PublicIP  string `json:"public_ip"`  // DEPRECATED
-	CIDR      string `json:"cidr"`       // the network CIDR
+	NetworkID string `json:"network_id,omitempty"` // contains the ID of the network
+	GatewayID string `json:"gateway_id,omitempty"` // DEPRECATED
+	GatewayIP string `json:"gateway_ip,omitempty"` // DEPRECATED
+	PublicIP  string `json:"public_ip,omitempty"`  // DEPRECATED
+	CIDR      string `json:"cidr,omitempty"`       // the network CIDR
 }
 
 func newClusterNetwork() *ClusterNetwork {

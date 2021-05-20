@@ -30,9 +30,9 @@ import (
 //       Create a new version instead with needed supplemental fields
 type VolumeDescription struct {
 	// Purpose contains the reason of the existence of the volume
-	Purpose string
+	Purpose string `json:"purpose,omitempty"`
 	// Created contains the time of creation of the volume
-	Created time.Time
+	Created time.Time `json:"created,omitempty"`
 }
 
 // NewVolumeDescription ...

@@ -28,8 +28,8 @@ import (
 //       Create a new version instead with needed supplemental fields
 type SecurityGroupSubnets struct {
 	DefaultFor string                        `json:"default_for,omitempty"` // contains the ID of the subnet for which the Security Group is default
-	ByID       map[string]*SecurityGroupBond `json:"by_id"`                 // contains the bonds of a Security Group with Subnets using it, indexed on Subnets' ID
-	ByName     map[string]string             `json:"by_name"`               // contains the Subnets' ID indexed on Subnets' Name
+	ByID       map[string]*SecurityGroupBond `json:"by_id,omitempty"`       // contains the bonds of a Security Group with Subnets using it, indexed on Subnets' ID
+	ByName     map[string]string             `json:"by_name,omitempty"`     // contains the Subnets' ID indexed on Subnets' Name
 }
 
 // NewSecurityGroupSubnets ...

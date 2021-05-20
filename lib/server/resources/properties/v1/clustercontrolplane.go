@@ -28,7 +28,7 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type ClusterControlplane struct {
-	VirtualIP *abstract.VirtualIP `json:"virtual_ip"` // contains the VirtualIP used to contact the control plane when HA is enabled
+	VirtualIP *abstract.VirtualIP `json:"virtual_ip,omitempty"` // contains the VirtualIP used to contact the control plane when HA is enabled
 }
 
 func newClusterControlPlane() *ClusterControlplane {

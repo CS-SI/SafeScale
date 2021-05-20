@@ -22,8 +22,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
-// HostSecurityGroups contains a list of security groups binded to the host
-// not FROZEN yet
+// HostSecurityGroups contains a list of security groups bound to the host
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type HostSecurityGroups struct {
