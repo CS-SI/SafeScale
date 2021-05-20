@@ -53,7 +53,7 @@ func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
 
 	// -- check mutators are all available
 	var (
-		mutatorList []Mutator
+		mutatorList     []Mutator
 		fromVersionList []string
 	)
 	for {
@@ -93,7 +93,7 @@ func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
 		return xerr
 	}
 
-	xerr = folder.Write("", "version", []byte(to), data.NewImmutableKeyValue("doNotCrypt", true),)
+	xerr = folder.Write("", "version", []byte(to), data.NewImmutableKeyValue("doNotCrypt", true))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to update content of '/version' file in metadata bucket")
