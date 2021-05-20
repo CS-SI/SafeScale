@@ -185,7 +185,7 @@ func ClusterNodeFromPropertyToProtocol(in propertiesv3.ClusterNode) *protocol.Ho
 }
 
 // ClusterDefaultsPropertyV1ToV2 converts propertiesv1.ClusterDefaults to propertiesv2.ClusterDefaults
-func ClusterDefaultsPropertyV1ToV2(in *propertiesv1.ClusterDefaults) *propertiesv2.ClusterDefaults{
+func ClusterDefaultsPropertyV1ToV2(in *propertiesv1.ClusterDefaults) *propertiesv2.ClusterDefaults {
 	out := &propertiesv2.ClusterDefaults{
 		Image: in.Image,
 		GatewaySizing: propertiesv2.HostSizingRequirements{

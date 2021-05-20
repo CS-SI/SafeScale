@@ -170,7 +170,7 @@ func (f MetadataFolder) Delete(path string, name string) fail.Error {
 // returns true, nil if the object has been found
 // returns false, fail.Error if an error occured (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options... data.ImmutableKeyValue) fail.Error {
+func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...data.ImmutableKeyValue) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
