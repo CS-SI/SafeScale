@@ -2072,8 +2072,13 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 	xerr = rh.Delete(context.Background())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Errorf(prefix + fmt.Sprintf("failed to delete Host '%s'", hostName))
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			logrus.Debugf("Node %s not found, deletion considered success", hostName)
+			return nil, nil
+		default:
+			return nil, xerr
+		}
 	}
 
 	logrus.Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
@@ -2220,8 +2225,13 @@ func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 	xerr = hostInstance.Delete(context.Background())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Errorf(prefix + fmt.Sprintf("failed to delete Host '%s'", hostName))
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			logrus.Debugf("Host %s not found, deletion considered success", hostName)
+			return nil, nil
+		default:
+			return nil, xerr
+		}
 	}
 
 	logrus.Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
