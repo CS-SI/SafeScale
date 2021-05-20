@@ -90,7 +90,7 @@ func NewCluster(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	coreInstance, xerr := NewCore(svc, "Cluster", clustersFolderName, &abstract.ClusterIdentity{})
+	coreInstance, xerr := NewCore(svc, clusterKind, clustersFolderName, &abstract.ClusterIdentity{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -923,14 +923,14 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	_, xerr = taskGroup.Start(instance.taskStartHost, gatewayID)
+	_, xerr = taskGroup.StartInSubtask(instance.taskStartHost, gatewayID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
 	if secondaryGatewayID != "" {
-		_, xerr = taskGroup.Start(instance.taskStartHost, secondaryGatewayID)
+		_, xerr = taskGroup.StartInSubtask(instance.taskStartHost, secondaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -939,7 +939,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 
 	// Start masters
 	for _, n := range masters {
-		_, xerr = taskGroup.Start(instance.taskStartHost, n)
+		_, xerr = taskGroup.StartInSubtask(instance.taskStartHost, n)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -947,7 +947,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 	}
 	// Start nodes
 	for _, n := range nodes {
-		_, xerr = taskGroup.Start(instance.taskStartHost, n)
+		_, xerr = taskGroup.StartInSubtask(instance.taskStartHost, n)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1121,22 +1121,22 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 		}
 
 		for _, n := range nodes {
-			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
+			if _, innerXErr = taskGroup.StartInSubtask(instance.taskStopHost, n); innerXErr != nil {
 				return innerXErr
 			}
 		}
 		// Stop masters
 		for _, n := range masters {
-			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
+			if _, innerXErr = taskGroup.StartInSubtask(instance.taskStopHost, n); innerXErr != nil {
 				return innerXErr
 			}
 		}
 		// Stop gateway(s)
-		if _, innerXErr = taskGroup.Start(instance.taskStopHost, gatewayID); innerXErr != nil {
+		if _, innerXErr = taskGroup.StartInSubtask(instance.taskStopHost, gatewayID); innerXErr != nil {
 			return innerXErr
 		}
 		if secondaryGatewayID != "" {
-			if _, innerXErr = taskGroup.Start(instance.taskStopHost, secondaryGatewayID); innerXErr != nil {
+			if _, innerXErr = taskGroup.StartInSubtask(instance.taskStopHost, secondaryGatewayID); innerXErr != nil {
 				return innerXErr
 			}
 		}
@@ -1217,14 +1217,19 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		return nil, fail.InvalidParameterError("count", "must be an int > 0")
 	}
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	tgo, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if task.Aborted() {
+	if tgo.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
+	}
+
+	task, err := concurrency.NewTaskGroupWithParent(tgo)
+	if err != nil {
+		return nil, err
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", count)
@@ -1277,41 +1282,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute
 
-	var subtasks []concurrency.Task
-	for i := uint(0); i < count; i++ {
-		if task.Aborted() {
-			return nil, fail.AbortedError(nil, "aborted")
-		}
-
-		subtask, xerr := task.StartInSubtask(instance.taskCreateNode, taskCreateNodeParameters{
-			index:         i + 1,
-			nodeDef:       nodeDef,
-			timeout:       timeout,
-			keepOnFailure: false,
-		})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		subtasks = append(subtasks, subtask)
-	}
-	for _, s := range subtasks {
-		res, err := s.Wait()
-		err = debug.InjectPlannedFail(err)
-		if err != nil {
-			errors = append(errors, err.Error())
-		} else {
-			if res != nil {
-				hosts = append(hosts, res.(resources.Host))
-			} else {
-				errors = append(errors, "unknown error creating a node") // FIXME: This is a Task issue
-			}
-		}
-	}
-
-	// Starting from here, delete nodes if exiting with error
-	newHosts := hosts
+	var newHosts []resources.Host
 	defer func() {
 		if xerr != nil && len(newHosts) > 0 {
 			logrus.Debugf("Cleaning up on failure, deleting Nodes...")
@@ -1323,10 +1294,29 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			}
 		}
 	}()
-
-	if len(errors) > 0 {
-		xerr = fail.NewError("errors occurred on %s node%s addition: %s", nodeTypeStr, strprocess.Plural(uint(len(errors))), strings.Join(errors, "\n"))
-		return nil, xerr
+	for i := uint(0); i < count; i++ {
+		_, xerr := task.StartInSubtask(instance.taskCreateNode, taskCreateNodeParameters{
+			index:         i + 1,
+			nodeDef:       nodeDef,
+			timeout:       timeout,
+			keepOnFailure: false,
+		})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+	res, err := task.WaitGroup()
+	if res != nil {
+		for _, v := range res {
+			if aHost, ok := v.(resources.Host); ok {
+				newHosts = append(newHosts, aHost)
+			}
+		}
+	}
+	err = debug.InjectPlannedFail(err)
+	if err != nil {
+		return nil, fail.NewErrorWithCause(err, "errors occurred on %s node%s addition", nodeTypeStr, strprocess.Plural(uint(len(errors))))
 	}
 
 	// Now configure new nodes
@@ -2368,14 +2358,19 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (xerr fail.Erro
 func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	task, xerr := concurrency.TaskFromContext(ctx)
+	tog, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	if task.Aborted() {
+	if tog.Aborted() {
 		return fail.AbortedError(nil, "aborted")
+	}
+
+	task, err := concurrency.NewTaskGroupWithParent(tog)
+	if err != nil {
+		return err
 	}
 
 	var cleaningErrors []error
@@ -2467,37 +2462,25 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 
 	if nodeCount > 0 {
 		for _, v := range nodes {
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
-			}
-
 			if n, ok := all[v]; ok {
-				// subtask, xerr := task.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: n})
-				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, options...)
+				_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, options...)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
 					break
 				}
-				// subtasks = append(subtasks, subtask)
 			}
 		}
 	}
 	if masterCount > 0 {
 		for _, v := range masters {
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
-			}
-
 			if n, ok := all[v]; ok {
-				// subtask, xerr := task.StartInSubtask(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n})
-				_, xerr := tg.Start(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, options...)
+				_, xerr := tg.StartInSubtask(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, options...)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
 					break
 				}
-				// subtasks = append(subtasks, subtask)
 			}
 		}
 	}
@@ -2537,11 +2520,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 
 	if allCount > 0 {
 		for _, v := range all {
-			if task.Aborted() {
-				return fail.AbortedError(nil, "aborted")
-			}
-
-			_, xerr = task.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: v})
+			_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: v})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", v.Name))
@@ -2811,52 +2790,37 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 }
 
 // configureNodesFromList configures nodes from a list
-func (instance *Cluster) configureNodesFromList(task concurrency.Task, hosts []resources.Host) (xerr fail.Error) {
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
+func (instance *Cluster) configureNodesFromList(tgo concurrency.Task, hosts []resources.Host) (xerr fail.Error) {
+	tracer := debug.NewTracer(tgo, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
-	if task.Aborted() {
+	if tgo.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	var (
-		hostID string
-		errs   []error
-	)
+	task, err := concurrency.NewTaskGroupWithParent(tgo)
+	if err != nil {
+		return err
+	}
 
-	var subtasks []concurrency.Task
 	length := len(hosts)
 	for i := 0; i < length; i++ {
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
-
-		subtask, err := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
+		_, ierr := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
 			Index: uint(i + 1),
 			Host:  hosts[i],
 		})
-		err = debug.InjectPlannedFail(err)
-		if err != nil {
-			xerr = err
+		ierr = debug.InjectPlannedFail(ierr)
+		if ierr != nil {
+			_ = task.Abort()
 			break
 		}
-		subtasks = append(subtasks, subtask)
 	}
-	// Deals with the metadata read failure
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", hostID))
+	_, err = task.WaitGroup()
+	err = debug.InjectPlannedFail(err)
+	if err != nil {
+		return err
 	}
 
-	for _, s := range subtasks {
-		_, state := s.Wait()
-		if state != nil {
-			errs = append(errs, state)
-		}
-	}
-	if len(errs) > 0 {
-		return fail.NewErrorList(errs)
-	}
 	return nil
 }
 
@@ -3201,7 +3165,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	}()
 
 	for _, v := range removedNodes {
-		_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, master: nil})
+		_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, master: nil})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errors = append(errors, xerr)
