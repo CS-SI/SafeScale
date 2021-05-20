@@ -26,18 +26,18 @@ import (
 // ClusterNetwork contains network information relative to cluster
 // !!! FROZEN !!!
 type ClusterNetwork struct {
-	NetworkID          string           `json:"network_id"`           // contains the ID of the subnet (not called SubnetID because of legacy)
-	CIDR               string           `json:"cidr"`                 // the network CIDR
-	GatewayID          string           `json:"gateway_id"`           // contains the ID of the primary gateway
-	GatewayIP          string           `json:"gateway_ip"`           // contains the private IP address of the primary gateway
-	SecondaryGatewayID string           `json:"secondary_gateway_id"` // contains the ID of the secondary gateway
-	SecondaryGatewayIP string           `json:"secondary_gateway_ip"` // contains the private IP of the secondary gateway
-	DefaultRouteIP     string           `json:"default_route_ip"`     // contains the IP of the default route
-	PrimaryPublicIP    string           `json:"primary_public_ip"`    // contains the public IP of the primary gateway
-	SecondaryPublicIP  string           `json:"secondary_public_ip"`  // contains the public IP of the secondary gateway
-	EndpointIP         string           `json:"endpoint_ip"`          // contains the IP of the external Endpoint
-	NetworkState       subnetstate.Enum `json:"status"`               // contains the subnet state (not called SubnetState because of legacy)
-	Domain             string           `json:"domain,omitempty"`     // contains the domain used to define the FQDN of hosts created (taken from network)
+	NetworkID          string           `json:"network_id,omitempty"`           // contains the ID of the subnet (not called SubnetID because of legacy)
+	CIDR               string           `json:"cidr,omitempty"`                 // the network CIDR
+	GatewayID          string           `json:"gateway_id,omitempty"`           // contains the ID of the primary gateway
+	GatewayIP          string           `json:"gateway_ip,omitempty"`           // contains the private IP address of the primary gateway
+	SecondaryGatewayID string           `json:"secondary_gateway_id,omitempty"` // contains the ID of the secondary gateway
+	SecondaryGatewayIP string           `json:"secondary_gateway_ip,omitempty"` // contains the private IP of the secondary gateway
+	DefaultRouteIP     string           `json:"default_route_ip,omitempty"`     // contains the IP of the default route
+	PrimaryPublicIP    string           `json:"primary_public_ip,omitempty"`    // contains the public IP of the primary gateway
+	SecondaryPublicIP  string           `json:"secondary_public_ip,omitempty"`  // contains the public IP of the secondary gateway
+	EndpointIP         string           `json:"endpoint_ip,omitempty"`          // contains the IP of the external Endpoint
+	NetworkState       subnetstate.Enum `json:"status,omitempty"`               // contains the subnet state (not called SubnetState because of legacy)
+	Domain             string           `json:"domain,omitempty"`               // contains the domain used to define the FQDN of hosts created (taken from network)
 }
 
 func newClusterNetwork() *ClusterNetwork {
