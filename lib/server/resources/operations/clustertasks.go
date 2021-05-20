@@ -1535,6 +1535,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 	if len(loadErrors) != 0 {
 		logrus.Warnf("there were error reading master's metadata")
+		return nil, fail.NewErrorList(loadErrors)
 	}
 
 	if len(taskErrors) != 0 {
