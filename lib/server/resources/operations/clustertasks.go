@@ -2129,7 +2129,13 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	xerr = instance.deleteNode(task.GetContext(), p.node, p.master)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			logrus.Debugf("Node %s not found, deletion considered success", nodeName)
+			return nil, nil
+		default:
+			return nil, xerr
+		}
 	}
 
 	logrus.Debugf("Successfully deleted Node '%s'", nodeName)
@@ -2176,8 +2182,13 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	xerr = instance.deleteMaster(task.GetContext(), host)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Errorf("Failed to delete Master '%s'", p.node.Name)
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			logrus.Debugf("Master %s not found, deletion considered success", p.node.Name)
+			return nil, nil
+		default:
+			return nil, xerr
+		}
 	}
 
 	logrus.Debugf("Successfully deleted Master '%s'", p.node.Name)
