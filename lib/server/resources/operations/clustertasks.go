@@ -137,17 +137,27 @@ func (instance *Cluster) taskCreateCluster(tc concurrency.Task, params concurren
 			if rs != nil && rn != nil {
 				logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", rs.GetName())
 				if derr := rs.Delete(context.Background()); derr != nil {
-					cleanFailure = true
-					logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(xerr), rs.GetName())
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(xerr)))
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// missing Subnet is considered as a successful deletion, continue
+					default:
+						cleanFailure = true
+						logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(xerr), rs.GetName())
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(xerr)))
+					}
 				} else {
 					logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(xerr), rs.GetName())
 					if req.NetworkID == "" {
 						logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(xerr), rn.GetName())
 						if derr := rn.Delete(context.Background()); derr != nil {
-							cleanFailure = true
-							logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(xerr), rn.GetName())
-							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(xerr)))
+							switch derr.(type) {
+							case *fail.ErrNotFound:
+								// missing Network is considered as a successful deletion, continue
+							default:
+								cleanFailure = true
+								logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(xerr), rn.GetName())
+								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(xerr)))
+							}
 						} else {
 							logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(xerr), rn.GetName())
 						}
@@ -559,7 +569,12 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 			if xerr != nil && !req.KeepOnFailure {
 				// Using context.Background() here disables abort
 				if derr := rn.Delete(context.Background()); derr != nil {
-					_ = xerr.AddConsequence(derr)
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// missing Network is considered as a successful deletion, continue
+					default:
+						_ = xerr.AddConsequence(derr)
+					}
 				}
 			}
 		}()
@@ -636,7 +651,12 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
 			if derr := subnetInstance.Delete(context.Background()); derr != nil {
-				_ = xerr.AddConsequence(derr)
+				switch derr.(type) {
+				case *fail.ErrNotFound:
+					// missing Subnet is considered as a successful deletion, continue
+				default:
+					_ = xerr.AddConsequence(derr)
+				}
 			}
 		}
 	}()
@@ -1408,7 +1428,12 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
 			if derr := rh.Delete(context.Background()); derr != nil {
-				_ = xerr.AddConsequence(derr)
+				switch derr.(type) {
+				case *fail.ErrNotFound:
+					// missing Host is considered as a successful deletion, continue
+				default:
+					_ = xerr.AddConsequence(derr)
+				}
 			}
 		}
 	}()
@@ -1839,7 +1864,12 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
 			if derr := rh.Delete(context.Background()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(xerr), rh.GetName()))
+				switch derr.(type) {
+				case *fail.ErrNotFound:
+					// missing Host is considered as a successful deletion, continue
+				default:
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(xerr), rh.GetName()))
+				}
 			}
 		}
 	}()
@@ -2080,7 +2110,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Debugf("Node %s not found, deletion considered success", hostName)
+			logrus.Tracef("Node %s not found, deletion considered success", hostName)
 			return nil, nil
 		default:
 			return nil, xerr
@@ -2233,7 +2263,7 @@ func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Debugf("Host %s not found, deletion considered success", hostName)
+			logrus.Tracef("Host %s not found, deletion considered success", hostName)
 			return nil, nil
 		default:
 			return nil, xerr

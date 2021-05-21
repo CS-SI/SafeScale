@@ -347,7 +347,12 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 	defer func() {
 		logrus.Infof("Deleting host '%s' with ID '%s'", hostName, host.GetID())
 		if derr := host.Delete(context.Background()); derr != nil {
-			logrus.Warnf("Error deleting host '%s'", hostName)
+			switch derr.(type) {
+			case *fail.ErrNotFound:
+				// missing Host is considered a successful deletion, continue
+			default:
+				logrus.Warnf("Error deleting host '%s'", hostName)
+			}
 		}
 	}()
 
