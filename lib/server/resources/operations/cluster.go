@@ -2207,7 +2207,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// master seems already deleted, so consider it as a success
-			logrus.Tracef("master not found, deletion considered as a success")
+			logrus.Tracef("master not found, deletion considered successful")
 		default:
 			return xerr
 		}
@@ -2542,7 +2542,12 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	rn, deleteNetwork, rs, xerr := instance.extractNetworkingInfo(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// missing Network and Subnet is considered as successful deletion, continue
+		default:
+			return xerr
+		}
 	}
 
 	if task.Aborted() {

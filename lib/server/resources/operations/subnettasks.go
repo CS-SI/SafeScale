@@ -103,7 +103,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
 				case *fail.ErrNotFound:
-					logrus.Errorf(msgRoot+", resource not found: %v", hostReq.ResourceName, derr)
+					// missing Host is considered as a successful deletion, continue
+					// logrus.Errorf(msgRoot+", resource not found: %v", hostReq.ResourceName, derr)
 				case *fail.ErrTimeout:
 					logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
 				default:
