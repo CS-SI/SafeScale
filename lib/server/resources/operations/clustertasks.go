@@ -183,9 +183,11 @@ func (instance *Cluster) taskCreateCluster(tc concurrency.Task, params concurren
 					_ = xerr.AddConsequence(derr)
 				} else {
 					for _, v := range list {
-						if _, derr = tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
-							cleanFailure = true
-							_ = xerr.AddConsequence(derr)
+						if v.ID != "" {
+							if _, derr = tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
+								cleanFailure = true
+								_ = xerr.AddConsequence(derr)
+							}
 						}
 					}
 				}
@@ -822,8 +824,10 @@ func (instance *Cluster) createHostResources(
 					_ = xerr.AddConsequence(tgerr)
 				} else {
 					for _, v := range list {
-						if _, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
-							_ = xerr.AddConsequence(derr)
+						if v.ID != "" {
+							if _, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
+								_ = xerr.AddConsequence(derr)
+							}
 						}
 					}
 					if _, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout()); derr != nil {
@@ -864,8 +868,10 @@ func (instance *Cluster) createHostResources(
 					_ = xerr.AddConsequence(tgerr)
 				} else {
 					for _, v := range list {
-						if _, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
-							_ = xerr.AddConsequence(derr)
+						if v.ID != "" {
+							if _, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
+								_ = xerr.AddConsequence(derr)
+							}
 						}
 					}
 					if _, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout()); derr != nil {
