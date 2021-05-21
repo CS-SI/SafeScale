@@ -36,7 +36,7 @@ const (
 	HostTimeout = 6 * time.Minute
 
 	// LongHostOperationTimeout is a Long timeout
-	LongHostOperationTimeout = 12 * time.Minute
+	LongHostOperationTimeout = 14 * time.Minute
 
 	// DefaultSSHConnectionTimeout is the default ssh timeout connection
 	DefaultSSHConnectionTimeout = 3 * time.Minute
@@ -54,7 +54,7 @@ const (
 	DefaultExecutionTimeout = 6 * time.Minute
 
 	// DefaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
-	DefaultMetadataReadAfterWriteTimeout = 1 * time.Minute
+	DefaultMetadataReadAfterWriteTimeout = 90 * time.Second
 
 	// SmallDelay is the predefined small delay
 	SmallDelay = 1 * time.Second
