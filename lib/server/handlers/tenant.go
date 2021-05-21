@@ -98,7 +98,7 @@ const (
 	scanNetworkCIDR   string  = "192.168.20.0/24"
 	scanSubnetName    string  = "safescale-scan-subnet"
 	scanSubnetCIDR    string  = "192.168.20.0/26"
-	defaultScanImage  string  = "Ubuntu 20.04"
+	defaultScanImage  string  = "Ubuntu 18.04"
 	scannedHostPrefix string  = "scanhost-"
 	maxParallelScans  float64 = 4.0
 )
