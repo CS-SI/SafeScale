@@ -370,7 +370,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 	if imageID == "" {
-		imageID = "Ubuntu 20.04"
+		imageID = "Ubuntu 18.04"
 	}
 
 	// Determine getGateway sizing
