@@ -444,7 +444,10 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
 	)
 	data["reserved_LongTimeout"] = strings.Replace(
-		temporal.GetHostTimeout().Truncate(time.Minute).String(), "0s", "", -1,
+		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
+	)
+	data["reserved_ClusterJoinTimeout"] = strings.Replace(
+		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
 	)
 	data["reserved_DockerImagePullTimeout"] = strings.Replace(
 		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
