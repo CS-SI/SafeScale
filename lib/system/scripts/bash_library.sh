@@ -185,6 +185,11 @@ sfLongTimeout() {
 }
 export -f sfLongTimeout
 
+sfClusterJoinTimeout() {
+    echo {{ default "14m" .reserved_ClusterJoinTimeout }}
+}
+export -f sfClusterJoinTimeout
+
 sfDockerImagePullTimeout() {
     echo {{ default "10m" .reserved_DockerImagePullTimeout }}
 }

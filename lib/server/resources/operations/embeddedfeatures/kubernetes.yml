@@ -740,7 +740,7 @@ feature:
 
                             [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 225
                             # sometimes, etcd cluster appears to be unhealthy when calling this... So retries!
-                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 226
+                            sfRetry $(sfClusterJoinTimeout) $(sfDefaultDelay) bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 226
                             [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 227
                             bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 228
 
