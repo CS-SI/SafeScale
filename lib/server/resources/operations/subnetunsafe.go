@@ -378,7 +378,7 @@ func (instance *Subnet) undoCreateSecurityGroup(errorPtr *fail.Error, keepOnFail
 func (instance *Subnet) createInternalSecurityGroup(ctx context.Context, network resources.Network, keepOnFailure bool) (_ resources.SecurityGroup, xerr fail.Error) {
 	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, instance.GetName(), network.GetName())
 
-	cidr, xerr := instance.GetCIDR()
+	cidr, xerr := instance.unsafeGetCIDR()
 	if xerr != nil {
 		return nil, xerr
 	}
