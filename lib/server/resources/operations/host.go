@@ -1225,10 +1225,10 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					}(lansg)
 
 					if innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
-						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", as.Name, lansg.GetName(), req.ResourceName)
+						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.GetName(), lansg.GetName(), req.ResourceName)
 					}
 					return nil
-				})
+				}
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return xerr
