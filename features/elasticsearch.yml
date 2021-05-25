@@ -139,7 +139,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d || sfFail 195
+                            echo "docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
                             sfExit
 
                     running:
@@ -184,7 +185,8 @@ feature:
                                 {{ else }}
                                 OPTIONS=
                                 {{ end }}
-                                docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 197
+                                echo "docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                                docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 197
                             fi
                             sfExit
 
