@@ -97,7 +97,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d || sfFail 193
+                            echo "docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
                             sfExit
 
             remove:
@@ -115,7 +116,8 @@ feature:
                             {{ else }}
                                 OPTIONS=
                             {{ end }}
-                                docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 194
+                                echo "docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                                docker-compose -f ${SF_ETCDIR}/kibana/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 194
                             fi
                             sfExit
 

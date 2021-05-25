@@ -143,7 +143,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d
+                            echo "docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1
 
                     ready:
                         targets:
@@ -173,7 +174,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 192
+                            echo "docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
                             sfExit
 
                     remove:
