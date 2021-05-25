@@ -130,7 +130,8 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale up -d || sfFail 193
+                            echo "docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
                             sfStandardRetry "sfDoesDockerRunContainer docker.elastic.co/beats/filebeat:{{ .Version }} filebeat4safescale_agent_1" || sfFail 194
                             sfExit
 
@@ -144,7 +145,8 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale rm --stop --force || sfFail 195
+                            echo "docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
                             sfExit
 
                     cleanup:

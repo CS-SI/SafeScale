@@ -179,7 +179,8 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat up -d || sfFail 193
+                            echo "docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
                             sfStandardRetry "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat_agent_1" || sfFail 194
                             sfExit
 
@@ -193,7 +194,8 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat rm --stop --force || sfFail 195
+                            echo "docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
                             sfExit
 
                     cleanup:
