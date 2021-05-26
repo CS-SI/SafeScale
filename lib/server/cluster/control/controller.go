@@ -706,10 +706,9 @@ func deleteNodeFromListByID(list []*clusterpropsv1.Node, ID string) (*clusterpro
 	}
 	node := list[idx]
 	var outList []*clusterpropsv1.Node
+	outList = list[:idx]
 	if idx < length-1 {
-		outList = append(list[:idx], list[idx+1:]...)
-	} else {
-		outList = list[:idx]
+		outList = append(outList, list[idx+1:]...)
 	}
 	return node, outList, nil
 }
@@ -722,10 +721,9 @@ func deleteNodeFromListByName(list []*clusterpropsv1.Node, name string) (*cluste
 	}
 	node := list[idx]
 	var outList []*clusterpropsv1.Node
+	outList = list[:idx]
 	if idx < length-1 {
-		outList = append(list[:idx], list[idx+1:]...)
-	} else {
-		outList = list[:idx]
+		outList = append(outList, list[idx+1:]...)
 	}
 	return node, outList, nil
 }
@@ -1334,12 +1332,12 @@ func (c *Controller) deleteNode(task concurrency.Task, node *clusterpropsv1.Node
 				func(clonable data.Clonable) error {
 					nodesV1 := clonable.(*clusterpropsv1.Nodes)
 					var innerErr error
-					var newMasters []*clusterpropsv1.Node
-					node, newMasters, innerErr = deleteNodeFromListByID(nodesV1.PrivateNodes, node.ID)
+					var newNodes []*clusterpropsv1.Node
+					node, newNodes, innerErr = deleteNodeFromListByID(nodesV1.PrivateNodes, node.ID)
 					if innerErr != nil {
 						return innerErr
 					}
-					nodesV1.PrivateNodes = newMasters
+					nodesV1.PrivateNodes = newNodes
 					return nil
 				},
 			)
