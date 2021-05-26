@@ -1664,9 +1664,13 @@ var clusterNodeDeleteCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		err = extractHostArgument(c, 1)
-		if err != nil {
-			return clitools.FailureResponse(err)
+		// err = extractHostArgument(c, 1)
+		// if err != nil {
+		//      return clitools.FailureResponse(err)
+		// }
+		hostID := c.Args().Get(2)
+		if hostID == "" {
+			return clitools.ExitOnInvalidArgument("argument HOSTID invalid")
 		}
 
 		yes := c.Bool("yes")
@@ -1683,9 +1687,16 @@ var clusterNodeDeleteCommand = cli.Command{
 			logrus.Println("'-f,--force' does nothing yet")
 		}
 
-		// FIXME: No more does nothing yet
-
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
+		// fmt.Printf("Deleting %d node%s from Cluster '%s' (this may take a while)...\n", count, countS, clusterName)
+		var msgs []string
+		err = clusterInstance.DeleteSpecificNode(concurrency.RootTask(), hostID, "")
+		if err != nil {
+			msgs = append(msgs, fmt.Sprintf("failed to delete node %s: %s", hostID, err.Error()))
+		}
+		if len(msgs) > 0 {
+			return clitools.FailureResponse(clitools.ExitOnRPC(strings.Join(msgs, "\n")))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 

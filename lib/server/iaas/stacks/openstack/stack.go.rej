@@ -1,0 +1,17 @@
+***************
+*** 271,277 ****
+  
+  	// Get provider network ID from network service
+  	if cfg.ProviderNetwork != "" {
+- 		s.ProviderNetworkID, err = networks.IDFromName(s.NetworkClient, cfg.ProviderNetwork)
+  		if err != nil {
+  			return nil, fail.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
+  		}
+--- 271,277 ----
+  
+  	// Get provider network ID from network service
+  	if cfg.ProviderNetwork != "" {
++ 		s.ProviderNetworkID, err = IDFromName(s.NetworkClient, cfg.ProviderNetwork)
+  		if err != nil {
+  			return nil, fail.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
+  		}
