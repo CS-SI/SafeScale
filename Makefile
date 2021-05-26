@@ -118,7 +118,7 @@ getdevdeps: begin ground
   		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.26.0; \
 	fi
 	@which gosec > /dev/null; if [ $$? -ne 0 ]; then \
-    	curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest; \
+    	curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest; \
 	fi
 
 ensure:
@@ -154,7 +154,7 @@ mrproper: clean
 	@(git clean -xdf -e .idea -e vendor -e .vscode || true)
 
 install:
-	@($(CP) -f $(EXECS) $(GOBIN) || true)
+	@($(CP) -f $(EXECS) $(GOPATH)/bin || true)
 
 installci:
 	@(mkdir -p $(CIBIN) || true)
