@@ -1668,7 +1668,7 @@ var clusterNodeDeleteCommand = cli.Command{
 		// if err != nil {
 		//      return clitools.FailureResponse(err)
 		// }
-		hostID := c.Args().Get(2)
+		hostID := c.Args().Get(1)
 		if hostID == "" {
 			return clitools.ExitOnInvalidArgument("argument HOSTID invalid")
 		}
