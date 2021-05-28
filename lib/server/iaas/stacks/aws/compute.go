@@ -563,7 +563,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			}
 			if innerXErr != nil {
 				switch innerXErr.(type) {
-				case *fail.ErrOverload:
+				case *fail.ErrOverload, *fail.ErrInvalidRequest:
 					return retry.StopRetryError(innerXErr)
 				default:
 					logrus.Warnf("error creating Host: %+v", innerXErr)
@@ -916,24 +916,24 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	ips, xerr := s.rpcDescribeAddresses([]*string{aws.String(ahf.Core.ID)})
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// continue
-		default:
-			return xerr
-		}
-	}
-	var errors []error
-	for _, ip := range ips {
-		if derr := s.rpcReleaseAddress(ip.AllocationId); derr != nil {
-			errors = append(errors, fail.Wrap(derr, "cleaning up on failure, failed to delete IP address"))
-		}
-	}
-	if len(errors) > 0 {
-		return fail.NewErrorList(errors)
-	}
+	// ips, xerr := s.rpcDescribeAddresses([]*string{aws.String(ahf.Core.ID)})
+	// if xerr != nil {
+	// 	switch xerr.(type) {
+	// 	case *fail.ErrNotFound:
+	// 		// continue
+	// 	default:
+	// 		return xerr
+	// 	}
+	// }
+	// var errors []error
+	// for _, ip := range ips {
+	// 	if derr := s.rpcReleaseAddress(ip.AllocationId); derr != nil {
+	// 		errors = append(errors, fail.Wrap(derr, "cleaning up on failure, failed to delete IP address"))
+	// 	}
+	// }
+	// if len(errors) > 0 {
+	// 	return fail.NewErrorList(errors)
+	// }
 
 	vm, xerr := s.rpcDescribeInstanceByID(aws.String(ahf.GetID()))
 	if xerr != nil {
@@ -951,59 +951,32 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			attachedVolumes []string
 		)
 
-		// register attached volumes
+		// inventory attached volumes
 		for _, attVol := range vm.BlockDeviceMappings {
-			if attVol != nil {
-				if attVol.Ebs != nil {
-					if attVol.Ebs.VolumeId != nil {
-						volume := aws.StringValue(attVol.Ebs.VolumeId)
-						if volume != "" {
-							attachedVolumes = append(attachedVolumes, volume)
-						}
-					}
+			if attVol != nil && attVol.Ebs != nil && attVol.Ebs.VolumeId != nil {
+				volume := aws.StringValue(attVol.Ebs.VolumeId)
+				if volume != "" {
+					attachedVolumes = append(attachedVolumes, volume)
 				}
 			}
 		}
 
 		keyPairName = aws.StringValue(vm.KeyName)
 
+		// Stop instance forcibly
+		xerr := s.StopHost(ahf, false)
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to stop Host '%s'", ahf.Core.Name)
+		}
+
 		// Terminate instance
-		if xerr = s.rpcTerminateInstance(aws.String(ahf.GetID())); xerr != nil {
+		xerr = s.rpcTerminateInstance(vm)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
 			default:
 				return xerr
-			}
-		}
-
-		retryErr := retry.WhileUnsuccessful(
-			func() error {
-				hostTmp, innerXErr := s.InspectHost(ahf)
-				if innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// if IPAddress is not found, consider operation as successful
-						return nil
-					default:
-						return innerXErr
-					}
-				}
-
-				if hostTmp.CurrentState != hoststate.Terminated {
-					return fail.NewError(innerXErr, "not in stopped or terminated state (current state: %s)", hostTmp.CurrentState.String())
-				}
-				return nil
-			},
-			temporal.GetDefaultDelay(),
-			temporal.GetHostCleanupTimeout(),
-		)
-		if retryErr != nil {
-			switch retryErr.(type) {
-			case *retry.ErrTimeout:
-				return fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", ahf.GetID(), temporal.GetHostCleanupTimeout())
-			default:
-				return retryErr
 			}
 		}
 
@@ -1032,23 +1005,14 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 		// Remove keypair
 		if keyPairName != "" {
-			// FIXME: move this in rpc.go and call it rpcDeleteKeyPair()
-			xerr = stacks.RetryableRemoteCall(
-				func() error {
-					_, err := s.EC2Service.DeleteKeyPair(&ec2.DeleteKeyPairInput{
-						KeyName: aws.String(keyPairName),
-					})
-					return err
-				},
-				normalizeError,
-			)
+			xerr = s.rpcDeleteKeyPair(aws.String(keyPairName))
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// A missing keypair is considered as a successful deletion
-					logrus.Tracef("keypair not found, deletion considered as a success")
+					logrus.Tracef("keypair '%s' not found, deletion considered as a success", keyPairName)
 				default:
-					return fail.Wrap(xerr, "error deleting keypair")
+					return fail.Wrap(xerr, "error deleting keypair '%s'", keyPairName)
 				}
 			}
 		}
@@ -1058,7 +1022,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StopHost stops a running host
-func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1070,8 +1034,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	// FIXME: forcing
-	if xerr = s.rpcStopInstances([]*string{aws.String(ahf.Core.ID)}, aws.Bool(true)); xerr != nil {
+	if xerr = s.rpcStopInstances([]*string{aws.String(ahf.Core.ID)}, aws.Bool(gracefully)); xerr != nil {
 		return xerr
 	}
 
