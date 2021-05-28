@@ -1353,7 +1353,7 @@ func (s Stack) rpcGetServer(id string) (_ *servers.Server, xerr fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s Stack) StopHost(hostParam stacks.HostParameter) fail.Error {
+func (s Stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
