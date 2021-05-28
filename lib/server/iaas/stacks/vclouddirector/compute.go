@@ -869,7 +869,7 @@ func (s *stack) ListHosts() ([]*abstract.HostCore, fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s *stack) StopHost(hostParam stacks.HostParameter) fail.Error {
+func (s *stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
 	if s == nil {
 		return fail.InvalidInstanceError()
 	}

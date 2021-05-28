@@ -126,7 +126,7 @@ type Stack interface {
 	// DeleteHost deletes the host identified by id
 	DeleteHost(stacks.HostParameter) fail.Error
 	// StopHost stops the host identified by id
-	StopHost(stacks.HostParameter) fail.Error
+	StopHost(host stacks.HostParameter, gracefully bool) fail.Error
 	// StartHost starts the host identified by id
 	StartHost(stacks.HostParameter) fail.Error
 	// RebootHost reboots a host

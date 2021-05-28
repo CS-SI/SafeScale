@@ -233,7 +233,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StopHost stub
-func (s stack) StopHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
 	return gError
 }
 
