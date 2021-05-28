@@ -270,7 +270,7 @@ func SSHConfigFromAbstractToProtocol(in system.SSHConfig) *protocol.SshConfig {
 func HostStatusFromAbstractToProtocol(name string, status hoststate.Enum) *protocol.HostStatus {
 	return &protocol.HostStatus{
 		Name:   name,
-		Status: protocol.HostState(status).String(),
+		Status: protocol.HostState(status),
 	}
 }
 

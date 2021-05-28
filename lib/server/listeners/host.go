@@ -509,7 +509,13 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		}
 	}
 
-	return converters.HostStatusFromAbstractToProtocol(rh.GetName(), rh.GetState()), nil
+	// Gather host state from Cloud Provider
+	state, xerr := rh.ForceGetState(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return converters.HostStatusFromAbstractToProtocol(rh.GetName(), state), nil
 }
 
 // Inspect an host

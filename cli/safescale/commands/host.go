@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc/codes"
@@ -224,7 +225,12 @@ var hostStatus = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
 		}
-		return clitools.SuccessResponse(resp)
+		formatted := make(map[string]interface{})
+		formatted["name"] = resp.Name
+		converted := converters.HostStateFromProtocolToEnum(resp.Status)
+		formatted["status_code"] = converted
+		formatted["status_label"] = converted.String()
+		return clitools.SuccessResponse(formatted)
 	},
 }
 

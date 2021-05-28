@@ -522,9 +522,14 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
+		abstractHostFull, innerXErr := instance.GetService().InspectHost(ahc.ID)
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		ahc = abstractHostFull.Core
 		state = ahc.LastState
 		return nil
-
 	})
 	return state, xerr
 }
@@ -2496,6 +2501,12 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 			return xerr
 		}
 	}
+
+	_, xerr = instance.ForceGetState(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
 	return nil
 }
 

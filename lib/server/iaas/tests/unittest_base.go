@@ -585,7 +585,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, host)
 	{
-		err := tester.Service.StopHost(host.Core.ID)
+		err := tester.Service.StopHost(host.Core.ID, true)
 		require.Nil(t, err)
 		start := time.Now()
 		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Stopped, temporal.GetBigDelay())
