@@ -2465,7 +2465,7 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 	hostID := instance.GetID()
 
 	svc := instance.GetService()
-	xerr = svc.StopHost(hostID)
+	xerr = svc.StopHost(hostID, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
