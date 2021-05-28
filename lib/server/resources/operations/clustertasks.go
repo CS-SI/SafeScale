@@ -1091,7 +1091,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	xerr = instance.GetService().StopHost(id)
+	xerr = instance.GetService().StopHost(id, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { //nolint
