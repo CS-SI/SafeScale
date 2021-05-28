@@ -72,21 +72,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	if xerr != nil {
 		return nil, xerr
 	}
-	userData, cerr := rgw.Create(task.GetContext(), hostReq, hostSizing) // cerr is tested later
 
-	// Set link to Subnet before testing if Host has been successfully created; in case of failure, we need to have registered the gateway ID in Subnet
-	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		if id := rgw.GetID(); id != "" {
-			as.GatewayIDs = append(as.GatewayIDs, id)
-		}
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
+	userData, xerr := rgw.Create(task.GetContext(), hostReq, hostSizing) // cerr is tested later
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -118,9 +105,21 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		}
 	}()
 
-	// Now we can react to failure on Host creation
-	if cerr != nil {
-		return nil, cerr
+	// Set link to Subnet before testing if Host has been successfully created; in case of failure, we need to have registered the gateway ID in Subnet
+	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		if id := rgw.GetID(); id != "" {
+			as.GatewayIDs = append(as.GatewayIDs, id)
+		}
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// Binds gateway to VIP if needed
