@@ -19,6 +19,7 @@ package gcp
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -567,7 +568,7 @@ func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instanc
 }
 
 func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
-	switch gcpHostStatus {
+	switch strings.ToUpper(gcpHostStatus) {
 	case "PROVISIONING":
 		return hoststate.Starting, nil
 	case "REPAIRING":
@@ -576,18 +577,18 @@ func stateConvert(gcpHostStatus string) (hoststate.Enum, fail.Error) {
 		return hoststate.Started, nil
 	case "STAGING":
 		return hoststate.Starting, nil
-	case "Stopped":
+	case "STOPPED":
 		return hoststate.Stopped, nil
-	case "Stopping":
+	case "STOPPING":
 		return hoststate.Stopping, nil
 	case "SUSPENDED":
 		return hoststate.Stopped, nil
 	case "SUSPENDING":
 		return hoststate.Stopping, nil
-	case "Terminated":
+	case "TERMINATED":
 		return hoststate.Stopped, nil
 	default:
-		return -1, fail.NewError("unexpected host status: [%s]", gcpHostStatus)
+		return -1, fail.NewError("unexpected host status '%s'", gcpHostStatus)
 	}
 }
 

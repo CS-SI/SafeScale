@@ -359,14 +359,13 @@ message HostDefinition {
 }
 
 enum HostState {
-	HS_STOPPED = 0; 	// host is stopped
-	HS_STARTING = 1; 	// host is starting
-	HS_STARTED = 2; 	// host is started
-	HS_STOPPING = 3; 	// host is stopping
-	HS_ERROR = 4; 	    // host is in error state
+	HS_STOPPED = 0; 		// host is stopped
+	HS_STARTING = 1; 		// host is starting
+	HS_STARTED = 2; 		// host is started
+	HS_STOPPING = 3; 		// host is stopping
+	HS_ERROR = 4; 			// host is in error state
 	HS_TERMINATED = 5; 	// host is terminated (in AWS, it's like DELETED)
-	HS_UNKNOWN = 6; 	// status is unknown
-
+	HS_UNKNOWN = 6; 		// status is unknown
 }
 
 message Host {
@@ -388,7 +387,7 @@ message Host {
 
 message HostStatus {
 	string name = 1;
-	string status = 2;
+	HostState status = 2;
 }
 
 message HostList {
