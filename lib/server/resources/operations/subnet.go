@@ -646,7 +646,6 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation() fail.Error {
 	return instance.updateCachedInformation()
 }
 
-
 func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) fail.Error {
 	svc := instance.GetService()
 	if gwSizing == nil {
@@ -735,6 +734,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		TemplateID:       template.ID,
 		KeepOnFailure:    req.KeepOnFailure,
 		SecurityGroupIDs: sgs,
+		IsGateway:        true,
 	}
 
 	var (
@@ -1384,8 +1384,8 @@ func (instance *Subnet) AbandonHost(ctx context.Context, hostID string) (xerr fa
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("resources.subnet"), "('"+hostID+"')").Entering()
 	defer tracer.Exiting()
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	// instance.lock.Lock()
+	// defer instance.lock.Unlock()
 
 	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return instance.unsafeAbandonHost(props, hostID)

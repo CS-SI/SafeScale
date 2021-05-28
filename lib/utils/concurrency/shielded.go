@@ -68,7 +68,7 @@ func (instance *Shielded) Inspect( /*task Task, */ inspector func(clonable data.
 // 'alterer' can use a special error to tell the outside there was no change : fail.ErrAlteredNothing, which can be
 // generated with fail.AlteredNothingError().
 // The caller of the Alter() method will then be able to known, when an error occurs, if it's because there was no change.
-func (instance *Shielded) Alter( /*task Task, */ alterer func(data.Clonable) fail.Error) (xerr fail.Error) {
+func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (xerr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

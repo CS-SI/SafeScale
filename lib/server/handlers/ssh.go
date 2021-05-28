@@ -124,12 +124,17 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		User:      user,
 	}
 
-	single, xerr := host.IsSingle()
+	isSingle, xerr := host.IsSingle()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if single {
+	isGateway, xerr := host.IsGateway()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	if isSingle || isGateway {
 		xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			ahc, ok := clonable.(*abstract.HostCore)
 			if !ok {
@@ -137,6 +142,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			}
 
 			sshConfig.PrivateKey = ahc.PrivateKey
+			sshConfig.Port = int(ahc.SSHPort)
 			return nil
 		})
 		if xerr != nil {
@@ -147,10 +153,11 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			ahc, ok := clonable.(*abstract.HostCore)
 			if !ok {
-				return fail.InconsistentError("")
-			}
+					return fail.InconsistentError("")
+				}
 
 			sshConfig.PrivateKey = ahc.PrivateKey
+			sshConfig.Port = int(ahc.SSHPort)
 			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
 				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
 				if !ok {
@@ -161,15 +168,15 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 					var innerXErr fail.Error
 					rs, innerXErr = subnetfactory.Load(svc, "", hnV2.DefaultSubnetID)
 					if innerXErr != nil {
-						return innerXErr
-					}
+							return innerXErr
+						}
 				}
 				return nil
 			})
 		})
 		if xerr != nil {
-			return nil, xerr
-		}
+				return nil, xerr
+			}
 		if rs == nil {
 			return nil, fail.NotFoundError("failed to find default Subnet of Host")
 		}
@@ -179,82 +186,75 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			ok    bool
 		)
 
-		if _, xerr = host.GetPublicIP(); xerr != nil {
+		// gets primary gateway information
+		gw, xerr := rs.InspectGateway(true)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				// gets primary gateway information
-				gw, xerr := rs.InspectGateway(true)
-				if xerr != nil {
-					switch xerr.(type) {
-					case *fail.ErrNotFound:
-						// Primary gateway not found ? let's try with the secondary one later...
-					default:
-						return nil, xerr
-					}
-				} else {
-					xerr = gw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-						if gwahc, ok = clonable.(*abstract.HostCore); !ok {
-							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
-						}
-
-						return nil
-					})
-					if xerr != nil {
-						return nil, xerr
-					}
-
-					if ip, xerr = gw.GetAccessIP(); xerr != nil {
-						return nil, xerr
-					}
-					GatewayConfig := system.SSHConfig{
-						PrivateKey: gwahc.PrivateKey,
-						Port:       22,
-						IPAddress:  ip,
-						Hostname:   gw.GetName(),
-						User:       user,
-					}
-					sshConfig.GatewayConfig = &GatewayConfig
-				}
-
-				// gets secondary gateway information
-				gw, xerr = rs.InspectGateway(false)
-				if xerr != nil {
-					switch xerr.(type) {
-					case *fail.ErrNotFound:
-						// If secondary gateway is not found, and previously failed to set primary gateway config, bail out
-						if sshConfig.GatewayConfig == nil {
-							return nil, fail.NotFoundError("failed to find a gateway to reach Host")
-						}
-					default:
-						return nil, xerr
-					}
-				} else {
-					xerr = gw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-						gwahc, ok = clonable.(*abstract.HostCore)
-						if !ok {
-							return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
-						}
-						return nil
-					})
-					if xerr != nil {
-						return nil, xerr
-					}
-
-					if ip, xerr = gw.GetAccessIP(); xerr != nil {
-						return nil, xerr
-					}
-					GatewayConfig := system.SSHConfig{
-						PrivateKey: gwahc.PrivateKey,
-						Port:       22,
-						IPAddress:  ip,
-						Hostname:   gw.GetName(),
-						User:       user,
-					}
-					sshConfig.SecondaryGatewayConfig = &GatewayConfig
-				}
+				// Primary gateway not found ? let's try with the secondary one later...
 			default:
 				return nil, xerr
 			}
+		} else {
+			xerr = gw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				if gwahc, ok = clonable.(*abstract.HostCore); !ok {
+					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				return nil
+			})
+			if xerr != nil {
+						return nil, xerr
+					}
+
+			if ip, xerr = gw.GetAccessIP(); xerr != nil {
+						return nil, xerr
+					}
+			GatewayConfig := system.SSHConfig{
+				PrivateKey: gwahc.PrivateKey,
+				Port:       22,
+				IPAddress:  ip,
+				Hostname:   gw.GetName(),
+				User:       user,
+			}
+			sshConfig.GatewayConfig = &GatewayConfig
+		}
+
+		// gets secondary gateway information
+		gw, xerr = rs.InspectGateway(false)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// If secondary gateway is not found, and previously failed to set primary gateway config, bail out
+				if sshConfig.GatewayConfig == nil {
+							return nil, fail.NotFoundError("failed to find a gateway to reach Host")
+						}
+			default:
+				return nil, xerr
+			}
+		} else {
+			xerr = gw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				gwahc, ok = clonable.(*abstract.HostCore)
+				if !ok {
+					return fail.InconsistentError("'*abstract.HostFull' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				return nil
+			})
+			if xerr != nil {
+						return nil, xerr
+					}
+
+			if ip, xerr = gw.GetAccessIP(); xerr != nil {
+						return nil, xerr
+					}
+			GatewayConfig := system.SSHConfig{
+				PrivateKey: gwahc.PrivateKey,
+				Port:       22,
+				IPAddress:  ip,
+				Hostname:   gw.GetName(),
+				User:       user,
+			}
+			sshConfig.SecondaryGatewayConfig = &GatewayConfig
 		}
 	}
 
