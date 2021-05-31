@@ -42,7 +42,7 @@ const (
 	DefaultSSHConnectionTimeout = 3 * time.Minute
 
 	// HostCleanupTimeout is the default timeout of host teardown operations
-	HostCleanupTimeout = 3 * time.Minute
+	HostCleanupTimeout = 5 * time.Minute
 
 	// DefaultConnectionTimeout is the default connection timeout
 	DefaultConnectionTimeout = 1 * time.Minute
