@@ -47,8 +47,14 @@ func CurrentTenant() *Tenant {
 
 		// Set unique tenant as selected
 		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
-		for _, anon := range tenants {
-			name := anon.(string)
+		for k, anon := range tenants {
+			tenant, ok := anon.(map[string]interface{})
+			if !ok {
+				logrus.Errorf(fail.SyntaxError("tenant entry #%d not in the right format", k+1).Error())
+				continue
+			}
+
+			name := tenant["name"].(string)
 
 			service, xerr := loadTenant(name)
 			xerr = debug.InjectPlannedFail(xerr)
