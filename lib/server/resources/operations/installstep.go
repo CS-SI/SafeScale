@@ -76,7 +76,7 @@ func (sr stepResult) ErrorMessage() string {
 		msg = sr.err.Error()
 	}
 	if msg == "" && sr.retcode != 0 {
-		msg = fmt.Sprintf("exited with error core %d", sr.retcode)
+		msg = fmt.Sprintf("exited with error code %d", sr.retcode)
 	}
 	return msg
 }
