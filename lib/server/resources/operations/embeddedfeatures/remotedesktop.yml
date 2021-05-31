@@ -544,26 +544,26 @@ feature:
                                 <short>Drop any connection to SafeScale remote desktop</short>
                             </zone>
                             EOF
-                            sfFirewallReload || sfFail 204 "Firewall problem"
 
+                            sfFirewallReload || sfFail 204 "Firewall problem"
                             # Allow only gateway(s) to connect to port {{ .GuacamolePort }}
-                            sfFirewall --zone=sf_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 205 "Firewall problem"
                             {{ if .DefaultRouteIP }}
-                            sfFirewall --zone=sf_remotedesktop --add-source={{ .DefaultRouteIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .DefaultRouteIP }} || sfFail 206 "Firewall problem"
                             {{ end }}
                             {{ if .SecondaryGatewayIP }}
                             {{ if .PrimaryGatewayIP }}
-                            sfFirewall --zone=sf_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 207 "Firewall problem"
                             {{ end }}
-                            sfFirewall --zone=sf_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 208 "Firewall problem"
                             {{ end }}
-                            sfFirewallReload || sfFail 204 "Firewall problem"
+                            sfFirewallReload || sfFail 209 "Firewall problem"
 
                             ###########################################################
                             # Starts remotedesktop container                          #
                             ###########################################################
                             echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 203
+                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 210
                             sfExit
 
             remove:
