@@ -192,9 +192,10 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 				if m, ok = lvl1["message"].(string); ok {
 					msg = m
 					// This switch exists only to return another kind of fail.Error if the errorName does not comply with the real Neutron error (not seen yet)
-					switch t { // nolint
+					switch t {
 					// FIXME: What about *fail.ErrDuplicate ?
 					case "SecurityGroupRuleExists": // return a *fail.ErrDuplicate
+					default:
 					}
 				}
 			}
