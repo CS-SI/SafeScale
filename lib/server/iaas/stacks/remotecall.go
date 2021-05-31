@@ -40,13 +40,12 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 	}
 
 	// Execute the remote call with tolerance for transient communication failure
-	// xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
 	xerr := netutils.WhileUnsuccessfulButRetryable(
 		func() error {
 			if innerErr := callback(); innerErr != nil {
 				captured := normalizeError(innerErr)
 				switch captured.(type) { //nolint
-				case *fail.ErrNotFound:
+				case *fail.ErrNotFound, *fail.ErrDuplicate: // Do not retry if not found or duplicate
 					return retry.StopRetryError(captured)
 				}
 				return captured
