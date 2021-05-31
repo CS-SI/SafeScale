@@ -996,8 +996,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// A missing volume is considered as a successful deletion
-					logrus.Tracef("volume not found, deletion considered as a success")
-				default:
+					default:
 					logrus.Warnf("failed to delete volume %s", volume)
 				}
 			}
@@ -1054,11 +1053,12 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 		temporal.GetHostCleanupTimeout(),
 	)
 	if retryErr != nil {
-		switch retryErr.(type) { //nolint
+		switch retryErr.(type) {
 		case *retry.ErrTimeout:
 			return fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", hostRef, temporal.GetHostCleanupTimeout())
+		default:
+			return retryErr
 		}
-		return retryErr
 	}
 
 	return nil
