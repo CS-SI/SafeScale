@@ -1427,7 +1427,6 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			} else {
 				return fail.SyntaxError("invalid value for ports in rule '%s'")
 			}
-
 		}
 	}
 
