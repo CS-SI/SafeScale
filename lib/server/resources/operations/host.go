@@ -2094,6 +2094,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					case *fail.ErrNotFound:
 						// A Host not found is considered as a successful deletion
 						logrus.Tracef("Host not found, deletion considered as a success")
+						fail.Ignore(derr)
 					default:
 						return fail.Wrap(derr, "cannot delete Host")
 					}
@@ -2175,6 +2176,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
+		fail.Ignore(xerr)
 		logrus.Tracef("core instance not found, deletion considered as a success")
 	}
 
@@ -2931,7 +2933,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 			}
 
 			sgID := rsg.GetID()
-			// If the Security Group is already bound to the Host with the exact same state, consider as a success
+			// If the Security Group is already bound to the Host with the exact same state, considered as a success
 			if v, ok := hsgV1.ByID[sgID]; ok && v.Disabled == !bool(enable) {
 				return nil
 			}
@@ -3138,12 +3140,13 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 					return xerr
 				}
 			} else {
-				// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), consider as a success
+				// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
 				xerr = sg.GetService().BindSecurityGroupToHost(asg, instance.GetID())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
+						fail.Ignore(xerr)
 						// continue
 					default:
 						return xerr
@@ -3158,7 +3161,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 	})
 }
 
-// DisableSecurityGroup disables a binded security group to Host
+// DisableSecurityGroup disables a bound security group to Host
 func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -3234,12 +3237,13 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 					return xerr
 				}
 			} else {
-				// Bind the security group on provider side; if security group not binded, consider as a success
+				// Bind the security group on provider side; if security group not binded, considered as a success
 				xerr = svc.UnbindSecurityGroupFromHost(asg, instance.GetID())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
+						fail.Ignore(xerr)
 						// continue
 					default:
 						return xerr

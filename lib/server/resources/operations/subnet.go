@@ -1774,6 +1774,7 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 				case *fail.ErrNotFound:
 					// missing gateway is considered as a successful deletion, continue
 					logrus.Tracef("host instance not found, gateway deletion considered as a success")
+					fail.Ignore(xerr)
 				default:
 					return ids, xerr
 				}
@@ -1790,6 +1791,7 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 					case *fail.ErrNotFound:
 						// missing gateway is considered as a successful deletion, continue
 						logrus.Tracef("host instance not found, relaxed gateway deletion considered as a success")
+						fail.Ignore(xerr)
 					default:
 						return ids, xerr
 					}
@@ -2250,7 +2252,8 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, rsg resources.S
 				if innerXErr = rsg.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrDuplicate:
-						// security group already bound to Subnet with the same state, consider as a success
+						// security group already bound to Subnet with the same state, considered as a success
+						fail.Ignore(innerXErr)
 					default:
 						return innerXErr
 					}
@@ -2329,7 +2332,8 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sg resources.S
 				if innerXErr = sg.BindToSubnet(ctx, instance, resources.SecurityGroupDisable, resources.KeepCurrentSecurityGroupMark); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
-						// security group not bound to Subnet, consider as a success
+						// security group not bound to Subnet, considered as a success
+						fail.Ignore(innerXErr)
 					default:
 						return innerXErr
 					}

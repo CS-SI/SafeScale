@@ -57,7 +57,8 @@ func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// if the security group is not bound to the host, consider as a success and continue
+			// if the security group is not bound to the host, considered as a success and continue
+			fail.Ignore(xerr)
 		default:
 			return nil, xerr
 		}
@@ -108,7 +109,8 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// subnet does not exist anymore ? consider as a success and continue
+			// subnet does not exist anymore ? considered as a success and continue
+			fail.Ignore(xerr)
 		default:
 			return nil, xerr
 		}
@@ -180,7 +182,8 @@ func (instance *SecurityGroup) taskEnableOnHost(task concurrency.Task, params co
 	if innerXErr != nil {
 		switch innerXErr.(type) {
 		case *fail.ErrNotFound:
-			// host vanished, consider as a success
+			// host vanished, considered as a success
+			fail.Ignore(innerXErr)
 		default:
 			return nil, innerXErr
 		}
@@ -218,7 +221,8 @@ func (instance *SecurityGroup) taskDisableOnHost(task concurrency.Task, params c
 	if innerXErr != nil {
 		switch innerXErr.(type) {
 		case *fail.ErrNotFound:
-			// host vanished, consider as a success
+			// host vanished, considered as a success
+			fail.Ignore(innerXErr)
 		default:
 			return nil, innerXErr
 		}
@@ -228,6 +232,7 @@ func (instance *SecurityGroup) taskDisableOnHost(task concurrency.Task, params c
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// considered as a success
+			fail.Ignore(xerr)
 			return nil, nil
 		default:
 			return nil, xerr

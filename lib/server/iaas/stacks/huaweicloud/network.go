@@ -557,7 +557,8 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// If subnet is not found, consider as a success
+			// If subnet is not found, considered as a success
+			fail.Ignore(xerr)
 			return nil
 		default:
 			return xerr
