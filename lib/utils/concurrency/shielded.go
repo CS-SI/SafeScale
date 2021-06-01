@@ -27,7 +27,6 @@ import (
 // Shielded allows to store data with controlled access to it
 type Shielded struct {
 	witness data.Clonable
-	// lock    TaskedLock
 	lock sync.RWMutex
 }
 
@@ -35,7 +34,6 @@ type Shielded struct {
 func NewShielded(witness data.Clonable) *Shielded {
 	return &Shielded{
 		witness: witness.Clone(),
-		// lock:    NewTaskedLock(),
 	}
 }
 
@@ -45,21 +43,23 @@ func (instance *Shielded) Clone() *Shielded {
 }
 
 // Inspect is used to lock a clonable for read
-func (instance *Shielded) Inspect( /*task Task, */ inspector func(clonable data.Clonable) fail.Error) (xerr fail.Error) {
+func (instance *Shielded) Inspect(inspector func(clonable data.Clonable) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-
 	if inspector == nil {
 		return fail.InvalidParameterCannotBeNilError("inspector")
 	}
-	if instance.witness == nil {
-		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
-	}
 
 	instance.lock.RLock()
-
 	defer instance.lock.RUnlock()
+
+	if instance.witness == nil {
+		return fail.InvalidInstanceContentError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
+	}
+
 
 	return inspector(instance.witness.Clone())
 }
@@ -69,20 +69,21 @@ func (instance *Shielded) Inspect( /*task Task, */ inspector func(clonable data.
 // generated with fail.AlteredNothingError().
 // The caller of the Alter() method will then be able to known, when an error occurs, if it's because there was no change.
 func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
-
 	if alterer == nil {
 		return fail.InvalidParameterCannotBeNilError("alterer")
 	}
-	if instance.witness == nil {
-		return fail.InvalidParameterError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
-	}
 
 	instance.lock.Lock()
-
 	defer instance.lock.Unlock()
+
+	if instance.witness == nil {
+		return fail.InvalidInstanceContentError("d.witness", "cannot be nil; use concurrency.NewData() to instantiate")
+	}
 
 	clone := instance.witness.Clone()
 	if xerr = alterer(clone); xerr != nil {
@@ -95,7 +96,9 @@ func (instance *Shielded) Alter(alterer func(data.Clonable) fail.Error) (xerr fa
 
 // Serialize transforms content of Shielded instance to data suitable for serialization
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded) Serialize() ([]byte, fail.Error) {
+func (instance *Shielded) Serialize() (_ []byte, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -107,6 +110,7 @@ func (instance *Shielded) Serialize() ([]byte, fail.Error) {
 		if innerErr != nil {
 			return fail.SyntaxError("failed to marshal: %s", innerErr.Error())
 		}
+
 		return nil
 	})
 	if xerr != nil {
@@ -118,7 +122,9 @@ func (instance *Shielded) Serialize() ([]byte, fail.Error) {
 
 // Deserialize transforms serialization data to valid content of Shielded instance
 // Note: doesn't follow interface data.Serializable (task parameter not used in it)
-func (instance *Shielded) Deserialize(buf []byte) fail.Error {
+func (instance *Shielded) Deserialize(buf []byte) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
