@@ -225,7 +225,13 @@ func (instance *SecurityGroup) taskDisableOnHost(task concurrency.Task, params c
 	} else {
 		xerr := rh.DisableSecurityGroup(task.GetContext(), instance)
 		rh.Released()
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// considered as a success
+			return nil, nil
+		default:
+			return nil, xerr
+		}
 	}
 	return nil, nil
 }
