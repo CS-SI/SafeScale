@@ -893,16 +893,34 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 
 	rh, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
-		return empty, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// considered as a success
+			return empty, nil
+		default:
+			return empty, xerr
+		}
 	}
 
 	sg, xerr := securitygroupfactory.Load(svc, sgRef)
 	if xerr != nil {
-		return empty, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// considered as a success
+			return empty, nil
+		default:
+			return empty, xerr
+		}
 	}
 
 	if xerr = rh.DisableSecurityGroup(task.GetContext(), sg); xerr != nil {
-		return empty, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// considered as a success
+			return empty, nil
+		default:
+			return empty, xerr
+		}
 	}
 
 	return empty, nil
