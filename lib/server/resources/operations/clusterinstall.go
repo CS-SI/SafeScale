@@ -91,16 +91,39 @@ func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 		return nil
 	}
 
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
-
-	return instance.installMethods
+	out := make(map[uint8]installmethod.Enum)
+	instance.installMethods.Range(func(k, v interface{}) bool {
+		out[k.(uint8)] = v.(installmethod.Enum)
+		return true
+	})
+	return out
 }
 
 // InstalledFeatures returns a list of installed features
 func (instance *Cluster) InstalledFeatures() []string {
-	var list []string
-	return list
+	if instance == nil {
+		return []string{}
+	}
+
+	var out []string
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			for k := range featuresV1.Installed {
+				out = append(out, k)
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		logrus.Error(xerr.Error())
+		return []string{}
+	}
+	return out
 }
 
 // ComplementFeatureParameters FIXME: include the Cluster part of setImplicitParameters() from feature

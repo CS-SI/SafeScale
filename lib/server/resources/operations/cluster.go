@@ -72,7 +72,7 @@ type Cluster struct {
 	*MetadataCore
 
 	lock                sync.RWMutex
-	installMethods      map[uint8]installmethod.Enum
+	installMethods      sync.Map// map[uint8]installmethod.Enum
 	lastStateCollection time.Time
 	makers              clusterflavors2.Makers
 }
@@ -431,26 +431,17 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 
 // updateCachedInformation updates information cached in the instance
 func (instance *Cluster) updateCachedInformation() {
-	instance.lock.Lock()
-	if instance.installMethods == nil {
-		instance.installMethods = map[uint8]installmethod.Enum{}
-	}
-	instance.lock.Unlock()
-
 	var index uint8
 	flavor, err := instance.UnsafeGetFlavor()
 	if err == nil && flavor == clusterflavor.K8S {
 		index++
-		instance.lock.Lock()
-		instance.installMethods[index] = installmethod.Helm
-		instance.lock.Unlock()
+		instance.installMethods.Store(index, installmethod.Helm)
 	}
-	instance.lock.Lock()
+
 	index++
-	instance.installMethods[index] = installmethod.Bash
+	instance.installMethods.Store(index, installmethod.Bash)
 	index++
-	instance.installMethods[index] = installmethod.None
-	instance.lock.Unlock()
+	instance.installMethods.Store(index, installmethod.None)
 }
 
 // convertDefaultsV1ToDefaultsV2 converts propertiesv1.ClusterDefaults to propertiesv2.ClusterDefaults
