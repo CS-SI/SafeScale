@@ -338,6 +338,7 @@ func (instance *Share) Create(
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
+			fail.Ignore(xerr)
 		default:
 			return xerr
 		}
@@ -422,6 +423,7 @@ func (instance *Share) Create(
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
 			// continue
+			fail.Ignore(xerr)
 		default:
 			return xerr
 		}

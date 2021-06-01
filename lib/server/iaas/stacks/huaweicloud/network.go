@@ -333,6 +333,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
+			fail.Ignore(xerr)
 		default:
 			return nullAS, xerr
 		}

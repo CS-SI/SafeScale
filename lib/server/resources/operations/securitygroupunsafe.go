@@ -183,6 +183,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a Security Group not found as a successful deletion
+			fail.Ignore(xerr)
 		default:
 			return xerr
 		}

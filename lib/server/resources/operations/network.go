@@ -260,6 +260,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
+			fail.Ignore(xerr)
 		default:
 			return xerr
 		}

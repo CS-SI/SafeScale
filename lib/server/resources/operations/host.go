@@ -301,6 +301,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
 							// continue
+							fail.Ignore(xerr)
 						default:
 							return xerr
 						}
@@ -701,7 +702,8 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-		// continue
+			// continue
+			fail.Ignore(xerr)
 		default:
 			return nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)
 		}
@@ -717,6 +719,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
+			fail.Ignore(xerr)
 		default:
 			return nil, fail.Wrap(xerr, "failed to check if Host resource name '%s' is already used", hostReq.ResourceName)
 		}
@@ -732,7 +735,8 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-				// continue
+					// continue
+					fail.Ignore(xerr)
 				default:
 					return nil, xerr
 				}
@@ -1320,6 +1324,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// ignore this error
+				fail.Ignore(innerXErr)
 			default:
 				return innerXErr
 			}
@@ -1327,6 +1332,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// Consider a security group not found as a successful unbind
+				fail.Ignore(innerXErr)
 			default:
 				return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
 			}
@@ -2084,6 +2090,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
+						fail.Ignore(derr)
 					default:
 						errors = append(errors, derr)
 					}
@@ -2131,6 +2138,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:
 							// If Host is not found anymore, consider this as a success
+							fail.Ignore(stateErr)
 							return nil
 						default:
 							return stateErr
@@ -2154,6 +2162,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					// continue
+					fail.Ignore(innerXErr)
 				default:
 					return innerXErr
 				}

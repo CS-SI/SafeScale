@@ -132,6 +132,7 @@ func (s *stack) initVPC() fail.Error {
 			case *fail.ErrNotFound:
 				// FIXME: error or automatic DefaultNetwork creation ?
 				// continue
+				fail.Ignore(xerr)
 			default:
 				return xerr
 			}

@@ -1699,6 +1699,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 						switch innerXErr.(type) {
 						case *fail.ErrNotFound:
 							// Security Group not found, consider this as a success
+							fail.Ignore(innerXErr)
 						default:
 							return innerXErr
 						}
@@ -1707,6 +1708,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// Security Group not found, consider this as a success
+						fail.Ignore(innerXErr)
 					default:
 						return innerXErr
 					}
@@ -1817,6 +1819,7 @@ func (instance *Subnet) unbindSecurityGroups(ctx context.Context, sgs *propertie
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// consider a Security Group not found as a successful unbind
+				fail.Ignore(xerr)
 			default:
 				return xerr
 			}
@@ -1833,6 +1836,7 @@ func (instance *Subnet) unbindSecurityGroups(ctx context.Context, sgs *propertie
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// consider a Security Group not found as a successful unbind
+					fail.Ignore(xerr)
 				default:
 					return xerr
 				}
