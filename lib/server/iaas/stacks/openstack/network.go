@@ -620,6 +620,7 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 	routerList, _ := s.ListRouters()
 	var router *Router
 	for _, r := range routerList {
+		r := r
 		if r.Name == id {
 			router = &r
 			break
@@ -894,6 +895,7 @@ func (s Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 		IPAddress:  vip.PrivateIP,
 	}
 	for _, p := range hostPorts {
+		p := p
 		p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
 		xerr = stacks.RetryableRemoteCall(
 			func() error {
