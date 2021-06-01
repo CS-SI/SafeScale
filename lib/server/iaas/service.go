@@ -335,6 +335,7 @@ func (svc service) FindTemplateByName(name string) (*abstract.HostTemplate, fail
 		return nil, err
 	}
 	for _, i := range allTemplates {
+		i := i
 		if i.Name == name {
 			return &i, nil
 		}
