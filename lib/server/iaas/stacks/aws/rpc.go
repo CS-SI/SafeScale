@@ -772,7 +772,7 @@ func (s stack) rpcAllocateAddress(description string) (allocID *string, publicIP
 
 	tags := []*ec2.Tag{
 		{
-			Key: aws.String("Name"),
+			Key:   aws.String("Name"),
 			Value: aws.String(description),
 		},
 	}
@@ -810,7 +810,7 @@ func (s stack) rpcAssociateAddress(nicID, addressID *string) (*string, fail.Erro
 	}
 
 	request := ec2.AssociateAddressInput{
-		AllocationId:        addressID,
+		AllocationId:       addressID,
 		NetworkInterfaceId: nicID,
 	}
 	var resp *ec2.AssociateAddressOutput
@@ -1483,7 +1483,7 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 	// If PublicIP is requested, satisfy the request
 	if aws.BoolValue(publicIP) {
 		// Allocate Elastic IP
-		description := "Elastic IP for "+ aws.StringValue(name)
+		description := "Elastic IP for " + aws.StringValue(name)
 		addrAllocID, _, xerr := s.rpcAllocateAddress(description)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to allocate Elastic IP")
@@ -1607,6 +1607,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// continue
+						fail.Ignore(xerr)
 					default:
 						return fail.Wrap(xerr, "failed to request information about Elastic IP '%s'", ip)
 					}
@@ -1702,6 +1703,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
+				fail.Ignore(xerr)
 			default:
 				return fail.Wrap(xerr, "failed to delete network interface %s from instance", aws.StringValue(v))
 			}
