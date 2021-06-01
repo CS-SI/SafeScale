@@ -2102,7 +2102,13 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 	rh, xerr := LoadHost(instance.GetService(), node.ID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			logrus.Tracef("Node %s not found, deletion considered success", hostName)
+			return nil, nil
+		default:
+			return nil, xerr
+		}
 	}
 
 	xerr = rh.Delete(context.Background())
@@ -2216,7 +2222,13 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			logrus.Tracef("Master %s not found, deletion considered success", p.node.Name)
+			return nil, nil
+		default:
+			return nil, xerr
+		}
 	}
 
 	logrus.Debugf("Deleting Master '%s'", p.node.Name)
