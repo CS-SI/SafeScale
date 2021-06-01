@@ -330,7 +330,8 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound, *fail.ErrNotAvailable:
-		// continue
+			// continue
+			fail.Ignore(xerr)
 		default:
 			return fail.Wrap(xerr, "failed to check if Security Group name '%s' is already used", name)
 		}
@@ -907,6 +908,7 @@ func (instance *SecurityGroup) BindToHost(ctx context.Context, rh resources.Host
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
+						fail.Ignore(xerr)
 						// continue
 					default:
 						return xerr
@@ -919,6 +921,7 @@ func (instance *SecurityGroup) BindToHost(ctx context.Context, rh resources.Host
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
+						fail.Ignore(xerr)
 						// continue
 					default:
 						return xerr
@@ -1217,7 +1220,8 @@ func (instance *SecurityGroup) UnbindFromSubnet(ctx context.Context, rs resource
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
-				// consider a Security Group not found as a successful unbind, and continue to update metadata
+					// consider a Security Group not found as a successful unbind, and continue to update metadata
+					fail.Ignore(innerXErr)
 				default:
 					return innerXErr
 				}
@@ -1280,6 +1284,7 @@ func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, 
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						// consider a Security Group not found as a successful unbind, and continue to update metadata
+						fail.Ignore(innerXErr)
 					default:
 						return innerXErr
 					}

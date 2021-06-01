@@ -204,6 +204,7 @@ func (s Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
+			fail.Ignore(xerr)
 		default:
 			return nullAN, xerr
 		}

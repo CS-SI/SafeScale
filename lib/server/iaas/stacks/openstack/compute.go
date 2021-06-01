@@ -850,6 +850,7 @@ func (s Stack) deletePortsInSlice(ports []string) fail.Error {
 			switch derr.(type) {
 			case *fail.ErrNotFound:
 				// consider a not found port as a successful deletion
+				fail.Ignore(derr)
 			default:
 				errors = append(errors, fail.Wrap(derr, "failed to delete port %s", v))
 			}
@@ -1216,6 +1217,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
+				fail.Ignore(xerr)
 			default:
 				return fail.Wrap(xerr, "failed to find floating ip of host '%s'", hostRef)
 			}
@@ -1242,7 +1244,8 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-		// continue
+			// continue
+			fail.Ignore(xerr)
 		default:
 			return xerr
 		}
@@ -1308,6 +1311,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		case *fail.ErrNotFound:
 			// if host disappeared (rpcListPorts succeeded and host was still there at this moment), consider the error as a successful deletion;
 			// leave a chance to remove ports
+			fail.Ignore(xerr)
 		default:
 			return xerr
 		}
@@ -1320,6 +1324,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			switch derr.(type) {
 			case *fail.ErrNotFound:
 				// consider a not found port as a successful deletion
+				fail.Ignore(derr)
 			default:
 				errors = append(errors, fail.Wrap(derr, "failed to delete port %s (%s)", v.ID, v.Description))
 			}

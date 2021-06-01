@@ -306,6 +306,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a Subnet not found as a successful deletion
+			fail.Ignore(xerr)
 		default:
 			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
 		}
