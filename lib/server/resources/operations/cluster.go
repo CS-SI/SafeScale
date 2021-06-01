@@ -2553,7 +2553,8 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// missing Network and Subnet is considered as successful deletion, continue
+			// missing Network and Subnet is considered as a successful deletion, continue
+			fail.Ignore(xerr)
 		default:
 			return xerr
 		}
@@ -2595,7 +2596,8 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				// Subnet not found, consider as a successful deletion and continue
+				// Subnet not found, considered as a successful deletion and continue
+				fail.Ignore(xerr)
 			default:
 				return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 			}
@@ -2636,7 +2638,8 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				// network not found, consider as a successful deletion and continue
+				// network not found, considered as a successful deletion and continue
+				fail.Ignore(xerr)
 			default:
 				logrus.Errorf("Failed to delete Network '%s'", networkName)
 				return fail.Wrap(xerr, "failed to delete Network '%s'", networkName)

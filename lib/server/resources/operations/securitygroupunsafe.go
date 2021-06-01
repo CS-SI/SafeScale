@@ -199,6 +199,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			logrus.Tracef("core not found, deletion considered as a success")
+			fail.Ignore(xerr)
 			// continue
 		default:
 			return xerr

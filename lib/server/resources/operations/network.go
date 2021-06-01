@@ -463,7 +463,8 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					if xerr != nil {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
-							// Subnet is already deleted, consider as a success and continue
+							// Subnet is already deleted, considered as a success and continue
+							fail.Ignore(xerr)
 						default:
 							return xerr
 						}
