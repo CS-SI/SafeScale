@@ -518,6 +518,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 					if state != hoststate.Terminated {
 						return innerXErr
 					}
+					fail.Ignore(innerXErr)
 					st = hoststate.Terminated
 				default:
 					return innerXErr
@@ -1317,6 +1318,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// if host is not found, consider operation as a success; continue
+			fail.Ignore(xerr)
 			return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
 		default:
 			return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)

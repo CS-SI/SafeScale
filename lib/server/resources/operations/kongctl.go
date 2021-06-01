@@ -325,6 +325,7 @@ func (k *KongController) addSourceControl(
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
+			fail.Ignore(xerr)
 		default:
 			return xerr
 		}

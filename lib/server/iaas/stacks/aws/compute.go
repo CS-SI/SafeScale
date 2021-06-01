@@ -916,25 +916,6 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
-	// ips, xerr := s.rpcDescribeAddresses([]*string{aws.String(ahf.Core.ID)})
-	// if xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound:
-	// 		// continue
-	// 	default:
-	// 		return xerr
-	// 	}
-	// }
-	// var errors []error
-	// for _, ip := range ips {
-	// 	if derr := s.rpcReleaseAddress(ip.AllocationId); derr != nil {
-	// 		errors = append(errors, fail.Wrap(derr, "cleaning up on failure, failed to delete IP address"))
-	// 	}
-	// }
-	// if len(errors) > 0 {
-	// 	return fail.NewErrorList(errors)
-	// }
-
 	vm, xerr := s.rpcDescribeInstanceByID(aws.String(ahf.GetID()))
 	if xerr != nil {
 		switch xerr.(type) {
@@ -974,6 +955,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
+				fail.Ignore(xerr)
 				// continue
 			default:
 				return xerr

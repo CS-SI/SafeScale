@@ -71,6 +71,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 	if _, xerr = s.rpcDescribeVpcByName(aws.String(req.Name)); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			fail.Ignore(xerr)
 			// continue
 		default:
 			return nullAN, xerr
