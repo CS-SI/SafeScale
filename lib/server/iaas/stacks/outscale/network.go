@@ -319,7 +319,8 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// if no nics found, consider as a success and continue
+			// if no nics found, considered as a success and continue
+			fail.Ignore(xerr)
 		default:
 			return xerr
 		}
@@ -541,7 +542,8 @@ func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *fail.ErrNotFound:
-			// No nics found, consider as successful and returns empty slices
+			// No nics found, considered as a success and returns empty slices
+			fail.Ignore(xerr)
 			return emptySubnetSlice, emptyNicSlice, nil
 		}
 		return emptySubnetSlice, emptyNicSlice, xerr

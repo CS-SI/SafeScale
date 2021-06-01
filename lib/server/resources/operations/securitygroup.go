@@ -964,11 +964,12 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, rh resources.
 				return fail.InconsistentError("'*securitygroupproperty.HostsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			// Unbind security group on provider side; if not found, consider as a success
+			// Unbind security group on provider side; if not found, considered as a success
 			hostID := rh.GetID()
 			if innerXErr := instance.GetService().UnbindSecurityGroupFromHost(instance.GetID(), hostID); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
+					fail.Ignore(innerXErr)
 					return nil
 				default:
 					return innerXErr
@@ -1028,10 +1029,11 @@ func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, ho
 				hostName = hostRef
 			}
 			if hostID != "" {
-				// Unbind security group on provider side; if not found, consider as a success
+				// Unbind security group on provider side; if not found, considered as a success
 				if innerXErr := instance.GetService().UnbindSecurityGroupFromHost(instance.GetID(), hostID); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
+						fail.Ignore(innerXErr)
 						return nil
 					default:
 						return innerXErr

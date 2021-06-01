@@ -42,6 +42,12 @@ func AddConsequence(err error, cons error) error {
 	return err
 }
 
+func Ignore(err error) {
+	if err != nil {
+		logrus.Debugf("ignoring error [%s]", err)
+	}
+}
+
 // Consequences returns the list of consequences
 func Consequences(err error) []error {
 	if err != nil {
