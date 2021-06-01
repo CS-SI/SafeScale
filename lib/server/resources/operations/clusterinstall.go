@@ -91,6 +91,9 @@ func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 		return nil
 	}
 
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
 	return instance.installMethods
 }
 

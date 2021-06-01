@@ -216,7 +216,9 @@ func LoadHost(svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) 
 func (instance *Host) updateCachedInformation() fail.Error {
 	svc := instance.GetService()
 
+	instance.lock.Lock()
 	instance.installMethods = map[uint8]installmethod.Enum{}
+	instance.lock.Unlock()
 
 	opUser, opUserErr := getOperatorUsernameFromCfg(svc)
 	if opUserErr != nil {
@@ -239,6 +241,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
+				instance.lock.Lock()
 				if len(hnV2.IPv4Addresses) > 0 {
 					instance.privateIP = hnV2.IPv4Addresses[hnV2.DefaultSubnetID]
 					if instance.privateIP == "" {
@@ -254,6 +257,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 				} else {
 					instance.accessIP = instance.privateIP
 				}
+				instance.lock.Unlock()
 
 				// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
 				// Do not execute neither if Host is single or is a gateway
@@ -327,6 +331,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 				return innerXErr
 			}
 
+			instance.lock.Lock()
 			instance.sshProfile = &system.SSHConfig{
 				Port:                   int(ahc.SSHPort),
 				IPAddress:              instance.accessIP,
@@ -336,6 +341,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 				GatewayConfig:          primaryGatewayConfig,
 				SecondaryGatewayConfig: secondaryGatewayConfig,
 			}
+			instance.lock.Unlock()
 		}
 
 		var index uint8
@@ -348,15 +354,21 @@ func (instance *Host) updateCachedInformation() fail.Error {
 				switch systemV1.Flavor {
 				case "centos", "redhat":
 					index++
+					instance.lock.Lock()
 					instance.installMethods[index] = installmethod.Yum
+					instance.lock.Unlock()
 				case "debian":
 					fallthrough
 				case "ubuntu":
 					index++
+					instance.lock.Lock()
 					instance.installMethods[index] = installmethod.Apt
+					instance.lock.Unlock()
 				case "fedora", "rhel":
 					index++
+					instance.lock.Lock()
 					instance.installMethods[index] = installmethod.Dnf
+					instance.lock.Unlock()
 				}
 			}
 			return nil
@@ -365,10 +377,12 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			return innerXErr
 		}
 
+		instance.lock.Lock()
 		index++
 		instance.installMethods[index] = installmethod.Bash
 		index++
 		instance.installMethods[index] = installmethod.None
+		instance.lock.Unlock()
 		return nil
 	})
 }
