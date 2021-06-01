@@ -431,17 +431,26 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 
 // updateCachedInformation updates information cached in the instance
 func (instance *Cluster) updateCachedInformation() {
-	instance.installMethods = map[uint8]installmethod.Enum{}
+	instance.lock.Lock()
+	if instance.installMethods == nil {
+		instance.installMethods = map[uint8]installmethod.Enum{}
+	}
+	instance.lock.Unlock()
+
 	var index uint8
 	flavor, err := instance.UnsafeGetFlavor()
 	if err == nil && flavor == clusterflavor.K8S {
 		index++
+		instance.lock.Lock()
 		instance.installMethods[index] = installmethod.Helm
+		instance.lock.Unlock()
 	}
+	instance.lock.Lock()
 	index++
 	instance.installMethods[index] = installmethod.Bash
 	index++
 	instance.installMethods[index] = installmethod.None
+	instance.lock.Unlock()
 }
 
 // convertDefaultsV1ToDefaultsV2 converts propertiesv1.ClusterDefaults to propertiesv2.ClusterDefaults
