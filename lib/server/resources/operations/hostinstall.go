@@ -219,6 +219,9 @@ func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 		return map[uint8]installmethod.Enum{}
 	}
 
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
 	return instance.installMethods
 }
 
