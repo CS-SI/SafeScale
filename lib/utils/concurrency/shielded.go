@@ -104,7 +104,7 @@ func (instance *Shielded) Serialize() (_ []byte, xerr fail.Error) {
 	}
 
 	var jsoned []byte
-	xerr := instance.Inspect(func(clonable data.Clonable) fail.Error {
+	xerr = instance.Inspect(func(clonable data.Clonable) fail.Error {
 		var innerErr error
 		jsoned, innerErr = json.Marshal(clonable)
 		if innerErr != nil {
