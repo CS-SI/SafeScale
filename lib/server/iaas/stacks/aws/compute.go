@@ -562,18 +562,20 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				server, innerXErr = s.buildAwsMachine(keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, string(userDataPhase1), publicIP, template)
 			}
 			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrOverload, *fail.ErrInvalidRequest:
-					return retry.StopRetryError(innerXErr)
+				captured := normalizeError(innerXErr)
+
+				switch captured.(type) {
+				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrOverload, *fail.ErrSyntax:
+					return retry.StopRetryError(captured)
 				default:
-					logrus.Warnf("error creating Host: %+v", innerXErr)
+					logrus.Warnf("error creating Host: %+v", captured)
 
 					if server != nil && server.ID != "" {
 						if derr := s.DeleteHost(server.ID); derr != nil {
 							_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", server.Name))
 						}
 					}
-					return innerXErr
+					return captured
 				}
 			}
 
