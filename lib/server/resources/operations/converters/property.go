@@ -126,7 +126,37 @@ func ClusterNetworkFromPropertyToProtocol(in propertiesv3.ClusterNetwork) *proto
 // ClusterFeaturesFromPropertyToProtocol does what the name says
 func ClusterFeaturesFromPropertyToProtocol(in propertiesv1.ClusterFeatures) (*protocol.FeatureListResponse, *protocol.FeatureListResponse) {
 	installed := &protocol.FeatureListResponse{}
+	for k, v := range in.Installed {
+		var requiredBy []string
+		if len(v.RequiredBy) > 0 {
+			for k := range v.RequiredBy {
+				requiredBy = append(requiredBy, k)
+			}
+		}
+
+		var requires []string
+		if len(v.Requires) > 0 {
+			for k := range v.Requires {
+				requires = append(requires, k)
+			}
+		}
+
+		item := &protocol.FeatureResponse{
+			Name: k,
+			FileName: v.FileName,
+			RequiredBy: requiredBy,
+			Requires: requires,
+		}
+		installed.Features = append(installed.Features, item)
+	}
+
 	disabled := &protocol.FeatureListResponse{}
+	for k := range in.Disabled {
+		item := &protocol.FeatureResponse{
+			Name: k,
+		}
+		disabled.Features = append(disabled.Features, item)
+	}
 
 	return installed, disabled
 }

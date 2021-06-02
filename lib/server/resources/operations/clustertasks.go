@@ -235,6 +235,20 @@ func (instance *Cluster) taskCreateCluster(tc concurrency.Task, params concurren
 
 	// Sets nominal state of the new Cluster in metadata
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// update metadata about disabled default features
+		innerXErr := props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			featuresV1.Disabled = req.DisabledDefaultFeatures
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
 		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
 			if !ok {
