@@ -112,19 +112,18 @@ type task struct {
 	finishCh chan struct{} // Used to signal the routine that Wait() the go routine is done
 	doneCh   chan bool     // Used by routine to signal it has done its processing
 	abortCh  chan bool     // Used to signal the routine it has to stop processing
-	// closeCh  chan struct{} // Used to signal the routine capturing the cancel signal to stop capture
 
 	err    fail.Error
 	result TaskResult
 
 	abortDisengaged bool
-	//	subtasks        map[string]Task // list of subtasks created from this task
 }
 
 var globalTask atomic.Value
 
 // RootTask is the "task to rule them all"
-func RootTask() (Task, fail.Error) {
+func RootTask() (rt Task, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	anon := globalTask.Load()
 	if anon == nil {
 		newT, err := newTask(context.Background(), nil)
@@ -197,7 +196,8 @@ func NewTaskWithContext(ctx context.Context /*, parentTask Task*/) (Task, fail.E
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
-func newTask(ctx context.Context, parentTask Task) (*task, fail.Error) {
+func newTask(ctx context.Context, parentTask Task) (nt *task, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	var (
 		childContext context.Context
 		cancel       context.CancelFunc
@@ -281,17 +281,6 @@ func (t *task) GetID() (string, fail.Error) {
 
 	return t.id, nil
 }
-
-// // MustGetSignature builds the "signature" of the task passed as parameter,
-// // ie a string representation of the task ID in the format "{task <id>}".
-// func (t *task) MustGetSignature() (string, fail.Error) {
-// 	if t.isNull() {
-// 		return "", fail.InvalidInstanceError()
-// 	}
-//
-// 	theId, _ := t.GetID()
-// 	return fmt.Sprintf("{task %s}", theId), nil
-// }
 
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
@@ -414,9 +403,6 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters, options 
 
 	t.mu.Lock()
 	defer t.mu.Unlock()
-
-	// subtaskID, _ := st.GetID()
-	// t.subtasks[subtaskID] = st
 
 	return st.Start(action, params)
 }
@@ -680,7 +666,7 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 }
 
 // WaitFor waits for the task to end, for 'duration' duration.
-// Note: if timeout occured, the task is not aborted. You have to abort it yourself if needed.
+// Note: if timeout occurred, the task is not aborted. You have to abort it yourself if needed.
 // If task done, returns (true, <error from the task>)
 // If task aborted, returns (true, utils.ErrAborted)
 // If duration elapsed (meaning the task is still running after duration), returns (false, utils.ErrTimeout)
@@ -827,7 +813,7 @@ func (t *task) Abortable() (bool, fail.Error) {
 // If on call the abort signal is already disarmed, does nothing and returned function does nothing also.
 // If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
 
-func (t *task) DisarmAbortSignal() func() { // FIXME: Untested
+func (t *task) DisarmAbortSignal() func() {
 	if t.IsNull() {
 		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.")
 		return func() {}
