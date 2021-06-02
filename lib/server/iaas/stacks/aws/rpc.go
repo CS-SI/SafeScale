@@ -1987,3 +1987,153 @@ func (s stack) rpcDescribeNetworkInterface(nicID *string) (*ec2.NetworkInterface
 	}
 	return resp.NetworkInterfaces[0], nil
 }
+
+func (s stack) rpcDescribeVolumes(ids []*string) ([]*ec2.Volume, fail.Error) {
+	var request ec2.DescribeVolumesInput
+	if len(ids) > 0 {
+		request.VolumeIds = ids
+	}
+	var resp *ec2.DescribeVolumesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeVolumes(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return []*ec2.Volume{}, xerr
+	}
+	if len(resp.Volumes) == 0 {
+		return []*ec2.Volume{}, nil
+	}
+	return resp.Volumes, nil
+}
+
+func (s stack) rpcDescribeVolumeByID(id *string) (*ec2.Volume, fail.Error) {
+	if id == nil {
+		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("id")
+	}
+	if aws.StringValue(id) == "" {
+		return &ec2.Volume{}, fail.InvalidParameterError("id", "cannot be empty AWS String")
+	}
+
+	resp, xerr := s.rpcDescribeVolumes([]*string{id})
+	if xerr != nil {
+		return &ec2.Volume{}, xerr
+	}
+	if len(resp) == 0 {
+		return &ec2.Volume{}, fail.NotFoundError("failed to find a Volume with ID %s", aws.StringValue(id))
+	}
+	if len(resp) > 1 {
+		return &ec2.Volume{}, fail.InconsistentError("found more than one Volume with ID %s", aws.StringValue(id))
+	}
+
+	return resp[0], nil
+}
+
+// rpcDescribeVolumeByName returns information about a volume identified by its name
+func (s stack) rpcDescribeVolumeByName(name *string) (*ec2.Volume, fail.Error) {
+	if name == nil {
+		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("name")
+	}
+	if aws.StringValue(name) == "" {
+		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be empty AWS String")
+	}
+	request := ec2.DescribeVolumesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name: aws.String("tag:Name"),
+				Values: []*string{name},
+			},
+		},
+	}
+	var resp *ec2.DescribeVolumesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeVolumes(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if len(resp.Volumes) == 0 {
+		return nil, fail.NotFoundError("failed to find a volume with name '%s'", aws.StringValue(name))
+	}
+	if len(resp.Volumes) > 1 {
+		return &ec2.Volume{}, fail.InconsistentError("found more than one Volume with name '%s'", aws.StringValue(name))
+	}
+
+	return resp.Volumes[0], nil
+}
+
+func (s stack) rpcCreateVolume(name *string, size int64, speed string) (*ec2.Volume, fail.Error) {
+	if name == nil {
+		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("name")
+	}
+	if aws.StringValue(name) == "" {
+		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be empty AWS String")
+	}
+	if size <= 0 {
+		return &ec2.Volume{}, fail.InvalidParameterError("size", "cannot be negative or 0 integer")
+	}
+
+	request := ec2.CreateVolumeInput{
+		Size:             aws.Int64(size),
+		VolumeType:       aws.String(speed),
+		AvailabilityZone: aws.String(s.AwsConfig.Zone),
+	}
+	var resp *ec2.Volume
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.CreateVolume(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return &ec2.Volume{}, xerr
+	}
+
+	defer func() {
+		if xerr != nil {
+			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
+			}
+		}
+	}()
+
+	tags := []*ec2.Tag{
+		{
+			Key:   awsTagNameLabel,
+			Value: name,
+		},
+	}
+	if xerr := s.rpcCreateTags([]*string{resp.VolumeId}, tags); xerr != nil {
+		return nil, xerr
+	}
+
+	return resp, nil
+}
+
+func (s stack) rpcDeleteVolume(id *string) fail.Error {
+	if id == nil {
+		return fail.InvalidParameterCannotBeNilError("id")
+	}
+	if *id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty AWS String")
+	}
+
+	request := ec2.DeleteVolumeInput{
+		VolumeId: id,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.DeleteVolume(&request)
+			return err
+		},
+		normalizeError,
+	)
+}
