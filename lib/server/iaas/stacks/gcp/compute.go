@@ -182,7 +182,7 @@ func (s stack) DeleteKeyPair(id string) fail.Error {
 	return fail.NotImplementedError("DeleteKeyPair() not implemented yet") // FIXME: Technical debt
 }
 
-// CreateHost creates an host satisfying request
+// CreateHost creates a host meeting the requirements specified by request
 func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	nullUD := userdata.NewContent()
@@ -293,13 +293,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		func() error {
 			var innerXErr fail.Error
 			if ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs); innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrDuplicate:
-					return retry.StopRetryError(innerXErr)
-				case *fail.ErrInvalidRequest:
-					return retry.StopRetryError(innerXErr)
+				captured := normalizeError(innerXErr)
+				switch captured.(type) {
+				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrOverload, *fail.ErrSyntax:
+					return retry.StopRetryError(captured)
 				default:
-					return innerXErr
+					return captured
 				}
 			}
 
@@ -354,7 +353,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	return ahf, userData, nil
 }
 
-// WaitHostReady waits an host achieve ready state
+// WaitHostReady waits until a host reaches ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter.
 func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAHC := abstract.NewHostCore()
