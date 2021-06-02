@@ -92,6 +92,7 @@ func NewTaskGroupWithContext(ctx context.Context, options ...data.ImmutableKeyVa
 }
 
 func newTaskGroup(ctx context.Context, parentTask Task, options ...data.ImmutableKeyValue) (tg *taskGroup, err fail.Error) {
+	defer fail.OnPanic(&err)
 	var t Task
 
 	if parentTask == nil {
@@ -189,8 +190,9 @@ func (instance *taskGroup) StartInSubtask(action TaskAction, params TaskParamete
 }
 
 // Start runs in goroutine the function with parameters
-// Returns the subtask created to run the action (should be ignored in majority of cases)
-func (instance *taskGroup) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
+// Returns the subtask created to run the action (should be ignored in most cases)
+func (instance *taskGroup) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (tg Task, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if instance.isNull() {
 		return instance, fail.InvalidInstanceError()
 	}
@@ -220,7 +222,7 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 		}
 	}
 
-	_, xerr := subtask.Start(action, params)
+	_, xerr = subtask.Start(action, params)
 	if xerr != nil {
 		return instance, err
 	}
