@@ -438,7 +438,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		return fail.DuplicateError("there is already a Volume named '%s'", req.Name)
 	}
 
-	// Check if host exists but is not managed by SafeScale
+	// Check if Volume exists but is not managed by SafeScale
 	_, xerr = svc.InspectVolume(req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -780,7 +780,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			hostMountsV1.LocalMountsByPath[mountPoint] = &propertiesv1.HostLocalMount{
 				Device:     volumeUUID,
 				Path:       mountPoint,
-				FileSystem: "nfs",
+				FileSystem: format,
 			}
 			hostMountsV1.LocalMountsByDevice[volumeUUID] = mountPoint
 
@@ -1172,6 +1172,7 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		//goland:noinspection ALL
 		defer func(hostInstance resources.Host) {
 			hostInstance.Released()
@@ -1195,10 +1196,12 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 				return nil, fail.InconsistentError("failed to find a mount of attached volume '%s' on host '%s'", volumeName, k)
 			}
 
+			hostID := rh.GetID()
+			hostName := rh.GetName()
 			a := &protocol.VolumeAttachmentResponse{
 				Host: &protocol.Reference{
-					Name: k,
-					Id:   rh.GetID(),
+					Name: hostName,
+					Id:   hostID,
 				},
 				MountPath: path,
 				Format:    m.FileSystem,

@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -261,35 +260,41 @@ var volumeDetach = &cli.Command{
 }
 
 type volumeInfoDisplayable struct {
-	ID        string
-	Name      string
-	Speed     string
-	Size      int32
-	Host      string
-	MountPath string
-	Format    string
-	Device    string
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Speed     string `json:"speed"`
+	Size      int32  `json:"size"`
+	HostID    string `json:"host_id"`
+	HostName  string `json:"host_name"`
+	MountPath string `json:"mount_path"`
+	Format    string `json:"format"`
+	Device    string `json:"device_uuid"`
 }
 
 type volumeDisplayable struct {
-	ID    string
-	Name  string
-	Speed string
-	Size  int32
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Speed string `json:"speed"`
+	Size  int32  `json:"size"`
 }
 
 func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInspectResponse) *volumeInfoDisplayable {
-	ref, _ := srvutils.GetReference(volumeInfo.GetHost())
-	return &volumeInfoDisplayable{
-		volumeInfo.GetId(),
-		volumeInfo.GetName(),
-		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
-		volumeInfo.GetSize(),
-		ref,
-		volumeInfo.GetMountPath(),
-		volumeInfo.GetFormat(),
-		volumeInfo.GetDevice(),
+	out := &volumeInfoDisplayable{
+		ID:    volumeInfo.GetId(),
+		Name:  volumeInfo.GetName(),
+		Speed: protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
+		Size:  volumeInfo.GetSize(),
 	}
+	if len(volumeInfo.Attachments) > 0 {
+		// do not support multiple attachment currently...
+		a := volumeInfo.Attachments[0]
+		out.HostID = a.GetHost().Id
+		out.HostName = a.GetHost().Name
+		out.MountPath = a.GetMountPath()
+		out.Format = a.GetFormat()
+		out.Device = a.GetDevice()
+	}
+	return out
 }
 
 func toDisplayableVolume(volumeInfo *protocol.VolumeInspectResponse) *volumeDisplayable {
@@ -301,6 +306,7 @@ func toDisplayableVolume(volumeInfo *protocol.VolumeInspectResponse) *volumeDisp
 	}
 }
 
+// FIXME: do not use protocol values here
 func getAllowedSpeeds() string {
 	speeds := ""
 	i := 0
