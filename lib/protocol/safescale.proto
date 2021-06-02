@@ -888,6 +888,8 @@ message FeatureListRequest {
 message FeatureResponse {
 	string name = 1;
 	string file_name = 3;
+	repeated string required_by = 4;
+	repeated string requires = 5;
 }
 
 message FeatureListResponse {
