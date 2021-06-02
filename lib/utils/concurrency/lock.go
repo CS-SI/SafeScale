@@ -75,7 +75,8 @@ func NewTaskedLock() TaskedLock {
 // RLock locks for read in the context if:
 // 1. registers the lock for read only if a lock for write is already registered in the context
 // 2. registers the lock for read AND effectively lock for read otherwise
-func (tm *taskedLock) RLock(task Task) fail.Error {
+func (tm *taskedLock) RLock(task Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if tm == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -91,7 +92,6 @@ func (tm *taskedLock) RLock(task Task) fail.Error {
 		return err
 	}
 
-	// logrus.Warnf("Calling rlock from %d, with tid %s", goid(), tid)
 	tm.mu.Lock()
 	acquired := false
 	defer func() {
@@ -136,6 +136,8 @@ func (tm *taskedLock) SafeRLock(task Task) {
 // RUnlock unregisters the mu for read for the context and unlock for read
 // only if no mu for write is registered for the context
 func (tm *taskedLock) RUnlock(task Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	traceR := newTracer(task, tracing.ShouldTrace("concurrency.lock")).entering()
 	defer traceR.exiting()
 	// defer fail.OnExitLogError(&err)
@@ -199,7 +201,9 @@ func (tm *taskedLock) SafeRUnlock(task Task) {
 }
 
 // Lock acquires a write mu.
-func (tm *taskedLock) Lock(task Task) fail.Error {
+func (tm *taskedLock) Lock(task Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	traceR := newTracer(task, tracing.ShouldTrace("concurrency.lock")).entering()
 	defer traceR.exiting()
 
@@ -258,7 +262,9 @@ func (tm *taskedLock) SafeLock(task Task) {
 }
 
 // Unlock releases a write mu
-func (tm *taskedLock) Unlock(task Task) fail.Error {
+func (tm *taskedLock) Unlock(task Task) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	traceR := newTracer(task, tracing.ShouldTrace("concurrency.lock")).entering()
 	defer traceR.exiting()
 
@@ -316,7 +322,9 @@ func (tm *taskedLock) SafeUnlock(task Task) {
 }
 
 // IsRLocked tells if the task is owning a read lock
-func (tm *taskedLock) IsRLocked(task Task) (bool, fail.Error) {
+func (tm *taskedLock) IsRLocked(task Task) (locked bool, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if tm == nil {
 		return false, fail.InvalidInstanceError()
 	}
@@ -335,7 +343,9 @@ func (tm *taskedLock) IsRLocked(task Task) (bool, fail.Error) {
 }
 
 // IsLocked tells if the task is owning a write lock
-func (tm *taskedLock) IsLocked(task Task) (bool, fail.Error) {
+func (tm *taskedLock) IsLocked(task Task) (locked bool, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if tm == nil {
 		return false, fail.InvalidInstanceError()
 	}
@@ -355,7 +365,9 @@ func (tm *taskedLock) IsLocked(task Task) (bool, fail.Error) {
 }
 
 // GetReadLockCount ...
-func (tm *taskedLock) GetReadLockCount(task Task) (uint64, fail.Error) {
+func (tm *taskedLock) GetReadLockCount(task Task) (count uint64, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if tm == nil {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -378,7 +390,9 @@ func (tm *taskedLock) GetReadLockCount(task Task) (uint64, fail.Error) {
 }
 
 // GetWriteLockCount ...
-func (tm *taskedLock) GetWriteLockCount(task Task) (uint64, fail.Error) {
+func (tm *taskedLock) GetWriteLockCount(task Task) (count uint64, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if tm == nil {
 		return 0, fail.InvalidInstanceError()
 	}
