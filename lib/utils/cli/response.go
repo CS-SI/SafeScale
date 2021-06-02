@@ -97,7 +97,8 @@ func (r *response) Display() {
 		if r.Status == cmdstatus.FAILURE {
 			logrus.Error(string(out))
 		} else {
-			logrus.Warn(string(out))
+			// FIXME: why warning here ?
+			//logrus.Warn(string(out))
 		}
 	}
 

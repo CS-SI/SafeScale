@@ -2563,9 +2563,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			func() error {
 				if innerXErr := rs.Delete(ctx); innerXErr != nil {
 					switch innerXErr.(type) {
-					case *fail.ErrNotAvailable:
-						return retry.StopRetryError(innerXErr)
-					case *fail.ErrNotFound:
+					case *fail.ErrNotAvailable, *fail.ErrNotFound:
 						return retry.StopRetryError(innerXErr)
 					default:
 						return innerXErr
@@ -2578,10 +2576,9 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
-			case *fail.ErrTimeout:
+			case *fail.ErrTimeout, *fail.ErrAborted:
 				xerr = fail.ConvertError(xerr.Cause())
-			case *fail.ErrAborted:
-				xerr = fail.ConvertError(xerr.Cause())
+			default:
 			}
 		}
 		xerr = debug.InjectPlannedFail(xerr)
