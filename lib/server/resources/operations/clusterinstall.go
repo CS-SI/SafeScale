@@ -284,8 +284,10 @@ func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 				}
 
 				item = propertiesv1.NewClusterInstalledFeature()
+				item.Name = feat.GetName()
+				item.FileName = feat.GetDisplayFilename()
 				item.Requires = requirements
-				featuresV1.Installed[feat.GetName()] = item
+				featuresV1.Installed[item.Name] = item
 			}
 			if rf, ok := requiredBy.(*Feature); ok && rf != nil && !rf.IsNull() {
 				item.RequiredBy[rf.GetName()] = struct{}{}

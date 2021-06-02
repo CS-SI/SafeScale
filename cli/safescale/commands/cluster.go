@@ -129,10 +129,10 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		delete(config, "last_state")
 	} else {
 		remotedesktopInstalled := true
-		disabledFeatures, ok := config["disabled_features"].(map[string]struct{})
+		disabledFeatures, ok := config["disabled_features"].(*protocol.FeatureListResponse)
 		if ok {
-			for k := range disabledFeatures {
-				if k == "remotedesktop" {
+			for _, v := range disabledFeatures.Features {
+				if v.Name == "remotedesktop" {
 					remotedesktopInstalled = false
 					break
 				}
@@ -140,10 +140,10 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		}
 		if !remotedesktopInstalled {
 			remotedesktopInstalled = false
-			installedFeatures, ok := config["installed_features"].(map[string]interface{})
+			installedFeatures, ok := config["installed_features"].(*protocol.FeatureListResponse)
 			if ok {
-				for k := range installedFeatures {
-					if k == "remotedesktop" {
+				for _, v := range installedFeatures.Features {
+					if v.Name == "remotedesktop" {
 						remotedesktopInstalled = true
 						break
 					}
@@ -159,13 +159,12 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 				for _, v := range masters {
 					urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
 				}
-				config["remotedesktop"] = urls
+				config["remote_desktop"] = urls
 			} else {
 				remotedesktopInstalled = false
 			}
-		}
-		if !remotedesktopInstalled {
-			config["remotedesktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
+		} else {
+			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
 		}
 	}
 	return config
@@ -223,8 +222,8 @@ func outputClusterConfig(cluster *protocol.ClusterResponse) (map[string]interfac
 	if xerr != nil {
 		return nil, xerr
 	}
-	formatted := formatClusterConfig(toFormat, true)
 
+	formatted := formatClusterConfig(toFormat, true)
 	return formatted, nil
 }
 
@@ -251,7 +250,7 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 
 	if c.Controlplane != nil {
 		if c.Controlplane.Vip != nil {
-			result["controplane_vip"] = c.Controlplane.Vip.PrivateIp
+			result["controlplane_vip"] = c.Controlplane.Vip.PrivateIp
 		}
 	}
 
@@ -297,35 +296,35 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 	result["last_state"] = c.State
 	result["admin_login"] = "cladm"
 
-	// Add information not directly in cluster GetConfig()
-	// TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
-	found := false
-	if c.DisabledFeatures != nil && len(c.DisabledFeatures.Features) > 0 {
-		for _, v := range c.DisabledFeatures.Features {
-			if v.Name == "remotedesktop" {
-				found = true
-				break
-			}
-		}
-		if !found {
-			remoteDesktops := map[string][]string{}
-			const urlFmt = "https://%s/_platform/remotedesktop/%s/"
-			for _, v := range nodes["masters"] {
-				urls := []string{fmt.Sprintf(urlFmt, result["EndpointIP"], v.Name)}
-				if sgwpubip != "" {
-					// VPL: no public VIP IP yet, so don't repeat primary gateway public IP
-					// urls = append(urls, fmt.Sprintf(+urlFmt, netCfg.PrimaryPublicIP, host.Name))
-					urls = append(urls, fmt.Sprintf(urlFmt, sgwpubip, v.Name))
-				}
-				remoteDesktops[v.Name] = urls
-			}
-			result["remote_desktop"] = remoteDesktops
-		}
-	}
-	if found {
-		result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale cluster add-feature %s remotedesktop'.",
-			clusterName)
-	}
+	// // Add information not directly in cluster GetConfig()
+	// // TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
+	// found := false
+	// if c.DisabledFeatures != nil && len(c.DisabledFeatures.Features) > 0 {
+	// 	for _, v := range c.DisabledFeatures.Features {
+	// 		if v.Name == "remotedesktop" {
+	// 			found = true
+	// 			break
+	// 		}
+	// 	}
+	// 	if !found {
+	// 		remoteDesktops := map[string][]string{}
+	// 		const urlFmt = "https://%s/_platform/remotedesktop/%s/"
+	// 		for _, v := range nodes["masters"] {
+	// 			urls := []string{fmt.Sprintf(urlFmt, result["EndpointIP"], v.Name)}
+	// 			if sgwpubip != "" {
+	// 				// VPL: no public VIP IP yet, so don't repeat primary gateway public IP
+	// 				// urls = append(urls, fmt.Sprintf(+urlFmt, netCfg.PrimaryPublicIP, host.Name))
+	// 				urls = append(urls, fmt.Sprintf(urlFmt, sgwpubip, v.Name))
+	// 			}
+	// 			remoteDesktops[v.Name] = urls
+	// 		}
+	// 		result["remote_desktop"] = remoteDesktops
+	// 	}
+	// }
+	// if found {
+	// 	result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale cluster add-feature %s remotedesktop'.",
+	// 		clusterName)
+	// }
 
 	return result, nil
 }
@@ -512,8 +511,6 @@ var clusterCreateCommand = &cli.Command{
 
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			// msg := fmt.Sprintf("failed to create cluster: %s", err.Error())
-			// return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		if res == nil {

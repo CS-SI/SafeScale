@@ -27,8 +27,10 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type ClusterInstalledFeature struct {
+	Name       string              `json:"name"`                  // contains the name of the feature
+	FileName   string              `json:"filename"`              // contains name of file used
 	RequiredBy map[string]struct{} `json:"required_by,omitempty"` // tells what feature(s) needs this one
-	Requires   map[string]struct{} `json:"requires,omitempty"`
+	Requires   map[string]struct{} `json:"requires,omitempty"`    // tells what feature(s) is(are) required by this one
 }
 
 // NewClusterInstalledFeature ...
