@@ -47,6 +47,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 				switch captured.(type) { //nolint
 				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrOverload: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(captured)
+				default:
 				}
 				return captured
 			}
