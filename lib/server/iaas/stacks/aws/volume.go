@@ -17,6 +17,9 @@
 package aws
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
@@ -62,100 +65,52 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	return &volume, nil
 }
 
-func (s stack) rpcDeleteVolume(id *string) fail.Error {
-	if id == nil {
-		return fail.InvalidParameterCannotBeNilError("id")
-	}
-	if *id == "" {
-		return fail.InvalidParameterError("id", "cannot be empty AWS String")
-	}
-
-	request := ec2.DeleteVolumeInput{
-		VolumeId: id,
-	}
-	return stacks.RetryableRemoteCall(
-		func() error {
-			_, err := s.EC2Service.DeleteVolume(&request)
-			return err
-		},
-		normalizeError,
-	)
-}
-func (s stack) rpcCreateVolume(name *string, size int64, speed string) (*ec2.Volume, fail.Error) {
-	if name == nil {
-		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("name")
-	}
-	if aws.StringValue(name) == "" {
-		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be empty AWS String")
-	}
-	if size <= 0 {
-		return &ec2.Volume{}, fail.InvalidParameterError("size", "cannot be negative or 0 integer")
-	}
-
-	request := ec2.CreateVolumeInput{
-		Size:             aws.Int64(size),
-		VolumeType:       aws.String(speed),
-		AvailabilityZone: aws.String(s.AwsConfig.Zone),
-	}
-	var resp *ec2.Volume
-	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			resp, err = s.EC2Service.CreateVolume(&request)
-			return err
-		},
-		normalizeError,
-	)
-	if xerr != nil {
-		return &ec2.Volume{}, xerr
-	}
-
-	defer func() {
-		if xerr != nil {
-			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
-			}
-		}
-	}()
-
-	tags := []*ec2.Tag{
-		{
-			Key:   awsTagNameLabel,
-			Value: name,
-		},
-	}
-	if xerr := s.rpcCreateTags([]*string{resp.VolumeId}, tags); xerr != nil {
-		return nil, xerr
-	}
-
-	return resp, nil
-}
 
 // InspectVolume ...
-func (s stack) InspectVolume(id string) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if s.IsNull() {
 		return nullAV, fail.InvalidInstanceError()
 	}
-	if id == "" {
-		return nullAV, fail.InvalidParameterError("id", "cannot be empty string")
+	if ref == "" {
+		return nullAV, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", ref).WithStopwatch().Entering().Exiting()
+	// VPL: caller must log; sometimes InspectVolume() returned error is to be considered as an information, not a real error
+	// defer fail.OnExitLogError(&xerr)
 
-	resp, xerr := s.rpcDescribeVolumeByID(aws.String(id))
-	if xerr != nil {
-		return nullAV, xerr
-	}
-	var (
-		name string
-	)
-	for _, v := range resp.Tags {
-		if aws.StringValue(v.Key) == tagNameLabel {
-			name = aws.StringValue(v.Value)
-			break
+	var name string
+	resp, xerr := s.rpcDescribeVolumeByName(aws.String(ref))
+	if xerr != nil || resp == nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound, *fail.ErrInvalidRequest:
+			resp, xerr = s.rpcDescribeVolumeByID(aws.String(ref))
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound, *fail.ErrInvalidRequest:
+					return nullAV, fail.NotFoundError("failed to find Volume %s", ref)
+				default:
+					return nullAV, xerr
+				}
+			}
+			if resp == nil {
+				return nullAV, fail.NotFoundError("failed to find Volume %s", ref)
+			}
+
+			name = ref
+		default:
+			return nullAV, xerr
+		}
+	} else {
+		for _, v := range resp.Tags {
+			if aws.StringValue(v.Key) == tagNameLabel {
+				name = aws.StringValue(v.Value)
+				break
+			}
 		}
 	}
+
 	volume := abstract.Volume{
 		ID:    aws.StringValue(resp.VolumeId),
 		Name:  name,
@@ -164,50 +119,6 @@ func (s stack) InspectVolume(id string) (_ *abstract.Volume, xerr fail.Error) {
 		State: toAbstractVolumeState(resp.State),
 	}
 	return &volume, nil
-}
-
-func (s stack) rpcDescribeVolumes(ids []*string) ([]*ec2.Volume, fail.Error) {
-	var request ec2.DescribeVolumesInput
-	if len(ids) > 0 {
-		request.VolumeIds = ids
-	}
-	var resp *ec2.DescribeVolumesOutput
-	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			resp, err = s.EC2Service.DescribeVolumes(&request)
-			return err
-		},
-		normalizeError,
-	)
-	if xerr != nil {
-		return []*ec2.Volume{}, xerr
-	}
-	if len(resp.Volumes) == 0 {
-		return []*ec2.Volume{}, nil
-	}
-	return resp.Volumes, nil
-}
-
-func (s stack) rpcDescribeVolumeByID(id *string) (*ec2.Volume, fail.Error) {
-	if id == nil {
-		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("id")
-	}
-	if aws.StringValue(id) == "" {
-		return &ec2.Volume{}, fail.InvalidParameterError("id", "cannot be empty AWS String")
-	}
-
-	resp, xerr := s.rpcDescribeVolumes([]*string{id})
-	if xerr != nil {
-		return &ec2.Volume{}, xerr
-	}
-	if len(resp) == 0 {
-		return &ec2.Volume{}, fail.NotFoundError("failed to find a Volume with ID %s", aws.StringValue(id))
-	}
-	if len(resp) > 1 {
-		return &ec2.Volume{}, fail.InconsistentError("found more than one Volume with ID %s", aws.StringValue(id))
-	}
-
-	return resp[0], nil
 }
 
 func fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
@@ -348,25 +259,96 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
+
+	availableDevices := initAvailableDevices()
 	var resp *ec2.VolumeAttachment
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
+			var (
+				deviceName string
+				innerXErr fail.Error
+			)
+			deviceName, availableDevices, innerXErr = s.findNextAvailableDevice(request.HostID, availableDevices)
+			if xerr != nil {
+				return innerXErr
+			}
+
 			resp, innerErr = s.EC2Service.AttachVolume(&ec2.AttachVolumeInput{
-				Device:     aws.String(request.Name),
+				Device:     aws.String(deviceName), // aws.String(request.Name),
 				InstanceId: aws.String(request.HostID),
 				VolumeId:   aws.String(request.VolumeID),
 			})
-			return normalizeError(innerErr)
+			return innerErr
 		},
 		normalizeError,
 	)
 	if xerr != nil {
 		return "", xerr
 	}
-	return aws.StringValue(resp.Device) + aws.StringValue(resp.VolumeId), nil
+
+	// In AWS, there is no volume attachment ID, the value returned is the volumeID alone
+	return aws.StringValue(resp.VolumeId), nil
 }
 
-// InspectVolumeAttachment ...
+// initAvailableDevices inits a map with potentially usable device names
+// For AWS, recommended names for EBS volume is /dev/sd[f-z], allowing 21 attached volumes on one Host
+func initAvailableDevices() map[string]struct{} {
+	// Initialize the map of possible slots
+	availableSlots := make(map[string]struct{})
+	for i := int('f'); i <= int('z'); i++ {
+		availableSlots[string(byte(i))] = struct{}{}
+	}
+	return availableSlots
+}
+
+func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]struct{}) (string, map[string]struct{}, fail.Error) {
+	instance, xerr := s.rpcDescribeInstanceByID(aws.String(hostID))
+	if xerr != nil {
+		return "", availableSlots, xerr
+	}
+
+	var sdCount, xvdCount uint
+	// walk through all the devices already attached to the Host and remove from available slots the ones that
+	// are already used
+	for _, v := range instance.BlockDeviceMappings {
+		var suffix string
+		deviceName := aws.StringValue(v.DeviceName)
+		if strings.HasPrefix(deviceName, "/dev/sd") {
+			suffix = strings.Trim(deviceName, "/dev/sd")
+			sdCount++
+		} else if strings.HasPrefix(deviceName, "/dev/xvd") {
+			suffix = strings.Trim(deviceName, "/dev/xvd")
+			xvdCount++
+		} else {
+			continue
+		}
+		delete(availableSlots, suffix)
+	}
+	if len(availableSlots) == 0 {
+		return "", availableSlots, fail.OverflowError(nil, 25, "no more devices available to attach a volume on Host %s", hostID)
+	}
+
+	// extract keys from availableSlots
+	availableKeys := make([]string, 0, len(availableSlots))
+	for k := range availableSlots {
+		availableKeys = append(availableKeys, k)
+	}
+	sort.Strings(availableKeys)
+	// The winner is the first entry in availableKeys
+
+	// decide what prefix to use for device name
+	var deviceName string
+	if sdCount >= xvdCount {
+		deviceName = "sd"
+	} else {
+		deviceName = "xvd"
+	}
+	deviceName += availableKeys[0]
+	delete(availableSlots, availableKeys[0])    // selected, remove it from availableSlots for optional next rounds
+	return deviceName, availableSlots, nil
+}
+
+// InspectVolumeAttachment returns information about a volume attachment
 func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeAttachment, xerr fail.Error) {
 	nullAVA := abstract.NewVolumeAttachment()
 	if s.IsNull() {
@@ -380,16 +362,17 @@ func (s stack) InspectVolumeAttachment(serverID, id string) (_ *abstract.VolumeA
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	// VPL: caller MUST log; sometimes, InspectVolumeAttachment returned error may be considered as an information of non-existence, not a real error
+	// defer fail.OnExitLogError(&xerr)
 
 	query := ec2.DescribeVolumesInput{
 		VolumeIds: []*string{aws.String(id)},
 	}
 	var resp *ec2.DescribeVolumesOutput
 	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.DescribeVolumes(&query)
-			return normalizeError(innerErr)
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeVolumes(&query)
+			return normalizeError(err)
 		},
 		normalizeError,
 	)
@@ -421,7 +404,6 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s)", serverID).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
 
 	query := ec2.DescribeVolumesInput{
 		Filters: []*ec2.Filter{
@@ -433,9 +415,9 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 	}
 	var resp *ec2.DescribeVolumesOutput
 	xerr = stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			resp, innerErr = s.EC2Service.DescribeVolumes(&query)
-			return normalizeError(innerErr)
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeVolumes(&query)
+			return normalizeError(err)
 		},
 		normalizeError,
 	)
@@ -456,7 +438,7 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 	return vas, nil
 }
 
-// DeleteVolumeAttachment ...
+// DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
 func (s stack) DeleteVolumeAttachment(serverID, id string) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -469,7 +451,6 @@ func (s stack) DeleteVolumeAttachment(serverID, id string) (xerr fail.Error) {
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%s, %s)", serverID, id).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
 
 	query := ec2.DetachVolumeInput{
 		InstanceId: aws.String(serverID),
@@ -477,8 +458,8 @@ func (s stack) DeleteVolumeAttachment(serverID, id string) (xerr fail.Error) {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.EC2Service.DetachVolume(&query)
-			return normalizeError(innerErr)
+			_, err := s.EC2Service.DetachVolume(&query)
+			return normalizeError(err)
 		},
 		normalizeError,
 	)
