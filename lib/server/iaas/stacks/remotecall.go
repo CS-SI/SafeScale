@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// RetryableRemoteCall calls a remote API with communication failure tolerance
+// RetryableRemoteCall calls a remote API with tolerance to communication failures
 // Remote API is done inside 'callback' parameter and returns remote error if necessary that 'convertError' function convert to SafeScale error
 func RetryableRemoteCall(callback func() error, convertError func(error) fail.Error) fail.Error {
 	if callback == nil {
@@ -45,7 +45,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 			if innerErr := callback(); innerErr != nil {
 				captured := normalizeError(innerErr)
 				switch captured.(type) { //nolint
-				case *fail.ErrNotFound, *fail.ErrDuplicate: // Do not retry if not found or duplicate
+				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrOverload: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(captured)
 				}
 				return captured
