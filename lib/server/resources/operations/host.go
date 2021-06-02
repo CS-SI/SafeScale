@@ -2874,8 +2874,8 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 				}
 
 				volumes = make([]string, 0, len(hostVolumesV1.VolumesByName))
-				for _, v := range hostVolumesV1.VolumesByName {
-					volumes = append(volumes, v)
+				for k := range hostVolumesV1.VolumesByName {
+					volumes = append(volumes, k)
 				}
 				return nil
 			})

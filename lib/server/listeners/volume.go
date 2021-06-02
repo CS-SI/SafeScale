@@ -33,12 +33,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// safescale volume create v1 --speed="Ssd" --size=2000 (par default Hdd, possible Ssd, Hdd, Cold)
-// safescale volume attach v1 host1 --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4)
+// safescale volume create --speed="Ssd" --size=2000 (par default Hdd, possible Ssd, Hdd, Cold) v1
+// safescale volume attach --path="/shared/data" --format="xfs" (par default /shared/v1 et ext4) v1 host1
 // safescale volume detach v1
 // safescale volume delete v1
 // safescale volume inspect v1
-// safescale volume update v1 --speed="Hdd" --size=1000
+// safescale volume update  --speed="Hdd" --size=1000 v1
 
 // VolumeHandler ...
 var VolumeHandler = handlers.NewVolumeHandler
@@ -133,6 +133,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.volume"), "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
 	handler := handlers.NewVolumeHandler(job)
 	rv, xerr := handler.Create(name, int(size), volumespeed.Enum(speed))
 	if xerr != nil {
