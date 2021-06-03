@@ -54,14 +54,16 @@ type stepResult struct {
 	completed bool // if true, the script has been run to completion
 	retcode   int
 	output    string
-	success   bool  // if true, the script has been run successfully and the result is a success
-	err       error // if an error occurred, contains the err
+	success   bool  // if true, the script has finished, and the result is a success
+	err       error // if an error occurred, 'err' contains it
 }
 
+// Successful returns true if the script has finished AND its results is a success
 func (sr stepResult) Successful() bool {
 	return sr.success
 }
 
+// Completed returns true if the script has finished, false otherwise
 func (sr stepResult) Completed() bool {
 	return sr.completed
 }
@@ -76,7 +78,26 @@ func (sr stepResult) ErrorMessage() string {
 		msg = sr.err.Error()
 	}
 	if msg == "" && sr.retcode != 0 {
-		msg = fmt.Sprintf("exited with error code %d", sr.retcode)
+		recoveredErr := ""
+		if sr.output != "" {
+			lastMsg := ""
+			lines := strings.Split(sr.output, "\n")
+			for _, line := range lines {
+				if strings.Contains(line, "+ echo '") {
+					lastMsg = line
+				}
+			}
+
+			if len(lastMsg) > 0 {
+				recoveredErr = lastMsg[8 : len(lastMsg)-1]
+			}
+		}
+
+		if len(recoveredErr) > 0 {
+			msg = fmt.Sprintf("exited with error code %d: %s", sr.retcode, recoveredErr)
+		} else {
+			msg = fmt.Sprintf("exited with error code %d", sr.retcode)
+		}
 	}
 	return msg
 }
