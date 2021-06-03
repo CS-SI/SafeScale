@@ -3068,6 +3068,7 @@ func (instance *Cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return out, nil
 }
 
