@@ -1484,7 +1484,7 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 	// If PublicIP is requested, satisfy the request
 	if aws.BoolValue(publicIP) {
 		// Allocate Elastic IP
-		description := fmt.Sprintf("elasticip--%s--%s", aws.StringValue(nic.NetworkInterfaceId), name) // Make each description unique
+		description := fmt.Sprintf("elasticip--%s--%s", aws.StringValue(nic.NetworkInterfaceId), aws.StringValue(name)) // Make each description unique
 		addrAllocID, _, xerr := s.rpcAllocateAddress(description)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to allocate Elastic IP")
