@@ -450,7 +450,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 							}
 						}
 					}
-					return xerr
+					switch xerr.(type) {
+					case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+						return retry.StopRetryError(xerr)
+					default:
+						return xerr
+					}
 				},
 				normalizeError,
 			)

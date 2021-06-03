@@ -889,11 +889,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		func() error {
 			resp, innerXErr := s.rpcCreateVMs(vmsRequest)
 			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrOverload:
-					return retry.StopRetryError(innerXErr)
+				casted := normalizeError(innerXErr)
+				switch casted.(type) {
+				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+					return retry.StopRetryError(casted)
 				default:
-					return innerXErr
+					return casted
 				}
 			}
 

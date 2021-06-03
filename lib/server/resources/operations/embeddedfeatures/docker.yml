@@ -209,9 +209,17 @@ feature:
                             # If firewalld doesn't run, start it
                             sfService status firewalld | grep running || {
                                 # Makes sure firewalld is running, starting first its dependency dbus...
-                                sfService start dbus
+                                op=-1
+                                sfService start dbus && op=$? || op=$?
+                                if [[ $op -ne 0 ]]; then
+                                    sfFail $op "problem starting dbus: errorcode $op"
+                                fi
                                 # then firewalld  itself
-                                sfService restart firewalld
+                                op=-1
+                                sfService restart firewalld && op=$? || op=$?
+                                if [[ $op -ne 0 ]]; then
+                                    sfFail $op "problem starting firewalld: errorcode $op"
+                                fi
                             }
 
                             # If a zone named 'docker' is created and activated, we do not need to add interfaces to trusted zone
