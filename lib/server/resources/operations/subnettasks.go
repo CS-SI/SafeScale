@@ -73,9 +73,31 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		return nil, xerr
 	}
 
-	userData, xerr := rgw.Create(task.GetContext(), hostReq, hostSizing) // cerr is tested later
+	userData, createXErr := rgw.Create(task.GetContext(), hostReq, hostSizing) // createXErr is tested later
+
+	// Set link to Subnet before testing if Host has been successfully created;
+	// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
+	// be able to delete subnet on later safescale command
+	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		// If Host resources has been created and error occured after (and KeepOnFailure is requested), rgw.GetID() does contain the ID of the Host
+		if id := rgw.GetID(); id != "" {
+			as.GatewayIDs = append(as.GatewayIDs, id)
+		}
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	// Now test result of gateway creation
+	if createXErr != nil {
+		return nil, createXErr
 	}
 
 	// Starting from here, deletes the gateway if exiting with error
@@ -104,23 +126,6 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			_ = xerr.AddConsequence(derr)
 		}
 	}()
-
-	// Set link to Subnet before testing if Host has been successfully created; in case of failure, we need to have registered the gateway ID in Subnet
-	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		if id := rgw.GetID(); id != "" {
-			as.GatewayIDs = append(as.GatewayIDs, id)
-		}
-		return nil
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
 
 	// Binds gateway to VIP if needed
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
