@@ -648,6 +648,8 @@ func (instance *Host) GetState() (state hoststate.Enum) {
 
 // Create creates a new Host and its metadata
 // If the metadata is already carrying a Host, returns fail.ErrNotAvailable
+// In case of error occuring after Host resource creation, 'instance' still contains ID of the Host created. This can be used to
+// defer Host deletion in case of error
 func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (_ *userdata.Content, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
