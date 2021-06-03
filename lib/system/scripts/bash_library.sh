@@ -291,11 +291,11 @@ sfFirewall() {
 	# check firewalld is running
 	local op=-1
 	local restarted=-1
-	while [[ $restarted -eq -1 ]]; do
+	while [[ $op -eq -1 && $restarted -eq -1 ]]; do
 		# try to get firewall state
 		state=$(timeout 10s firewall-cmd --state); op=$?
 		# Restart firewalld if failed
-		if [[ $op -ne 0 || "$state" != "running" ]]; then
+		if [[ $op -ne 0 || $state != "running" ]]; then
 			sfService stop firewalld &>/dev/null
 			sfSalvageDBusIfNeeded
 			sfService start firewalld; restarted=0
