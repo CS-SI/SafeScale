@@ -692,9 +692,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
 					innerXErr = fail.ConvertError(innerXErr.Cause())
-				case *fail.ErrInvalidRequest: // useless to retry on bad request...
-					return retry.StopRetryError(innerXErr)
-				case *fail.ErrDuplicate: // useless to retry on duplicate (no matter on what resource the duplicate is found)...
+				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(innerXErr)
 				}
 				if server != nil && server.ID != "" {
@@ -702,12 +700,10 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName))
 					}
 				}
-				logrus.Errorf(innerXErr.Error())
 				return innerXErr
 			}
 			if server == nil || server.ID == "" {
 				innerXErr = fail.NewError("failed to create server")
-				logrus.Errorf(innerXErr.Error())
 				return innerXErr
 			}
 
