@@ -267,7 +267,7 @@ export -f sfStandardRetry
 # sfSalvageDBusIfNeeded restarts dbus-daemon if needed (ie there are no or more than 1 dbus-daemon)
 # returns 0 if nothing has been done, 1 if dbus has been restarted
 sfSalvageDBusIfNeeded() {
-	count=$(ps ax | grep dbus-daemon | wc -l)
+	count=$(ps ax | grep dbus-daemon | grep -v grep | wc -l)
 	if [ $count -ne 1 ]; then
 		sfService stop dbus
 		pkill dbus-daemon
@@ -291,17 +291,17 @@ sfFirewall() {
 	# check firewalld is running
 	local op=-1
 	local restarted=-1
-	while [[ $restarted == -1 ]]; do
+	while [[ $restarted -eq -1 ]]; do
 		# try to get firewall state
 		state=$(timeout 10s firewall-cmd --state); op=$?
 		# Restart firewalld if failed
-		if [[ $op != 0 || "$state" != "running" ]]; then
+		if [[ $op -ne 0 || "$state" != "running" ]]; then
 			sfService stop firewalld &>/dev/null
 			sfSalvageDBusIfNeeded
 			sfService start firewalld; restarted=0
 		fi
 	done
-	if [[ $op != 0 ]]; then
+	if [[ $op -ne 0 ]]; then
 		echo "failed to start currently stopped firewalld"
 		return 1
 	fi
@@ -323,9 +323,9 @@ sfFirewallReload() {
 	local op=-1
 	sudo timeout 30s sfFirewall --reload; op=$?
 	local sop=-1
-	if [[ $op != 0 ]]; then
+	if [[ $op -ne 0 ]]; then
 		sudo timeout 30s sfFirewall --complete-reload; sop=$?
-		if [[ $sop != 0 ]]; then
+		if [[ $sop -ne 0 ]]; then
 			echo "firewall-cmd reloading failed with $op first and then with $sop" # keep the error codes from firewall-cmd
 			return $sop
 		fi
