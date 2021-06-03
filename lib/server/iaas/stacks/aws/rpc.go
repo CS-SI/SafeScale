@@ -1615,7 +1615,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 				} else {
 					xerr = s.rpcDisassociateAddress(address.AssociationId)
 					if xerr != nil {
-						return fail.Wrap(xerr, "failed to disassociate Elastic IP 'ùs' from interface", ip)
+						return fail.Wrap(xerr, "failed to disassociate Elastic IP '%s' from interface", ip)
 					}
 
 					xerr = s.rpcReleaseAddress(address.AllocationId)
