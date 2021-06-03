@@ -18,6 +18,7 @@ package aws
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -1483,7 +1484,7 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 	// If PublicIP is requested, satisfy the request
 	if aws.BoolValue(publicIP) {
 		// Allocate Elastic IP
-		description := "Elastic IP for " + aws.StringValue(name)
+		description := fmt.Sprintf("elasticip--%s--%s", aws.StringValue(nic.NetworkInterfaceId), name) // Make each description unique
 		addrAllocID, _, xerr := s.rpcAllocateAddress(description)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to allocate Elastic IP")
@@ -2043,7 +2044,7 @@ func (s stack) rpcDescribeVolumeByName(name *string) (*ec2.Volume, fail.Error) {
 	request := ec2.DescribeVolumesInput{
 		Filters: []*ec2.Filter{
 			{
-				Name: aws.String("tag:Name"),
+				Name:   aws.String("tag:Name"),
 				Values: []*string{name},
 			},
 		},
