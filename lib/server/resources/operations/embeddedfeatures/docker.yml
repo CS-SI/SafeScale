@@ -39,20 +39,27 @@ feature:
                                 debian|ubuntu)
                                     dpkg -l | grep docker-ce &>/dev/null || sfFail 194 "package docker-ce not found"
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
+                                    docker pull hello-world 2>/tmp/fail.txt 7>/tmp/fail.txt || sfFail 210 "$(cat /tmp/fail.txt)"
+                                    docker run hello-world | grep "working correctly" || sfFail 211 "failure running hello-world docker image"
                                     ;;
                                 centos|redhat|rhel)
                                     rpm -qa | grep docker-ce &>/dev/null || sfFail 194 "package docker-ce not found"
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
+                                    docker pull hello-world 2>/tmp/fail.txt 7>/tmp/fail.txt || sfFail 210 "$(cat /tmp/fail.txt)"
+                                    docker run hello-world | grep "working correctly" || sfFail 211 "failure running hello-world docker image"
                                     ;;
                                 fedora)
                                     rpm -qa | grep docker-ce &>/dev/null || sfFail 194 "package docker-ce not found"
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
+                                    docker pull hello-world 2>/tmp/fail.txt 7>/tmp/fail.txt || sfFail 210 "$(cat /tmp/fail.txt)"
+                                    docker run hello-world | grep "working correctly" || sfFail 211 "failure running hello-world docker image"
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 195
+                                    sfFail 195 "Unsupported operating system '$LINUX_KIND'"
                                     ;;
                             esac
+                            sfExit
 
             add:
                 pace: docker-ce,docker-compose,config,firewall,ready,verify
@@ -70,14 +77,14 @@ feature:
                                     sfStandardRetry "sfApt update"
                                     sfStandardRetry "sfApt install -y gnupg2 || sfApt install -y gnupg"
                                     sfStandardRetry "sfApt install -y apt-transport-https ca-certificates curl software-properties-common" || sfFail $? "error installing apt tools"
-                                    sfStandardRetry "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 193
+                                    sfStandardRetry "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 193 "error updating gpg keys"
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
                                     sfStandardRetry "sfApt update"
                                     sfStandardRetry "sfApt install -qqy docker-ce" || sfFail $? "error installing docker-ce"
                                     ;;
                                 centos|redhat|rhel)
-                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 195
-                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo" || sfFail 196
+                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 195 "error installing yum prerequisites"
+                                    sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo" || sfFail 196 "error adding docker-ce repo"
                                     kop=0
                                     op=-1
                                     yum install -y curl --nobest &>/dev/null && op=$? || true
@@ -89,7 +96,7 @@ feature:
                                             sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce" || sfFail $? "error installing docker-ce"
                                         fi
                                     else
-                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce --nobest" || sfFail 199
+                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "yum install -y docker-ce --nobest" || sfFail 199 "error installing docker-ce --nobest"
                                     fi
                                     cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
                                     ;;
@@ -102,18 +109,18 @@ feature:
                                     if [ $op -ne 0 ]; then
                                         dnf install -y curl &>/dev/null && op=$? || true
                                         if [ $op -ne 0 ]; then
-                                            sfFail 201
+                                            sfFail 201 "error installing curl"
                                         else
-                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce" || sfFail 202
+                                            sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce" || sfFail 202 "error installing docker-ce"
                                         fi
                                     else
-                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce --nobest" || sfFail 203
+                                        sfRetry $(sfLongTimeout) $(sfDefaultDelay) "dnf install -y docker-ce --nobest" || sfFail 203 "error installing docker-ce"
                                     fi
                                     systemctl enable --now docker || true
                                     ;;
                                 *)
                                     echo "Unsupported operating system '$LINUX_KIND'"
-                                    sfFail 197
+                                    sfFail 197 "Unsupported operating system '$LINUX_KIND'"
                                     ;;
                             esac
                             sfExit
@@ -129,10 +136,10 @@ feature:
                             VERSION="{{.DockerComposeVersion}}"
                             if [[ "latest" = "${VERSION}" ]]; then
                                 VERSION=$(sfStandardRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/{{.DockerComposeVersion}} | jq -r .name") && op=$? || true
-                                [ $op -ne 0 ] && sfFail 204
+                                [ $op -ne 0 ] && sfFail 204 "error getting last docker version"
                             fi
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
-                            sfDownload "$URL" docker-compose 3m 5 || sfFail 205
+                            sfDownload "$URL" docker-compose 3m 5 || sfFail 205 "error downloading last docker version"
                             chmod +x docker-compose && mv docker-compose /usr/bin
                             sfExit
 
@@ -223,11 +230,11 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfService enable docker || sfFail 207
-                            sfService restart docker || sfFail 208
+                            sfService enable docker || sfFail 207 "error enabling docker service"
+                            sfService restart docker || sfFail 208 "error restarting docker service"
                             op=-1
                             sfStandardRetry "sfService status docker &>/dev/null" && op=$? || true
-                            [ $op -ne 0 ] && sfFail 209
+                            [ $op -ne 0 ] && sfFail 209 "error getting docker service status"
                             sfExit
 
                     verify:
@@ -238,6 +245,7 @@ feature:
                             nodes: all
                         run: |
                             docker pull hello-world 2>/tmp/fail.txt 7>/tmp/fail.txt || sfFail 210 "$(cat /tmp/fail.txt)"
+                            docker run hello-world | grep "working correctly" || sfFail 211 "failure running hello-world docker image"
                             sfExit
 
             remove:
