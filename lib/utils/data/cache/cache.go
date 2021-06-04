@@ -99,13 +99,13 @@ func (instance *cache) GetEntry(key string) (*Entry, fail.Error) {
 	defer instance.lock.RUnlock()
 
 	if _, ok := instance.reserved[key]; ok {
-		return nil, fail.NotAvailableError("cache entry '%s' is reserved and cannot be use until freed or committed", key)
+		return nil, fail.NotAvailableError("entry '%s' is reserved in cache %s and cannot be use until freed or committed", key, instance.GetName())
 	}
 	if ce, ok := instance.cache[key]; ok {
 		return ce, nil
 	}
 
-	return nil, fail.NotFoundError("failed to find cache entry with key '%s'", key)
+	return nil, fail.NotFoundError("failed to find cache entry with key '%s' in cache %s", key, instance.GetName())
 }
 
 // ReserveEntry locks an entry identified by key for update
@@ -127,10 +127,10 @@ func (instance *cache) ReserveEntry(key string) (xerr fail.Error) {
 // unsafeReserveEntry is the workforce of ReserveEntry, without locking
 func (instance *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
 	if _, ok := instance.reserved[key]; ok {
-		return fail.NotAvailableError("the cache entry '%s' is already reserved", key)
+		return fail.NotAvailableError("the entry '%s' of cache %s is already reserved", key, instance.GetName())
 	}
 	if _, ok := instance.cache[key]; ok {
-		return fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry in the cache with key '%s'", key), 0))
+		return fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry with key '%s' in the cache %s", key, instance.GetName()), 0))
 	}
 
 	ce := newEntry(&reservation{key: key})
@@ -166,7 +166,7 @@ func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Ent
 	// content may bring new key, based on content.GetID(), than the key reserved; we have to check if this new key has not been reserved by someone else...
 	if content.GetID() != key {
 		if _, ok := instance.reserved[content.GetID()]; ok {
-			return nil, fail.InconsistentError("the cache entry '%s' corresponding to the ID of the content is reserved; content cannot be committed", content.GetID())
+			return nil, fail.InconsistentError("the cache entry '%s' in cache %s, corresponding to the ID of the content, is reserved; content cannot be committed", content.GetID(), instance.GetName())
 		}
 	}
 
@@ -190,7 +190,7 @@ func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Ent
 		return ce, nil
 	}
 
-	return nil, fail.NotFoundError("failed to find cache entry identified by '%s'", key)
+	return nil, fail.NotFoundError("failed to find cache entry identified by '%s' in cache %s", key, instance.GetName())
 }
 
 // FreeEntry unlocks the cache entry and removes the reservation
@@ -211,7 +211,7 @@ func (instance *cache) FreeEntry(key string) (xerr fail.Error) {
 // unsafeFreeEntry is the workforce of FreeEntry, without locking
 func (instance *cache) unsafeFreeEntry(key string) fail.Error {
 	if _, ok := instance.reserved[key]; !ok {
-		return fail.NotAvailableError("the cache entry '%s' is not reserved", key)
+		return fail.NotAvailableError("the entry '%s' in cache %s is not reserved", key, instance.GetName())
 	}
 
 	var (
@@ -246,7 +246,7 @@ func (instance *cache) AddEntry(content Cacheable) (_ *Entry, xerr fail.Error) {
 	defer func() {
 		if xerr != nil {
 			if derr := instance.unsafeFreeEntry(id); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry '%s'", id))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry '%s' in cache %s", id, instance.GetName()))
 			}
 		}
 	}()
