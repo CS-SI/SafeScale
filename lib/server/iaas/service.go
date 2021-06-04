@@ -747,6 +747,7 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 		ResourceName:   request.ResourceName,
 		HostName:       request.HostName,
 		ImageID:        request.ImageID,
+		ImageRequest:   request.ImageID,
 		KeyPair:        kp,
 		PublicIP:       request.PublicIP,
 		Subnets:        request.Subnets,
