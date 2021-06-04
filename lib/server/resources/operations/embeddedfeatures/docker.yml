@@ -80,7 +80,7 @@ feature:
                             sfExit
 
             add:
-                pace: docker-ce,docker-compose,config,firewall,ready,verify
+                pace: docker-ce,docker-compose,config,enable,firewall,verify
                 steps:
                     docker-ce:
                         targets:
@@ -217,6 +217,20 @@ feature:
                             fi
                             sfExit
 
+                    enable:
+                        targets:
+                            gateways: all
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfService enable docker || sfFail 207
+                            sfService restart docker || sfFail 208
+                            op=-1
+                            sfStandardRetry "sfService status docker &>/dev/null" && op=$? || true
+                            [ $op -ne 0 ] && sfFail 209
+                            sfExit
+
                     firewall:
                         targets:
                             gateways: all
@@ -249,20 +263,6 @@ feature:
                             }
                             sfExit
 
-                    ready:
-                        targets:
-                            gateways: all
-                            hosts: yes
-                            masters: all
-                            nodes: all
-                        run: |
-                            sfService enable docker || sfFail 207 "error enabling docker service"
-                            sfService restart docker || sfFail 208 "error restarting docker service"
-                            op=-1
-                            sfStandardRetry "sfService status docker &>/dev/null" && op=$? || true
-                            [ $op -ne 0 ] && sfFail 209 "error getting docker service status"
-                            sfExit
-
                     verify:
                         targets:
                             gateways: all
@@ -272,7 +272,7 @@ feature:
                         run: |
                             rm -f /tmp/docker-fail.txt || true
                             op=-1
-                            docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                            sfStandardRetry "docker pull hello-world 2>>/tmp/fail.txt 7>>/tmp/fail.txt" && op=$? || op=$?
                             if [[ $op -ne 0 ]]; then
                                 sfFail $op "$(cat /tmp/docker-fail.txt)"
                             fi

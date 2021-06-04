@@ -269,10 +269,12 @@ export -f sfStandardRetry
 sfSalvageDBusIfNeeded() {
 	count=$(ps ax | grep dbus-daemon | grep -v grep | wc -l)
 	if [ $count -ne 1 ]; then
-		sfService stop dbus
+		echo "dbus-daemon in abnormal situation (process count=$count), restarting dbus.service"
+		sfService stop dbus &>/dev/null
 		pkill dbus-daemon
-		rm -f /var/run/system_bus_socket
+		rm -f /var/run/system_bus_socket &>/dev/null
 		sfService start dbus
+		echo "dbus.service restarted"
 		return 1
 	fi
 	return 0
@@ -290,19 +292,28 @@ sfFirewall() {
 
 	# check firewalld is running
 	local op=-1
-	local restarted=-1
-	while [[ $op -eq -1 && $restarted -eq -1 ]]; do
+	local tried_restart=-1
+	while [[ $op -eq -1 && $tried_restart -eq -1 ]]; do
 		# try to get firewall state
+		echo "getting current state of firewalld"
 		state=$(timeout 10s firewall-cmd --state); op=$?
+		echo "firewalld current state: $state"
 		# Restart firewalld if failed
 		if [[ $op -ne 0 || $state != "running" ]]; then
+			echo "firewalld.service is in incorrect state, restarting"
 			sfService stop firewalld &>/dev/null
 			sfSalvageDBusIfNeeded
-			sfService start firewalld; restarted=0
+			sfService start firewalld
+			if [[ $? -ne 0 ]]; then
+				echo "failed to restart firewalld.service"
+			else
+				echo "restarted firewalld.service"
+			fi
+			tried_restart=0
 		fi
 	done
 	if [[ $op -ne 0 ]]; then
-		echo "failed to start currently stopped firewalld"
+		echo "failed to start currently stopped firewalld.service"
 		return 1
 	fi
 
@@ -321,10 +332,16 @@ export -f sfFirewallAdd
 # sfFirewallReload reloads firewall rules
 sfFirewallReload() {
 	local op=-1
-	sudo timeout 30s sfFirewall --reload; op=$?
+	echo "calling firewall-cmd --reload"
+	#sudo timeout 30s sfFirewall --reload; op=$?
+	sudo firewall-cmd --reload; op=$?
+	echo "firewall-cmd --reload called"
 	local sop=-1
 	if [[ $op -ne 0 ]]; then
-		sudo timeout 30s sfFirewall --complete-reload; sop=$?
+		echo "calling firewall-cmd --complete-reload"
+		#sudo timeout 30s sfFirewall --complete-reload; sop=$?
+		sudo sfFirewall --complete-reload; sop=$?
+		echo "firewall-cmd --complete-reload called"
 		if [[ $sop -ne 0 ]]; then
 			echo "firewall-cmd reloading failed with $op first and then with $sop" # keep the error codes from firewall-cmd
 			return $sop
