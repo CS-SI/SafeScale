@@ -247,6 +247,20 @@ feature:
                             fi
                             sfExit
 
+                    enable:
+                        targets:
+                            gateways: all
+                            hosts: yes
+                            masters: all
+                            nodes: all
+                        run: |
+                            sfService enable docker || sfFail 207
+                            sfService restart docker || sfFail 208
+                            op=-1
+                            sfStandardRetry "sfService status docker &>/dev/null" && op=$? || true
+                            [ $op -ne 0 ] && sfFail 209
+                            sfExit
+
                     firewall:
                         targets:
                             gateways: all
