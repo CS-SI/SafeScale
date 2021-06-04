@@ -39,19 +39,37 @@ feature:
                                 debian|ubuntu)
                                     dpkg -l | grep docker-ce &>/dev/null || sfFail 194 "package docker-ce not found"
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
-                                    docker pull hello-world 2>/tmp/fail.txt 7>/tmp/fail.txt || sfFail 210 "$(cat /tmp/fail.txt)"
+                                    rm -f /tmp/docker-fail.txt || true
+                                    op=-1
+                                    docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                                    if [[ $op -ne 0 ]]; then
+                                        sfFail $op "$(cat /tmp/docker-fail.txt)"
+                                    fi
+                                    rm -f /tmp/docker-fail.txt || true
                                     docker run hello-world | grep "working correctly" || sfFail 211 "failure running hello-world docker image"
                                     ;;
                                 centos|redhat|rhel)
                                     rpm -qa | grep docker-ce &>/dev/null || sfFail 194 "package docker-ce not found"
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
-                                    docker pull hello-world 2>/tmp/fail.txt 7>/tmp/fail.txt || sfFail 210 "$(cat /tmp/fail.txt)"
+                                    rm -f /tmp/docker-fail.txt || true
+                                    op=-1
+                                    docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                                    if [[ $op -ne 0 ]]; then
+                                        sfFail $op "$(cat /tmp/docker-fail.txt)"
+                                    fi
+                                    rm -f /tmp/docker-fail.txt || true
                                     docker run hello-world | grep "working correctly" || sfFail 211 "failure running hello-world docker image"
                                     ;;
                                 fedora)
                                     rpm -qa | grep docker-ce &>/dev/null || sfFail 194 "package docker-ce not found"
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
-                                    docker pull hello-world 2>/tmp/fail.txt 7>/tmp/fail.txt || sfFail 210 "$(cat /tmp/fail.txt)"
+                                    rm -f /tmp/docker-fail.txt || true
+                                    op=-1
+                                    docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                                    if [[ $op -ne 0 ]]; then
+                                        sfFail $op "$(cat /tmp/docker-fail.txt)"
+                                    fi
+                                    rm -f /tmp/docker-fail.txt || true
                                     docker run hello-world | grep "working correctly" || sfFail 211 "failure running hello-world docker image"
                                     ;;
                                 *)
@@ -252,7 +270,13 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            docker pull hello-world 2>/tmp/fail.txt 7>/tmp/fail.txt || sfFail 210 "$(cat /tmp/fail.txt)"
+                            rm -f /tmp/docker-fail.txt || true
+                            op=-1
+                            docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                            if [[ $op -ne 0 ]]; then
+                                sfFail $op "$(cat /tmp/docker-fail.txt)"
+                            fi
+                            rm -f /tmp/docker-fail.txt || true
                             docker run hello-world | grep "working correctly" || sfFail 211 "failure running hello-world docker image"
                             sfExit
 
