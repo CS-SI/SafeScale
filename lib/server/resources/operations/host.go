@@ -1194,10 +1194,10 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					continue
 				}
 
-				otherSubnetInstance, xerr := LoadSubnet(svc, "", v.ID)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
+				otherSubnetInstance, innerXErr := LoadSubnet(svc, "", v.ID)
+				innerXErr = debug.InjectPlannedFail(innerXErr)
+				if innerXErr != nil {
+					return innerXErr
 				}
 				//goland:noinspection ALL
 				defer func(subnetInstance resources.Subnet) {
@@ -1205,7 +1205,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				}(otherSubnetInstance)
 
 				var otherAbstractSubnet *abstract.Subnet
-				xerr = otherSubnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				innerXErr = otherSubnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 					var ok bool
 					otherAbstractSubnet, ok = clonable.(*abstract.Subnet)
 					if !ok {
@@ -1214,8 +1214,8 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 					return nil
 				})
-				if xerr != nil {
-					return xerr
+				if innerXErr != nil {
+					return innerXErr
 				}
 
 				if otherAbstractSubnet.InternalSecurityGroupID != "" {
@@ -1236,22 +1236,17 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					if innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.GetName(), lansg.GetName(), req.ResourceName)
 					}
-					return nil
-				}
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return xerr
-				}
 
-				// register security group in properties
-				item := &propertiesv1.SecurityGroupBond{
-					ID:         lansg.GetID(),
-					Name:       lansg.GetName(),
-					Disabled:   false,
-					FromSubnet: true,
+					// register security group in properties
+					item := &propertiesv1.SecurityGroupBond{
+						ID:         lansg.GetID(),
+						Name:       lansg.GetName(),
+						Disabled:   false,
+						FromSubnet: true,
+					}
+					hsgV1.ByID[item.ID] = item
+					hsgV1.ByName[item.Name] = item.ID
 				}
-				hsgV1.ByID[item.ID] = item
-				hsgV1.ByName[item.Name] = item.ID
 			}
 
 			return nil
