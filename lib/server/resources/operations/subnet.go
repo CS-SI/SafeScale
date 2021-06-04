@@ -658,6 +658,8 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		return fail.Wrap(xerr, "failed to find appropriate template")
 	}
 
+	originalGwReq := gwSizing.Image
+
 	// define image...
 	if gwSizing.Image == "" {
 		gwSizing.Image = req.Image
@@ -682,6 +684,23 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to find image '%s'", gwSizing.Image)
+	}
+
+	// look for an exact match by ID
+	{
+		imgs, xerr := svc.ListImages(true)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return fail.Wrap(xerr, "failure listing images")
+		}
+
+		for _, aimg := range imgs {
+			if strings.Compare(aimg.ID, originalGwReq) == 0 {
+				logrus.Tracef("exact match by ID, ignoring jarowinkler results")
+				img = &aimg
+				break
+			}
+		}
 	}
 
 	subnetName := instance.GetName()
@@ -729,6 +748,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 
 	gwRequest := abstract.HostRequest{
 		ImageID:          img.ID,
+		ImageRequest:     originalGwReq,
 		Subnets:          []*abstract.Subnet{as},
 		SSHPort:          req.DefaultSSHPort,
 		TemplateID:       template.ID,

@@ -748,6 +748,23 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 	}
 
+	// look for an exact match by ID
+	{
+		imgs, xerr := svc.ListImages(true)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failure listing images")
+		}
+
+		for _, aimg := range imgs {
+			if strings.Compare(aimg.ID, hostReq.ImageRequest) == 0 {
+				logrus.Tracef("exact match by ID, ignoring jarowinkler results")
+				hostReq.ImageID = aimg.ID
+				break
+			}
+		}
+	}
+
 	// identify default Subnet
 	var (
 		defaultSubnet                  resources.Subnet

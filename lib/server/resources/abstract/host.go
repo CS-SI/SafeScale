@@ -164,6 +164,7 @@ type HostRequest struct {
 	DefaultRouteIP   string              // DefaultRouteIP is the IP used as default route
 	TemplateID       string              // TemplateID is the UUID of the template used to size the host (see SelectTemplates)
 	ImageID          string              // ImageID is the UUID of the image that contains the server's OS and initial state.
+	ImageRequest     string              // ImageRequest is the original name of the image requested
 	KeyPair          *KeyPair            // KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
 	SSHPort          uint32              // contains the port to use for SSH
 	Password         string              // Password contains the password of OperatorUsername account, usable on host console only
