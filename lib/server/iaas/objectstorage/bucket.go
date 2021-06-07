@@ -99,7 +99,8 @@ func (b *bucket) IsNull() bool {
 }
 
 // CreateObject ...
-func (b bucket) CreateObject(objectName string) (Object, fail.Error) {
+func (b bucket) CreateObject(objectName string) (_ Object, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -114,7 +115,8 @@ func (b bucket) CreateObject(objectName string) (Object, fail.Error) {
 }
 
 // InspectObject ...
-func (b bucket) InspectObject(objectName string) (Object, fail.Error) {
+func (b bucket) InspectObject(objectName string) (_ Object, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -132,7 +134,8 @@ func (b bucket) InspectObject(objectName string) (Object, fail.Error) {
 }
 
 // ListObjects list objects of a GetBucket
-func (b bucket) ListObjects(path, prefix string) ([]string, fail.Error) {
+func (b bucket) ListObjects(path, prefix string) (_ []string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -162,7 +165,8 @@ func (b bucket) ListObjects(path, prefix string) ([]string, fail.Error) {
 }
 
 // Browse walks through the objects in the GetBucket and executes callback on each Object found
-func (b bucket) Browse(path, prefix string, callback func(Object) fail.Error) fail.Error {
+func (b bucket) Browse(path, prefix string, callback func(Object) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -187,7 +191,8 @@ func (b bucket) Browse(path, prefix string, callback func(Object) fail.Error) fa
 }
 
 // Clear empties a bucket
-func (b bucket) Clear(path, prefix string) fail.Error {
+func (b bucket) Clear(path, prefix string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -216,7 +221,8 @@ func (b bucket) Clear(path, prefix string) fail.Error {
 }
 
 // DeleteObject deletes an object from a bucket
-func (b bucket) DeleteObject(objectName string) fail.Error {
+func (b bucket) DeleteObject(objectName string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -234,7 +240,8 @@ func (b bucket) DeleteObject(objectName string) fail.Error {
 }
 
 // ReadObject ...
-func (b bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (Object, fail.Error) {
+func (b bucket) ReadObject(objectName string, target io.Writer, from int64, to int64) (_ Object, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -253,7 +260,8 @@ func (b bucket) ReadObject(objectName string, target io.Writer, from int64, to i
 }
 
 // WriteObject ...
-func (b bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (Object, fail.Error) {
+func (b bucket) WriteObject(objectName string, source io.Reader, sourceSize int64, metadata abstract.ObjectStorageItemMetadata) (_ Object, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -284,8 +292,8 @@ func (b bucket) WriteMultiPartObject(
 	source io.Reader, sourceSize int64,
 	chunkSize int,
 	metadata abstract.ObjectStorageItemMetadata,
-) (Object, fail.Error) {
-
+) (_ Object, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -308,7 +316,8 @@ func (b bucket) WriteMultiPartObject(
 }
 
 // GetName returns the name of the GetBucket
-func (b bucket) GetName() (string, fail.Error) {
+func (b bucket) GetName() (_ string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
@@ -316,8 +325,9 @@ func (b bucket) GetName() (string, fail.Error) {
 }
 
 // GetCount returns the count of objects in the GetBucket
-// 'path' corresponds to stow prefix, and 'prefix' allows to filter what to count
-func (b bucket) GetCount(path, prefix string) (int64, fail.Error) {
+// 'path' corresponds to stow prefix, and 'prefix' allows filtering what to count
+func (b bucket) GetCount(path, prefix string) (_ int64, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -345,7 +355,8 @@ func (b bucket) GetCount(path, prefix string) (int64, fail.Error) {
 }
 
 // GetSize returns the total size of the Objects inside the GetBucket
-func (b bucket) GetSize(path, prefix string) (int64, string, fail.Error) {
+func (b bucket) GetSize(path, prefix string) (_ int64, _ string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if b.IsNull() {
 		return 0, "", fail.InvalidInstanceError()
 	}
