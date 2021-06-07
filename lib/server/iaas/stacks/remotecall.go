@@ -17,8 +17,6 @@
 package stacks
 
 import (
-	"time"
-
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
@@ -27,7 +25,9 @@ import (
 
 // RetryableRemoteCall calls a remote API with tolerance to communication failures
 // Remote API is done inside 'callback' parameter and returns remote error if necessary that 'convertError' function convert to SafeScale error
-func RetryableRemoteCall(callback func() error, convertError func(error) fail.Error) fail.Error {
+func RetryableRemoteCall(callback func() error, convertError func(error) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
@@ -40,11 +40,11 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 	}
 
 	// Execute the remote call with tolerance for transient communication failure
-	xerr := netutils.WhileUnsuccessfulButRetryable(
+	xerr = netutils.WhileUnsuccessfulButRetryable(
 		func() error {
 			if innerErr := callback(); innerErr != nil {
 				captured := normalizeError(innerErr)
-				switch captured.(type) { //nolint
+				switch captured.(type) { // nolint
 				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(captured)
 				default:
@@ -53,7 +53,7 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 			}
 			return nil
 		},
-		retry.Fibonacci(1*time.Second), // waiting time between retries follows Fibonacci numbers x 1s
+		retry.Fibonacci(temporal.GetMinDelay()), // waiting time between retries follows Fibonacci numbers x 1s
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
