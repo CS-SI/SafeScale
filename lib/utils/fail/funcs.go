@@ -42,6 +42,7 @@ func AddConsequence(err error, cons error) error {
 	return err
 }
 
+// Ignore logs an error that's considered not important by the caller
 func Ignore(err error) {
 	if err != nil {
 		logrus.Debugf("ignoring error [%s]", err)
@@ -154,6 +155,26 @@ func Wrap(cause error, msg ...interface{}) Error {
 	}
 }
 
+func lastUnwrapOrNil(in error) (err error) {
+	if in == nil {
+		return nil
+	}
+
+	last := in
+	for {
+		err = last
+		u, ok := last.(interface {
+			Unwrap() error
+		})
+		if !ok {
+			break
+		}
+		last = u.Unwrap()
+	}
+
+	return err
+}
+
 func lastUnwrap(in error) (err error) {
 	if in == nil {
 		return nil
@@ -184,17 +205,9 @@ func RootCause(err error) (resp error) {
 	return lastUnwrap(err)
 }
 
-// Cause returns the first immediate cause of an error, or nil if there no cause
+// Cause returns the cause of an error if it implements the causer interface
 func Cause(err error) (resp error) {
-	resp = err
-	core, ok := err.(Error)
-	if ok {
-		err = core.Cause()
-		if err != nil {
-			resp = err
-		}
-	}
-	return resp
+	return lastUnwrap(err)
 }
 
 // ConvertError converts an error to a fail.Error

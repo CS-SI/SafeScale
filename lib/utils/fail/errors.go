@@ -144,9 +144,16 @@ func defaultCauseFormatter(e Error) string {
 	if lenConseq > 0 {
 		msgFinal += fmt.Sprintf("\nwith consequence%s:\n", strprocess.Plural(lenConseq))
 		for ind, con := range errCore.consequences {
-			msgFinal += "- " + con.(Error).UnformattedError()
-			if uint(ind+1) < lenConseq {
-				msgFinal += "\n"
+			if _, ok := con.(Error); ok {
+				msgFinal += "- " + con.(Error).UnformattedError()
+				if uint(ind+1) < lenConseq {
+					msgFinal += "\n"
+				}
+			} else {
+				msgFinal += "- " + con.Error()
+				if uint(ind+1) < lenConseq {
+					msgFinal += "\n"
+				}
 			}
 		}
 	}
@@ -193,6 +200,7 @@ func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 	e.causeFormatter = formatter
 }
 
+// Unwrap implements the Wrapper interface
 func (e errorCore) Unwrap() error {
 	return e.cause
 }
@@ -369,6 +377,7 @@ func (e *ErrWarning) Annotate(key string, value data.Annotation) data.Annotatabl
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrWarning) UnformattedError() string {
 	return e.Error()
 }
@@ -414,6 +423,7 @@ func (e *ErrTimeout) Annotate(key string, value data.Annotation) data.Annotatabl
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrTimeout) UnformattedError() string {
 	return e.Error()
 }
@@ -461,6 +471,7 @@ func (e *ErrNotFound) Annotate(key string, value data.Annotation) data.Annotatab
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotFound) UnformattedError() string {
 	return e.Error()
 }
@@ -508,6 +519,7 @@ func (e *ErrNotAvailable) Annotate(key string, value data.Annotation) data.Annot
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotAvailable) UnformattedError() string {
 	return e.Error()
 }
@@ -539,6 +551,7 @@ func (e *ErrDuplicate) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrDuplicate) UnformattedError() string {
 	return e.Error()
 }
@@ -581,6 +594,7 @@ func (e *ErrInvalidRequest) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidRequest) UnformattedError() string {
 	return e.Error()
 }
@@ -629,6 +643,7 @@ func (e *ErrSyntax) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrSyntax) UnformattedError() string {
 	return e.Error()
 }
@@ -670,6 +685,7 @@ func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotAuthenticated) UnformattedError() string {
 	return e.Error()
 }
@@ -711,6 +727,7 @@ func (e *ErrForbidden) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrForbidden) UnformattedError() string {
 	return e.Error()
 }
@@ -759,6 +776,7 @@ func (e *ErrAborted) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrAborted) UnformattedError() string {
 	return e.Error()
 }
@@ -812,6 +830,7 @@ func (e *ErrOverflow) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrOverflow) UnformattedError() string {
 	return e.Error()
 }
@@ -853,6 +872,7 @@ func (e *ErrOverload) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrOverload) UnformattedError() string {
 	return e.Error()
 }
@@ -901,6 +921,7 @@ func (e *ErrNotImplemented) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotImplemented) UnformattedError() string {
 	return e.Error()
 }
@@ -944,6 +965,7 @@ func (e *ErrRuntimePanic) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrRuntimePanic) UnformattedError() string {
 	return e.Error()
 }
@@ -987,6 +1009,7 @@ func (e *ErrInvalidInstance) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidInstance) UnformattedError() string {
 	return e.Error()
 }
@@ -1044,6 +1067,7 @@ func (e *ErrInvalidParameter) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidParameter) UnformattedError() string {
 	return e.Error()
 }
@@ -1087,6 +1111,7 @@ func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidInstanceContent) UnformattedError() string {
 	return e.Error()
 }
@@ -1128,6 +1153,7 @@ func (e *ErrInconsistent) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInconsistent) UnformattedError() string {
 	return e.Error()
 }
@@ -1186,6 +1212,7 @@ func (e *ErrExecution) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrExecution) UnformattedError() string {
 	return e.Error()
 }
@@ -1227,6 +1254,7 @@ func (e *ErrAlteredNothing) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrAlteredNothing) UnformattedError() string {
 	return e.Error()
 }
@@ -1268,6 +1296,7 @@ func (e *ErrUnknown) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrUnknown) UnformattedError() string {
 	return e.Error()
 }
