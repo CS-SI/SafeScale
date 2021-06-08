@@ -136,7 +136,7 @@ func (c cluster) Create(def *protocol.ClusterCreateRequest, timeout time.Duratio
 }
 
 // Delete deletes a cluster
-func (c cluster) Delete(clusterName string, timeout time.Duration) error {
+func (c cluster) Delete(clusterName string, force bool, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -150,7 +150,11 @@ func (c cluster) Delete(clusterName string, timeout time.Duration) error {
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.Delete(ctx, &protocol.ClusterDeleteRequest{Name: clusterName})
+	req := &protocol.ClusterDeleteRequest{
+		Name: clusterName,
+		Force: force,
+	}
+	_, err := service.Delete(ctx, req)
 	return err
 }
 

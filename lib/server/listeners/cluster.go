@@ -337,7 +337,7 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 		return nil, xerr
 	}
 
-	return empty, rc.Delete(task.GetContext(), false)
+	return empty, rc.Delete(task.GetContext(), in.GetForce())
 }
 
 // Expand adds node(s) to a cluster
