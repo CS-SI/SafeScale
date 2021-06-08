@@ -532,7 +532,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				ahf.CurrentState, ahf.Core.LastState = st, st
 				return nil
 			default:
-				return fail.NewError("wrong state")
+				return fail.NewError("wrong state: %s", st)
 			}
 		},
 		timeout,
