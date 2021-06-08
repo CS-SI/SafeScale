@@ -72,7 +72,7 @@ type Cluster struct {
 	*MetadataCore
 
 	lock                sync.RWMutex
-	installMethods      sync.Map// map[uint8]installmethod.Enum
+	installMethods      sync.Map // map[uint8]installmethod.Enum
 	lastStateCollection time.Time
 	makers              clusterflavors2.Makers
 }
@@ -2464,7 +2464,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	if nodeCount > 0 {
 		for _, v := range nodes {
 			if n, ok := all[v]; ok {
-				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, options...)
+				_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, options...)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
@@ -2476,7 +2476,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	if masterCount > 0 {
 		for _, v := range masters {
 			if n, ok := all[v]; ok {
-				_, xerr := tg.Start(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, options...)
+				_, xerr := tg.StartInSubtask(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, options...)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
@@ -2521,7 +2521,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 
 	if allCount > 0 {
 		for _, v := range all {
-			_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v})
+			_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: v})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", v.Name))
