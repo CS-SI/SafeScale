@@ -63,13 +63,14 @@ type taskGroup struct {
 	*task
 	result TaskGroupResult
 
-	children subTasks //[]subTask
+	children subTasks
 
 	options []data.ImmutableKeyValue
 }
 
+// FUTURE: next version of TaskGroup will allow using options
+
 var (
-	// FUTURE: next version of TaskGroup will allow to use options
 	// FailEarly tells the TaskGroup to fail as soon as a child fails
 	FailEarly = data.NewImmutableKeyValue("fail", "early")
 	// FailLately tells the TaskGroup to end all children before determine if TaskGroup has failed

@@ -143,14 +143,14 @@ func VoidTask() (Task, fail.Error) {
 }
 
 // user-defined type to use as key in context.WithValue()
-type taskContextKey string
+type taskContextKey = string
 
-const keyForTaskInContext taskContextKey = "task"
+const KeyForTaskInContext taskContextKey = "task"
 
 // TaskFromContext extracts the task instance from context
 func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	if ctx != nil {
-		if ctxValue := ctx.Value(keyForTaskInContext); ctxValue != nil {
+		if ctxValue := ctx.Value(KeyForTaskInContext); ctxValue != nil {
 			if task, ok := ctxValue.(*task); ok {
 				return task, nil
 			}
@@ -232,7 +232,7 @@ func newTask(ctx context.Context, parentTask Task) (nt *task, xerr fail.Error) {
 	}
 
 	t.id = u.String()
-	t.ctx = context.WithValue(childContext, keyForTaskInContext, &t)
+	t.ctx = context.WithValue(childContext, KeyForTaskInContext, &t)
 
 	return &t, nil
 }
@@ -243,7 +243,7 @@ func (t *task) IsNull() bool {
 }
 
 // GetLastError returns the last error of the Task
-func (t *task) GetLastError() (error, fail.Error) { //nolint
+func (t *task) GetLastError() (error, fail.Error) { // nolint
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -718,7 +718,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 		}
 	}
 
-	select { //nolint
+	select { // nolint
 	case <-c:
 		return true, result, err
 	}

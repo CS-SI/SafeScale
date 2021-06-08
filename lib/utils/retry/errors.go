@@ -31,7 +31,7 @@ import (
 type ErrTimeout = fail.ErrTimeout
 
 // TimeoutError ...
-func TimeoutError(err error, limit time.Duration, options ...data.ImmutableKeyValue) *ErrTimeout {
+func TimeoutError(err error, limit time.Duration, actual time.Duration, options ...data.ImmutableKeyValue) *ErrTimeout {
 	var (
 		msg      string
 		decorate bool
@@ -39,14 +39,14 @@ func TimeoutError(err error, limit time.Duration, options ...data.ImmutableKeyVa
 
 	if len(options) > 0 {
 		for _, v := range options {
-			switch v.Key() { //nolint
+			switch v.Key() { // nolint
 			case "callstack":
 				decorate = v.Value().(bool)
 			}
 		}
 	}
 
-	msg = fmt.Sprintf("retries timed out after %s", temporal.FormatDuration(limit))
+	msg = fmt.Sprintf("retries timed out after %s (timeout defined at %s)", temporal.FormatDuration(actual), temporal.FormatDuration(limit))
 	if decorate {
 		msg = callstack.DecorateWith(msg, "", "", 0)
 	}
