@@ -408,18 +408,18 @@ func (instance *Subnet) createInternalSecurityGroup(ctx context.Context, network
 	// adds rules that depends on Security Group ID
 	rules := abstract.SecurityGroupRules{
 		{
-			Description: fmt.Sprintf("[egress][ipv4][all] Allow LAN traffic in %s", cidr),
+			Description: fmt.Sprintf("[egress][ipv4][all] Allow all from %s", cidr),
 			EtherType:   ipversion.IPv4,
 			Direction:   securitygroupruledirection.Egress,
 			Sources:     []string{sg.GetID()},
-			Targets:     []string{sg.GetID()},
+			Targets:     []string{"0.0.0.0/0"},
 		},
 		{
-			Description: fmt.Sprintf("[egress][ipv6][all] Allow LAN traffic in %s", cidr),
+			Description: fmt.Sprintf("[egress][ipv6][all] Allow all from %s", cidr),
 			EtherType:   ipversion.IPv6,
 			Direction:   securitygroupruledirection.Egress,
 			Sources:     []string{sg.GetID()},
-			Targets:     []string{sg.GetID()},
+			Targets:     []string{"::0/0"},
 		},
 		{
 			Description: fmt.Sprintf("[ingress][ipv4][all] Allow LAN traffic in %s", cidr),
