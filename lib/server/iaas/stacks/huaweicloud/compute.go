@@ -1030,7 +1030,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			return nil
 		},
-		temporal.GetBigDelay(),
+		temporal.GetOperationTimeout(),
 	)
 	if retryErr != nil {
 		return fail.Wrap(retryErr, "failed to enable Router Mode on host '%s'", host.Core.Name)

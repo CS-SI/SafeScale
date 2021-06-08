@@ -441,7 +441,7 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Started, 2*temporal.GetBigDelay())
+	server, xerr := s.WaitHostState(ahf, hoststate.Started, temporal.GetOperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
