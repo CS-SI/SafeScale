@@ -247,21 +247,44 @@ feature:
                             fi
                             sfExit
 
-                    enable:
+                    firewall:
                         targets:
                             gateways: all
                             hosts: yes
                             masters: all
                             nodes: all
                         run: |
-                            sfService enable docker || sfFail 207
-                            sfService restart docker || sfFail 208
-                            op=-1
-                            sfStandardRetry "sfService status docker &>/dev/null" && op=$? || true
-                            [ $op -ne 0 ] && sfFail 209
+                            # VPL: not necessary anymore, integrated in sfFirewall, but kept for now for history
+                            ## If firewalld doesn't run, start it
+                            #sfService status firewalld | grep running || {
+                            #    # Makes sure firewalld is running, starting first its dependency dbus...
+                            #    op=-1
+                            #    sfService start dbus && op=$? || op=$?
+                            #    if [[ $op -ne 0 ]]; then
+                            #        sfFail $op "problem starting dbus: errorcode $op"
+                            #    fi
+                            #    # then firewalld  itself
+                            #    op=-1
+                            #    sfService restart firewalld && op=$? || op=$?
+                            #    if [[ $op -ne 0 ]]; then
+                            #        sfFail $op "problem starting firewalld: errorcode $op"
+                            #    fi
+                            #}
+
+                            # First once dockerd, allowing it to create needed firewalld zone docker...
+                            sfFirewallReload || sfFail 206 "failed to reload firewalld, ensuring it works correctly"
+                            sfService restart docker || sfFail 207 "failed to restart dockerd for the first time"
+
+                            # ... and if no such zone is created, create needed firewalld rules
+                            # FIXME: it should be better to create a configuration identical to the one created by docker 20.10+...
+                            sfFirewall --info-zone=docker 2>&1 >/dev/null || {
+                                sfFirewallAdd --zone=trusted --add-interface=docker0
+                                sfFirewallAdd --zone=trusted --add-masquerade
+                                sfFirewallReload || sfFail 208 "Firewall problem"
+                            }
                             sfExit
 
-                    firewall:
+                    enable:
                         targets:
                             gateways: all
                             hosts: yes

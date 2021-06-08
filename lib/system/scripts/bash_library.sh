@@ -404,7 +404,6 @@ function sfFirewall() {
 		op=$?
 		# Restart firewalld if failed
 		if [[ $op -ne 0 || $state != "running" ]]; then
-			echo "firewalld.service is in incorrect state, restarting"
 			sfService stop firewalld &>/dev/null
 			sfSalvageDBusIfNeeded
 			sfService start firewalld && op=$? || op=$?
