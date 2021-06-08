@@ -27,9 +27,10 @@ const (
 	// DefaultContextTimeout default timeout for grpc command invocation
 	DefaultContextTimeout = 1 * time.Minute
 
-	// MetadataTimeout default timeout to handle object storage issues
+	// DefaultMetadataTimeout default timeout to handle object storage issues
 	DefaultMetadataTimeout = 150 * time.Second
 
+	// DefaultOperationTimeout default timeout to handle operations
 	DefaultOperationTimeout = 120 * time.Second
 
 	// HostTimeout timeout for grpc command relative to host creation
@@ -103,7 +104,7 @@ func GetContextTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_CONTEXT_TIMEOUT", DefaultContextTimeout)
 }
 
-// GetContextTimeout ...
+// GetMetadataTimeout ...
 func GetMetadataTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_METADATA_TIMEOUT", DefaultMetadataTimeout)
 }
