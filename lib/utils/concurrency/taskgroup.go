@@ -293,13 +293,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		defer instance.children.lock.RUnlock()
 
 		for {
-			//stop := false
 			for k, s := range instance.children.tasks {
-				//if instance.Aborted() {
-				//	stop = true
-				//	break
-				//}
-
 				if doneWaitStates[k] {
 					continue
 				}
@@ -439,7 +433,7 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[strin
 		return false, nil, err
 	}
 	if taskStatus != RUNNING {
-		return false, nil, fail.InvalidRequestError("cannot wait task '%s': not running (%d)", tid, taskStatus)
+		return false, nil, fail.InvalidRequestError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 
 	c := make(chan struct{})
@@ -463,7 +457,7 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[strin
 		}
 	}
 
-	select { //nolint
+	select { // nolint
 	case <-c:
 		return true, results, err
 	}

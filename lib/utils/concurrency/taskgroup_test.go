@@ -127,6 +127,10 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	require.NotEmpty(t, res)
 
 	cause := fail.RootCause(err)
+	if cause == nil {
+		t.FailNow()
+	}
+
 	ct := cause.Error()
 	if !strings.Contains(ct, "Panic protection") {
 		t.Errorf("Expected to catch a Panic here...")
@@ -378,7 +382,7 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 
 	fmt.Println("Here we are")
 
-	if end >= (time.Microsecond * 20100) {
+	if end >= (time.Microsecond * 22100) {
 		t.Errorf("It should have finished near 20 ms but it didn't, it was %s !!", end)
 	}
 }
@@ -448,7 +452,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 		}
 	}()
 
-	runOutOfTime := waitTimeout(&wg, time.Duration(15*time.Second))
+	runOutOfTime := waitTimeout(&wg, 15*time.Second)
 	if runOutOfTime {
 		if failure {
 			t.FailNow()
