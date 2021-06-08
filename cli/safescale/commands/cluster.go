@@ -569,7 +569,7 @@ var clusterDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.Delete(clusterName, temporal.GetLongOperationTimeout())
+		err = clientSession.Cluster.Delete(clusterName, force, temporal.GetLongOperationTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
