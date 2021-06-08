@@ -2627,6 +2627,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 
 		for _, v := range nodes {
 			if n, ok := all[v]; ok {
+				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, options...)
 				completedOptions := append(options, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", n.Name)))
 				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, completedOptions...)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -2639,6 +2640,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 
 		for _, v := range masters {
 			if n, ok := all[v]; ok {
+				_, xerr := tg.Start(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, options...)
 				completedOptions := append(options, concurrency.AmendID(fmt.Sprintf("/master/%s/delete", n.Name)))
 				_, xerr := tg.Start(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, completedOptions...)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -2685,6 +2687,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		}
 
 		for _, v := range all {
+			_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v})
 			_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
