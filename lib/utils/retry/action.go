@@ -20,9 +20,13 @@ package retry
 // delays and stop conditions
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -49,6 +53,8 @@ type action struct {
 	Last func() error
 	// Notify
 	Notify Notify
+	// Timeout if any
+	Timeout time.Duration
 }
 
 // Action tries to executes 'run' following verdicts from arbiter, with delay decided by 'officer'.
@@ -126,6 +132,7 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 		First:   nil,
 		Last:    nil,
 		Notify:  nil,
+		Timeout: timeout,
 	}.loopWithSoftTimeout()
 }
 
@@ -158,6 +165,7 @@ func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, 
 		First:   nil,
 		Last:    nil,
 		Notify:  nil,
+		Timeout: timeout,
 	}.loopWithSoftTimeout()
 }
 
@@ -182,7 +190,34 @@ func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, tim
 		Run:     run,
 		First:   nil,
 		Last:    nil,
-		Notify:  nil,
+		Notify:  DefaultNotifier(),
+		Timeout: timeout,
+	}.loopWithHardTimeout(timeout)
+}
+
+// WhileUnsuccessfulWithHardTimeout retries every 'delay' while 'run' is unsuccessful with a 'timeout'
+func WhileUnsuccessfulWithHardTimeoutWithNotifier(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
+	if delay > timeout {
+		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
+	}
+
+	if delay <= 0 {
+		delay = time.Second
+	}
+	var arbiter Arbiter
+	if timeout <= 0 {
+		arbiter = Unsuccessful()
+	} else {
+		arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
+	}
+	return action{
+		Arbiter: arbiter,
+		Officer: BackoffSelector()(delay),
+		Run:     run,
+		First:   nil,
+		Last:    nil,
+		Notify:  notify,
+		Timeout: timeout,
 	}.loopWithHardTimeout(timeout)
 }
 
@@ -231,6 +266,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 		First:   nil,
 		Last:    nil,
 		Notify:  notify,
+		Timeout: timeout,
 	}.loopWithSoftTimeout()
 }
 
@@ -251,9 +287,9 @@ func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Dur
 	}
 	var arbiter Arbiter
 	if timeout <= 0 {
-		arbiter = UnsuccessfulWhereRetcode255()
+		arbiter = Unsuccessful()
 	} else {
-		arbiter = PrevailDone(UnsuccessfulWhereRetcode255(), Timeout(timeout))
+		arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
 	}
 	return action{
 		Arbiter: arbiter,
@@ -262,6 +298,7 @@ func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Dur
 		First:   nil,
 		Last:    nil,
 		Notify:  notify,
+		Timeout: timeout,
 	}.loopWithSoftTimeout()
 }
 
@@ -284,6 +321,118 @@ func WhileUnsuccessfulDelay5SecondsWithNotify(run func() error, timeout time.Dur
 // 'notify' is called after each try for feedback.
 func WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
 	return WhileUnsuccessfulWhereRetcode255WithNotify(run, time.Second*5, timeout, notify)
+}
+
+func DefaultNotifier() func(t Try, v verdict.Enum) {
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics == "" {
+		return func(t Try, v verdict.Enum) {
+		}
+	}
+
+	return func(t Try, v verdict.Enum) {
+		switch v {
+		case verdict.Retry:
+			logrus.Tracef("retrying (#%d), previous error was: %v [%s]", t.Count, t.Err, spew.Sdump(fail.RootCause(t.Err)))
+		case verdict.Done:
+			if t.Err == nil {
+				if t.Count > 1 {
+					logrus.Tracef("no more retries, operation was OK")
+				}
+			} else {
+				logrus.Tracef("no more retries, operation had an error %v [%s] but it's considered OK", t.Err, spew.Sdump(fail.RootCause(t.Err)))
+			}
+		case verdict.Undecided:
+			logrus.Tracef("nothing to do")
+		case verdict.Abort:
+			logrus.Tracef("aborting, previous error was: %v [%s]", t.Err, spew.Sdump(fail.RootCause(t.Err)))
+		}
+	}
+}
+
+func DefaultMetadataNotifier(metaID string) func(t Try, v verdict.Enum) {
+	return func(t Try, v verdict.Enum) {
+		switch v {
+		case verdict.Retry:
+			logrus.Tracef("retrying metadata [%s] (#%d), previous error was: %v [%s]", metaID, t.Count, t.Err, spew.Sdump(fail.RootCause(t.Err)))
+		case verdict.Done:
+			if t.Err == nil {
+				if t.Count > 1 {
+					logrus.Tracef("no more retries metadata [%s], operation was OK", metaID)
+				}
+			} else {
+				logrus.Tracef("no more retries metadata [%s], operation had an error %v [%s] but it's considered OK", metaID, t.Err, spew.Sdump(fail.RootCause(t.Err)))
+			}
+		case verdict.Undecided:
+			logrus.Tracef("nothing to do, metadata [%s]", metaID)
+		case verdict.Abort:
+			logrus.Tracef("aborting metadata [%s], previous error was: %v [%s]", metaID, t.Err, spew.Sdump(fail.RootCause(t.Err)))
+		}
+	}
+}
+
+func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum) {
+	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics == "" {
+		return func(t Try, v verdict.Enum) {
+		}
+	}
+
+	ctxID := ""
+
+	// FIXME: OPP Too specific, this should go into a function that gets the id from the interface{}
+	if ctx != nil {
+		if ctx != context.TODO() {
+			res := ctx.Value(concurrency.KeyForTaskInContext)
+			if res != nil {
+				switch rt := res.(type) {
+				case string:
+					ctxID = rt
+				case concurrency.TaskCore:
+					ctxID, _ = rt.GetID()
+				}
+			}
+		}
+	}
+
+	if ctxID == "" {
+		return func(t Try, v verdict.Enum) {
+			switch v {
+			case verdict.Retry:
+				logrus.Tracef("retrying (#%d), previous error was: %v", t.Count, t.Err)
+			case verdict.Done:
+				if t.Err == nil {
+					logrus.Tracef("no more retries, operation was OK")
+				} else {
+					logrus.Tracef("no more retries, operation had an error %v but it's considered OK", t.Err)
+				}
+			case verdict.Undecided:
+				logrus.Tracef("nothing to do")
+			case verdict.Abort:
+				logrus.Tracef("aborting, previous error was: %v", t.Err)
+			}
+		}
+	}
+
+	ctxID = fmt.Sprintf("[%s]", ctxID)
+	ctxLog := logrus.WithField(concurrency.KeyForTaskInContext, ctxID)
+
+	return func(t Try, v verdict.Enum) {
+		switch v {
+		case verdict.Retry:
+			ctxLog.Tracef("retrying (#%d), previous error was: %v", t.Count, t.Err)
+		case verdict.Done:
+			if t.Err == nil {
+				if t.Count > 1 {
+					ctxLog.Tracef("no more retries, operation was OK")
+				}
+			} else {
+				ctxLog.Tracef("no more retries, operation had an error %v but it's considered OK", t.Err)
+			}
+		case verdict.Undecided:
+			ctxLog.Tracef("nothing to do")
+		case verdict.Abort:
+			ctxLog.Tracef("aborting, previous error was: %v", t.Err)
+		}
+	}
 }
 
 // WhileSuccessful retries while 'run' is successful (ie 'run' returns an error == nil),
@@ -310,6 +459,7 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 		First:   nil,
 		Last:    nil,
 		Notify:  nil,
+		Timeout: timeout,
 	}.loopWithSoftTimeout()
 }
 
@@ -354,6 +504,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 		First:   nil,
 		Last:    nil,
 		Notify:  notify,
+		Timeout: timeout,
 	}.loopWithSoftTimeout()
 }
 
@@ -371,12 +522,16 @@ func WhileSuccessfulDelay5SecondsWithNotify(run func() error, timeout time.Durat
 	return WhileSuccessfulWithNotify(run, 5*time.Second, timeout, notify)
 }
 
-// loopWithSoftTimeout executes the tries and stops if the elapsed time is gone passed the timeout (hence the "soft timeout")
-func (a action) loopWithSoftTimeout() fail.Error {
-	var (
-		arbiter = a.Arbiter
-		start   = time.Now()
-	)
+// loopWithSoftTimeout executes the tries and stops if the elapsed time is gone beyond the timeout (hence the "soft timeout")
+func (a action) loopWithSoftTimeout() (xerr fail.Error) {
+	arbiter := a.Arbiter
+	start := time.Now()
+
+	var duration time.Duration
+	_ = duration
+
+	count := uint(1)
+
 	if arbiter == nil {
 		arbiter = DefaultArbiter
 	}
@@ -388,7 +543,7 @@ func (a action) loopWithSoftTimeout() fail.Error {
 		}
 	}
 
-	for count := uint(1); ; count++ {
+	for ; ; count++ {
 		// Perform action
 		err := a.Run()
 

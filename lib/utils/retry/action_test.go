@@ -105,7 +105,7 @@ func CreateDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
 	defer func() {
 		if xerr != nil {
 			for loop := uint(0); loop < n; loop++ {
-				nerr := fail.NewError("random cleanup problem")
+				nerr := fmt.Errorf("random cleanup problem")
 				_ = xerr.AddConsequence(nerr)
 			}
 		}
@@ -382,7 +382,7 @@ func genErr() error {
 }
 
 func genTimeout() error {
-	return TimeoutError(fmt.Errorf("too late ... "), 10*time.Millisecond)
+	return TimeoutError(fmt.Errorf("too late ... "), 10*time.Millisecond, 30*time.Millisecond)
 }
 
 func genLimit() error {
@@ -472,7 +472,7 @@ func TestErrCheckTimeout(t *testing.T) {
 		t.Errorf("the error HAS to be a timeout")
 		t.FailNow()
 	}
-	reason := fail.RootCause(xerr)
+	reason := fail.Cause(xerr)
 	if reason == nil {
 		t.Errorf("it MUST have a cause")
 		t.FailNow()
@@ -503,7 +503,7 @@ func TestErrCheckAbortedNoTimeout(t *testing.T) {
 		t.FailNow()
 	}
 
-	reason := fail.RootCause(xerr)
+	reason := fail.Cause(xerr)
 	if reason == nil {
 		t.Errorf("it MUST have a cause")
 		t.FailNow()
@@ -539,7 +539,7 @@ func TestErrCheckPanicNoTimeout(t *testing.T) {
 		t.FailNow()
 	}
 
-	reason := fail.RootCause(xerr)
+	reason := fail.Cause(xerr)
 	if reason == nil {
 		t.Errorf("it MUST have a cause")
 		t.FailNow()
@@ -575,13 +575,15 @@ func TestErrCheckNoTimeout(t *testing.T) {
 		t.FailNow()
 	}
 
-	reason := fail.RootCause(xerr)
+	reason := fail.Cause(xerr)
 	if reason == nil {
 		t.Errorf("it MUST have a cause")
 		t.FailNow()
 	}
-	if _, ok := reason.(*fail.ErrNotFound); !ok {
-		t.Errorf("the cause MUST be a ErrNotFound")
+
+	// In this case the Cause and the RootCause are the same because we have only 1 level of nesting
+	otherReason := fail.Cause(xerr)
+	if _, ok := otherReason.(*fail.ErrNotFound); !ok {
 		t.FailNow()
 	}
 
@@ -611,7 +613,7 @@ func TestRetriesHitFirst(t *testing.T) {
 		t.FailNow()
 	}
 
-	reason := fail.RootCause(xerr)
+	reason := fail.Cause(xerr)
 	if reason == nil {
 		t.FailNow()
 	}
@@ -633,14 +635,17 @@ func TestCustomActionWithTimeout(t *testing.T) {
 		Constant(1*time.Second),
 		nil, nil, nil,
 	)
-	if xerr == nil { // when timeout is fixed, the test must change
+	if xerr == nil {
 		t.FailNow()
-	} else {
-		t.Errorf(xerr.Error())
 	}
+	if _, ok := xerr.(*fail.ErrTimeout); !ok {
+		t.Errorf("the error HAS to be a timeout")
+		t.FailNow()
+	}
+
 	delta := time.Since(begin)
-	if delta > 2*time.Second {
-		t.Errorf("There was a retry and it should have been none, timeout shoudn't be able to dictate when the retry finishes")
+	if delta < 6*time.Second {
+		t.Errorf("retry timing didn't work well")
 		t.FailNow()
 	}
 }
@@ -656,11 +661,11 @@ func TestOtherCustomActionWithTimeout(t *testing.T) {
 		Constant(1*time.Second),
 		nil, nil, nil,
 	)
-	if xerr == nil { // when timeout is fixed, the test must change
+	if xerr != nil {
+		t.Errorf("It shouln't fail nor retry")
 		t.FailNow()
-	} else {
-		t.Errorf(xerr.Error())
 	}
+
 	delta := time.Since(begin)
 	if delta > 2*time.Second {
 		t.Errorf("There was a retry and it should have been none, timeout shoudn't be able to dictate when the retry finishes")

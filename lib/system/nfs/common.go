@@ -219,7 +219,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 
 			return nil
 		},
-		retry.PrevailDone(retry.UnsuccessfulWhereRetcode255(), retry.Timeout(temporal.GetContextTimeout())),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetContextTimeout())),
 		retry.Constant(temporal.GetDefaultDelay()),
 		nil, nil, nil,
 	)
