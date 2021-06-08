@@ -84,7 +84,7 @@ func (el *ErrorList) Error() string {
 	return r
 }
 
-// FIXME: All other errors MUST also override UnformattedError
+// UnformattedError returns Error() without any extra formatting applied
 func (el *ErrorList) UnformattedError() string {
 	return el.Error()
 }
