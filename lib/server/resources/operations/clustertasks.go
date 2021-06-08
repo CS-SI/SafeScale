@@ -1717,9 +1717,8 @@ func (instance *Cluster) taskCreateNodes(toc concurrency.Task, params concurrenc
 	logrus.Debugf("[Cluster %s] creating %d node%s...", clusterName, p.count, strprocess.Plural(p.count))
 
 	timeout := temporal.GetContextTimeout() + time.Duration(p.count)*time.Minute
-	var subtasks []concurrency.Task
 	for i := uint(1); i <= p.count; i++ {
-		subtask, xerr := task.StartInSubtask(instance.taskCreateNode, taskCreateNodeParameters{
+		_, xerr := task.StartInSubtask(instance.taskCreateNode, taskCreateNodeParameters{
 			index:         i,
 			nodeDef:       p.nodesDef,
 			timeout:       timeout,
@@ -1729,8 +1728,6 @@ func (instance *Cluster) taskCreateNodes(toc concurrency.Task, params concurrenc
 		if xerr != nil {
 			return nil, xerr
 		}
-
-		subtasks = append(subtasks, subtask)
 	}
 
 	tr, err := task.WaitGroup()
