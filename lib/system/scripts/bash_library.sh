@@ -176,7 +176,7 @@ sfDefaultDelay() {
 export -f sfDefaultDelay
 
 sfDefaultTimeout() {
-	echo {{ default "2m" .reserved_DefaultTimeout }}
+	echo {{ default "3m" .reserved_DefaultTimeout }}
 }
 export -f sfDefaultTimeout
 
