@@ -541,6 +541,11 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 			xerr = fail.Wrap(xerr.Cause(), "reached timeout of %s", temporal.FormatDuration(timeout))
 		default:
 		}
+
+		if strings.Contains(xerr.Error(), "cannot allocate memory") {
+			return -1, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")
+		}
+
 		tracer.Trace("run failed: %v", xerr)
 		return -1, "", "", xerr
 	}
@@ -655,7 +660,7 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 		}
 	} else {
 		xerr = fail.ExecutionError(runErr)
-		// If error doesn't contain ouputs and return code of the process, stop the pipe bridges and return error
+		// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
 		var (
 			note   data.Annotation
 			stderr string
@@ -734,7 +739,7 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel,
 				time.Minute,
 			)
 			if xerr != nil {
-				switch xerr.(type) { //nolint
+				switch xerr.(type) { // nolint
 				case *retry.ErrTimeout:
 					xerr = fail.ConvertError(xerr.Cause())
 				}
