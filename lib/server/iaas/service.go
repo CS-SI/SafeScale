@@ -19,7 +19,6 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"regexp"
 	"sort"
@@ -685,34 +684,75 @@ func (svc service) SearchImage(osname string) (*abstract.Image, fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
+	if osname == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("osname")
+	}
 
 	imgs, xerr := svc.ListImages(false)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	maxscore := 0.0
-	maxi := -1
-	// fields := strings.Split(strings.ToUpper(osname), " ")
-	for i, img := range imgs {
-		// score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
-		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
-		// score := matchScore(fields, strings.ToUpper(img.Name))
-		// score := SimilarityScore(osname, img.Name)
-		if score > maxscore {
-			maxscore = score
-			maxi = i
-		}
-	}
-
-	// fmt.Println(fields, len(fields))
-	// fmt.Println(len(fields))
-	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {
+	if len(imgs) == 0 {
 		return nil, fail.NotFoundError("unable to find an image matching '%s'", osname)
 	}
 
-	logrus.Infof("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
-	return &imgs[maxi], nil
+	reg, err := regexp.Compile("[^A-Z0-9.]")
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	var maxLength int
+	for _, img := range imgs {
+		length := len(img.Name)
+		if maxLength < length {
+			maxLength = length
+		}
+	}
+
+	normalizedOSName := normalizeString(osname, reg)
+	paddedNormalizedOSName := addPadding(normalizedOSName, maxLength)
+
+	minWFScore := -1
+	wfSelect := -1
+	for i, entry := range imgs {
+		normalizedImageName := normalizeString(entry.Name, reg)
+		normalizedImageName = addPadding(normalizedImageName, maxLength)
+		wfScore := smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
+		logrus.Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
+
+		if minWFScore == -1 || wfScore < minWFScore {
+			if strings.Contains(normalizedImageName, normalizedOSName) {
+				minWFScore = wfScore
+				wfSelect = i
+			}
+		}
+	}
+
+	if wfSelect < 0 {
+		return nil, fail.NotFoundError("unable to find an image matching '%s'", osname)
+	}
+
+	logrus.Infof("Selected image: '%s' (ID='%s')", imgs[wfSelect].Name, imgs[wfSelect].ID)
+	return &imgs[wfSelect], nil
+}
+
+func normalizeString(in string, reg *regexp.Regexp) string {
+	in = strings.ToUpper(in)
+	in = reg.ReplaceAllString(in, "")
+	return in
+}
+
+func addPadding(in string, maxLength int) string {
+	if maxLength <= 0 {
+		return in
+	}
+
+	length := len(in)
+	if length < maxLength {
+		paddingRight := maxLength - length
+		in += strings.Repeat(" ", paddingRight)
+	}
+	return in
 }
 
 // CreateHostWithKeyPair creates an host
@@ -787,105 +827,106 @@ func (svc service) TenantCleanup(force bool) fail.Error {
 	return fail.NotImplementedError("service.TenantCleanup() not yet implemented")
 }
 
-func runeIndexes(s string, r rune) []int {
-	var positions []int
-	for i, l := range s {
-		if l == r {
-			positions = append(positions, i)
-		}
-	}
-	return positions
+// func runeIndexes(s string, r rune) []int {
+// 	var positions []int
+// 	for i, l := range s {
+// 		if l == r {
+// 			positions = append(positions, i)
+// 		}
+// 	}
+// 	return positions
+//
+// }
 
-}
+// func runesIndexes(ref string, s string) [][]int {
+// 	var positions [][]int
+// 	uref := strings.ToUpper(ref)
+// 	us := strings.ToUpper(s)
+// 	for _, r := range uref {
+// 		if r != ' ' {
+// 			positions = append(positions, runeIndexes(us, r))
+// 		}
+// 	}
+// 	return positions
+// }
 
-func runesIndexes(ref string, s string) [][]int {
-	var positions [][]int
-	uref := strings.ToUpper(ref)
-	us := strings.ToUpper(s)
-	for _, r := range uref {
-		if r != ' ' {
-			positions = append(positions, runeIndexes(us, r))
-		}
-	}
-	return positions
-}
+// func recPossiblePathes(positions [][]int, level int) [][]int {
+// 	var newPathes [][]int
+// 	if level >= len(positions) {
+// 		return [][]int{
+// 			{},
+// 		}
+// 	}
+// 	pathes := recPossiblePathes(positions, level+1)
+// 	if len(positions[level]) == 0 {
+// 		for _, path := range pathes {
+// 			newPathes = append(newPathes, append([]int{-1}, path...))
+// 		}
+// 	} else {
+// 		for _, idx := range positions[level] {
+// 			for _, path := range pathes {
+// 				newPathes = append(newPathes, append([]int{idx}, path...))
+// 			}
+// 		}
+// 	}
+//
+// 	return newPathes
+// }
 
-func recPossiblePathes(positions [][]int, level int) [][]int {
-	var newPathes [][]int
-	if level >= len(positions) {
-		return [][]int{
-			{},
-		}
-	}
-	pathes := recPossiblePathes(positions, level+1)
-	if len(positions[level]) == 0 {
-		for _, path := range pathes {
-			newPathes = append(newPathes, append([]int{-1}, path...))
-		}
-	} else {
-		for _, idx := range positions[level] {
-			for _, path := range pathes {
-				newPathes = append(newPathes, append([]int{idx}, path...))
-			}
-		}
-	}
+// func possiblePathes(positions [][]int) [][]int {
+// 	return recPossiblePathes(positions, 0)
+// }
 
-	return newPathes
-}
+// func bestPath(pathes [][]int, size int) (int, int) {
+// 	if len(pathes) == 0 {
+// 		return -1, 10000
+// 	}
+// 	minD := distance(pathes[0], size)
+// 	bestI := 0
+// 	for i, p := range pathes {
+// 		d := distance(p, size)
+// 		if d < minD {
+// 			minD = d
+// 			bestI = i
+// 		}
+// 	}
+// 	return bestI, minD
+// }
 
-func possiblePathes(positions [][]int) [][]int {
-	return recPossiblePathes(positions, 0)
-}
+// func distance(path []int, size int) int {
+// 	d := 0
+// 	previous := path[0]
+// 	for _, index := range path {
+// 		if index < 0 {
+// 			d += size
+// 		} else {
+// 			di := index - previous
+// 			d += di
+// 			if di < 0 {
+// 				d += di + size
+// 			}
+// 		}
+// 		previous = index
+// 	}
+// 	return d
+// }
 
-func bestPath(pathes [][]int, size int) (int, int) {
-	if len(pathes) == 0 {
-		return -1, 10000
-	}
-	minD := distance(pathes[0], size)
-	bestI := 0
-	for i, p := range pathes {
-		d := distance(p, size)
-		if d < minD {
-			minD = d
-			bestI = i
-		}
-	}
-	return bestI, minD
-}
+// func score(d int, rsize int) float64 {
+// 	return float64(rsize-1) / float64(d)
+// }
 
-func distance(path []int, size int) int {
-	d := 0
-	previous := path[0]
-	for _, index := range path {
-		if index < 0 {
-			d += size
-		} else {
-			di := index - previous
-			d += di
-			if di < 0 {
-				d += di + size
-			}
-		}
-		previous = index
-	}
-	return d
-}
-
-func score(d int, rsize int) float64 {
-	return float64(rsize-1) / float64(d)
-}
-
-// SimilarityScore computes a similarity score between 2 strings
-func SimilarityScore(ref string, s string) float64 {
-	size := len(s)
-	rsize := len(ref)
-	if rsize > size {
-		return SimilarityScore(s, ref)
-	}
-	_, d := bestPath(possiblePathes(runesIndexes(ref, s)), size)
-	ds := math.Abs(float64(size-rsize)) / float64(rsize)
-	return score(d, len(ref)) / (math.Log10(10 * (1. + ds)))
-}
+// // SimilarityScore computes a similarity score between 2 strings
+// func SimilarityScore(ref string, s string) float64 {
+// 	size := len(s)
+// 	rsize := len(ref)
+// 	if rsize > size {
+// 		return SimilarityScore(s, ref)
+// 	}
+//
+// 	_, d := bestPath(possiblePathes(runesIndexes(ref, s)), size)
+// 	ds := math.Abs(float64(size-rsize)) / float64(rsize)
+// 	return score(d, len(ref)) / (math.Log10(10 * (1. + ds)))
+// }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
 func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule) (bool, fail.Error) {

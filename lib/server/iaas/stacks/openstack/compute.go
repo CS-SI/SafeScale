@@ -138,11 +138,14 @@ func (s Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	opts := images.ListOpts{}
+	opts := images.ListOpts{
+		Status: images.ImageStatusActive,
+		Sort:   "name=asc,updated_at:desc",
+	}
 
 	// Retrieve a pager (i.e. a paginated collection)
 	pager := images.List(s.ComputeClient, opts)
