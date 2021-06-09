@@ -328,7 +328,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 					case *fail.ErrAborted:
 						return innerXErr
 					default:
-						return fail.NewError("file may have existing on remote with inappropriate access rights, deleted it and now retrying")
+						return fail.NewError("file may exist on remote with inappropriate access rights, deleted it and now retrying")
 					}
 				}
 				if system.IsSCPRetryable(retcode) {
@@ -337,8 +337,8 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 			}
 			return nil
 		},
-		1*time.Second,
-		2*time.Minute,
+		temporal.GetMinDelay(),
+		2*temporal.MaxTimeout(temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout()),
 	)
 	_ = os.Remove(f.Name())
 	if retryErr != nil {
@@ -380,8 +380,8 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 				}
 				return nil
 			},
-			2*time.Second,
-			1*time.Minute,
+			temporal.GetMinDelay(),
+			2*temporal.MaxTimeout(temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout()),
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
