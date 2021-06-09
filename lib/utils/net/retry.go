@@ -45,7 +45,8 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 	}
 
 	xerr := retry.Action(
-		func() error {
+		func() (nested error) {
+			defer fail.OnPanic(&nested)
 			callbackErr := callback()
 			actionErr := normalizeErrorAndCheckIfRetriable(callbackErr)
 			return actionErr
