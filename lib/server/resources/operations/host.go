@@ -157,10 +157,7 @@ func LoadHost(svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) 
 	}
 	_ = ce.LockContent()
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			_ = ce.UnlockContent()
-		}
+		_ = ce.UnlockContent()
 	}()
 
 	return hostInstance, hostInstance.(*Host).updateCachedInformation()
@@ -1024,7 +1021,9 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, xerr
 	}
 	defer func() {
-		instance.undoUpdateSubnets(hostReq, &xerr)
+		if xerr != nil {
+			instance.undoUpdateSubnets(hostReq, &xerr)
+		}
 	}()
 
 	xerr = instance.finalizeProvisioning(ctx, userdataContent)
@@ -1239,6 +1238,8 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					if lansg, innerXErr = LoadSecurityGroup(svc, otherAbstractSubnet.InternalSecurityGroupID); innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to load Subnet '%s' internal Security Group %s", otherAbstractSubnet.Name, otherAbstractSubnet.InternalSecurityGroupID)
 					}
+
+					//goland:noinspection ALL
 					defer func(sgInstance resources.SecurityGroup) {
 						sgInstance.Released()
 					}(lansg)
@@ -1246,6 +1247,8 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 					if innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
 					}
+
+					//goland:noinspection ALL
 					defer func(sgInstance resources.SecurityGroup) {
 						sgInstance.Released()
 					}(lansg)
@@ -1375,7 +1378,7 @@ func (instance *Host) findImageID(hostDef *abstract.HostSizingRequirements) (str
 			img, innerXErr = svc.SearchImage(hostDef.Image)
 			return innerXErr
 		},
-		30*time.Second,
+		temporal.GetOperationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
