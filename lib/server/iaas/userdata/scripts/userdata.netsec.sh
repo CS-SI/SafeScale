@@ -324,8 +324,7 @@ function configure_network() {
 		elif systemctl status networking &>/dev/null; then
 			configure_network_debian
 		else
-			echo "PROVISIONING_ERROR: failed to determine how to configure network"
-			failure 192
+			failure 192 "failed to determine how to configure network"
 		fi
 		;;
 
@@ -339,8 +338,7 @@ function configure_network() {
 		;;
 
 	*)
-		echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-		failure 193
+		failure 193 "Unsupported Linux distribution '$LINUX_KIND'!"
 		;;
 	esac
 
@@ -351,8 +349,7 @@ function configure_network() {
 	update_fqdn
 
 	check_for_network || {
-		echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
-		failure 195
+		failure 195 "missing or incomplete network connectivity"
 	}
 }
 
@@ -384,8 +381,7 @@ function configure_network_debian() {
 
 	echo "Looking for network..."
 	check_for_network || {
-		echo "PROVISIONING_ERROR: failed network cfg 0"
-		failure 196
+		failure 196 "failed network cfg 0"
 	}
 
 	configure_dhclient
@@ -394,16 +390,14 @@ function configure_network_debian() {
 
 	echo "Looking for network..."
 	check_for_network || {
-		echo "PROVISIONING_ERROR: failed network cfg 1"
-		failure 197
+		failure 197 "failed network cfg 1"
 	}
 
 	systemctl restart networking
 
 	echo "Looking for network..."
 	check_for_network || {
-		echo "PROVISIONING_ERROR: failed network cfg 2"
-		failure 199
+		failure 199 "failed network cfg 2"
 	}
 
 	reset_fw || failure 200
@@ -528,8 +522,7 @@ function configure_network_systemd_networkd() {
 	if [[ $AWS -eq 1 ]]; then
 		echo "Looking for network..."
 		check_for_network || {
-			echo "PROVISIONING_ERROR: failed networkd cfg 0"
-			failure 201
+			failure 201 "failed networkd cfg 0"
 		}
 	fi
 
@@ -538,8 +531,7 @@ function configure_network_systemd_networkd() {
 	if [[ $AWS -eq 1 ]]; then
 		echo "Looking for network..."
 		check_for_network || {
-			echo "PROVISIONING_ERROR: failed networkd cfg 1"
-			failure 203
+			failure 203 "failed networkd cfg 1"
 		}
 	fi
 
@@ -548,8 +540,7 @@ function configure_network_systemd_networkd() {
 	if [[ $AWS -eq 1 ]]; then
 		echo "Looking for network..."
 		check_for_network || {
-			echo "PROVISIONING_ERROR: failed networkd cfg 2"
-			failure 204
+			failure 204 "failed networkd cfg 2"
 		}
 	fi
 
@@ -558,8 +549,7 @@ function configure_network_systemd_networkd() {
 	if [[ $AWS -eq 1 ]]; then
 		echo "Looking for network..."
 		check_for_network || {
-			echo "PROVISIONING_ERROR: failed networkd cfg 3"
-			failure 205
+			failure 205 "failed networkd cfg 3"
 		}
 	fi
 
@@ -903,8 +893,7 @@ function install_packages() {
 		yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || failure 214
 		;;
 	*)
-		echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-		failure 215
+		failure 215 "Unsupported Linux distribution '$LINUX_KIND'!"
 		;;
 	esac
 }

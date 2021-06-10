@@ -100,8 +100,7 @@ function install_drivers_nvidia() {
             rm -f NVIDIA-Linux-x86_64-410.78.run
             ;;
         *)
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 209
+            fail 209 "Unsupported Linux distribution '$LINUX_KIND'!"
             ;;
     esac
 }
@@ -117,8 +116,7 @@ function install_python3() {
         yum install -y python3 || fail 210
         ;;
     *)
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-        fail 209
+        fail 209 "Unsupported Linux distribution '$LINUX_KIND'!"
         ;;
     esac
 }
