@@ -1404,7 +1404,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 
 	command := fmt.Sprintf("sudo bash %s; exit $?", file)
 	// Executes the script on the remote Host
-	retcode, _, stderr, xerr := instance.UnsafeRun(ctx, command, outputs.COLLECT, 0, 0)
+	retcode, stdout, stderr, xerr := instance.UnsafeRun(ctx, command, outputs.COLLECT, 0, 0)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply configuration phase '%s'", phase)
@@ -1413,7 +1413,44 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 		if retcode == 255 {
 			return fail.NewError("failed to execute install phase '%s' on Host '%s': SSH connection failed", phase, instance.GetName())
 		}
-		return fail.NewError("failed to execute install phase '%s' on Host '%s': %s", phase, instance.GetName(), stderr)
+
+		// build new error
+		problem := fail.NewError("failed to execute install phase '%s' on Host '%s'", phase, instance.GetName())
+		_ = problem.Annotate("stdout", stdout)
+		_ = problem.Annotate("stderr", stderr)
+
+		if abstract.IsProvisioningError(problem) {
+			// Rewrite stdout, probably has too much information
+			if stdout != "" {
+				lastMsg := ""
+				lines := strings.Split(stdout, "\n")
+				for _, line := range lines {
+					if strings.Contains(line, "+ echo '") {
+						lastMsg = line
+					}
+				}
+
+				if len(lastMsg) > 0 {
+					problem = fail.NewError("failed to execute install phase '%s' on Host '%s': %s", phase, instance.GetName(), lastMsg[8:len(lastMsg)-1])
+				}
+			}
+
+			if stderr != "" {
+				lastMsg := ""
+				lines := strings.Split(stderr, "\n")
+				for _, line := range lines {
+					if strings.Contains(line, "+ echo '") {
+						lastMsg = line
+					}
+				}
+
+				if len(lastMsg) > 0 {
+					problem = fail.NewError("failed to execute install phase '%s' on Host '%s': %s", phase, instance.GetName(), lastMsg[8:len(lastMsg)-1])
+				}
+			}
+		}
+
+		return problem
 	}
 	return nil
 }
@@ -1427,7 +1464,7 @@ func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase
 		}
 	}
 
-	// TODO: configurable timeout here
+	// FIXME: configurable timeout here
 	duration := time.Duration(sshDefaultTimeout) * time.Minute
 	status, xerr := instance.sshProfile.WaitServerReady(ctx, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1438,8 +1475,48 @@ func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase
 		default:
 		}
 		if abstract.IsProvisioningError(xerr) {
-			logrus.Errorf("%+v", xerr)
-			return status, fail.Wrap(xerr, "error provisioning Host '%s', please check safescaled logs", instance.GetName())
+			stdout := ""
+			stderr := ""
+
+			if astdout, ok := xerr.Annotation("stdout"); ok {
+				if _, ok = astdout.(string); ok {
+					stdout = astdout.(string)
+				}
+			}
+			if astderr, ok := xerr.Annotation("stderr"); ok {
+				if _, ok = astderr.(string); ok {
+					stderr = astderr.(string)
+				}
+			}
+
+			// Rewrite stdout, probably has too much information
+			if stdout != "" {
+				lastMsg := ""
+				lines := strings.Split(stdout, "\n")
+				for _, line := range lines {
+					if strings.Contains(line, "+ echo '") {
+						lastMsg = line
+					}
+				}
+
+				if len(lastMsg) > 0 {
+					xerr = fail.NewError("failed to execute install phase '%s' on Host '%s': %s", phase, instance.GetName(), lastMsg[8:len(lastMsg)-1])
+				}
+			}
+
+			if stderr != "" {
+				lastMsg := ""
+				lines := strings.Split(stderr, "\n")
+				for _, line := range lines {
+					if strings.Contains(line, "+ echo '") {
+						lastMsg = line
+					}
+				}
+
+				if len(lastMsg) > 0 {
+					xerr = fail.NewError("failed to execute install phase '%s' on Host '%s': %s", phase, instance.GetName(), lastMsg[8:len(lastMsg)-1])
+				}
+			}
 		}
 	}
 	return status, xerr
