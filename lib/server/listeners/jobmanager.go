@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"

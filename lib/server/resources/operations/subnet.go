@@ -840,6 +840,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 				return nil
 			})
 			if xerr != nil {
+				//goland:noinspection GoNilness
 				if groupXErr == nil {
 					groupXErr = xerr
 				} else {
@@ -874,6 +875,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 				xerr = instance.bindInternalSecurityGroupToGateway(ctx, primaryGateway)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
+					//goland:noinspection GoNilness
 					if groupXErr == nil {
 						groupXErr = xerr
 					} else {
