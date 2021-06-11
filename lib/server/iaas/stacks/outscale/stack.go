@@ -109,7 +109,9 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { //nolint
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	client := osc.NewAPIClient(osc.NewConfiguration())
+	config := osc.NewConfiguration()
+	config.BasePath = options.Compute.URL
+	client := osc.NewAPIClient(config)
 	auth := context.WithValue(context.Background(), osc.ContextAWSv4, osc.AWSv4{
 		AccessKey: options.Identity.AccessKey,
 		SecretKey: options.Identity.SecretKey,

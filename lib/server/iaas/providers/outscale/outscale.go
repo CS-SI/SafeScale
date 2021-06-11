@@ -123,7 +123,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			SecretKey: get(identity, "SecretKey"),
 		},
 		Compute: outscale.ComputeConfiguration{
-			URL:                get(compute, "URL", "outscale.com/api/latest"),
+			URL:                get(compute, "URL", fmt.Sprintf("https://api.%s.outscale.com/api/v1", region)),
 			Service:            get(compute, "Service", "api"),
 			Region:             region,
 			Subregion:          get(compute, "Subregion"),
