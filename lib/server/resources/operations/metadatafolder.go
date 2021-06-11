@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	datadef "github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -168,9 +168,9 @@ func (f MetadataFolder) Delete(path string, name string) fail.Error {
 
 // Read loads the content of the object stored in metadata bucket
 // returns true, nil if the object has been found
-// returns false, fail.Error if an error occured (including object not found)
+// returns false, fail.Error if an error occurred (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...data.ImmutableKeyValue) fail.Error {
+func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -214,17 +214,17 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 		default:
 		}
 	}
-	data := buffer.Bytes()
+	datas := buffer.Bytes()
 	if doCrypt {
 		var err error
-		data, err = crypt.Decrypt(data, f.cryptKey)
+		datas, err = crypt.Decrypt(datas, f.cryptKey)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return fail.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
 	}
 
-	xerr = callback(data)
+	xerr = callback(datas)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, xerr)
@@ -237,7 +237,7 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 // Returns nil on success (with assurance the write has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (f MetadataFolder) Write(path string, name string, content []byte, options ...data.ImmutableKeyValue) fail.Error {
+func (f MetadataFolder) Write(path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
