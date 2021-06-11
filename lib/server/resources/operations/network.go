@@ -55,7 +55,7 @@ type Network struct {
 	lock sync.RWMutex
 }
 
-// ShareNullValue returns a *Network representing a null value
+// NullValue returns a *Network representing a null value
 func NullValue() *Network {
 	return &Network{MetadataCore: NullCore()}
 }
