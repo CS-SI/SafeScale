@@ -53,7 +53,7 @@ case $LINUX_KIND in
         finishPreviousInstall
 
         sfRetry 3m 5 "sfWaitForApt && apt -y update"
-        sfRetry 5m 5 "sfWaitForApt && apt-get install -qqy nfs-common"
+        sfRetry 5m 5 "sfWaitForApt && apt-get install -qqy --force-yes nfs-common"
         ;;
 
     rhel|centos)

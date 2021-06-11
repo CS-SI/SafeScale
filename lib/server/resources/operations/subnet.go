@@ -1072,7 +1072,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	return xerr
 }
 
-// bindInternalSecurityGroupTogateway does what its name says
+// bindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host) fail.Error {
 	return instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)

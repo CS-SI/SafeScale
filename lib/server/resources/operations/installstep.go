@@ -485,9 +485,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 
 	if !hidesOutput {
-		command = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", filename, filename)
+		command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; bash -x -c %s; exit ${PIPESTATUS}'", filename, filename)
 	} else {
-		command = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
+		command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -x -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
 	}
 
 	// Executes the script on the remote host
@@ -501,7 +501,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	return stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil
 }
 
-// realizeVariables replaces any template occuring in every variable
+// realizeVariables replaces any template occurring in every variable
 func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 	cloneV := variables.Clone()
 

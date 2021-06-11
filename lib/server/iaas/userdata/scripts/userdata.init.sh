@@ -26,11 +26,20 @@ function print_error() {
 trap print_error ERR
 
 function fail() {
-    echo "PROVISIONING_ERROR: $1"
-    echo -n "$1,${LINUX_KIND},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.init.done
-    (sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
-    exit $1
+	MYIP="$(ip -br a | grep UP | awk {'print $3'})"
+	if [ $# -eq 1 ]; then
+		echo "PROVISIONING_ERROR: $1"
+		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" >/opt/safescale/var/state/user_data.init.done
+		(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+		exit $1
+	elif [ $# -eq 2 -a $1 -ne 0 ]; then
+		echo "PROVISIONING_ERROR: $1, $2"
+		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$2" >/opt/safescale/var/state/user_data.init.done
+		(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+		exit $1
+	fi
 }
+export -f fail
 
 mkdir -p /opt/safescale/etc /opt/safescale/bin &>/dev/null
 mkdir -p /opt/safescale/var/log &>/dev/null

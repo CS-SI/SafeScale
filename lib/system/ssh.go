@@ -542,8 +542,15 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		default:
 		}
 
-		if strings.Contains(xerr.Error(), "cannot allocate memory") {
-			return -1, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")
+		// FIXME: This kind of resource exhaustion deserves its own handling and it own kind of error
+		{
+			if strings.Contains(xerr.Error(), "annot allocate memory") {
+				return -1, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")
+			}
+
+			if strings.Contains(xerr.Error(), "esource temporarily unavailable") {
+				return -1, "", "", fail.AbortedError(xerr, "not enough resources, pointless to retry")
+			}
 		}
 
 		tracer.Trace("run failed: %v", xerr)
@@ -927,10 +934,10 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 				return innerXErr
 			}
 			if retcode != 0 {
-				if retcode == 255 {
-					return fail.NewError("remote SSH not ready: error code: 255; Output [%s]; Error [%s]", stdout, stderr)
-				}
-				return fail.NewError("remote SSH NOT ready: error code: %d; Output [%s]; Error [%s]", retcode, stdout, stderr)
+				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
+				_ = fe.Annotate("stdout", stdout)
+				_ = fe.Annotate("stderr", stderr)
+				return fe
 			}
 			return nil
 		},

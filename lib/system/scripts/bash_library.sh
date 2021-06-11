@@ -63,7 +63,7 @@ sfWaitForApt() {
 export -f sfWaitForApt
 
 # sfApt does exactly what apt does, but we call sfWaitForApt first
-sfApt() {
+function sfApt() {
 	echo "waiting for apt lock..."
 	sfWaitForApt
 	echo "running apt " "$@"
@@ -352,7 +352,7 @@ sfInstall() {
 		debian|ubuntu)
 			export DEBIAN_FRONTEND=noninteractive
 			sfRetry 5m 3 "sfApt update"
-			sfApt install $1 -y || exit 194
+			sfApt install $1 -y --force-yes || exit 194
 			command -v $1 || exit 194
 			;;
 		centos|rhel)
