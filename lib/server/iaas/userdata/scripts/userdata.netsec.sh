@@ -30,12 +30,20 @@ function failure() {
 	if [ $# -eq 1 ]; then
 		echo "PROVISIONING_ERROR: $1"
 		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" >/opt/safescale/var/state/user_data.netsec.done
-		(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+		(
+			sync
+			echo 3 >/proc/sys/vm/drop_caches
+			sleep 2
+		) || true
 		exit $1
 	elif [ $# -eq 2 -a $1 -ne 0 ]; then
 		echo "PROVISIONING_ERROR: $1, $2"
 		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$2" >/opt/safescale/var/state/user_data.netsec.done
-		(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+		(
+			sync
+			echo 3 >/proc/sys/vm/drop_caches
+			sleep 2
+		) || true
 		exit $1
 	fi
 }
@@ -343,7 +351,7 @@ function configure_network() {
 	esac
 
 	{{- if .IsGateway }}
-	configure_as_gateway || failure 194
+	configure_as_gateway || failure 194 "failed to configure machine as a gateway"
 	{{- end }}
 
 	update_fqdn
@@ -400,7 +408,7 @@ function configure_network_debian() {
 		failure 199 "failed network cfg 2"
 	}
 
-	reset_fw || failure 200
+	reset_fw || failure 200 "failure resetting firewall"
 
 	echo "done"
 }
@@ -526,7 +534,7 @@ function configure_network_systemd_networkd() {
 		}
 	fi
 
-	netplan generate && netplan apply || failure 202
+	netplan generate && netplan apply || failure 202 "failure running netplan"
 
 	if [[ $AWS -eq 1 ]]; then
 		echo "Looking for network..."
@@ -553,7 +561,7 @@ function configure_network_systemd_networkd() {
 		}
 	fi
 
-	reset_fw || failure 206
+	reset_fw || failure 206 "failure resetting firewall"
 
 	echo "done"
 }
@@ -632,7 +640,7 @@ function configure_network_redhat() {
 
 	echo "exclude=NetworkManager" >>/etc/yum.conf
 
-	reset_fw || failure 207
+	reset_fw || failure 207 "failure resetting firewall"
 
 	echo "done"
 }
@@ -703,7 +711,7 @@ function configure_as_gateway() {
 	# Allows default services on public zone
 	firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
 
-	sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || failure 208
+	sed -i '/^\#*AllowTcpForwarding / s/^.*$/AllowTcpForwarding yes/' /etc/ssh/sshd_config || failure 208 "failure allowing tcp forwarding"
 
 	systemctl restart sshd
 
@@ -843,7 +851,7 @@ function early_packages_update() {
 
 		sfApt update
 		# Force update of systemd, pciutils
-		sfApt install -q -y systemd pciutils sudo || failure 209
+		sfApt install -q -y systemd pciutils sudo || failure 209 "failure installing systemd and other basic requirements"
 		# systemd, if updated, is restarted, so we may need to ensure again network connectivity
 		ensure_network_connectivity
 		;;
@@ -857,9 +865,9 @@ function early_packages_update() {
 		sfApt update
 		# Force update of systemd, pciutils and netplan
 		if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-			sfApt install -y systemd pciutils netplan.io sudo || failure 210
+			sfApt install -y systemd pciutils netplan.io sudo || failure 210 "problem installing systemd and other basic requirements"
 		else
-			sfApt install -y systemd pciutils sudo || failure 211
+			sfApt install -y systemd pciutils sudo || failure 211 "problem installing systemd and other basic requirements"
 		fi
 		# systemd, if updated, is restarted, so we may need to ensure again network connectivity
 		ensure_network_connectivity
@@ -873,7 +881,7 @@ function early_packages_update() {
 		# echo "ip_resolve=4" >>/etc/yum.conf
 
 		# Force update of systemd and pciutils
-		yum install -q -y systemd pciutils yum-utils sudo || failure 212
+		yum install -q -y systemd pciutils yum-utils sudo || failure 212 "failure installing systemd and other basic requirements"
 		# systemd, if updated, is restarted, so we may need to ensure again network connectivity
 		ensure_network_connectivity
 
@@ -887,13 +895,31 @@ function early_packages_update() {
 function install_packages() {
 	case $LINUX_KIND in
 	ubuntu | debian)
-		sfApt install -y -qq jq zip time &>/dev/null || failure 213
+		sfApt install -y -qq jq zip time &>/dev/null || failure 213 "failure installing utility packages: jq zip time"
 		;;
 	redhat | centos)
-		yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || failure 214
+		yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || failure 214 "failure installing utility packages: jq zip time"
 		;;
 	*)
 		failure 215 "Unsupported Linux distribution '$LINUX_KIND'!"
+		;;
+	esac
+}
+
+function no_daily_update() {
+	case $LINUX_KIND in
+	debian | ubuntu)
+		# TODO: Check for errors, also look other cloud distros
+		# first kill apt-daily
+		systemctl stop apt-daily.service
+		systemctl kill --kill-who=all apt-daily.service
+
+		# wait until apt-daily dies
+		while ! (systemctl list-units --all apt-daily.service | egrep -q '(dead|failed)'); do
+			systemctl stop apt-daily.service
+			systemctl kill --kill-who=all apt-daily.service
+			sleep 1
+		done
 		;;
 	esac
 }
@@ -902,6 +928,7 @@ function add_common_repos() {
 	case $LINUX_KIND in
 	ubuntu)
 		sfFinishPreviousInstall
+		# no_daily_update # TODO: Enable this when properly tested
 		add-apt-repository universe -y || return 1
 		codename=$(sfGetFact "linux_codename")
 		echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
@@ -972,7 +999,7 @@ is_network_reachable && early_packages_update
 
 install_packages
 
-update_kernel_settings || failure 216
+update_kernel_settings || failure 216 "failure updating kernel settings"
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
 
@@ -984,7 +1011,11 @@ force_dbus_restart
 
 systemctl restart sshd
 
-(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+(
+	sync
+	echo 3 >/proc/sys/vm/drop_caches
+	sleep 2
+) || true
 
 set +x
 exit 0
