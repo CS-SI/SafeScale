@@ -78,7 +78,7 @@ func genNetURLError() error {
 	return &url.Error{
 		Op:  "GET",
 		URL: "http://whocares.com",
-		Err: fmt.Errorf("Horrible things happened"),
+		Err: fmt.Errorf("horrible things happened"),
 	}
 }
 

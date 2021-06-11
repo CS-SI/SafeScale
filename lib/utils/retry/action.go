@@ -26,12 +26,15 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 )
+
+const minNumRetries = 3
 
 // Try keeps track of the number of tries, starting from 1. Action is valid only when Err is nil.
 type Try struct {
@@ -195,7 +198,7 @@ func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, tim
 	}.loopWithHardTimeout(timeout)
 }
 
-// WhileUnsuccessfulWithHardTimeout retries every 'delay' while 'run' is unsuccessful with a 'timeout'
+// WhileUnsuccessfulWithHardTimeoutWithNotifier retries every 'delay' while 'run' is unsuccessful with a 'timeout'
 func WhileUnsuccessfulWithHardTimeoutWithNotifier(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
@@ -528,9 +531,49 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 	start := time.Now()
 
 	var duration time.Duration
-	_ = duration
-
 	count := uint(1)
+
+	defer func() {
+		if checkTimeouts := os.Getenv("SAFESCALE_CHECK"); checkTimeouts != "ok" && checkTimeouts != "all" {
+			return
+		}
+
+		all := false
+		if checkTimeouts := os.Getenv("SAFESCALE_CHECK"); checkTimeouts == "all" {
+			all = true
+		}
+
+		if a.Timeout != 0 {
+			if !all {
+				if xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrAborted:
+						return
+					}
+				}
+			}
+
+			duration = time.Since(start)
+			if duration > a.Timeout {
+				if count <= minNumRetries {
+					msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) exceeded the mark (%s)", duration, a.Timeout), "", 0)
+					logrus.Warnf(msg)
+				}
+			} else if duration > time.Duration(55*a.Timeout/100) {
+				if count <= minNumRetries {
+					if count == 1 {
+						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) is too close to the mark (%s)", duration, a.Timeout), "", 0)
+						logrus.Warnf(msg)
+					} else {
+						if xerr != nil {
+							msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
+							logrus.Warnf(msg)
+						}
+					}
+				}
+			}
+		}
+	}()
 
 	if arbiter == nil {
 		arbiter = DefaultArbiter
@@ -593,7 +636,7 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 }
 
 // loopWithHardTimeout executes the tries and stops at the exact timeout (hence the "hard timeout")
-func (a action) loopWithHardTimeout(timeout time.Duration) fail.Error {
+func (a action) loopWithHardTimeout(timeout time.Duration) (xerr fail.Error) {
 	var (
 		arbiter = a.Arbiter
 		start   = time.Now()
@@ -602,6 +645,9 @@ func (a action) loopWithHardTimeout(timeout time.Duration) fail.Error {
 		arbiter = DefaultArbiter
 	}
 
+	var duration time.Duration
+	count := uint(1)
+
 	if a.First != nil {
 		err := a.First()
 		if err != nil {
@@ -609,11 +655,53 @@ func (a action) loopWithHardTimeout(timeout time.Duration) fail.Error {
 		}
 	}
 
-	// the time.After inside the for bucle (16 lines below), is evaluated each time we enter the bucle, if we want a timeout for
-	// the whole bucle, we need to define it outside the bucle, this is the desist timeout
-	// ideally, the timeout inside the bucle and the timeout ouside should be different, something like: outsideTimeout = #maxAllowedIterations * insideTimeout
+	defer func() {
+		if checkTimeouts := os.Getenv("SAFESCALE_CHECK"); checkTimeouts != "ok" && checkTimeouts != "all" {
+			return
+		}
+
+		all := false
+		if checkTimeouts := os.Getenv("SAFESCALE_CHECK"); checkTimeouts == "all" {
+			all = true
+		}
+
+		if a.Timeout != 0 {
+			if !all {
+				if xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrAborted:
+						return
+					}
+				}
+			}
+
+			duration = time.Since(start)
+			if duration > a.Timeout {
+				if count <= minNumRetries {
+					msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) exceeded the mark (%s)", duration, a.Timeout), "", 0)
+					logrus.Warnf(msg)
+				}
+			} else if duration > time.Duration(55*a.Timeout/100) {
+				if count <= minNumRetries {
+					if count == 1 {
+						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) is too close to the mark (%s)", duration, a.Timeout), "", 0)
+						logrus.Warnf(msg)
+					} else {
+						if xerr != nil {
+							msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
+							logrus.Warnf(msg)
+						}
+					}
+				}
+			}
+		}
+	}()
+
+	// the time.After inside the for loop (16 lines below), is evaluated each time we enter the loop, if we want a timeout for
+	// the whole loop, we need to define it outside the loop, this is the 'desist' timeout
+	// ideally, the timeout inside the loop and the timeout outside should be different, something like: outsideTimeout = #maxAllowedIterations * insideTimeout
 	desist := time.After(timeout)
-	for count := uint(1); ; count++ {
+	for ; ; count++ {
 		var err error
 
 		// Perform action
