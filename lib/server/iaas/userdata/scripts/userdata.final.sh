@@ -26,13 +26,24 @@ function print_error() {
 trap print_error ERR
 
 function fail() {
-    echo "PROVISIONING_ERROR: $1"
-    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.final.done
-	(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
-    # For compatibility with previous user_data implementation (until v19.03.x)...
-    ln -s ${SF_VARDIR}/state/user_data.final.done /var/tmp/user_data.done
-    exit $1
+	MYIP="$(ip -br a | grep UP | awk {'print $3'})"
+	if [ $# -eq 1 ]; then
+		echo "PROVISIONING_ERROR: $1"
+		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" >/opt/safescale/var/state/user_data.final.done
+		(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+		# For compatibility with previous user_data implementation (until v19.03.x)...
+        ln -s ${SF_VARDIR}/state/user_data.final.done /var/tmp/user_data.done
+		exit $1
+	elif [ $# -eq 2 -a $1 -ne 0 ]; then
+		echo "PROVISIONING_ERROR: $1, $2"
+		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$2" >/opt/safescale/var/state/user_data.final.done
+		(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+		# For compatibility with previous user_data implementation (until v19.03.x)...
+        ln -s ${SF_VARDIR}/state/user_data.final.done /var/tmp/user_data.done
+		exit $1
+	fi
 }
+export -f fail
 
 # Redirects outputs to /opt/safescale/var/log/user_data.final.log
 LOGFILE=/opt/safescale/var/log/user_data.final.log
@@ -89,8 +100,7 @@ function install_drivers_nvidia() {
             rm -f NVIDIA-Linux-x86_64-410.78.run
             ;;
         *)
-            echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-            fail 209
+            fail 209 "Unsupported Linux distribution '$LINUX_KIND'!"
             ;;
     esac
 }
@@ -106,8 +116,7 @@ function install_python3() {
         yum install -y python3 || fail 210
         ;;
     *)
-        echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
-        fail 209
+        fail 209 "Unsupported Linux distribution '$LINUX_KIND'!"
         ;;
     esac
 }
