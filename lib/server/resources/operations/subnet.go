@@ -1645,31 +1645,35 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("operations.Subnet")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	// Lock Subnet instance
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	var (
+		hostsLen uint
+		hostList []string
+	)
+	svc := instance.GetService()
+	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		svc := instance.GetService()
-
 		// Check if hosts are still attached to Subnet according to metadata
 		var errorMsg string
-		innerErr := props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			shV1, ok := clonable.(*propertiesv1.SubnetHosts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hostsLen := uint(len(shV1.ByName))
-			hostList := make([]string, 0, hostsLen)
+			hostsLen = uint(len(shV1.ByName))
+			hostList = make([]string, 0, hostsLen)
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
-					if hostInstance, innerXErr := LoadHost(svc, k); innerXErr == nil {
+					if hostInstance, innerXErr := LoadHost(svc, k, HostLightOption); innerXErr == nil {
 						hostInstance.Released()
 						hostList = append(hostList, k)
 					}
@@ -1686,17 +1690,24 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			}
 			return nil
 		})
-		if innerErr != nil {
-			return innerErr
-		}
+	})
+	if xerr != nil {
+		return xerr
+	}
 
-		// Leave a chance to abort
-		taskStatus, _ := task.GetStatus()
-		if taskStatus == concurrency.ABORTED {
+	// Leave a chance to abort
+	taskStatus, _ := task.GetStatus()
+	if taskStatus == concurrency.ABORTED {
 			return fail.AbortedError(nil)
 		}
 
-		// 1st delete gateway(s)
+	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			// 1st delete gateway(s)
 		gwIDs, innerXErr := instance.deleteGateways(as)
 		if innerXErr != nil {
 			return innerXErr
