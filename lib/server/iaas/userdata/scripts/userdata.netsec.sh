@@ -527,21 +527,7 @@ function configure_network_systemd_networkd() {
 		fi
 	fi
 
-	if [[ $AWS -eq 1 ]]; then
-		echo "Looking for network..."
-		check_for_network || {
-			failure 201 "failed networkd cfg 0"
-		}
-	fi
-
 	netplan generate && netplan apply || failure 202 "failure running netplan"
-
-	if [[ $AWS -eq 1 ]]; then
-		echo "Looking for network..."
-		check_for_network || {
-			failure 203 "failed networkd cfg 1"
-		}
-	fi
 
 	configure_dhclient
 
@@ -662,6 +648,30 @@ function check_for_network() {
 	for i in $(seq $NETROUNDS); do
 		if which wget; then
 			wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+		else
+			ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
+		fi
+	done
+
+	[ $REACHED -eq 0 ] && echo "Unable to reach network" && return 1
+
+	[ ! -z "$PU_IF" ] && {
+		sfRetry 3m 10 check_for_ip $PU_IF || return 1
+	}
+	for i in $PR_IFs; do
+		sfRetry 3m 10 check_for_ip $i || return 1
+	done
+	return 0
+}
+
+function check_for_network_refined() {
+	NETROUNDS=$1
+	REACHED=0
+
+	for i in $(seq $NETROUNDS); do
+		if which wget; then
+			wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+			ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
 		else
 			ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
 		fi
@@ -864,13 +874,26 @@ function early_packages_update() {
 
 		sfApt update
 		# Force update of systemd, pciutils and netplan
+
 		if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
-			sfApt install -y systemd pciutils netplan.io sudo || failure 210 "problem installing systemd and other basic requirements"
+			sfApt install -y --force-yes pciutils || failure 210 "problem installing pciutils"
+			sfApt install -y --force-yes netplan.io || failure 210 "problem installing netplan.io"
+			sfApt install -y --force-yes sudo || failure 210 "problem installing sudo"
 		else
-			sfApt install -y systemd pciutils sudo || failure 211 "problem installing systemd and other basic requirements"
+			sfApt install -y systemd pciutils sudo || failure 211
 		fi
-		# systemd, if updated, is restarted, so we may need to ensure again network connectivity
-		ensure_network_connectivity
+
+		if dpkg --compare-versions $(sfGetFact "linux_version") ge 20.04; then
+			if [ "{{.ProviderName}}" == "aws" ]; then
+				: # do nothing
+			else
+				sfApt install -y --force-yes systemd || failure 210 "problem installing systemd"
+			fi
+		else
+			sfApt install -y --force-yes systemd || failure 210 "problem installing systemd"
+			# systemd, if updated, is restarted, so we may need to ensure again network connectivity
+			ensure_network_connectivity
+		fi
 
 		# # Security updates ...
 		# sfApt update &>/dev/null && sfApt install -qy unattended-upgrades && unattended-upgrades -v
