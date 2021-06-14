@@ -70,13 +70,18 @@ const (
 	// defaultHostSecurityGroupNamePattern = "safescale-sg_host_%s.%s.%s" // safescale-sg_host_<hostname>.<subnet name>.<network name>; should be unique across a tenant
 )
 
+var (
+	// HostLightOption is used as option to LoadHost() to disable external information caching (that may lead to deadlock sometimes)
+	HostLightOption = data.NewImmutableKeyValue("light", "true")
+)
+
 // Host ...
 // follows interface resources.Host
 type Host struct {
 	*MetadataCore
 
 	lock                          sync.RWMutex
-	installMethods                sync.Map //map[uint8]installmethod.Enum
+	installMethods                sync.Map
 	privateIP, publicIP, accessIP string
 	sshProfile                    *system.SSHConfig
 }
@@ -108,7 +113,7 @@ func HostNullValue() *Host {
 }
 
 // LoadHost ...
-func LoadHost(svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) {
+func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
@@ -124,7 +129,7 @@ func LoadHost(svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) 
 		return nil, xerr
 	}
 
-	options := []data.ImmutableKeyValue{
+	cacheOptions := []data.ImmutableKeyValue{
 		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
 			hostInstance, innerXErr := NewHost(svc)
 			if innerXErr != nil {
@@ -140,7 +145,7 @@ func LoadHost(svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) 
 		}),
 	}
 
-	ce, xerr := hostCache.Get(ref, options...)
+	ce, xerr := hostCache.Get(ref, cacheOptions...)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -160,7 +165,24 @@ func LoadHost(svc iaas.Service, ref string) (_ resources.Host, xerr fail.Error) 
 		_ = ce.UnlockContent()
 	}()
 
-	return hostInstance, hostInstance.(*Host).updateCachedInformation()
+	updateCachedInformation := true
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case "light":
+				updateCachedInformation = false
+			default:
+				logrus.Warningf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+			}
+		}
+	}
+	if updateCachedInformation {
+		xerr = hostInstance.(*Host).updateCachedInformation()
+		if xerr != nil {
+			return hostInstance, xerr
+		}
+	}
+	return hostInstance, nil
 }
 
 // VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
