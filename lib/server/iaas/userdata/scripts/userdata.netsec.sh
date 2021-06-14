@@ -921,6 +921,17 @@ function no_daily_update() {
 			sleep 1
 		done
 		;;
+	redhat | centos)
+		systemctl stop yum-cron.service
+		systemctl kill --kill-who=all yum-cron.service
+
+		# wait until yum-cron dies
+		while ! (systemctl list-units --all yum-cron.service | egrep -q '(dead|failed)'); do
+			systemctl stop yum-crom.service
+			systemctl kill --kill-who=all yum-cron.service
+			sleep 1
+		done
+		;;
 	esac
 }
 
@@ -928,10 +939,13 @@ function add_common_repos() {
 	case $LINUX_KIND in
 	ubuntu)
 		sfFinishPreviousInstall
-		# no_daily_update # TODO: Enable this when properly tested
+		no_daily_update
 		add-apt-repository universe -y || return 1
 		codename=$(sfGetFact "linux_codename")
 		echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
+		;;
+	debian)
+		sfFinishPreviousInstall
 		;;
 	redhat | centos)
 		# Install EPEL repo ...
