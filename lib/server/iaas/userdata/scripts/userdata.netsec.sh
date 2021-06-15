@@ -66,32 +66,32 @@ function reset_fw() {
 	case $LINUX_KIND in
 	ubuntu)
 		echo "Reset firewall"
-		sfApt update &>/dev/null || return 1
-		sfApt install -q -y iptables 2>&1 || return 1
-		sfApt install -q -y firewalld 2>&1 || return 1
+		sfApt update &>/dev/null || failure 206 "failure running apt update"
+		sfApt install -q -y iptables 2>&1 || failure 206 "failure updating iptables"
+		sfApt install -q -y firewalld 2>&1 || failure 206 "failure updating firewalld"
 
 		echo "Stopping ufw"
-		systemctl stop ufw || return 1
-		systemctl disable ufw || return 1
-		sfApt purge -q -y ufw 2>&1 || return 1
+		systemctl stop ufw || failure 206 "failure stopping ufw"
+		systemctl disable ufw || failure 206 "failure disabling ufw"
+		sfApt purge -q -y ufw 2>&1 || failure 206 "failure purging ufw"
 		;;
 	debian)
 		echo "Reset firewall"
-		sfApt update &>/dev/null || return 1
-		sfApt install -q -y iptables 2>&1 || return 1
-		sfApt install -q -y firewalld 2>&1 || return 1
+		sfApt update &>/dev/null || failure 206 "failure running apt update"
+		sfApt install -q -y iptables 2>&1 || failure 206 "failure updating iptables"
+		sfApt install -q -y firewalld 2>&1 || failure 206 "failure updating firewalld"
 
 		echo "Stopping ufw"
 		systemctl stop ufw || true    # set to true to fix issues
 		systemctl disable ufw || true # set to true to fix issues
-		sfApt purge -q -y ufw 2>&1 || return 1
+		sfApt purge -q -y ufw 2>&1 || failure 206 "failure purging ufw"
 		;;
 
 	redhat | rhel | centos | fedora)
 		# firewalld may not be installed
 		if ! systemctl is-active firewalld &>/dev/null; then
 			if ! systemctl status firewalld &>/dev/null; then
-				yum install -q -y firewalld || return 1
+				yum install -q -y firewalld || failure 206 "failure updating firewalld"
 			fi
 		fi
 		;;
@@ -142,8 +142,7 @@ function reset_fw() {
 	fi
 
 	if [[ $op -ne 0 ]]; then
-		echo "firewall-offline-cmd failed with $op"
-		return 1
+		failure 206 "firewall-offline-cmd failed with $op"
 	fi
 
 	sfService enable firewalld &>/dev/null || (echo "service firewalld enable failed with $?" && return 1)
@@ -153,8 +152,7 @@ function reset_fw() {
 	firewall-cmd --runtime-to-permanent && sop=$? || sop=$?
 	if [[ $sop -ne 0 ]]; then
 		if [[ $sop -ne 31 ]]; then
-			echo "saving rules with firewall-cmd failed with $sop"
-			return 1
+			failure 206 "saving rules with firewall-cmd failed with $sop"
 		fi
 	fi
 
