@@ -272,7 +272,7 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 	err = f.Chmod(filemode)
 	if err != nil {
 		logrus.Warnf("Error changing directory: %v", err)
-		return nil, fail.ExecutionError(err, "failed to change temporary file acess rights")
+		return nil, fail.ExecutionError(err, "failed to change temporary file access rights")
 	}
 
 	err = f.Close()
@@ -331,9 +331,11 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		return nil, fail.ConvertError(cerr)
 	}
 
+	// gives 10s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
+
 	if !isTunnelReady(localPort) {
 		return nil, fail.NotAvailableError("the tunnel is not ready")
 	}
@@ -776,15 +778,20 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 				func() error {
 					tunnel, xerr = buildTunnel(cfg)
 					if xerr != nil {
-						return xerr
+						switch xerr.(type) {
+						case *fail.ErrNotAvailable: // When this happens, resources are already exhausted
+							return fail.AbortedError(xerr, "not enough resources, pointless to retry")
+						default:
+							return xerr
+						}
 					}
 
 					// Note: uses LIFO (Last In First Out) during the deletion of tunnels
 					*tunnels = append(SSHTunnels{tunnel}, *tunnels...)
 					return nil
 				},
-				2*time.Second,
-				time.Minute,
+				2*time.Second, // FIXME: NO hardcoded waits
+				time.Minute,   // FIXME: NO hardcoded timeouts
 			)
 			if xerr != nil {
 				switch xerr.(type) { // nolint

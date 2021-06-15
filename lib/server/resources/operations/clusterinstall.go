@@ -83,7 +83,7 @@ func (instance *Cluster) TargetType() featuretargettype.Enum {
 	return featuretargettype.Cluster
 }
 
-// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
 func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 	if instance == nil || instance.IsNull() {
@@ -507,9 +507,9 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	// executes remote file
 	var cmd string
 	if hidesOutput {
-		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
+		cmd = fmt.Sprintf("sudo -- bash -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
 	} else {
-		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
+		cmd = fmt.Sprintf("sudo -- bash -c 'sync; chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
 	}
 	return host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 }
@@ -867,9 +867,9 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 	return nil
 }
 
-// intallDocker installs docker and docker-compose
+// installDocker installs docker and docker-compose
 func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
-	// uses NewFeature() to let a chance to the user to use it's own docker feature
+	// uses NewFeature() to let a chance to the user to use its own docker feature
 	feat, xerr := NewFeature(instance.GetService(), "docker")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
