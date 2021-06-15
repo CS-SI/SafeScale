@@ -53,6 +53,8 @@ func getImages(filename string) ([]abstract.Image, error) {
 	return output.Result, nil
 }
 
+type Searcher func(iaas.Service, string) (*abstract.Image, fail.Error)
+
 // just a copy of original code from iaas/service.go, but mockable (the 1st parameter of this function can be replaced by a mock),
 // the only thing that changes is the method signature, the code inside is the same (even the commented/unused lines)
 func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail.Error) {
@@ -207,6 +209,68 @@ func Test_service_SearchImage_AWS_Centos7(t *testing.T) {
 
 	// those are the true results of a request "CentOS 7.4" using AWS on west-3
 	// now we can play tuning parameters in SearchImageOriginal and see what happens
+	if res.Name != expected.Name {
+		t.Errorf("It seems that we selected %s, (expected %s)", res.Name, expected.Name)
+		t.FailNow()
+	}
+
+	if res.ID != expected.ID {
+		t.Errorf("It seems that we had the wrong ID %s, (expected %s)", res.ID, expected.ID)
+		t.FailNow()
+	}
+}
+
+func Test_service_SearchImage_OVH_Centos7(t *testing.T) {
+	recovered, err := getImages("ovh-images.json")
+	if err != nil {
+		t.FailNow()
+	}
+
+	mc := minimock.NewController(t)
+	common := mocks.NewServiceMock(mc)
+	common.ListImagesMock.Expect(false).Return(recovered, nil)
+
+	res, err := SearchImageOriginal(common, "CentOS 7.4")
+	if err != nil {
+		t.FailNow()
+	}
+
+	expected := &abstract.Image{
+		ID:   "1d848651-ab8c-43a8-9783-3bab62d6ddc1",
+		Name: "Centos 7",
+	}
+
+	if res.Name != expected.Name {
+		t.Errorf("It seems that we selected %s, (expected %s)", res.Name, expected.Name)
+		t.FailNow()
+	}
+
+	if res.ID != expected.ID {
+		t.Errorf("It seems that we had the wrong ID %s, (expected %s)", res.ID, expected.ID)
+		t.FailNow()
+	}
+}
+
+func Test_service_SearchImage_FE_Centos7(t *testing.T) {
+	recovered, err := getImages("fe-images.json")
+	if err != nil {
+		t.FailNow()
+	}
+
+	mc := minimock.NewController(t)
+	common := mocks.NewServiceMock(mc)
+	common.ListImagesMock.Expect(false).Return(recovered, nil)
+
+	res, err := SearchImageOriginal(common, "CentOS 7.4")
+	if err != nil {
+		t.FailNow()
+	}
+
+	expected := &abstract.Image{
+		ID:   "df427f70-d88d-42fc-96b2-076b5ada293",
+		Name: "CentOS8.2",
+	}
+
 	if res.Name != expected.Name {
 		t.Errorf("It seems that we selected %s, (expected %s)", res.Name, expected.Name)
 		t.FailNow()
