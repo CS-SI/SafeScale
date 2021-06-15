@@ -735,15 +735,20 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *[]*SSHTunnel) (*SSHTunnel,
 				func() error {
 					tunnel, xerr = buildTunnel(cfg)
 					if xerr != nil {
-						return xerr
+						switch xerr.(type) {
+						case *fail.ErrNotAvailable: // When this happens, resources are already exhausted
+							return fail.AbortedError(xerr, "not enough resources, pointless to retry")
+						default:
+							return xerr
+						}
 					}
 
 					// Note: uses LIFO (Last In First Out) during the deletion of tunnels
 					*tunnels = append([]*SSHTunnel{tunnel}, *tunnels...)
 					return nil
 				},
-				2*time.Second,
-				time.Minute,
+				2*time.Second, // FIXME: NO hardcoded waits
+				time.Minute,   // FIXME: NO hardcoded timeouts
 			)
 			if xerr != nil {
 				switch xerr.(type) { // nolint
