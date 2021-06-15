@@ -222,7 +222,7 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 	err = f.Chmod(filemode)
 	if err != nil {
 		logrus.Warnf("Error changing directory: %v", err)
-		return nil, fail.ExecutionError(err, "failed to change temporary file acess rights")
+		return nil, fail.ExecutionError(err, "failed to change temporary file access rights")
 	}
 
 	err = f.Close()
