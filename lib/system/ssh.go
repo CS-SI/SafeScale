@@ -249,7 +249,7 @@ func isTunnelReady(port int) bool {
 }
 
 // buildTunnel create SSH from local host to remote host through gateway
-// if localPort is set to 0 then it's  automatically choosed
+// if localPort is set to 0 then it's  automatically chosen
 func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 	f, err := CreateTempFileFromString(scfg.GatewayConfig.PrivateKey, 0400)
 	if err != nil {
@@ -279,9 +279,11 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		return nil, fail.ConvertError(cerr)
 	}
 
+	// gives 10s to build a tunnel, 1s is not enough as the number of tunnels keeps growing
 	for nbiter := 0; !isTunnelReady(localPort) && nbiter < 100; nbiter++ {
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
+
 	if !isTunnelReady(localPort) {
 		return nil, fail.NotAvailableError("the tunnel is not ready")
 	}
