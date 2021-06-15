@@ -24,8 +24,54 @@ declare -x SF_SERIALIZED_FACTS=$(mktemp)
 declare -A FACTS
 export LINUX_KIND=
 export VERSION_ID=
+export FULL_VERSION_ID=
 
-sfFail() {
+function versionchk() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+export -f versionchk
+
+function sfVercomp() {
+    if [[ $1 == $2 ]]; then
+        return 0
+    fi
+    local IFS=.
+    local i ver1=($1) ver2=($2)
+    # fill empty fields in ver1 with zeros
+    for ((i = ${#ver1[@]}; i < ${#ver2[@]}; i++)); do
+        ver1[i]=0
+    done
+    for ((i = 0; i < ${#ver1[@]}; i++)); do
+        if [[ -z ${ver2[i]} ]]; then
+            # fill empty fields in ver2 with zeros
+            ver2[i]=0
+        fi
+        if ((10#${ver1[i]} > 10#${ver2[i]})); then
+            return 1
+        fi
+        if ((10#${ver1[i]} < 10#${ver2[i]})); then
+            return 2
+        fi
+    done
+    return 0
+}
+export -f sfVercomp
+
+function sfTestvercomp() {
+    sfVercomp $1 $2
+    case $? in
+    0) ope='=' ;;
+    1) ope='>' ;;
+    2) ope='<' ;;
+    esac
+    if [[ $ope != $3 ]]; then
+        echo "FAIL: Expected '$3', Actual '$ope', Arg1 '$1', Arg2 '$2'"
+        return 1
+    else
+        return 0
+    fi
+}
+export -f sfTestvercomp
+
+function sfFail() {
 	if [ $# -eq 1 ]; then
 		if [ $1 -ne 0 ]; then
 			echo "Exiting with error $1"
@@ -33,18 +79,26 @@ sfFail() {
 	elif [ $# -eq 2 -a $1 -ne 0 ]; then
 		echo "Exiting with error $1: $2"
 	fi
-	(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+	(
+		sync
+		echo 3 >/proc/sys/vm/drop_caches
+		sleep 2
+	) || true
 	exit $1
 }
 export -f sfFail
 
 function sfExit() {
-	(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+	(
+		sync
+		echo 3 >/proc/sys/vm/drop_caches
+		sleep 2
+	) || true
 	exit 0
 }
 export -f sfExit
 
-sfFinishPreviousInstall() {
+function sfFinishPreviousInstall() {
 	local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
 	if [[ "$unfinished" == 0 ]]; then
 		echo "good"
@@ -56,7 +110,7 @@ sfFinishPreviousInstall() {
 export -f sfFinishPreviousInstall
 
 # sfWaitForApt waits an already running apt-like command to finish
-sfWaitForApt() {
+function sfWaitForApt() {
 	sfFinishPreviousInstall || true
 	sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
 }
@@ -71,7 +125,20 @@ function sfApt() {
 }
 export -f sfApt
 
-sfWaitLockfile() {
+# try using dnf instead of yum if available
+function sfYum() {
+	rc=-1
+	if [[ -n $(which dnf) ]]; then
+		dnf "$@" && rc=$?
+	else
+		yum "$@" && rc=$?
+	fi
+	[ $rc -eq -1 ] && return 1
+	return $rc
+}
+export -f sfYum
+
+function sfWaitLockfile() {
 	local ROUNDS=600
 	name=$1
 	shift
@@ -89,7 +156,7 @@ sfWaitLockfile() {
 			echo "Timed out waiting (1 hour!) for ${name} lock!"
 			exit 100
 		else
-			t=$(($i*6))
+			t=$(($i * 6))
 			echo "${name} is unlocked (waited $t seconds), continuing."
 		fi
 	else
@@ -98,14 +165,14 @@ sfWaitLockfile() {
 }
 export -f sfWaitLockfile
 
-sfIP2long() {
+function sfIP2long() {
 	local a b c d
 	IFS=. read -r a b c d <<<$*
 	echo $(((((((a << 8) | b) << 8) | c) << 8) | d))
 }
 export -f sfIP2long
 
-sfLong2IP() {
+function sfLong2IP() {
 	local ui32=$1
 	local ip n
 	for n in 1 2 3 4; do
@@ -117,80 +184,82 @@ sfLong2IP() {
 export -f sfLong2IP
 
 # Convert netmask to CIDR
-sfNetmask2cidr() {
+function sfNetmask2cidr() {
 	# Assumes there's no "255." after a non-255 byte in the mask
 	local x=${1##*255.}
-	set -- 0^^^128^192^224^240^248^252^254^ $(( (${#1} - ${#x})*2 )) ${x%%.*}
+	set -- 0^^^128^192^224^240^248^252^254^ $(((${#1} - ${#x}) * 2)) ${x%%.*}
 	x=${1%%$3*}
-	echo $(( $2 + (${#x}/4) ))
+	echo $(($2 + (${#x} / 4)))
 }
 export -f sfNetmask2cidr
 
 # Convert CIDR to netmask
-sfCidr2netmask() {
+function sfCidr2netmask() {
 	local bits=${1#*/}
-	local mask=$((0xffffffff << (32-$bits)))
+	local mask=$((0xffffffff << (32 - $bits)))
 	sfLong2IP $mask
 }
 export -f sfCidr2netmask
 
 # Convert CIDR to network
-sfCidr2network()
-{
+function sfCidr2network() {
 	local base=${1%%/*}
 	local bits=${1#*/}
-	local long=$(sfIP2long $base); shift
-	local mask=$((0xffffffff << (32-$bits))); shift
+	local long=$(sfIP2long $base)
+	shift
+	local mask=$((0xffffffff << (32 - $bits)))
+	shift
 	sfLong2IP $((long & mask))
 }
 export -f sfCidr2network
 
 # Convert CIDR to broadcast
-sfCidr2broadcast()
-{
+function sfCidr2broadcast() {
 	local base=${1%%/*}
 	local bits=${1#*/}
-	local long=$(sfIP2long $base); shift
-	local mask=$((0xffffffff << (32-$bits))); shift
+	local long=$(sfIP2long $base)
+	shift
+	local mask=$((0xffffffff << (32 - $bits)))
+	shift
 	sfLong2IP $((long | ~mask))
 }
 export -f sfCidr2broadcast
 
-sfCidr2iprange() {
+function sfCidr2iprange() {
 	local network=$(sfCidr2network $1)
 	local broadcast=$(sfCidr2broadcast $1)
 	echo ${network}-${broadcast}
 }
 export -f sfCidr2iprange
 
-sfInterfaceWithIP() {
+function sfInterfaceWithIP() {
 	ifconfig | grep -B1 "$1" | grep -o "^\w*"
 }
 export -f sfInterfaceWithIP
 
 #------ delays and timeouts ------
 
-sfDefaultDelay() {
+function sfDefaultDelay() {
 	echo {{ default 10 .reserved_DefaultDelay }}
 }
 export -f sfDefaultDelay
 
-sfDefaultTimeout() {
+function sfDefaultTimeout() {
 	echo {{ default "3m" .reserved_DefaultTimeout }}
 }
 export -f sfDefaultTimeout
 
-sfLongTimeout() {
+function sfLongTimeout() {
 	echo {{ default "5m" .reserved_LongTimeout }}
 }
 export -f sfLongTimeout
 
-sfClusterJoinTimeout() {
+function sfClusterJoinTimeout() {
 	echo {{ default "14m" .reserved_ClusterJoinTimeout }}
 }
 export -f sfClusterJoinTimeout
 
-sfDockerImagePullTimeout() {
+function sfDockerImagePullTimeout() {
 	echo {{ default "10m" .reserved_DockerImagePullTimeout }}
 }
 export -f sfDockerImagePullTimeout
@@ -198,7 +267,7 @@ export -f sfDockerImagePullTimeout
 #------
 
 # sfAsyncStart <what> <duration> <command>...
-sfAsyncStart() {
+function sfAsyncStart() {
 	local pid=${1}_PID
 	local log=${1}.log
 	local duration=$2
@@ -211,7 +280,7 @@ export -f sfAsyncStart
 
 # sfAsyncWait <what>
 # return 0 on success, !=0 on failure
-sfAsyncWait() {
+function sfAsyncWait() {
 	local pid="${1}_PID"
 	local log="${1}.log"
 	eval "wait \$$pid"
@@ -229,7 +298,7 @@ export -f sfAsyncWait
 
 # sfRetry <timeout> <delay> command
 # retries command until success, with sleep of <delay> seconds
-sfRetry() {
+function sfRetry() {
 	local timeout=$1
 	local delay=$2
 	shift 2
@@ -248,7 +317,7 @@ sfRetry() {
 			return \$rc
 		}
 		export -f fn
-EOF
+	EOF
 	eval "$code"
 	result=$(timeout $timeout bash -c -x fn)
 	rc=$?
@@ -259,8 +328,8 @@ EOF
 }
 export -f sfRetry
 
-sfStandardRetry() {
-	sfRetry $(sfDefaultTimeout) $(sfDefaultDelay) $@
+function sfStandardRetry() {
+	sfRetry $(sfDefaultTimeout) $(sfDefaultDelay) "$@"
 }
 export -f sfStandardRetry
 
@@ -268,7 +337,7 @@ export -f sfStandardRetry
 # returns 0 if nothing has been done, 1 if dbus has been salvaged
 # Note: often dbus cannot be restarted automatically. It's necessary to restart a service that has dusb as dependency to
 #       effectively restart dbus
-sfSalvageDBusIfNeeded() {
+function sfSalvageDBusIfNeeded() {
 	count=$(ps ax | grep dbus-daemon | grep -v grep | wc -l)
 	if [ $count -ne 1 ]; then
 		echo "dbus-daemon in abnormal situation (process count=$count), restarting dbus.service"
@@ -288,7 +357,7 @@ export sfSalvageDBusIfNeeded
 # sfFirewall sets a runtime firewall rule (using firewall-cmd, so arguments are firewall-cmd ones)
 # rule doesn't need sfFirewallReload to be applied, but isn't save as permanent (except if you add --permanent parameter,
 # but you may use sfFirewallAdd in this case)
-sfFirewall() {
+function sfFirewall() {
 	[ $# -eq 0 ] && return 0
 
 	# check existence of firewall-cmd binary
@@ -299,7 +368,8 @@ sfFirewall() {
 	local tried_restart=-1
 	while [[ $op -eq -1 && $tried_restart -eq -1 ]]; do
 		# try to get firewall state
-		state=$(sudo timeout 10s firewall-cmd --state 2>&1 | tee -a /tmp/fw.txt); op=$?
+		state=$(sudo timeout 10s firewall-cmd --state 2>&1 | tee -a /tmp/fw.txt)
+		op=$?
 		# Restart firewalld if failed
 		if [[ $op -ne 0 || $state != "running" ]]; then
 			sfService stop firewalld &>/dev/null
@@ -325,13 +395,13 @@ export -f sfFirewall
 
 # sfFirewallAdd sets a permanent firewall rule (using firewall-cmd, so arguments are firewall-cmd ones)
 # sfFirewallReload needed to apply rule
-sfFirewallAdd() {
+function sfFirewallAdd() {
 	sfFirewall --permanent "$@"
 }
 export -f sfFirewallAdd
 
 # sfFirewallReload reloads firewall rules
-sfFirewallReload() {
+function sfFirewallReload() {
 	local op=-1
 	sfFirewall --reload 2>&1 | tee -a /tmp/fw.txt && op=$? || op=$?
 	local sop=-1
@@ -347,31 +417,32 @@ sfFirewallReload() {
 export -f sfFirewallReload
 
 # sfInstall installs a package and exits if it fails...
-sfInstall() {
+function sfInstall() {
 	case $LINUX_KIND in
-		debian|ubuntu)
-			export DEBIAN_FRONTEND=noninteractive
-			sfRetry 5m 3 "sfApt update"
-			sfApt install $1 -y --force-yes || exit 194
-			command -v $1 || exit 194
-			;;
-		centos|rhel)
-			yum install -y $1 || exit 194
-			command -v $1 || exit 194
-			;;
-		*)
-			echo "Unsupported operating system '$LINUX_KIND'"
-			exit 195
-			;;
+	debian | ubuntu)
+		export DEBIAN_FRONTEND=noninteractive
+		sfRetry 5m 3 "sfApt update"
+		sfApt install $1 -y --force-yes || exit 194
+		command -v $1 || exit 194
+		;;
+	centos | rhel)
+		yum install -y $1 || exit 194
+		command -v $1 || exit 194
+		;;
+	*)
+		echo "Unsupported operating system '$LINUX_KIND'"
+		exit 195
+		;;
 	esac
 	return 0
 }
 export -f sfInstall
 
 # sfDownload url filename timeout delay
-sfDownload() {
+function sfDownload() {
 	local url="$1"
-	local encoded=$(echo "$url" | md5sum | cut -d' ' -f1)
+	local encoded
+	encoded=$(echo "$url" | md5sum | cut -d' ' -f1)
 	local filename="$2"
 	local timeout=$3
 	local delay=$4
@@ -380,19 +451,25 @@ sfDownload() {
 	{ code=$(</dev/stdin); } <<-EOF
 		$fn() {
 			while true; do
-				#wget -q -nc -O "$filename" "$url"
-				curl -L -k -SsL "$url" >"$filename"
+				rm -f $filename || true # begin by cleaning up
+				curl -L -k -SsL --fail "$url" >"$filename"
 				rc=\$?
-				# if $filename exists, remove it and restart without delay
-				[ \$rc -eq 1 ] && rm -f $filename && continue
-				# break if download succeeded or if not found (no benefit to loop on this kind of error)
-				[ \$rc -eq 0 -o \$rc -eq 8 ] && break
+				# break if download succeeded or if not found; 22 is the curl error code for 404
+				[ \$rc -eq 0 -o \$rc -eq 22 ] && break
+				# give wget a chance if installed
+				if which wget &>/dev/null; then
+					rm -f $filename || true # begin by cleaning up
+					wget -q -nc -O "$filename" "$url"
+					rc=\$?
+					# break if download succeeded or not found; 8 is the wget error code for 404
+					[ \$rc -eq 0 -o \$rc -eq 8 ] && break
+				fi
 				sleep $delay
 			done
 			return \$rc
 		}
 		export -f $fn
-EOF
+	EOF
 	eval "$code"
 	sfAsyncStart $name $timeout bash -c -x $fn
 	sfAsyncWait $name
@@ -408,14 +485,14 @@ __create_dropzone() {
 	chmod ug+s ~cladm/.dropzone
 }
 
-sfDownloadInDropzone() {
+function sfDownloadInDropzone() {
 	__create_dropzone &>/dev/null
-	( cd ~cladm/.dropzone && sfDownload "$@")
+	(cd ~cladm/.dropzone && sfDownload "$@")
 }
 export -f sfDownloadInDropzone
 
 # Copy local file to drop zone in remote
-sfDropzonePush() {
+function sfDropzonePush() {
 	local file="$1"
 	__create_dropzone &>/dev/null
 	cp -rf "$file" ~cladm/.dropzone/
@@ -424,7 +501,7 @@ sfDropzonePush() {
 export -f sfDropzonePush
 
 # Copy content of local dropzone to remote dropzone (parameter can be IP or name)
-sfDropzoneSync() {
+function sfDropzoneSync() {
 	local remote="$1"
 	__create_dropzone &>/dev/null
 	scp $__cluster_admin_ssh_options__ -r ~cladm/.dropzone cladm@${remote}:~/
@@ -433,7 +510,7 @@ export -f sfDropzoneSync
 
 # Moves all files in drop zone to folder (1st parameter)
 # if 2nd parameter is set, moves only the file on folder
-sfDropzonePop() {
+function sfDropzonePop() {
 	[ $# -eq 0 ] && return 1
 	local dest="$1"
 	local file=
@@ -448,7 +525,7 @@ sfDropzonePop() {
 }
 export -f sfDropzonePop
 
-sfDropzoneUntar() {
+function sfDropzoneUntar() {
 	local file="$1"
 	local dest="$2"
 	shift 2
@@ -457,42 +534,42 @@ sfDropzoneUntar() {
 }
 export -f sfDropzoneUntar
 
-sfDropzoneClean() {
+function sfDropzoneClean() {
 	rm -rf ~cladm/.dropzone/* ~cladm/.dropzone/.[^.]*
 }
 export -f sfDropzoneClean
 
 # Executes a remote command with SSH
-sfRemoteExec() {
+function sfRemoteExec() {
 	local remote=$1
 	shift
 	ssh $__cluster_admin_ssh_options__ cladm@$remote $*
 }
 export -f sfRemoteExec
 
-sfKubectl() {
+function sfKubectl() {
 	sudo -u cladm -i kubectl "$@"
 }
 export -f sfKubectl
 
-sfHelm() {
+function sfHelm() {
 	# analyzes parameters...
 	local use_tls=--tls
 	local stop=0
 	for p in "$@"; do
 		case "$p" in
-			"--*")
-				;;
-			"search"|"repo")
-				stop=1
-				use_tls=
-				;;
-			"init")
-				echo "sfHelm init is forbidden" && return 1
-				;;
-			*)
-				stop=1
-				;;
+		"--*") ;;
+
+		"search" | "repo")
+			stop=1
+			use_tls=
+			;;
+		"init")
+			echo "sfHelm init is forbidden" && return 1
+			;;
+		*)
+			stop=1
+			;;
 		esac
 		[ $stop -eq 1 ] && break
 	done
@@ -501,17 +578,17 @@ sfHelm() {
 }
 export -f sfHelm
 
-sfDcos() {
+function sfDcos() {
 	sudo -u cladm -i dcos "$@"
 }
 export -f sfDcos
 
-sfMarathon() {
+function sfMarathon() {
 	sudo -u cladm -i marathon "$@"
 }
 export -f sfMarathon
 
-sfProbeGPU() {
+function sfProbeGPU() {
 	if command -v lspci &>/dev/null; then
 		val=$(lspci | grep nvidia 2>/dev/null) || true
 		[ ! -z "$val" ] && FACTS["nVidia GPU"]=$val || true
@@ -519,7 +596,7 @@ sfProbeGPU() {
 }
 export -f sfProbeGPU
 
-sfEdgeProxyReload() {
+function sfEdgeProxyReload() {
 	id=$(sfGetFact "edgeproxy4subnet_docker_id")
 	if [ ! -z ${id+x} ]; then
 		docker exec $id kong reload >/dev/null
@@ -529,12 +606,12 @@ sfEdgeProxyReload() {
 }
 export -f sfEdgeProxyReload
 
-sfReverseProxyReload() {
+function sfReverseProxyReload() {
 	sfEdgeProxyReload
 }
 export -f sfReverseProxyReload
 
-sfIngressReload() {
+function sfIngressReload() {
 	id=$(sfGetFact "ingress4platform_docker_id")
 	if [ ! -z ${id+x} ]; then
 		docker exec $id kong reload >/dev/null
@@ -546,7 +623,7 @@ export -f sfIngressReload
 
 # This function allows to create a database on platform PostgreSQL
 # It is intended to be used on one of the platform PostgreSQL servers in the cluster
-sfPgsqlCreateDatabase() {
+function sfPgsqlCreateDatabase() {
 	[ $# -eq 0 ] && echo "missing dbname" && return 1
 	local dbname=$1
 	if [ -z "$dbname" ]; then
@@ -566,7 +643,7 @@ sfPgsqlCreateDatabase() {
 }
 export -f sfPgsqlCreateDatabase
 
-sfPgsqlDropDatabase() {
+function sfPgsqlDropDatabase() {
 	local dbname=$1
 	if [ -z "$dbname" ]; then
 		echo "missing dbname"
@@ -591,7 +668,7 @@ export -f sfPgsqlDropDatabase
 #     echo "toto" | sfPgsqlCreateRole my_role CREATEDB LOGIN
 #     "toto" is the password, "my_role" is the role name
 # It is intended to be used on one of the platform PostgreSQL servers in the cluster
-sfPgsqlCreateRole() {
+function sfPgsqlCreateRole() {
 	local rolename=$1
 	shift
 	[ -z "$rolename" ] && echo "missing role name" && return 1
@@ -612,7 +689,7 @@ export -f sfPgsqlCreateRole
 # This function allows to drop a database on platform PostgreSQL
 # Role name is passed as parameter
 # It is intended to be used on one of the platform PostgreSQL servers in the cluster
-sfPgsqlDropRole() {
+function sfPgsqlDropRole() {
 	local rolename=$1
 	id=$(sfGetFact "postgresql4platform_docker_id")
 	[ -z ${id+x} ] && return 1
@@ -630,7 +707,7 @@ __cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStri
 #     echo "toto" | sfPgPoolUpdatePassword tata
 #     "toto" is the password, "tata" is the username
 # It is intended to be used on one of the platform PostgreSQL servers in the cluster
-sfPgsqlUpdatePassword() {
+function sfPgsqlUpdatePassword() {
 	local username=${1}
 	if [ -z "$username" ]; then
 		echo "username is missing"
@@ -663,7 +740,7 @@ export -f sfPgsqlUpdatePassword
 
 # sfKeycloakRun allows to execute keycloak admin command
 # Intended to be use on target masters:any
-sfKeycloakRun() {
+function sfKeycloakRun() {
 	local id=$(sfGetFact "keycloak4platform_docker_id")
 	[ $? -ne 0 -o -z ${id+x} ] && echo "failed to find keycloak container" && return 1
 
@@ -692,7 +769,7 @@ export -f sfKeycloakRun
 
 # Returns all the information about the client passed as first parameters
 # Subsequent parameters ((--realm, --user, --password, ...) are passed as-is to kcadm.sh
-sfKeycloakGetClient() {
+function sfKeycloakGetClient() {
 	[ $# -eq 0 ] && return 1
 	local name=$1
 	shift
@@ -700,7 +777,7 @@ sfKeycloakGetClient() {
 }
 export -f sfKeycloakGetClient
 
-sfKeycloakDeleteClient() {
+function sfKeycloakDeleteClient() {
 	[ $# -eq 0 ] && return 1
 	local name=$1
 	shift
@@ -714,7 +791,7 @@ export -f sfKeycloakDeleteClient
 
 # Returns all the information about the group passed as first parameters
 # Subsequent parameters ((--realm, --user, --password, ...) are passed as-is to kcadm.sh
-sfKeycloakGetGroup() {
+function sfKeycloakGetGroup() {
 	[ $# -eq 0 ] && return 1
 	local name=$1
 	shift
@@ -722,7 +799,7 @@ sfKeycloakGetGroup() {
 }
 export -f sfKeycloakGetGroup
 
-sfKeycloakDeleteGroup() {
+function sfKeycloakDeleteGroup() {
 	[ $# -eq 0 ] && return 1
 	local name=$1
 	shift
@@ -735,7 +812,7 @@ sfKeycloakDeleteGroup() {
 export -f sfKeycloakDeleteGroup
 
 function sfSystemctl-exists() {
-  [ $(systemctl list-unit-files "${1}*" | wc -l) -gt 3 ]
+	[ $(systemctl list-unit-files "${1}*" | wc -l) -gt 3 ]
 }
 export -f sfSystemctl-exists
 
@@ -755,87 +832,87 @@ function sfServiceRuns() {
 }
 export -f sfServiceRuns
 
-# sfService abstract the command to use to manipulate services
+# sfService abstracts the command to use to manipulate services
 function sfService() {
 	[ $# -ne 2 ] && return 1
 
 	local use_systemd=$(sfGetFact "use_systemd")
 	local redhat_like=$(sfGetFact "redhat_like")
 
-	# Preemptively run daemon-reload in case of changes
+    # Preventive run daemon-reload in case of changes
 	[ "$use_systemd" = "1" ] && systemctl daemon-reload
 
 	case $1 in
-		enable)
-			[ "$use_systemd" = "1" ] && systemctl enable $2 && return $?
-			[ "$redhat_like" = "1" ] && chkconfig $2 on && return $?
-			;;
-		disable)
-			[ "$use_systemd" = "1" ] && systemctl disable $2 && return $?
-			[ "$redhat_like" = "1" ] && chkconfig $2 off && return $?
-			;;
-		start)
-			[ "$use_systemd" = "1" ] && systemctl start $2 && return $?
-			[ "$redhat_like" = "1" ] && service $2 start && return $?
-			;;
-		stop)
-			[ "$use_systemd" = "1" ] && systemctl stop $2 && return $?
-			[ "$redhat_like" = "1" ] && service $2 stop && return $?
-			;;
-		restart)
-			[ "$use_systemd" = "1" ] && systemctl restart $2 && return $?
-			[ "$redhat_like" = "1" ] && service $2 restart && return $?
-			;;
-		reload)
-			[ "$use_systemd" = "1" ] && systemctl reload $2 && return $?
-			[ "$redhat_like" = "1" ] && service $2 reload && return $?
-			;;
-		status)
-			[ "$use_systemd" = "1" ] && systemctl status $2 && return $?
-			[ "$redhat_like" = "1" ] && service $2 status && return $?
-			;;
-		*)
-			echo "sfService(): unhandled command '$1'"
-			;;
+	enable)
+		[ "$use_systemd" = "1" ] && systemctl enable $2 && return $?
+		[ "$redhat_like" = "1" ] && chkconfig $2 on && return $?
+		;;
+	disable)
+		[ "$use_systemd" = "1" ] && systemctl disable $2 && return $?
+		[ "$redhat_like" = "1" ] && chkconfig $2 off && return $?
+		;;
+	start)
+		[ "$use_systemd" = "1" ] && systemctl start $2 && return $?
+		[ "$redhat_like" = "1" ] && service $2 start && return $?
+		;;
+	stop)
+		[ "$use_systemd" = "1" ] && systemctl stop $2 && return $?
+		[ "$redhat_like" = "1" ] && service $2 stop && return $?
+		;;
+	restart)
+		[ "$use_systemd" = "1" ] && systemctl restart $2 && return $?
+		[ "$redhat_like" = "1" ] && service $2 restart && return $?
+		;;
+	reload)
+		[ "$use_systemd" = "1" ] && systemctl reload $2 && return $?
+		[ "$redhat_like" = "1" ] && service $2 reload && return $?
+		;;
+	status)
+		[ "$use_systemd" = "1" ] && systemctl status $2 && return $?
+		[ "$redhat_like" = "1" ] && service $2 status && return $?
+		;;
+	*)
+		echo "sfService(): unhandled command '$1'"
+		;;
 	esac
 	return 1
 }
 export -f sfService
 
 # Displays the subnet of the docker bridge
-sfSubnetOfDockerBridge() {
+function sfSubnetOfDockerBridge() {
 	sfSubnetOfDockerNetwork bridge
 }
 export -f sfSubnetOfDockerBridge
 
 # Displays the subnet of the docker swarm bridge
-sfSubnetOfDockerSwarmBridge() {
+function sfSubnetOfDockerSwarmBridge() {
 	sfSubnetOfDockerNetwork docker_gwbridge
 }
 export -f sfSubnetOfDockerSwarmBridge
 
 # Displays the subnet of a docker network
-sfSubnetOfDockerNetwork() {
+function sfSubnetOfDockerNetwork() {
 	[ $# -ne 1 ] && return 1
 	docker network inspect $1 {{ "--format '{{json .}}'" }} | jq -r .IPAM.Config[0].Subnet
 }
 export -f sfSubnetOfDockerNetwork
 
 # Tells if the node is registered as swarm node
-sfIsDockerSwarmInit() {
+function sfIsDockerSwarmInit() {
 	STATE="$(docker info {{ "--format '{{.Swarm.LocalNodeState}}'" }})"
 	case "$STATE" in
-		"inactive"|"pending")
-			echo "{{ .Hostname }} is not in a Swarm cluster"
-			return 1
-			;;
-		"active"|"locked")
-			return 0
-			;;
-		"error")
-			echo "{{ .Hostname }} is in a Swarm error state"
-			return 2
-			;;
+	"inactive" | "pending")
+		echo "{{ .Hostname }} is not in a Swarm cluster"
+		return 1
+		;;
+	"active" | "locked")
+		return 0
+		;;
+	"error")
+		echo "{{ .Hostname }} is in a Swarm error state"
+		return 2
+		;;
 	esac
 	echo "Unknown Swarm state '$STATE' on host {{ .Hostname }}"
 	return 3
@@ -843,7 +920,7 @@ sfIsDockerSwarmInit() {
 export -f sfIsDockerSwarmInit
 
 # tells if a container using a specific image (and optionnaly name) is running in standalone mode
-sfDoesDockerRunContainer() {
+function sfDoesDockerRunContainer() {
 	[ $# -eq 0 ] && return 1
 	local IMAGE=$1
 	shift
@@ -860,8 +937,8 @@ sfDoesDockerRunContainer() {
 export -f sfDoesDockerRunContainer
 
 # tells if a container using a specific image and name is running in Swarm mode
-sfDoesDockerRunService() {
-	[  $# -ne 2 ] && return 1
+function sfDoesDockerRunService() {
+	[ $# -ne 2 ] && return 1
 	local IMAGE=$1
 	local NAME=$2
 
@@ -885,15 +962,15 @@ sfDoesDockerRunService() {
 export -f sfDoesDockerRunService
 
 # tells if a stack is running in Swarm mode
-sfDoesDockerRunStack() {
-	[  $# -ne 1 ] && return 1
+function sfDoesDockerRunStack() {
+	[ $# -ne 1 ] && return 1
 	local NAME=$1
 
 	docker stack ps $NAME {{ "--filter 'desired-state=running'" }} &>/dev/null
 }
 export -f sfDoesDockerRunStack
 
-sfRemoveDockerImage() {
+function sfRemoveDockerImage() {
 	local list=$(docker image ls {{ "--format '{{.Repository}}:{{.Tag}}|{{.ID}}'" }} | grep "^$1")
 	if [ ! -z "$list" ]; then
 		local i image id repo
@@ -914,7 +991,7 @@ export -f sfRemoveDockerImage
 
 # Allows to create or update a docker secret
 # password can be passed as second parameter or through stdin (prefered option)
-sfUpdateDockerSecret() {
+function sfUpdateDockerSecret() {
 	[ $# -lt 1 ] && return 1
 	local name=$1
 	shift
@@ -933,7 +1010,7 @@ sfUpdateDockerSecret() {
 }
 export -f sfUpdateDockerSecret
 
-sfRemoveDockerSecret() {
+function sfRemoveDockerSecret() {
 	[ $# -ne 1 ] && return 1
 	if docker secret inspect $1 &>/dev/null; then
 		docker secret rm $1
@@ -943,12 +1020,12 @@ sfRemoveDockerSecret() {
 }
 export -f sfRemoveDockerSecret
 
-sfIsPodRunning() {
+function sfIsPodRunning() {
 	local pod=${1%@*}
 	local domain=${1#*@}
 	[ -z ${domain+x} ] && domain=default
 	set +o pipefail
-	( sfKubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null)
+	(sfKubectl get -n $domain pod $pod 2>&1 | grep Running &>/dev/null)
 	retcode=$?
 	set -o pipefail
 	[ $retcode = 0 ] && return 0 || return 1
@@ -956,26 +1033,26 @@ sfIsPodRunning() {
 export -f sfIsPodRunning
 
 # Returns the tag name corresponding to latest release
-sfGithubLastRelease() {
+function sfGithubLastRelease() {
 	curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases/latest" | jq -r .tag_name
 }
 export -f sfGithubLastRelease
 
 # Returns the tag name corresponding to the last non-beta release
-sfGithubLastNotBetaRelease() {
-  curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases" | jq -c '.[] | select(.tag_name | contains("beta") | not)' | head -n 1 | jq -r .tag_name
+function sfGithubLastNotBetaRelease() {
+	curl -L -k -Ssl -X GET "https://api.github.com/repos/$1/$2/releases" | jq -c '.[] | select(.tag_name | contains("beta") | not)' | head -n 1 | jq -r .tag_name
 }
 export -f sfGithubLastNotBetaRelease
 
 # echoes a random string
 # $1 is the size of the result (optional)
 # $2 is the characters to choose from (optional); use preferably [:xxx:] notation (like [:alnum:] for all letters and digits)
-sfRandomString() {
+function sfRandomString() {
 	local count=16
 	[ $# -ge 1 ] && count=$1
 	local charset="[:graph:]"
 	[ $# -ge 2 ] && charset="$2"
-	</dev/urandom tr -dc "$charset" | head -c${count} || true
+	tr </dev/urandom -dc "$charset" | head -c${count} || true
 	return 0
 }
 export -f sfRandomString
@@ -983,30 +1060,41 @@ export -f sfRandomString
 # --------
 # Workaround for associative array not exported in bash
 declare -x SERIALIZED_FACTS=$(mktemp)
-factsCleanup() {
+function factsCleanup() {
 	rm -f "$SERIALIZED_FACTS" &>/dev/null
 }
 trap factsCleanup exit
 # --------
 
-sfDetectFacts() {
+function sfDetectFacts() {
 	if [ -f /etc/os-release ]; then
 		. /etc/os-release
 		FACTS["linux_kind"]=$ID
 		LINUX_KIND=${ID,,}
 		FACTS["linux_version"]=$VERSION_ID
 		VERSION_ID=$VERSION_ID
+        FULL_VERSION_ID=$VERSION_ID
 		[ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux_codename"]=${VERSION_CODENAME,,}
 	else
 		if which lsb_release &>/dev/null; then
 			LINUX_KIND=$(lsb_release -is)
 			LINUX_KIND=${LINUX_KIND,,}
 			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
+            FULL_VERSION_ID=$(lsb_release -rs)
 		else
 			[ -f /etc/redhat-release ] && {
 				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
 				LINUX_KIND=${LINUX_KIND,,}
 				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+                FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3)
+                case $VERSION_ID in
+                '' | *[!0-9]*)
+                    VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
+                    FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
+                    ;;
+                *) ;;
+
+                esac
 			}
 		fi
 		FACTS["linux_kind"]=${LINUX_KIND,,}
@@ -1015,16 +1103,16 @@ sfDetectFacts() {
 
 	# Some facts about system
 	case ${FACTS["linux_kind"]} in
-		redhat|centos)
-			FACTS["redhat_like"]=1
-			FACTS["debian_like"]=0
-				  FACTS["docker_version"]=$(yum info docker-ce || true)
-			;;
-		debian|ubuntu)
-			FACTS["redhat_like"]=0
-			FACTS["debian_like"]=1
-			FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f3 | cut -d~ -f1 || true)
-			;;
+    redhat | rhel | centos | fedora)
+		FACTS["redhat_like"]=1
+		FACTS["debian_like"]=0
+		FACTS["docker_version"]=$(yum info docker-ce || true)
+		;;
+	debian | ubuntu)
+		FACTS["redhat_like"]=0
+		FACTS["debian_like"]=1
+		FACTS["docker_version"]=$(apt show docker-ce 2>/dev/null | grep "^Version" | cut -d: -f3 | cut -d~ -f1 || true)
+		;;
 	esac
 	if systemctl | grep '\-.mount' &>/dev/null; then
 		FACTS["use_systemd"]=1
@@ -1037,11 +1125,11 @@ sfDetectFacts() {
 	FACTS["sockets"]=${val//[[:blank:]]/}
 	val=$(LANG=C lscpu | grep "Core(s) per socket" | cut -d: -f2 | sed 's/"//g')
 	FACTS["cores/socket"]=${val//[[:blank:]]/}
-	FACTS["cores"]=$(( ${FACTS["sockets"]} * ${FACTS["cores/socket"]} ))
+	FACTS["cores"]=$((${FACTS["sockets"]} * ${FACTS["cores/socket"]}))
 	val=$(LANG=C lscpu | grep "Thread(s) per core" | cut -d: -f2 | sed 's/"//g')
 	FACTS["threads/core"]=${val//[[:blank:]]/}
-	FACTS["threads"]=$(( ${FACTS["cores"]} * ${FACTS["threads/core"]} ))
-	val=$(( ${FACTS["threads"]} * 2 / 3 ))
+	FACTS["threads"]=$((${FACTS["cores"]} * ${FACTS["threads/core"]}))
+	val=$((${FACTS["threads"]} * 2 / 3))
 	[ $val -le 0 ] && val=1
 	FACTS["2/3_of_threads"]=$val
 
@@ -1073,7 +1161,7 @@ sfDetectFacts() {
 }
 export -f sfDetectFacts
 
-sfGetFact() {
+function sfGetFact() {
 	[ $# -eq 0 ] && return
 	source "$SERIALIZED_FACTS"
 	[ ${FACTS[$1]+x} ] && echo -n ${FACTS[$1]}
@@ -1081,13 +1169,14 @@ sfGetFact() {
 export -f sfGetFact
 
 # Waits the completion of the execution of userdata
-waitForUserdata() {
+function waitForUserdata() {
 	while true; do
 		[ -f ${SF_VARDIR}/state/user_data.netsec.done ] && break
 		echo "Waiting userdata completion..."
 		sleep 5
 	done
 }
+export -f waitForUserdata
 
 waitForUserdata
 sfDetectFacts
