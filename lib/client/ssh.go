@@ -69,13 +69,24 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 
 	// Create the command
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
-		func() error {
+		func() (innerErr error) {
 			sshCmd, innerXErr := sshCfg.NewCommand(ctx, command)
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			defer func() { _ = sshCmd.Close() }()
+			defer func() {
+				derr := sshCmd.Close()
+				if derr != nil {
+					if innerErr == nil {
+						innerErr = derr
+					} else {
+						innerXErr := fail.ConvertError(innerErr)
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
+						innerErr = innerXErr
+					}
+				}
+			}()
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, executionTimeout)
 			if innerXErr != nil {
@@ -325,16 +336,8 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 
 	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
 		func() error {
-			tunnels, _, err := sshCfg.CreateTunneling()
-			if err != nil {
-				for _, t := range tunnels {
-					if nerr := t.Close(); nerr != nil {
-						logrus.Errorf("error closing ssh tunnel: %v", nerr)
-					}
-				}
-				return fail.Wrap(err, "unable to create command")
-			}
-			return nil
+			_, _, innerErr := sshCfg.CreateTunneling()
+			return innerErr
 		},
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v verdict.Enum) {

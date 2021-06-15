@@ -685,13 +685,14 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 		return false, nil, err
 	}
 
-	if status == DONE {
+	switch status {
+	case DONE:
 		return true, t.result, t.err
-	}
-	if status == ABORTED {
+	case ABORTED:
 		return true, nil, t.err
-	}
-	if status != RUNNING {
+	case RUNNING:
+		// continue
+	default:
 		return false, nil, fail.NewError("cannot wait task '%s': not running (%d)", tid, status)
 	}
 
