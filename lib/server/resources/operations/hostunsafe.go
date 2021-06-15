@@ -78,11 +78,13 @@ func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.En
 				xerr = fail.ConvertError(cerr)
 			}
 		case *fail.ErrTimeout:
-			switch xerr.Cause().(type) {
-			case *fail.ErrTimeout:
-				xerr = fail.Wrap(xerr.Cause(), "failed to execute command on Host '%s' in %s", hostName, temporal.FormatDuration(executionTimeout))
-			default:
-				xerr = fail.Wrap(xerr.Cause(), "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
+			if cerr := xerr.Cause(); cerr != nil {
+				switch cerr.(type) {
+				case *fail.ErrTimeout:
+					xerr = fail.Wrap(cerr, "failed to execute command on Host '%s' in %s", hostName, temporal.FormatDuration(executionTimeout))
+				default:
+					xerr = fail.Wrap(cerr, "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
+				}
 			}
 		}
 	}

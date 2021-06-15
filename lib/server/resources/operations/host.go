@@ -1025,8 +1025,10 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			}
 
 			parts := strings.Split(status, ",")
-			systemV1.Type = parts[1]
-			systemV1.Flavor = parts[2]
+			if len(parts) >= 3 {
+				systemV1.Type = parts[1]
+				systemV1.Flavor = parts[2]
+			}
 			systemV1.Image = hostReq.ImageID
 			return nil
 		})
