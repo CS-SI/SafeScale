@@ -636,32 +636,6 @@ function check_for_ip() {
 }
 export -f check_for_ip
 
-# Checks network is set correctly
-# - DNS and routes (by pinging a FQDN)
-# - IP address on "physical" interfaces
-function check_for_network() {
-	NETROUNDS=12
-	REACHED=0
-
-	for i in $(seq $NETROUNDS); do
-		if which wget; then
-			wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
-		else
-			ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
-		fi
-	done
-
-	[ $REACHED -eq 0 ] && echo "Unable to reach network" && return 1
-
-	[ ! -z "$PU_IF" ] && {
-		sfRetry 3m 10 check_for_ip $PU_IF || return 1
-	}
-	for i in $PR_IFs; do
-		sfRetry 3m 10 check_for_ip $i || return 1
-	done
-	return 0
-}
-
 function check_for_network_refined() {
 	NETROUNDS=$1
 	REACHED=0
@@ -684,6 +658,14 @@ function check_for_network_refined() {
 		sfRetry 3m 10 check_for_ip $i || return 1
 	done
 	return 0
+}
+
+# Checks network is set correctly
+# - DNS and routes (by pinging a FQDN)
+# - IP address on "physical" interfaces
+function check_for_network() {
+	check_for_network_refined 12
+	return $?
 }
 
 function configure_as_gateway() {
