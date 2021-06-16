@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
@@ -1608,7 +1609,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// continue
-						fail.Ignore(xerr)
+						debug.IgnoreError(xerr)
 					default:
 						return fail.Wrap(xerr, "failed to request information about Elastic IP '%s'", ip)
 					}
@@ -1704,7 +1705,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// continue
-				fail.Ignore(xerr)
+				debug.IgnoreError(xerr)
 			default:
 				return fail.Wrap(xerr, "failed to delete network interface %s from instance", aws.StringValue(v))
 			}

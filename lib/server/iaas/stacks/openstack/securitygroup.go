@@ -17,6 +17,7 @@
 package openstack
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -83,7 +84,7 @@ func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules a
 			asg = abstract.NewSecurityGroup()
 			asg.Name = name
 			// continue
-			fail.Ignore(xerr)
+			debug.IgnoreError(xerr)
 		case *fail.ErrDuplicate:
 			// Special case : a duplicate error may come from OpenStack after normalization, because there are already more than 1
 			// security groups with the same name. In this situation, returns a DuplicateError with the xerr as cause
@@ -385,7 +386,7 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			fail.Ignore(xerr)
+			debug.IgnoreError(xerr)
 		default:
 			return asg, xerr
 		}

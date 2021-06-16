@@ -58,7 +58,7 @@ func CheckMetadataVersion(svc iaas.Service) (string, fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			fail.Ignore(xerr)
+			debug.IgnoreError(xerr)
 		default:
 			return "", fail.Wrap(xerr, "failed to read content of 'version' file in metadata bucket")
 		}

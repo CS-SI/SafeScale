@@ -204,7 +204,7 @@ func (s Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			fail.Ignore(xerr)
+			debug.IgnoreError(xerr)
 		default:
 			return nullAN, xerr
 		}
@@ -652,7 +652,7 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 					return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
 				case *fail.ErrNotFound:
 					// consider a missing Subnet as a successful deletion
-					fail.Ignore(innerXErr)
+					debug.IgnoreError(innerXErr)
 				default:
 					return innerXErr
 				}

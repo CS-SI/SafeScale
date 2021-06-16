@@ -896,7 +896,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// considered as a success
-			fail.Ignore(xerr)
+			debug.IgnoreError(xerr)
 			return empty, nil
 		default:
 			return empty, xerr
@@ -908,7 +908,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// considered as a success
-			fail.Ignore(xerr)
+			debug.IgnoreError(xerr)
 			return empty, nil
 		default:
 			return empty, xerr
@@ -919,7 +919,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// considered as a success
-			fail.Ignore(xerr)
+			debug.IgnoreError(xerr)
 			return empty, nil
 		default:
 			return empty, xerr
