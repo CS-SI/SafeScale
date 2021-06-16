@@ -104,8 +104,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 			}
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 /*|| !ready*/ {
-				logrus.Warnf("Remote SSH server on Host '%s' is not available, retrying", sshCfg.Hostname)
-				return fail.NotAvailableError("failed to connect")
+				return fail.NotAvailableError("Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname)
 			}
 			return nil
 		},
