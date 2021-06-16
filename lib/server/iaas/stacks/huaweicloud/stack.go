@@ -17,6 +17,7 @@
 package huaweicloud
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	// Gophercloud OpenStack API
 	"github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
@@ -132,7 +133,7 @@ func (s *stack) initVPC() fail.Error {
 			case *fail.ErrNotFound:
 				// FIXME: error or automatic DefaultNetwork creation ?
 				// continue
-				fail.Ignore(xerr)
+				debug.IgnoreError(xerr)
 			default:
 				return xerr
 			}

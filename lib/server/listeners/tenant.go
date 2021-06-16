@@ -289,7 +289,7 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 			switch xerr.(type) {
 			case *fail.ErrForbidden, *fail.ErrNotFound:
 				// continue
-				fail.Ignore(xerr)
+				debug.IgnoreError(xerr)
 			default:
 				return nil, xerr
 			}

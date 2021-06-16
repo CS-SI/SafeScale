@@ -191,27 +191,32 @@ func killProcess(proc *os.Process) fail.Error {
 		case syscall.Errno:
 			switch cerr {
 			case syscall.ESRCH:
-				// process group not found, continue
+				// process not found, continue
+				debug.IgnoreError(err)
 			default:
 				logrus.Errorf("proc.Kill() failed: %s", cerr.Error())
 				return fail.Wrap(err, "unable to send kill signal to process")
 			}
 		default:
-			if cerr.Error() != "os: process already finished" {
-				logrus.Errorf("proc.Wait() failed: %s", err.Error())
+			switch err.Error() {
+			case "os: process already finished":
+				debug.IgnoreError(err)
+			default:
+				logrus.Errorf("proc.Kill() failed: %s", err.Error())
 				return fail.Wrap(err, "unable to send kill signal to process")
 			}
 		}
-	} else {
-		_, err := proc.Wait()
-		if err != nil {
-			switch err {
-			case syscall.ESRCH:
-				// process group not found or already stopped, continue
-			default:
-				logrus.Error(err.Error())
-				return fail.Wrap(err, "unable to close tunnel")
-			}
+	}
+
+	_, err = proc.Wait()
+	if err != nil {
+		switch err {
+		case syscall.ESRCH:
+			// process group not found or already stopped, continue
+			debug.IgnoreError(err)
+		default:
+			logrus.Error(err.Error())
+			return fail.Wrap(err, "unable to wait on SSH tunnel process")
 		}
 	}
 

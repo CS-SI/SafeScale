@@ -2192,7 +2192,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						// Consider that a Security Group that cannot be loaded or is not bound as a success
-						fail.Ignore(derr)
+						debug.IgnoreError(derr)
 					default:
 						errors = append(errors, derr)
 					}
@@ -2217,7 +2217,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					case *fail.ErrNotFound:
 						// A Host not found is considered as a successful deletion
 						logrus.Tracef("Host not found, deletion considered as a success")
-						fail.Ignore(derr)
+						debug.IgnoreError(derr)
 					default:
 						return fail.Wrap(derr, "cannot delete Host")
 					}
@@ -2240,7 +2240,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 						switch stateErr.(type) {
 						case *fail.ErrNotFound:
 							// If Host is not found anymore, consider this as a success
-							fail.Ignore(stateErr)
+							debug.IgnoreError(stateErr)
 							return nil
 						default:
 							return stateErr
@@ -2264,7 +2264,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					// continue
-					fail.Ignore(innerXErr)
+					debug.IgnoreError(innerXErr)
 				default:
 					return innerXErr
 				}
@@ -2301,7 +2301,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
 		}
-		fail.Ignore(xerr)
+		debug.IgnoreError(xerr)
 		logrus.Tracef("core instance not found, deletion considered as a success")
 	}
 
@@ -3271,7 +3271,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
-						fail.Ignore(xerr)
+						debug.IgnoreError(xerr)
 						// continue
 					default:
 						return xerr
@@ -3368,7 +3368,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 				if xerr != nil {
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
-						fail.Ignore(xerr)
+						debug.IgnoreError(xerr)
 						// continue
 					default:
 						return xerr

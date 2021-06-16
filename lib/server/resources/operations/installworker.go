@@ -1378,7 +1378,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 					switch xerr.(type) {
 					case *fail.ErrDuplicate:
 						// This rule already exists, considered as a success and continue
-						fail.Ignore(xerr)
+						debug.IgnoreError(xerr)
 					default:
 						return xerr
 					}
@@ -1419,7 +1419,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 							switch xerr.(type) {
 							case *fail.ErrDuplicate:
 								// This rule already exists, considered as a success and continue
-								fail.Ignore(xerr)
+								debug.IgnoreError(xerr)
 							default:
 								return xerr
 							}

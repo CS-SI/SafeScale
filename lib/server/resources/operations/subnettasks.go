@@ -113,7 +113,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Host is considered as a successful deletion, continue
-					fail.Ignore(derr)
+					debug.IgnoreError(derr)
 				case *fail.ErrTimeout:
 					logrus.Errorf(msgRoot+", timeout: %v", hostReq.ResourceName, derr)
 				default:
