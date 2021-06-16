@@ -314,7 +314,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
 							// continue
-							fail.Ignore(xerr)
+							debug.IgnoreError(xerr)
 						default:
 							return xerr
 						}
@@ -708,7 +708,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			fail.Ignore(xerr)
+			debug.IgnoreError(xerr)
 		default:
 			return nil, fail.Wrap(xerr, "failed to check if Host '%s' already exists", hostReq.ResourceName)
 		}
@@ -724,7 +724,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
-			fail.Ignore(xerr)
+			debug.IgnoreError(xerr)
 		default:
 			return nil, fail.Wrap(xerr, "failed to check if Host resource name '%s' is already used", hostReq.ResourceName)
 		}
@@ -741,7 +741,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// continue
-					fail.Ignore(xerr)
+					debug.IgnoreError(xerr)
 				default:
 					return nil, xerr
 				}
@@ -1349,7 +1349,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// ignore this error
-				fail.Ignore(innerXErr)
+				debug.IgnoreError(innerXErr)
 			default:
 				return innerXErr
 			}
@@ -1357,7 +1357,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 			switch innerXErr.(type) {
 			case *fail.ErrNotFound:
 				// Consider a security group not found as a successful unbind
-				fail.Ignore(innerXErr)
+				debug.IgnoreError(innerXErr)
 			default:
 				return fail.Wrap(innerXErr, "failed to unbind Security Group '%s' from Host", sgName)
 			}

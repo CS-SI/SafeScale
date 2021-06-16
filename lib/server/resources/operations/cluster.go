@@ -2240,7 +2240,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 		return fail.InvalidInstanceError()
 	}
 
-	// Identify the node to delete and remove it preventive from metadata
+	// Identify the node to delete and remove it preventively from metadata
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)

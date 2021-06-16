@@ -749,16 +749,29 @@ func (instance *Cluster) createHostResources(
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
+
 	ctx := task.GetContext()
 	startedTasks := []concurrency.Task{}
 	defer func() {
 		if xerr != nil {
+			// Disable abort signal during the clean up
+			defer task.DisarmAbortSignal()()
+
+			// VPL: not sure this is needed; in a subtask, if parent Task aborts, child is notified and
+			//      in a TaskGroup, if parent Task of the TaskGroup aborts, children are notified...
 			for _, startedTask := range startedTasks {
 				if !startedTask.Aborted() {
 					cleanErr := startedTask.Abort()
 					if cleanErr != nil {
 						logrus.Warnf("error aborting tasks spawn by createHostResources: %s", cleanErr.Error())
 					}
+				}
+			}
+			// we have to wait for completion of aborted taskgroups, not get out before
+			for _, startedTask := range startedTasks {
+				_, _, werr := startedTask.WaitFor(temporal.GetLongOperationTimeout())
+				if werr != nil {
+					_ = xerr.AddConsequence(werr)
 				}
 			}
 		}
@@ -865,12 +878,12 @@ func (instance *Cluster) createHostResources(
 					for _, v := range list {
 						if v.ID != "" {
 							if _, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
-								_ = xerr.AddConsequence(derr)
+								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete master '%s'", v.Name))
 							}
 						}
 					}
 					if _, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout()); derr != nil {
-						_ = xerr.AddConsequence(derr)
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for master deletions"))
 					}
 				}
 			}
@@ -905,17 +918,17 @@ func (instance *Cluster) createHostResources(
 			} else {
 				tg, tgerr := concurrency.NewTaskGroup(task)
 				if tgerr != nil {
-					_ = xerr.AddConsequence(tgerr)
+					_ = xerr.AddConsequence(fail.Wrap(tgerr, "cleaning up on failure, failed to create TaskGroup"))
 				} else {
 					for _, v := range list {
 						if v.ID != "" {
 							if _, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}); derr != nil {
-								_ = xerr.AddConsequence(derr)
+								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete node '%s'", v.Name))
 							}
 						}
 					}
 					if _, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout()); derr != nil {
-						_ = xerr.AddConsequence(derr)
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for node deletions"))
 					}
 				}
 			}
@@ -2127,7 +2140,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Tracef("Node %s not found, deletion considered success", hostName)
+			logrus.Tracef("Node %s not found, deletion considered successful", hostName)
 			return nil, nil
 		default:
 			return nil, xerr
@@ -2139,7 +2152,7 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Tracef("Node %s not found, deletion considered success", hostName)
+			logrus.Tracef("Node %s not found, deletion considered successful", hostName)
 			return nil, nil
 		default:
 			return nil, xerr
@@ -2201,7 +2214,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Debugf("Node %s not found, deletion considered success", nodeName)
+			logrus.Debugf("Node %s not found, deletion considered successful", nodeName)
 			return nil, nil
 		default:
 			return nil, xerr
@@ -2237,9 +2250,9 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 
 	var host resources.Host
 	if p.node.ID != "" { //nolint
-		host, xerr = LoadHost(instance.GetService(), p.node.ID)
+		host, xerr = LoadHost(instance.GetService(), p.node.ID, HostLightOption)
 	} else if p.node.Name != "" {
-		host, xerr = LoadHost(instance.GetService(), p.node.Name)
+		host, xerr = LoadHost(instance.GetService(), p.node.Name, HostLightOption)
 	} else {
 		return nil, fail.InvalidParameterError("p.node", "must have a non-empty string in either field ID or Name")
 	}
@@ -2247,7 +2260,7 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Tracef("Master %s not found, deletion considered success", p.node.Name)
+			logrus.Tracef("Master %s not found, deletion considered successful", p.node.Name)
 			return nil, nil
 		default:
 			return nil, xerr
@@ -2260,7 +2273,7 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Debugf("Master %s not found, deletion considered success", p.node.Name)
+			logrus.Debugf("Master %s not found, deletion considered successful", p.node.Name)
 			return nil, nil
 		default:
 			return nil, xerr
@@ -2298,7 +2311,7 @@ func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Tracef("Host %s not found, deletion considered success", hostName)
+			logrus.Tracef("Host %s not found, deletion considered successful", hostName)
 			return nil, nil
 		default:
 			return nil, xerr
