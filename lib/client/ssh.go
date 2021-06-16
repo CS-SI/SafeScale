@@ -75,18 +75,18 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 				return innerXErr
 			}
 
-			defer func() {
-				derr := sshCmd.Close()
+			defer func(cmd *system.SSHCommand) {
+				derr := cmd.Close()
 				if derr != nil {
 					if innerErr == nil {
 						innerErr = derr
 					} else {
-						innerXErr := fail.ConvertError(innerErr)
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
+						innerXErr = fail.ConvertError(innerErr)
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 						innerErr = innerXErr
 					}
 				}
-			}()
+			}(sshCmd)
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, executionTimeout)
 			if innerXErr != nil {

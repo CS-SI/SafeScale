@@ -346,11 +346,12 @@ func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 	}
 
 	defer func() {
-		if derr := sshCmd.Close(); derr != nil {
+		derr := sshCmd.Close()
+		if derr != nil {
 			if xerr == nil {
 				xerr = derr
 			} else {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSHCommand"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 			}
 		}
 	}()

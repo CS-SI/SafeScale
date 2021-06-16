@@ -118,15 +118,17 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 				return innerXErr
 			}
 
-			defer func() {
-				if derr := sshCmd.Close(); derr != nil {
+			// Do not forget to close the command (allowing to close SSH tunnels and free process)
+			defer func(cmd *system.SSHCommand) {
+				derr := cmd.Close()
+				if derr != nil {
 					if innerXErr == nil {
 						innerXErr = derr
 					} else {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSHCommand"))
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 					}
 				}
-			}()
+			}(sshCmd)
 
 			retcode = -1
 			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout); innerXErr != nil {

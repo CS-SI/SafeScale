@@ -99,13 +99,13 @@ func (instance *cache) GetEntry(key string) (*Entry, fail.Error) {
 	defer instance.lock.RUnlock()
 
 	if _, ok := instance.reserved[key]; ok {
-		return nil, fail.NotAvailableError("entry '%s' is reserved in cache %s and cannot be use until freed or committed", key, instance.GetName())
+		return nil, fail.NotAvailableError("entry '%s' is reserved in %s cache and cannot be use until freed or committed", key, instance.GetName())
 	}
 	if ce, ok := instance.cache[key]; ok {
 		return ce, nil
 	}
 
-	return nil, fail.NotFoundError("failed to find cache entry with key '%s' in cache %s", key, instance.GetName())
+	return nil, fail.NotFoundError("failed to find cache entry with key '%s' in %s cache", key, instance.GetName())
 }
 
 // ReserveEntry locks an entry identified by key for update
@@ -127,10 +127,10 @@ func (instance *cache) ReserveEntry(key string) (xerr fail.Error) {
 // unsafeReserveEntry is the workforce of ReserveEntry, without locking
 func (instance *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
 	if _, ok := instance.reserved[key]; ok {
-		return fail.NotAvailableError("the entry '%s' of cache %s is already reserved", key, instance.GetName())
+		return fail.NotAvailableError("the entry '%s' of %s cache is already reserved", key, instance.GetName())
 	}
 	if _, ok := instance.cache[key]; ok {
-		return fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry with key '%s' in the cache %s", key, instance.GetName()), 0))
+		return fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry with key '%s' in the %s cache", key, instance.GetName()), 0))
 	}
 
 	ce := newEntry(&reservation{key: key})
