@@ -257,7 +257,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 			}
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 {
-				xerr = fail.NewError("failed to connect")
+				xerr = fail.NewError("failure copying '%s' to '%s': failed to connect to '%s'", toPath, hostTo, hostTo)
 				return xerr
 			}
 			return nil
