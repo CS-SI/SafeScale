@@ -314,7 +314,8 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 	}
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10"
-	cmdString := fmt.Sprintf( "ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
+	cmdString := fmt.Sprintf(
+		"ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
 		f.Name(),
 		localPort,
 		scfg.IPAddress,
@@ -323,7 +324,8 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		scfg.GatewayConfig.IPAddress,
 		options,
 		scfg.Hostname,
-		scfg.GatewayConfig.Port)
+		scfg.GatewayConfig.Port,
+	)
 	cmd := exec.Command("bash", "-c", cmdString)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cerr := cmd.Start()
@@ -559,7 +561,9 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		return -1, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout,
+	).WithStopwatch().Entering()
 	tracer.Trace("host='%s', command=\n%s\n", scmd.hostname, scmd.runCmdString)
 	defer tracer.Exiting()
 
@@ -568,7 +572,9 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		return -1, "", "", xerr
 	}
 
-	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
+	if _, xerr = subtask.StartWithTimeout(
+		scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout,
+	); xerr != nil {
 		return -1, "", "", xerr
 	}
 
@@ -774,13 +780,18 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 			cfg.GatewayConfig = &gateway
 		}
 		if cfg.GatewayConfig != nil {
+			failures := 0
 			xerr = retry.WhileUnsuccessful(
 				func() error {
 					tunnel, xerr = buildTunnel(cfg)
 					if xerr != nil {
 						switch xerr.(type) {
-						case *fail.ErrNotAvailable: // When this happens, resources are already exhausted
-							return fail.AbortedError(xerr, "not enough resources, pointless to retry")
+						case *fail.ErrNotAvailable: // When this happens, resources are close to exhaustion
+							failures++
+							if failures > 6 { // TODO: retry lib should provide some kind of circuit-breaker pattern
+								return fail.AbortedError(xerr, "not enough resources, pointless to retry")
+							}
+							return xerr
 						default:
 							return xerr
 						}
@@ -790,8 +801,8 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 					*tunnels = append(SSHTunnels{tunnel}, *tunnels...)
 					return nil
 				},
-				2*time.Second, // FIXME: NO hardcoded waits
-				time.Minute,   // FIXME: NO hardcoded timeouts
+				temporal.GetDefaultDelay(),
+				temporal.GetOperationTimeout(),
 			)
 			if xerr != nil {
 				switch xerr.(type) { // nolint
@@ -990,7 +1001,9 @@ func createSCPCommand(sconf *SSHConfig, localPath, remotePath string, isUpload b
 		return "", nil, fail.Wrap(err, "unable to create temporary key file")
 	}
 
-	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", sconf.Hostname) + " -v"
+	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(
+		" -oSendEnv='IAM=%s'", sconf.Hostname,
+	) + " -v"
 
 	sshCmdString := fmt.Sprintf("scp -i %s %s -P %d ", f.Name(), options, sconf.Port)
 	if isUpload {
@@ -1026,8 +1039,13 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
-	defer debug.NewTracer(task, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
-	defer fail.OnExitTraceError(&xerr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname, temporal.FormatDuration(timeout))
+	defer debug.NewTracer(
+		task, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout),
+	).Entering().Exiting()
+	defer fail.OnExitTraceError(
+		&xerr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname,
+		temporal.FormatDuration(timeout),
+	)
 
 	originalPhase := phase
 	if phase == "ready" {
@@ -1043,7 +1061,9 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() (innerErr error) {
 
-			sshCmd, innerXErr := sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
+			sshCmd, innerXErr := sconf.NewCommand(
+				ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase),
+			)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1080,7 +1100,10 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		return stdout, retryErr
 	}
 
-	logrus.Debugf("host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.Hostname, originalPhase, temporal.FormatDuration(time.Since(begins)), stdout)
+	logrus.Debugf(
+		"host [%s] phase [%s] check successful in [%s]: host stdout is [%s]", sconf.Hostname, originalPhase,
+		temporal.FormatDuration(time.Since(begins)), stdout,
+	)
 	return stdout, nil
 }
 
