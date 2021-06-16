@@ -27,6 +27,7 @@ import (
 	"os/exec"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -168,17 +169,17 @@ func (stun *SSHTunnel) Close() fail.Error {
 		return xerr
 	}
 
-	// // Kills remaining processes if there are some
-	// bytesCmd, err := exec.Command("pgrep", "-f", stun.cmdString).Output()
-	// if err == nil {
-	// 	portStr := strings.Trim(string(bytesCmd), "\n")
-	// 	if _, err = strconv.Atoi(portStr); err == nil {
-	// 		if err = exec.Command("kill", "-9", portStr).Run(); err != nil {
-	// 			logrus.Errorf("kill -9 failed: %s", reflect.TypeOf(err).String())
-	// 			return fail.Wrap(err, "unable to close tunnel")
-	// 		}
-	// 	}
-	// }
+	// Kills remaining processes if there are some
+	bytesCmd, err := exec.Command("pgrep", "-f", stun.cmdString).Output()
+	if err == nil {
+		portStr := strings.Trim(string(bytesCmd), "\n")
+		if _, err = strconv.Atoi(portStr); err == nil {
+			if err = exec.Command("kill", "-9", portStr).Run(); err != nil {
+				logrus.Errorf("kill -9 failed: %s", reflect.TypeOf(err).String())
+				return fail.Wrap(err, "unable to close tunnel")
+			}
+		}
+	}
 	return nil
 }
 
@@ -210,9 +211,14 @@ func killProcess(proc *os.Process) fail.Error {
 
 	_, err = proc.Wait()
 	if err != nil {
+		switch cerr := err.(type) {
+		case *os.SyscallError:
+			err = cerr.Err
+		default:
+		}
 		switch err {
-		case syscall.ESRCH:
-			// process group not found or already stopped, continue
+		case syscall.ESRCH, syscall.ECHILD:
+			// process not found or has no child, continue
 			debug.IgnoreError(err)
 		default:
 			logrus.Error(err.Error())
@@ -223,6 +229,7 @@ func killProcess(proc *os.Process) fail.Error {
 	return nil
 }
 
+// Close closes all the tunnels
 func (tunnels SSHTunnels) Close() fail.Error {
 	var errorList []error
 	for _, t := range tunnels {
@@ -233,6 +240,7 @@ func (tunnels SSHTunnels) Close() fail.Error {
 	if len(errorList) > 0 {
 		return fail.NewErrorList(errorList)
 	}
+
 	return nil
 }
 
@@ -914,10 +922,10 @@ func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTt
 		return nil, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if cmdString = strings.TrimSpace(cmdString); cmdString == "" {
-		return nil, fail.InvalidParameterError("runCmdString", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("runCmdString")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -929,9 +937,9 @@ func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTt
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tunnels, sshConfig, err := sconf.CreateTunneling()
-	if err != nil {
-		return nil, fail.Wrap(err, "unable to create command")
+	tunnels, sshConfig, xerr := sconf.CreateTunneling()
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "unable to create SSH tunnel")
 	}
 
 	if task.Aborted() {
@@ -1065,17 +1073,14 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() (innerErr error) {
-
-			sshCmd, innerXErr := sconf.NewCommand(
-				ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase),
-			)
+			sshCmd, innerXErr := sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
 				return innerXErr
 			}
 
-			// Do not forget to close command, ie close SSH tunnels
-			defer func() {
-				derr := sshCmd.Close()
+			// Do not forget to close command, ie close SSH tunnel
+			defer func(cmd *SSHCommand) {
+				derr := cmd.Close()
 				if derr != nil {
 					if innerErr == nil {
 						innerErr = derr
@@ -1085,7 +1090,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 						innerErr = innerXErr
 					}
 				}
-			}()
+			}(sshCmd)
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout)
 			if innerXErr != nil {
@@ -1146,27 +1151,19 @@ func (sconf *SSHConfig) copy(
 		return -1, "", "", fail.Wrap(xerr, "failed to create copy command")
 	}
 
+	// Do not forget to close sshCommand, allowing the SSH tunnel close and corresponding process cleanup
 	defer func() {
 		derr := sshCommand.Close()
 		if derr != nil {
 			if xerr == nil {
 				xerr = derr
 			} else {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 			}
 		}
 	}()
 
-	retcode, stdout, stderr, xerr = sshCommand.RunWithTimeout(ctx, outputs.COLLECT, timeout)
-	derr := sshCommand.Close()
-	if derr != nil {
-		if xerr != nil {
-			_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH command, probably leaving SSH tunnels"))
-		} else {
-			xerr = derr
-		}
-	}
-	return retcode, stdout, stderr, xerr
+	return sshCommand.RunWithTimeout(ctx, outputs.COLLECT, timeout)
 }
 
 // Enter Enter to interactive shell
