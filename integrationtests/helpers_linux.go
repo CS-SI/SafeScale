@@ -18,6 +18,8 @@
 
 package integrationtests
 
+import "syscall"
+
 func getSyscallAttrs() *syscall.SysProcAttr {
 	return &syscall.SysProcAttr{Setpgid: true}
 }
