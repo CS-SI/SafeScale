@@ -480,9 +480,9 @@ function sfDownload() {
 export -f sfDownload
 
 __create_dropzone() {
-	mkdir -p ~cladm/.dropzone
-	chown cladm:cladm ~cladm/.dropzone
-	chmod ug+s ~cladm/.dropzone
+	[[ ! -d ~cladm/.dropzone ]] && mkdir -p ~cladm/.dropzone
+	chown -R cladm:cladm ~cladm/.dropzone
+	chmod -R ug+s ~cladm/.dropzone
 }
 
 function sfDownloadInDropzone() {
@@ -494,9 +494,9 @@ export -f sfDownloadInDropzone
 # Copy local file to drop zone in remote
 function sfDropzonePush() {
 	local file="$1"
-	__create_dropzone &>/dev/null
-	cp -rf "$file" ~cladm/.dropzone/
-	chown -R cladm:cladm ~cladm/.dropzone
+	__create_dropzone || echo "failed to create dropzone (exit code $?)"
+	cp -rf "$file" ~cladm/.dropzone/ || echo "failed to copy '$file' in dropzone (exit code $?)"
+	chown -R cladm:cladm ~cladm/.dropzone || echo "failed to set ownership of dropzone (exit code $?)"
 }
 export -f sfDropzonePush
 
@@ -515,12 +515,12 @@ function sfDropzonePop() {
 	local dest="$1"
 	local file=
 	[ $# -eq 2 ] && file="$2"
-	__create_dropzone &>/dev/null
-	mkdir -p "$dest" &>/dev/null
+	__create_dropzone || echo "failed to create dropzone (exit code $?)"
+	mkdir -p "$dest" >/dev/null || echo "failed to create '$dest' folder (exit code $?)"
 	if [ $# -eq 1 ]; then
-		mv -f ~cladm/.dropzone/* "$dest"
+		mv -f ~cladm/.dropzone/* "$dest" || echo "failed to move all files in dropzone to '$dest' (exit code $?)"
 	else
-		mv -f ~cladm/.dropzone/"$file" "$dest"
+		mv -f ~cladm/.dropzone/"$file" "$dest" || echo "failed to move file '$file' in dropzone to '$dest' (exit code $?)"
 	fi
 }
 export -f sfDropzonePop

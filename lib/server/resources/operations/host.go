@@ -66,8 +66,6 @@ const (
 	hostKind = "host"
 	// hostsFolderName is the technical name of the container used to store networks info
 	hostsFolderName = "hosts"
-
-	// defaultHostSecurityGroupNamePattern = "safescale-sg_host_%s.%s.%s" // safescale-sg_host_<hostname>.<subnet name>.<network name>; should be unique across a tenant
 )
 
 var (
@@ -1974,6 +1972,13 @@ func (instance *Host) Delete(ctx context.Context) (xerr fail.Error) {
 // RelaxedDeleteHost is the method that really deletes a host, being a gateway or not
 func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+
+	if instance == nil || instance.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
