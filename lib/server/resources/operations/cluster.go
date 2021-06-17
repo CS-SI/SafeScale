@@ -2236,10 +2236,6 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 		nodeRef = node.Name
 	}
 
-	if instance == nil || instance.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-
 	// Identify the node to delete and remove it preventively from metadata
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -2298,36 +2294,41 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	}()
 
 	// Deletes node
-	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		hostInstance, xerr := LoadHost(instance.GetService(), nodeRef, HostLightOption)
+	hostInstance, xerr := LoadHost(instance.GetService(), nodeRef, HostLightOption)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	// Leave node from Cluster, if master is not null
+	if master != nil && !master.IsNull() {
+		xerr = instance.leaveNodesFromList([]resources.Host{hostInstance}, master)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
-
-		// Leave node from Cluster, if master is not null
-		if master != nil && !master.IsNull() {
-			if innerXErr := instance.leaveNodesFromList([]resources.Host{hostInstance}, master); innerXErr != nil {
-				return innerXErr
-			}
-			if instance.makers.UnconfigureNode != nil {
-				if innerXErr := instance.makers.UnconfigureNode(instance, hostInstance, master); innerXErr != nil {
-					return innerXErr
-				}
+		if instance.makers.UnconfigureNode != nil {
+			xerr = instance.makers.UnconfigureNode(instance, hostInstance, master)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
 			}
 		}
+	}
 
-		// Finally delete host
-		if innerXErr := hostInstance.Delete(ctx); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				// host seems already deleted, so it's a success
-			default:
-				return innerXErr
-			}
+	// Finally delete host
+	xerr = hostInstance.Delete(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// Host seems already deleted, so it's a success
+		default:
+			return xerr
 		}
-		return nil
-	})
+	}
+
+	return nil
 }
 
 // Delete deletes the Cluster
