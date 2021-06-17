@@ -7,11 +7,11 @@ sudo yum groupinstall -y "Development Tools"
 sudo yum install -y wget unzip vim git
 ```
 
-## Install GO 1.14.4
+## Install GO 1.16.2
 ```
-wget https://dl.google.com/go/go1.14.4.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.14.4.linux-amd64.tar.gz
-rm ./go1.14.4.linux-amd64.tar.gz
+wget https://dl.google.com/go/go1.16.2.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
+rm ./go1.16.2.linux-amd64.tar.gz
 ```
 
 ## Install Protoc 3.6

@@ -13,29 +13,25 @@ Here is an example of a TOML encoded configuration file:
 
     # This part defines how to authenticate with the provider
     [tenants.identity]
-        Username = "<Username>"
-        Password = "<Password>"
-        DomainName = "<Domain Name>"
+        ApplicationKey = "<Openstack Application Key>"
+        OpenstackID = "<Openstack ID>"
+        OpenstackPassword = "<Openstack password>"
 
     # This part defines configuration specifically applied to compute resources (AWS EC2, OpenStack Nova, ...)
     [tenants.compute]
-        ProjectID = "<Project ID>"
+        ProjectName = "<Project Name>"
         Region = "<Region>"
         AvailabilityZone = "<Availability Zone>"
         DefaultImage = "<OS Image Name to use as default, ex: Ubuntu 18.04>"
 
     # This part defines configuration specifically applied to network resources (optional)
     [tenants.network]
-        VPCName = "<VPC Name>"
-        VPCCIDR = "<VPC CIDR, ex: 192.168.0.0/16>"
         ProviderNetwork = "<Provider network for public access, ex:Ext-Net>"
 
     # This part defines object storage protocol and associated authentication parameters
     [tenants.objectstorage]
-        Type = "s3"
-        Endpoint = "https://oss.eu-west-0.prod-cloud-ocb.orange-business.com"
-        AccessKey = "<Access Key>"
-        SecretKey = "<Secret Key>"
+        Type = "swift"
+        AuthURL = "https://auth.cloud.ovh.net/v3"
 
     # This part defines object storage protocol and associated authentication parameters (optional)
     # if not provided, metadata are stored using tenants.objectstorage section
@@ -43,10 +39,6 @@ Here is an example of a TOML encoded configuration file:
     [tenants.metadata]
         Type = "swift"
         AuthURL = "https://auth.cloud.ovh.net/v3"
-        ApplicationKey = "<Openstack Application Key>"
-        OpenstackID = "<Openstack ID>"
-        OpenstackPassword = "<Openstack password>"
-        CryptKey = "<metadata crypt password>"
 ```
 
 The same configuration can be provided in JSON or in YAML.
@@ -61,34 +53,31 @@ Here is the JSON equivalent of the TOML configuration file example:
       "client": "ovh",
       "compute": {
         "DefaultImage": "<OS Image Name to use as default, ex: Ubuntu 18.04>",
-        "ProjectID": "<Project ID>",
+        "ProjectName": "<Project Name>",
         "Region": "<Region>",
         "AvailabilityZone": "<Availability Zone>"
       },
       "identity": {
-        "DomainName": "<Domain Name>",
-        "Password": "<Password>",
-        "Username": "<Username>"
+        "ApplicationKey": "<Openstack Application Key>",
+        "OpenstackID": "<Openstack ID>",
+        "OpenstackPassword": "<Openstack Password>"
       },
       "metadata": {
         "ApplicationKey": "<Openstack Application Key>",
         "AuthURL": "https://auth.cloud.ovh.net/v3",
-        "CryptKey": "<metadata crypt password>",
+        "OpenstackID": "<Openstack ID>",
+        "OpenstackPassword": "<Openstack Password>",
+        "Type": "swift"
+      },
+      "network": {
+        "ProviderNetwork": "<Provider network for public access, ex:Ext-Net>",
+      },
+      "objectstorage": {
+        "ApplicationKey": "<Openstack Application Key>",
+        "AuthURL": "https://auth.cloud.ovh.net/v3",
         "OpenstackID": "<Openstack ID>",
         "OpenstackPassword": "<Openstack password>",
         "Type": "swift"
-      },
-
-      "network": {
-        "ProviderNetwork": "<Provider network for public access, ex:Ext-Net>",
-        "VPCCIDR": "<VPC CIDR, ex: 192.168.0.0/16>",
-        "VPCName": "<VPC Name>"
-      },
-      "objectstorage": {
-        "AccessKey": "<Access Key>",
-        "Endpoint": "https://oss.eu-west-0.prod-cloud-ocb.orange-business.com",
-        "SecretKey": "<Secret Key>",
-        "Type": "s3"
       }
     }
   ]
@@ -102,30 +91,28 @@ tenants:
 - client: ovh
   compute:
     DefaultImage: '<OS Image Name to use as default, ex: Ubuntu 18.04>'
-    ProjectID: <Project ID>
+    ProjectName: <Project Name>
     Region: <Region>
     AvailabilityZone: <Availability Zone>
   identity:
-    DomainName: <Domain Name>
-    Password: <Password>
-    Username: <Username>
+    ApplicationKey: <Openstack Application Key>
+    OpenstackID: <Openstack ID>
+    OpenstackPassword: <Openstack Password>
   metadata:
     ApplicationKey: <Openstack Application Key>
     AuthURL: https://auth.cloud.ovh.net/v3
-    CryptKey: <metadata crypt password>
     OpenstackID: <Openstack ID>
     OpenstackPassword: <Openstack password>
     Type: swift
   name: TenantName
   network:
     ProviderNetwork: <Provider network for public access, ex:Ext-Net>
-    VPCCIDR: '<VPC CIDR, ex: 192.168.0.0/16>'
-    VPCName: <VPC Name>
   objectstorage:
-    AccessKey: <Access Key>
-    Endpoint: https://oss.eu-west-0.prod-cloud-ocb.orange-business.com
-    SecretKey: <Secret Key>
-    Type: s3
+    ApplicationKey: <Openstack Application Key>
+    AuthURL: https://auth.cloud.ovh.net/v3
+    OpenstackID: <Openstack ID>
+    OpenstackPassword: <Openstack password>
+    Type: swift
 ```
 When SafeScale commands are invoked, they search for a tenant configuration file in these folders, in that order :
 
@@ -271,7 +258,7 @@ It defines the "driver" to communicate with the provider. Valid values are:
 > | `"cloudferro"` |
 > | `"ebrc"` |
 > | `"flexibleengine"` |
-> | `"gpc"` |
+> | `"gcp"` |
 > | `"local"` |
 > | `"openstack"` |
 > | `"opentelekom"` |
