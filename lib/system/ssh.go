@@ -352,7 +352,12 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 	}
 
 	if !isTunnelReady(localPort) {
-		return nil, fail.NotAvailableError("the tunnel is not ready")
+		xerr := fail.NotAvailableError("the tunnel is not ready")
+		derr := killProcess(cmd.Process)
+		if derr != nil {
+			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to kill SSH process"))
+		}
+		return nil, xerr
 	}
 
 	return &SSHTunnel{
@@ -810,7 +815,7 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 						}
 					}
 
-					// Note: uses LIFO (Last In First Out) during the deletion of tunnels
+					// Note: provokes LIFO (Last In First Out) during the deletion of tunnels
 					*tunnels = append(SSHTunnels{tunnel}, *tunnels...)
 					return nil
 				},
@@ -904,7 +909,6 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 	}
 
 	return sshCmdString, f, nil
-
 }
 
 // NewCommand returns the cmd struct to execute runCmdString remotely

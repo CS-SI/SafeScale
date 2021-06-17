@@ -2216,7 +2216,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 	return nil
 }
 
-// deleteNode deletes a node identified by its ID
+// deleteNode deletes a node
 func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.ClusterNode, master *Host) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -2299,7 +2299,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 
 	// Deletes node
 	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		hostInstance, xerr := LoadHost(instance.GetService(), nodeRef)
+		hostInstance, xerr := LoadHost(instance.GetService(), nodeRef, HostLightOption)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr

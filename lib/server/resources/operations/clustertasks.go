@@ -132,47 +132,59 @@ func (instance *Cluster) taskCreateCluster(tc concurrency.Task, params concurren
 	var rn resources.Network
 	var rs resources.Subnet
 
+	// Create the Network and Subnet
+	rn, rs, xerr = instance.createNetworkingResources(task, req, gatewaysDef)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			if rs != nil && rn != nil {
-				logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", rs.GetName())
-				if derr := rs.Delete(context.Background()); derr != nil {
-					switch derr.(type) {
-					case *fail.ErrNotFound:
-						// missing Subnet is considered as a successful deletion, continue
-						debug.IgnoreError(derr)
-					default:
-						cleanFailure = true
-						logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(xerr), rs.GetName())
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(xerr)))
-					}
-				} else {
-					logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(xerr), rs.GetName())
-					if req.NetworkID == "" {
-						logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(xerr), rn.GetName())
-						if derr := rn.Delete(context.Background()); derr != nil {
-							switch derr.(type) {
-							case *fail.ErrNotFound:
-								// missing Network is considered as a successful deletion, continue
-								debug.IgnoreError(derr)
-							default:
-								cleanFailure = true
-								logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(xerr), rn.GetName())
-								_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(xerr)))
-							}
-						} else {
-							logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(xerr), rn.GetName())
+			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", rs.GetName())
+			if derr := rs.Delete(context.Background()); derr != nil {
+				switch derr.(type) {
+				case *fail.ErrNotFound:
+					// missing Subnet is considered as a successful deletion, continue
+					debug.IgnoreError(derr)
+				default:
+					cleanFailure = true
+					logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(xerr), rs.GetName())
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(xerr)))
+				}
+			} else {
+				logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(xerr), rs.GetName())
+				if req.NetworkID == "" {
+					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(xerr), rn.GetName())
+					if derr := rn.Delete(context.Background()); derr != nil {
+						switch derr.(type) {
+						case *fail.ErrNotFound:
+							// missing Network is considered as a successful deletion, continue
+							debug.IgnoreError(derr)
+						default:
+							cleanFailure = true
+							logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(xerr), rn.GetName())
+							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(xerr)))
 						}
+					} else {
+						logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(xerr), rn.GetName())
 					}
 				}
 			}
 		}
 	}()
 
+	// Creates and configures hosts
+	xerr = instance.createHostResources(task, rs, *mastersDef, *nodesDef, req.InitialNodeCount, req.KeepOnFailure)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// Starting from here, exiting with error deletes hosts if req.keepOnFailure is false
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			// Disable abort signal during the clean up
+			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
 			tg, tgerr := concurrency.NewTaskGroup(task)
@@ -211,20 +223,6 @@ func (instance *Cluster) taskCreateCluster(tc concurrency.Task, params concurren
 			}
 		}
 	}()
-
-	// Create the Network and Subnet
-	rn, rs, xerr = instance.createNetworkingResources(task, req, gatewaysDef)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// Creates and configures hosts
-	xerr = instance.createHostResources(task, rs, *mastersDef, *nodesDef, req.InitialNodeCount, req.KeepOnFailure)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
 
 	// configure Cluster as a whole
 	xerr = instance.configureCluster(ctx)
@@ -752,25 +750,38 @@ func (instance *Cluster) createHostResources(
 
 	ctx := task.GetContext()
 	startedTasks := []concurrency.Task{}
+
 	defer func() {
 		if xerr != nil {
-			// Disable abort signal during the clean up
+			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
-			// VPL: not sure this is needed; in a subtask, if parent Task aborts, child is notified and
-			//      in a TaskGroup, if parent Task of the TaskGroup aborts, children are notified...
-			for _, startedTask := range startedTasks {
-				if !startedTask.Aborted() {
-					cleanErr := startedTask.Abort()
+			taskID := func(t concurrency.Task) string {
+				tid, cleanErr := t.GetID()
+				if cleanErr != nil{
+					_ = xerr.AddConsequence(cleanErr)
+					tid = "<unknown>"
+				}
+				return tid
+			}
+
+			// On error, instructs Tasks/TaskGroups to abort, to stop as soon as possible
+			for _, v := range startedTasks {
+				if !v.Aborted() {
+					cleanErr := v.Abort()
 					if cleanErr != nil {
-						logrus.Warnf("error aborting tasks spawn by createHostResources: %s", cleanErr.Error())
+						cleanErr = fail.Wrap(cleanErr, "cleaning up on failure, failed to abort Task/TaskGroup %s spawn by createHostResources()", reflect.TypeOf(v).String(), taskID(v))
+						logrus.Error(cleanErr.Error())
+						_ = xerr.AddConsequence(cleanErr)
 					}
 				}
 			}
-			// we have to wait for completion of aborted taskgroups, not get out before
-			for _, startedTask := range startedTasks {
-				_, _, werr := startedTask.WaitFor(temporal.GetLongOperationTimeout())
+
+			// we have to wait for completion of aborted Tasks/TaskGroups, not get out before
+			for _, v := range startedTasks {
+				_, _, werr := v.WaitFor(temporal.GetLongOperationTimeout())
 				if werr != nil {
+					werr = fail.Wrap(werr, "cleaning up on failure, failed to wait for %s %s", reflect.TypeOf(v).String(), taskID(v))
 					_ = xerr.AddConsequence(werr)
 				}
 			}

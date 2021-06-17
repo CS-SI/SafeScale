@@ -116,3 +116,5 @@ lib/server/iaas/userdata/version.go
 .run/
 
 .DS_Store
+
+*.pprof
