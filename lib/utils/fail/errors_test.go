@@ -590,3 +590,22 @@ func TestNotUncategorizedError(t *testing.T) {
 		t.Fail()
 	}
 }
+
+// typos adding consequences -> infinite loops
+func TestNiceLoop(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		aerr := AbortedError(fmt.Errorf("this broke my heart"))
+		_ = aerr.AddConsequence(aerr)
+
+		broken := aerr.Error() // It works until we make the call
+		_ = broken
+		return
+	}()
+	failed := waitTimeout(&wg, 1*time.Second)
+	if failed { // It never ended
+		t.FailNow()
+	}
+}
