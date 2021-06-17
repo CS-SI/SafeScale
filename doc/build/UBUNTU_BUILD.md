@@ -7,20 +7,20 @@ sudo apt-get install -y build-essential make wget unzip vim git
 sudo apt-get install -y golang
 ```
 
-## Install GO 1.14.4
+## Install GO 1.16.5
 ```
-wget https://dl.google.com/go/go1.14.4.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.14.4.linux-amd64.tar.gz
-rm ./go1.14.4.linux-amd64.tar.gz
+wget https://golang.org/dl/go1.16.5.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
+rm ./go1.16.5.linux-amd64.tar.gz
 ```
 
-## Install Protoc 3.6.1
+## Install Protoc 3.17.3
 ```
-PROTOCZIP=$(echo "protoc-3.6.1-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).zip")
-wget https://github.com/google/protobuf/releases/download/v3.6.1/$PROTOCZIP
+PROTOCZIP=$(echo "protoc-3.17.3-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).zip")
+wget https://github.com/google/protobuf/releases/download/v3.17.3/$PROTOCZIP
 sudo unzip -d /usr/local/include/protoc $PROTOCZIP
 sudo ln -s /usr/local/include/protoc/bin/protoc /usr/local/bin/
-rm -rf protoc
+rm -rf $PROTOCZIP
 unset PROTOCZIP
 ```
 
@@ -42,6 +42,7 @@ git clone https://github.com/CS-SI/SafeScale
 
 cd SafeScale
 git checkout -b develop -t origin/develop
+go mod tidy
 
 # Show help
 make
