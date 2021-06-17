@@ -56,7 +56,7 @@ feature:
         - EnableAudit=false
         - ExternalLoadBalancerHostname=
         - Hardening=true
-        - KubeVersion=1.18.5
+        - KubeVersion=1.20.7
         - OIDCClientName=default
         - OIDCGroupName=user_groups
         - OIDCRealm=
@@ -86,7 +86,7 @@ feature:
                                 [ $(sfKubectl get nodes -A | wc -l) -gt 1 ] || sfFail 194
                                 sfExit
                             fi
-                            sfFail 196
+                            sfFail 195
 
             add:
                 pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,final
@@ -730,7 +730,6 @@ feature:
                     cpx-init:
                         targets:
                             masters: all
-                        serialized: true
                         run: |
                             # Don't try to init a kubernetes cluster already running
                             [ -f /etc/kubernetes/.joined ] && sfExit
