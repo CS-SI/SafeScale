@@ -105,7 +105,7 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 			yamlKey := "feature.suitableFor.cluster"
 			if feat.Specs().IsSet(yamlKey) {
 				values := strings.Split(strings.ToLower(feat.Specs().GetString(yamlKey)), ",")
-				if values[0] == "all" || values[0] == "dcos" || values[0] == "k8s" || values[0] == "boh" || values[0] == "swarm" || values[0] == "ohpc" {
+				if values[0] == "all" || values[0] == "k8s" || values[0] == "boh" {
 					cfg := struct {
 						FeatureName    string   `json:"feature"`
 						ClusterFlavors []string `json:"available-cluster-flavors"`
