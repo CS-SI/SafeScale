@@ -93,12 +93,14 @@ func qualifyFromCode(code, details string) fail.Error {
 		return fail.InvalidRequestError("not included in VPC Targets")
 	case "9058":
 		return fail.DuplicateError("network already exist")
+	case "10010":
+		return fail.OverloadError("host quota exceeded")
 	case "10022":
-		return fail.OverloadError("VPC quota exceeded")
+		return fail.OverloadError("network/VPC quota exceeded")
 	case "10023":
 		return fail.OverloadError("internet gateway quota exceeded")
 	case "10029":
-		return fail.OverloadError("CPU quota exceeded")
+		return fail.OverloadError("cpu core quota exceeded")
 	case "10042":
 		return fail.OverloadError("memory quota exceeded")
 	}
