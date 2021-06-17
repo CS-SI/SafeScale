@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -26,7 +25,7 @@ type HostInfo struct {
 func IsSafescaledLaunched() (bool, error) {
 	cmd := "ps -ef | grep safescaled | grep -v grep"
 	proc := exec.Command("bash", "-c", cmd)
-	proc.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	proc.SysProcAttr = getSyscallAttrs()
 	out, err := proc.Output()
 	if err != nil {
 		return false, err
@@ -38,7 +37,7 @@ func IsSafescaledLaunched() (bool, error) {
 func CanBeRun(command string) (bool, error) {
 	cmd := "which " + command
 	proc := exec.Command("bash", "-c", cmd)
-	proc.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	proc.SysProcAttr = getSyscallAttrs()
 	out, err := proc.Output()
 	if err != nil {
 		return false, err
@@ -50,7 +49,7 @@ func CanBeRun(command string) (bool, error) {
 func GetTaggedOutput(command string, tag string) (string, error) {
 	fmt.Printf("%sRunning [%s]\n", tag, command)
 	proc := exec.Command("bash", "-c", command)
-	proc.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	proc.SysProcAttr = getSyscallAttrs()
 	out, err := proc.CombinedOutput()
 	if err != nil {
 		return string(out), err
