@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
  * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
@@ -340,7 +338,7 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		scfg.GatewayConfig.Port,
 	)
 	cmd := exec.Command("bash", "-c", cmdString)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.SysProcAttr = getSyscallAttrs()
 	cerr := cmd.Start()
 	if cerr != nil {
 		return nil, fail.ConvertError(cerr)
@@ -600,7 +598,7 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "reached timeout of %s", temporal.FormatDuration(timeout))
+			xerr = fail.Wrap(xerr.Cause(), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
 		default:
 		}
 
@@ -665,7 +663,7 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 
 	// Prepare command
 	scmd.cmd = exec.CommandContext(ctx, "bash", "-c", scmd.runCmdString)
-	scmd.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	scmd.cmd.SysProcAttr = getSyscallAttrs()
 
 	// Set up the outputs (std and err)
 	stdoutPipe, xerr := scmd.getStdoutPipe()
@@ -1228,7 +1226,7 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 	}()
 
 	proc := exec.Command("bash", "-c", sshCmdString)
-	proc.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	proc.SysProcAttr = getSyscallAttrs()
 	proc.Stdin = os.Stdin
 	proc.Stdout = os.Stdout
 	proc.Stderr = os.Stderr
