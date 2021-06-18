@@ -2193,7 +2193,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	// Convert and validate params
+	// Convert and validate paramsx
 	p, ok := params.(taskDeleteNodeParameters)
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
