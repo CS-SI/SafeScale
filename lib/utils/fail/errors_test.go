@@ -604,7 +604,53 @@ func TestNiceLoop(t *testing.T) {
 		_ = broken
 		return
 	}()
-	failed := waitTimeout(&wg, 1*time.Second)
+	failed := waitTimeout(&wg, 500*time.Millisecond)
+	if failed { // It never ended
+		t.FailNow()
+	}
+}
+
+// forcing causes also might be a bad idea -> infinite loops
+func TestNiceNestedLoop(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		aerr := AbortedError(NewError("it hurts"))
+		_ = aerr.ForceSetCause(aerr)
+
+		broken := aerr.Error() // It works until we make the call
+		_ = broken
+
+		broken = aerr.UnformattedError()
+		_ = broken
+
+		return
+	}()
+	failed := waitTimeout(&wg, 500*time.Millisecond)
+	if failed { // It never ended
+		t.FailNow()
+	}
+}
+
+// forcing causes also might be a bad idea -> infinite loops
+func TestNiceNestedLoopStackError(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		aerr := AbortedError(NewError("it hurts"))
+		_ = aerr.ForceSetCause(aerr)
+
+		broken := aerr.Error() // It works until we make the call
+		_ = broken
+
+		broken = aerr.UnformattedError()
+		_ = broken
+
+		return
+	}()
+	failed := waitTimeout(&wg, 1000*time.Millisecond)
 	if failed { // It never ended
 		t.FailNow()
 	}
