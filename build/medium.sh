@@ -60,7 +60,7 @@ CODE=0
 RUN=0
 CLEAN=0
 
-declare -a flavor=("k8s" "boh" "swarm")
+declare -a flavor=("k8s" "boh")
 
 for fla in "${flavor[@]}"
 do
