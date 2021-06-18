@@ -114,7 +114,6 @@ var clusterListCommand = &cli.Command{
 
 // formatClusterConfig removes unneeded entry from config
 func formatClusterConfig(config map[string]interface{}, detailed bool) map[string]interface{} {
-	delete(config, "keypair")
 	if !detailed {
 		delete(config, "admin_login")
 		delete(config, "admin_password")
@@ -125,7 +124,6 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		delete(config, "secondary_gateway_ip")
 		delete(config, "network_id")
 		delete(config, "nodes")
-		delete(config, "ssh_private_key")
 		delete(config, "last_state")
 	} else {
 		remotedesktopInstalled := true
@@ -241,11 +239,11 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 		"admin_login":      "cladm",
 		"admin_password":   c.GetIdentity().GetAdminPassword(),
 		// "keypair":        c.GetIdentity().GetSshConfig().GetPrivateKey(),
-		"ssh_private_key": c.GetIdentity().GetPrivateKey(),
+		//"ssh_private_key": c.GetIdentity().GetPrivateKey(),
 	}
 
 	if c.Composite != nil && len(c.Composite.Tenants) > 0 {
-		result["tenant"] = c.Composite.Tenants[0]
+		result["tenants"] = strings.Join(c.Composite.Tenants, ", ")
 	}
 
 	if c.Controlplane != nil {

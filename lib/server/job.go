@@ -36,6 +36,7 @@ type Job interface {
 	GetName() string
 	GetContext() context.Context
 	GetTask() concurrency.Task
+	GetTenant() string
 	GetService() iaas.Service
 	GetDuration() time.Duration
 	String() string
@@ -147,6 +148,15 @@ func (j job) GetName() string {
 	}
 
 	return j.uuid
+}
+
+// GetTenant returns the tenant to use
+func (j job) GetTenant() string {
+	if j.isNull() {
+		return ""
+	}
+
+	return j.tenant
 }
 
 // GetContext returns the context of the job (should be the same than the one of the task)

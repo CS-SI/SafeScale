@@ -108,7 +108,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.New(job.GetService())
+	instance, xerr := clusterfactory.New(job.GetService())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -118,12 +118,15 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 		return nil, xerr
 	}
 
-	xerr = rc.Create(task.GetContext(), req)
+	if req.Tenant == "" {
+		req.Tenant = job.GetTenant()
+	}
+	xerr = instance.Create(task.GetContext(), req)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return rc.ToProtocol()
+	return instance.ToProtocol()
 }
 
 // State returns the status of a cluster
@@ -160,12 +163,12 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.Load(job.GetService(), ref)
+	instance, xerr := clusterfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	st, xerr := rc.GetState()
+	st, xerr := instance.GetState()
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -207,12 +210,12 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.Load(job.GetService(), ref)
+	instance, xerr := clusterfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return rc.ToProtocol()
+	return instance.ToProtocol()
 }
 
 // Start ...
@@ -247,12 +250,12 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.Load(job.GetService(), ref)
+	instance, xerr := clusterfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return empty, rc.Start(task.GetContext())
+	return empty, instance.Start(task.GetContext())
 }
 
 // Stop shutdowns a entire cluster (including the gateways)
@@ -290,11 +293,12 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.Load(job.GetService(), ref)
+	instance, xerr := clusterfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return empty, rc.Stop(task.GetContext())
+
+	return empty, instance.Stop(task.GetContext())
 }
 
 // Delete a cluster
@@ -332,12 +336,12 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.Load(job.GetService(), ref)
+	instance, xerr := clusterfactory.Load(job.GetService(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return empty, rc.Delete(task.GetContext(), in.GetForce())
+	return empty, instance.Delete(task.GetContext(), in.GetForce())
 }
 
 // Expand adds node(s) to a cluster
@@ -384,12 +388,12 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		sizing.Image = in.GetImageId()
 	}
 
-	rc, xerr := clusterfactory.Load(job.GetService(), in.GetName())
+	instance, xerr := clusterfactory.Load(job.GetService(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	resp, xerr := rc.AddNodes(task.GetContext(), uint(in.Count), *sizing)
+	resp, xerr := instance.AddNodes(task.GetContext(), uint(in.Count), *sizing)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -506,12 +510,12 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.Load(job.GetService(), in.GetName())
+	instance, xerr := clusterfactory.Load(job.GetService(), in.GetName())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	list, xerr := rc.ListNodes(task.GetContext())
+	list, xerr := instance.ListNodes(task.GetContext())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -769,19 +773,21 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.Load(job.GetService(), clusterName)
+	instance, xerr := clusterfactory.Load(job.GetService(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	list, xerr := rc.ListMasters(task.GetContext())
+	list, xerr := instance.ListMasters(task.GetContext())
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	out, xerr := converters.IndexedListOfClusterNodesFromResourceToProtocol(list)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return out, nil
 }
 
@@ -820,18 +826,21 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.Load(job.GetService(), clusterName)
+	instance, xerr := clusterfactory.Load(job.GetService(), clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
-	master, xerr := rc.FindAvailableMaster(task.GetContext())
+
+	master, xerr := instance.FindAvailableMaster(task.GetContext())
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	out, xerr := master.ToProtocol()
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return out, nil
 }
 
@@ -875,13 +884,13 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rc, xerr := clusterfactory.Load(svc, clusterName)
+	instance, xerr := clusterfactory.Load(svc, clusterName)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	var masterID string
-	xerr = rc.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
