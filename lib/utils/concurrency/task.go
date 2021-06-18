@@ -78,14 +78,15 @@ type TaskCore interface {
 	Abort() fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
+	AppendToID(string) fail.Error    // appends string to the current Task ID
 	DisarmAbortSignal() func()
-	SetID(string) fail.Error
 	GetID() (string, fail.Error)
 	GetSignature() string
 	GetStatus() (TaskStatus, fail.Error)
 	GetContext() context.Context
 	GetLastError() (error, fail.Error)
 	GetResult() (TaskResult, fail.Error)
+	SetID(string) fail.Error
 
 	Run(TaskAction, TaskParameters) (TaskResult, fail.Error)
 	RunInSubtask(TaskAction, TaskParameters) (TaskResult, fail.Error)
@@ -120,6 +121,10 @@ type task struct {
 }
 
 var globalTask atomic.Value
+
+var (
+	InheritParentIDOption = data.NewImmutableKeyValue("inheritID", true)
+)
 
 // RootTask is the "task to rule them all"
 func RootTask() (rt Task, xerr fail.Error) {
@@ -350,6 +355,26 @@ func (t *task) SetID(id string) fail.Error {
 	}
 
 	t.id = id
+	return nil
+}
+
+// AppendToID appends string to current ID
+func (t *task) AppendToID(id string) fail.Error {
+	if t.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("id")
+	}
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.status == ABORTED {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	t.id += "+"+id
 	return nil
 }
 

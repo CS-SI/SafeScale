@@ -116,6 +116,25 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 			t, err = NewTaskWithParent(p.task)
 		}
 	}
+
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case "inheritID":
+				// this option orders to copy ParentTask.ID to children; the latter are responsible to update their own ID
+				if v.Value().(bool) {
+					id, xerr := parentTask.GetID()
+					if xerr != nil {
+						return nil, xerr
+					}
+					xerr = t.SetID(id)
+					if xerr != nil {
+						return nil, xerr
+					}
+				}
+			}
+		}
+	}
 	tg = &taskGroup{
 		task:     t.(*task),
 		children: subTasks{
@@ -216,6 +235,18 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 	if len(options) > 0 {
 		for _, v := range options {
 			switch v.Key() {
+			case "inheritID":
+				value, ok := v.Value().(bool)
+				if ok && value {
+					id, xerr := instance.task.GetID()
+					if xerr != nil {
+						return nil, xerr
+					}
+					xerr = subtask.SetID(id)
+					if xerr != nil {
+						return nil, xerr
+					}
+				}
 			case "normalizeError":
 				newChild.normalizeError = v.Value().(func(error) error)
 			default:
@@ -433,34 +464,40 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[strin
 	if err != nil {
 		return false, nil, err
 	}
-	if taskStatus != RUNNING {
-		return false, nil, fail.InvalidRequestError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
-	}
 
-	c := make(chan struct{})
-	go func() {
-		results, err = instance.WaitGroup()
-		c <- struct{}{} // done
-		close(c)
-	}()
+	switch taskStatus {
+	case READY:
+		return false, nil, fail.InconsistentError("cannot wait TaskGroup '%s': not started", tid)
+	case DONE, TIMEOUT:
+		return true, instance.result, nil
+	case RUNNING, ABORTED:
+		c := make(chan struct{})
+		go func() {
+			results, err = instance.WaitGroup()
+			c <- struct{}{} // done
+			close(c)
+		}()
 
-	if duration > 0 {
-		select {
-		case <-time.After(duration):
-			tout := fail.TimeoutError(nil, duration, fmt.Sprintf("timeout of %s waiting for task group '%s'", duration, tid))
-			abErr := instance.Abort()
-			if abErr != nil {
-				_ = tout.AddConsequence(abErr)
+		if duration > 0 {
+			select {
+			case <-time.After(duration):
+				tout := fail.TimeoutError(nil, duration, fmt.Sprintf("timeout of %s waiting for task group '%s'", duration, tid))
+				abErr := instance.Abort()
+				if abErr != nil {
+					_ = tout.AddConsequence(abErr)
+				}
+				return false, nil, tout
+			case <-c:
+				return true, results, err
 			}
-			return false, nil, tout
+		}
+
+		select { // nolint
 		case <-c:
 			return true, results, err
 		}
-	}
-
-	select { // nolint
-	case <-c:
-		return true, results, err
+	default:
+		return false, nil, fail.InvalidRequestError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 }
 
