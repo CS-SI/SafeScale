@@ -30,44 +30,44 @@ function versionchk() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,
 export -f versionchk
 
 function sfVercomp() {
-    if [[ $1 == $2 ]]; then
-        return 0
-    fi
-    local IFS=.
-    local i ver1=($1) ver2=($2)
-    # fill empty fields in ver1 with zeros
-    for ((i = ${#ver1[@]}; i < ${#ver2[@]}; i++)); do
-        ver1[i]=0
-    done
-    for ((i = 0; i < ${#ver1[@]}; i++)); do
-        if [[ -z ${ver2[i]} ]]; then
-            # fill empty fields in ver2 with zeros
-            ver2[i]=0
-        fi
-        if ((10#${ver1[i]} > 10#${ver2[i]})); then
-            return 1
-        fi
-        if ((10#${ver1[i]} < 10#${ver2[i]})); then
-            return 2
-        fi
-    done
-    return 0
+	if [[ $1 == $2 ]]; then
+		return 0
+	fi
+	local IFS=.
+	local i ver1=($1) ver2=($2)
+	# fill empty fields in ver1 with zeros
+	for ((i = ${#ver1[@]}; i < ${#ver2[@]}; i++)); do
+		ver1[i]=0
+	done
+	for ((i = 0; i < ${#ver1[@]}; i++)); do
+		if [[ -z ${ver2[i]} ]]; then
+			# fill empty fields in ver2 with zeros
+			ver2[i]=0
+		fi
+		if ((10#${ver1[i]} > 10#${ver2[i]})); then
+			return 1
+		fi
+		if ((10#${ver1[i]} < 10#${ver2[i]})); then
+			return 2
+		fi
+	done
+	return 0
 }
 export -f sfVercomp
 
 function sfTestvercomp() {
-    sfVercomp $1 $2
-    case $? in
-    0) ope='=' ;;
-    1) ope='>' ;;
-    2) ope='<' ;;
-    esac
-    if [[ $ope != $3 ]]; then
-        echo "FAIL: Expected '$3', Actual '$ope', Arg1 '$1', Arg2 '$2'"
-        return 1
-    else
-        return 0
-    fi
+	sfVercomp $1 $2
+	case $? in
+	0) ope='=' ;;
+	1) ope='>' ;;
+	2) ope='<' ;;
+	esac
+	if [[ $ope != $3 ]]; then
+		echo "FAIL: Expected '$3', Actual '$ope', Arg1 '$1', Arg2 '$2'"
+		return 1
+	else
+		return 0
+	fi
 }
 export -f sfTestvercomp
 
@@ -119,9 +119,12 @@ export -f sfWaitForApt
 # sfApt does exactly what apt does, but we call sfWaitForApt first
 function sfApt() {
 	echo "waiting for apt lock..."
+	rc=-1
 	sfWaitForApt
 	echo "running apt " "$@"
-	DEBIAN_FRONTEND=noninteractive apt "$@"
+	DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
+	[ $rc -eq -1 ] && return 1
+	return $rc
 }
 export -f sfApt
 
@@ -137,6 +140,25 @@ function sfYum() {
 	return $rc
 }
 export -f sfYum
+
+function sfAvail() {
+	rc=-1
+	case $LINUX_KIND in
+	redhat | rhel | centos | fedora)
+		if [[ -n $(which dnf) ]]; then
+			dnf list available "$@" &>/dev/null && rc=$?
+		else
+			yum list available "$@" &>/dev/null && rc=$?
+		fi
+		;;
+	debian | ubuntu)
+		DEBIAN_FRONTEND=noninteractive apt search "$@" &>/dev/null && rc=$?
+		;;
+	esac
+	[ $rc -eq -1 ] && return 1
+	return $rc
+}
+export -f sfAvail
 
 function sfWaitLockfile() {
 	local ROUNDS=600
@@ -250,7 +272,7 @@ function sfDefaultTimeout() {
 export -f sfDefaultTimeout
 
 function sfLongTimeout() {
-	echo {{ default "5m" .reserved_LongTimeout }}
+	echo {{ default "6m" .reserved_LongTimeout }}
 }
 export -f sfLongTimeout
 
@@ -839,7 +861,7 @@ function sfService() {
 	local use_systemd=$(sfGetFact "use_systemd")
 	local redhat_like=$(sfGetFact "redhat_like")
 
-    # Preventive run daemon-reload in case of changes
+	# Preventive run daemon-reload in case of changes
 	[ "$use_systemd" = "1" ] && systemctl daemon-reload
 
 	case $1 in
@@ -1073,28 +1095,28 @@ function sfDetectFacts() {
 		LINUX_KIND=${ID,,}
 		FACTS["linux_version"]=$VERSION_ID
 		VERSION_ID=$VERSION_ID
-        FULL_VERSION_ID=$VERSION_ID
+		FULL_VERSION_ID=$VERSION_ID
 		[ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux_codename"]=${VERSION_CODENAME,,}
 	else
 		if which lsb_release &>/dev/null; then
 			LINUX_KIND=$(lsb_release -is)
 			LINUX_KIND=${LINUX_KIND,,}
 			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
-            FULL_VERSION_ID=$(lsb_release -rs)
+			FULL_VERSION_ID=$(lsb_release -rs)
 		else
 			[ -f /etc/redhat-release ] && {
 				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
 				LINUX_KIND=${LINUX_KIND,,}
 				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
-                FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3)
-                case $VERSION_ID in
-                '' | *[!0-9]*)
-                    VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
-                    FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
-                    ;;
-                *) ;;
+				FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3)
+				case $VERSION_ID in
+				'' | *[!0-9]*)
+					VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
+					FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
+					;;
+				*) ;;
 
-                esac
+				esac
 			}
 		fi
 		FACTS["linux_kind"]=${LINUX_KIND,,}
@@ -1103,7 +1125,7 @@ function sfDetectFacts() {
 
 	# Some facts about system
 	case ${FACTS["linux_kind"]} in
-    redhat | rhel | centos | fedora)
+	redhat | rhel | centos | fedora)
 		FACTS["redhat_like"]=1
 		FACTS["debian_like"]=0
 		FACTS["docker_version"]=$(yum info docker-ce || true)
