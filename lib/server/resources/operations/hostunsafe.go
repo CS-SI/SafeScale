@@ -143,7 +143,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 			}
 			// If retcode == 255, ssh connection failed
 			if retcode == 255 {
-				return fail.NotAvailableError("failed to connect")
+				return fail.NotAvailableError("failed to execute command '%s': failed to connect", cmd)
 			}
 			return nil
 		},
@@ -153,7 +153,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "failed to execute command after %s", temporal.FormatDuration(timeout))
+			xerr = fail.Wrap(xerr.Cause(), "failed to execute command '%s' after '%s'", cmd, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
 			if xerr.Cause() != nil {
 				xerr = fail.ConvertError(xerr.Cause())
