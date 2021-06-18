@@ -1226,7 +1226,7 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 	}()
 
 	proc := exec.Command("bash", "-c", sshCmdString)
-	proc.SysProcAttr = getSyscallAttrs()
+	// proc.SysProcAttr = getSyscallAttrs()
 	proc.Stdin = os.Stdin
 	proc.Stdout = os.Stdout
 	proc.Stderr = os.Stderr
