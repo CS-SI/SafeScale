@@ -23,6 +23,7 @@ require (
 	github.com/gophercloud/gophercloud v0.15.0
 	github.com/gopherjs/gopherjs v0.0.0-20210202160940-bed99a852dfe // indirect
 	github.com/gregoryv/gocyclo v0.1.0
+	github.com/hexdigest/gowrap v1.1.12 // indirect
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/itchyny/gojq v0.12.4
@@ -62,10 +63,12 @@ require (
 	golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84
 	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 	golang.org/x/text v0.3.4 // indirect
+	golang.org/x/tools v0.1.3 // indirect
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.31.0
+	google.golang.org/protobuf v1.25.0
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
