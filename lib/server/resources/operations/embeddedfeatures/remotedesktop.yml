@@ -107,7 +107,7 @@ feature:
                         run: |
                             URL="https://sourceforge.net/projects/tigervnc/files/stable/1.10.1/tigervnc-1.10.1.x86_64.tar.gz/download"
                             sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || sfFail 194
-                            tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || sfFail 195
+                            tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || sfFail 195 "failed to extract tigervnc archive"
                             rm -rf ${SF_TMPDIR}/tigervnc.tgz
 
                             [ ! -d ~{{ .Username }} ] && sfFail 196 "Homedir of user {{ .Username }} not found"
