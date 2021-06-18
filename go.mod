@@ -41,7 +41,7 @@ require (
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/quasilyte/go-ruleguard/dsl v0.3.2
+	github.com/quasilyte/go-ruleguard/dsl v0.3.6
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sanity-io/litter v1.3.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
@@ -60,13 +60,12 @@ require (
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
 	golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84
-	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
+	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
 	golang.org/x/text v0.3.4 // indirect
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.31.0
-	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
