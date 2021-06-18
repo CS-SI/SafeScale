@@ -130,6 +130,7 @@ func RootTask() (rt Task, xerr fail.Error) {
 		if err != nil {
 			return nil, err
 		}
+
 		newT.id = "0"
 		globalTask.Store(newT)
 		anon = globalTask.Load()
@@ -172,6 +173,7 @@ func NewUnbreakableTask() (Task, fail.Error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// To be able to For safety, normally the cancel signal capture routine is not started in this case...
 	nt.abortDisengaged = true
 	return nt, nil
@@ -183,6 +185,7 @@ func NewTaskWithParent(parentTask Task) (Task, fail.Error) {
 	if parentTask == nil {
 		return nil, fail.InvalidParameterError("parentTask", "must not be nil")
 	}
+
 	return newTask(context.Background(), parentTask)
 }
 
@@ -355,6 +358,7 @@ func (t *task) Start(action TaskAction, params TaskParameters, options ...data.I
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
+
 	return t.StartWithTimeout(action, params, 0)
 }
 
@@ -376,6 +380,7 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 	if t.status != READY {
 		return nil, fail.NewError("cannot start task '%s': not ready", tid)
 	}
+
 	if action == nil {
 		t.status = DONE
 	} else {
@@ -603,25 +608,26 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
-		return nil, nil
+		return nil, fail.InconsistentError("cannot wait a Task that has not be started")
 	case DONE:
 		return t.result, t.err
 	case TIMEOUT:
 		return nil, t.err
-	case UNKNOWN:
-		return nil, fail.InconsistentError("cannot wait task '%s': unknown status", tid)
+	case RUNNING, ABORTED:
+		// status == ABORTED does not prevent to wait the end of the task
+		<-t.finishCh
+
+		t.mu.Lock()
+		defer t.mu.Unlock()
+
+		if t.status == ABORTED || t.status == TIMEOUT {
+			return nil, t.err
+		}
+
+		return t.result, t.err
+	default:
+		return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%d)", tid, status)
 	}
-
-	// status == ABORTED does not prevent to wait the end of the task
-	<-t.finishCh
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	if t.status == ABORTED || t.status == TIMEOUT {
-		return nil, t.err
-	}
-	return t.result, t.err
 }
 
 // TryWait tries to wait on a task
@@ -644,6 +650,8 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 	}
 
 	switch status {
+	case READY: // Waiting a ready task always succeed by design
+		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
 	case DONE:
 		t.mu.Lock()
 		defer t.mu.Unlock()
@@ -661,7 +669,7 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 		}
 		return false, nil, nil
 	default:
-		return false, nil, fail.NewError("cannot wait task '%s': not running (%d)", tid, status)
+		return false, nil, fail.NewError("cannot wait task '%s': unkown status (%d)", tid, status)
 	}
 }
 
@@ -686,6 +694,8 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 	}
 
 	switch status {
+	case READY: // Waiting a ready task always succeed by design
+		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
 	case DONE:
 		return true, t.result, t.err
 	case ABORTED:
@@ -693,11 +703,10 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 	case RUNNING:
 		// continue
 	default:
-		return false, nil, fail.NewError("cannot wait task '%s': not running (%d)", tid, status)
+		return false, nil, fail.NewError("cannot wait task '%s': unknown status (%d)", tid, status)
 	}
 
 	var result TaskResult
-
 	c := make(chan struct{})
 	go func() {
 		result, err = t.Wait()
@@ -729,6 +738,7 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 // A call of this method does not actually stop the running task if there is one; a subsequent
 // call of Wait() may still be needed, it's still the responsibility of the executed code in task to stop
 // early on Abort.
+// returns an error if abort signal send fails
 func (t *task) Abort() (err fail.Error) {
 	if t.IsNull() {
 		return fail.InvalidInstanceError()
@@ -741,8 +751,8 @@ func (t *task) Abort() (err fail.Error) {
 		return fail.NotAvailableError("abort signal is disengaged on task %s", t.id)
 	}
 
-	previousErr := t.err
-	previousStatus := t.status
+	// previousErr := t.err
+	// previousStatus := t.status
 
 	switch t.status {
 	case RUNNING:
@@ -758,7 +768,8 @@ func (t *task) Abort() (err fail.Error) {
 		// } else if t.status == DONE {
 		// 	t.status = ABORTED
 		// 	t.err = fail.AbortedError(t.err)
-	case ABORTED:
+	case ABORTED, TIMEOUT, DONE:
+		// already stopped, do nothing more
 	default:
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
@@ -766,14 +777,10 @@ func (t *task) Abort() (err fail.Error) {
 
 	logrus.Debugf("task %s aborted", t.getSignature())
 
-	if previousErr != nil && previousStatus != TIMEOUT {
-		switch previousErr.(type) {
-		case *fail.ErrAborted:
-			return previousErr
-		default:
-			return fail.AbortedError(previousErr)
-		}
-	}
+	// VPL: why this?
+	// if previousErr != nil && previousStatus != TIMEOUT && previousStatus != ABORTED {
+	// 	return fail.AbortedError(previousErr)
+	// }
 
 	return nil
 }
