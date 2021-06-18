@@ -41,6 +41,17 @@ export BUILD_TAGS
 all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
+release: logclean ground getdevdeps mod releasetags sdk generate lib mintest cli minimock err vet releasearchive
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
+
+releasetags:
+	@echo "settings go build tags for release"
+	@$(eval BUILD_TAGS = "release,$(BUILD_TAGS)")
+
+releasearchive:
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";
+	@tar -zcf safescale-$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz cli/safescale/safescale cli/safescaled/safescaled
+
 fastall: begin
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build assumes all dependencies are already there and code generation is also up to date $(NO_COLOR)\n";
 	@(cd lib && $(MAKE) all)
