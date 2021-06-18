@@ -31,7 +31,7 @@ $ export PATH=$PATH:$GOROOT/bin
 You may want to put these commands in ~/.bashrc or ~/.zshrc to keep them after logout/restart.
  
 ## Build
-```bash 
+```bash
 # Prepare directory
 $ mkdir -p ${GOPATH:-$HOME}/src/github.com/CS-SI
 
@@ -42,6 +42,8 @@ $ git clone https://github.com/CS-SI/SafeScale
 $ cd SafeScale
 $ git checkout -b develop -t origin/develop
 
+$ go mod tidy
+ 
 # Show help
 $ make
 
