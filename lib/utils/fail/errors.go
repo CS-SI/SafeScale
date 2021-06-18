@@ -55,9 +55,6 @@ type Error interface {
 
 	AnnotationFormatter(func(data.Annotations) string)
 
-	ForceSetCause(error) Error // set the cause of the error
-	TrySetCause(error) bool    // set the cause of the error if not already set
-
 	GRPCCode() codes.Code
 	ToGRPCStatus() error
 
@@ -159,32 +156,6 @@ func defaultCauseFormatter(e Error) string {
 	}
 
 	return msgFinal
-}
-
-// ForceSetCause sets the cause error even if already set
-func (e *errorCore) ForceSetCause(err error) Error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from null value", 0))
-		return ConvertError(err)
-	}
-	e.cause = err
-	return e
-}
-
-// TrySetCause sets the cause error if not already set
-// Returns true if cause has been successfully set, false if cause was already set
-func (e *errorCore) TrySetCause(err error) bool {
-	if e.IsNull() {
-		return false
-	}
-	if err == nil {
-		return e.cause == nil
-	}
-	if e.cause != nil {
-		return false
-	}
-	e.cause = err
-	return true
 }
 
 // CauseFormatter defines the func uses to format cause to string
@@ -547,6 +518,12 @@ type ErrDuplicate struct {
 // DuplicateError creates a ErrDuplicate error
 func DuplicateError(msg ...interface{}) *ErrDuplicate {
 	r := newError(nil, nil, msg...)
+	r.grpcCode = codes.AlreadyExists
+	return &ErrDuplicate{r}
+}
+
+func DuplicateErrorWithCause(cause error, msg ...interface{}) *ErrDuplicate {
+	r := newError(cause, nil, msg...)
 	r.grpcCode = codes.AlreadyExists
 	return &ErrDuplicate{r}
 }
