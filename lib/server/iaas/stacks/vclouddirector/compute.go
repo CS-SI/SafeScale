@@ -676,8 +676,7 @@ func (s *stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostF
 	if err != nil {
 		vapp, err = vdc.FindVAppByName(hostRef)
 		if err != nil {
-			xerr = fail.NotFoundError("error inspecting host")
-			xerr.ForceSetCause(normalizeError(err))
+			xerr = fail.NotFoundErrorWithCause(normalizeError(err), "error inspecting host")
 			return ahf, xerr
 		}
 	}
