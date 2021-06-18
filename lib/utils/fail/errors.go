@@ -335,7 +335,7 @@ func (e errorCore) ToGRPCStatus() error {
 
 func (e *errorCore) prependToMessage(msg string) {
 	if e.IsNull() {
-		logrus.Errorf("invalid call of errorCore.updateMessage() from null instance")
+		logrus.Errorf("invalid call of errorCore.prependToMessage() from null instance")
 		return
 	}
 	e.message = msg + ": " + e.message
