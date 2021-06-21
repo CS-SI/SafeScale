@@ -105,14 +105,9 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	}
 	defer job.Close()
 
-	task := job.GetTask()
-	id, xerr := task.GetID()
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	// Propagate task id to the context
-	ctx = context.WithValue(task.GetContext(), concurrency.KeyForTaskInContext, id)
+	task := job.GetTask()
+	ctx = context.WithValue(task.GetContext(), concurrency.KeyForTaskInContext, task)
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()

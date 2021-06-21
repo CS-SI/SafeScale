@@ -155,7 +155,9 @@ func VoidTask() (Task, fail.Error) {
 // user-defined type to use as key in context.WithValue()
 type taskContextKey = string
 
-const KeyForTaskInContext taskContextKey = "task"
+const (
+	KeyForTaskInContext taskContextKey = "task"
+)
 
 // TaskFromContext extracts the task instance from context
 func TaskFromContext(ctx context.Context) (Task, fail.Error) {
