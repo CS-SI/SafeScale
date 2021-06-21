@@ -31,6 +31,8 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gojuno/minimock/v3 v3.0.9
 	github.com/golang/protobuf v1.5.2
+	github.com/golangci/errcheck v0.0.0-20181223084120-ef45e06d44b6 // indirect
+	github.com/golangci/ineffassign v0.0.0-20190609212857-42439a7714cc // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/rpmpack v0.0.0-20210518075352-dc539ef4f2ea // indirect
 	github.com/gophercloud/gophercloud v0.15.0
@@ -42,7 +44,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.0 // indirect
 	github.com/hashicorp/go-version v1.3.0 // indirect
-	github.com/hexdigest/gowrap v1.1.12 // indirect
+	github.com/hexdigest/gowrap v1.2.0 // indirect
 	github.com/itchyny/gojq v0.12.4
 	github.com/jcelliott/lumber v0.0.0-20160324203708-dd349441af25 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -67,6 +69,7 @@ require (
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
 	github.com/securego/gosec/v2 v2.8.1 // indirect
 	github.com/sethvargo/go-password v0.1.1
+	github.com/shirou/gopsutil v0.0.0-20190901111213-e4ec7b275ada // indirect
 	github.com/sirupsen/logrus v1.8.1
 	github.com/smartystreets/assertions v1.2.0 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
@@ -75,6 +78,7 @@ require (
 	github.com/spf13/viper v1.8.0
 	github.com/stretchr/objx v0.3.0 // indirect
 	github.com/stretchr/testify v1.7.0
+	github.com/tomarrell/wrapcheck v0.0.0-20200807122107-df9e8bcb914d // indirect
 	github.com/tomarrell/wrapcheck/v2 v2.2.0 // indirect
 	github.com/urfave/cli/v2 v2.1.1
 	github.com/vmware/go-vcloud-director v2.0.0+incompatible
