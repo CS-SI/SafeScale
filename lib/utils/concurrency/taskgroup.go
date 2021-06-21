@@ -203,6 +203,15 @@ func (instance *taskGroup) SetID(id string) fail.Error {
 	return instance.task.SetID(id)
 }
 
+// AppendTOID ...
+func (instance *taskGroup) AppendToID(id string) fail.Error {
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	return instance.task.AppendToID(id)
+}
+
 // StartInSubtask starts an action in a subtask
 func (instance *taskGroup) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if instance.isNull() {
@@ -355,7 +364,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 				}
 			}
 
-			if /*stop || */ doneWaitCount >= doneWaitSize {
+			if doneWaitCount >= doneWaitSize {
 				break
 			}
 

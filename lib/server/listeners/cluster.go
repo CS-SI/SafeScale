@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -105,6 +106,14 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	defer job.Close()
 
 	task := job.GetTask()
+	id, xerr := task.GetID()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// Propagate task id to the context
+	ctx = context.WithValue(task.GetContext(), concurrency.KeyForTaskInContext, id)
+
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.cluster"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -122,7 +131,8 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	if req.Tenant == "" {
 		req.Tenant = job.GetTenant()
 	}
-	xerr = instance.Create(task.GetContext(), req)
+
+	xerr = instance.Create(ctx, req)
 	if xerr != nil {
 		return nil, xerr
 	}

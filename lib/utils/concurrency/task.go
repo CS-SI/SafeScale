@@ -161,7 +161,7 @@ const KeyForTaskInContext taskContextKey = "task"
 func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	if ctx != nil {
 		if ctxValue := ctx.Value(KeyForTaskInContext); ctxValue != nil {
-			if task, ok := ctxValue.(*task); ok {
+			if task, ok := ctxValue.(Task); ok {
 				return task, nil
 			}
 			return nil, fail.InconsistentError("context value for 'task' is not a 'concurrency.Task'")

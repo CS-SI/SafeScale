@@ -65,7 +65,7 @@ type Subnet struct {
 	GWSecurityGroupID       string           `json:"gw_security_group_id,omitempty"`       // Contains the ID of the Security Group for external access of gateways in Subnet
 	PublicIPSecurityGroupID string           `json:"publicip_security_group_id,omitempty"` // contains the ID of the Security Group for hosts with public IP in Subnet
 	InternalSecurityGroupID string           `json:"internal_security_group_id,omitempty"` // contains the ID of the security group for internal access of hosts
-	DefaultSSHPort          uint32           `json:"default_ssh_port,omitempty"`           // contains the port to use for SSH by default on hosts in the Subnet
+	DefaultSSHPort          uint32           `json:"default_ssh_port,omitempty"`           // contains the port to use for SSH by default on gateways in the Subnet
 	SingleHostCIDRIndex     uint             `json:"single_host_cidr_index,omitempty"`     // if > 0, contains the index of the CIDR in the single Host Network
 }
 
