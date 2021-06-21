@@ -60,7 +60,7 @@ func (s *ClusterListener) List(ctx context.Context, in *protocol.Reference) (hl 
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "cluster list")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/clusters/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -816,7 +816,7 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 		return nil, fail.InvalidRequestError("cluster name is missing")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/masters/available", clusterName))
+	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/cluster/%s/master/available", clusterName))
 	if err != nil {
 		return nil, err
 	}

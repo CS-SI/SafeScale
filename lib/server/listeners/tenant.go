@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/metadataupgrade"
 	"github.com/asaskevich/govalidator"
@@ -151,13 +152,13 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "tenant metadata delete")
+	name := in.GetName()
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("tenant/%s/metadata/delete", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	name := in.GetName()
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -190,8 +191,7 @@ func (s *TenantListener) Scan(ctx context.Context, in *protocol.TenantScanReques
 	}
 
 	name := in.GetName()
-
-	job, xerr := PrepareJob(ctx, name, "tenant scan")
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/tenant/%s/scan", name))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -228,13 +228,13 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, "", "tenant inspect")
+	name := in.GetName()
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/tenant/%s/inspect", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	name := in.GetName()
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -262,14 +262,14 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJobWithoutService(ctx, "tenant metadata upgrade")
+	name := in.GetName()
+	job, xerr := PrepareJobWithoutService(ctx, fmt.Sprintf("/tenant/%s/metadata/upgrade", name))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	name := in.GetName()
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.tenant"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())

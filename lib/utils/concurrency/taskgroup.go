@@ -120,13 +120,15 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 	if len(options) > 0 {
 		for _, v := range options {
 			switch v.Key() {
-			case "inheritID":
+			case keywordInheritParentIDOption:
 				// this option orders to copy ParentTask.ID to children; the latter are responsible to update their own ID
-				if v.Value().(bool) {
+				value, ok := v.Value().(bool)
+				if ok && value && parentTask != nil {
 					id, xerr := parentTask.GetID()
 					if xerr != nil {
 						return nil, xerr
 					}
+
 					xerr = t.SetID(id)
 					if xerr != nil {
 						return nil, xerr
@@ -235,7 +237,7 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 	if len(options) > 0 {
 		for _, v := range options {
 			switch v.Key() {
-			case "inheritID":
+			case keywordInheritParentIDOption:
 				value, ok := v.Value().(bool)
 				if ok && value {
 					id, xerr := instance.task.GetID()
@@ -247,7 +249,7 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 						return nil, xerr
 					}
 				}
-			case "normalizeError":
+			case "normalize_error":
 				newChild.normalizeError = v.Value().(func(error) error)
 			default:
 			}

@@ -74,7 +74,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, fail.InvalidParameterError("in.Network", "must contain an ID or a Name")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("subnet create '%s'", networkRef))
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/subnet/%s/create", networkRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -158,7 +158,7 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network list")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "/subnets/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -229,7 +229,7 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet inspect")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/inspect", networkRef, subnetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -279,7 +279,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet delete")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/delete", networkRef, subnetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -355,7 +355,7 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group bind")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/bind", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -428,7 +428,7 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group unbind")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/unbind", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -497,7 +497,7 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group enable")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/enable", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -558,7 +558,7 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group disable")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/disable", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -612,7 +612,7 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group list")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("network/%s/subnet/%s/securitygroups/list", networkRef, subnetRef))
 	if xerr != nil {
 		return nil, xerr
 	}

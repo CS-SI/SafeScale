@@ -18,7 +18,9 @@ package listeners
 
 import (
 	"context"
+	"fmt"
 
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -60,7 +62,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "bucket list")
+	job, xerr := PrepareJob(ctx, "", "/buckets/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -102,13 +104,13 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "bucket create")
+	bucketName := in.GetName()
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/create", bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	bucketName := in.GetName()
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -144,13 +146,13 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "bucket list")
+	bucketName := in.GetName()
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/delete", bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	bucketName := in.GetName()
 	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -185,13 +187,13 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "bucket inspect")
+	bucketName := in.GetName()
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/inspect", bucketName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	bucketName := in.GetName()
 	task := job.GetTask()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -232,20 +234,20 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "bucket mount")
+	bucketName := in.GetBucket()
+	hostRef, _ := srvutils.GetReference(in.GetHost())
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/host/%s/mount", bucketName, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	bucketName := in.GetBucket()
-	hostName := in.GetHost().Name
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	if xerr = handler.Mount(bucketName, hostName, in.GetPath()); xerr != nil {
+	if xerr = handler.Mount(bucketName, hostRef, in.GetPath()); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil
@@ -274,20 +276,20 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, "", "bucket unmount")
+	bucketName := in.GetBucket()
+	hostRef, _ := srvutils.GetReference(in.GetHost())
+	job, xerr := PrepareJob(ctx, "", fmt.Sprintf("/bucket/%s/host/%s/unmount", bucketName, hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	bucketName := in.GetBucket()
-	hostName := in.GetHost().Name
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.bucket"), "('%s', '%s')", bucketName, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	if xerr = handler.Unmount(bucketName, hostName); xerr != nil {
+	if xerr = handler.Unmount(bucketName, hostRef); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil

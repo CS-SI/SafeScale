@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -95,7 +96,7 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host start")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/start", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -142,7 +143,7 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host stop")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/stop", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -188,7 +189,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host reboot")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host%s/reboot", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -229,7 +230,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host list")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/hosts/list")
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -277,14 +278,14 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host create")
+	name := in.GetName()
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 	task := job.GetTask()
 
-	name := in.GetName()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -407,14 +408,14 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host resize")
+	name := in.GetName()
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/resize", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 	task := job.GetTask()
 
-	name := in.GetName()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
@@ -488,7 +489,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		return nil, fail.InvalidRequestError("neither name nor id given as reference").ToGRPCStatus()
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "host state")
+	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/state", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -543,7 +544,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host inspect")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -593,7 +594,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "host delete")
+	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/delete", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -642,7 +643,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host ssh")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/sshconfig", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -687,12 +688,13 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Host")
 	}
+
 	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host security-group bind")
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/bind", hostRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -759,7 +761,7 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host unbind-security-group")
+	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/unbind", hostRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -819,7 +821,7 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "host security-group enable")
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/enable", hostRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -879,7 +881,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "host security-group enable")
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/disable", hostRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -954,7 +956,7 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "host security-group list")
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroups/list", hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
