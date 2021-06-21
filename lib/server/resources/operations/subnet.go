@@ -1904,11 +1904,12 @@ func (instance *Subnet) unbindSecurityGroups(ctx context.Context, sgs *propertie
 			default:
 				return xerr
 			}
+		} else {
+			//goland:noinspection ALL
+			defer func(sgInstance resources.SecurityGroup) {
+				sgInstance.Released()
+			}(rsg)
 		}
-		//goland:noinspection ALL
-		defer func(sgInstance resources.SecurityGroup) {
-			sgInstance.Released()
-		}(rsg)
 
 		if rsg != nil {
 			xerr = rsg.UnbindFromSubnet(ctx, instance)

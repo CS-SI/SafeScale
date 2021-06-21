@@ -89,10 +89,10 @@ type TaskCore interface {
 	SetID(string) fail.Error
 
 	Run(TaskAction, TaskParameters) (TaskResult, fail.Error)
-	RunInSubtask(TaskAction, TaskParameters) (TaskResult, fail.Error)
-	Start(TaskAction, TaskParameters, ...data.ImmutableKeyValue) (Task, fail.Error)
-	StartWithTimeout(TaskAction, TaskParameters, time.Duration, ...data.ImmutableKeyValue) (Task, fail.Error)
-	StartInSubtask(TaskAction, TaskParameters, ...data.ImmutableKeyValue) (Task, fail.Error)
+	RunInSubtask(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error)
+	Start(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error)
+	StartWithTimeout(fn TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error)
+	StartInSubtask(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error)
 }
 
 // Task is the interface of a task running in goroutine, allowing to identity (indirectly) goroutines
@@ -120,10 +120,14 @@ type task struct {
 	abortDisengaged bool
 }
 
-var globalTask atomic.Value
+const (
+	// keywordInheritParentIDOption is the string to use to make task inherit the ID ofr the parent task
+	keywordInheritParentIDOption = "inherit_parent_id"
+)
 
 var (
-	InheritParentIDOption = data.NewImmutableKeyValue("inheritID", true)
+	globalTask atomic.Value
+	InheritParentIDOption = data.NewImmutableKeyValue(keywordInheritParentIDOption, true)
 )
 
 // RootTask is the "task to rule them all"
@@ -167,7 +171,7 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	return VoidTask()
 }
 
-// NewTask ...
+// NewTask creates a new instance of Task
 func NewTask() (Task, fail.Error) {
 	return newTask(context.Background(), nil)
 }
@@ -186,25 +190,25 @@ func NewUnbreakableTask() (Task, fail.Error) {
 
 // NewTaskWithParent creates a subtask
 // Such a task can be aborted if the parent one can be
-func NewTaskWithParent(parentTask Task) (Task, fail.Error) {
+func NewTaskWithParent(parentTask Task, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if parentTask == nil {
 		return nil, fail.InvalidParameterError("parentTask", "must not be nil")
 	}
 
-	return newTask(context.Background(), parentTask)
+	return newTask(context.Background(), parentTask, options...)
 }
 
-// NewTaskWithContext ...
-func NewTaskWithContext(ctx context.Context /*, parentTask Task*/) (Task, fail.Error) {
+// NewTaskWithContext creates an intance of Task with context
+func NewTaskWithContext(ctx context.Context) (Task, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	return newTask(ctx, nil /*parentTask*/)
+	return newTask(ctx, nil)
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
-func newTask(ctx context.Context, parentTask Task) (nt *task, xerr fail.Error) {
+func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyValue) (nt *task, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	var (
 		childContext context.Context
@@ -224,25 +228,44 @@ func newTask(ctx context.Context, parentTask Task) (nt *task, xerr fail.Error) {
 	} else {
 		childContext, cancel = context.WithCancel(parentTask.(*task).ctx)
 	}
-	t := task{
-		// ctx:      childContext,
+	t := &task{
 		cancel:   cancel,
 		status:   READY,
 		abortCh:  make(chan bool, 1),
 		doneCh:   make(chan bool, 1),
 		finishCh: make(chan struct{}, 1),
-		//		subtasks: make(map[string]Task),
 	}
 
-	u, err := uuid.NewV4()
-	if err != nil {
-		return nil, fail.Wrap(err, "failed to create a new task")
+	generateID := true
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case keywordInheritParentIDOption:
+				value, ok := v.Value().(bool)
+				if ok && value && parentTask != nil {
+					generateID = false
+					id, xerr := parentTask.GetID()
+					if xerr != nil {
+						return nil, xerr
+					}
+					t.id = id
+				}
+			}
+		}
 	}
 
-	t.id = u.String()
-	t.ctx = context.WithValue(childContext, KeyForTaskInContext, &t)
+	if generateID {
+		u, err := uuid.NewV4()
+		if err != nil {
+			return nil, fail.Wrap(err, "failed to create a new task")
+		}
 
-	return &t, nil
+		t.id = u.String()
+	}
+
+	t.ctx = context.WithValue(childContext, KeyForTaskInContext, t)
+
+	return t, nil
 }
 
 // IsNull ...
@@ -384,7 +407,7 @@ func (t *task) Start(action TaskAction, params TaskParameters, options ...data.I
 		return nil, fail.InvalidInstanceError()
 	}
 
-	return t.StartWithTimeout(action, params, 0)
+	return t.StartWithTimeout(action, params, 0, options...)
 }
 
 // StartWithTimeout runs in goroutine the TaskAction with TaskParameters, and stops after timeout (if > 0)
@@ -426,7 +449,7 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters, options 
 		return nil, fail.InvalidInstanceError()
 	}
 
-	st, xerr := NewTaskWithParent(t)
+	st, xerr := NewTaskWithParent(t, options...)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -434,7 +457,7 @@ func (t *task) StartInSubtask(action TaskAction, params TaskParameters, options 
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	return st.Start(action, params)
+	return st.Start(action, params, options...)
 }
 
 // controller controls the start, termination and possibly abortion of the action
@@ -590,16 +613,16 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, fail.E
 		return nil, fail.InvalidInstanceError()
 	}
 
-	stask, err := t.Start(action, params)
+	_, err := t.Start(action, params)
 	if err != nil {
 		return nil, err
 	}
 
-	return stask.Wait()
+	return t.Wait()
 }
 
 // RunInSubtask starts a subtask, waits its completion then return the error code
-func (t *task) RunInSubtask(action TaskAction, params TaskParameters) (TaskResult, fail.Error) {
+func (t *task) RunInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -607,7 +630,7 @@ func (t *task) RunInSubtask(action TaskAction, params TaskParameters) (TaskResul
 		return nil, fail.InvalidParameterCannotBeNilError("action")
 	}
 
-	st, xerr := NewTaskWithParent(t)
+	st, xerr := NewTaskWithParent(t, options...)
 	if xerr != nil {
 		return nil, xerr
 	}

@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	networkfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/network"
@@ -56,7 +57,7 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, "", "security-group list")
+	job, err := PrepareJob(ctx, "", "/securitygroups/list")
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +101,9 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "security-group create")
+	name := in.GetName()
+	networkRef, _ := srvutils.GetReference(in.GetNetwork())
+	job, err := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/securitygroup/%s/create", networkRef, name))
 	if err != nil {
 		return nil, err
 	}
@@ -108,12 +111,10 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 	task := job.GetTask()
 	svc := job.GetService()
 
-	name := in.GetName()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkRef, _ := srvutils.GetReference(in.GetNetwork())
 	rn, xerr := networkfactory.Load(svc, networkRef)
 	if xerr != nil {
 		return nil, xerr
@@ -160,12 +161,13 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 		}
 	}
 
+	// FIXME: networkRef is missing to locate security group if name is provided
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group clear")
+	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/clear", ref))
 	if err != nil {
 		return empty, err
 	}
@@ -218,7 +220,7 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group reset")
+	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/reset", ref))
 	if err != nil {
 		return empty, err
 	}
@@ -265,12 +267,13 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 		}
 	}
 
+	// FIXME: networkRef missing if security group is provided by name
 	ref, refLabel := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group inspect")
+	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/inspect", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -312,23 +315,24 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 		}
 	}
 
-	ref, refLabel := srvutils.GetReference(in.GetGroup())
-	if ref == "" {
+	// FIXME: networkRef missing if security group is provided by name
+	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
+	if sgRef == "" {
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), "security-group delete")
+	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/delete", sgRef))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.GetService(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -338,7 +342,7 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 		return empty, xerr
 	}
 
-	tracer.Trace("Security Group %s successfully deleted.", refLabel)
+	tracer.Trace("Security Group %s successfully deleted.", sgRefLabel)
 	return empty, nil
 }
 
@@ -364,8 +368,8 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 		}
 	}
 
-	ref, refLabel := srvutils.GetReference(in.Group)
-	if ref == "" {
+	sgRef, sgRefLabel := srvutils.GetReference(in.Group)
+	if sgRef == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
@@ -374,18 +378,18 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 		return nil, xerr
 	}
 
-	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), "security-group add-rule")
+	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/rule/add", sgRef))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 	task := job.GetTask()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.GetService(), sgRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -395,7 +399,7 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 		return nil, xerr
 	}
 
-	tracer.Trace("Rule successfully added to security group %s", refLabel)
+	tracer.Trace("Rule successfully added to security group %s", sgRefLabel)
 	return rsg.ToProtocol()
 }
 
@@ -431,7 +435,7 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 		return nil, xerr
 	}
 
-	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), "security-group delete-rule")
+	job, err := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/securitygroup/%s/rule/delete", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -483,7 +487,7 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "security-group sanitize")
+	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/securitygroup/%s/sanitize", ref))
 	if err != nil {
 		return nil, err
 	}
@@ -536,7 +540,7 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 		return nil, fail.InvalidRequestError("invalid value '%s' in field 'Kind'", in.GetKind())
 	}
 
-	job, err := PrepareJob(ctx, in.GetTarget().GetTenantId(), "security-group delete-rule")
+	job, err := PrepareJob(ctx, in.GetTarget().GetTenantId(), fmt.Sprintf("/securitygroup/%s/bonds/list", ref))
 	if err != nil {
 		return nil, err
 	}
