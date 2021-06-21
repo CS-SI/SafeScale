@@ -1740,7 +1740,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
-	xerr = task.AppendToID(fmt.Sprintf("/host/%d/configure", p.Host.GetName()))
+	xerr = task.AppendToID(fmt.Sprintf("/host/%s/configure", p.Host.GetName()))
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
