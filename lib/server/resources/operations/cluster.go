@@ -1217,19 +1217,14 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		return nil, fail.InvalidParameterError("count", "must be an int > 0")
 	}
 
-	tgo, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if tgo.Aborted() {
+	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	task, err := concurrency.NewTaskGroupWithParent(tgo)
-	if err != nil {
-		return nil, err
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", count)
@@ -1294,8 +1289,19 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			}
 		}
 	}()
+
+	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	xerr = tg.AppendToID("/expand")
+	if xerr != nil {
+		return nil, xerr
+	}
+	
 	for i := uint(0); i < count; i++ {
-		_, xerr := task.StartInSubtask(instance.taskCreateNode, taskCreateNodeParameters{
+		_, xerr := tg.StartInSubtask(instance.taskCreateNode, taskCreateNodeParameters{
 			index:         i + 1,
 			nodeDef:       nodeDef,
 			timeout:       timeout,
@@ -1306,7 +1312,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			return nil, xerr
 		}
 	}
-	res, err := task.WaitGroup()
+	res, err := tg.WaitGroup()
 	if res != nil {
 		for _, v := range res {
 			if aHost, ok := v.(resources.Host); ok {

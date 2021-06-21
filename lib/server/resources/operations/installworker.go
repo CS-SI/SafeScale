@@ -634,7 +634,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.InvalidParameterCannotBeNilError("params[variables]")
 	}
 
-	xerr = task.AppendToID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action), strings.ToLower(w.target.TargetType()), p.stepName))
+	xerr = task.AppendToID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action.String()), strings.ToLower(w.target.TargetType().String()), p.stepName))
 	if xerr != nil {
 		return nil, xerr
 	}
