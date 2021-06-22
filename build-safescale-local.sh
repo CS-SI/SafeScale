@@ -2,7 +2,8 @@
 
 echo "Checks..."
 if [[ ! -v BUILD_ENV ]]; then
-    echo "BUILD_ENV is not set, this script is intended to run inside a docker container" && exit 1
+    echo "BUILD_ENV is not set, this script is intended to run inside a docker container"
+    [[ $SHLVL -gt 2 ]] && return 1 || exit 1
 fi
 
 # ----------------------
@@ -23,7 +24,7 @@ sed -i "s#\(.*\)develop#\1${BRANCH_NAME}#" common.mk
 echo "mod"
 make mod
 
-echo "All"
+echo "Make All"
 make all
 [ $? -ne 0 ] && echo "Build failure" && exit 1
 
