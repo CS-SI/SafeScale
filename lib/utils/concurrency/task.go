@@ -78,7 +78,7 @@ type TaskCore interface {
 	Abort() fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
-	AppendToID(string) fail.Error    // appends string to the current Task ID
+	AppendToID(string) fail.Error // appends string to the current Task ID
 	DisarmAbortSignal() func()
 	GetID() (string, fail.Error)
 	GetSignature() string
@@ -126,7 +126,7 @@ const (
 )
 
 var (
-	globalTask atomic.Value
+	globalTask            atomic.Value
 	InheritParentIDOption = data.NewImmutableKeyValue(keywordInheritParentIDOption, true)
 )
 
@@ -399,7 +399,7 @@ func (t *task) AppendToID(id string) fail.Error {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	t.id += "+"+id
+	t.id += "+" + id
 	return nil
 }
 
@@ -439,7 +439,10 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 		t.abortCh = make(chan bool, 1)
 		t.finishCh = make(chan struct{}, 1)
 		go func() {
-			_ = t.controller(action, params, timeout)
+			ctrlErr := t.controller(action, params, timeout)
+			if ctrlErr != nil {
+				logrus.Warningf("unexpected error running the controller: %s", ctrlErr) // TBR
+			}
 		}()
 	}
 	return t, nil
@@ -660,8 +663,14 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 	case READY: // Waiting a ready task always succeed by design
 		return nil, fail.InconsistentError("cannot wait a Task that has not be started")
 	case DONE:
+		t.mu.Lock()
+		defer t.mu.Unlock()
+
 		return t.result, t.err
 	case TIMEOUT:
+		t.mu.Lock()
+		defer t.mu.Unlock()
+
 		return nil, t.err
 	case RUNNING, ABORTED:
 		// status == ABORTED does not prevent to wait the end of the task
@@ -713,8 +722,8 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 	case RUNNING:
 		if len(t.finishCh) == 1 {
 			_, err := t.Wait()
-			//	t.mu.Lock()
-			//	defer t.mu.Unlock()
+			t.mu.Lock()
+			defer t.mu.Unlock()
 			return true, t.result, err
 		}
 		return false, nil, nil
@@ -747,8 +756,12 @@ func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
 	case READY: // Waiting a ready task always succeed by design
 		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
 	case DONE:
+		t.mu.Lock()
+		defer t.mu.Unlock()
 		return true, t.result, t.err
 	case ABORTED:
+		t.mu.Lock()
+		defer t.mu.Unlock()
 		return true, nil, t.err
 	case RUNNING:
 		// continue
@@ -806,7 +819,7 @@ func (t *task) Abort() (err fail.Error) {
 
 	switch t.status {
 	case RUNNING:
-		// Tell controller to stop go routine
+		// Tell controller to stop goroutine
 		t.abortCh <- true
 		close(t.abortCh)
 
