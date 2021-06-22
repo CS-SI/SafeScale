@@ -59,7 +59,6 @@ func TestRealCharge(t *testing.T) {
 	}
 
 	res, err := overlord.Wait()
-	require.NotNil(t, err)
 	require.NotEmpty(t, res)
 }
 

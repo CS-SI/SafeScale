@@ -41,6 +41,10 @@ export BUILD_TAGS
 all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
+allcover: all
+	@(cd cli/safescale && $(MAKE) $(@))
+	@(cd cli/safescaled && $(MAKE) $(@))
+
 release: logclean ground getdevdeps mod releasetags sdk generate lib mintest cli minimock err vet releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
 
@@ -156,8 +160,8 @@ ifneq ($(STRICT),1)
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null && $(GO) install github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null; \
 	fi
 	@$(WHICH) minimock > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) get $(MINIMOCK)@v3.0.8 &>/dev/null || true; \
-		$(GO) install $(MINIMOCK)@v3.0.8 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) get $(MINIMOCK)@v3.0.9 &>/dev/null || true; \
+		$(GO) install $(MINIMOCK)@v3.0.9 &>/dev/null || true; \
 	fi
 	@$(WHICH) errcheck > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get $(ERRCHECK)@v1.6.0 &>/dev/null || true; \
@@ -204,7 +208,7 @@ else
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null && $(GO) install github.com/golang/protobuf/protoc-gen-go &>/dev/null; \
 	fi
 	@$(WHICH) minimock > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) get $(MINIMOCK)@v3.0.8 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) get $(MINIMOCK)@v3.0.9 &>/dev/null || true; \
 		$(GO) install $(MINIMOCK) &>/dev/null || true; \
 	fi
 	@$(WHICH) errcheck > /dev/null; if [ $$? -ne 0 ]; then \
@@ -323,7 +327,6 @@ semgrep: begin generate
 	@if [ -s ./semgrep_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) semgrep FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
 minimock: begin generate
-	@$(GO) get -u github.com/gojuno/minimock/v3/cmd/minimock > /dev/null || true
 	@$(GO) generate -run minimock ./... > /dev/null 2>&1 | $(TEE) -a generation_results.log
 
 metalint: begin generate
