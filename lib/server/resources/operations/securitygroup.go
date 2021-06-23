@@ -437,7 +437,12 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			hostInstance, xerr := LoadHost(svc, v.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				break
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					continue
+				default:
+					break
+				}
 			}
 
 			//goland:noinspection ALL
@@ -452,10 +457,12 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			}
 		}
 
-		_, xerr = tg.WaitGroup()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
+		if count, xerr := tg.GetStarted(); xerr == nil && count > 0 {
+			_, xerr = tg.WaitGroup()
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
 		}
 
 		if count, xerr := tg.GetStarted(); xerr == nil && count > 0 {
