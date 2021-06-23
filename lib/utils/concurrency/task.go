@@ -661,19 +661,21 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
-		return nil, fail.InconsistentError("cannot wait a Task that has not be started")
+		return nil, fail.InconsistentError("cannot wait a Task that has not been started")
+
 	case DONE:
 		t.mu.Lock()
 		defer t.mu.Unlock()
 
 		return t.result, t.err
+
 	case TIMEOUT:
 		t.mu.Lock()
 		defer t.mu.Unlock()
 
 		return nil, t.err
+
 	case RUNNING, ABORTED:
-		// status == ABORTED does not prevent to wait the end of the task
 		<-t.finishCh
 
 		t.mu.Lock()
@@ -684,6 +686,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 		}
 
 		return t.result, t.err
+
 	default:
 		return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%d)", tid, status)
 	}
@@ -814,9 +817,6 @@ func (t *task) Abort() (err fail.Error) {
 		return fail.NotAvailableError("abort signal is disengaged on task %s", t.id)
 	}
 
-	// previousErr := t.err
-	// previousStatus := t.status
-
 	switch t.status {
 	case RUNNING:
 		// Tell controller to stop goroutine
@@ -828,9 +828,6 @@ func (t *task) Abort() (err fail.Error) {
 
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
-		// } else if t.status == DONE {
-		// 	t.status = ABORTED
-		// 	t.err = fail.AbortedError(t.err)
 	case ABORTED, TIMEOUT, DONE:
 		// already stopped, do nothing more
 	default:
@@ -838,7 +835,7 @@ func (t *task) Abort() (err fail.Error) {
 		t.err = fail.AbortedError(t.err)
 	}
 
-	logrus.Debugf("task %s aborted", t.getSignature())
+	// logrus.Debugf("task %s aborted", t.getSignature())
 
 	// VPL: why this?
 	// if previousErr != nil && previousStatus != TIMEOUT && previousStatus != ABORTED {
