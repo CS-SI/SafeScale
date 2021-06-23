@@ -338,9 +338,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	case READY:
 		return nil, fail.InconsistentError("cannot wait a TaskGroup that has not been started")
 
-	case ABORTED:
-		fallthrough
-	case RUNNING:
+	case RUNNING, ABORTED:
 		doneWaitSize := len(instance.children.tasks)
 		doneWaitStates := make(map[int]bool, doneWaitSize)
 		for k := range instance.children.tasks {
@@ -453,6 +451,8 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		instance.task.mu.Unlock()
 
 		instance.result = results
+		instance.task.mu.Lock()
+		defer instance.task.mu.Unlock()
 		return results, instance.task.err
 
 	default:
