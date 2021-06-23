@@ -2484,6 +2484,14 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 				}
 			}
 		}
+	}
+	if masterCount+nodeCount > 0 {
+		_, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			cleaningErrors = append(cleaningErrors, xerr)
+		}
+	}
 
 		_, xerr = tg.WaitGroup()
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2528,7 +2536,6 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 				break
 			}
 		}
-
 		_, xerr = tg.WaitGroup()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
