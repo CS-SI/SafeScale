@@ -2493,10 +2493,12 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			}
 		}
 	}
-	_, xerr = tg.WaitGroup()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		cleaningErrors = append(cleaningErrors, xerr)
+	if masterCount+nodeCount > 0 {
+		_, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			cleaningErrors = append(cleaningErrors, xerr)
+		}
 	}
 
 	if len(cleaningErrors) > 0 {
@@ -2536,15 +2538,14 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 				break
 			}
 		}
-	}
-
-	_, xerr = tg.WaitGroup()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		cleaningErrors = append(cleaningErrors, xerr)
-	}
-	if len(cleaningErrors) > 0 {
-		return fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
+		_, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			cleaningErrors = append(cleaningErrors, xerr)
+		}
+		if len(cleaningErrors) > 0 {
+			return fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
+		}
 	}
 
 	// --- Deletes the Network, Subnet and gateway ---
