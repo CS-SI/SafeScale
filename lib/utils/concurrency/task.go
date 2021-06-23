@@ -704,9 +704,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 		return nil, t.err
 
-	case ABORTED:
-		fallthrough
-	case RUNNING:
+	case RUNNING, ABORTED:
 		<-t.finishCh
 
 		t.mu.RLock()
@@ -718,8 +716,6 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 		return t.result, t.err
 
-	case UNKNOWN:
-		fallthrough
 	default:
 		return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%d)", tid, status)
 	}
@@ -860,18 +856,17 @@ func (t *task) Abort() (err fail.Error) {
 		close(t.abortCh)
 		t.status = ABORTED
 
-	case ABORTED:
-		fallthrough
-	case TIMEOUT:
-		fallthrough
-	case DONE:
-		fallthrough
-	case READY:
-		fallthrough
-	case UNKNOWN:
-		fallthrough
+		// Tell context to cancel
+		defer t.cancel()
+
+		t.status = ABORTED
+		t.err = fail.AbortedError(t.err)
+	case ABORTED, TIMEOUT, DONE:
+		// already stopped, do nothing more
 	default:
 	}
+
+	// logrus.Debugf("task %s aborted", t.getSignature())
 
 	// VPL: why this?
 	// if previousErr != nil && previousStatus != TIMEOUT && previousStatus != ABORTED {
