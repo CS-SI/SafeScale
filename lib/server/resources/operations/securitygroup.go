@@ -18,6 +18,7 @@ package operations
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"sync"
@@ -426,24 +427,29 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 		return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from hosts", instance.GetName())
 	}
 
+	xerr = tg.AppendToID("/unbind")
+	if xerr != nil {
+		return xerr
+	}
+
 	// iterate on hosts bound to the security group and start a go routine to unbind
 	svc := instance.GetService()
 	for _, v := range in.ByID {
 		if v.FromSubnet {
 			return fail.InvalidRequestError("cannot unbind from host a security group applied from subnet; use disable instead or remove from bound subnet")
 		}
-		rh, xerr := LoadHost(svc, v.ID)
+		hostInstance, xerr := LoadHost(svc, v.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			break
 		}
 
 		//goland:noinspection ALL
-		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
-		}(rh)
+		defer func(h resources.Host) {
+			h.Released()
+		}(hostInstance)
 
-		_, xerr = tg.Start(instance.taskUnbindFromHost, rh)
+		_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			break
@@ -479,16 +485,17 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 		return xerr
 	}
 
-	tg, xerr := concurrency.NewTaskGroup(task)
+	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from subnets", instance.GetName())
 	}
 
+	xerr = tg.AppendToID(fmt.Sprintf("/unbind"))
 	// iterate on all networks bound to the security group to unbind security group from hosts attached to those networks (in parallel)
 	for _, v := range in.ByID {
 		// Unbind security group from hosts attached to subnet
-		_, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, v.ID)
+		_, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, v.ID, concurrency.InheritParentIDOption)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			break
