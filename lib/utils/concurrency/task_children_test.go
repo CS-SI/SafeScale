@@ -28,7 +28,6 @@ import (
 // make sure children cannot wait after father is aborted
 func TestTaskFatherAbortion(t *testing.T) {
 	parent, err := NewTaskGroup()
-	_ = parent.SetID("/parent")
 	require.NotNil(t, parent)
 	require.Nil(t, err)
 
