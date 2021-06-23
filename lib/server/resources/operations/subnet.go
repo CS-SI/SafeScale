@@ -1705,10 +1705,11 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// Leave a chance to abort
-	taskStatus, _ := task.GetStatus()
-	if taskStatus == concurrency.ABORTED {
-		return fail.AbortedError(nil)
+	//taskStatus, _ := task.GetStatus()
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
 	}
+
 
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)

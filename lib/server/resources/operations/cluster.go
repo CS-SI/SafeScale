@@ -2491,7 +2491,6 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			cleaningErrors = append(cleaningErrors, xerr)
 		}
 	}
-
 	if len(cleaningErrors) > 0 {
 		return fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
 	}
@@ -2541,7 +2540,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// --- Deletes the Network, Subnet and gateway ---
-	rn, deleteNetwork, rs, xerr := instance.extractNetworkingInfo(ctx)
+	networkInstance, deleteNetwork, subnetInstance, xerr := instance.extractNetworkingInfo(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2557,12 +2556,12 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if rs != nil && !rs.IsNull() {
-		subnetName := rs.GetName()
+	if subnetInstance != nil && !subnetInstance.IsNull() {
+		subnetName := subnetInstance.GetName()
 		logrus.Debugf("Cluster Deleting Subnet '%s'", subnetName)
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
 			func() error {
-				if innerXErr := rs.Delete(ctx); innerXErr != nil {
+				if innerXErr := subnetInstance.Delete(ctx); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotAvailable, *fail.ErrNotFound:
 						return retry.StopRetryError(innerXErr)
@@ -2582,7 +2581,6 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			default:
 			}
 		}
-		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -2598,12 +2596,12 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if rn != nil && !rn.IsNull() && deleteNetwork {
-		networkName := rn.GetName()
+	if networkInstance != nil && !networkInstance.IsNull() && deleteNetwork {
+		networkName := networkInstance.GetName()
 		logrus.Debugf("Deleting Network '%s'...", networkName)
 		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
 			func() error {
-				if innerXErr := rn.Delete(ctx); innerXErr != nil {
+				if innerXErr := networkInstance.Delete(ctx); innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						return retry.StopRetryError(innerXErr)
