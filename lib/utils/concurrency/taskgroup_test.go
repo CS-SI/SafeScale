@@ -30,7 +30,7 @@ import (
 )
 
 func TestChildrenWaitingGame(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -54,7 +54,7 @@ func TestChildrenWaitingGame(t *testing.T) {
 }
 
 func TestChildrenHaveDistinctIDs(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -99,7 +99,7 @@ func TestChildrenHaveDistinctIDs(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithPanic(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -142,7 +142,7 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithRandomError(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -171,7 +171,7 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 }
 
 func TestChildrenTryWaitingGameWithRandomError(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -208,7 +208,7 @@ func TestChildrenTryWaitingGameWithRandomError(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -276,7 +276,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 }
 
 func TestOneErrorOneOk(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -308,7 +308,7 @@ func TestOneErrorOneOk(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -348,7 +348,7 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -394,7 +394,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		overlord, xerr := NewTaskGroup(nil)
+		overlord, xerr := NewTaskGroup()
 		require.NotNil(t, overlord)
 		require.Nil(t, xerr)
 

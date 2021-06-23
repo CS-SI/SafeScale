@@ -32,6 +32,7 @@ type TaskGroupResult map[string]TaskResult
 
 // TaskGroupGuard is the task group interface defining method to wait the taskgroup
 type TaskGroupGuard interface {
+	GetStarted() (uint, fail.Error)
 	TryWaitGroup() (bool, map[string]TaskResult, fail.Error)
 	WaitGroup() (map[string]TaskResult, fail.Error)
 	WaitGroupFor(time.Duration) (bool, map[string]TaskResult, fail.Error)
@@ -625,4 +626,16 @@ func (instance *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error
 		}
 	}
 	return status, nil
+}
+
+// GetStarted returns the number of subtasks started in the TaskGroup
+func (instance *taskGroup) GetStarted() (uint, fail.Error) {
+	if instance.isNull() {
+		return 0, fail.InvalidInstanceError()
+	}
+
+	instance.children.lock.RLock()
+	defer instance.children.lock.RUnlock()
+
+	return uint(len(instance.children.tasks)), nil
 }
