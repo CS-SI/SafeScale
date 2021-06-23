@@ -50,7 +50,7 @@ func doTheDefferedReengage(t *testing.T, overlord *taskGroup) {
 }
 
 func TestDeferredReengage(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -73,7 +73,7 @@ func TestDeferredReengage(t *testing.T) {
 }
 
 func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -122,7 +122,7 @@ func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
 }
 
 func TestBadTaskActionCitizenDisengaged(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -174,7 +174,7 @@ func TestAwfulTaskActionCitizenDisengaged(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 

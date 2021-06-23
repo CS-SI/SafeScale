@@ -27,7 +27,7 @@ import (
 
 // make sure children cannot wait after father is aborted
 func TestTaskFatherAbortion(t *testing.T) {
-	parent, err := NewTaskGroup(nil)
+	parent, err := NewTaskGroup()
 	require.NotNil(t, parent)
 	require.Nil(t, err)
 
@@ -69,7 +69,7 @@ func TestTaskFatherAbortion(t *testing.T) {
 
 // if a children doesn't listen to abort, it keeps running
 func TestTaskFatherAbortionNoAbort(t *testing.T) {
-	parent, err := NewTaskGroup(nil)
+	parent, err := NewTaskGroup()
 	require.NotNil(t, parent)
 	require.Nil(t, err)
 
@@ -107,7 +107,7 @@ func TestTaskFatherAbortionNoAbort(t *testing.T) {
 
 // make sure that if subtasks listen, aborting a parent also aborts its children
 func TestTaskFatherAbortionLater(t *testing.T) {
-	parent, err := NewTaskGroup(nil)
+	parent, err := NewTaskGroup()
 	require.NotNil(t, parent)
 	require.Nil(t, err)
 

@@ -160,7 +160,7 @@ func heavyDutyTaskThatFails(duration time.Duration, wantedResult bool, withError
 }
 
 func TestSomethingFails(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -207,7 +207,7 @@ func TestSomethingFails(t *testing.T) {
 }
 
 func TestGoodTaskActionCitizen(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -267,7 +267,7 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 }
 
 func TestBadTaskActionCitizen(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -334,7 +334,7 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
