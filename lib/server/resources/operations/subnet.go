@@ -514,6 +514,15 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		return xerr
 	}
 
+	defer func() {
+		if xerr != nil && !req.KeepOnFailure {
+			derr := instance.deleteSecurityGroups(ctx, [3]string{subnetGWSG.GetID(), subnetInternalSG.GetID(), subnetPublicIPSG.GetID()})
+			if derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Groups"))
+			}
+		}
+	}()
+
 	caps := svc.GetCapabilities()
 	failover := req.HA
 	if failover {
@@ -763,7 +772,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		primaryTask, secondaryTask         concurrency.Task
 	)
 
-	tg, xerr := concurrency.NewTaskGroupWithContext(ctx)
+	tg, xerr := concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/creategateways"))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -773,7 +782,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	primaryRequest := gwRequest
 	primaryRequest.ResourceName = primaryGatewayName
 	primaryRequest.HostName = primaryGatewayName + domain
-	primaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
+	primaryTask, xerr = tg.StartInSubtask(instance.taskCreateGateway, taskCreateGatewayParameters{
 		request: primaryRequest,
 		sizing:  *gwSizing,
 	})
@@ -790,7 +799,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		if req.Domain != "" {
 			secondaryRequest.HostName = secondaryGatewayName + domain
 		}
-		secondaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
+		secondaryTask, xerr = tg.StartInSubtask(instance.taskCreateGateway, taskCreateGatewayParameters{
 			request: secondaryRequest,
 			sizing:  *gwSizing,
 		})
@@ -1043,13 +1052,13 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		return xerr
 	}
 
-	tg, xerr = concurrency.NewTaskGroupWithContext(ctx)
+	tg, xerr = concurrency.NewTaskGroupWithContext(ctx, concurrency.InheritParentIDOption, concurrency.AmendID("/configuregateways"))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+	_, xerr = tg.StartInSubtask(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
 		host:     primaryGateway,
 		userdata: primaryUserdata,
 	})
@@ -1059,7 +1068,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	}
 
 	if req.HA {
-		_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+		_, xerr = tg.StartInSubtask(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
 			host:     secondaryGateway,
 			userdata: secondaryUserdata,
 		})
@@ -1766,38 +1775,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		logrus.Infof("Subnet '%s' successfully deleted.", as.Name)
 
 		// Delete Subnet's own Security Groups
-		var (
-			rsg    resources.SecurityGroup
-			sgName string
-		)
-		sgs := [3]string{as.GWSecurityGroupID, as.PublicIPSecurityGroupID, as.InternalSecurityGroupID}
-		for _, v := range sgs {
-			if v != "" {
-				if rsg, innerXErr = LoadSecurityGroup(svc, v); innerXErr == nil {
-					sgName = rsg.GetName()
-					logrus.Debugf("Deleting Security Group '%s'...", sgName)
-					if innerXErr = rsg.Delete(ctx, true); innerXErr != nil {
-						switch innerXErr.(type) {
-						case *fail.ErrNotFound:
-							// Security Group not found, consider this as a success
-							debug.IgnoreError(innerXErr)
-						default:
-							return innerXErr
-						}
-					}
-				} else {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						// Security Group not found, consider this as a success
-						debug.IgnoreError(innerXErr)
-					default:
-						return innerXErr
-					}
-				}
-			}
-		}
-
-		return nil
+		return instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1806,6 +1784,41 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 	// Remove metadata
 	return instance.MetadataCore.Delete()
+}
+
+// deleteSecurityGroups deletes the Security Groups created for the Subnet
+func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string) (xerr fail.Error) {
+	var (
+		rsg    resources.SecurityGroup
+		sgName string
+	)
+	svc := instance.GetService()
+	for _, v := range sgs {
+		if v != "" {
+			if rsg, xerr = LoadSecurityGroup(svc, v); xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// Security Group not found, consider this as a success
+					debug.IgnoreError(xerr)
+				default:
+					return xerr
+				}
+			} else {
+				sgName = rsg.GetName()
+				logrus.Debugf("Deleting Security Group '%s'...", sgName)
+				if xerr = rsg.Delete(ctx, true); xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						// Security Group not found, consider this as a success
+						debug.IgnoreError(xerr)
+					default:
+						return xerr
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // Released overloads core.Released() to release the parent Network instance
