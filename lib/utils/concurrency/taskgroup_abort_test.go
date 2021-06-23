@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func problemsHappen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
+func problemsHappens(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
 	return heavyDutyTaskThatFails(40*time.Millisecond, true, true)
 }
 
@@ -177,11 +177,11 @@ func TestSomethingFails(t *testing.T) {
 			t.Errorf("Unexpected: %s", xerr)
 		}
 	}
-	_, xerr = overlord.Start(problemsHappen, nil)
+	_, xerr = overlord.Start(problemsHappens, nil)
 	if xerr != nil {
 		t.Errorf("Unexpected: %s", xerr)
 	}
-	_, xerr = overlord.Start(problemsHappen, nil)
+	_, xerr = overlord.Start(problemsHappens, nil)
 	if xerr != nil {
 		t.Errorf("Unexpected: %s", xerr)
 	}
