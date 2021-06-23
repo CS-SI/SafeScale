@@ -143,7 +143,7 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 	tg = &taskGroup{
 		task:     t.(*task),
 		children: subTasks{},
-		options:  options,
+		options: options,
 	}
 
 	if len(options) > 0 {
@@ -152,7 +152,7 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 			case keywordAmendID:
 				value, ok := v.Value().(string)
 				if ok {
-					tg.task.id += "+" + value
+					tg.task.id += "+"+value
 				}
 			}
 		}
@@ -251,19 +251,19 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 	if len(options) > 0 {
 		for _, v := range options {
 			switch v.Key() {
-			case keywordInheritParentIDOption:
-				value, ok := v.Value().(bool)
-				if ok && value {
-					id, xerr := instance.task.GetID()
-					if xerr != nil {
-						return nil, xerr
-					}
-
-					xerr = subtask.SetID(id)
-					if xerr != nil {
-						return nil, xerr
-					}
-				}
+			// case keywordInheritParentIDOption:
+			// 	value, ok := v.Value().(bool)
+			// 	if ok && value {
+			// 		id, xerr := instance.task.GetID()
+			// 		if xerr != nil {
+			// 			return nil, xerr
+			// 		}
+			//
+			// 		xerr = subtask.SetID(id)
+			// 		if xerr != nil {
+			// 			return nil, xerr
+			// 		}
+			// 	}
 			case "normalize_error":
 				newChild.normalizeError = v.Value().(func(error) error)
 			default:
