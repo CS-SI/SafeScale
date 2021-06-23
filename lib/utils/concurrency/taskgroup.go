@@ -78,8 +78,8 @@ var (
 )
 
 // NewTaskGroup ...
-func NewTaskGroup(parentTask Task, options ...data.ImmutableKeyValue) (*taskGroup, fail.Error) { // nolint
-	return newTaskGroup(context.TODO(), parentTask, options...)
+func NewTaskGroup(options ...data.ImmutableKeyValue) (*taskGroup, fail.Error) { // nolint
+	return newTaskGroup(context.TODO(), nil, options...)
 }
 
 // NewTaskGroupWithParent ...
@@ -137,13 +137,25 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 			}
 		}
 	}
+
 	tg = &taskGroup{
 		task:     t.(*task),
-		children: subTasks{
-			// lock: NewTaskedLock(),
-		},
+		children: subTasks{},
 		options: options,
 	}
+
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case keywordAmendID:
+				value, ok := v.Value().(string)
+				if ok {
+					tg.task.id += "+"+value
+				}
+			}
+		}
+	}
+
 	return tg, err
 }
 
@@ -203,15 +215,6 @@ func (instance *taskGroup) SetID(id string) fail.Error {
 	return instance.task.SetID(id)
 }
 
-// AppendTOID ...
-func (instance *taskGroup) AppendToID(id string) fail.Error {
-	if instance.isNull() {
-		return fail.InvalidInstanceError()
-	}
-
-	return instance.task.AppendToID(id)
-}
-
 // StartInSubtask starts an action in a subtask
 func (instance *taskGroup) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if instance.isNull() {
@@ -234,7 +237,7 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 	}
 
 	instance.last++
-	subtask, err := NewTaskWithParent(instance.task)
+	subtask, err := NewTaskWithParent(instance.task, options...)
 	if err != nil {
 		return instance, err
 	}
@@ -246,19 +249,19 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 	if len(options) > 0 {
 		for _, v := range options {
 			switch v.Key() {
-			case keywordInheritParentIDOption:
-				value, ok := v.Value().(bool)
-				if ok && value {
-					id, xerr := instance.task.GetID()
-					if xerr != nil {
-						return nil, xerr
-					}
-
-					xerr = subtask.SetID(id)
-					if xerr != nil {
-						return nil, xerr
-					}
-				}
+			// case keywordInheritParentIDOption:
+			// 	value, ok := v.Value().(bool)
+			// 	if ok && value {
+			// 		id, xerr := instance.task.GetID()
+			// 		if xerr != nil {
+			// 			return nil, xerr
+			// 		}
+			//
+			// 		xerr = subtask.SetID(id)
+			// 		if xerr != nil {
+			// 			return nil, xerr
+			// 		}
+			// 	}
 			case "normalize_error":
 				newChild.normalizeError = v.Value().(func(error) error)
 			default:

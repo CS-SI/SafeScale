@@ -570,7 +570,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			stepKey:   stepKey,
 			stepMap:   stepMap,
 			variables: v,
-		}, concurrency.InheritParentIDOption)
+		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action.String()), strings.ToLower(w.target.TargetType().String()), k)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return outcomes, xerr
@@ -632,11 +632,6 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 	if p.variables == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("params[variables]")
-	}
-
-	xerr = task.AppendToID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action.String()), strings.ToLower(w.target.TargetType().String()), p.stepName))
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {

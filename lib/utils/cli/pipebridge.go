@@ -156,10 +156,11 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	}
 
 	// ... then starts the "pipe readers"
-	taskGroup, xerr := concurrency.NewTaskGroup(task)
+	taskGroup, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/pipebridges"))
 	if xerr != nil {
 		return xerr
 	}
+
 	for _, v := range pbc.bridges {
 		if _, xerr = taskGroup.Start(taskRead, taskReadParameters{bridge: v, ch: pbc.displayCh}); xerr != nil {
 			return xerr

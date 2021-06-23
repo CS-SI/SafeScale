@@ -294,7 +294,7 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 				return nil, xerr
 			}
 
-			subtask, xerr := concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption)
+			subtask, xerr := concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -430,11 +430,6 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	}
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
-	}
-
-	xerr = task.AppendToID(fmt.Sprintf("/host/%s", p.Host.GetName()))
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {

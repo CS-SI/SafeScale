@@ -78,7 +78,6 @@ type TaskCore interface {
 	Abort() fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
-	AppendToID(string) fail.Error // appends string to the current Task ID
 	DisarmAbortSignal() func()
 	GetID() (string, fail.Error)
 	GetSignature() string
@@ -123,12 +122,19 @@ type task struct {
 const (
 	// keywordInheritParentIDOption is the string to use to make task inherit the ID ofr the parent task
 	keywordInheritParentIDOption = "inherit_parent_id"
+	keywordAmendID = "amend_id"
 )
 
 var (
 	globalTask            atomic.Value
 	InheritParentIDOption = data.NewImmutableKeyValue(keywordInheritParentIDOption, true)
 )
+
+// AmendID returns a data.ImmutableKeyValue containing string to add to task ID
+// to be used as option on NewXXX functions that accept such options
+func AmendID(id string) data.ImmutableKeyValue {
+	return data.NewImmutableKeyValue(keywordAmendID, id)
+}
 
 // RootTask is the "task to rule them all"
 func RootTask() (rt Task, xerr fail.Error) {
@@ -201,12 +207,12 @@ func NewTaskWithParent(parentTask Task, options ...data.ImmutableKeyValue) (Task
 }
 
 // NewTaskWithContext creates an intance of Task with context
-func NewTaskWithContext(ctx context.Context) (Task, fail.Error) {
+func NewTaskWithContext(ctx context.Context, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	return newTask(ctx, nil)
+	return newTask(ctx, nil, options...)
 }
 
 // newTask creates a new Task from parentTask or using ctx as parent context
@@ -263,6 +269,18 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 		}
 
 		t.id = u.String()
+	}
+
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case keywordAmendID:
+				value, ok := v.Value().(string)
+				if ok {
+					t.id += "+"+value
+				}
+			}
+		}
 	}
 
 	t.ctx = context.WithValue(childContext, KeyForTaskInContext, t)
@@ -380,26 +398,6 @@ func (t *task) SetID(id string) fail.Error {
 	}
 
 	t.id = id
-	return nil
-}
-
-// AppendToID appends string to current ID
-func (t *task) AppendToID(id string) fail.Error {
-	if t.IsNull() {
-		return fail.InvalidInstanceError()
-	}
-	if id == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("id")
-	}
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	if t.status == ABORTED {
-		return fail.AbortedError(nil, "aborted")
-	}
-
-	t.id += "+" + id
 	return nil
 }
 

@@ -917,7 +917,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// Start gateway(s)
-	taskGroup, xerr := concurrency.NewTaskGroup(task)
+	taskGroup, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1115,7 +1115,7 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 		}
 
 		// Stop nodes
-		taskGroup, innerXErr := concurrency.NewTaskGroup(task)
+		taskGroup, innerXErr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -1135,6 +1135,7 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 		if _, innerXErr = taskGroup.StartInSubtask(instance.taskStopHost, gatewayID); innerXErr != nil {
 			return innerXErr
 		}
+
 		if secondaryGatewayID != "" {
 			if _, innerXErr = taskGroup.StartInSubtask(instance.taskStopHost, secondaryGatewayID); innerXErr != nil {
 				return innerXErr
@@ -1290,23 +1291,21 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		}
 	}()
 
-	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/expand/%d", count)))
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = tg.AppendToID("/expand")
-	if xerr != nil {
-		return nil, xerr
-	}
-	
-	for i := uint(0); i < count; i++ {
+	for i := uint(1); i <= count; i++ {
 		_, xerr := tg.StartInSubtask(instance.taskCreateNode, taskCreateNodeParameters{
-			index:         i + 1,
+			index:         i,
 			nodeDef:       nodeDef,
 			timeout:       timeout,
 			keepOnFailure: false,
-		}, concurrency.InheritParentIDOption)
+		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", i)))
+		if xerr != nil {
+			return nil, xerr
+		}
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -2366,19 +2365,14 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (xerr fail.Erro
 func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	tog, xerr := concurrency.TaskFromContext(ctx)
+	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	if tog.Aborted() {
+	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
-	}
-
-	task, err := concurrency.NewTaskGroupWithParent(tog)
-	if err != nil {
-		return err
 	}
 
 	var cleaningErrors []error
@@ -2444,35 +2438,33 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	// Note: we are not using a TaskGroup here because we need to filter ErrNotFound for each Host (a missing Host is considered a successful deletion)
-	// TaskGroup, as currently designed, does not allow that
 	masterCount, nodeCount := len(masters), len(nodes)
-	//	subtasks := make([]concurrency.Task, 0, masterCount+nodeCount)
-	tg, xerr := concurrency.NewTaskGroupWithParent(task)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+	if masterCount+nodeCount > 0 {
+		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 
-	options := []data.ImmutableKeyValue{
-		data.NewImmutableKeyValue("normalize_error", func(err error) error {
-			err = debug.InjectPlannedError(err)
-			if err != nil {
-				switch err.(type) {
-				case *fail.ErrNotFound:
-					return nil
-				default:
+		options := []data.ImmutableKeyValue{
+			concurrency.InheritParentIDOption,
+			data.NewImmutableKeyValue("normalize_error", func(err error) error {
+				err = debug.InjectPlannedError(err)
+				if err != nil {
+					switch err.(type) {
+					case *fail.ErrNotFound:
+						return nil
+					default:
+					}
 				}
-			}
-			return err
-		}),
-		concurrency.InheritParentIDOption,
-	}
+				return err
+			}),
+		}
 
-	if nodeCount > 0 {
 		for _, v := range nodes {
 			if n, ok := all[v]; ok {
-				_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, options...)
+				completedOptions := append(options, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", n.Name)))
+				_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, completedOptions...)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
@@ -2480,11 +2472,11 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 				}
 			}
 		}
-	}
-	if masterCount > 0 {
+
 		for _, v := range masters {
 			if n, ok := all[v]; ok {
-				_, xerr := tg.StartInSubtask(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, options...)
+				completedOptions := append(options, concurrency.AmendID(fmt.Sprintf("/master/%s/delete", n.Name)))
+				_, xerr := tg.StartInSubtask(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, completedOptions...)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
@@ -2492,8 +2484,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 				}
 			}
 		}
-	}
-	if masterCount+nodeCount > 0 {
+
 		_, xerr = tg.WaitGroup()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -2523,21 +2514,22 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	allCount := len(all)
-	tg, xerr = concurrency.NewTaskGroupWithParent(task)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
-
 	if allCount > 0 {
+		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
 		for _, v := range all {
-			_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: v}, concurrency.InheritParentIDOption)
+			_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: v}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", v.Name))
 				break
 			}
 		}
+
 		_, xerr = tg.WaitGroup()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -2805,35 +2797,37 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 }
 
 // configureNodesFromList configures nodes from a list
-func (instance *Cluster) configureNodesFromList(tgo concurrency.Task, hosts []resources.Host) (xerr fail.Error) {
-	tracer := debug.NewTracer(tgo, tracing.ShouldTrace("resources.cluster")).Entering()
+func (instance *Cluster) configureNodesFromList(task concurrency.Task, hosts []resources.Host) (xerr fail.Error) {
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
-	if tgo.Aborted() {
+	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	task, err := concurrency.NewTaskGroupWithParent(tgo)
-	if err != nil {
-		return err
-	}
-
 	length := len(hosts)
-	for i := 0; i < length; i++ {
-		_, ierr := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
-			Index: uint(i + 1),
-			Host:  hosts[i],
-		}, concurrency.InheritParentIDOption)
-		ierr = debug.InjectPlannedFail(ierr)
-		if ierr != nil {
-			_ = task.Abort()
-			break
+	if length > 0 {
+		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+		if xerr != nil {
+			return xerr
 		}
-	}
-	_, err = task.WaitGroup()
-	err = debug.InjectPlannedFail(err)
-	if err != nil {
-		return err
+
+		for i := 0; i < length; i++ {
+			_, ierr := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
+				Index: uint(i + 1),
+				Host:  hosts[i],
+			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/configure", hosts[i].GetName())))
+			ierr = debug.InjectPlannedFail(ierr)
+			if ierr != nil {
+				_ = task.Abort()
+				break
+			}
+		}
+		_, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	return nil
@@ -2928,7 +2922,7 @@ func (instance *Cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2936,7 +2930,7 @@ func (instance *Cluster) deleteHosts(task concurrency.Task, hosts []resources.Ho
 
 	errors := make([]error, 0, len(hosts)+1)
 	for _, h := range hosts {
-		_, xerr = tg.StartInSubtask(instance.taskDeleteHostOnFailure, taskDeleteHostOnFailureParameters{host: h.(*Host)}, concurrency.InheritParentIDOption)
+		_, xerr = tg.StartInSubtask(instance.taskDeleteHostOnFailure, taskDeleteHostOnFailureParameters{host: h.(*Host)}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", h.GetName())))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errors = append(errors, xerr)
@@ -3113,12 +3107,6 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		return emptySlice, xerr
 	}
 
-	tg, xerr := concurrency.NewTaskGroup(task)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return emptySlice, xerr
-	}
-
 	var (
 		removedNodes []*propertiesv3.ClusterNode
 		errors       []error
@@ -3180,17 +3168,25 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		}
 	}()
 
-	for _, v := range removedNodes {
-		_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, master: nil}, concurrency.InheritParentIDOption)
+	if len(removedNodes) > 0 {
+		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/shrink/%d", len(removedNodes))))
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+
+		for _, v := range removedNodes {
+			_, xerr = tg.StartInSubtask(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, master: nil}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)))
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				errors = append(errors, xerr)
+			}
+		}
+		_, xerr = tg.WaitGroup()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errors = append(errors, xerr)
 		}
-	}
-	_, xerr = tg.WaitGroup()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		errors = append(errors, xerr)
 	}
 	if len(errors) > 0 {
 		return emptySlice, fail.NewErrorList(errors)
