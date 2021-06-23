@@ -421,38 +421,41 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 		return xerr
 	}
 
-	tg, xerr := concurrency.NewTaskGroup(task)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from hosts", instance.GetName())
-	}
-
-	xerr = tg.AppendToID("/unbind")
-	if xerr != nil {
-		return xerr
-	}
-
-	// iterate on hosts bound to the security group and start a go routine to unbind
-	svc := instance.GetService()
-	for _, v := range in.ByID {
-		if v.FromSubnet {
-			return fail.InvalidRequestError("cannot unbind from host a security group applied from subnet; use disable instead or remove from bound subnet")
-		}
-		hostInstance, xerr := LoadHost(svc, v.ID)
+	if len(in.ByID) > 0 {
+		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/unbind"))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from hosts", instance.GetName())
 		}
 
-		//goland:noinspection ALL
-		defer func(h resources.Host) {
-			h.Released()
-		}(hostInstance)
+		// iterate on hosts bound to the security group and start a go routine to unbind
+		svc := instance.GetService()
+		for _, v := range in.ByID {
+			if v.FromSubnet {
+				return fail.InvalidRequestError("cannot unbind from host a security group applied from subnet; use disable instead or remove from bound subnet")
+			}
+			hostInstance, xerr := LoadHost(svc, v.ID)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				break
+			}
 
-		_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption)
+			//goland:noinspection ALL
+			defer func(h resources.Host) {
+				h.Released()
+			}(hostInstance)
+
+			_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", hostInstance.GetName())))
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				break
+			}
+		}
+
+		_, xerr = tg.WaitGroup()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			break
+			return xerr
 		}
 
 		if count, xerr := tg.GetStarted(); xerr == nil && count > 0 {
@@ -488,17 +491,23 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 		return xerr
 	}
 
-	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from subnets", instance.GetName())
-	}
+	if len(in.ByID) > 0 {
+		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/unbind"))
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from subnets", instance.GetName())
+		}
 
-	xerr = tg.AppendToID(fmt.Sprintf("/unbind"))
-	// iterate on all networks bound to the security group to unbind security group from hosts attached to those networks (in parallel)
-	for _, v := range in.ByID {
-		// Unbind security group from hosts attached to subnet
-		_, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, v.ID, concurrency.InheritParentIDOption)
+		// iterate on all networks bound to the security group to unbind security group from hosts attached to those networks (in parallel)
+		for k, v := range in.ByName {
+			_, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, v, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/subnet/%s/unbind", k)))
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				break
+			}
+		}
+
+		_, xerr = tg.WaitGroup()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr

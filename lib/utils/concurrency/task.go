@@ -122,7 +122,7 @@ type task struct {
 const (
 	// keywordInheritParentIDOption is the string to use to make task inherit the ID ofr the parent task
 	keywordInheritParentIDOption = "inherit_parent_id"
-	keywordAmendID               = "amend_id"
+	keywordAmendID = "amend_id"
 )
 
 var (
@@ -277,7 +277,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 			case keywordAmendID:
 				value, ok := v.Value().(string)
 				if ok {
-					t.id += "+" + value
+					t.id += "+"+value
 				}
 			}
 		}
