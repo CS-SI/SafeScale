@@ -47,6 +47,11 @@ func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params 
 		return nil, fail.InvalidParameterError("params", "must be a '*host' and cannot be nil")
 	}
 
+	xerr = task.AppendToID(fmt.Sprintf("/host/%s/unbind", hostInstance.GetName()))
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -99,6 +104,7 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 	}
 
 	sgName := instance.GetName()
+	xerr = task.AppendToID(fmt.Sprintf("/subnet/%s/unbind", sgName))
 
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
@@ -131,7 +137,7 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 				}
 
 				for _, v := range nsgV1.ByName {
-					_, innerXErr = tg.Start(instance.taskUnbindFromHost, v, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", v)))
+					_, innerXErr = tg.Start(instance.taskUnbindFromHost, v, concurrency.InheritParentIDOption)
 					if innerXErr != nil {
 						break
 					}
