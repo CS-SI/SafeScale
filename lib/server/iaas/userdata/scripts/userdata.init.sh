@@ -203,7 +203,9 @@ function disable_services() {
 function no_daily_update() {
 	case $LINUX_KIND in
 	debian | ubuntu)
-		# TODO: Check for errors, also look other cloud distros
+		# If it's not there, nothing to do
+		systemctl list-units --all apt-daily.service | egrep -q 'apt-daily' || return 0
+
 		# first kill apt-daily
 		systemctl stop apt-daily.service
 		systemctl kill --kill-who=all apt-daily.service
@@ -215,7 +217,10 @@ function no_daily_update() {
 			sleep 1
 		done
 		;;
-	redhat | centos)
+	redhat | fedora | centos)
+		# If it's not there, nothing to do
+		systemctl list-units --all yum-cron.service | egrep -q 'yum-cron' || return 0
+
 		systemctl stop yum-cron.service
 		systemctl kill --kill-who=all yum-cron.service
 
@@ -237,10 +242,10 @@ put_hostname_in_hosts
 disable_cloudinit_network_autoconf
 disable_services
 
-no_daily_update
-
 secure_sshd
 create_user
+
+no_daily_update
 
 touch /etc/cloud/cloud-init.disabled
 
