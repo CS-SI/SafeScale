@@ -122,7 +122,7 @@ type task struct {
 const (
 	// keywordInheritParentIDOption is the string to use to make task inherit the ID ofr the parent task
 	keywordInheritParentIDOption = "inherit_parent_id"
-	keywordAmendID = "amend_id"
+	keywordAmendID               = "amend_id"
 )
 
 var (
@@ -277,7 +277,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 			case keywordAmendID:
 				value, ok := v.Value().(string)
 				if ok {
-					t.id += "+"+value
+					t.id += "+" + value
 				}
 			}
 		}
@@ -727,7 +727,8 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 // TryWait tries to wait on a task
 // If task done, returns (true, TaskResult, <error from the task>)
-// If task is not done, returns (false, nil, nil) (subsequent calls of TryWait may be necessary)
+// If task aborted, returns (false, nil, *fail.ErrAborted) (subsequent calls of TryWait may be necessary)
+// If task still running, returns (false, nil)
 // if Task is not started, returns (false, nil, *fail.ErrInconsistent)
 func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 	if t.IsNull() {
@@ -751,8 +752,8 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 	case ABORTED:
 		fallthrough
 	case TIMEOUT:
-		t.mu.Lock()
-		defer t.mu.Unlock()
+		t.mu.RLock()
+		defer t.mu.RUnlock()
 		return true, nil, t.err
 
 	case RUNNING:
@@ -861,19 +862,12 @@ func (t *task) Abort() (err fail.Error) {
 		close(t.abortCh)
 		t.status = ABORTED
 
-		// Tell context to cancel
-		defer t.cancel()
-
-		t.status = ABORTED
-		t.err = fail.AbortedError(t.err)
-
 	case ABORTED:
 		fallthrough
 	case TIMEOUT:
 		fallthrough
 	case DONE:
-		// already stopped, do nothing more
-
+		fallthrough
 	case READY:
 		fallthrough
 	case UNKNOWN:
