@@ -704,7 +704,9 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 		return nil, t.err
 
-	case RUNNING, ABORTED:
+	case ABORTED:
+		fallthrough
+	case RUNNING:
 		<-t.finishCh
 
 		t.mu.RLock()
@@ -716,6 +718,8 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 		return t.result, t.err
 
+	case UNKNOWN:
+		fallthrough
 	default:
 		return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%d)", tid, status)
 	}
@@ -737,18 +741,19 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
-		return false, nil, fail.InconsistentError("cannot wait a Task that has not been started")
-
-	// ABORTED and TIMEOUT are transient status, TryWait() succeeds only when status reaches DONE
-	case ABORTED:
-		fallthrough
-	case TIMEOUT:
-		return false, nil, nil
+		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
 
 	case DONE:
 		t.mu.RLock()
 		defer t.mu.RUnlock()
 		return true, t.result, t.err
+
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		t.mu.Lock()
+		defer t.mu.Unlock()
+		return true, nil, t.err
 
 	case RUNNING:
 		if len(t.finishCh) == 1 {
@@ -861,12 +866,20 @@ func (t *task) Abort() (err fail.Error) {
 
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
-	case ABORTED, TIMEOUT, DONE:
+
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		fallthrough
+	case DONE:
 		// already stopped, do nothing more
+
+	case READY:
+		fallthrough
+	case UNKNOWN:
+		fallthrough
 	default:
 	}
-
-	// logrus.Debugf("task %s aborted", t.getSignature())
 
 	// VPL: why this?
 	// if previousErr != nil && previousStatus != TIMEOUT && previousStatus != ABORTED {
