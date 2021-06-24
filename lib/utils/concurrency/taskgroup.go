@@ -426,6 +426,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		case READY:
 			fallthrough
 		case RUNNING:
+			// parent task is running, we need to abort it, even if abort was disable, now that all the children have terminated
 			instance.task.mu.Lock()
 			previousErr := instance.task.err
 			abortSaved := instance.task.abortDisengaged
@@ -433,14 +434,10 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			instance.task.mu.Unlock()
 
 			_ = instance.task.Abort()
-
-			instance.task.mu.Lock()
-			instance.task.abortDisengaged = abortSaved
-			instance.task.mu.Unlock()
-
 			_, _ = instance.task.Wait()
 
 			instance.task.mu.Lock()
+			instance.task.abortDisengaged = abortSaved
 			if len(errors) > 0 {
 				instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
 			} else {
@@ -460,9 +457,9 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 
 		instance.task.mu.Lock()
 		defer instance.task.mu.Unlock()
-		if instance.task.status != ABORTED {
+
 			instance.task.status = DONE
-		}
+
 		instance.result = results
 		return results, instance.task.err
 
