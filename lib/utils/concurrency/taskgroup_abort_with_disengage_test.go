@@ -76,6 +76,7 @@ func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
 	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
+	_ = overlord.SetID("/taskgroup")
 
 	theID, xerr := overlord.GetID()
 	require.Nil(t, xerr)
@@ -87,7 +88,7 @@ func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
 
 	numChild := 10
 	for ind := 0; ind < numChild; ind++ {
-		_, xerr := overlord.Start(goodTaskActionCitizen, nil)
+		_, xerr := overlord.Start(goodTaskActionCitizen, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
