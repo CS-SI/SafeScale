@@ -647,15 +647,10 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
-	if err != nil {
-		return nil, err
-	}
-
-	status, err := t.GetStatus()
-	if err != nil {
-		return nil, err
-	}
+	t.mu.Lock()
+	tid := t.id
+	status := t.status
+	t.mu.Unlock()
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
@@ -673,7 +668,9 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 		return nil, t.err
 
-	case RUNNING, ABORTED:
+	case ABORTED:
+		fallthrough
+	case RUNNING:
 		<-t.finishCh
 
 		t.mu.Lock()
@@ -685,6 +682,8 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 		return t.result, t.err
 
+	case UNKNOWN:
+		fallthrough
 	default:
 		return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%d)", tid, status)
 	}
@@ -699,27 +698,27 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
-	if err != nil {
-		return false, nil, err
-	}
-
-	status, err := t.GetStatus()
-	if err != nil {
-		return false, nil, err
-	}
+	t.mu.Lock()
+	tid := t.id
+	status := t.status
+	t.mu.Unlock()
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
-		return false, nil, fail.InconsistentError("cannot wait a Task that has not been started")
+		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
+
 	case DONE:
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		return true, t.result, t.err
+
 	case ABORTED:
+		fallthrough
+	case TIMEOUT:
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		return true, nil, t.err
+
 	case RUNNING:
 		if len(t.finishCh) == 1 {
 			_, err := t.Wait()
@@ -728,6 +727,9 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 			return true, t.result, err
 		}
 		return false, nil, nil
+
+	case UNKNOWN:
+		fallthrough
 	default:
 		return false, nil, fail.NewError("cannot wait task '%s': unknown status (%d)", tid, status)
 	}
@@ -738,63 +740,64 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 // If task done, returns (true, <error from the task>)
 // If task aborted, returns (true, utils.ErrAborted)
 // If duration elapsed (meaning the task is still running after duration), returns (false, utils.ErrTimeout)
-func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, fail.Error) {
+func (t *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xerr fail.Error) {
 	if t.IsNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
-	if err != nil {
-		return false, nil, err
-	}
-
-	status, err := t.GetStatus()
-	if err != nil {
-		return false, nil, err
-	}
+	t.mu.Lock()
+	tid := t.id
+	status := t.status
+	t.mu.Unlock()
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
 		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
+
 	case DONE:
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		return true, t.result, t.err
+
 	case ABORTED:
+		fallthrough
+	case TIMEOUT:
 		t.mu.Lock()
 		defer t.mu.Unlock()
 		return true, nil, t.err
+
 	case RUNNING:
-		// continue
-	default:
-		return false, nil, fail.NewError("cannot wait task '%s': unknown status (%d)", tid, status)
-	}
+		var result TaskResult
+		c := make(chan struct{})
+		go func() {
+			result, xerr = t.Wait()
+			c <- struct{}{} // done
+			close(c)
+		}()
 
-	var result TaskResult
-	c := make(chan struct{})
-	go func() {
-		result, err = t.Wait()
-		c <- struct{}{} // done
-		close(c)
-	}()
-
-	if duration > 0 {
-		select {
-		case <-time.After(duration):
-			toErr := fail.TimeoutError(fmt.Errorf("timeout of %s waiting for task '%s'", duration, tid), duration, nil)
-			abErr := t.Abort()
-			if abErr != nil {
-				_ = toErr.AddConsequence(abErr)
+		if duration > 0 {
+			select {
+			case <-time.After(duration):
+				toErr := fail.TimeoutError(fmt.Errorf("timeout of %s waiting for task '%s'", duration, tid), duration, nil)
+				abErr := t.Abort()
+				if abErr != nil {
+					_ = toErr.AddConsequence(abErr)
+				}
+				return false, nil, toErr
+			case <-c:
+				return true, result, xerr
 			}
-			return false, nil, toErr
-		case <-c:
-			return true, result, err
 		}
-	}
 
-	select { // nolint
-	case <-c:
-		return true, result, err
+		select { // nolint
+		case <-c:
+			return true, result, xerr
+		}
+
+	case UNKNOWN:
+		fallthrough
+	default:
+		return false, nil, fail.NewError("cannot wait Task '%s': unknown status (%d)", tid, status)
 	}
 }
 
@@ -826,14 +829,22 @@ func (t *task) Abort() (err fail.Error) {
 
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
-	case ABORTED, TIMEOUT, DONE:
+
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		fallthrough
+	case DONE:
 		// already stopped, do nothing more
+
+	case READY:
+		fallthrough
+	case UNKNOWN:
+		fallthrough
 	default:
 		t.status = ABORTED
 		t.err = fail.AbortedError(t.err)
 	}
-
-	// logrus.Debugf("task %s aborted", t.getSignature())
 
 	// VPL: why this?
 	// if previousErr != nil && previousStatus != TIMEOUT && previousStatus != ABORTED {
