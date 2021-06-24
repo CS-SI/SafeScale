@@ -240,7 +240,7 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 	instance.last++
 	subtask, err := NewTaskWithParent(instance.task, options...)
 	if err != nil {
-		return instance, err
+		return nil, err
 	}
 
 	newChild := subTask{
@@ -272,7 +272,7 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 
 	_, xerr = subtask.Start(action, params)
 	if xerr != nil {
-		return instance, err
+		return nil, err
 	}
 
 	instance.children.lock.Lock()
@@ -414,6 +414,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		case READY:
 			fallthrough
 		case RUNNING:
+			// parent task is running, we need to abort it, even if abort was disable, now that all the children have terminated
 			instance.task.mu.Lock()
 			previousErr := instance.task.err
 			abortSaved := instance.task.abortDisengaged
@@ -421,14 +422,10 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			instance.task.mu.Unlock()
 
 			_ = instance.task.Abort()
-
-			instance.task.mu.Lock()
-			instance.task.abortDisengaged = abortSaved
-			instance.task.mu.Unlock()
-
 			_, _ = instance.task.Wait()
 
 			instance.task.mu.Lock()
+			instance.task.abortDisengaged = abortSaved
 			if len(errors) > 0 {
 				instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
 			} else {
@@ -448,9 +445,9 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 
 		instance.task.mu.Lock()
 		defer instance.task.mu.Unlock()
-		if instance.task.status != ABORTED {
+
 			instance.task.status = DONE
-		}
+
 		instance.result = results
 		return results, instance.task.err
 
@@ -459,7 +456,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	}
 }
 
-// TryWait ...
+// TryWait executes TryWaitGroup
 func (instance *taskGroup) TryWait() (bool, TaskResult, fail.Error) {
 	if instance.isNull() {
 		return false, nil, fail.InvalidInstanceError()
@@ -468,7 +465,11 @@ func (instance *taskGroup) TryWait() (bool, TaskResult, fail.Error) {
 	return instance.TryWaitGroup()
 }
 
-// TryWaitGroup tries to wait on a task; if done returns the error and true, if not returns nil and false
+// TryWaitGroup tries to wait on a TaskGroup
+// If TaskGroup done, returns (true, TaskResult, <error from the task>)
+// If TaskGroup aborted, returns (false, nil, *fail.ErrAborted) (subsequent calls of TryWaitGroup may be necessary)
+// If TaskGroup still running, returns (false, nil, nil)
+// if TaskGroup is not started, returns (false, nil, *fail.ErrInconsistent)
 func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
 	if instance.isNull() {
 		return false, nil, fail.InvalidInstanceError()

@@ -268,7 +268,13 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		begin := time.Now()
 
 		single, err = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(sleep)
+			tempo := sleep/100
+			for i := 0 ; i < 100; i++ {
+				if t.Aborted() {
+					break
+				}
+				time.Sleep(tempo)
+			}
 			return "Ahhhh", nil
 		}, nil)
 		require.Nil(t, err)
@@ -287,17 +293,24 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		}
 
 		if errorExpected {
-			st, _ := single.GetStatus()
-			if st != ABORTED {
+			require.NotNil(t, err)
+			switch err.(type) {
+			case *fail.ErrAborted:
+			default:
 				t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
 			}
-			require.True(t, st == ABORTED)
+			// st, _ := single.GetStatus()
+			// if st != ABORTED {
+			// 	t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
+			// }
+			// require.True(t, st == ABORTED)
 		} else {
-			st, _ := single.GetStatus()
-			if st == ABORTED {
-				t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
-			}
-			require.True(t, st != ABORTED)
+			require.Nil(t, err)
+			// st, _ := single.GetStatus()
+			// if st == ABORTED {
+			// 	t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
+			// }
+			// require.True(t, st != ABORTED)
 		}
 
 		if !((err != nil) == errorExpected) {
@@ -329,6 +342,14 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 		begin := time.Now()
 
 		single, err = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			dur := time.Duration(sleep*10) * time.Millisecond
+			tempo := dur / 100
+			for i := 0; i < 100; i++ {
+				if t.Aborted() {
+					break
+				}
+				time.Sleep(tempo)
+			}
 			time.Sleep(time.Duration(sleep*10) * time.Millisecond)
 			return "Ahhhh", nil
 		}, nil)
@@ -378,7 +399,14 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 		begin := time.Now()
 
 		single, xerr = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(sleep*10) * time.Millisecond)
+			dur := time.Duration(sleep*10) * time.Millisecond
+			tempo := dur/100
+			for i := 0; i < 100; i++ {
+				if t.Aborted() {
+					break
+				}
+				time.Sleep(tempo)
+			}
 			return "Ahhhh", nil
 		}, nil)
 		require.Nil(t, xerr)

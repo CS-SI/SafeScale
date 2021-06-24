@@ -42,14 +42,14 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 	var iRes int
 
 	defer func(err *fail.Error) {
-		if st, _ := t.GetStatus(); st == ABORTED {
+		if t.Aborted() {
 			if iRes > 1 {
 				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
 		}
 	}(&xerr)
 
-	if st, _ := t.GetStatus(); st == ABORTED {
+	if t.Aborted() {
 		fmt.Println("Exiting before real execution")
 		return iRes, nil
 	}
@@ -60,7 +60,7 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 	}
 	iRes++
 
-	if st, _ := t.GetStatus(); st == ABORTED {
+	if t.Aborted() {
 		fmt.Println("Exiting before 2nd execution")
 		return iRes, nil
 	}
@@ -71,7 +71,7 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 	}
 	iRes++
 
-	if st, _ := t.GetStatus(); st == ABORTED {
+	if t.Aborted() {
 		fmt.Println("Exiting before 3rd execution")
 		return iRes, nil
 	}
@@ -82,7 +82,7 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 	}
 	iRes++
 
-	if st, _ := t.GetStatus(); st == ABORTED {
+	if t.Aborted() {
 		fmt.Println("Exiting before function return")
 		return iRes, nil
 	}

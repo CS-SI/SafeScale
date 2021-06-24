@@ -28,30 +28,37 @@ import (
 // make sure children cannot wait after father is aborted
 func TestTaskFatherAbortion(t *testing.T) {
 	parent, err := NewTaskGroup()
+	_ = parent.SetID("/parent")
 	require.NotNil(t, parent)
 	require.Nil(t, err)
 
 	count := 0
 
 	child, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		fmt.Println("child started.")
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		if t.Aborted() {
+			fmt.Println("child aborts.")
 			return "A", nil
 		}
 		count++
+		fmt.Println("child done.")
 		return "B", nil
-	}, nil)
+	}, nil, InheritParentIDOption, AmendID("/child"))
 	require.Nil(t, err)
 
 	sibling, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		fmt.Println("sibling started.")
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		if t.Aborted() {
+			fmt.Println("sibling aborts.")
 			return "A", nil
 		}
 		count++
+		fmt.Println("sibling done.")
 		return "B", nil
-	}, nil)
+	}, nil, InheritParentIDOption, AmendID("/sibling"))
 	require.Nil(t, err)
 
 	time.Sleep(time.Duration(50) * time.Millisecond)
