@@ -40,6 +40,7 @@ import (
 // This is not what happens (even if that's the easy case where children actually listen and don't block themselves fighting for resources)...
 // Let's take a look...
 func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t *testing.T) {
+	streak := 0
 	enough := false
 	iter := 0
 	for {
@@ -95,7 +96,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 			require.Nil(t, xerr)
 		}()
 
-		_, xerr = single.Wait() // 100 ms after this, .Abort() should hit
+		res, xerr := single.Wait() // 100 ms after this, .Abort() should hit
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 			switch xerr.(type) {
@@ -113,6 +114,15 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 				}
 			default:
 				t.Errorf("Unexpected error: %v", xerr)
+			}
+		} else {
+			require.NotNil(t, res)
+			if len(bailout) == 80 {
+				streak++
+				if streak > 5 {
+					break
+				}
+				continue
 			}
 		}
 		close(bailout) // If Wait actually waits, this is closed AFTER all Tasks filled the channel, so no panics
@@ -141,10 +151,11 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaiting(t *testing.T) {
 	caught := false
 	enough := false
+	streak := 0
 	iter := 0
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 15 {
 			break
 		}
 		if enough {
@@ -203,7 +214,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 			require.Nil(t, xerr)
 		}()
 
-		_, xerr = overlord.Wait() // 100 ms after this, .Abort() should hit
+		res, xerr := overlord.Wait() // 100 ms after this, .Abort() should hit
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 			switch xerr.(type) {
@@ -227,6 +238,15 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 				}
 			default:
 				t.Errorf("Unexpected error: %v", xerr)
+			}
+		} else {
+			require.NotNil(t, res)
+			if len(bailout) == 80 {
+				streak++
+				if streak > 5 {
+					break
+				}
+				continue
 			}
 		}
 		close(bailout) // If Wait actually waits, this is closed AFTER all Tasks filled the channel, so no panics
@@ -256,12 +276,128 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 	}
 }
 
+// Like previous tests but also with errors
+func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t *testing.T) {
+	enough := false
+	iter := 0
+	streak := 0
+	for {
+		iter++
+		if iter > 20 {
+			break
+		}
+		if enough {
+			break
+		}
+
+		t.Log("Next") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
+		single, xerr := NewTaskGroup()
+		require.NotNil(t, single)
+		require.Nil(t, xerr)
+		xerr = single.SetID(fmt.Sprintf("/parent-%d", iter))
+		require.Nil(t, xerr)
+
+		bailout := make(chan string, 80) // a buffered channel
+		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
+			_, xerr = single.StartInSubtask(
+				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+					for { // do some work, then look for aborted, again and again
+						// some work
+						time.Sleep(time.Duration(tools.RandomInt(20, 30)) * time.Millisecond)
+						if t.Aborted() {
+							// Cleaning up first before leaving... ;)
+							time.Sleep(time.Duration(tools.RandomInt(100, 800)) * time.Millisecond)
+							break
+						}
+					}
+
+					// We are using the classic 'send on closed channel' trick to see if Wait actually waits until everyone is DONE.
+					// If it does we will never see a panic, but if Abort doesn't mean TellYourChildrenToAbort but
+					// actually means AbortYourChildrenAndQuitNOWWithoutWaiting, then we have a problem
+					acha := parameters.(chan string)
+					acha <- "Bailing out"
+
+					// flip a coin, true and we panic, false we don't
+					if tools.RandomInt(0, 2) == 1 {
+						return "mistakes happen", fail.NewError("It was head")
+					}
+
+					return "who cares", nil
+				}, bailout, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
+			)
+			require.Nil(t, xerr)
+		}
+
+		// after this, some tasks will already be looking for ABORT signals
+		time.Sleep(time.Duration(65) * time.Millisecond)
+
+		go func() {
+			// this will actually start after wait
+			time.Sleep(time.Duration(100) * time.Millisecond)
+
+			// let's have fun
+			xerr := single.Abort()
+			require.Nil(t, xerr)
+		}()
+
+		res, xerr := single.Wait() // 100 ms after this, .Abort() should hit
+		if xerr != nil {
+			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
+			switch xerr.(type) {
+			case *fail.ErrAborted:
+				cause := xerr.Cause()
+				if !strings.Contains(spew.Sdump(cause), "panic happened") {
+					t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
+				}
+			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
+			case *fail.ErrRuntimePanic:
+				t.Logf("We catched a panic...")
+			case *fail.ErrorList:
+				if !strings.Contains(spew.Sdump(xerr), "panic happened") {
+					t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
+				}
+			default:
+				t.Errorf("Unexpected error: %v", xerr)
+			}
+		} else {
+			require.NotNil(t, res)
+			if len(bailout) == 80 {
+				streak++
+				if streak > 5 {
+					break
+				}
+				continue
+			}
+		}
+		close(bailout) // If Wait actually waits, this is closed AFTER all Tasks filled the channel, so no panics
+		// If not..., well...
+
+		reminder := false
+		if len(bailout) != 80 { // this means panic
+			reminder = true
+			t.Errorf("Not everyone finished on time !!, panic is coming !!, some tasks will hit a closed channel !!")
+			// if we now do a t.FailNow() we already proved our point (if Wait actually waited, the channel
+			// size should be 80 each time), but if we don't...
+			// we will see runtime panics on our LOGS !!, but NOT in the code
+			// with a t.FailNow() we also fail, but the test output is less frightening
+			enough = true
+		}
+
+		time.Sleep(2 * time.Second)
+		if reminder {
+			t.Errorf("by now we should see panics in lines above, panics that only shows in logs and the rest of the code is unaware of")
+		}
+		// Well, we have a problem Waiting, now it's clear, and as a bonus we uncovered a problem communicating panics to function callers
+	}
+}
+
 // This tests the same thing as TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting, it just
 // runs .Abort first, then Wait
 // It fails, however it's unclear if it should work..: by design, what should happen if we abort 1st before running the wait ?
 func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T) {
 	enough := false
 	iter := 0
+	streak := 0
 	for {
 		iter++
 		if iter > 20 {
@@ -309,7 +445,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		xerr = overlord.Abort()
 		require.Nil(t, xerr)
 
-		_, xerr = overlord.Wait()
+		res, xerr := single.Wait()
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 			switch xerr.(type) {
@@ -328,7 +464,17 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 			default:
 				t.Errorf("Unexpected error: %v", xerr)
 			}
+		} else {
+			require.NotNil(t, res)
+			if len(bailout) == 80 {
+				streak++
+				if streak > 5 {
+					break
+				}
+				continue
+			}
 		}
+
 		close(bailout) // If Wait actually waits, this is closed AFTER all Tasks filled the channel, so no panics
 		// If not..., well...
 

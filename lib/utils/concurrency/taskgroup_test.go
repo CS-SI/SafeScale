@@ -66,8 +66,8 @@ func TestCallingReadyTaskGroup(t *testing.T) {
 	require.Empty(t, res)
 	require.NotNil(t, err)
 
-	done, res, err := overlord.WaitFor(10 * time.Millisecond)
-	require.False(t, done)
+	done, res, err := single.WaitFor(10 * time.Millisecond)
+	require.True(t, done) // there's nothing to do with a READY group, so shouldn't this be true ?
 	require.Empty(t, res)
 	require.NotNil(t, err)
 
