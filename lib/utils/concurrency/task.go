@@ -710,7 +710,7 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
-		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
+		return false, nil, fail.InconsistentError("cannot wait a Task that has not been started")
 	case DONE:
 		t.mu.Lock()
 		defer t.mu.Unlock()
@@ -728,7 +728,7 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 		}
 		return false, nil, nil
 	default:
-		return false, nil, fail.NewError("cannot wait task '%s': unkown status (%d)", tid, status)
+		return false, nil, fail.NewError("cannot wait task '%s': unknown status (%d)", tid, status)
 	}
 }
 
