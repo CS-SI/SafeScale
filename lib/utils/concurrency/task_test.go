@@ -356,6 +356,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 				}
 				time.Sleep(tempo)
 			}
+
 			time.Sleep(time.Duration(sleep*10) * time.Millisecond)
 			fmt.Printf("%s: sleeped %v\n", singleID, time.Duration(i)*tempo+time.Duration(sleep)*10*time.Millisecond)
 			return "Ahhhh", nil
@@ -387,9 +388,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 	funk(1, 3, 5, 1, true)
 	funk(2, 3, 5, 9, true)
 	funk(3, 5, 3, 1, true)
-
 	funk(4, 5, 1, 3, false)
-
 	funk(5, 7, 3, 1, true)
 	funk(6, 4, 1, 3, false)
 	funk(7, 14, 2, 4, false)

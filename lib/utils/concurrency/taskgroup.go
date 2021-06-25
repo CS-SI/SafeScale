@@ -682,8 +682,8 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[strin
 }
 
 // Abort aborts the task execution
-// If TaskGroup is already finished, returns nil
-// Otherwise, return error if
+// If TaskGroup is already finished, returns nil (and in this case TaskGroup.Wait() will not report a *fail.ErrAborted)
+// Otherwise, return error if Abort() was not sent successfully
 func (instance *taskGroup) Abort() fail.Error {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
