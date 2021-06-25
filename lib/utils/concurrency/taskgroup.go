@@ -57,11 +57,12 @@ type subTask struct {
 type subTasks struct {
 	lock  sync.RWMutex
 	tasks []subTask
+	ended bool  // set to true when all subtasks are done (set by Abort() to differentiate an Abort to end properly the TaskGroup of a real Abort)
 }
 
 // task is a structure allowing to identify (indirectly) goroutines
 type taskGroup struct {
-	last uint
+	// last uint
 	*task
 	result TaskGroupResult
 
@@ -233,12 +234,20 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 		return instance, fail.InvalidInstanceError()
 	}
 
-	status, err := instance.task.GetStatus()
+	instance.children.lock.Lock()
+	defer  instance.children.lock.Unlock()
+
+	status, err := instance.GetStatus()
 	if err != nil {
 		return instance, err
 	}
 
-	instance.last++
+	// Do not try to start a new Task if TaskGroup is aborted or terminated (all children are done and TaskGroup has been waited)
+	if status != READY && status != RUNNING {
+		return nil, fail.InvalidRequestError("cannot start a new action, TaskGroup is aborted or done (status=%d)", status)
+	}
+
+	// instance.last++
 	subtask, err := NewTaskWithParent(instance.task, options...)
 	if err != nil {
 		return nil, err
@@ -276,10 +285,9 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 		return nil, err
 	}
 
-	instance.children.lock.Lock()
 	instance.children.tasks = append(instance.children.tasks, newChild)
-	instance.children.lock.Unlock()
 
+	// starts parent Task doing nothing more than waiting for Abort()
 	if status != RUNNING {
 		fnNOP := func(t Task, _ TaskParameters) (TaskResult, fail.Error) {
 			for !t.Aborted() {
@@ -323,7 +331,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		return nil, err
 	}
 
-	taskStatus, err := instance.task.GetStatus()
+	taskStatus, err := instance.GetStatus()
 	if err != nil {
 		return nil, err
 	}
@@ -332,73 +340,76 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	results := make(TaskGroupResult, len(instance.children.tasks))
 
 	switch taskStatus {
-	case DONE:
-		instance.task.mu.Lock()
-		defer instance.task.mu.Unlock()
-
-		results = instance.result
-		return results, instance.task.err
-
 	case READY:
 		return nil, fail.InconsistentError("cannot wait a TaskGroup that has not been started")
+
+	case DONE:
+		instance.task.lock.RLock()
+		defer instance.task.lock.RUnlock()
+		return instance.result, instance.err
 
 	case ABORTED:
 		fallthrough
 	case RUNNING:
-		doneWaitSize := len(instance.children.tasks)
-		doneWaitStates := make(map[int]bool, doneWaitSize)
-		for k := range instance.children.tasks {
-			doneWaitStates[k] = false
-		}
-		doneWaitCount := 0
-
-		instance.children.lock.RLock()
-		defer instance.children.lock.RUnlock()
-
-		for {
-			for k, s := range instance.children.tasks {
-				if doneWaitStates[k] {
-					continue
-				}
-
-				sid, err := s.task.GetID()
-				if err != nil {
-					continue
-				}
-
-				done, result, err := s.task.TryWait()
-				if done {
-					if err != nil {
-						if s.normalizeError != nil {
-							if normalizedError := s.normalizeError(err); normalizedError != nil {
-								errs[sid] = normalizedError
-							}
-						} else {
-							errs[sid] = err
-						}
-					}
-
-					results[sid] = result
-					doneWaitStates[k] = true
-					doneWaitCount++
-					break
-				}
-
-				time.Sleep(1 * time.Millisecond)
-			}
-
-			if doneWaitCount >= doneWaitSize {
-				break
-			}
-		}
+		results, errs = instance.waitChildren()
+		// doneWaitSize := len(instance.children.tasks)
+		// doneWaitStates := make(map[int]bool, doneWaitSize)
+		// for k := range instance.children.tasks {
+		// 	doneWaitStates[k] = false
+		// }
+		// doneWaitCount := 0
+		//
+		// instance.children.lock.RLock()
+		// defer instance.children.lock.RUnlock()
+		//
+		// for {
+		// 	for k, s := range instance.children.tasks {
+		// 		if doneWaitStates[k] {
+		// 			continue
+		// 		}
+		//
+		// 		sid, err := s.task.GetID()
+		// 		if err != nil {
+		// 			continue
+		// 		}
+		//
+		// 		done, result, err := s.task.TryWait()
+		// 		if done {
+		// 			if err != nil {
+		// 				if s.normalizeError != nil {
+		// 					if normalizedError := s.normalizeError(err); normalizedError != nil {
+		// 						errs[sid] = normalizedError
+		// 					}
+		// 				} else {
+		// 					errs[sid] = err
+		// 				}
+		// 			}
+		//
+		// 			results[sid] = result
+		// 			doneWaitStates[k] = true
+		// 			doneWaitCount++
+		// 			break
+		// 		}
+		//
+		// 		time.Sleep(1 * time.Millisecond)
+		// 	}
+		//
+		// 	if doneWaitCount >= doneWaitSize {
+		// 		break
+		// 	}
+		// }
 
 		var errors []error
-		instance.task.mu.Lock()
+		instance.task.lock.Lock()
+		// If all children have finished, the parent task has no valid error (Abort() may be submitted after all children terminate)
+		if instance.children.ended {
+			instance.task.err = nil
+		}
 		if instance.task.err != nil {
 			errors = append(errors, instance.task.err)
 		}
 		instance.task.result = results
-		instance.task.mu.Unlock()
+		instance.task.lock.Unlock()
 		for i, e := range errs {
 			switch cerr := e.(type) {
 			case *fail.ErrAborted:
@@ -420,9 +431,9 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		switch taskStatus {
 		case ABORTED:
 			if len(errors) > 0 {
-				instance.task.mu.Lock()
+				instance.task.lock.Lock()
 				instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
-				instance.task.mu.Unlock()
+				instance.task.lock.Unlock()
 			}
 
 		case TIMEOUT:
@@ -431,11 +442,11 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			fallthrough
 		case RUNNING:
 			// parent task is running, we need to abort it, even if abort was disable, now that all the children have terminated
-			instance.task.mu.Lock()
+			instance.task.lock.Lock()
 			previousErr := instance.task.err
 			abortSaved := instance.task.abortDisengaged
 			instance.task.abortDisengaged = false
-			instance.task.mu.Unlock()
+			instance.task.lock.Unlock()
 
 			taErr := instance.task.Abort()
 			if taErr != nil {
@@ -443,26 +454,29 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			}
 			_, tawErr := instance.task.Wait()
 			if tawErr != nil {
-				logrus.Tracef("ignored error waiting for task: %v", tawErr)
+				if previousErr == nil {
+					previousErr = tawErr
+				} else {
+					logrus.Tracef("ignored error waiting for task: %v", tawErr)
+				}
 			}
 
-			instance.task.mu.Lock()
+			instance.task.lock.Lock()
 			instance.task.abortDisengaged = abortSaved
 			if len(errors) > 0 {
 				instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "TaskGroup ended with failures")
 			} else {
 				instance.task.err = previousErr
 			}
-			instance.task.mu.Unlock()
+			instance.task.lock.Unlock()
 
 		case UNKNOWN:
 			return nil, fail.InconsistentError("cannot wait on TaskGroup in 'UNKNOWN' state")
 
 		case DONE:
 			// task done, WaitGroup successful
-			instance.task.mu.Lock()
-			defer instance.task.mu.Unlock()
 			if len(errors) > 0 {
+				instance.task.lock.Lock()
 				if instance.task.err != nil {
 					switch instance.task.err.(type) {
 					case *fail.ErrAborted:
@@ -472,12 +486,12 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 				} else {
 					instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
 				}
+				instance.task.lock.Unlock()
 			}
-			return instance.result, instance.task.err
 		}
 
-		instance.task.mu.Lock()
-		defer instance.task.mu.Unlock()
+		instance.task.lock.Lock()
+		defer instance.task.lock.Unlock()
 		instance.task.status = DONE
 		instance.result = results
 		return results, instance.task.err
@@ -485,6 +499,60 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	default:
 		return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
+}
+
+func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
+	instance.children.lock.RLock()
+	defer instance.children.lock.RUnlock()
+
+	childrenCount := len(instance.children.tasks)
+	errorList := make(map[string]error)
+	results := make(TaskGroupResult, childrenCount)
+
+	doneWaitStates := make(map[int]bool, childrenCount)
+	for k := range instance.children.tasks {
+		doneWaitStates[k] = false
+	}
+	doneWaitCount := 0
+
+	for {
+		for k, s := range instance.children.tasks {
+			if doneWaitStates[k] {
+				continue
+			}
+
+			sid, err := s.task.GetID()
+			if err != nil {
+				continue
+			}
+
+			done, result, err := s.task.TryWait()
+			if done {
+				if err != nil {
+					if s.normalizeError != nil {
+						if normalizedError := s.normalizeError(err); normalizedError != nil {
+							errorList[sid] = normalizedError
+						}
+					} else {
+						errorList[sid] = err
+					}
+				}
+
+				results[sid] = result
+				doneWaitStates[k] = true
+				doneWaitCount++
+				break
+			}
+
+			time.Sleep(1 * time.Millisecond)
+		}
+
+		if doneWaitCount >= childrenCount {
+			break
+		}
+	}
+
+	return results, errorList
 }
 
 // TryWait executes TryWaitGroup
@@ -614,22 +682,32 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, map[strin
 }
 
 // Abort aborts the task execution
+// If TaskGroup is already finished, returns nil
+// Otherwise, return error if
 func (instance *taskGroup) Abort() fail.Error {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 
-	var errors []error
 	if !instance.task.Aborted() {
-		// Send abort signal to subtasks' parent task
+		allDone := true
+		for _, v := range instance.children.tasks {
+			if done, _, _ := v.task.TryWait(); !done {
+				allDone = false
+				break
+			}
+		}
+
+		instance.task.lock.Lock()
+		instance.children.ended = allDone
+		instance.task.lock.Unlock()
+
+		// Send abort signal to parent task
 		if xerr := instance.task.Abort(); xerr != nil {
-			errors = append(errors, xerr)
+			return xerr
 		}
 	}
 
-	if len(errors) > 0 {
-		return fail.NewErrorList(errors)
-	}
 	return nil
 }
 
