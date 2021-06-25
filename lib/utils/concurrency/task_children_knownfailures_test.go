@@ -30,8 +30,6 @@ func TestAbortFatherTask(t *testing.T) {
 	require.NotNil(t, parent)
 	require.Nil(t, err)
 
-	count := 0
-
 	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		if t.Aborted() {
@@ -70,8 +68,6 @@ func TestAbortFatherTaskGroup(t *testing.T) {
 	parent, err := NewTaskGroupWithParent(nil)
 	require.NotNil(t, parent)
 	require.Nil(t, err)
-
-	count := 0
 
 	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)

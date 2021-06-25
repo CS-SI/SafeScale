@@ -440,7 +440,7 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 }
 
 // VPL: is not meaningful anymore now that Task.StartInSubtask is deprecated...
-// FIXME: move it in TaskGroup context ?
+// FIXME: move it in TaskGroup situation?
 // func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
 // 	overlord, xerr := NewUnbreakableTask()
 // 	require.NotNil(t, overlord)

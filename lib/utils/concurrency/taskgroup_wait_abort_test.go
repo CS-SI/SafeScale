@@ -362,7 +362,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 	iter := 0
 	for {
 		iter++
-		if iter > 60 {
+		if iter > 100 {
 			break
 		}
 
