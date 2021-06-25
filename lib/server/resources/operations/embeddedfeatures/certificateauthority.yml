@@ -217,8 +217,9 @@ feature:
                             fi
 
                             {{ if .ClusterFlavor }}
-                            tar zcvf ${SF_TMPDIR}/safescale-rootca.tar.gz ${SF_ETCDIR}/pki/ca && \
-                            sfDropzonePush ${SF_TMPDIR}/safescale-rootca.tar.gz && rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz || sfFail 196
+                            tar zcvf ${SF_TMPDIR}/safescale-rootca.tar.gz ${SF_ETCDIR}/pki/ca || sfFail 196 "failure unzipping safescale-rootca"
+                            sfDropzonePush ${SF_TMPDIR}/safescale-rootca.tar.gz || sfFail 196 "failure running dropzonepush"
+                            rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz || true
                             sfDropzoneSync {{ .PrimaryGatewayIP }}
                             {{ if .SecondaryGatewayIP }} sfDropzoneSync {{ .SecondaryGatewayIP }} {{ end }}
                             for i in {{ range .ClusterNodeIPs }}{{ . }} {{ end }}; do
