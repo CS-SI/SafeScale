@@ -71,6 +71,8 @@ func qualifyFromCode(code, details string) fail.Error {
 			details = "invalid parameter"
 		}
 		return fail.InvalidRequestError(details)
+	case "5009":
+		return fail.NotFoundError("availability zone not found")
 	case "5020":
 		return fail.NotFoundError("security group not found")
 	case "5057":
