@@ -24,6 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 // TaskGroupResult is a map of the TaskResult of each task
@@ -287,7 +288,11 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 			return nil, nil
 		}
 
-		_, _ = instance.task.Start(fnNOP, nil)
+		_, stErr := instance.task.Start(fnNOP, nil)
+		if stErr != nil {
+			logrus.Tracef("ignored task start error: %v", stErr)
+		}
+
 	}
 
 	return subtask, nil
@@ -421,13 +426,19 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			instance.task.abortDisengaged = false
 			instance.task.mu.Unlock()
 
-			_ = instance.task.Abort()
-			_, _ = instance.task.Wait()
+			taErr := instance.task.Abort()
+			if taErr != nil {
+				logrus.Tracef("ignored error aborting task: %v", taErr)
+			}
+			_, tawErr := instance.task.Wait()
+			if tawErr != nil {
+				logrus.Tracef("ignored error waiting for task: %v", tawErr)
+			}
 
 			instance.task.mu.Lock()
 			instance.task.abortDisengaged = abortSaved
 			if len(errors) > 0 {
-				instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
+				instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "TaskGroup ended with failures")
 			} else {
 				instance.task.err = previousErr
 			}
@@ -437,7 +448,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			return nil, fail.InconsistentError("cannot wait on TaskGroup in 'UNKNOWN' state")
 
 		case DONE:
-			// task done, WaitGroup successfull
+			// task done, WaitGroup successful
 			instance.task.mu.Lock()
 			defer instance.task.mu.Unlock()
 			return instance.result, instance.task.err
@@ -446,7 +457,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		instance.task.mu.Lock()
 		defer instance.task.mu.Unlock()
 
-			instance.task.status = DONE
+		instance.task.status = DONE
 
 		instance.result = results
 		return results, instance.task.err
@@ -495,7 +506,10 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 		defer instance.children.lock.RUnlock()
 
 		for _, s := range instance.children.tasks {
-			if ok, _, _ := s.task.TryWait(); !ok {
+			if ok, _, twErr := s.task.TryWait(); !ok {
+				if twErr != nil {
+					logrus.Tracef("ignored trywait error: %v", twErr)
+				}
 				return false, nil, nil
 			}
 		}
