@@ -20,7 +20,9 @@ export SF_VARDIR=${SF_BASEDIR}/var
 export SF_TMPDIR=${SF_VARDIR}/tmp
 export SF_LOGDIR=${SF_VARDIR}/log
 
-declare -x SF_SERIALIZED_FACTS=$(mktemp)
+declare -x SF_SERIALIZED_FACTS
+SF_SERIALIZED_FACTS=$(mktemp)
+
 declare -A FACTS
 export LINUX_KIND=
 export VERSION_ID=
@@ -99,12 +101,16 @@ function sfExit() {
 export -f sfExit
 
 function sfFinishPreviousInstall() {
-	local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+	local unfinished
+	unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
 	if [[ "$unfinished" == 0 ]]; then
 		echo "good"
+		return 0
 	else
 		echo "there are unconfigured packages !"
 		sudo dpkg --configure -a --force-all
+		[ $? -ne 0 ] && return $?
+		return 1
 	fi
 }
 export -f sfFinishPreviousInstall
@@ -112,7 +118,10 @@ export -f sfFinishPreviousInstall
 # sfWaitForApt waits an already running apt-like command to finish
 function sfWaitForApt() {
 	sfFinishPreviousInstall || true
+	[ $? -ne 0 ] && return $?
 	sfWaitLockfile apt /var/{lib/{dpkg,apt/lists},cache/apt/archives}/lock
+	[ $? -ne 0 ] && return $?
+	return 0
 }
 export -f sfWaitForApt
 
@@ -121,6 +130,7 @@ function sfApt() {
 	echo "waiting for apt lock..."
 	rc=-1
 	sfWaitForApt
+	[ $? -ne 0 ] && return $?
 	echo "running apt " "$@"
 	DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
 	[ $rc -eq -1 ] && return 1
@@ -444,16 +454,16 @@ function sfInstall() {
 	debian | ubuntu)
 		export DEBIAN_FRONTEND=noninteractive
 		sfRetry 5m 3 "sfApt update"
-		sfApt install $1 -y --force-yes || exit 194
-		command -v $1 || exit 194
+		sfApt install $1 -y --force-yes || return 194
+		command -v $1 || return 194
 		;;
 	centos | rhel)
-		yum install -y $1 || exit 194
-		command -v $1 || exit 194
+		yum install -y $1 || return 194
+		command -v $1 || return 194
 		;;
 	*)
 		echo "Unsupported operating system '$LINUX_KIND'"
-		exit 195
+		return 195
 		;;
 	esac
 	return 0
@@ -502,23 +512,39 @@ function sfDownload() {
 export -f sfDownload
 
 __create_dropzone() {
-	[[ ! -d ~cladm/.dropzone ]] && mkdir -p ~cladm/.dropzone
+	[[ ! -d ~cladm/.dropzone ]] && {
+		mkdir -p ~cladm/.dropzone
+		[ $? -ne 0 ] && return $?
+	}
 	chown -R cladm:cladm ~cladm/.dropzone
+	[ $? -ne 0 ] && return $?
 	chmod -R ug+s ~cladm/.dropzone
+	[ $? -ne 0 ] && return $?
+	return 0
 }
 
 function sfDownloadInDropzone() {
 	__create_dropzone &>/dev/null
-	(cd ~cladm/.dropzone && sfDownload "$@")
+	[ $? -ne 0 ] && return $?
+	cd ~cladm/.dropzone && {
+		sfDownload "$@"
+		[ $? -ne 0 ] && return $?
+	}
+	return 0
 }
 export -f sfDownloadInDropzone
 
 # Copy local file to drop zone in remote
 function sfDropzonePush() {
-	local file="$1"
+	local file
+	file="$1"
 	__create_dropzone || echo "failed to create dropzone (exit code $?)"
+	[ $? -ne 0 ] && return $?
 	cp -rf "$file" ~cladm/.dropzone/ || echo "failed to copy '$file' in dropzone (exit code $?)"
+	[ $? -ne 0 ] && return $?
 	chown -R cladm:cladm ~cladm/.dropzone || echo "failed to set ownership of dropzone (exit code $?)"
+	[ $? -ne 0 ] && return $?
+	return 0
 }
 export -f sfDropzonePush
 
@@ -526,7 +552,10 @@ export -f sfDropzonePush
 function sfDropzoneSync() {
 	local remote="$1"
 	__create_dropzone &>/dev/null
+	[ $? -ne 0 ] && return $?
 	scp $__cluster_admin_ssh_options__ -r ~cladm/.dropzone cladm@${remote}:~/
+	[ $? -ne 0 ] && return $?
+	return 0
 }
 export -f sfDropzoneSync
 
@@ -538,12 +567,16 @@ function sfDropzonePop() {
 	local file=
 	[ $# -eq 2 ] && file="$2"
 	__create_dropzone || echo "failed to create dropzone (exit code $?)"
+	[ $? -ne 0 ] && return $?
 	mkdir -p "$dest" >/dev/null || echo "failed to create '$dest' folder (exit code $?)"
 	if [ $# -eq 1 ]; then
 		mv -f ~cladm/.dropzone/* "$dest" || echo "failed to move all files in dropzone to '$dest' (exit code $?)"
+		[ $? -ne 0 ] && return $?
 	else
 		mv -f ~cladm/.dropzone/"$file" "$dest" || echo "failed to move file '$file' in dropzone to '$dest' (exit code $?)"
+		[ $? -ne 0 ] && return $?
 	fi
+	return 0
 }
 export -f sfDropzonePop
 
@@ -552,12 +585,17 @@ function sfDropzoneUntar() {
 	local dest="$2"
 	shift 2
 	__create_dropzone &>/dev/null
+	[ $? -ne 0 ] && return $?
 	tar zxvf ~cladm/.dropzone/"$file" -C "$dest"
+	[ $? -ne 0 ] && return $?
+	return 0
 }
 export -f sfDropzoneUntar
 
 function sfDropzoneClean() {
 	rm -rf ~cladm/.dropzone/* ~cladm/.dropzone/.[^.]*
+	[ $? -ne 0 ] && return $?
+	return 0
 }
 export -f sfDropzoneClean
 
@@ -565,12 +603,16 @@ export -f sfDropzoneClean
 function sfRemoteExec() {
 	local remote=$1
 	shift
-	ssh $__cluster_admin_ssh_options__ cladm@$remote $*
+	ssh $__cluster_admin_ssh_options__ cladm@$remote "$@"
+	[ $? -ne 0 ] && return $?
+	return 0
 }
 export -f sfRemoteExec
 
 function sfKubectl() {
 	sudo -u cladm -i kubectl "$@"
+	[ $? -ne 0 ] && return $?
+	return 0
 }
 export -f sfKubectl
 
@@ -597,16 +639,22 @@ function sfHelm() {
 	done
 
 	sudo -u cladm -i helm "$@" $use_tls
+	[ $? -ne 0 ] && return $?
+    return 0
 }
 export -f sfHelm
 
 function sfDcos() {
 	sudo -u cladm -i dcos "$@"
+	[ $? -ne 0 ] && return $?
+    return 0
 }
 export -f sfDcos
 
 function sfMarathon() {
 	sudo -u cladm -i marathon "$@"
+	[ $? -ne 0 ] && return $?
+    return 0
 }
 export -f sfMarathon
 
@@ -615,6 +663,7 @@ function sfProbeGPU() {
 		val=$(lspci | grep nvidia 2>/dev/null) || true
 		[ ! -z "$val" ] && FACTS["nVidia GPU"]=$val || true
 	fi
+	return 0
 }
 export -f sfProbeGPU
 
@@ -941,7 +990,7 @@ function sfIsDockerSwarmInit() {
 }
 export -f sfIsDockerSwarmInit
 
-# tells if a container using a specific image (and optionnaly name) is running in standalone mode
+# tells if a container using a specific image (and optional name) is running in standalone mode
 function sfDoesDockerRunContainer() {
 	[ $# -eq 0 ] && return 1
 	local IMAGE=$1
@@ -989,6 +1038,7 @@ function sfDoesDockerRunStack() {
 	local NAME=$1
 
 	docker stack ps $NAME {{ "--filter 'desired-state=running'" }} &>/dev/null
+	[ $? -ne 0 ] && return $?
 }
 export -f sfDoesDockerRunStack
 
@@ -1012,7 +1062,7 @@ function sfRemoveDockerImage() {
 export -f sfRemoveDockerImage
 
 # Allows to create or update a docker secret
-# password can be passed as second parameter or through stdin (prefered option)
+# password can be passed as second parameter or through stdin (preferred option)
 function sfUpdateDockerSecret() {
 	[ $# -lt 1 ] && return 1
 	local name=$1
@@ -1094,6 +1144,7 @@ function sfDetectFacts() {
 		FACTS["linux_kind"]=$ID
 		LINUX_KIND=${ID,,}
 		FACTS["linux_version"]=$VERSION_ID
+		FACTS["distrib_version"]=$VERSION_ID
 		VERSION_ID=$VERSION_ID
 		FULL_VERSION_ID=$VERSION_ID
 		[ ! -z ${VERSION_CODENAME+x} ] && FACTS["linux_codename"]=${VERSION_CODENAME,,}
@@ -1121,6 +1172,7 @@ function sfDetectFacts() {
 		fi
 		FACTS["linux_kind"]=${LINUX_KIND,,}
 		FACTS["linux_version"]=$VERSION_ID
+		FACTS["distrib_version"]=$VERSION_ID
 	fi
 
 	# Some facts about system
@@ -1202,3 +1254,4 @@ export -f waitForUserdata
 
 waitForUserdata
 sfDetectFacts
+set -x
