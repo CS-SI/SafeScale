@@ -536,7 +536,7 @@ feature:
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 212
+                            bash -x ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 212
                             # Starting from here, any kubectl command must be changed to sfKubectl
 
                             # Push control-plane join command to all the other masters
@@ -679,15 +679,15 @@ feature:
                               resourceNames: ['privileged']
                             EOF
 
-                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 216
-                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 217
+                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 216 "failure applying psp-default.yaml"
+                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 217 "failure applying psp-privileged.yaml"
                             {{ end }}
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 218
-                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 219
-                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 220
+                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 218 "failure checking apiserver"
+                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 219 "failure checking controller"
+                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 220 "failure checking scheduler"
 
                             echo "cp1 init done"
                             sfExit
@@ -734,20 +734,20 @@ feature:
                             # Don't try to init a kubernetes cluster already running
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
-                            sfDropzonePop ${SF_TMPDIR} || sfFail 224
-                            sfDropzoneClean
+                            sfDropzonePop ${SF_TMPDIR} || sfFail 224 "failure creating drop zone"
+                            sfDropzoneClean || sfFail 224 "failure cleaning drop zone"
 
-                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 225
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 225 "failure due to missing cp_join_cmd.sh"
                             # sometimes, etcd cluster appears to be unhealthy when calling this... So retries!
-                            sfRetry $(sfClusterJoinTimeout) $(sfDefaultDelay) bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 226
-                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 227
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 228
+                            sfRetry $(sfClusterJoinTimeout) $(sfDefaultDelay) bash -x ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 226 "failure running cp_join_cmd.sh"
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 227 "failure due to missing init_cluster_admin_kube.sh"
+                            bash -x ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 228 "failure running init_cluster_admin_kube.sh"
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 229
-                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 230
-                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 231
+                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 229 "failure running k8s apiserver"
+                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 230 "failure running k8s controller"
+                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 231 "failure running k8s scheduler"
 
                             touch /etc/kubernetes/.joined
                             echo "cpx init done"
