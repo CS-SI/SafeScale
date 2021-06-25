@@ -34,7 +34,7 @@ func TestTaskFatherAbortion(t *testing.T) {
 
 	count := 0
 
-	child, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		fmt.Println("child started.")
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		if t.Aborted() {
@@ -47,7 +47,7 @@ func TestTaskFatherAbortion(t *testing.T) {
 	}, nil, InheritParentIDOption, AmendID("/child"))
 	require.Nil(t, err)
 
-	sibling, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		fmt.Println("sibling started.")
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		fmt.Println("Evaluating...")
@@ -82,14 +82,14 @@ func TestTaskFatherAbortionNoAbort(t *testing.T) {
 
 	count := make(chan int, 4)
 
-	child, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		count <- 1
 		return "B", nil
 	}, nil)
 	require.Nil(t, err)
 
-	sibling, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		count <- 1
@@ -120,7 +120,7 @@ func TestTaskFatherAbortionLater(t *testing.T) {
 
 	count := make(chan int, 4)
 
-	child, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		if t.Aborted() {
@@ -132,7 +132,7 @@ func TestTaskFatherAbortionLater(t *testing.T) {
 	require.Nil(t, err)
 	_ = child
 
-	sibling, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		if t.Aborted() {

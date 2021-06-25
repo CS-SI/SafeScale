@@ -26,11 +26,13 @@ import (
 
 // tasks with subtasks don't play well with aborts
 func TestAbortFatherTask(t *testing.T) {
-	parent, err := NewTask()
+	parent, err := NewTaskGroup()
 	require.NotNil(t, parent)
 	require.Nil(t, err)
 
-	child, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	count := 0
+
+	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		if t.Aborted() {
 			return "A", nil
@@ -39,7 +41,7 @@ func TestAbortFatherTask(t *testing.T) {
 	}, nil)
 	require.Nil(t, err)
 
-	sibling, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		if t.Aborted() {
 			return "A", nil
@@ -55,6 +57,9 @@ func TestAbortFatherTask(t *testing.T) {
 
 	require.True(t, parent.Aborted())
 
+	_, xerr := parent.Wait()
+	require.NotNil(t, xerr)
+
 	_ = parent
 	_ = child
 	_ = sibling
@@ -66,7 +71,9 @@ func TestAbortFatherTaskGroup(t *testing.T) {
 	require.NotNil(t, parent)
 	require.Nil(t, err)
 
-	child, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	count := 0
+
+	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		if t.Aborted() {
 			return "A", nil
@@ -75,7 +82,7 @@ func TestAbortFatherTaskGroup(t *testing.T) {
 	}, nil)
 	require.Nil(t, err)
 
-	sibling, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		if t.Aborted() {
 			return "A", nil

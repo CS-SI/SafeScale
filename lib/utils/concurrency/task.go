@@ -88,10 +88,8 @@ type TaskCore interface {
 	SetID(string) fail.Error
 
 	Run(TaskAction, TaskParameters) (TaskResult, fail.Error)
-	RunInSubtask(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error)
 	Start(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error)
 	StartWithTimeout(fn TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error)
-	StartInSubtask(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error)
 }
 
 // Task is the interface of a task running in goroutine, allowing to identity (indirectly) goroutines
@@ -224,7 +222,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	)
 
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil!, use context.TODO() instead!")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil!, use context.TODO() or context.Background() instead!")
 	}
 
 	if parentTask == nil {
@@ -451,22 +449,22 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 	return t, nil
 }
 
-// StartInSubtask runs in a subtask goroutine the function with parameters
-func (t *task) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if t.IsNull() {
-		return nil, fail.InvalidInstanceError()
-	}
-
-	st, xerr := NewTaskWithParent(t, options...)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	return st.Start(action, params, options...)
-}
+// // StartInSubtask runs in a subtask goroutine the function with parameters
+// func (t *task) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
+// 	if t.IsNull() {
+// 		return nil, fail.InvalidInstanceError()
+// 	}
+//
+// 	st, xerr := NewTaskWithParent(t, options...)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	t.lock.Lock()
+// 	defer t.lock.Unlock()
+//
+// 	return st.Start(action, params, options...)
+// }
 
 // controller controls the start, termination and possibly abortion of the action
 func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) fail.Error {
@@ -590,6 +588,8 @@ func (t *task) processAbort(traceR *tracer) fail.Error {
 			default:
 				t.err = fail.AbortedError(t.err)
 			}
+		} else {
+			t.err = fail.AbortedError(nil)
 		}
 	} else {
 		traceR.trace("abort signal is disengaged, ignored")
@@ -657,22 +657,23 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, fail.E
 	return t.Wait()
 }
 
-// RunInSubtask starts a subtask, waits its completion then return the error code
-func (t *task) RunInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error) {
-	if t.IsNull() {
-		return nil, fail.InvalidInstanceError()
-	}
-	if action == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("action")
-	}
-
-	st, xerr := NewTaskWithParent(t, options...)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	return st.Run(action, params)
-}
+// VPL: DEPRECATED
+// // RunInSubtask starts a subtask, waits its completion then return the error code
+// func (t *task) RunInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error) {
+// 	if t.IsNull() {
+// 		return nil, fail.InvalidInstanceError()
+// 	}
+// 	if action == nil {
+// 		return nil, fail.InvalidParameterCannotBeNilError("action")
+// 	}
+//
+// 	st, xerr := NewTaskWithParent(t, options...)
+// 	if xerr != nil {
+// 		return nil, xerr
+// 	}
+//
+// 	return st.Run(action, params)
+// }
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
 func (t *task) Wait() (TaskResult, fail.Error) {

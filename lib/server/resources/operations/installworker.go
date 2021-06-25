@@ -1055,17 +1055,34 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 
 			primaryGatewayVariables["Hostname"] = h.GetName() + domain
 
-			tP, xerr := task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
+			tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/proxy/rule/"))
+			if xerr != nil {
+				return xerr
+			}
+
+			_, xerr = tg.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
 				controller: primaryKongController,
 				rule:       r.(map[interface{}]interface{}),
 				variables:  &primaryGatewayVariables,
-			}, concurrency.InheritParentIDOption)
+			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%s/host/%s/apply", primaryKongController.GetHostname())))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to apply proxy rules")
 			}
 
-			var errS fail.Error
+			defer func() {
+				if xerr != nil {
+					derr := tg.Abort()
+					if derr != nil {
+						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort TaskGroup"))
+					}
+					_, derr = tg.Wait()
+					if derr != nil {
+						_ = xerr.AddConsequence(derr)
+					}
+				}
+			}()
+
 			if secondaryKongController != nil {
 				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
 				xerr = debug.InjectPlannedFail(xerr)
@@ -1096,23 +1113,19 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 
 				secondaryGatewayVariables["Hostname"] = h.GetName() + domain
 
-				tS, errOp := task.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
+				_, xerr = tg.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
 					controller: secondaryKongController,
 					rule:       rule,
 					variables:  &secondaryGatewayVariables,
-				}, concurrency.InheritParentIDOption)
-				if errOp == nil {
-					_, errOp = tS.Wait()
+				}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%s/host/%s/apply", secondaryKongController.GetHostname())))
+				if xerr != nil {
+					return xerr
 				}
-				errS = errOp
 			}
 
-			_, errP := tP.Wait()
-			if errP != nil {
-				return errP
-			}
-			if errS != nil {
-				return errS
+			_, xerr = tg.Wait()
+			if xerr != nil {
+				return xerr
 			}
 		}
 	}
@@ -1131,14 +1144,15 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
 
 	p := params.(taskApplyProxyRuleParameters)
 	hostName, ok := (*p.variables)["Hostname"].(string)
 	if !ok {
 		return nil, fail.InvalidParameterError("variables['Hostname']", "is not a string")
+	}
+
+	if task.Aborted() {
+		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	ruleName, xerr := p.controller.Apply(p.rule, p.variables)

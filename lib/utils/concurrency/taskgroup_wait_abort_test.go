@@ -60,7 +60,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 
 		bailout := make(chan string, 80) // a buffered channel
 		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
-			_, xerr = single.StartInSubtask(
+			_, xerr = single.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
@@ -160,7 +160,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 
 		bailout := make(chan string, 80) // a buffered channel
 		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
-			_, xerr = overlord.StartInSubtask(
+			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
@@ -272,15 +272,15 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		}
 
 		t.Log("Next") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
-		single, xerr := NewTaskGroup()
-		require.NotNil(t, single)
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
 		require.Nil(t, xerr)
-		xerr = single.SetID(fmt.Sprintf("parent-%d", iter))
+		xerr = overlord.SetID(fmt.Sprintf("parent-%d", iter))
 		require.Nil(t, xerr)
 
 		bailout := make(chan string, 80) // a buffered channel
 		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
-			_, xerr = single.StartInSubtask(
+			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
@@ -306,10 +306,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		// after this, some tasks will already be looking for ABORT signals
 		time.Sleep(time.Duration(65) * time.Millisecond)
 
-		xerr = single.Abort()
+		xerr = overlord.Abort()
 		require.Nil(t, xerr)
 
-		_, xerr = single.Wait()
+		_, xerr = overlord.Wait()
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 			switch xerr.(type) {
