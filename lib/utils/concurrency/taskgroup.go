@@ -57,7 +57,7 @@ type subTask struct {
 type subTasks struct {
 	lock  sync.RWMutex
 	tasks []subTask
-	ended bool  // set to true when all subtasks are done (set by Abort() to differentiate an Abort to end properly the TaskGroup of a real Abort)
+	ended bool // set to true when all subtasks are done (set by Abort() to differentiate an Abort to end properly the TaskGroup of a real Abort)
 }
 
 // task is a structure allowing to identify (indirectly) goroutines
@@ -235,7 +235,7 @@ func (instance *taskGroup) Start(action TaskAction, params TaskParameters, optio
 	}
 
 	instance.children.lock.Lock()
-	defer  instance.children.lock.Unlock()
+	defer instance.children.lock.Unlock()
 
 	status, err := instance.GetStatus()
 	if err != nil {
@@ -457,7 +457,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 				// if previousErr == nil {
 				// 	previousErr = tawErr
 				// } else {
-					logrus.Tracef("ignored error waiting for task: %v", tawErr)
+				logrus.Tracef("ignored error waiting for task: %v", tawErr)
 				// }
 			}
 
@@ -692,7 +692,10 @@ func (instance *taskGroup) Abort() fail.Error {
 	if !instance.task.Aborted() {
 		allDone := true
 		for _, v := range instance.children.tasks {
-			if done, _, _ := v.task.TryWait(); !done {
+			if done, _, twErr := v.task.TryWait(); !done {
+				if twErr != nil {
+					logrus.Tracef("ignoring TryWait error: %v", twErr)
+				}
 				allDone = false
 				break
 			}
