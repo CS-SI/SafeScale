@@ -317,12 +317,18 @@ func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
 }
 
 // WaitGroup waits for the task to end, and returns the error (or nil) of the execution
-// Note: this function may lead to go routine leaks, because we do not want a taskgroup to be locked because of
-//       a subtask not responding; if a subtask is designed to run forever, it will never end.
-//       It's highly recommended to use task.Aborted() in the body of a task to check
+// Returns:
+//  - nil, *fail.InconsistentError: if TaskGroup has not started anything
+//  - nil, *fail.Error: if anything wrong occured during the waiting
+//  - TaskGroupResult, *fail.ErrAborted: if TaskGroup or some of the sub-Tasks have been aborted (meaning explicitely or because a Task failed)
+//  - TaskGroupResult, nil: if TaskGroup finished without error
+//
+// Note: this function may lead to go routine leaks, because we do not want a TaskGroup to be locked because of
+//       a sub-Task not responding; if a sub-Task is designed to run forever, it will never end.
+//       It's highly recommended to use Task.Aborted() in the body of a task to check
 //       for abortion signal and quit the go routine accordingly to reduce the risk (a taskgroup remains abortable with
 //       this recommendation).
-func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
+func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -337,7 +343,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		return nil, err
 	}
 
-	errs := make(map[string]error)
+	childrenErrors := make(map[string]error)
 	results := make(TaskGroupResult, len(instance.children.tasks))
 
 	switch taskStatus {
@@ -347,58 +353,26 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 	case DONE:
 		instance.task.lock.RLock()
 		defer instance.task.lock.RUnlock()
-		return instance.result, instance.err
+
+		if instance.task.err != nil {
+			switch cerr := instance.task.err.(type) {
+			case *fail.ErrAborted:
+				cause := fail.ConvertError(cerr.Cause())
+				if cause == nil && instance.children.ended {
+					// situation where we do not want WaitGroup() to return *fail.ErrAborted, because children terminated properly
+					instance.task.err = nil
+				}
+			}
+		}
+		return instance.result, instance.task.err
 
 	case ABORTED:
 		fallthrough
 	case RUNNING:
-		results, errs = instance.waitChildren()
-		// doneWaitSize := len(instance.children.tasks)
-		// doneWaitStates := make(map[int]bool, doneWaitSize)
-		// for k := range instance.children.tasks {
-		// 	doneWaitStates[k] = false
-		// }
-		// doneWaitCount := 0
-		//
-		// instance.children.lock.RLock()
-		// defer instance.children.lock.RUnlock()
-		//
-		// for {
-		// 	for k, s := range instance.children.tasks {
-		// 		if doneWaitStates[k] {
-		// 			continue
-		// 		}
-		//
-		// 		sid, err := s.task.GetID()
-		// 		if err != nil {
-		// 			continue
-		// 		}
-		//
-		// 		done, result, err := s.task.TryWait()
-		// 		if done {
-		// 			if err != nil {
-		// 				if s.normalizeError != nil {
-		// 					if normalizedError := s.normalizeError(err); normalizedError != nil {
-		// 						errs[sid] = normalizedError
-		// 					}
-		// 				} else {
-		// 					errs[sid] = err
-		// 				}
-		// 			}
-		//
-		// 			results[sid] = result
-		// 			doneWaitStates[k] = true
-		// 			doneWaitCount++
-		// 			break
-		// 		}
-		//
-		// 		time.Sleep(1 * time.Millisecond)
-		// 	}
-		//
-		// 	if doneWaitCount >= doneWaitSize {
-		// 		break
-		// 	}
-		// }
+		results, childrenErrors = instance.waitChildren()
+		if len(childrenErrors) == 0 {
+			instance.children.ended = true
+		}
 
 		var errors []error
 		instance.task.lock.Lock()
@@ -409,9 +383,9 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		if instance.task.err != nil {
 			errors = append(errors, instance.task.err)
 		}
-		instance.task.result = results
+		instance.result = results
 		instance.task.lock.Unlock()
-		for i, e := range errs {
+		for i, e := range childrenErrors {
 			switch cerr := e.(type) {
 			case *fail.ErrAborted:
 				cause := fail.ConvertError(cerr.Cause())
@@ -455,11 +429,7 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			}
 			_, tawErr := instance.task.Wait()
 			if tawErr != nil {
-				// if previousErr == nil {
-				// 	previousErr = tawErr
-				// } else {
 				logrus.Tracef("ignored error waiting for task: %v", tawErr)
-				// }
 			}
 
 			instance.task.lock.Lock()
@@ -467,6 +437,14 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			if len(errors) > 0 {
 				instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "TaskGroup ended with failures")
 			} else {
+				// If all children have terminated before the Abort, we have to ignore the abort error
+				if instance.children.ended {
+					switch previousErr.(type) {
+					case *fail.ErrAborted:
+						previousErr = nil
+					default:
+					}
+				}
 				instance.task.err = previousErr
 			}
 			instance.task.lock.Unlock()
@@ -488,14 +466,28 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 					instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
 				}
 				instance.task.lock.Unlock()
+			// } else if instance.children.ended {
+			// 	switch instance.task.err.(type) {
+			// 	case *fail.ErrAborted:
+			// 		instance.task.err = nil
+			// 	default:
+			// 	}
 			}
 		}
 
 		instance.task.lock.Lock()
 		defer instance.task.lock.Unlock()
+
+		switch cerr := instance.task.err.(type) {
+		case *fail.ErrAborted:
+			cause := fail.ConvertError(cerr.Cause())
+			if cause == nil && instance.children.ended {
+				// situation where we do not want WaitGroup() to return *fail.ErrAborted, because children terminated properly
+				instance.task.err = nil
+			}
+		}
 		instance.task.status = DONE
-		instance.result = results
-		return results, instance.task.err
+		return instance.result, instance.task.err
 
 	default:
 		return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
@@ -691,18 +683,18 @@ func (instance *taskGroup) Abort() fail.Error {
 	}
 
 	if !instance.task.Aborted() {
-		allDone := true
-		for _, v := range instance.children.tasks {
-			if done, _, xerr := v.task.TryWait(); !done || xerr != nil {
-				allDone = false
-				break
-			}
-		}
-
-		instance.task.lock.Lock()
-		instance.children.ended = allDone
-		instance.task.lock.Unlock()
-
+		// allDone := true
+		// for _, v := range instance.children.tasks {
+		// 	if done, _, xerr := v.task.TryWait(); !done || xerr != nil {
+		// 		allDone = false
+		// 		break
+		// 	}
+		// }
+		//
+		// instance.task.lock.Lock()
+		// instance.children.ended = allDone
+		// instance.task.lock.Unlock()
+		//
 		// Send abort signal to parent task
 		if xerr := instance.task.Abort(); xerr != nil {
 			return xerr

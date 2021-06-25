@@ -30,7 +30,7 @@ import (
 )
 
 func TestChildrenWaitingGameOnlyAWhile(t *testing.T) {
-	overlord, err := NewTaskGroupWithParent(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -39,7 +39,7 @@ func TestChildrenWaitingGameOnlyAWhile(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 800; ind++ {
-		_, err := overlord.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
@@ -58,25 +58,25 @@ func TestChildrenWaitingGameOnlyAWhile(t *testing.T) {
 }
 
 func TestCallingReadyTaskGroup(t *testing.T) {
-	single, err := NewTaskGroupWithParent(nil)
-	require.NotNil(t, single)
+	overlord, err := NewTaskGroupWithParent(nil)
+	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	res, err := single.Wait()
+	res, err := overlord.Wait()
 	require.Empty(t, res)
 	require.NotNil(t, err)
 
-	done, res, err := single.WaitFor(10 * time.Millisecond)
-	require.True(t, done)
+	done, res, err := overlord.WaitFor(10 * time.Millisecond)
+	require.False(t, done)
 	require.Empty(t, res)
 	require.NotNil(t, err)
 
-	done, res, err = single.TryWait()
-	require.True(t, done)
+	done, res, err = overlord.TryWait()
+	require.False(t, done)
 	require.Empty(t, res)
 	require.NotNil(t, err)
 
-	err = single.Abort()
+	err = overlord.Abort()
 	require.Nil(t, err)
 }
 
@@ -90,7 +90,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 800; ind++ {
-		_, err := overlord.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)

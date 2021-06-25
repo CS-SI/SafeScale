@@ -21,14 +21,14 @@ func TestKeepRecords(t *testing.T) {
 		}
 
 		t.Log("Next") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
-		single, xerr := NewTaskGroup()
-		require.NotNil(t, single)
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
 		require.Nil(t, xerr)
-		xerr = single.SetID(fmt.Sprintf("/parent-%d", iter))
+		xerr = overlord.SetID(fmt.Sprintf("/parent-%d", iter))
 		require.Nil(t, xerr)
 
 		for ind := 0; ind < 5; ind++ { // work with 5 tasks
-			_, xerr = single.StartInSubtask(
+			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					mylimit := tools.RandomInt(5, 15)
 					for { // iterate only a few times: mylimit
@@ -58,7 +58,7 @@ func TestKeepRecords(t *testing.T) {
 		// after this, some tasks will already be looking for ABORT signals
 		time.Sleep(time.Duration(65) * time.Millisecond)
 
-		res, xerr := single.Wait()
+		res, xerr := overlord.Wait()
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrAborted:
