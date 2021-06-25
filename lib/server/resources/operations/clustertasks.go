@@ -186,12 +186,14 @@ func (instance *Cluster) taskCreateCluster(tc concurrency.Task, params concurren
 
 			tg, tgerr := concurrency.NewTaskGroup(task, concurrency.InheritParentIDOption)
 			if tgerr != nil {
+				cleanFailure = true
 				_ = xerr.AddConsequence(tgerr)
 				return
 			}
 
 			derr := tg.AppendToID("/onfailure/")
 			if derr != nil {
+				cleanFailure = true
 				_ = xerr.AddConsequence(derr)
 				return
 			}
@@ -209,6 +211,7 @@ func (instance *Cluster) taskCreateCluster(tc concurrency.Task, params concurren
 				})
 			})
 			if derr != nil {
+				cleanFailure = true
 				_ = xerr.AddConsequence(derr)
 				return
 			}
@@ -765,7 +768,7 @@ func (instance *Cluster) createHostResources(
 
 			taskID := func(t concurrency.Task) string {
 				tid, cleanErr := t.GetID()
-				if cleanErr != nil{
+				if cleanErr != nil {
 					_ = xerr.AddConsequence(cleanErr)
 					tid = "<unknown>"
 				}
@@ -1802,7 +1805,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 	if p.count < 1 {
 		return nil, fail.InvalidParameterError("params.count", "cannot be an integer less than 1")
 	}
-	
+
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
@@ -2325,7 +2328,6 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 			xerr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
 		}
 	}()
-
 
 	logrus.Debugf("Deleting Node '%s'", nodeName)
 	xerr = instance.deleteNode(task.GetContext(), p.node, p.master)
