@@ -242,24 +242,54 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 			break
 		}
 
-	single, xerr := NewTaskGroup()
-	require.NotNil(t, single)
-	require.Nil(t, xerr)
-	xerr = single.SetID("/parent")
-	require.Nil(t, xerr)
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
 
-	for ind := 0; ind < 10; ind++ {
-		_, err := single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(tools.RandomInt(10, 20)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		single, xerr := NewTaskGroup()
+		require.NotNil(t, single)
+		require.Nil(t, xerr)
+		xerr = single.SetID("/parent")
+		require.Nil(t, xerr)
+
+		for ind := 0; ind < 10; ind++ {
+			_, err := single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(tools.RandomInt(10, 20)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+			if err != nil {
+				t.Errorf("Unexpected: %s", err)
+				t.FailNow()
+			}
+		}
+
+		time.Sleep(time.Duration(200) * time.Millisecond)
+		// single should have finished a loooong time ago...
+
+		// but we abort anyway
+		xerr = single.Abort()
+		if xerr != nil {
+			t.Errorf("Failed to abort")
 			t.FailNow()
 		}
 
-	time.Sleep(time.Duration(100) * time.Millisecond)
-	// single should have finished a loooong time ago...
+		// the question here, is why we fail ?
+		// and more, from a client point of view, why this failed ?
+		// all we have is an aborted error
+		var res map[string]TaskResult
+		res, xerr = single.WaitGroup()
+		if xerr != nil {
+			t.Errorf("Failed to Wait: %v", xerr)
+		}
+		if iter == 1 {
+			previousRes = res
+		} else {
+			if len(res) != len(previousRes) {
+				t.Errorf("Not consistent, before: %d, now: %d", len(previousRes), len(res))
+				t.FailNow()
+			}
+			previousRes = res
+		}
 
 		t.Errorf("Recovered this: %v", res)
 
