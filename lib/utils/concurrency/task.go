@@ -727,8 +727,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 // TryWait tries to wait on a task
 // If task done, returns (true, TaskResult, <error from the task>)
-// If task aborted, returns (false, nil, *fail.ErrAborted) (subsequent calls of TryWait may be necessary)
-// If task still running, returns (false, nil)
+// If task is not done, returns (false, nil, nil) (subsequent calls of TryWait may be necessary)
 // if Task is not started, returns (false, nil, *fail.ErrInconsistent)
 func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 	if t.IsNull() {
@@ -742,19 +741,18 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
-		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
+		return false, nil, fail.InconsistentError("cannot wait a Task that has not been started")
+
+	// ABORTED and TIMEOUT are transient status, TryWait() succeeds only when status reaches DONE
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		return false, nil, nil
 
 	case DONE:
 		t.mu.RLock()
 		defer t.mu.RUnlock()
 		return true, t.result, t.err
-
-	case ABORTED:
-		fallthrough
-	case TIMEOUT:
-		t.mu.RLock()
-		defer t.mu.RUnlock()
-		return true, nil, t.err
 
 	case RUNNING:
 		if len(t.finishCh) == 1 {
