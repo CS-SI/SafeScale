@@ -352,7 +352,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 }
 
 // This could be an open question
-// This test runs some tasks that succeed by design, so what should happen
+// This test runs some tasks that succeed by design, so what should happen when we abort and then wait ?
 // What's troubling about this test, it's that non-determinisic...
 // non-deterministic ?? what ??, yes, run it enough times and you will have different outcomes, seriously
 // sometimes the wait fails, sometimes doesn't, sometimes we have an empty result map, sometimes a populated map...
