@@ -29,6 +29,86 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestChildrenWaitingGameOnlyAWhile(t *testing.T) {
+	overlord, err := NewTaskGroupWithParent(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	for ind := 0; ind < 800; ind++ {
+		_, err := overlord.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+			t.FailNow()
+		}
+	}
+
+	fastEnough, res, err := overlord.WaitFor(90 * time.Millisecond)
+	if fastEnough {
+		t.FailNow()
+	}
+	require.NotNil(t, err)
+	require.Empty(t, res)
+}
+
+func TestCallingReadyTaskGroup(t *testing.T) {
+	single, err := NewTaskGroupWithParent(nil)
+	require.NotNil(t, single)
+	require.Nil(t, err)
+
+	res, err := single.Wait()
+	require.Empty(t, res)
+	require.NotNil(t, err)
+
+	done, res, err := single.WaitFor(10 * time.Millisecond)
+	require.True(t, done)
+	require.Empty(t, res)
+	require.NotNil(t, err)
+
+	done, res, err = single.TryWait()
+	require.True(t, done)
+	require.Empty(t, res)
+	require.NotNil(t, err)
+
+	err = single.Abort()
+	require.Nil(t, err)
+}
+
+func TestChildrenWaitingGameEnoughTime(t *testing.T) {
+	overlord, err := NewTaskGroupWithParent(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	for ind := 0; ind < 800; ind++ {
+		_, err := overlord.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+			t.FailNow()
+		}
+	}
+
+	fastEnough, res, err := overlord.WaitFor(350 * time.Millisecond)
+	if !fastEnough {
+		t.Errorf("It should be enough time but it wasn't")
+		t.FailNow()
+	}
+	require.Nil(t, err)
+	require.NotEmpty(t, res)
+}
+
 func TestChildrenWaitingGame(t *testing.T) {
 	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
@@ -412,7 +492,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 				fmt.Printf("Entering (waiting %v)\n", delay)
 				defer fmt.Println("Exiting")
 
-				dur := delay/100
+				dur := delay / 100
 				for i := 0; i < 100; i++ {
 					if t.Aborted() {
 						break
@@ -453,7 +533,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 
 		fmt.Println("Here we are")
 
-		if end >= (time.Millisecond * 500) {
+		if end >= (time.Millisecond * 800) {
 			t.Errorf("It should have finished near 350 ms but it didn't, it was %v !!", end)
 		}
 	}()
