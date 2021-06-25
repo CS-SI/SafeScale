@@ -351,7 +351,6 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 			var i int
 			for ; i < 100; i++ {
 				if t.Aborted() {
-					fmt.Printf("%s: aborted in %v\n", singleID, time.Since(begin))
 					break
 				}
 				time.Sleep(tempo)
@@ -440,43 +439,45 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	funk(5, 8, false)
 }
 
-func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
-	overlord, xerr := NewUnbreakableTask()
-	require.NotNil(t, overlord)
-	require.Nil(t, xerr)
-
-	theID, xerr := overlord.GetID()
-	require.Nil(t, xerr)
-	require.NotEmpty(t, theID)
-
-	var tasks []Task
-	for ind := 0; ind < 10; ind++ {
-		incentive, xerr := overlord.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := tools.RandomInt(3, 5)
-			time.Sleep(time.Duration(rint) * time.Millisecond)
-
-			return "waiting game", nil
-		}, nil)
-		if xerr != nil {
-			t.Errorf("Unexpected: %s", xerr)
-		} else {
-			tasks = append(tasks, incentive)
-		}
-	}
-
-	begin := time.Now()
-	for _, war := range tasks {
-		_, xerr = war.Wait()
-		if xerr != nil {
-			t.Errorf("Unexpected: %s", xerr)
-		}
-	}
-	end := time.Since(begin)
-
-	if end >= (time.Millisecond * 20) {
-		t.Errorf("It should have finished near 15 ms but it didn't, it was (%s) !!", end)
-	}
-}
+// VPL: is not meaningful anymore now that Task.StartInSubtask is deprecated...
+// FIXME: move it in TaskGroup context ?
+// func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
+// 	overlord, xerr := NewUnbreakableTask()
+// 	require.NotNil(t, overlord)
+// 	require.Nil(t, xerr)
+//
+// 	theID, xerr := overlord.GetID()
+// 	require.Nil(t, xerr)
+// 	require.NotEmpty(t, theID)
+//
+// 	var tasks []Task
+// 	for ind := 0; ind < 10; ind++ {
+// 		incentive, xerr := overlord.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+// 			rint := tools.RandomInt(3, 5)
+// 			time.Sleep(time.Duration(rint) * time.Millisecond)
+//
+// 			return "waiting game", nil
+// 		}, nil)
+// 		if xerr != nil {
+// 			t.Errorf("Unexpected: %s", xerr)
+// 		} else {
+// 			tasks = append(tasks, incentive)
+// 		}
+// 	}
+//
+// 	begin := time.Now()
+// 	for _, war := range tasks {
+// 		_, xerr = war.Wait()
+// 		if xerr != nil {
+// 			t.Errorf("Unexpected: %s", xerr)
+// 		}
+// 	}
+// 	end := time.Since(begin)
+//
+// 	if end >= (time.Millisecond * 20) {
+// 		t.Errorf("It should have finished near 15 ms but it didn't, it was (%s) !!", end)
+// 	}
+// }
 
 func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 	rescueStdout := os.Stdout

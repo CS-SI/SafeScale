@@ -364,14 +364,14 @@ func TestOneErrorOneOk(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	_, err = overlord.StartInSubtask(
+	_, err = overlord.Start(
 		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := tools.RandomInt(30, 50)
 			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
 
 			return "waiting game", nil
 		}, nil)
-	_, err = overlord.StartInSubtask(
+	_, err = overlord.Start(
 		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := tools.RandomInt(30, 50)
 			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)

@@ -129,6 +129,14 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	return ctrl, nil
 }
 
+// GetHostname returns the name of the Host that corresponds to this instance
+func (k *KongController) GetHostname() string {
+	if k == nil {
+		return ""
+	}
+	return k.gateway.GetName()
+}
+
 // Apply applies the rule to Kong proxy
 // Currently, support rule types service, route and upstream
 // Returns rule name and error

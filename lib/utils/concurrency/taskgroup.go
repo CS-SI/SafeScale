@@ -218,13 +218,14 @@ func (instance *taskGroup) SetID(id string) fail.Error {
 	return instance.task.SetID(id)
 }
 
-// StartInSubtask starts an action in a subtask
-func (instance *taskGroup) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if instance.isNull() {
-		return instance, fail.InvalidInstanceError()
-	}
-	return instance.Start(action, params, options...)
-}
+// VPL: DEPRECATED
+// // StartInSubtask starts an action in a subtask
+// func (instance *taskGroup) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
+// 	if instance.isNull() {
+// 		return instance, fail.InvalidInstanceError()
+// 	}
+// 	return instance.Start(action, params, options...)
+// }
 
 // Start runs in goroutine the function with parameters
 // Returns the subtask created to run the action (should be ignored in most cases)
@@ -692,10 +693,7 @@ func (instance *taskGroup) Abort() fail.Error {
 	if !instance.task.Aborted() {
 		allDone := true
 		for _, v := range instance.children.tasks {
-			if done, _, twErr := v.task.TryWait(); !done {
-				if twErr != nil {
-					logrus.Tracef("ignoring TryWait error: %v", twErr)
-				}
+			if done, _, xerr := v.task.TryWait(); !done || xerr != nil {
 				allDone = false
 				break
 			}
