@@ -359,7 +359,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 	iter := 0
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 60 {
 			break
 		}
 
@@ -424,7 +424,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 			previousRes = res
 		}
 
-		t.Errorf("Recovered this: %v", res)
+		t.Logf("Recovered this: %v", res)
 
 		_ = w.Close()
 		_, _ = ioutil.ReadAll(r)
