@@ -333,60 +333,67 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
-	funk := func(timeout uint, sleep uint, trigger uint, errorExpected bool) {
+	funk := func(ind int, timeout uint, sleep uint, trigger uint, errorExpected bool) {
 		ctx, cafu := context.WithDeadline(context.TODO(), time.Now().Add(time.Duration(timeout*10)*time.Millisecond))
-		single, err := NewTaskWithContext(ctx)
+		single, xerr := NewTaskWithContext(ctx)
 		require.NotNil(t, single)
-		require.Nil(t, err)
+		require.Nil(t, xerr)
+
+		singleID := fmt.Sprintf("/single-%d", ind)
+		xerr = single.SetID(singleID)
+		require.Nil(t, xerr)
 
 		begin := time.Now()
 
-		single, err = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		_, xerr = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			dur := time.Duration(sleep*10) * time.Millisecond
 			tempo := dur / 100
-			for i := 0; i < 100; i++ {
+			var i int
+			for ; i < 100; i++ {
 				if t.Aborted() {
+					fmt.Printf("%s: aborted in %v\n", singleID, time.Since(begin))
 					break
 				}
 				time.Sleep(tempo)
 			}
 			time.Sleep(time.Duration(sleep*10) * time.Millisecond)
+			fmt.Printf("%s: sleeped %v\n", singleID, time.Duration(i)*tempo+time.Duration(sleep)*10*time.Millisecond)
 			return "Ahhhh", nil
 		}, nil)
-		require.Nil(t, err)
+		require.Nil(t, xerr)
 
 		go func() {
 			time.Sleep(time.Duration(trigger*10) * time.Millisecond)
 			cafu()
 		}()
 
-		_, err = single.Wait()
+		_, xerr = single.Wait()
 		end := time.Since(begin)
-		if err != nil {
-			if !strings.Contains(err.Error(), "abort") {
-				t.Errorf("Why so serious ? it's just a failure cancelling a goroutine: %s", err.Error())
+		if xerr != nil {
+			if !strings.Contains(xerr.Error(), "abort") {
+				t.Errorf("Why so serious ? it's just a failure cancelling a goroutine: %s", xerr.Error())
 			}
 		}
 
-		if !((err != nil) == errorExpected) {
-			t.Errorf("Failure in test: %d, %d, %d, %t", timeout, sleep, trigger, errorExpected)
+		if !((xerr != nil) == errorExpected) {
+			t.Errorf("Failure in test %s: %d, %d, %d, %t", singleID, timeout, sleep, trigger, errorExpected)
 		}
-		require.True(t, (err != nil) == errorExpected)
+		require.True(t, (xerr != nil) == errorExpected)
 
 		if end > time.Millisecond*time.Duration(10*(trigger+2)) {
-			t.Errorf("Failure in test: %v, %v, %v, %t: We waited too much! %v > %v", timeout, sleep, trigger, errorExpected, end, time.Duration(trigger+2)*10*time.Millisecond)
+			t.Errorf("Failure in test %s: %v, %v, %v, %t: We waited too much! %v > %v", singleID, timeout, sleep, trigger, errorExpected, end, time.Duration(trigger+2)*10*time.Millisecond)
 		}
 	}
-	funk(3, 5, 1, true)
-	funk(3, 5, 9, true)
-	funk(5, 3, 1, true)
+	funk(1, 3, 5, 1, true)
+	funk(2, 3, 5, 9, true)
+	funk(3, 5, 3, 1, true)
 
-	funk(5, 1, 3, false)
+	funk(4, 5, 1, 3, false)
 
-	funk(7, 3, 1, true)
-	funk(4, 1, 3, false)
-	funk(14, 2, 4, false)
-	funk(14, 4, 2, true)
+	funk(5, 7, 3, 1, true)
+	funk(6, 4, 1, 3, false)
+	funk(7, 14, 2, 4, false)
+	funk(8, 14, 4, 2, true)
 }
 
 func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {

@@ -454,11 +454,11 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			}
 			_, tawErr := instance.task.Wait()
 			if tawErr != nil {
-				if previousErr == nil {
-					previousErr = tawErr
-				} else {
+				// if previousErr == nil {
+				// 	previousErr = tawErr
+				// } else {
 					logrus.Tracef("ignored error waiting for task: %v", tawErr)
-				}
+				// }
 			}
 
 			instance.task.lock.Lock()

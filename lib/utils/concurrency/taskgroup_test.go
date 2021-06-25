@@ -412,7 +412,12 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 				fmt.Printf("Entering (waiting %v)\n", delay)
 				defer fmt.Println("Exiting")
 
-				time.Sleep(delay * 1000)
+				for i := 0; i < 100; i++ {
+					if t.Aborted() {
+						break
+					}
+					time.Sleep(delay * 100)
+				}
 				return "waiting game", nil
 			}, rint)
 			if xerr != nil {
@@ -452,7 +457,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 		}
 	}()
 
-	runOutOfTime := waitTimeout(&wg, 15*time.Second)
+	runOutOfTime := waitTimeout(&wg, 30*time.Second)
 	if runOutOfTime {
 		if failure {
 			t.FailNow()
