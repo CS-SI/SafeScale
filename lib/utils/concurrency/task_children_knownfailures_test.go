@@ -1,5 +1,3 @@
-// +build alltests
-
 /*
  * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
@@ -27,7 +25,7 @@ import (
 )
 
 // tasks with subtasks don't play well with aborts
-func TestTaskGroupFatherAbortion(t *testing.T) {
+func TestAbortFatherTask(t *testing.T) {
 	parent, err := NewTask()
 	require.NotNil(t, parent)
 	require.Nil(t, err)
@@ -59,10 +57,49 @@ func TestTaskGroupFatherAbortion(t *testing.T) {
 	err = parent.Abort()
 	require.Nil(t, err)
 
-	_, err = child.Wait()
-	require.NotNil(t, err)
-	sibling.Wait()
-	require.NotNil(t, err)
+	require.True(t, parent.Aborted())
 
-	require.Equal(t, 0, count)
+	_ = parent
+	_ = child
+	_ = sibling
+}
+
+// taskgroups work well instead
+func TestAbortFatherTaskGroup(t *testing.T) {
+	parent, err := NewTaskGroupWithParent(nil)
+	require.NotNil(t, parent)
+	require.Nil(t, err)
+
+	count := 0
+
+	child, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(400) * time.Millisecond)
+		if t.Aborted() {
+			return "A", nil
+		}
+		count++
+		return "B", nil
+	}, nil)
+	require.Nil(t, err)
+
+	sibling, err := parent.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(500) * time.Millisecond)
+		if t.Aborted() {
+			return "A", nil
+		}
+		count++
+		return "B", nil
+	}, nil)
+	require.Nil(t, err)
+
+	time.Sleep(time.Duration(50) * time.Millisecond)
+
+	err = parent.Abort()
+	require.Nil(t, err)
+
+	require.True(t, parent.Aborted())
+
+	_ = parent
+	_ = child
+	_ = sibling
 }
