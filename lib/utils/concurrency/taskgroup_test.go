@@ -100,7 +100,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 		}
 	}
 
-	fastEnough, res, err := overlord.WaitFor(350 * time.Millisecond)
+	fastEnough, res, err := overlord.WaitFor(450 * time.Millisecond)
 	if !fastEnough {
 		t.Errorf("It should be enough time but it wasn't")
 		t.FailNow()
@@ -533,8 +533,8 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 
 		fmt.Println("Here we are")
 
-		if end >= (time.Millisecond * 800) {
-			t.Errorf("It should have finished near 350 ms but it didn't, it was %v !!", end)
+		if end >= (time.Millisecond * 1000) {
+			t.Errorf("It should have finished near 1000 ms but it didn't, it was %v !!", end)
 		}
 	}()
 

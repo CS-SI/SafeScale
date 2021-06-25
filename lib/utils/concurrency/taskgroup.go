@@ -29,9 +29,9 @@ import (
 
 // TaskGroupResult is a map of the TaskResult of each task
 // The index is the ID of the sub-Task running the action.
-type TaskGroupResult map[string]TaskResult
+type TaskGroupResult = map[string]TaskResult
 
-// TaskGroupGuard is the task group interface defining method to wait the taskgroup
+// TaskGroupGuard is the task group interface defining method to wait the TaskGroup
 type TaskGroupGuard interface {
 	GetStarted() (uint, fail.Error)
 	TryWaitGroup() (bool, map[string]TaskResult, fail.Error)
@@ -466,12 +466,12 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 					instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
 				}
 				instance.task.lock.Unlock()
-			// } else if instance.children.ended {
-			// 	switch instance.task.err.(type) {
-			// 	case *fail.ErrAborted:
-			// 		instance.task.err = nil
-			// 	default:
-			// 	}
+				// } else if instance.children.ended {
+				// 	switch instance.task.err.(type) {
+				// 	case *fail.ErrAborted:
+				// 		instance.task.err = nil
+				// 	default:
+				// 	}
 			}
 		}
 
