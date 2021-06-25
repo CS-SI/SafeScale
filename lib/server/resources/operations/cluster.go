@@ -2811,13 +2811,13 @@ func (instance *Cluster) configureNodesFromList(task concurrency.Task, hosts []r
 		}
 
 		for i := 0; i < length; i++ {
-			_, ierr := task.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
+			_, ierr := tg.StartInSubtask(instance.taskConfigureNode, taskConfigureNodeParameters{
 				Index: uint(i + 1),
 				Host:  hosts[i],
 			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/configure", hosts[i].GetName())))
 			ierr = debug.InjectPlannedFail(ierr)
 			if ierr != nil {
-				_ = task.Abort()
+				_ = tg.Abort()
 				break
 			}
 		}
