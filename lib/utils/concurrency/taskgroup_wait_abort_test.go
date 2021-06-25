@@ -114,8 +114,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 				if !strings.Contains(spew.Sdump(cause), "panic happened") {
 					t.Errorf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
 				}
-				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
-				default:
+			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
+			default:
 			}
 		}
 		close(bailout) // If Wait actually waits, this is closed AFTER all Tasks filled the channel, so no panics
@@ -231,49 +231,68 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 // This could be an open question
 // This test runs some tasks that succeed by design, so what should happen
 // What's troubling about this test, it's that non-determinisic...
-// non-deterministic ?? what ??, yes, run it enough times and you will have different outcomes, seriosly
+// non-deterministic ?? what ??, yes, run it enough times and you will have different outcomes, seriously
 // sometimes the wait fails, sometimes doesn't, sometimes we have an empty result map, sometimes a populated map...
 func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var previousRes map[string]TaskResult
+	iter := 0
+	for {
+		iter++
+		if iter > 50 {
+			break
+		}
 
-	single, xerr := NewTaskGroupWithParent(nil)
-	require.NotNil(t, single)
-	require.Nil(t, xerr)
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
+		os.Stdout = w
 
-	for ind := 0; ind < 10; ind++ {
-		_, err := single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(tools.RandomInt(10, 20)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil)
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		single, xerr := NewTaskGroupWithParent(nil)
+		require.NotNil(t, single)
+		require.Nil(t, xerr)
+
+		for ind := 0; ind < 10; ind++ {
+			_, err := single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(tools.RandomInt(10, 20)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil)
+			if err != nil {
+				t.Errorf("Unexpected: %s", err)
+				t.FailNow()
+			}
+		}
+
+		time.Sleep(time.Duration(200) * time.Millisecond)
+		// single should have finished a loooongtime ago...
+
+		// but we abort anyway
+		xerr = single.Abort()
+		if xerr != nil {
+			t.Errorf("Failed to abort")
 			t.FailNow()
 		}
+
+		// the question here, is why we fail ?
+		// and more, from a client point of view, why this failed ?
+		// all we have is an aborted error
+		var res map[string]TaskResult
+		res, xerr = single.WaitGroup()
+		if xerr != nil {
+			t.Errorf("Failed to Wait: %v", xerr)
+		}
+		if iter == 1 {
+			previousRes = res
+		} else {
+			if len(res) != len(previousRes) {
+				t.Errorf("Not consistent, before: %d, now: %d", len(previousRes), len(res))
+				t.FailNow()
+			}
+			previousRes = res
+		}
+
+		t.Errorf("Recovered this: %v", res)
+
+		_ = w.Close()
+		_, _ = ioutil.ReadAll(r)
+		os.Stdout = rescueStdout
 	}
-
-	time.Sleep(time.Duration(100) * time.Millisecond)
-	// single should have finished a loooongtime ago...
-
-	// but we abort anyway
-	xerr = single.Abort()
-	if xerr != nil {
-		t.Errorf("Failed to abort")
-		t.FailNow()
-	}
-
-	// the question here, is why we fail ?
-	// and more, from a client point of view, why this failed ?
-	// all we have is an aborted error
-	res, xerr := single.Wait()
-	if xerr != nil {
-		t.Errorf("Failed to Wait: %v", xerr)
-	}
-
-	t.Errorf("Recovered this: %v", res)
-
-	_ = w.Close()
-	_, _ = ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
 }
