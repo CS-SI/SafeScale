@@ -462,14 +462,23 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			// task done, WaitGroup successful
 			instance.task.mu.Lock()
 			defer instance.task.mu.Unlock()
+			if len(errors) > 0 {
+				if instance.task.err != nil {
+					switch instance.task.err.(type) {
+					case *fail.ErrAborted:
+						instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
+					default:
+					}
+				} else {
+					instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
+				}
+			}
 			return instance.result, instance.task.err
 		}
 
 		instance.task.mu.Lock()
 		defer instance.task.mu.Unlock()
-
 		instance.task.status = DONE
-
 		instance.result = results
 		return results, instance.task.err
 
