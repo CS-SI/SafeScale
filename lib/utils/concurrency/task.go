@@ -881,7 +881,10 @@ func (t *task) Abort() (err fail.Error) {
 	return nil
 }
 
-// Aborted tells if the task is aborted (by cancel(), by .Abort() or by timeout)
+// Aborted tells if the task is aborted (by cancel(), by Abort() or by timeout)
+// As a Task is actually a go routine, and there is no way to safely stop a go routine from outside, the code running in
+// the Task has to check regularly if Task has been aborted and stop execution (return...) as soon as possible
+// (leaving place for cleanup if needed). Without the use of Aborted(), a task may run indefinitely.
 func (t *task) Aborted() bool {
 	if t.IsNull() {
 		return false
