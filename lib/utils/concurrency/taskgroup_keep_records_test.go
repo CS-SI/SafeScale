@@ -86,14 +86,14 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 		}
 
 		t.Log("Next") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
-		single, xerr := NewTaskGroup()
-		require.NotNil(t, single)
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
 		require.Nil(t, xerr)
-		xerr = single.SetID(fmt.Sprintf("/parent-%d", iter))
+		xerr = overlord.SetID(fmt.Sprintf("/parent-%d", iter))
 		require.Nil(t, xerr)
 
 		for ind := 0; ind < 10; ind++ { // work with 10 tasks
-			_, xerr = single.StartInSubtask(
+			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					mylimit := tools.RandomInt(5, 15)
 					for { // iterate only a few times: mylimit
@@ -121,7 +121,7 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 		}
 
 		for ind := 0; ind < 10; ind++ { // and 10 unfortunate ones that will likely timeout
-			_, xerr = single.StartWithTimeout(
+			_, xerr = overlord.StartWithTimeout(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					mylimit := tools.RandomInt(5, 15)
 					for { // iterate only a few times: mylimit
@@ -151,7 +151,7 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 		// wait a little until we call wait
 		time.Sleep(time.Duration(100) * time.Millisecond)
 
-		res, xerr := single.Wait()
+		res, xerr := overlord.Wait()
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrAborted:

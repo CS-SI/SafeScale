@@ -50,16 +50,13 @@ func TestInvalidTask(t *testing.T) {
 	_, err = got.Run(nil, nil)
 	require.NotNil(t, err)
 
-	_, err = got.RunInSubtask(nil, nil)
-	require.NotNil(t, err)
-
 	_, err = got.Start(nil, nil)
 	require.NotNil(t, err)
 
 	_, err = got.StartWithTimeout(nil, nil, 0)
 	require.NotNil(t, err)
 
-	_, err = got.StartInSubtask(nil, nil)
+	_, err = got.Start(nil, nil)
 	require.NotNil(t, err)
 }
 
@@ -99,15 +96,9 @@ func TestInvalidTaskGroup(t *testing.T) {
 	_, err = got.Run(nil, nil)
 	require.NotNil(t, err)
 
-	_, err = got.RunInSubtask(nil, nil)
-	require.NotNil(t, err)
-
 	_, err = got.Start(nil, nil)
 	require.NotNil(t, err)
 
 	_, err = got.StartWithTimeout(nil, nil, 0)
-	require.NotNil(t, err)
-
-	_, err = got.StartInSubtask(nil, nil)
 	require.NotNil(t, err)
 }

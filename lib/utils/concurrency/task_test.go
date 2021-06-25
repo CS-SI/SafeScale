@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"reflect"
 	"strings"
@@ -268,8 +269,8 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		begin := time.Now()
 
 		single, err = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			tempo := sleep/100
-			for i := 0 ; i < 100; i++ {
+			tempo := sleep / 100
+			for i := 0; i < 100; i++ {
 				if t.Aborted() {
 					break
 				}
@@ -299,18 +300,8 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 			default:
 				t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
 			}
-			// st, _ := single.GetStatus()
-			// if st != ABORTED {
-			// 	t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
-			// }
-			// require.True(t, st == ABORTED)
 		} else {
 			require.Nil(t, err)
-			// st, _ := single.GetStatus()
-			// if st == ABORTED {
-			// 	t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
-			// }
-			// require.True(t, st != ABORTED)
 		}
 
 		if !((err != nil) == errorExpected) {
@@ -318,23 +309,31 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		}
 		require.True(t, (err != nil) == errorExpected)
 
-		// if end > time.Millisecond*time.Duration(10*(trigger+2)) {
-		if end > trigger+20*time.Millisecond {
+		// the minimum of the 3 wins, so
+		min := math.Min(math.Min(float64(timeout), float64(sleep)), float64(trigger))
+
+		if end > time.Duration(min+10)*time.Millisecond {
 			t.Errorf("Failure in test: %v, %v, %v, %t: We waited too much! %v > %v", timeout, sleep, trigger, errorExpected, end, trigger+20*time.Millisecond)
 		}
 	}
-	funk(30*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)
-	funk(30*time.Millisecond, 50*time.Millisecond, 80*time.Millisecond, true)
-	funk(80*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)
-	funk(40*time.Millisecond, 20*time.Millisecond, 10*time.Millisecond, true)
-	funk(40*time.Millisecond, 20*time.Millisecond, 30*time.Millisecond, false)
-	funk(140*time.Millisecond, 20*time.Millisecond, 40*time.Millisecond, false)
-	funk(140*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)
+
+	// No errors here, look at TestChildrenWaitingGameWithContextCancelfuncs for more information
+	// there is a performance degradation problem in Task/TaskGroup that impact the timings
+	funk(30*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)   // timeout
+	funk(30*time.Millisecond, 50*time.Millisecond, 80*time.Millisecond, true)   // timeout
+	funk(80*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)   // canceled
+	funk(40*time.Millisecond, 20*time.Millisecond, 10*time.Millisecond, true)   // canceled
+	funk(40*time.Millisecond, 20*time.Millisecond, 30*time.Millisecond, false)  // cancel is tiggered AFTER we are done (in 20ms), less that the timeout -> so no error
+	funk(140*time.Millisecond, 20*time.Millisecond, 40*time.Millisecond, false) // same thing here
+	funk(140*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)  // canceled
 }
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 	funk := func(ind int, timeout uint, sleep uint, trigger uint, errorExpected bool) {
 		ctx, cafu := context.WithDeadline(context.TODO(), time.Now().Add(time.Duration(timeout*10)*time.Millisecond))
+		require.NotNil(t, ctx)
+		require.NotNil(t, cafu)
+
 		single, xerr := NewTaskWithContext(ctx)
 		require.NotNil(t, single)
 		require.Nil(t, xerr)
@@ -380,8 +379,11 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 		}
 		require.True(t, (xerr != nil) == errorExpected)
 
-		if end > time.Millisecond*time.Duration(10*(trigger+2)) {
-			t.Errorf("Failure in test %s: %v, %v, %v, %t: We waited too much! %v > %v", singleID, timeout, sleep, trigger, errorExpected, end, time.Duration(trigger+2)*10*time.Millisecond)
+		// the minimum of the 3 wins, so
+		min := math.Min(math.Min(float64(timeout), float64(sleep)), float64(trigger))
+
+		if end > time.Millisecond*time.Duration(10*(min+1)) {
+			t.Errorf("Failure in test %s: %v, %v, %v, %t: We waited too much! %v > %v", singleID, timeout, sleep, trigger, errorExpected, end, time.Duration(min+1)*10*time.Millisecond)
 		}
 	}
 	funk(1, 3, 5, 1, true)
@@ -405,7 +407,7 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 
 		single, xerr = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			dur := time.Duration(sleep*10) * time.Millisecond
-			tempo := dur/100
+			tempo := dur / 100
 			for i := 0; i < 100; i++ {
 				if t.Aborted() {
 					break
@@ -431,53 +433,26 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 
 		require.True(t, (xerr != nil) == errorExpected)
 
-		if end > time.Millisecond*time.Duration(10*(trigger+2)) {
-			t.Errorf("Failure in test: %v, %v, %t: We waited too much! %v > %v", sleep, trigger, errorExpected, end, time.Duration(trigger+2)*time.Millisecond)
+		if trigger < sleep {
+			if end > time.Millisecond*time.Duration(10*(trigger+2)) {
+				t.Errorf("Failure in test: %v, %v, %t: We waited too much! %v > %v", sleep, trigger, errorExpected, end, time.Duration(trigger+2)*time.Millisecond)
+			}
+		} else {
+			if end > time.Millisecond*time.Duration(10*(sleep+2)) {
+				t.Errorf("Failure in test: %v, %v, %t: We waited too much! %v > %v", sleep, trigger, errorExpected, end, time.Duration(trigger+2)*time.Millisecond)
+			}
 		}
 	}
-	funk(5, 1, true)
-	funk(5, 8, false)
-}
 
-// VPL: is not meaningful anymore now that Task.StartInSubtask is deprecated...
-// FIXME: move it in TaskGroup situation?
-// func TestStChildrenWaitingGameWithTimeouts(t *testing.T) {
-// 	overlord, xerr := NewUnbreakableTask()
-// 	require.NotNil(t, overlord)
-// 	require.Nil(t, xerr)
-//
-// 	theID, xerr := overlord.GetID()
-// 	require.Nil(t, xerr)
-// 	require.NotEmpty(t, theID)
-//
-// 	var tasks []Task
-// 	for ind := 0; ind < 10; ind++ {
-// 		incentive, xerr := overlord.StartInSubtask(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-// 			rint := tools.RandomInt(3, 5)
-// 			time.Sleep(time.Duration(rint) * time.Millisecond)
-//
-// 			return "waiting game", nil
-// 		}, nil)
-// 		if xerr != nil {
-// 			t.Errorf("Unexpected: %s", xerr)
-// 		} else {
-// 			tasks = append(tasks, incentive)
-// 		}
-// 	}
-//
-// 	begin := time.Now()
-// 	for _, war := range tasks {
-// 		_, xerr = war.Wait()
-// 		if xerr != nil {
-// 			t.Errorf("Unexpected: %s", xerr)
-// 		}
-// 	}
-// 	end := time.Since(begin)
-//
-// 	if end >= (time.Millisecond * 20) {
-// 		t.Errorf("It should have finished near 15 ms but it didn't, it was (%s) !!", end)
-// 	}
-// }
+	// tests are right, errorExpected it what it should be
+	// previous versions got the work done in 50, 52 ms, problem is, now it takes twice the time, 110 ms, why ?
+	funk(5, 1, true)
+	funk(5, 8, false) // this is a performance degradation, it worked before, look at the 2 next tests, this text should work like the next ones, it does not because the timings of Wait are degraded
+	funk(5, 30, false)
+	funk(5, 300, false)
+	funk(5, 600, false)
+	funk(5, 6000, false)
+}
 
 func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 	rescueStdout := os.Stdout

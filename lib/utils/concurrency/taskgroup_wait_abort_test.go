@@ -53,15 +53,15 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 		}
 
 		t.Log("Next") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
-		single, xerr := NewTaskGroup()
-		require.NotNil(t, single)
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
 		require.Nil(t, xerr)
-		xerr = single.SetID(fmt.Sprintf("/parent-%d", iter))
+		xerr = overlord.SetID(fmt.Sprintf("/parent-%d", iter))
 		require.Nil(t, xerr)
 
 		bailout := make(chan string, 80) // a buffered channel
 		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
-			_, xerr = single.Start(
+			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
@@ -92,11 +92,11 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 			time.Sleep(time.Duration(100) * time.Millisecond)
 
 			// let's have fun
-			xerr := single.Abort()
+			xerr := overlord.Abort()
 			require.Nil(t, xerr)
 		}()
 
-		res, xerr := single.Wait() // 100 ms after this, .Abort() should hit
+		res, xerr := overlord.Wait() // 100 ms after this, .Abort() should hit
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 			switch xerr.(type) {
@@ -155,7 +155,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 	iter := 0
 	for {
 		iter++
-		if iter > 15 {
+		if iter > 8 {
 			break
 		}
 		if enough {
@@ -191,7 +191,6 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 
 					// flip a coin, true and we panic, false we don't
 					if tools.RandomInt(0, 2) == 1 {
-						fmt.Println("Panicking")
 						panic("head")
 					}
 					// tails
@@ -263,7 +262,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 			enough = true
 		}
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(250 * time.Millisecond)
 		if reminder {
 			t.Errorf("by now we should see panics in lines above, panics that only shows in logs and the rest of the code is unaware of")
 		}
@@ -283,7 +282,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 	streak := 0
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 12 {
 			break
 		}
 		if enough {
@@ -291,15 +290,15 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		}
 
 		t.Log("Next") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
-		single, xerr := NewTaskGroup()
-		require.NotNil(t, single)
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
 		require.Nil(t, xerr)
-		xerr = single.SetID(fmt.Sprintf("/parent-%d", iter))
+		xerr = overlord.SetID(fmt.Sprintf("/parent-%d", iter))
 		require.Nil(t, xerr)
 
 		bailout := make(chan string, 80) // a buffered channel
 		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
-			_, xerr = single.StartInSubtask(
+			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
@@ -336,11 +335,11 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 			time.Sleep(time.Duration(100) * time.Millisecond)
 
 			// let's have fun
-			xerr := single.Abort()
+			xerr := overlord.Abort()
 			require.Nil(t, xerr)
 		}()
 
-		res, xerr := single.Wait() // 100 ms after this, .Abort() should hit
+		res, xerr := overlord.Wait() // 100 ms after this, .Abort() should hit
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 			switch xerr.(type) {
@@ -445,7 +444,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		xerr = overlord.Abort()
 		require.Nil(t, xerr)
 
-		res, xerr := single.Wait()
+		res, xerr := overlord.Wait()
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 			switch xerr.(type) {
