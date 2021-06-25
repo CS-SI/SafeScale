@@ -152,15 +152,15 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 		}
 
 		t.Log("Next") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
-		single, xerr := NewTaskGroup()
-		require.NotNil(t, single)
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
 		require.Nil(t, xerr)
-		xerr = single.SetID(fmt.Sprintf("/parent-%d", iter))
+		xerr = overlord.SetID(fmt.Sprintf("/parent-%d", iter))
 		require.Nil(t, xerr)
 
 		bailout := make(chan string, 80) // a buffered channel
 		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
-			_, xerr = single.StartInSubtask(
+			_, xerr = overlord.StartInSubtask(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
@@ -199,11 +199,11 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 			time.Sleep(time.Duration(100) * time.Millisecond)
 
 			// let's have fun
-			xerr := single.Abort()
+			xerr := overlord.Abort()
 			require.Nil(t, xerr)
 		}()
 
-		_, xerr = single.Wait() // 100 ms after this, .Abort() should hit
+		_, xerr = overlord.Wait() // 100 ms after this, .Abort() should hit
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 			switch xerr.(type) {
@@ -213,7 +213,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 					t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
 				}
 			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
-			case *fail.ErrRuntimePanic:
+			case *fail.ErrRuntimePanic: // This MUST NEVER HAPPEN in a TaskGroup; the panic should be in the ErrorList returned by Wait()
 				t.Logf("We catched a panic..., good")
 				caught = true
 				break
@@ -275,6 +275,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		single, xerr := NewTaskGroup()
 		require.NotNil(t, single)
 		require.Nil(t, xerr)
+		xerr = single.SetID(fmt.Sprintf("parent-%d", iter))
+		require.Nil(t, xerr)
 
 		bailout := make(chan string, 80) // a buffered channel
 		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
@@ -296,6 +298,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 					acha <- "Bailing out"
 					return "who cares", nil
 				}, bailout,
+				InheritParentIDOption, AmendID(fmt.Sprintf("child-%d", ind)),
 			)
 			require.Nil(t, xerr)
 		}
@@ -367,14 +370,14 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		r, w, _ := os.Pipe()
 		os.Stdout = w
 
-		single, xerr := NewTaskGroup()
-		require.NotNil(t, single)
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
 		require.Nil(t, xerr)
-		xerr = single.SetID("/parent")
+		xerr = overlord.SetID("/parent")
 		require.Nil(t, xerr)
 
 		for ind := 0; ind < 10; ind++ {
-			_, err := single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 				time.Sleep(time.Duration(tools.RandomInt(10, 20)) * time.Millisecond)
 				return "waiting game", nil
 			}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
@@ -385,10 +388,10 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		}
 
 		time.Sleep(time.Duration(200) * time.Millisecond)
-		// single should have finished a loooong time ago...
+		// overlord should have finished a loooong time ago...
 
 		// but we abort anyway
-		xerr = single.Abort()
+		xerr = overlord.Abort()
 		if xerr != nil {
 			t.Errorf("Failed to abort")
 			t.FailNow()
@@ -398,7 +401,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		// and more, from a client point of view, why this failed ?
 		// all we have is an aborted error
 		var res map[string]TaskResult
-		res, xerr = single.WaitGroup()
+		res, xerr = overlord.WaitGroup()
 		if xerr != nil {
 			t.Errorf("Failed to Wait: %v", xerr)
 		}

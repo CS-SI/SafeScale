@@ -581,13 +581,15 @@ func (t *task) processAbort(traceR *tracer) fail.Error {
 	traceR.trace("receiving abort signal")
 	t.lock.Lock()
 	if !t.abortDisengaged {
-		switch t.err.(type) {
-		case *fail.ErrAborted:
-			// do nothing
-		case *fail.ErrTimeout:
-			// do nothing
-		default:
-			t.err = fail.AbortedError(t.err)
+		if t.err != nil {
+			switch t.err.(type) {
+			case *fail.ErrAborted:
+				// do nothing
+			case *fail.ErrTimeout:
+				// do nothing
+			default:
+				t.err = fail.AbortedError(t.err)
+			}
 		}
 	} else {
 		traceR.trace("abort signal is disengaged, ignored")
@@ -616,13 +618,8 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 
 			fmt.Printf("panic happened in Task %s\n", t.id)
 			if t.err != nil {
-				switch t.err.(type) {
-				case *fail.ErrAborted:
-					t.err = fail.AbortedError(fail.RuntimePanicError("panic happened: %v", err))
-				default:
-				}
-			}
-			if t.err == nil {
+				_ = t.err.AddConsequence(fail.RuntimePanicError("panic happened: %v", err))
+			} else {
 				t.err = fail.RuntimePanicError("panic happened: %v", err)
 			}
 			t.result = nil
