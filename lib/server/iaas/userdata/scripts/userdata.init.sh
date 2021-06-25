@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
 #
@@ -56,7 +56,7 @@ mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp 
 LOGFILE=/opt/safescale/var/log/user_data.init.log
 
 ### All output to one file and all output to the screen
-exec > >(tee -a ${LOGFILE} /var/log/ss.log) 2>&1
+exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
 LINUX_KIND=

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
 #
@@ -53,7 +53,7 @@ export -f failure
 LOGFILE=/opt/safescale/var/log/user_data.netsec.log
 
 ### All output to one file and all output to the screen
-exec > >(tee -a ${LOGFILE} /var/log/ss.log) 2>&1
+exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'netsec' is already done (otherwise will deadlock)
@@ -107,28 +107,28 @@ function reset_fw() {
 	# Attach Internet interface or source IP to zone public if host is gateway
 	[ ! -z $PU_IF ] && {
 		# sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
-		firewall-offline-cmd --zone=public --add-interface=$PU_IF || (echo "firewall-offline-cmd failed with $?" && return 1)
+		firewall-offline-cmd --zone=public --add-interface=$PU_IF || failure 206 "firewall-offline-cmd failed with $? adding interfaces"
 	}
 	{{- if or .PublicIP .IsGateway }}
 	[[ -z ${PU_IF} ]] && {
 		# sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
-		firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || (echo "firewall-offline-cmd failed with $?" && return 1)
+		firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || failure 206 "firewall-offline-cmd failed with $? adding sources"
 	}
 	{{- end }}
 
 	# Sets the default target of packets coming from public interface to DROP
-	firewall-offline-cmd --zone=public --set-target=DROP || (echo "firewall-offline-cmd failed with $?" && return 1)
+	firewall-offline-cmd --zone=public --set-target=DROP || failure 206 "firewall-offline-cmd failed with $? dropping public"
 
 	# Attach LAN interfaces to zone trusted
 	[[ ! -z ${PR_IFs} ]] && {
 		for i in $PR_IFs; do
 			# sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
-			firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || (echo "firewall-offline-cmd failed with $?" && return 1)
+			firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || failure 206 "firewall-offline-cmd failed with $? attaching lan to trusted"
 		done
 	}
 	# Attach lo interface to zone trusted
 	# sfFirewallAdd --zone=trusted --add-interface=lo || return 1
-	firewall-offline-cmd --zone=trusted --add-interface=lo || (echo "firewall-offline-cmd failed with $?" && return 1)
+	firewall-offline-cmd --zone=trusted --add-interface=lo || failure 206 "firewall-offline-cmd failed with $? adding lo to trusted"
 
 	# Allow service ssh on public zone
 	op=-1
@@ -142,11 +142,11 @@ function reset_fw() {
 	fi
 
 	if [[ $op -ne 0 ]]; then
-		failure 206 "firewall-offline-cmd failed with $op"
+		failure 206 "firewall-offline-cmd failed with $op adding ssh service"
 	fi
 
-	sfService enable firewalld &>/dev/null || (echo "service firewalld enable failed with $?" && return 1)
-	sfService start firewalld &>/dev/null || (echo "service firewalld start failed with $?" && return 1)
+	sfService enable firewalld &>/dev/null || failure 206 "service firewalld enable failed with $?"
+	sfService start firewalld &>/dev/null || failure 206 "service firewalld start failed with $?"
 
 	sop=-1
 	firewall-cmd --runtime-to-permanent && sop=$? || sop=$?
