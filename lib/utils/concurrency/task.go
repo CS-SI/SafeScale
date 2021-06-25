@@ -614,10 +614,21 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 			t.mu.Lock()
 			defer t.mu.Unlock()
 
-			t.err = fail.RuntimePanicError("panic happened: %v", err)
+			fmt.Printf("panic happened in Task %s\n", t.id)
+			if t.err != nil {
+				switch t.err.(type) {
+				case *fail.ErrAborted:
+					t.err = fail.AbortedError(fail.RuntimePanicError("panic happened: %v", err))
+				default:
+				}
+			}
+			if t.err == nil {
+				t.err = fail.RuntimePanicError("panic happened: %v", err)
+			}
 			t.result = nil
+			t.status = DONE
 			t.doneCh <- false
-			defer close(t.doneCh)
+			close(t.doneCh)
 		}
 	}()
 
@@ -630,10 +641,9 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 		t.err = xerr
 	}
 	t.status = DONE
-
 	t.result = result
 	t.doneCh <- true
-	defer close(t.doneCh)
+	close(t.doneCh)
 }
 
 // Run starts task, waits its completion then return the error code
@@ -717,8 +727,7 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 
 // TryWait tries to wait on a task
 // If task done, returns (true, TaskResult, <error from the task>)
-// If task aborted, returns (false, nil, *fail.ErrAborted) (subsequent calls of TryWait may be necessary)
-// If task still running, returns (false, nil)
+// If task is not done, returns (false, nil, nil) (subsequent calls of TryWait may be necessary)
 // if Task is not started, returns (false, nil, *fail.ErrInconsistent)
 func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 	if t.IsNull() {
@@ -732,19 +741,18 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
-		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
+		return false, nil, fail.InconsistentError("cannot wait a Task that has not been started")
+
+	// ABORTED and TIMEOUT are transient status, TryWait() succeeds only when status reaches DONE
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		return false, nil, nil
 
 	case DONE:
 		t.mu.RLock()
 		defer t.mu.RUnlock()
 		return true, t.result, t.err
-
-	case ABORTED:
-		fallthrough
-	case TIMEOUT:
-		t.mu.RLock()
-		defer t.mu.RUnlock()
-		return true, nil, t.err
 
 	case RUNNING:
 		if len(t.finishCh) == 1 {
@@ -873,7 +881,7 @@ func (t *task) Abort() (err fail.Error) {
 	return nil
 }
 
-// Aborted tells if the task is aborted
+// Aborted tells if the task is aborted (by cancel(), by .Abort() or by timeout)
 func (t *task) Aborted() bool {
 	if t.IsNull() {
 		return false
@@ -887,7 +895,7 @@ func (t *task) Aborted() bool {
 		return false
 	}
 
-	return t.status == ABORTED
+	return t.status == ABORTED || t.status == TIMEOUT
 }
 
 // Abortable tells if task can be aborted

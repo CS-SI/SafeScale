@@ -381,14 +381,15 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 					results[sid] = result
 					doneWaitStates[k] = true
 					doneWaitCount++
+					break
 				}
+
+				time.Sleep(1 * time.Millisecond)
 			}
 
 			if doneWaitCount >= doneWaitSize {
 				break
 			}
-
-			time.Sleep(1 * time.Millisecond)
 		}
 
 		var errors []error
@@ -399,7 +400,17 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 		instance.task.result = results
 		instance.task.mu.Unlock()
 		for i, e := range errs {
-			errors = append(errors, fail.Wrap(e, "%s", i))
+			switch cerr := e.(type) {
+			case *fail.ErrAborted:
+				cause := fail.ConvertError(cerr.Cause())
+				if cause != nil {
+					errors = append(errors, fail.Wrap(cause, "%s", i))
+				} else {
+					errors = append(errors, fail.Wrap(e, "%s", i))
+				}
+			default:
+				errors = append(errors, fail.Wrap(e, "%s", i))
+			}
 		}
 
 		taskStatus, err := instance.task.GetStatus()
@@ -451,14 +462,23 @@ func (instance *taskGroup) WaitGroup() (map[string]TaskResult, fail.Error) {
 			// task done, WaitGroup successful
 			instance.task.mu.Lock()
 			defer instance.task.mu.Unlock()
+			if len(errors) > 0 {
+				if instance.task.err != nil {
+					switch instance.task.err.(type) {
+					case *fail.ErrAborted:
+						instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
+					default:
+					}
+				} else {
+					instance.task.err = fail.AbortedError(fail.NewErrorList(errors), "taskgroup ended with failures")
+				}
+			}
 			return instance.result, instance.task.err
 		}
 
 		instance.task.mu.Lock()
 		defer instance.task.mu.Unlock()
-
 		instance.task.status = DONE
-
 		instance.result = results
 		return results, instance.task.err
 

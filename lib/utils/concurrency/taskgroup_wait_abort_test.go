@@ -17,6 +17,7 @@
 package concurrency
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -54,6 +55,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 		single, xerr := NewTaskGroup()
 		require.NotNil(t, single)
 		require.Nil(t, xerr)
+		xerr = single.SetID(fmt.Sprintf("/parent-%d", iter))
+		require.Nil(t, xerr)
 
 		bailout := make(chan string, 80) // a buffered channel
 		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
@@ -62,24 +65,27 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 					for { // do some work, then look for aborted, again and again
 						// some work
 						time.Sleep(time.Duration(tools.RandomInt(20, 30)) * time.Millisecond)
-						status, xerr := t.GetStatus()
-						if xerr != nil {
-							return "Big failure...", xerr
-						}
+						// status, xerr := t.GetStatus()
+						// if xerr != nil {
+						//	return "Big failure...", xerr
+						// }
 						// looking again and again...
-						if status == ABORTED || status == TIMEOUT {
+						// if status == ABORTED || status == TIMEOUT {
+						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
 							time.Sleep(time.Duration(tools.RandomInt(100, 800)) * time.Millisecond)
 							break
 						}
 					}
+
+					fmt.Println("abort signal")
 					// We are using the classic 'send on closed channel' trick to see if Wait actually waits until everyone is DONE.
-					// If it does we will never see a panic, but if, Abort doesn't mean TellYourChildrenToAbort but
+					// If it does we will never see a panic, but if Abort doesn't mean TellYourChildrenToAbort but
 					// actually means AbortYourChildrenAndQuitNOWWithoutWaiting, then we have a problem
 					acha := parameters.(chan string)
 					acha <- "Bailing out"
 					return "who cares", nil
-				}, bailout,
+				}, bailout, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
 			)
 			require.Nil(t, xerr)
 		}
@@ -99,13 +105,18 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 		_, xerr = single.Wait() // 100 ms after this, .Abort() should hit
 		if xerr != nil {
 			t.Errorf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
-			if _, ok := xerr.(*fail.ErrRuntimePanic); !ok {
-				t.Errorf("Wait, What ??, only Abort ? where is the panic ??")
+			switch xerr.(type) {
+			case *fail.ErrAborted:
+				cause := xerr.Cause()
+				// if _, ok := cause.(*fail.ErrRuntimePanic); !ok {
+				// 	t.Errorf("Wait, What ??, only Abort ? where is the panic ??")
+				// }
+				if !strings.Contains(spew.Sdump(cause), "panic happened") {
+					t.Errorf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
+				}
+				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
+				default:
 			}
-			if !strings.Contains(spew.Sdump(xerr), "panic happened") {
-				t.Errorf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
-			}
-			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 		}
 		close(bailout) // If Wait actually waits, this is closed AFTER all Tasks filled the channel, so no panics
 		// If not..., well...
@@ -115,7 +126,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 			reminder = true
 			t.Errorf("Not everyone finished on time !!, panic is coming !!, some tasks will hit a closed channel !!")
 			// if we now do a t.FailNow() we already proved our point (if Wait actually waited, the channel
-			// size should be 80 each time), but if we dont...
+			// size should be 80 each time), but if we don't...
 			// we will see runtime panics on our LOGS !!, but NOT in the code
 			// with a t.FailNow() we also fail, but the test output is less frightening
 			enough = true
