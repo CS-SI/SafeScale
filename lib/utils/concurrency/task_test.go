@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
 
@@ -222,10 +223,10 @@ func TestSingleTaskTryWaitKO(t *testing.T) {
 	// by now single should succeed
 
 	begin := time.Now()
-	waited, res, err := single.TryWait()
+	done, res, err := single.TryWait()
 	end := time.Since(begin)
 
-	require.True(t, waited)
+	require.True(t, done)
 	require.NotNil(t, res)
 	require.NotNil(t, err)
 
@@ -262,13 +263,13 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		ctx, cafu := context.WithTimeout(context.TODO(), timeout)
 		defer cafu()
 
-		single, err := NewTaskWithContext(ctx)
+		single, xerr := NewTaskWithContext(ctx)
 		require.NotNil(t, single)
-		require.Nil(t, err)
+		require.Nil(t, xerr)
 
 		begin := time.Now()
 
-		single, err = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		single, xerr = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			tempo := sleep / 100
 			for i := 0; i < 100; i++ {
 				if t.Aborted() {
@@ -278,36 +279,38 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 			}
 			return "Ahhhh", nil
 		}, nil)
-		require.Nil(t, err)
+		require.Nil(t, xerr)
 
 		go func() {
 			time.Sleep(trigger)
 			cafu()
 		}()
 
-		_, err = single.Wait()
+		_, xerr = single.Wait()
 		end := time.Since(begin)
-		if err != nil {
-			if !strings.Contains(err.Error(), "abort") {
-				t.Errorf("Why so serious? it's just a failure cancelling a goroutine: %s", err.Error())
-			}
-		}
+		// VPL: what's the point? We raise an error in the switch later...
+		// if xerr != nil {
+		// 	if !strings.Contains(xerr.Error(), "abort") {
+		// 		t.Errorf("Why so serious? it's just a failure cancelling a goroutine: %s", xerr.Error())
+		// 	}
+		// }
 
 		if errorExpected {
-			require.NotNil(t, err)
-			switch err.(type) {
+			require.NotNil(t, xerr)
+			switch xerr.(type) {
 			case *fail.ErrAborted:
+			case *fail.ErrTimeout:
 			default:
 				t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
 			}
 		} else {
-			require.Nil(t, err)
+			require.Nil(t, xerr)
 		}
 
-		if !((err != nil) == errorExpected) {
+		if !((xerr != nil) == errorExpected) {
 			t.Errorf("Failure in test: %v, %v, %v, %t", timeout, sleep, trigger, errorExpected)
 		}
-		require.True(t, (err != nil) == errorExpected)
+		require.True(t, (xerr != nil) == errorExpected)
 
 		// the minimum of the 3 wins, so
 		min := math.Min(math.Min(float64(timeout), float64(sleep)), float64(trigger))
@@ -319,13 +322,13 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 
 	// No errors here, look at TestChildrenWaitingGameWithContextCancelfuncs for more information
 	// there is a performance degradation problem in Task/TaskGroup that impact the timings
-	funk(30*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)   // timeout
+	funk(30*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)   // abort (canceled)
 	funk(30*time.Millisecond, 50*time.Millisecond, 80*time.Millisecond, true)   // timeout
-	funk(80*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)   // canceled
-	funk(40*time.Millisecond, 20*time.Millisecond, 10*time.Millisecond, true)   // canceled
-	funk(40*time.Millisecond, 20*time.Millisecond, 30*time.Millisecond, false)  // cancel is tiggered AFTER we are done (in 20ms), less that the timeout -> so no error
+	funk(80*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)   // abort (canceled)
+	funk(40*time.Millisecond, 20*time.Millisecond, 10*time.Millisecond, true)   // abort (canceled)
+	funk(40*time.Millisecond, 20*time.Millisecond, 30*time.Millisecond, false)  // no error (cancel is triggered AFTER we are done (in 20ms), less that the timeout)
 	funk(140*time.Millisecond, 20*time.Millisecond, 40*time.Millisecond, false) // same thing here
-	funk(140*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)  // canceled
+	funk(140*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)  // abort (canceled)
 }
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
@@ -392,7 +395,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 	funk(4, 5, 1, 3, false)
 	funk(5, 7, 3, 1, true)
 	funk(6, 4, 1, 3, false)
-	funk(7, 14, 2, 4, false)
+	funk(7, 14, 2, 4, true)
 	funk(8, 14, 4, 2, true)
 }
 
@@ -631,6 +634,7 @@ func TestTwoRoots(t *testing.T) {
 	require.True(t, theyAre)
 }
 
+// VPL: now that Task is working on this matter, maybe we should prepare a benchmark to compare Task method and this method?
 func TestAbortButThisTimeUsingTrueAbortChannel(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -699,5 +703,135 @@ func TestAbortButThisTimeUsingTrueAbortChannel(t *testing.T) {
 
 	if t.Failed() {
 		fmt.Println(outString)
+	}
+}
+
+func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t *testing.T) {
+	enough := false
+	iter := 0
+	panicReported := false
+
+	for !enough {
+		iter++
+		if iter > 12 {
+			break
+		}
+
+		t.Log("--- Next ---") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
+		single, xerr := NewTask()
+		require.NotNil(t, single)
+		require.Nil(t, xerr)
+
+		bailout := make(chan string, 80) // a buffered channel
+
+		_, xerr = single.Start(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				for { // do some work, then look for aborted, again and again
+					// some work
+					time.Sleep(time.Duration(tools.RandomInt(20, 30)) * time.Millisecond)
+					if t.Aborted() {
+						// Cleaning up first before leaving... ;)
+						time.Sleep(time.Duration(tools.RandomInt(100, 800)) * time.Millisecond)
+						break
+					}
+				}
+
+				// We are using the classic 'send on closed channel' trick to see if Wait actually waits until everyone is DONE.
+				// If it does we will never see a panic, but if Abort doesn't mean TellYourChildrenToAbort but
+				// actually means AbortYourChildrenAndQuitNOWWithoutWaiting, then we have a problem
+				acha := parameters.(chan string)
+				acha <- "Bailing out"
+
+				// flip a coin, true and we panic, false we don't
+				if tools.RandomInt(0, 2) == 1 {
+					return "mistakes happen", fail.NewError("It was head")
+				}
+
+				return "who cares", nil
+			}, bailout,
+		)
+		require.Nil(t, xerr)
+
+		// after this, some tasks will already be looking for ABORT signals
+		time.Sleep(time.Duration(65) * time.Millisecond)
+
+		go func() {
+			// this will actually start after wait
+			time.Sleep(time.Duration(100) * time.Millisecond)
+
+			// let's have fun
+			xerr := single.Abort()
+			require.Nil(t, xerr)
+		}()
+
+		/*res*/ _, xerr = single.Wait() // 100 ms after this, .Abort() should hit
+		if xerr != nil {
+			t.Logf("Wait reports a failure: %s", reflect.TypeOf(xerr).String()) // Of course, we did !!, we induced a panic !! didn't we ?
+			switch cerr := xerr.(type) {
+			case *fail.ErrAborted:
+				consequences := cerr.Consequences()
+				if len(consequences) > 0 {
+					t.Log("Task reports consequences of the Abort:")
+					for _, v := range consequences {
+						logged := false
+						switch cerr := v.(type) {
+						case *fail.ErrAborted:
+							consequences := cerr.Consequences()
+							if len(consequences) > 0 {
+								t.Logf("aborted with consequence: %v (%s)", v, reflect.TypeOf(v).String())
+								logged = true
+							}
+						default:
+						}
+						if !logged {
+							t.Logf("%v (%s)", v, reflect.TypeOf(v).String())
+						}
+					}
+				} else {
+					t.Log("Task reports no consequences of the Abort")
+				}
+
+				if !strings.Contains(spew.Sdump(consequences), "panic happened") {
+					t.Logf("no panic reported by Task")
+				} else {
+					t.Logf("Task reports panic in consequences!!!")
+					panicReported = true
+				}
+			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
+			case *fail.ErrRuntimePanic:
+				t.Logf("Task generates a panic!!!")
+				panicReported = true
+			default:
+				t.Errorf("Unexpected error: %v", xerr)
+			}
+		}
+		close(bailout) // If Wait actually waits, this is closed AFTER all Tasks filled the channel, so no panics
+		// If not..., well...
+
+		if panicReported {
+			enough = true
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if !panicReported {
+		t.Logf("No panic reported, good")
+	} else {
+		t.Errorf("panics have been reported, bad!!!")
+	}
+}
+
+func BenchmarkTryWait(b *testing.B) {
+	single, xerr := NewTask()
+	require.Nil(b, xerr)
+	require.NotNil(b, single)
+
+	_, xerr = single.Start(func(t Task, _ TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(1*time.Second)
+		return nil, nil
+	}, nil)
+	require.Nil(b, xerr)
+
+	for i := 0; i < b.N; i++ {
+		_, _, xerr = single.TryWait()
 	}
 }

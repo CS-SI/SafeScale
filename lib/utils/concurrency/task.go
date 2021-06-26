@@ -85,6 +85,7 @@ type TaskCore interface {
 	GetContext() context.Context
 	GetLastError() (error, fail.Error)
 	GetResult() (TaskResult, fail.Error)
+	IsSuccessful() (bool, fail.Error)
 	SetID(string) fail.Error
 
 	Run(TaskAction, TaskParameters) (TaskResult, fail.Error)
@@ -107,9 +108,9 @@ type task struct {
 	cancel context.CancelFunc
 	status TaskStatus
 
-	finishCh chan struct{} // Used to signal the routine that Wait() the go routine is done
-	doneCh   chan bool     // Used by routine to signal it has done its processing
-	abortCh  chan bool     // Used to signal the routine it has to stop processing
+	controllerTerminatedCh chan struct{} // Used to signal Wait() (and siblings) the controller of the go routine has terminated
+	runTerminatedCh        chan bool     // Used by go routine to signal it has done its processing
+	abortCh                chan bool     // Used to signal the routine it has to stop processing
 
 	err    fail.Error
 	result TaskResult
@@ -235,11 +236,11 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 		childContext, cancel = context.WithCancel(parentTask.(*task).ctx)
 	}
 	t := &task{
-		cancel:   cancel,
-		status:   READY,
-		abortCh:  make(chan bool, 1),
-		doneCh:   make(chan bool, 1),
-		finishCh: make(chan struct{}, 1),
+		cancel:                 cancel,
+		status:                 READY,
+		abortCh:                make(chan bool, 1),
+		runTerminatedCh:        make(chan bool, 1),
+		controllerTerminatedCh: make(chan struct{}, 1),
 	}
 
 	generateID := true
@@ -415,32 +416,28 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tid, err := t.GetID()
-	if err != nil {
-		return nil, err
-	}
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
 	if t.status != READY {
-		return nil, fail.NewError("cannot start task '%s': not ready", tid)
+		return nil, fail.NewError("cannot start task '%s': not ready", t.id)
 	}
 
 	if action == nil {
 		t.status = DONE
 	} else {
 		t.status = RUNNING
-		t.doneCh = make(chan bool, 1)
+		t.runTerminatedCh = make(chan bool, 1)
 		t.abortCh = make(chan bool, 1)
-		t.finishCh = make(chan struct{}, 1)
+		t.controllerTerminatedCh = make(chan struct{}, 1)
 		go func() {
 			ctrlErr := t.controller(action, params, timeout)
 			if ctrlErr != nil {
 				t.lock.Lock()
 				if t.err != nil {
-					_ = t.err.AddConsequence(fail.Wrap(ctrlErr, "unexpected error running the controller"))
+					_ = t.err.AddConsequence(fail.Wrap(ctrlErr, "unexpected error running the Task controller"))
 				} else {
-					t.err = fail.Wrap(ctrlErr, "unexpected error running the controller")
+					t.err = fail.Wrap(ctrlErr, "unexpected error running the Task controller")
 				}
 				t.lock.Unlock()
 			}
@@ -448,23 +445,6 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 	}
 	return t, nil
 }
-
-// // StartInSubtask runs in a subtask goroutine the function with parameters
-// func (t *task) StartInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-// 	if t.IsNull() {
-// 		return nil, fail.InvalidInstanceError()
-// 	}
-//
-// 	st, xerr := NewTaskWithParent(t, options...)
-// 	if xerr != nil {
-// 		return nil, xerr
-// 	}
-//
-// 	t.lock.Lock()
-// 	defer t.lock.Unlock()
-//
-// 	return st.Start(action, params, options...)
-// }
 
 // controller controls the start, termination and possibly abortion of the action
 func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) fail.Error {
@@ -476,7 +456,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 
 	defer func() {
 		t.lock.Lock()
-		close(t.finishCh)
+		close(t.controllerTerminatedCh)
 		if t.cancel != nil {
 			// Make sure cancel() is called at the end of the task
 			t.cancel()
@@ -496,7 +476,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					return xerr
 				}
 
-			case <-t.doneCh:
+			case <-t.runTerminatedCh:
 				t.processDone(traceR)
 				finish = true // stop to react on signals
 
@@ -519,7 +499,7 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 					return xerr
 				}
 
-			case <-t.doneCh:
+			case <-t.runTerminatedCh:
 				t.processDone(traceR)
 				finish = true // stop to react on signals
 
@@ -578,7 +558,7 @@ func (t *task) processDone(traceR *tracer) {
 	traceR.trace("receiving done signal from go routine")
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	t.finishCh <- struct{}{}
+	t.controllerTerminatedCh <- struct{}{}
 }
 
 // processAbort operates when Abort has been requested
@@ -594,7 +574,9 @@ func (t *task) processAbort(traceR *tracer) fail.Error {
 			case *fail.ErrTimeout:
 				// do nothing
 			default:
-				t.err = fail.AbortedError(t.err)
+				abortError := fail.AbortedError(nil)
+				_ = abortError.AddConsequence(t.err)
+				t.err = abortError
 			}
 		} else {
 			t.err = fail.AbortedError(nil)
@@ -632,8 +614,8 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 			}
 			t.result = nil
 			t.status = DONE
-			t.doneCh <- false
-			close(t.doneCh)
+			t.runTerminatedCh <- false
+			close(t.runTerminatedCh)
 		}
 	}()
 
@@ -642,13 +624,10 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if t.status == RUNNING {
-		t.err = xerr
-	}
-	t.status = DONE
+	t.err = xerr
 	t.result = result
-	t.doneCh <- true
-	close(t.doneCh)
+	t.runTerminatedCh <- true
+	close(t.runTerminatedCh)
 }
 
 // Run starts task, waits its completion then return the error code
@@ -665,64 +644,95 @@ func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, fail.E
 	return t.Wait()
 }
 
-// VPL: DEPRECATED
-// // RunInSubtask starts a subtask, waits its completion then return the error code
-// func (t *task) RunInSubtask(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error) {
-// 	if t.IsNull() {
-// 		return nil, fail.InvalidInstanceError()
-// 	}
-// 	if action == nil {
-// 		return nil, fail.InvalidParameterCannotBeNilError("action")
-// 	}
-//
-// 	st, xerr := NewTaskWithParent(t, options...)
-// 	if xerr != nil {
-// 		return nil, xerr
-// 	}
-//
-// 	return st.Run(action, params)
-// }
+// IsSuccessful tells if the Task has been executed without error
+func (instance *task) IsSuccessful() (bool, fail.Error) {
+	if instance.IsNull() {
+		return false, fail.InvalidInstanceError()
+	}
 
-// Wait waits for the task to end, and returns the error (or nil) of the execution
-func (t *task) Wait() (TaskResult, fail.Error) {
-	if t.IsNull() {
+
+	switch instance.status {
+	case DONE:
+		instance.lock.RLock()
+		defer instance.lock.RUnlock()
+		return instance.err == nil, nil
+
+	case READY:
+		return false, fail.InconsistentError("cannot test the success of a Task that has not started")
+
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		fallthrough
+	case RUNNING:
+		return false, fail.InvalidRequestError("cannot test the success of a Task that has not been waited")
+
+	case UNKNOWN:
+		fallthrough
+	default:
+		return false, fail.InvalidRequestError("failed to tell if Task is successful: invalid status")
+	}
+}
+
+// Wait awaits for the task to end, and returns the error (or nil) of the execution
+// Returns:
+// - TaskResult, nil: the Task ended normally and provide a Result
+// - nil, *fail.ErrAborted: the Task has been aborted; *fail.ErrAborted.Consequences() may contain error(s) happening after the signal has been received by the Task
+// - nil, *fail.ErrTimeout: the Task has reached its execution delay
+// - TaskResult, <other error>: the Task runs successfully but returned an error; the TaskResult usage is dependant of the TaskAction content
+
+func (instance *task) Wait() (TaskResult, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	t.lock.RLock()
-	tid := t.id
-	status := t.status
-	t.lock.RUnlock()
+	instance.lock.RLock()
+	tid := instance.id
+	status := instance.status
+	instance.lock.RUnlock()
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
 		return nil, fail.InconsistentError("cannot wait a Task that has not been started")
 
 	case DONE:
-		t.lock.RLock()
-		defer t.lock.RUnlock()
+		instance.lock.RLock()
+		defer instance.lock.RUnlock()
 
-		return t.result, t.err
+		return instance.result, instance.err
 
 	case TIMEOUT:
-		t.lock.RLock()
-		defer t.lock.RUnlock()
-
-		return nil, t.err
-
+		fallthrough
 	case ABORTED:
 		fallthrough
 	case RUNNING:
-		<-t.finishCh
+		<-instance.controllerTerminatedCh
 
-		t.lock.RLock()
-		defer t.lock.RUnlock()
+		instance.lock.Lock()
+		defer instance.lock.Unlock()
 
-		if t.status == ABORTED || t.status == TIMEOUT {
-			return nil, t.err
+		if instance.status == ABORTED {
+			// In case of ABORT, if an error is already there, the TASK has ended, so just return this error with the result
+			if instance.err != nil {
+				instance.status = DONE
+				return instance.result, instance.err
+			}
+			// In case of ABORT, if there is no error and instance.result is not nil, return an Abort error with result
+			if instance.result != nil {
+				instance.status = DONE
+				return instance.result, fail.AbortedError(nil)
+			}
 		}
 
-		return t.result, t.err
+		if instance.status == TIMEOUT {
+			instance.status = DONE
+			instance.result = nil
+			instance.err = fail.TimeoutError(nil, 0)
+			return nil, instance.err
+		}
+
+		instance.status = DONE
+		return instance.result, instance.err
 
 	case UNKNOWN:
 		fallthrough
@@ -735,37 +745,35 @@ func (t *task) Wait() (TaskResult, fail.Error) {
 // If task done, returns (true, TaskResult, <error from the task>)
 // If task is not done, returns (false, nil, nil) (subsequent calls of TryWait may be necessary)
 // if Task is not started, returns (false, nil, *fail.ErrInconsistent)
-func (t *task) TryWait() (bool, TaskResult, fail.Error) {
-	if t.IsNull() {
+func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
+	if instance.IsNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
-	t.lock.RLock()
-	tid := t.id
-	status := t.status
-	t.lock.RUnlock()
+	instance.lock.RLock()
+	tid := instance.id
+	status := instance.status
+	instance.lock.RUnlock()
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
 		return false, nil, fail.InconsistentError("cannot wait a Task that has not been started")
 
-	// ABORTED and TIMEOUT are transient status, TryWait() succeeds only when status reaches DONE
+	case DONE:
+		instance.lock.RLock()
+		defer instance.lock.RUnlock()
+		return true, instance.result, instance.err
+
 	case ABORTED:
 		fallthrough
 	case TIMEOUT:
-		return false, nil, nil
-
-	case DONE:
-		t.lock.RLock()
-		defer t.lock.RUnlock()
-		return true, t.result, t.err
-
+		fallthrough
 	case RUNNING:
-		if len(t.finishCh) == 1 {
-			_, err := t.Wait()
-			t.lock.RLock()
-			defer t.lock.RUnlock()
-			return true, t.result, err
+		if len(instance.controllerTerminatedCh) == 1 {
+			_, err := instance.Wait()
+			instance.lock.RLock()
+			defer instance.lock.RUnlock()
+			return true, instance.result, err
 		}
 		return false, nil, nil
 
@@ -778,53 +786,81 @@ func (t *task) TryWait() (bool, TaskResult, fail.Error) {
 
 // WaitFor waits for the task to end, for 'duration' duration.
 // Note: if timeout occurred, the task is not aborted. You have to abort it yourself if needed.
-// If task done, returns (true, <error from the task>)
-// If task aborted, returns (true, utils.ErrAborted)
-// If duration elapsed (meaning the task is still running after duration), returns (false, utils.ErrTimeout)
-func (t *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xerr fail.Error) {
-	if t.IsNull() {
+// - true, TaskResult, fail.Error: Task terminates, but TaskAction returned an error
+// - true, TaskResult, *failErrAborted: Task terminates on Abort
+// - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
+//                                 abort signal has been received would be attached to the error as consequence)
+func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xerr fail.Error) {
+	if instance.IsNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
-	t.lock.RLock()
-	tid := t.id
-	status := t.status
-	t.lock.RUnlock()
+	instance.lock.RLock()
+	tid := instance.id
+	status := instance.status
+	instance.lock.RUnlock()
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
 		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
 
 	case DONE:
-		t.lock.RLock()
-		defer t.lock.RUnlock()
-		return true, t.result, t.err
+		instance.lock.RLock()
+		defer instance.lock.RUnlock()
+		return true, instance.result, instance.err
 
 	case ABORTED:
 		fallthrough
 	case TIMEOUT:
-		t.lock.RLock()
-		defer t.lock.RUnlock()
-		return true, nil, t.err
-
+		fallthrough
 	case RUNNING:
-		var result TaskResult
-		c := make(chan struct{})
-		go func() {
-			result, xerr = t.Wait()
-			c <- struct{}{} // done
-			close(c)
-		}()
+		var (
+			result TaskResult
+			c chan struct{}
+		)
+		waiterTask, xerr := NewTaskWithParent(instance, InheritParentIDOption, AmendID("WaitForHelper"))
+		if xerr != nil {
+			return false, nil, fail.Wrap(xerr, "failed to create helper Task to WaitFor")
+		}
+		_, xerr = waiterTask.Start(
+			func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
+				t.DisarmAbortSignal()
+
+				var done bool
+				for ; !t.Aborted() && !done; {
+					done, result, innerXErr = instance.TryWait()
+					if !done {
+						time.Sleep(1*time.Millisecond) // FIXME: hardcoded value :-(
+					}
+				}
+				if done {
+					c <- struct{}{}
+				}
+				return nil, nil
+			}, nil,
+		)
 
 		if duration > 0 {
 			select {
 			case <-time.After(duration):
-				toErr := fail.TimeoutError(fmt.Errorf("timeout of %s waiting for task '%s'", duration, tid), duration, nil)
-				abErr := t.Abort()
-				if abErr != nil {
-					_ = toErr.AddConsequence(abErr)
+				// We want now waiterTask to react to abort signal...
+				waiterTask.(*task).lock.Lock()
+				waiterTask.(*task).abortDisengaged = false
+				waiterTask.(*task).lock.Unlock()
+
+				// signal waiterTask to abort (and do not wait for it, it will terminate)
+				xerr := waiterTask.Abort()
+				tout := fail.TimeoutError(xerr, duration, fmt.Sprintf("timeout of %s waiting for Task '%s'", duration, tid))
+
+				// Timeout has been reached, send abort signal to Task
+				xerr = instance.Abort()
+				if xerr != nil {
+					_ = tout.AddConsequence(xerr)
 				}
-				return false, nil, toErr
+				// We do not wait on Task after the Abort, because if the TaskAction is badly coded and never
+				// terminate, Wait would not terminate neither... So bad for leaked go routines but this function has to end...
+
+				return false, nil, tout
 			case <-c:
 				return true, result, xerr
 			}

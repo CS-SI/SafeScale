@@ -128,7 +128,7 @@ func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskRe
 	var iRes int
 
 	defer func(err *fail.Error) {
-		if st, _ := t.GetStatus(); st == ABORTED {
+		if t.Aborted() {
 			if iRes > 1 {
 				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
@@ -189,16 +189,9 @@ func TestSomethingFails(t *testing.T) {
 	_, xerr = overlord.WaitGroup()
 	require.NotNil(t, xerr)
 	if xerr != nil {
-		if eab, ok := xerr.(*fail.ErrAborted); ok {
-			cause := eab.Cause()
-			if causes, ok := cause.(*fail.ErrorList); ok {
-				errList := causes.ToErrorSlice()
-
-				if len(errList) != 2 {
-					t.Fail()
-				}
-			} else {
-				t.FailNow()
+		if eab, ok := xerr.(*fail.ErrorList); ok {
+			if len(eab.ToErrorSlice()) != 2 {
+				t.Fail()
 			}
 		} else {
 			t.FailNow()
@@ -329,6 +322,7 @@ func TestBadTaskActionCitizen(t *testing.T) {
 	}
 }
 
+// VPL: as coded, this test never stop... There is no way to kill the goroutines
 func TestAwfulTaskActionCitizen(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -362,9 +356,19 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 
 	time.Sleep(60 * time.Millisecond)
 
-	_, xerr = overlord.WaitGroup()
+	// VPL: waiting on a taskgroup running task that cannot end will deadlock... As expected...
+	ended, _, xerr := overlord.WaitGroupFor(20*time.Second)
 	if xerr == nil { // It should fail because it's an aborted task...
 		t.Fail()
+	}
+	if !ended {
+		t.Logf("TaskGroup hasn't ended after 20s")
+	}
+	switch xerr.(type) {
+	case *fail.ErrTimeout:
+		t.Logf("timeout occurred as expected, TaskGroup cannot end because of the way TaskActions have been coded")
+	default:
+		t.Errorf("unexpected error occurred: %v", xerr)
 	}
 
 	time.Sleep(1000 * time.Millisecond)

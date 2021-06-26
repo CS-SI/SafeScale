@@ -81,32 +81,36 @@ func TestCallingReadyTaskGroup(t *testing.T) {
 }
 
 func TestChildrenWaitingGameEnoughTime(t *testing.T) {
-	overlord, err := NewTaskGroupWithParent(nil)
-	require.NotNil(t, overlord)
-	require.Nil(t, err)
+	for iter := 0; iter < 100 ; iter++ {
+		overlord, xerr := NewTaskGroupWithParent(nil)
+		require.NotNil(t, overlord)
+		require.Nil(t, xerr)
+		xerr = overlord.SetID("/parent")
+		require.Nil(t, xerr)
 
-	theID, err := overlord.GetID()
-	require.Nil(t, err)
-	require.NotEmpty(t, theID)
+		theID, xerr := overlord.GetID()
+		require.Nil(t, xerr)
+		require.NotEmpty(t, theID)
 
-	for ind := 0; ind < 800; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil)
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		for ind := 0; ind < 800; ind++ {
+			_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+			if xerr != nil {
+				t.Errorf("Unexpected: %s", xerr)
+				t.FailNow()
+			}
+		}
+
+		fastEnough, res, xerr := overlord.WaitFor(450 * time.Millisecond)
+		if !fastEnough {
+			t.Errorf("It should be enough time but it wasn't at iteration #%d", iter)
 			t.FailNow()
 		}
+		require.Nil(t, xerr)
+		require.NotEmpty(t, res)
 	}
-
-	fastEnough, res, err := overlord.WaitFor(450 * time.Millisecond)
-	if !fastEnough {
-		t.Errorf("It should be enough time but it wasn't")
-		t.FailNow()
-	}
-	require.Nil(t, err)
-	require.NotEmpty(t, res)
 }
 
 func TestChildrenWaitingGame(t *testing.T) {
@@ -548,5 +552,23 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 	}
 	if failure {
 		t.FailNow()
+	}
+}
+
+func BenchmarkTryWaitGroup(b *testing.B) {
+	overlord, xerr := NewTaskGroup()
+	require.Nil(b, xerr)
+	require.NotNil(b, overlord)
+
+	for ind := 0; ind < 1000; ind++ {
+		_, xerr = overlord.Start(func(t Task, _ TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(10 * time.Second)
+			return nil, nil
+		}, nil)
+		require.Nil(b, xerr)
+	}
+
+	for i := 0; i < b.N; i++ {
+		_, _, xerr = overlord.TryWaitGroup()
 	}
 }

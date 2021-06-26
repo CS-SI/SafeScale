@@ -29,7 +29,7 @@ import (
 
 // This imitates some of the code found in cluster.go
 func TestRealCharge(t *testing.T) {
-	overlord, err := NewTaskGroup(nil)
+	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
@@ -38,24 +38,35 @@ func TestRealCharge(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	gorrs := 8000
-
+	abortOccurred := false
+	started := 0
 	for ind := 0; ind < gorrs; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		if xerr != nil {
+			if !overlord.Aborted() {
+				t.Errorf("Unexpected: %s", xerr)
+			}
+		} else {
+			started++
 		}
 		if tools.RandomInt(50, 250) > 200 {
-			aErr := overlord.Abort()
-			if aErr != nil {
+			xerr = overlord.Abort()
+			if xerr != nil {
 				t.Errorf("What, Cannot abort ??")
 				t.FailNow()
 			}
+			abortOccurred = true
 		}
 	}
 
 	res, err := overlord.Wait()
 	require.NotEmpty(t, res)
+	var abortState string
+	if abortOccurred {
+		abortState = " before Abort"
+	}
+	t.Logf("Started %d TaskActions%s", started, abortState)
 }
