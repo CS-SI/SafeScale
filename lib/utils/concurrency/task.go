@@ -543,7 +543,15 @@ func (t *task) processCancel(traceR *tracer) fail.Error {
 	if !t.abortDisengaged {
 		switch t.status {
 		case RUNNING:
-			t.status = ABORTED
+			switch t.ctx.Err() {
+			case context.DeadlineExceeded:
+				t.status = TIMEOUT
+				t.err = fail.TimeoutError(nil, 0, "context deadline exceeded")
+			case context.Canceled:
+				fallthrough
+			default:
+				t.status = ABORTED
+			}
 			t.abortCh <- true
 
 		case ABORTED:
