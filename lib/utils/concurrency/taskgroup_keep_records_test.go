@@ -2,6 +2,7 @@ package concurrency
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -64,6 +65,10 @@ func TestKeepRecords(t *testing.T) {
 			case *fail.ErrAborted:
 				t.Errorf("Seriously ?, Are we confusing that a group is aborted and that are reported errors in the results ??, nobody is aborting in this test")
 				t.FailNow()
+			case *fail.ErrTimeout:
+				t.Logf("%v", xerr)
+			case *fail.ErrorList:
+				t.Logf("%v", xerr)
 			default:
 				t.Errorf("Unexpected error: %v", xerr)
 				t.FailNow()
@@ -143,7 +148,7 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 					}
 
 					return "who cares about timeout", nil
-				}, nil, 100*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
+				}, nil, 100*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-with-timeout-%d", ind)),
 			)
 			require.Nil(t, xerr)
 		}
@@ -153,12 +158,18 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 
 		res, xerr := overlord.Wait()
 		if xerr != nil {
-			switch xerr.(type) {
+			switch cerr := xerr.(type) {
 			case *fail.ErrAborted:
 				t.Errorf("Seriously ?, Are we confusing that a group is aborted and that are reported errors in the results ??, nobody is aborting in this test")
 				t.FailNow()
+			case *fail.ErrTimeout:
+				t.Logf("%v (%s)", xerr, reflect.TypeOf(xerr).String())
+			case *fail.ErrorList:
+				for _, v := range cerr.ToErrorSlice() {
+					t.Logf("%s (%s)", v.Error(), reflect.TypeOf(v).String())
+				}
 			default:
-				t.Errorf("Unexpected error: %v", xerr)
+				t.Errorf("Unexpected error: %v (%s)", xerr, reflect.TypeOf(xerr).String())
 				t.FailNow()
 			}
 		} else {
