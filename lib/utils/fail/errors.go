@@ -72,19 +72,30 @@ type errorCore struct {
 	grpcCode            codes.Code
 }
 
+// ErrUnqualified is a generic Error type that has no particulaur signification
+type ErrUnqualified struct {
+	*errorCore
+}
+
 // NewError creates a new failure report
 func NewError(msg ...interface{}) Error {
-	return newError(nil, nil, msg...)
+	return &ErrUnqualified{
+		errorCore: newError(nil, nil, msg...),
+	}
 }
 
 // NewErrorWithCause creates a new failure report with a cause
 func NewErrorWithCause(cause error, msg ...interface{}) Error {
-	return newError(cause, nil, msg...)
+	return &ErrUnqualified{
+		errorCore: newError(cause, nil, msg...),
+	}
 }
 
 // NewErrorWithCauseAndConsequences creates a new failure report with a cause and a list of teardown problems 'consequences'
 func NewErrorWithCauseAndConsequences(cause error, consequences []error, msg ...interface{}) Error {
-	return newError(cause, consequences, msg...)
+	return &ErrUnqualified{
+		errorCore: newError(cause, consequences, msg...),
+	}
 }
 
 // newError creates a new failure report with a message 'message', a causer error 'causer' and a list of teardown problems 'consequences'
@@ -127,14 +138,18 @@ func defaultCauseFormatter(e Error) string {
 
 	errCore := e.(*errorCore)
 	if errCore.cause != nil {
-		msgFinal += ": "
 		switch cerr := errCore.cause.(type) {
 		case Error:
-			msgFinal += cerr.UnformattedError()
+			raw := cerr.UnformattedError()
+			if raw != "" {
+				msgFinal += ": " + raw
+			}
 		default:
-			msgFinal += cerr.Error()
+			raw := cerr.Error()
+			if raw != "" {
+				msgFinal += ": " + raw
+			}
 		}
-		// msgFinal += errCore.cause.Error()
 	}
 
 	lenConseq := uint(len(errCore.consequences))
@@ -278,7 +293,7 @@ func (e *errorCore) Error() string {
 		msgFinal += e.annotationFormatter(e.annotations)
 	}
 
-	return msgFinal
+ 	return msgFinal
 }
 
 // UnformattedError returns a human-friendly error explanation
