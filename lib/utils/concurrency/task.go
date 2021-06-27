@@ -88,7 +88,7 @@ type TaskCore interface {
 	IsSuccessful() (bool, fail.Error)
 	SetID(string) fail.Error
 
-	Run(TaskAction, TaskParameters) (TaskResult, fail.Error)
+	Run(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error)
 	Start(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error)
 	StartWithTimeout(fn TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error)
 }
@@ -631,12 +631,12 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 }
 
 // Run starts task, waits its completion then return the error code
-func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, fail.Error) {
+func (t *task) Run(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error) {
 	if t.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	_, err := t.Start(action, params)
+	_, err := t.Start(action, params, options...)
 	if err != nil {
 		return nil, err
 	}
