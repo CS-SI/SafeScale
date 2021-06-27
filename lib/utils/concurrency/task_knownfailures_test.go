@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,7 +41,7 @@ func TestRealCharge(t *testing.T) {
 	started := 0
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if xerr != nil {
@@ -52,7 +51,7 @@ func TestRealCharge(t *testing.T) {
 		} else {
 			started++
 		}
-		if tools.RandomInt(50, 250) > 200 {
+		if RandomInt(50, 250) > 200 {
 			xerr = overlord.Abort()
 			if xerr != nil {
 				t.Errorf("What, Cannot abort ??")

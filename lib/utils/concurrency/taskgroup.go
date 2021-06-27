@@ -301,16 +301,6 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	return subtask, nil
 }
 
-
-// Wait is a synonym to WaitGroup (exists to satisfy interface Task)
-func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
-	if instance.isNull() {
-		return instance, fail.InvalidInstanceError()
-	}
-
-	return instance.WaitGroup()
-}
-
 // IsSuccessful tells if the TaskGroup has been executed without error
 func (instance *taskGroup) IsSuccessFul() (bool, fail.Error) {
 	if instance.isNull() {
@@ -321,6 +311,15 @@ func (instance *taskGroup) IsSuccessFul() (bool, fail.Error) {
 	defer instance.task.lock.RUnlock()
 
 	return instance.task.IsSuccessful()
+}
+
+// Wait is a synonym to WaitGroup (exists to satisfy interface Task)
+func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
+	if instance.isNull() {
+		return instance, fail.InvalidInstanceError()
+	}
+
+	return instance.WaitGroup()
 }
 
 // WaitGroup waits for the task to end, and returns the error (or nil) of the execution
@@ -499,6 +498,7 @@ func (instance *taskGroup) buildErrorList(in map[string]error) fail.Error {
 	return fail.NewErrorList(errors)
 }
 
+// waitChildren waits all the children to terminate
 func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
 	instance.children.lock.RLock()
 	defer instance.children.lock.RUnlock()
@@ -507,45 +507,68 @@ func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
 	errorList := make(map[string]error)
 	results := make(TaskGroupResult, childrenCount)
 
-	doneWaitStates := make(map[int]bool, childrenCount)
-	for k := range instance.children.tasks {
-		doneWaitStates[k] = false
-	}
-	doneWaitCount := 0
+	// doneWaitStates := make(map[int]bool, childrenCount)
+	// for k := range instance.children.tasks {
+	// 	doneWaitStates[k] = false
+	// }
+	// doneWaitCount := 0
+	//
+	// for {
+	// 	for k, s := range instance.children.tasks {
+	// 		if doneWaitStates[k] {
+	// 			continue
+	// 		}
+	//
+	// 		sid, err := s.task.GetID()
+	// 		if err != nil {
+	// 			continue
+	// 		}
+	//
+	// 		done, result, err := s.task.TryWait()
+	// 		if done {
+	// 			if err != nil {
+	// 				if s.normalizeError != nil {
+	// 					if normalizedError := s.normalizeError(err); normalizedError != nil {
+	// 						errorList[sid] = normalizedError
+	// 					}
+	// 				} else {
+	// 					errorList[sid] = err
+	// 				}
+	// 			}
+	//
+	// 			results[sid] = result
+	// 			doneWaitStates[k] = true
+	// 			doneWaitCount++
+	// 			break
+	// 		}
+	//
+	// 		time.Sleep(1 * time.Millisecond)
+	// 	}
+	//
+	// 	if doneWaitCount >= childrenCount {
+	// 		break
+	// 	}
+	// }
 
-	for {
-		for k, s := range instance.children.tasks {
-			if doneWaitStates[k] {
-				continue
-			}
-
+	for _, s := range instance.children.tasks {
+		for {
 			sid, err := s.task.GetID()
 			if err != nil {
-				continue
-			}
-
-			done, result, err := s.task.TryWait()
-			if done {
-				if err != nil {
-					if s.normalizeError != nil {
-						if normalizedError := s.normalizeError(err); normalizedError != nil {
-							errorList[sid] = normalizedError
-						}
-					} else {
-						errorList[sid] = err
-					}
-				}
-
-				results[sid] = result
-				doneWaitStates[k] = true
-				doneWaitCount++
 				break
 			}
 
-			time.Sleep(1 * time.Millisecond)
-		}
+			result, err := s.task.Wait()
+			if err != nil {
+				if s.normalizeError != nil {
+					if normalizedError := s.normalizeError(err); normalizedError != nil {
+						errorList[sid] = normalizedError
+					}
+				} else {
+					errorList[sid] = err
+				}
+			}
 
-		if doneWaitCount >= childrenCount {
+			results[sid] = result
 			break
 		}
 	}
