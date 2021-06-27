@@ -28,7 +28,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
 )
 
@@ -67,10 +66,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
-						time.Sleep(time.Duration(tools.RandomInt(20, 30)) * time.Millisecond)
+						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
 						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
-							time.Sleep(time.Duration(tools.RandomInt(100, 800)) * time.Millisecond)
+							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
 							break
 						}
 					}
@@ -180,10 +179,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
-						time.Sleep(time.Duration(tools.RandomInt(20, 30)) * time.Millisecond)
+						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
 						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
-							time.Sleep(time.Duration(tools.RandomInt(100, 800)) * time.Millisecond)
+							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
 							break
 						}
 					}
@@ -195,7 +194,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 					acha <- "Bailing out"
 
 					// flip a coin, true and we panic, false we don't
-					if tools.RandomInt(0, 2) == 1 {
+					if RandomInt(0, 2) == 1 {
 						panic("head")
 					}
 					// tails
@@ -308,10 +307,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
-						time.Sleep(time.Duration(tools.RandomInt(20, 30)) * time.Millisecond)
+						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
 						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
-							time.Sleep(time.Duration(tools.RandomInt(100, 800)) * time.Millisecond)
+							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
 							break
 						}
 					}
@@ -323,7 +322,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 					acha <- "Bailing out"
 
 					// flip a coin, true and we panic, false we don't
-					if tools.RandomInt(0, 2) == 1 {
+					if RandomInt(0, 2) == 1 {
 						atomic.AddInt32(&failureCounter, 1)
 						return "mistakes happen", fail.NewError("It was head")
 					}
@@ -475,10 +474,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
 						// some work
-						time.Sleep(time.Duration(tools.RandomInt(20, 30)) * time.Millisecond)
+						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
 						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
-							time.Sleep(time.Duration(tools.RandomInt(100, 800)) * time.Millisecond)
+							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
 							break
 						}
 					}
@@ -579,7 +578,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 
 		for ind := 0; ind < 10; ind++ {
 			_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				time.Sleep(time.Duration(tools.RandomInt(10, 20)) * time.Millisecond)
+				time.Sleep(time.Duration(RandomInt(10, 20)) * time.Millisecond)
 				return "waiting game", nil
 			}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 			if err != nil {

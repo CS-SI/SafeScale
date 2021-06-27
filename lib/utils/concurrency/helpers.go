@@ -17,6 +17,7 @@
 package concurrency
 
 import (
+	mrand "math/rand"
 	"sync"
 	"time"
 )
@@ -35,4 +36,10 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	case <-time.After(timeout):
 		return true // timed out
 	}
+}
+
+// RandomInt will return a random integer between a specified range.
+func RandomInt(min, max int) int {
+	mrand.Seed(time.Now().UnixNano())
+	return mrand.Intn(max-min) + min
 }

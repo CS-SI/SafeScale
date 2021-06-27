@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/gophercloud/gophercloud/acceptance/tools"
 	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -79,7 +78,7 @@ func TestWaitingGame(t *testing.T) {
 		require.NotNil(t, got)
 
 		theTask, err := got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(tools.RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if err == nil {
@@ -728,10 +727,10 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 				for { // do some work, then look for aborted, again and again
 					// some work
-					time.Sleep(time.Duration(tools.RandomInt(20, 30)) * time.Millisecond)
+					time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
 					if t.Aborted() {
 						// Cleaning up first before leaving... ;)
-						time.Sleep(time.Duration(tools.RandomInt(100, 800)) * time.Millisecond)
+						time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
 						break
 					}
 				}
@@ -743,7 +742,7 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 				acha <- "Bailing out"
 
 				// flip a coin, true and we panic, false we don't
-				if tools.RandomInt(0, 2) == 1 {
+				if RandomInt(0, 2) == 1 {
 					return "mistakes happen", fail.NewError("It was head")
 				}
 

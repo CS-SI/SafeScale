@@ -757,7 +757,7 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 
 	switch status {
 	case READY: // Waiting a ready task always succeed by design
-		return false, nil, fail.InconsistentError("cannot wait a Task that has not been started")
+		return false, nil, fail.InconsistentError("cannot wait task '%s': has not been started", tid)
 
 	case DONE:
 		instance.lock.RLock()
