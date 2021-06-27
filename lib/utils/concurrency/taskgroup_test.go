@@ -451,7 +451,7 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 
 	for ind := 0; ind < 10; ind++ {
 		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := time.Duration(RandomInt(300, 500))*time.Millisecond
+			rint := time.Duration(RandomInt(30, 50))*10*time.Millisecond
 			fmt.Printf("Entering (sleeping %v)\n", rint)
 
 			tempo := rint /100
@@ -474,12 +474,12 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 	xerr = overlord.Abort()
 	require.Nil(t, xerr)
 	end := time.Since(begin)
-	fmt.Printf("Aborted in %v\n", end)
+	t.Logf("Abort() lasted %v\n", end)
 
 	_, xerr = overlord.Wait()
 	require.NotNil(t, xerr)
 	end = time.Since(begin)
-	t.Logf("Wait lasted %v\n", end)
+	t.Logf("Wait() lasted %v\n", end)
 	if end >= (time.Millisecond * 100) {
 		t.Errorf("It should have finished near 100 ms but it didn't!!")
 	}

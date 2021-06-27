@@ -782,7 +782,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	primaryRequest := gwRequest
 	primaryRequest.ResourceName = primaryGatewayName
 	primaryRequest.HostName = primaryGatewayName + domain
-	primaryTask, xerr = tg.StartInSubtask(instance.taskCreateGateway, taskCreateGatewayParameters{
+	primaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
 		request: primaryRequest,
 		sizing:  *gwSizing,
 	})
@@ -799,7 +799,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		if req.Domain != "" {
 			secondaryRequest.HostName = secondaryGatewayName + domain
 		}
-		secondaryTask, xerr = tg.StartInSubtask(instance.taskCreateGateway, taskCreateGatewayParameters{
+		secondaryTask, xerr = tg.Start(instance.taskCreateGateway, taskCreateGatewayParameters{
 			request: secondaryRequest,
 			sizing:  *gwSizing,
 		})
@@ -1058,7 +1058,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		return xerr
 	}
 
-	_, xerr = tg.StartInSubtask(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+	_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
 		host:     primaryGateway,
 		userdata: primaryUserdata,
 	})
@@ -1068,7 +1068,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	}
 
 	if req.HA {
-		_, xerr = tg.StartInSubtask(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
+		_, xerr = tg.Start(instance.taskFinalizeGatewayConfiguration, taskFinalizeGatewayConfigurationParameters{
 			host:     secondaryGateway,
 			userdata: secondaryUserdata,
 		})

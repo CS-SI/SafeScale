@@ -178,7 +178,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		if xerr != nil && !req.KeepOnFailure {
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
-
+			
 			logrus.Debugf("Cleaning up on failure, deleting Hosts...")
 			var list map[uint]*propertiesv3.ClusterNode
 			derr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -207,7 +207,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 				for _, v := range list {
 					if v.ID != "" {
-						_, tgerr = tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", v.Name)))
+						_, tgerr = tg.Start(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", v.Name)))
 						if tgerr != nil {
 							cleanFailure = true
 							_ = xerr.AddConsequence(tgerr)
@@ -848,7 +848,7 @@ func (instance *Cluster) createHostResources(
 	}
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
-	_, xerr = gwInstallTasks.StartInSubtask(instance.taskInstallGateway, taskInstallGatewayParameters{primaryGateway}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%s/install", primaryGateway.GetName())))
+	_, xerr = gwInstallTasks.Start(instance.taskInstallGateway, taskInstallGatewayParameters{primaryGateway}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%s/install", primaryGateway.GetName())))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -861,7 +861,7 @@ func (instance *Cluster) createHostResources(
 	}
 
 	if haveSecondaryGateway {
-		_, xerr = gwInstallTasks.StartInSubtask(instance.taskInstallGateway, taskInstallGatewayParameters{secondaryGateway}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%s/install", secondaryGateway.GetName())))
+		_, xerr = gwInstallTasks.Start(instance.taskInstallGateway, taskInstallGatewayParameters{secondaryGateway}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%s/install", secondaryGateway.GetName())))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -893,7 +893,7 @@ func (instance *Cluster) createHostResources(
 
 				for _, v := range list {
 					if v.ID != "" {
-						_, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", v.Name)))
+						_, derr := tg.Start(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", v.Name)))
 						if derr != nil {
 							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete master '%s'", v.Name))
 						}
@@ -911,7 +911,7 @@ func (instance *Cluster) createHostResources(
 		return xerr
 	}
 
-	_, xerr = mastersCreateTasks.StartInSubtask(instance.taskCreateMasters, taskCreateMastersParameters{
+	_, xerr = mastersCreateTasks.Start(instance.taskCreateMasters, taskCreateMastersParameters{
 		count:         masterCount,
 		mastersDef:    mastersDef,
 		keepOnFailure: keepOnFailure,
@@ -948,7 +948,7 @@ func (instance *Cluster) createHostResources(
 
 				for _, v := range list {
 					if v.ID != "" {
-						_, derr := tg.StartInSubtask(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", v.Name)))
+						_, derr := tg.Start(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", v.Name)))
 						if derr != nil {
 							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete node '%s'", v.Name))
 						}
@@ -966,7 +966,7 @@ func (instance *Cluster) createHostResources(
 		return xerr
 	}
 
-	_, xerr = privateNodesCreateTasks.StartInSubtask(instance.taskCreateNodes, taskCreateNodesParameters{
+	_, xerr = privateNodesCreateTasks.Start(instance.taskCreateNodes, taskCreateNodesParameters{
 		count:         initialNodeCount,
 		public:        false,
 		nodesDef:      nodesDef,
@@ -1004,7 +1004,7 @@ func (instance *Cluster) createHostResources(
 		return xerr
 	}
 
-	_, xerr = gwCfgTasks.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/configure", primaryGateway.GetName())))
+	_, xerr = gwCfgTasks.Start(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: primaryGateway}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/configure", primaryGateway.GetName())))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1013,7 +1013,7 @@ func (instance *Cluster) createHostResources(
 	startedTasks = append(startedTasks, gwCfgTasks)
 
 	if haveSecondaryGateway {
-		_, xerr = gwCfgTasks.StartInSubtask(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway}, concurrency.InheritParentIDOption)
+		_, xerr = gwCfgTasks.Start(instance.taskConfigureGateway, taskConfigureGatewayParameters{Host: secondaryGateway}, concurrency.InheritParentIDOption)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1026,12 +1026,12 @@ func (instance *Cluster) createHostResources(
 	}
 
 	// Step 4: configure masters (if masters created successfully and gateways configured successfully)
-	mastersCfgTasks, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+	mastersCfgTask, xerr := concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/masters"))
 	if xerr != nil {
 		return xerr
 	}
 
-	_, mastersStatus = mastersCfgTasks.RunInSubtask(instance.taskConfigureMasters, nil, concurrency.InheritParentIDOption, concurrency.AmendID("/configuremasters"))
+	_, mastersStatus = mastersCfgTask.Run(instance.taskConfigureMasters, nil, concurrency.InheritParentIDOption, concurrency.AmendID("/configure"))
 	if mastersStatus != nil {
 		return mastersStatus
 	}
@@ -1047,12 +1047,12 @@ func (instance *Cluster) createHostResources(
 	}
 
 	// Step 6: Starts nodes configuration, if all masters and nodes have been created and gateway has been configured with success
-	privateNodesCfgTasks, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/nodes"))
+	privateNodesCfgTask, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/nodes"))
 	if xerr != nil {
 		return xerr
 	}
 
-	_, privateNodesStatus = privateNodesCfgTasks.RunInSubtask(instance.taskConfigureNodes, nil, concurrency.InheritParentIDOption)
+	_, privateNodesStatus = privateNodesCfgTask.Run(instance.taskConfigureNodes, nil, concurrency.InheritParentIDOption, concurrency.AmendID("/configure"))
 	if privateNodesStatus != nil {
 		return privateNodesStatus
 	}
@@ -1344,7 +1344,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 	}
 	for i := uint(1); i <= p.count; i++ {
 		taskParams.index = i
-		_, xerr := tg.StartInSubtask(instance.taskCreateMaster, taskParams, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", i)))
+		_, xerr := tg.Start(instance.taskCreateMaster, taskParams, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", i)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -1773,7 +1773,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 
 	timeout := temporal.GetContextTimeout() + time.Duration(p.count)*time.Minute
 	for i := uint(1); i <= p.count; i++ {
-		_, xerr := tg.StartInSubtask(instance.taskCreateNode, taskCreateNodeParameters{
+		_, xerr := tg.Start(instance.taskCreateNode, taskCreateNodeParameters{
 			index:         i,
 			nodeDef:       p.nodesDef,
 			timeout:       timeout,

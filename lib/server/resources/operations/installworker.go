@@ -565,7 +565,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
 		}
 
-		subtask, xerr := task.StartInSubtask(w.taskLaunchStep, taskLaunchStepParameters{
+		subtask, xerr := task.Start(w.taskLaunchStep, taskLaunchStepParameters{
 			stepName:  k,
 			stepKey:   stepKey,
 			stepMap:   stepMap,
@@ -1060,7 +1060,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 				return xerr
 			}
 
-			_, xerr = tg.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
+			_, xerr = tg.Start(taskApplyProxyRule, taskApplyProxyRuleParameters{
 				controller: primaryKongController,
 				rule:       r.(map[interface{}]interface{}),
 				variables:  &primaryGatewayVariables,
@@ -1075,10 +1075,11 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 					derr := tg.Abort()
 					if derr != nil {
 						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort TaskGroup"))
-					}
-					_, derr = tg.Wait()
-					if derr != nil {
-						_ = xerr.AddConsequence(derr)
+					} else {
+						_, derr = tg.Wait()
+						if derr != nil {
+							_ = xerr.AddConsequence(derr)
+						}
 					}
 				}
 			}()
@@ -1113,7 +1114,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 
 				secondaryGatewayVariables["Hostname"] = h.GetName() + domain
 
-				_, xerr = tg.StartInSubtask(taskApplyProxyRule, taskApplyProxyRuleParameters{
+				_, xerr = tg.Start(taskApplyProxyRule, taskApplyProxyRuleParameters{
 					controller: secondaryKongController,
 					rule:       rule,
 					variables:  &secondaryGatewayVariables,
