@@ -80,6 +80,7 @@ func TestCallingReadyTaskGroup(t *testing.T) {
 }
 
 func TestChildrenWaitingGameEnoughTime(t *testing.T) {
+	failures := 0
 	for iter := 0; iter < 100; iter++ {
 		overlord, xerr := NewTaskGroupWithParent(nil)
 		require.NotNil(t, overlord)
@@ -114,10 +115,14 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 		t.Logf("WaitFor really waited %v", waitForRealDuration)
 		if !fastEnough {
 			t.Errorf("It should be enough time but it wasn't at iteration #%d", iter)
-			t.FailNow()
+			failures++
+			if failures > 6 {
+				t.FailNow()
+			}
+		} else {
+			require.Nil(t, xerr)
+			require.NotEmpty(t, res)
 		}
-		require.Nil(t, xerr)
-		require.NotEmpty(t, res)
 	}
 }
 
@@ -537,6 +542,15 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 			switch xerr.(type) {
 			case *fail.ErrAborted:
 				// Wanted situation, continue
+			case *fail.ErrorList:
+				el, _ := xerr.(*fail.ErrorList)
+				for _, ae := range el.ToErrorSlice() {
+					if _, ok := ae.(*fail.ErrAborted); !ok {
+						t.Errorf("everything should be aborts in this test")
+						failure = true
+						return
+					}
+				}
 			default:
 				t.Errorf("waitgroup failed with an unexpected error: %v", xerr)
 				failure = true

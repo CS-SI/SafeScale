@@ -301,7 +301,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	return subtask, nil
 }
 
-// IsSuccessful tells if the TaskGroup has been executed without error
+// IsSuccessFul tells if the TaskGroup has been executed without error
 func (instance *taskGroup) IsSuccessFul() (bool, fail.Error) {
 	if instance.isNull() {
 		return false, fail.InvalidInstanceError()
@@ -684,10 +684,10 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 				t.DisarmAbortSignal()
 
 				var done bool
-				for ; !t.Aborted() && !done; {
+				for !t.Aborted() && !done {
 					done, results, innerXErr = instance.TryWaitGroup()
 					if !done {
-						time.Sleep(100*time.Microsecond) // FIXME: hardcoded value :-(
+						time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
 					}
 				}
 				if done {

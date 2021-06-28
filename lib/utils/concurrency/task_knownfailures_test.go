@@ -101,7 +101,7 @@ func TestRealCharges(t *testing.T) {
 	}
 
 	fast, res, err := overlord.WaitFor(280 * time.Millisecond)
-	require.NotEmpty(t, res)
+	require.NotEmpty(t, res) // recovering partial records lead to a race condition, should we try ?
 	require.True(t, fast)
 }
 
