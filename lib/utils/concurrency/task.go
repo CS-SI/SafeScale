@@ -205,7 +205,7 @@ func NewTaskWithParent(parentTask Task, options ...data.ImmutableKeyValue) (Task
 	return newTask(context.Background(), parentTask, options...)
 }
 
-// NewTaskWithContext creates an intance of Task with context
+// NewTaskWithContext creates an instance of Task with context
 func NewTaskWithContext(ctx context.Context, options ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -288,98 +288,98 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 }
 
 // IsNull ...
-func (t *task) IsNull() bool {
-	return t == nil || t.id == ""
+func (instance *task) IsNull() bool {
+	return instance == nil || instance.id == ""
 }
 
 // GetLastError returns the last error of the Task
-func (t *task) GetLastError() (error, fail.Error) { // nolint
-	if t.IsNull() {
+func (instance *task) GetLastError() (error, fail.Error) { // nolint
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	return t.err, nil
+	return instance.err, nil
 }
 
 // GetResult returns the result of the ended task
-func (t *task) GetResult() (TaskResult, fail.Error) {
-	if t.IsNull() {
+func (instance *task) GetResult() (TaskResult, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	if t.status != DONE {
+	if instance.status != DONE {
 		return nil, fail.InvalidRequestError("task is not done, there is no result yet")
 	}
 
-	return t.result, nil
+	return instance.result, nil
 }
 
 // GetID returns an unique id for the task
-func (t *task) GetID() (string, fail.Error) {
-	if t.IsNull() {
+func (instance *task) GetID() (string, fail.Error) {
+	if instance.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
 
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	return t.id, nil
+	return instance.id, nil
 }
 
 // GetSignature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
-func (t *task) GetSignature() string {
-	if t.IsNull() {
+func (instance *task) GetSignature() string {
+	if instance.IsNull() {
 		return ""
 	}
 
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	return t.getSignature()
+	return instance.getSignature()
 }
 
-func (t *task) getSignature() string {
-	if t.id != "" {
-		return `{task ` + t.id + `}`
+func (instance *task) getSignature() string {
+	if instance.id != "" {
+		return `{task ` + instance.id + `}`
 	}
 	return ""
 }
 
 // GetStatus returns the current task status
-func (t *task) GetStatus() (TaskStatus, fail.Error) {
-	if t.IsNull() {
+func (instance *task) GetStatus() (TaskStatus, fail.Error) {
+	if instance.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
 
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	return t.status, nil
+	return instance.status, nil
 }
 
 // GetContext returns the context associated to the task
-func (t *task) GetContext() context.Context {
-	if t.IsNull() {
+func (instance *task) GetContext() context.Context {
+	if instance.IsNull() {
 		return context.TODO()
 	}
 
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	return t.ctx
+	return instance.ctx
 }
 
-// SetID allows to specify task ID. The uniqueness of the ID through all the tasks
+// SetID allows specifying task ID. The uniqueness of the ID through all the tasks
 // becomes the responsibility of the developer...
-func (t *task) SetID(id string) fail.Error {
-	if t.IsNull() {
+func (instance *task) SetID(id string) fail.Error {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if id == "" {
@@ -389,24 +389,24 @@ func (t *task) SetID(id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be '0', reserved for root task")
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	if t.status == ABORTED {
+	if instance.status == ABORTED {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	t.id = id
+	instance.id = id
 	return nil
 }
 
 // Start runs in goroutine the function with parameters
-func (t *task) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if t.IsNull() {
+func (instance *task) Start(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (Task, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	return t.StartWithTimeout(action, params, 0, options...)
+	return instance.StartWithTimeout(action, params, 0, options...)
 }
 
 // StartWithTimeout runs in goroutine the TaskAction with TaskParameters, and stops after timeout (if > 0)
@@ -427,8 +427,8 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 		instance.status = DONE
 	} else {
 		instance.status = RUNNING
-		instance.runTerminatedCh = make(chan struct{}, 1)
-		instance.abortCh = make(chan struct{}, 1)
+		instance.runTerminatedCh = make(chan bool, 1)
+		instance.abortCh = make(chan bool, 1)
 		instance.controllerTerminatedCh = make(chan struct{}, 1)
 		go func() {
 			ctrlErr := instance.controller(action, params, timeout)
@@ -461,6 +461,10 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 	defer func() {
 		instance.lock.Lock()
 		close(instance.controllerTerminatedCh)
+		if instance.cancel != nil {
+			// Make sure cancel() is called at the end of the task
+			instance.cancel()
+		}
 		instance.lock.Unlock()
 	}()
 
@@ -477,7 +481,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				}
 
 			case <-instance.runTerminatedCh:
-				instance.processTerminated(traceR)
+				instance.processDone(traceR)
 				finish = true // stop to react on signals
 
 			case <-instance.abortCh:
@@ -499,6 +503,10 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 					return xerr
 				}
 
+			case <-instance.runTerminatedCh:
+				instance.processDone(traceR)
+				finish = true // stop to react on signals
+
 			case <-instance.abortCh:
 				xerr := instance.processAbort(traceR)
 				if xerr != nil {
@@ -517,9 +525,8 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 
 // processCancel operates when cancel has been called
 func (instance *task) processCancel(traceR *tracer) fail.Error {
+	// Context cancel signal received, propagating using abort signal
 	instance.lock.Lock()
-	defer instance.lock.Unlock()
-
 	traceR.trace("receiving signal from context, aborting task '%s'...", instance.id)
 	if !instance.abortDisengaged {
 		switch instance.status {
@@ -533,7 +540,7 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 			default:
 				instance.status = ABORTED
 			}
-			instance.abortCh <- struct{}{}
+			instance.abortCh <- true
 
 		case ABORTED:
 			fallthrough
@@ -550,16 +557,16 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 			return fail.InconsistentError("invalid Task state '%d'", instance.status)
 		}
 	}
+	instance.lock.Unlock()
 	return nil
 }
 
-// processTerminated operates when go routine terminates
-func (t *task) processTerminated(traceR *tracer) {
+// processDone operates when go routine terminates
+func (instance *task) processDone(traceR *tracer) {
 	traceR.trace("receiving done signal from go routine")
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.abortDisengaged = true    // We are stopping controller, so disarm Abort signal, it doesn't make sense anymore
-	t.controllerTerminatedCh <- struct{}{}
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+	instance.controllerTerminatedCh <- struct{}{}
 }
 
 // processAbort operates when Abort has been requested
@@ -593,58 +600,59 @@ func (instance *task) processAbort(traceR *tracer) fail.Error {
 }
 
 // processTimeout operates when timeout occurs
-func (t *task) processTimeout(timeout time.Duration) {
-	t.lock.Lock()
-	if t.status != ABORTED {
-		t.abortCh <- struct{}{}
-		t.err = fail.TimeoutError(t.err, timeout)
-		t.status = TIMEOUT
+func (instance *task) processTimeout(timeout time.Duration) {
+	instance.lock.Lock()
+	if instance.status != ABORTED {
+		instance.abortCh <- true
+		instance.err = fail.TimeoutError(instance.err, timeout)
+		instance.status = TIMEOUT
 	}
-	t.lock.Unlock()
+	instance.lock.Unlock()
 }
 
 // run executes the function 'action'
-func (t *task) run(action TaskAction, params TaskParameters) {
+func (instance *task) run(action TaskAction, params TaskParameters) {
 	defer func() {
 		if err := recover(); err != nil {
-			t.lock.Lock()
-			defer t.lock.Unlock()
+			instance.lock.Lock()
+			defer instance.lock.Unlock()
 
-			t.runTerminatedCh <- struct{}{}
-			close(t.runTerminatedCh)
-			if t.err != nil {
-				_ = t.err.AddConsequence(fail.RuntimePanicError("panic happened: %v", err))
+			fmt.Printf("panic happened in Task %s\n", instance.id)
+			if instance.err != nil {
+				_ = instance.err.AddConsequence(fail.RuntimePanicError("panic happened: %v", err))
 			} else {
-				t.err = fail.RuntimePanicError("panic happened: %v", err)
+				instance.err = fail.RuntimePanicError("panic happened: %v", err)
 			}
-			t.result = nil
-			t.status = DONE
+			instance.result = nil
+			instance.status = DONE
+			instance.runTerminatedCh <- false
+			close(instance.runTerminatedCh)
 		}
 	}()
 
-	result, xerr := action(t, params)
+	result, xerr := action(instance, params)
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	t.runTerminatedCh <- struct{}{}
-	close(t.runTerminatedCh)
-	t.err = xerr
-	t.result = result
+	instance.err = xerr
+	instance.result = result
+	instance.runTerminatedCh <- true
+	close(instance.runTerminatedCh)
 }
 
 // Run starts task, waits its completion then return the error code
-func (t *task) Run(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error) {
-	if t.IsNull() {
+func (instance *task) Run(action TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	_, err := t.Start(action, params, options...)
+	_, err := instance.Start(action, params, options...)
 	if err != nil {
 		return nil, err
 	}
 
-	return t.Wait()
+	return instance.Wait()
 }
 
 // IsSuccessful tells if the Task has been executed without error
@@ -897,24 +905,24 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 // call of Wait() may still be needed, it's still the responsibility of the executed code in task to stop
 // early on Abort.
 // returns an error if abort signal send fails
-func (t *task) Abort() (err fail.Error) {
-	if t.IsNull() {
+func (instance *task) Abort() (err fail.Error) {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	if t.abortDisengaged {
-		return fail.NotAvailableError("abort signal is disengaged on task %s", t.id)
+	if instance.abortDisengaged {
+		return fail.NotAvailableError("abort signal is disengaged on task %s", instance.id)
 	}
 
-	switch t.status {
+	switch instance.status {
 	case RUNNING:
 		// Tell controller to stop goroutine
-		t.abortCh <- struct{}{}
-		close(t.abortCh)
-		t.status = ABORTED
+		instance.abortCh <- true
+		close(instance.abortCh)
+		instance.status = ABORTED
 
 	case ABORTED:
 		fallthrough
@@ -929,11 +937,6 @@ func (t *task) Abort() (err fail.Error) {
 	default:
 	}
 
-	// VPL: why this?
-	// if previousErr != nil && previousStatus != TIMEOUT && previousStatus != ABORTED {
-	// 	return fail.AbortedError(previousErr)
-	// }
-
 	return nil
 }
 
@@ -941,64 +944,64 @@ func (t *task) Abort() (err fail.Error) {
 // As a Task is actually a go routine, and there is no way to safely stop a go routine from outside, the code running in
 // the Task has to check regularly if Task has been aborted and stop execution (return...) as soon as possible
 // (leaving place for cleanup if needed). Without the use of Aborted(), a task may run indefinitely.
-func (t *task) Aborted() bool {
-	if t.IsNull() {
+func (instance *task) Aborted() bool {
+	if instance.IsNull() {
 		return false
 	}
 
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	// If abort signal is disengaged, return false
-	if t.abortDisengaged {
+	if instance.abortDisengaged {
 		return false
 	}
 
-	return t.status == ABORTED || t.status == TIMEOUT
+	return instance.status == ABORTED || instance.status == TIMEOUT
 }
 
 // Abortable tells if task can be aborted
-func (t *task) Abortable() (bool, fail.Error) {
-	if t.IsNull() {
+func (instance *task) Abortable() (bool, fail.Error) {
+	if instance.IsNull() {
 		return false, fail.InvalidInstanceError()
 	}
 
-	t.lock.RLock()
-	defer t.lock.RUnlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
-	return !t.abortDisengaged, nil
+	return !instance.abortDisengaged, nil
 }
 
-// DisarmAbortSignal can be use to disable the effect of Abort()
+// DisarmAbortSignal disables the effect of Abort()
 // Typically, it is advised to call this inside a defer statement when cleanup things (cleanup has to terminate; if abort signal is not disarmed, any
 // call with task as parameter may abort before the end.
 // Returns a function to rearm the signal handling
 // If on call the abort signal is already disarmed, does nothing and returned function does nothing also.
 // If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
 // Note: the disarm state is not propagated to subtasks. It's possible to disarm abort signal in a task and want to Abort() explicitely a subtask.
-func (t *task) DisarmAbortSignal() func() {
-	if t.IsNull() {
+func (instance *task) DisarmAbortSignal() func() {
+	if instance.IsNull() {
 		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.")
 		return func() {}
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	if !t.abortDisengaged {
+	if !instance.abortDisengaged {
 		// Disengage Abort signal
-		t.abortDisengaged = true
+		instance.abortDisengaged = true
 
 		// Return a func that reengage abort signal
 		return func() {
-			if t.IsNull() {
+			if instance.IsNull() {
 				return
 			}
 
-			t.lock.Lock()
-			defer t.lock.Unlock()
+			instance.lock.Lock()
+			defer instance.lock.Unlock()
 
-			t.abortDisengaged = false
+			instance.abortDisengaged = false
 		}
 	}
 
