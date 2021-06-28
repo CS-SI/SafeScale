@@ -399,13 +399,17 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 		_, xerr = single.Wait()
 		end := time.Since(begin)
 		if xerr != nil {
-			if !strings.Contains(xerr.Error(), "abort") {
-				t.Errorf("Why so serious ? it's just a failure cancelling a goroutine %s: %s", singleID, xerr.Error())
+			switch xerr.(type) {
+			case *fail.ErrAborted:
+			case *fail.ErrTimeout:
+				// expected error types
+			default:
+				t.Errorf("Unexpected error occurred in test #%d: %s (%s)", ind, xerr.Error(), reflect.TypeOf(xerr).String())
 			}
 		}
 
 		if !((xerr != nil) == errorExpected) {
-			t.Errorf("Failure in test %s: %d, %d, %d, %t", singleID, timeout, sleep, trigger, errorExpected)
+			t.Errorf("Failure in test %d: %d, %d, %d, %t", ind, timeout, sleep, trigger, errorExpected)
 		}
 		require.True(t, (xerr != nil) == errorExpected)
 
@@ -413,7 +417,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 		min := math.Min(math.Min(float64(timeout), float64(sleep)), float64(trigger))
 
 		if end > time.Millisecond*time.Duration(10*(min)*14/10) {
-			t.Logf("Failure in test %s: %v, %v, %v, %t: We waited too much! %v > %v", singleID, timeout, sleep, trigger, errorExpected, end, time.Duration(min)*10*14/10*time.Millisecond)
+			t.Logf("Failure in test %d: %v, %v, %v, %t: We waited too much! %v > %v", ind, timeout, sleep, trigger, errorExpected, end, time.Duration(min)*10*14/10*time.Millisecond)
 		}
 	}
 	funk(1, 30, 50, 10, true)
