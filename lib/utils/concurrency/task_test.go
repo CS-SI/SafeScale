@@ -96,6 +96,10 @@ func TestWaitingGame(t *testing.T) {
 		waited++
 	}
 
+	aerr, xerr := got.GetLastError()
+	require.Nil(t, xerr)
+	require.Nil(t, aerr)
+
 	if waited != 800 {
 		t.Errorf("Not enough waiting...: %d", waited)
 	}
@@ -122,6 +126,123 @@ func TestOneWaitingForGame(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.True(t, good)
+}
+
+func TestTaskReuse(t *testing.T) {
+	got, err := NewUnbreakableTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		return "waiting game", nil
+	}, nil)
+	if err != nil {
+		t.Errorf("Shouldn't happen")
+	}
+
+	res, err := got.Wait()
+	require.Nil(t, err)
+	require.NotNil(t, res)
+
+	tr, xerr := got.GetResult()
+	require.Nil(t, xerr)
+	require.NotNil(t, tr)
+
+	_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		return "waiting game", nil
+	}, nil, 10*time.Millisecond)
+	if err != nil {
+		// If by design a task cannot be reused, its error should be more specific
+		t.Errorf("shouldn't happen: %v", err)
+	}
+
+	res, err = got.Wait()
+	require.Nil(t, err)
+	require.NotNil(t, res)
+
+	tr, xerr = got.GetResult()
+	require.Nil(t, xerr)
+	require.NotNil(t, tr)
+}
+
+func TestResultCheck(t *testing.T) {
+	got, err := NewUnbreakableTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		return "waiting game", nil
+	}, nil, 10*time.Millisecond)
+	if err != nil {
+		t.Errorf("Shouldn't happen")
+	}
+
+	res, err := got.Wait()
+	require.NotNil(t, err)
+	require.Empty(t, res)
+
+	tr, xerr := got.GetResult()
+	require.Nil(t, xerr)
+	// Why would be this a problem ?, GetResult() was coded when the only states were RUNNING and DONE, long long time aga
+	// this is no longer true, GetResult needs review
+	require.NotNil(t, tr)
+}
+
+func TestResultCheckOfAbortedTask(t *testing.T) {
+	got, err := NewTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		tempo := time.Duration(RandomInt(50, 250)) * time.Millisecond
+		for i := 0; i < 100; i++ {
+			if t.Aborted() {
+				return "killed", fail.AbortedError(nil, "killed by parent")
+			}
+			time.Sleep(tempo)
+		}
+		return "waiting game", nil
+	}, nil, 400*time.Millisecond)
+	if err != nil {
+		t.Errorf("Shouldn't happen")
+	}
+
+	err = got.Abort()
+	require.Nil(t, err)
+
+	st, err := got.GetStatus()
+	if st != ABORTED {
+		t.FailNow()
+	}
+
+	tr, xerr := got.GetResult()
+	require.Nil(t, xerr)
+	// Why would be this a problem ?, GetResult() was coded when the only states were RUNNING and DONE, long long time aga
+	// this is no longer true, GetResult needs review
+	require.NotNil(t, tr)
+
+	_, err = got.Wait()
+	require.NotNil(t, err)
+
+	st, err = got.GetStatus()
+	if st != DONE {
+		t.FailNow()
+	}
 }
 
 func TestWaitingForGame(t *testing.T) {
