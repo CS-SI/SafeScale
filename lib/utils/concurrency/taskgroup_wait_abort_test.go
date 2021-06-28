@@ -328,7 +328,7 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 	chansize := 20
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 10 {
 			break
 		}
 		if enough || caught {
@@ -457,7 +457,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 	chansize := 10
 	for {
 		iter++
-		if iter > 12 {
+		if iter > 10 {
 			break
 		}
 		if enough {
@@ -751,7 +751,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 	iter := 0
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 10 {
 			break
 		}
 

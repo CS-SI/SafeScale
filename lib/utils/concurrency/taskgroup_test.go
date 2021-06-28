@@ -39,7 +39,14 @@ func TestIntrospection(t *testing.T) {
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			wat := time.Duration(RandomInt(50, 250)) * time.Millisecond
+			tempo := wat / 100
+			for i := 0; i < 100; i++ {
+				if t.Aborted() {
+					return "aborting", fail.AbortedError(nil, "killed by parent")
+				}
+				time.Sleep(tempo)
+			}
 			return "waiting game", nil
 		}, nil)
 		if err != nil {
@@ -108,7 +115,7 @@ func TestIntrospectionWithErrors(t *testing.T) {
 
 	num, err := overlord.GetStarted()
 	require.Nil(t, err)
-	if num != 800 {
+	if num != 801 {
 		t.Errorf("Problem reporting # of started tasks: %d (!= 800)", num)
 	}
 
@@ -219,7 +226,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 		if !fastEnough {
 			t.Errorf("It should be enough time but it wasn't at iteration #%d", iter)
 			failures++
-			if failures > 6 {
+			if failures > 4 {
 				t.FailNow()
 			}
 		} else {

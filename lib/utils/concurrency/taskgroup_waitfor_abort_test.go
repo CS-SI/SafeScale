@@ -751,7 +751,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 	iter := 0
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 15 {
 			break
 		}
 
