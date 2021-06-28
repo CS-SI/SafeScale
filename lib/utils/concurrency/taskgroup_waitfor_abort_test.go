@@ -176,6 +176,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 	streak := 0
 	iter := 0
 	chansize := 20
+
+	var failureCounter int32
+	var cleanCounter int32
+
 	for {
 		iter++
 		if iter > 20 {
@@ -214,8 +218,9 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 					acha := parameters.(chan string)
 					acha <- "Bailing out"
 
-					// flip a coin, true and we panic, false we don't
+					// we throw a loaded dice, 70% of the time we should have a panic
 					if RandomInt(0, 10) > 3 {
+						atomic.AddInt32(&failureCounter, 1)
 						panic("head")
 					}
 					// tails
@@ -261,6 +266,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 				} else {
 					t.Logf("We catched a panic..., good")
 					caught = true
+					atomic.AddInt32(&cleanCounter, 1)
 					break
 				}
 			default:
@@ -298,7 +304,12 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 	}
 
 	if !caught {
-		t.Errorf("We were unable to catch a panic...")
+		t.Errorf("We were unable to catch a panic..., and we generated %d", failureCounter)
+		t.FailNow()
+	}
+
+	if failureCounter != cleanCounter {
+		t.Errorf("Not all panics were caught: %d missing panics", failureCounter-cleanCounter)
 		t.FailNow()
 	}
 
