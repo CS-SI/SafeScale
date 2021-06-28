@@ -443,10 +443,7 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 				}
 				instance.lock.Unlock()
 			}
-			if instance.cancel != nil {
-				// Make sure cancel() is called at the end of the go routine
-				instance.cancel()
-			}
+			instance.contextCleanup()
 		}()
 	}
 	return instance, nil
@@ -462,7 +459,6 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 
 	defer func() {
 		instance.lock.Lock()
-		close(instance.controllerTerminatedCh)
 		instance.controllerTerminated = true
 		instance.lock.Unlock()
 	}()
@@ -470,11 +466,24 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 	go instance.run(action, params)
 
 	finish := false
+	canceled := false
 	if timeout > 0 {
-		for !finish {
+		for !finish && !canceled {
 			select {
 			case <-instance.ctx.Done():
-				xerr := instance.processCancel(traceR)
+				instance.lock.RLock()
+				status := instance.status
+				instance.lock.RUnlock()
+				if status != ABORTED && status != TIMEOUT {
+					xerr := instance.processCancel(traceR)
+					if xerr != nil {
+						return xerr
+					}
+				}
+				canceled = true
+				
+			case <-instance.abortCh:
+				xerr := instance.processAbort(traceR)
 				if xerr != nil {
 					return xerr
 				}
@@ -483,26 +492,42 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				instance.processDone(traceR)
 				finish = true // stop to react on signals
 
-			case <-instance.abortCh:
-				xerr := instance.processAbort(traceR)
-				if xerr != nil {
-					return xerr
-				}
-
 			case <-time.After(timeout):
 				instance.processTimeout(timeout)
 			}
 		}
+		if !finish {
+			for !finish {
+				select {
+				case <-instance.abortCh:
+					xerr := instance.processAbort(traceR)
+					if xerr != nil {
+						return xerr
+					}
+
+				case <-instance.runTerminatedCh:
+					instance.processTerminated(traceR)
+					finish = true // stop to react on signals
+
+				case <-time.After(timeout):
+					instance.processTimeout(timeout)
+				}
+			}
+		}
 	} else {
-		for !finish {
+		for !finish && !canceled{
 			select {
 			case <-instance.ctx.Done():
-				if len(instance.runTerminatedCh) == 0 {
+				instance.lock.RLock()
+				status := instance.status
+				instance.lock.RUnlock()
+				if status != ABORTED && status != TIMEOUT {
 					xerr := instance.processCancel(traceR)
 					if xerr != nil {
 						return xerr
 					}
 				}
+				canceled = true
 
 			case <-instance.runTerminatedCh:
 				instance.processDone(traceR)
@@ -517,6 +542,21 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 			case <-instance.runTerminatedCh:
 				instance.processTerminated(traceR)
 				finish = true // stop to react on signals
+			}
+		}
+		if !finish {
+			for !finish {
+				select {
+				case <-instance.abortCh:
+					xerr := instance.processAbort(traceR)
+					if xerr != nil {
+						return xerr
+					}
+
+				case <-instance.runTerminatedCh:
+					instance.processTerminated(traceR)
+					finish = true // stop to react on signals
+				}
 			}
 		}
 	}
@@ -535,7 +575,7 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 			switch instance.ctx.Err() {
 			case context.DeadlineExceeded:
 				instance.status = TIMEOUT
-				instance.err = fail.TimeoutError(nil, 0, "context deadline exceeded")
+				// instance.err = fail.TimeoutError(nil, 0, "context deadline exceeded")
 			case context.Canceled:
 				fallthrough
 			default:
@@ -570,6 +610,8 @@ func (instance *task) processDone(traceR *tracer) {
 
 	t.abortDisengaged = true // We are stopping controller, so disarm Abort signal, it doesn't make sense anymore
 	t.controllerTerminatedCh <- struct{}{}
+	close(t.controllerTerminatedCh)
+	t.controllerTerminated = true
 }
 
 // processAbort operates when Abort has been requested
@@ -580,9 +622,7 @@ func (instance *task) processAbort(traceR *tracer) fail.Error {
 	if !instance.abortDisengaged {
 		if instance.err != nil {
 			switch instance.err.(type) {
-			case *fail.ErrAborted:
-				// do nothing
-			case *fail.ErrTimeout:
+			case *fail.ErrAborted, *fail.ErrTimeout:
 				// do nothing
 			default:
 				abortError := fail.AbortedError(nil)
@@ -595,10 +635,7 @@ func (instance *task) processAbort(traceR *tracer) fail.Error {
 		if instance.status != TIMEOUT {
 			instance.status = ABORTED
 		}
-		if instance.cancel != nil {
-			// cancel is called to propagate the signal to children
-			instance.cancel()
-		}
+		instance.contextCleanup()
 	} else {
 		traceR.trace("abort signal is disengaged, ignored")
 	}
@@ -627,6 +664,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 
 			instance.runTerminatedCh <- struct{}{}
 			close(instance.runTerminatedCh)
+			instance.runTerminated = true
 			if instance.err != nil {
 				_ = instance.err.AddConsequence(fail.RuntimePanicError("panic happened: %v", err))
 			} else {
@@ -645,7 +683,35 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 	instance.runTerminatedCh <- struct{}{}
 	close(instance.runTerminatedCh)
 	instance.runTerminated = true
-	instance.err = xerr
+
+	if xerr == nil {
+		if instance.err != nil && (instance.status == ABORTED || instance.status == TIMEOUT) {
+			instance.err = nil
+		}
+	} else {
+		switch xerr.(type) {
+		case *fail.ErrAborted:
+			if instance.err != nil {
+				switch cerr := instance.err.(type) {
+				case *fail.ErrAborted:
+					// leave instance.err as it is
+				default:
+					_ = cerr.AddConsequence(xerr)
+				}
+			} else {
+				instance.err = xerr
+			}
+		default:
+			if instance.err != nil {
+				switch cerr := instance.err.(type) {
+				case fail.Error:
+					_ = cerr.AddConsequence(xerr)
+				}
+			} else {
+				instance.err = xerr
+			}
+		}
+	}
 	instance.result = result
 }
 
@@ -727,7 +793,19 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 
 		instance.status = DONE
 		instance.result = nil
-		instance.err = fail.TimeoutError(nil, 0)
+		var forgedError fail.Error
+		if instance.err != nil {
+			switch instance.err.(type) {
+			case *fail.ErrTimeout:
+				forgedError = instance.err
+			default:
+				forgedError = fail.TimeoutError(nil, 0)
+				_ = forgedError.AddConsequence(instance.err)
+			}
+		} else {
+			forgedError = fail.TimeoutError(nil, 0)
+		}
+		instance.err = forgedError
 		return nil, instance.err
 
 	case ABORTED:
@@ -741,13 +819,13 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 		// In case of ABORT, if an error is already there, the TASK has ended, so just return this error with the result
 		if instance.err != nil {
 			switch instance.err.(type) {
-			case *fail.ErrAborted:
-				// leave the abort error alone
+			case *fail.ErrAborted, *fail.ErrTimeout:
+				// leave the abort or timeout error alone
 			default:
 				// return abort error with instance.err as consequence (happened after Abort has been ackknowledged by TaskAction)
-				outErr := fail.AbortedError(nil)
-				_ = outErr.AddConsequence(instance.err)
-				instance.err = outErr
+				forgedError := fail.AbortedError(nil)
+				_ = forgedError.AddConsequence(instance.err)
+				instance.err = forgedError
 			}
 			return instance.result, instance.err
 		}
@@ -767,6 +845,13 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 		fallthrough
 	default:
 		return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%d)", tid, status)
+	}
+}
+
+func (instance *task) contextCleanup() {
+	if instance.cancel != nil {
+		instance.cancel()
+		instance.cancel = nil
 	}
 }
 
@@ -843,62 +928,58 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 	case TIMEOUT:
 		fallthrough
 	case RUNNING:
-		var (
-			result TaskResult
-			c      chan struct{}
-		)
-		waiterTask, xerr := NewTaskWithParent(instance, InheritParentIDOption, AmendID("WaitForHelper"))
-		if xerr != nil {
-			return false, nil, fail.Wrap(xerr, "failed to create helper Task to WaitFor")
-		}
-		_, xerr = waiterTask.Start(
-			func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
-				t.DisarmAbortSignal()
-
-				var done bool
-				for !t.Aborted() && !done {
-					done, result, innerXErr = instance.TryWait()
-					if !done {
-						time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
-					}
-				}
-				if done {
-					c <- struct{}{}
-				}
-				return nil, nil
-			}, nil,
-		)
-
 		if duration > 0 {
-			select {
-			case <-time.After(duration):
-				// We want now waiterTask to react to abort signal...
-				waiterTask.(*task).lock.Lock()
-				waiterTask.(*task).abortDisengaged = false
-				waiterTask.(*task).lock.Unlock()
+			var result TaskResult
+			doneWaitingCh := make(chan struct{}, 1)
+			waiterTask, xerr := NewTaskWithParent(instance, InheritParentIDOption, AmendID("WaitForHelper"))
+			if xerr != nil {
+				return false, nil, fail.Wrap(xerr, "failed to create helper Task to WaitFor")
+			}
+			_, xerr = waiterTask.Start(
+				func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
+					t.DisarmAbortSignal()
 
+					var done bool
+					for !t.Aborted() && !done {
+						done, result, innerXErr = instance.TryWait()
+						if !done {
+							time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
+						}
+					}
+					if done {
+						doneWaitingCh <- struct{}{}
+						return nil, nil
+					}
+					return nil, fail.AbortedError(nil)
+				}, nil,
+			)
+			if xerr != nil {
+				return false, nil, xerr
+			}
+
+			select {
+			case <-doneWaitingCh:
+				return true, result, xerr
+
+			case <-time.After(duration):
 				// signal waiterTask to abort (and do not wait for it, it will terminate)
-				xerr := waiterTask.Abort()
+				waiterTask.(*task).forceAbort()
 				tout := fail.TimeoutError(xerr, duration, fmt.Sprintf("timeout of %s waiting for Task '%s'", duration, tid))
 
-				// Timeout has been reached, send abort signal to Task
-				xerr = instance.Abort()
-				if xerr != nil {
-					_ = tout.AddConsequence(xerr)
-				}
+				// Timeout has been reached, send abort signal to instance
+				instance.lock.Lock()
+				instance.forceAbort()
+				instance.lock.Unlock()
 				// We do not wait on Task after the Abort, because if the TaskAction is badly coded and never
 				// terminate, Wait would not terminate neither... So bad for leaked go routines but this function has to end...
 
 				return false, nil, tout
-			case <-c:
-				return true, result, xerr
 			}
 		}
 
-		select { // nolint
-		case <-c:
-			return true, result, xerr
-		}
+		// No duration, do task.Wait()
+		result, xerr := instance.Wait()
+		return true, result, xerr
 
 	case UNKNOWN:
 		fallthrough
@@ -933,11 +1014,12 @@ func (instance *task) Abort() (err fail.Error) {
 		return fail.NotAvailableError("abort signal is disengaged on task %s", instance.id)
 	}
 
-	return instance.forceAbort()
+	instance.forceAbort()
+	return nil
 }
 
 // forceAbort is the weaponized arm of Abort(), that does the job without taking care if abort signal is disarmed
-func (instance *task) forceAbort() (err fail.Error) {
+func (instance *task) forceAbort() {
 	switch instance.status {
 	case RUNNING:
 		// Tell controller to stop goroutine
@@ -957,8 +1039,6 @@ func (instance *task) forceAbort() (err fail.Error) {
 		fallthrough
 	default:
 	}
-
-	return nil
 }
 
 // Aborted tells if the task is aborted (by cancel(), by Abort() or by timeout)

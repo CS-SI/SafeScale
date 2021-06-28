@@ -610,12 +610,11 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 
 		for ind := 0; ind < 10; ind++ {
 			_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				rint := time.Duration(RandomInt(30, 50)) * 10 * time.Millisecond
-
-				tempo := rint / 100
+				dur := time.Duration(RandomInt(30, 50)) * 10 * time.Millisecond
+				tempo := dur / 100
 				for i := 0; i < 100; i++ {
 					if t.Aborted() {
-						break
+						return nil, fail.AbortedError(nil)
 					}
 					time.Sleep(tempo)
 				}

@@ -379,38 +379,40 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 	case ABORTED:
 		fallthrough
 	case RUNNING:
-		previousErr := instance.task.err
+		// instance.task.lock.RLock()
+		// previousErr := instance.task.err
+		// instance.task.lock.RUnlock()
+
 		results, childrenErrors = instance.waitChildren()
+		instance.result = results
 		if len(childrenErrors) == 0 {
 			instance.children.ended = true
 		}
 
-		instance.task.lock.Lock()
-		instance.result = results
-
 		// parent task is running, we need to abort it, even if abort was disable, now that all the children have terminated
-		xerr := instance.task.forceAbort()
-		if xerr != nil {
-			logrus.Tracef("ignored error aborting task: %v", xerr)
-		}
+		instance.task.lock.Lock()
+		instance.task.forceAbort()
 		instance.task.lock.Unlock()
 
 		_, _ = instance.task.Wait() // will get *fail.ErrErrAborted, we know that, we asked for
-
+		var forgedError fail.Error
+		if taskStatus == ABORTED {
+			forgedError = instance.task.err
+		}
 		instance.task.lock.Lock()
 		if len(childrenErrors) > 0 {
-			switch previousErr.(type) {
+			switch forgedError.(type) {
 			case *fail.ErrAborted:
 				if !instance.children.ended {
-					instance.addErrorsAsConsequence(childrenErrors, &instance.task.err)
+					instance.addErrorsAsConsequence(childrenErrors, &forgedError)
 				} else {
-					previousErr = fail.AbortedError(instance.buildErrorList(childrenErrors), "TaskGroup aborted with failures")
+					forgedError = fail.AbortedError(instance.buildErrorList(childrenErrors), "TaskGroup aborted with failures")
 				}
 			default:
-				previousErr = instance.buildErrorList(childrenErrors)
+				forgedError = instance.buildErrorList(childrenErrors)
 			}
 		}
-		instance.task.err = previousErr
+		instance.task.err = forgedError
 		instance.task.lock.Unlock()
 
 	case UNKNOWN:
@@ -579,8 +581,6 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 		return false, nil, xerr
 	}
 
-	results := make(map[string]TaskResult)
-
 	taskStatus, xerr := instance.task.GetStatus()
 	if xerr != nil {
 		return false, nil, xerr
@@ -589,23 +589,55 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 		return false, nil, fail.NewError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
 	}
 
-	{
-		instance.children.lock.RLock()
-		defer instance.children.lock.RUnlock()
+	instance.children.lock.RLock()
+	defer instance.children.lock.RUnlock()
 
-		for _, s := range instance.children.tasks {
-			if ok, _, twErr := s.task.TryWait(); !ok {
-				if twErr != nil {
-					logrus.Tracef("ignored trywait error: %v", twErr)
-				}
-				return false, nil, nil
-			}
+	for _, s := range instance.children.tasks {
+		s.task.(*task).lock.RLock()
+		runTerminated := s.task.(*task).runTerminated
+		s.task.(*task).lock.RUnlock()
+		if !runTerminated {
+			return false, nil, nil
 		}
 	}
 
-	result, xerr := instance.Wait()
-	results[tid] = result
-	return true, results, xerr
+	// all children terminate, now recover results and errors
+	results, childrenErrors := instance.waitChildren()
+	instance.result = results
+	if len(childrenErrors) == 0 {
+		instance.children.ended = true
+	}
+
+	// parent task is still running, we need to abort it, even if abort was disable, now that all the children have terminated
+	instance.task.lock.Lock()
+	instance.task.forceAbort()
+	instance.task.lock.Unlock()
+
+	_, _ = instance.task.Wait() // will get *fail.ErrErrAborted, we know that, we asked for
+
+	// build error to return for the parent Task
+	var forgeError fail.Error
+	if taskStatus == ABORTED {
+		forgeError = instance.task.err
+	}
+	instance.task.lock.Lock()
+	if len(childrenErrors) > 0 {
+		switch forgeError.(type) {
+		case *fail.ErrAborted:
+			if !instance.children.ended {
+				instance.addErrorsAsConsequence(childrenErrors, &forgeError)
+			} else {
+				forgeError = fail.AbortedError(instance.buildErrorList(childrenErrors), "TaskGroup aborted with failures")
+			}
+		default:
+			forgeError = instance.buildErrorList(childrenErrors)
+		}
+	}
+	instance.task.err = forgeError
+	instance.task.lock.Unlock()
+
+	// now constructs
+	return true, instance.result, instance.task.err
 }
 
 // WaitFor is an alias to WaitGroupFor to satisfy interface TaskCore

@@ -119,13 +119,13 @@ func TestRealTryCharges(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	gorrs := 8//00
+	gorrs := 800
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(RandomInt(200, 250)) * time.Millisecond)
 			return "waiting game", nil
-		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/chil-%d", ind)))
+		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		}
@@ -146,46 +146,49 @@ func TestRealTryCharges(t *testing.T) {
 
 // This imitates some of the code found in cluster.go
 func TestTryWaitRecoversErrorContent(t *testing.T) {
-	overlord, err := NewTaskGroupWithParent(nil)
+	overlord, xerr := NewTaskGroupWithParent(nil)
 	require.NotNil(t, overlord)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
-	theID, err := overlord.GetID()
-	require.Nil(t, err)
+	xerr = overlord.SetID("/parent")
+	require.Nil(t, xerr)
+
+	theID, xerr := overlord.GetID()
+	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
 	gorrs := 800
 
 	for ind := 0; ind < gorrs; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(RandomInt(200, 250)) * time.Millisecond)
 			return "waiting game", nil
-		}, nil)
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+		if xerr != nil {
+			t.Errorf("Unexpected: %s", xerr)
 		}
 	}
 
-	_, err = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	_, xerr = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(RandomInt(10, 15)) * time.Millisecond)
 		return "waiting game", fail.NewError("Ouch")
-	}, nil)
-	if err != nil {
-		t.Errorf("Unexpected: %s", err)
+	}, nil, InheritParentIDOption, AmendID("/ill-child"))
+	if xerr != nil {
+		t.Errorf("Unexpected: %s", xerr)
 	}
 
 	time.Sleep(40 * time.Millisecond)
 
 	for {
-		done, res, err := overlord.TryWaitGroup()
+		done, res, xerr := overlord.TryWaitGroup()
 		if !done {
-			require.Nil(t, err)
+			require.Nil(t, xerr)
 			require.Nil(t, res)
 			require.False(t, done)
 		} else {
-			require.NotNil(t, err)
-			t.Logf("%s", spew.Sdump(err))
-			require.True(t, strings.Contains(spew.Sdump(err), "Ouch"))
+			require.NotNil(t, xerr)
+			// t.Logf("%s", spew.Sdump(xerr))
+			require.True(t, strings.Contains(spew.Sdump(xerr), "Ouch"))
 			break
 		}
 	}
@@ -193,46 +196,49 @@ func TestTryWaitRecoversErrorContent(t *testing.T) {
 
 // This imitates some of the code found in cluster.go
 func TestTryWaitRecoversErrorContentAlsoWhenRunningWithTimeout(t *testing.T) {
-	overlord, err := NewTaskGroupWithParent(nil)
+	overlord, xerr := NewTaskGroupWithParent(nil)
 	require.NotNil(t, overlord)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
-	theID, err := overlord.GetID()
-	require.Nil(t, err)
+	xerr = overlord.SetID("/parent")
+	require.Nil(t, xerr)
+
+	theID, xerr := overlord.GetID()
+	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
 	gorrs := 800
 
 	for ind := 0; ind < gorrs; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(RandomInt(200, 250)) * time.Millisecond)
 			return "waiting game", nil
-		}, nil)
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+		if xerr != nil {
+			t.Errorf("Unexpected: %s", xerr)
 		}
 	}
 
-	_, err = overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	_, xerr = overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(RandomInt(10, 15)) * time.Millisecond)
 		return "waiting game", fail.NewError("Ouch")
-	}, nil, 12*time.Millisecond)
-	if err != nil {
-		t.Errorf("Unexpected: %s", err)
+	}, nil, 12*time.Millisecond, InheritParentIDOption, AmendID("/ill-child"))
+	if xerr != nil {
+		t.Errorf("Unexpected: %s", xerr)
 	}
 
 	time.Sleep(40 * time.Millisecond)
 
 	for {
-		done, res, err := overlord.TryWaitGroup()
+		done, res, xerr := overlord.TryWaitGroup()
 		if !done {
-			require.Nil(t, err)
+			require.Nil(t, xerr)
 			require.Nil(t, res)
 			require.False(t, done)
 		} else {
-			require.NotNil(t, err)
-			t.Logf("%s", spew.Sdump(err))
-			require.True(t, strings.Contains(spew.Sdump(err), "Ouch"))
+			require.NotNil(t, xerr)
+			t.Logf("%s", spew.Sdump(xerr))
+			require.True(t, strings.Contains(spew.Sdump(xerr), "Ouch"))
 			break
 		}
 	}
