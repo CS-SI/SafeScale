@@ -364,7 +364,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 			tempo := sleep / 100
 			for i := 0; i < 100; i++ {
 				if t.Aborted() {
-					break
+					return "aborted", fail.AbortedError(nil)
 				}
 				time.Sleep(tempo)
 			}
@@ -821,10 +821,6 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 }
 
 func TestCheckTimeoutStatus(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
 	single, xerr := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
@@ -832,8 +828,7 @@ func TestCheckTimeoutStatus(t *testing.T) {
 	_, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		for {
 			time.Sleep(time.Duration(10) * time.Millisecond)
-			status, _ := t.GetStatus()
-			if status == ABORTED || status == TIMEOUT {
+			if t.Aborted() {
 				break
 			}
 			fmt.Println("Forever young...")
@@ -844,44 +839,16 @@ func TestCheckTimeoutStatus(t *testing.T) {
 
 	time.Sleep(time.Duration(100) * time.Millisecond)
 
-	sta, xerr := single.GetStatus()
-	require.Nil(t, xerr)
-
-	if sta != TIMEOUT {
-		t.Errorf("Automagically aborted ??, where is the timeout ?, this is the textbook definition of a timeout")
-		t.FailNow()
-	}
-
 	_, xerr = single.Wait()
 	require.NotNil(t, xerr)
 
-	sta, xerr = single.GetStatus()
-	require.Nil(t, xerr)
-
-	if sta != TIMEOUT {
-		t.Errorf("Automagically aborted ??, where is the timeout ?, this is the textbook definition of a timeout")
-		t.FailNow()
-	}
-
-	// Nothing wrong should happen after this point...
-	time.Sleep(time.Duration(100) * time.Millisecond)
-
-	_ = w.Close()
-	out, _ := ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
-
-	// Here, last 2 lines of the output should be:
-	// Forever young...
-	// Automagically aborted ??
-
-	outString := string(out)
-	nah := strings.Split(outString, "\n")
-
-	if !strings.Contains(nah[len(nah)-3], "Forever young") {
-		t.Fail()
-	}
-	if !strings.Contains(nah[len(nah)-2], "Automagically") {
-		t.Fail()
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			// This is expected
+		default:
+			t.Errorf("Unexpected error '%s'", reflect.TypeOf(xerr).String())
+		}
 	}
 }
 
@@ -893,8 +860,7 @@ func TestStartWithTimeoutWithTimeToFinish(t *testing.T) {
 	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		for {
 			time.Sleep(time.Duration(10) * time.Millisecond)
-			status, _ := t.GetStatus()
-			if status == ABORTED || status == TIMEOUT {
+			if t.Aborted() {
 				break
 			}
 			fmt.Println("Forever young...")
@@ -913,12 +879,12 @@ func TestStartWithTimeoutWithTimeToFinish(t *testing.T) {
 	time.Sleep(time.Duration(100) * time.Millisecond)
 
 	_, xerr = single.Wait()
-	if xerr == nil {
-		t.Errorf("Wait should have failed but didn't")
-	} else {
-		if _, ok := xerr.(*fail.ErrAborted); !ok {
-			t.Errorf("This should have failed by design with an Abortion error")
-		}
+	require.NotNil(t, xerr)
+	switch xerr.(type) {
+	case *fail.ErrAborted:
+		// expected
+	default:
+		t.Errorf("unexpected error '%s'", reflect.TypeOf(xerr).String())
 	}
 }
 
@@ -1142,6 +1108,8 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 			case *fail.ErrRuntimePanic:
 				t.Logf("Task generates a panic!!!")
 				panicReported = true
+			case *fail.ErrUnqualified:
+				// can occur, nothing more to say
 			default:
 				t.Errorf("Unexpected error: %v", xerr)
 			}

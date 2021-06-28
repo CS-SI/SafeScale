@@ -17,6 +17,7 @@
 package concurrency
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -26,41 +27,48 @@ import (
 
 // tasks with subtasks don't play well with aborts
 func TestAbortFatherTask(t *testing.T) {
-	parent, err := NewTaskGroup()
-	require.NotNil(t, parent)
-	require.Nil(t, err)
+	iter := 30
+	for i := 0; i < iter; i++ {
+		fmt.Println("--- NEXT ---")
 
-	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(400) * time.Millisecond)
-		if t.Aborted() {
-			return "A", nil
+		parent, xerr := NewTaskGroup()
+		require.NotNil(t, parent)
+		require.Nil(t, xerr)
+
+		xerr = parent.SetID("/parent")
+		require.Nil(t, xerr)
+
+		_, xerr = parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(400) * time.Millisecond)
+			if t.Aborted() {
+				return "A", fail.AbortedError(nil)
+			}
+			return "B", nil
+		}, nil, InheritParentIDOption, AmendID("/child"))
+		require.Nil(t, xerr)
+
+		_, xerr = parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(500) * time.Millisecond)
+			if t.Aborted() {
+				return "A", fail.AbortedError(nil)
+			}
+			return "B", nil
+		}, nil, InheritParentIDOption, AmendID("/sibling"))
+		require.Nil(t, xerr)
+
+		time.Sleep(time.Duration(50) * time.Millisecond)
+		xerr = parent.Abort()
+		require.Nil(t, xerr)
+
+		aborted := parent.Aborted()
+		if !aborted {
+			t.Errorf("not aborted on iter #%d", i)
+			t.FailNow()
 		}
-		return "B", nil
-	}, nil)
-	require.Nil(t, err)
 
-	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(500) * time.Millisecond)
-		if t.Aborted() {
-			return "A", nil
-		}
-		return "B", nil
-	}, nil)
-	require.Nil(t, err)
-
-	time.Sleep(time.Duration(50) * time.Millisecond)
-
-	err = parent.Abort()
-	require.Nil(t, err)
-
-	require.True(t, parent.Aborted())
-
-	_, xerr := parent.Wait()
-	require.NotNil(t, xerr)
-
-	_ = parent
-	_ = child
-	_ = sibling
+		_, xerr = parent.Wait()
+		require.NotNil(t, xerr)
+	}
 }
 
 // taskgroups work well instead
@@ -72,7 +80,7 @@ func TestAbortFatherTaskGroup(t *testing.T) {
 	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		if t.Aborted() {
-			return "A", nil
+			return "A", fail.AbortedError(nil)
 		}
 		return "B", nil
 	}, nil)
@@ -81,7 +89,7 @@ func TestAbortFatherTaskGroup(t *testing.T) {
 	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		if t.Aborted() {
-			return "A", nil
+			return "A", fail.AbortedError(nil)
 		}
 		return "B", nil
 	}, nil)
