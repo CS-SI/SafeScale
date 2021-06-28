@@ -101,6 +101,70 @@ func TestWaitingGame(t *testing.T) {
 	}
 }
 
+func TestOneWaitingForGame(t *testing.T) {
+	got, err := NewUnbreakableTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		return "waiting game", nil
+	}, nil)
+	if err != nil {
+		t.Errorf("Shouldn't happen")
+	}
+
+	good, res, err := got.WaitFor(8 * time.Second)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.True(t, good)
+}
+
+func TestWaitingForGame(t *testing.T) {
+	got, err := NewUnbreakableTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	var tarray []Task
+
+	for ind := 0; ind < 800; ind++ {
+		got, err := NewUnbreakableTask()
+		require.Nil(t, err)
+		require.NotNil(t, got)
+
+		theTask, err := got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil)
+		if err == nil {
+			tarray = append(tarray, theTask)
+		} else {
+			t.Errorf("Shouldn't happen")
+		}
+	}
+
+	waited := 0
+	for _, itta := range tarray {
+		good, res, err := itta.WaitFor(8 * time.Second)
+		require.Nil(t, err)
+		require.NotNil(t, res)
+		require.True(t, good)
+		waited++
+	}
+
+	if waited != 800 {
+		t.Errorf("Not enough waiting...: %d", waited)
+	}
+}
+
 func TestSingleTaskTryWait(t *testing.T) {
 	single, err := NewUnbreakableTask()
 	require.NotNil(t, single)
