@@ -109,8 +109,8 @@ type task struct {
 	status TaskStatus
 
 	controllerTerminatedCh chan struct{} // Used to signal Wait() (and siblings) the controller of the go routine has terminated
-	runTerminatedCh        chan bool     // Used by go routine to signal it has done its processing
-	abortCh                chan bool     // Used to signal the routine it has to stop processing
+	runTerminatedCh        chan struct{} // Used by go routine to signal it has done its processing
+	abortCh                chan struct{}     // Used to signal the routine it has to stop processing
 
 	err    fail.Error
 	result TaskResult
@@ -238,8 +238,8 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	t := &task{
 		cancel:                 cancel,
 		status:                 READY,
-		abortCh:                make(chan bool, 1),
-		runTerminatedCh:        make(chan bool, 1),
+		abortCh:                make(chan struct{}, 1),
+		runTerminatedCh:        make(chan struct{}, 1),
 		controllerTerminatedCh: make(chan struct{}, 1),
 	}
 
@@ -411,103 +411,103 @@ func (t *task) Start(action TaskAction, params TaskParameters, options ...data.I
 
 // StartWithTimeout runs in goroutine the TaskAction with TaskParameters, and stops after timeout (if > 0)
 // If timeout happens, error returned will be '*fail.ErrTimeout'
-func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error) {
-	if t.IsNull() {
+func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error) {
+	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	if t.status != READY {
-		return nil, fail.NewError("cannot start task '%s': not ready", t.id)
+	if instance.status != READY {
+		return nil, fail.NewError("cannot start task '%s': not ready", instance.id)
 	}
 
 	if action == nil {
-		t.status = DONE
+		instance.status = DONE
 	} else {
-		t.status = RUNNING
-		t.runTerminatedCh = make(chan bool, 1)
-		t.abortCh = make(chan bool, 1)
-		t.controllerTerminatedCh = make(chan struct{}, 1)
+		instance.status = RUNNING
+		instance.runTerminatedCh = make(chan struct{}, 1)
+		instance.abortCh = make(chan struct{}, 1)
+		instance.controllerTerminatedCh = make(chan struct{}, 1)
 		go func() {
-			ctrlErr := t.controller(action, params, timeout)
+			ctrlErr := instance.controller(action, params, timeout)
 			if ctrlErr != nil {
-				t.lock.Lock()
-				if t.err != nil {
-					_ = t.err.AddConsequence(fail.Wrap(ctrlErr, "unexpected error running the Task controller"))
+				instance.lock.Lock()
+				if instance.err != nil {
+					_ = instance.err.AddConsequence(fail.Wrap(ctrlErr, "unexpected error running the Task controller"))
 				} else {
-					t.err = fail.Wrap(ctrlErr, "unexpected error running the Task controller")
+					instance.err = fail.Wrap(ctrlErr, "unexpected error running the Task controller")
 				}
-				t.lock.Unlock()
+				instance.lock.Unlock()
+			}
+			if instance.cancel != nil {
+				// Make sure cancel() is called at the end of the go routine
+				instance.cancel()
 			}
 		}()
 	}
-	return t, nil
+	return instance, nil
 }
 
 // controller controls the start, termination and possibly abortion of the action
-func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) fail.Error {
-	if t.IsNull() {
+func (instance *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) fail.Error {
+	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
-	traceR := newTracer(t, tracing.ShouldTrace("concurrency.task"))
+	traceR := newTracer(instance, tracing.ShouldTrace("concurrency.task"))
 
 	defer func() {
-		t.lock.Lock()
-		close(t.controllerTerminatedCh)
-		if t.cancel != nil {
-			// Make sure cancel() is called at the end of the task
-			t.cancel()
-		}
-		t.lock.Unlock()
+		instance.lock.Lock()
+		close(instance.controllerTerminatedCh)
+		instance.lock.Unlock()
 	}()
 
-	go t.run(action, params)
+	go instance.run(action, params)
 
 	finish := false
 	if timeout > 0 {
 		for !finish {
 			select {
-			case <-t.ctx.Done():
-				xerr := t.processCancel(traceR)
+			case <-instance.ctx.Done():
+				xerr := instance.processCancel(traceR)
 				if xerr != nil {
 					return xerr
 				}
 
-			case <-t.runTerminatedCh:
-				t.processDone(traceR)
+			case <-instance.runTerminatedCh:
+				instance.processTerminated(traceR)
 				finish = true // stop to react on signals
 
-			case <-t.abortCh:
-				xerr := t.processAbort(traceR)
+			case <-instance.abortCh:
+				xerr := instance.processAbort(traceR)
 				if xerr != nil {
 					return xerr
 				}
 
 			case <-time.After(timeout):
-				t.processTimeout(timeout)
+				instance.processTimeout(timeout)
 			}
 		}
 	} else {
 		for !finish {
 			select {
-			case <-t.ctx.Done():
-				xerr := t.processCancel(traceR)
+			case <-instance.ctx.Done():
+				xerr := instance.processCancel(traceR)
 				if xerr != nil {
 					return xerr
 				}
 
-			case <-t.runTerminatedCh:
-				t.processDone(traceR)
+			case <-instance.abortCh:
+				xerr := instance.processAbort(traceR)
+				if xerr != nil {
+					return xerr
+				}
+
+			case <-instance.runTerminatedCh:
+				instance.processTerminated(traceR)
 				finish = true // stop to react on signals
-
-			case <-t.abortCh:
-				xerr := t.processAbort(traceR)
-				if xerr != nil {
-					return xerr
-				}
 			}
 		}
 	}
@@ -516,23 +516,24 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 }
 
 // processCancel operates when cancel has been called
-func (t *task) processCancel(traceR *tracer) fail.Error {
-	// Context cancel signal received, propagating using abort signal
-	t.lock.Lock()
-	traceR.trace("receiving signal from context, aborting task '%s'...", t.id)
-	if !t.abortDisengaged {
-		switch t.status {
+func (instance *task) processCancel(traceR *tracer) fail.Error {
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	traceR.trace("receiving signal from context, aborting task '%s'...", instance.id)
+	if !instance.abortDisengaged {
+		switch instance.status {
 		case RUNNING:
-			switch t.ctx.Err() {
+			switch instance.ctx.Err() {
 			case context.DeadlineExceeded:
-				t.status = TIMEOUT
-				t.err = fail.TimeoutError(nil, 0, "context deadline exceeded")
+				instance.status = TIMEOUT
+				instance.err = fail.TimeoutError(nil, 0, "context deadline exceeded")
 			case context.Canceled:
 				fallthrough
 			default:
-				t.status = ABORTED
+				instance.status = ABORTED
 			}
-			t.abortCh <- true
+			instance.abortCh <- struct{}{}
 
 		case ABORTED:
 			fallthrough
@@ -541,50 +542,53 @@ func (t *task) processCancel(traceR *tracer) fail.Error {
 		case DONE:
 			// do nothing
 
-		case READY: // abnormal status if controller is executed
+		case READY: // abnormal status if controller is running
 			fallthrough
 		case UNKNOWN: // by definition, this status is invalid
 			fallthrough
 		default:
-			return fail.InconsistentError("invalid Task state '%d'", t.status)
+			return fail.InconsistentError("invalid Task state '%d'", instance.status)
 		}
 	}
-	t.lock.Unlock()
 	return nil
 }
 
-// processDone operates when go routine terminates
-func (t *task) processDone(traceR *tracer) {
+// processTerminated operates when go routine terminates
+func (t *task) processTerminated(traceR *tracer) {
 	traceR.trace("receiving done signal from go routine")
 	t.lock.Lock()
 	defer t.lock.Unlock()
+	t.abortDisengaged = true    // We are stopping controller, so disarm Abort signal, it doesn't make sense anymore
 	t.controllerTerminatedCh <- struct{}{}
 }
 
 // processAbort operates when Abort has been requested
-func (t *task) processAbort(traceR *tracer) fail.Error {
+func (instance *task) processAbort(traceR *tracer) fail.Error {
 	// Abort signal received
 	traceR.trace("receiving abort signal")
-	t.lock.Lock()
-	if !t.abortDisengaged {
-		if t.err != nil {
-			switch t.err.(type) {
+	instance.lock.Lock()
+	if !instance.abortDisengaged {
+		if instance.err != nil {
+			switch instance.err.(type) {
 			case *fail.ErrAborted:
 				// do nothing
 			case *fail.ErrTimeout:
 				// do nothing
 			default:
 				abortError := fail.AbortedError(nil)
-				_ = abortError.AddConsequence(t.err)
-				t.err = abortError
+				_ = abortError.AddConsequence(instance.err)
+				instance.err = abortError
 			}
 		} else {
-			t.err = fail.AbortedError(nil)
+			instance.err = fail.AbortedError(nil)
+		}
+		if instance.status != TIMEOUT {
+			instance.status = ABORTED
 		}
 	} else {
 		traceR.trace("abort signal is disengaged, ignored")
 	}
-	t.lock.Unlock()
+	instance.lock.Unlock()
 	return nil
 }
 
@@ -592,7 +596,7 @@ func (t *task) processAbort(traceR *tracer) fail.Error {
 func (t *task) processTimeout(timeout time.Duration) {
 	t.lock.Lock()
 	if t.status != ABORTED {
-		t.abortCh <- true
+		t.abortCh <- struct{}{}
 		t.err = fail.TimeoutError(t.err, timeout)
 		t.status = TIMEOUT
 	}
@@ -606,7 +610,8 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 			t.lock.Lock()
 			defer t.lock.Unlock()
 
-			fmt.Printf("panic happened in Task %s\n", t.id)
+			t.runTerminatedCh <- struct{}{}
+			close(t.runTerminatedCh)
 			if t.err != nil {
 				_ = t.err.AddConsequence(fail.RuntimePanicError("panic happened: %v", err))
 			} else {
@@ -614,8 +619,6 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 			}
 			t.result = nil
 			t.status = DONE
-			t.runTerminatedCh <- false
-			close(t.runTerminatedCh)
 		}
 	}()
 
@@ -624,10 +627,10 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	t.runTerminatedCh <- struct{}{}
+	close(t.runTerminatedCh)
 	t.err = xerr
 	t.result = result
-	t.runTerminatedCh <- true
-	close(t.runTerminatedCh)
 }
 
 // Run starts task, waits its completion then return the error code
@@ -701,37 +704,49 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 		return instance.result, instance.err
 
 	case TIMEOUT:
-		fallthrough
+		<-instance.controllerTerminatedCh
+
+		instance.lock.Lock()
+		defer instance.lock.Unlock()
+
+		instance.status = DONE
+		instance.result = nil
+		instance.err = fail.TimeoutError(nil, 0)
+		return nil, instance.err
+
 	case ABORTED:
-		fallthrough
+		<-instance.controllerTerminatedCh
+
+		instance.lock.Lock()
+		defer instance.lock.Unlock()
+
+		instance.status = DONE
+
+		// In case of ABORT, if an error is already there, the TASK has ended, so just return this error with the result
+		if instance.err != nil {
+			switch instance.err.(type) {
+			case *fail.ErrAborted:
+				// leave the abort error alone
+			default:
+				// return abort error with instance.err as consequence (happened after Abort has been ackknowledged by TaskAction)
+				outErr := fail.AbortedError(nil)
+				_ = outErr.AddConsequence(instance.err)
+				instance.err = outErr
+			}
+			return instance.result, instance.err
+		}
+
+		return instance.result, fail.AbortedError(nil)
+
 	case RUNNING:
 		<-instance.controllerTerminatedCh
 
 		instance.lock.Lock()
 		defer instance.lock.Unlock()
 
-		if instance.status == ABORTED {
-			// In case of ABORT, if an error is already there, the TASK has ended, so just return this error with the result
-			if instance.err != nil {
-				instance.status = DONE
-				return instance.result, instance.err
-			}
-			// In case of ABORT, if there is no error and instance.result is not nil, return an Abort error with result
-			if instance.result != nil {
-				instance.status = DONE
-				return instance.result, fail.AbortedError(nil)
-			}
-		}
-
-		if instance.status == TIMEOUT {
-			instance.status = DONE
-			instance.result = nil
-			instance.err = fail.TimeoutError(nil, 0)
-			return nil, instance.err
-		}
-
 		instance.status = DONE
 		return instance.result, instance.err
+
 
 	case UNKNOWN:
 		fallthrough
@@ -897,7 +912,7 @@ func (t *task) Abort() (err fail.Error) {
 	switch t.status {
 	case RUNNING:
 		// Tell controller to stop goroutine
-		t.abortCh <- true
+		t.abortCh <- struct{}{}
 		close(t.abortCh)
 		t.status = ABORTED
 
