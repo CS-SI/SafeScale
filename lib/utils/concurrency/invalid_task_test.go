@@ -2,6 +2,7 @@ package concurrency
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -154,6 +155,12 @@ func TestInvalidTaskGroup(t *testing.T) {
 
 	// _, err = got.Wait()
 	// require.NotNil(t, err)
+
+	_, _, err = got.WaitGroupFor(0)
+	require.NotNil(t, err)
+
+	_, _, err = got.WaitGroupFor(5 * time.Second)
+	require.NotNil(t, err)
 
 	_, err = got.WaitGroup()
 	require.NotNil(t, err)

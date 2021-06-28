@@ -482,6 +482,15 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 	require.True(t, true)
 }
 
+func TestNewMethod(t *testing.T) {
+	overlord, err := NewTaskGroupWithParent(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+	other, err := overlord.New()
+	require.NotNil(t, other)
+	require.Nil(t, err)
+}
+
 func TestOneErrorOneOk(t *testing.T) {
 	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
@@ -506,6 +515,33 @@ func TestOneErrorOneOk(t *testing.T) {
 			return nil, fail.NewError("Ouch")
 		}, nil)
 	_, err = overlord.WaitGroup()
+	if err != nil {
+		repr := err.Error()
+		if !strings.Contains(repr, "Ouch") {
+			t.FailNow()
+		}
+	}
+
+	// Wait a 2nd time
+	_, err = overlord.WaitGroup()
+	if err != nil {
+		repr := err.Error()
+		if !strings.Contains(repr, "Ouch") {
+			t.FailNow()
+		}
+	}
+
+	// Wait a 3rd time
+	_, _, err = overlord.WaitGroupFor(0 * time.Second)
+	if err != nil {
+		repr := err.Error()
+		if !strings.Contains(repr, "Ouch") {
+			t.FailNow()
+		}
+	}
+
+	// Wait a 4th time
+	_, _, err = overlord.WaitGroupFor(1 * time.Second)
 	if err != nil {
 		repr := err.Error()
 		if !strings.Contains(repr, "Ouch") {
