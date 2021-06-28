@@ -42,6 +42,16 @@ func TestATaskIsAGroup(t *testing.T) {
 	require.False(t, IsATaskGroup(task{}))
 }
 
+// that IS a problem (considering the 2 above tests and the one below), now we have to be extra careful in cluster and clustertasks (because of TaskActions)
+// also, uncomment line 150 of this file to see another problem (variance of return types), the easy way out of this is remove taskgroup Wait keeping only WaitGroup
+func TestAGroupIsATask2(t *testing.T) {
+	require.False(t, IsATask(&taskGroup{}))
+}
+
+func TestATaskIsAGroup2(t *testing.T) {
+	require.False(t, IsATaskGroup(&task{}))
+}
+
 func TestInvalidTask(t *testing.T) {
 	got := generator()
 
@@ -135,6 +145,9 @@ func TestInvalidTaskGroup(t *testing.T) {
 
 	_, err = got.StartWithTimeout(nil, nil, 0)
 	require.NotNil(t, err)
+
+	// _, err = got.Wait()
+	// require.NotNil(t, err)
 
 	_, err = got.WaitGroup()
 	require.NotNil(t, err)

@@ -355,7 +355,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	funk(7, 140*time.Millisecond, 20*time.Millisecond, 40*time.Millisecond, false)  // same thing here
 	funk(8, 140*time.Millisecond, 20*time.Millisecond, 100*time.Millisecond, false) // same thing here
 	funk(9, 140*time.Millisecond, 20*time.Millisecond, 120*time.Millisecond, false) // same thing here
-	funk(10, 140*time.Millisecond, 20*time.Millisecond, 50*time.Millisecond, false)  // same thing here
+	funk(10, 140*time.Millisecond, 20*time.Millisecond, 50*time.Millisecond, false) // same thing here
 	funk(11, 140*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)  // canceled
 }
 
@@ -730,7 +730,7 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ??, that's the textbook definition")
+		t.Errorf("Where is the timeout ??, that's the textbook definition of a timeout")
 	}
 
 	// Nothing wrong should happen after this point...
@@ -795,7 +795,7 @@ func TestCheckTimeoutStatus(t *testing.T) {
 	require.Nil(t, xerr)
 
 	if sta != TIMEOUT {
-		t.Errorf("Automagically aborted ??, where is the timeout ?, this is the textbook definition")
+		t.Errorf("Automagically aborted ??, where is the timeout ?, this is the textbook definition of a timeout")
 		t.FailNow()
 	}
 

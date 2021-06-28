@@ -301,8 +301,8 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	return subtask, nil
 }
 
-// IsSuccessFul tells if the TaskGroup has been executed without error
-func (instance *taskGroup) IsSuccessFul() (bool, fail.Error) {
+// IsSuccessful tells if the TaskGroup has been executed without error
+func (instance *taskGroup) IsSuccessful() (bool, fail.Error) {
 	if instance.isNull() {
 		return false, fail.InvalidInstanceError()
 	}
@@ -325,7 +325,7 @@ func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
 // WaitGroup waits for the task to end, and returns the error (or nil) of the execution
 // Returns:
 //  - nil, *fail.InconsistentError: if TaskGroup has not started anything
-//  - nil, *fail.Error: if anything wrong occured during the waiting process
+//  - nil, *fail.Error: if anything wrong occurred during the waiting process
 //  - TaskGroupResult|nil, *fail.ErrorList: if TaskGroup ended properly but some sub-Tasks fail
 //  - TaskGroupResult|nil, *fail.ErrAborted: if TaskGroup has been aborted; ErrAborted Consequences() may contain an ErrorList corresponding to the errors of sub-Tasks
 //  - TaskGroupResult|nil, *fail.ErrTimeout: if TaskGroup has reached context deadline
