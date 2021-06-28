@@ -17,6 +17,7 @@
 package concurrency
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -187,6 +188,9 @@ func TestCallingReadyTaskGroup(t *testing.T) {
 
 	err = overlord.Abort()
 	require.Nil(t, err)
+
+	result := overlord.Aborted() // We just aborted without error, why not ?
+	require.True(t, result)
 }
 
 func TestChildrenWaitingGameEnoughTime(t *testing.T) {
@@ -489,6 +493,10 @@ func TestNewMethod(t *testing.T) {
 	other, err := overlord.New()
 	require.NotNil(t, other)
 	require.Nil(t, err)
+
+	overlord, err = NewTaskGroupWithContext(context.Background())
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
 }
 
 func TestOneErrorOneOk(t *testing.T) {
@@ -626,6 +634,12 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 		end := time.Since(begin)
 		t.Logf("Abort() lasted %v\n", end)
 
+		// did we abort ?
+		aborted := overlord.Aborted()
+		if !aborted {
+			t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
+		}
+
 		_, xerr = overlord.Wait()
 		require.NotNil(t, xerr)
 		end = time.Since(begin)
@@ -681,6 +695,11 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 			time.Sleep(310 * time.Millisecond)
 			if xerr := overlord.Abort(); xerr != nil {
 				t.Fail()
+			}
+			// did we abort ?
+			aborted := overlord.Aborted()
+			if !aborted {
+				t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
 			}
 		}()
 
