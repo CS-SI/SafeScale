@@ -18,8 +18,6 @@ package concurrency
 
 import (
 	"fmt"
-	"io/ioutil"
-	"os"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -44,9 +42,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 	streak := 0
 	enough := false
 	iter := 0
+	chansize := 10
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 12 {
 			break
 		}
 		if enough {
@@ -60,8 +59,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 		xerr = overlord.SetID(fmt.Sprintf("/parent-%d", iter))
 		require.Nil(t, xerr)
 
-		bailout := make(chan string, 80) // a buffered channel
-		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
+		bailout := make(chan string, chansize) // a buffered channel
+		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
@@ -103,25 +102,37 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 			switch xerr.(type) {
 			case *fail.ErrAborted:
 				cause := xerr.Cause()
-				// VPL: why expectinf a panic when there is no way to have one if everything is working ?
+				// VPL: why expecting a panic when there is no way to have one if everything is working ?
+				// this code can be removed safely IF AND ONLY IF test TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaiting
+				// proves than panics intended or unintended on a Task/Subtask/TaskGroup are detected by Start/Wait/Abort functions
+				// sometimes previous test works..., sometimes fails..., until panic handling is reliable, no need to remove this
 				if !strings.Contains(spew.Sdump(cause), "panic happened") {
 					t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
 				}
 			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 			// VPL: there is no way to get a *fail.ErrRuntimePanic from TaskGroup...
+			// yet..., all we have to do is, say add a new feature (that also breaks Wait behavior, mistakes happen... ) and then this case will catch the error for us...
+			// remove this (and also the default case), and this test no longer protects us against unintended errors
 			case *fail.ErrRuntimePanic:
-				t.Logf("We catched a panic...")
+				t.Errorf("That shouldn't ever happen")
+				t.FailNow()
 			case *fail.ErrorList:
 				// VPL: again, why expecting a panic when there is no way to have one if everything is working ?
+				// indeed, the test now works, but there were 2 problems:
+				// -wait didn't wait until the end (and the test induced a panic to prove it); this problem is fixed
+				// -panic goes unnoticed from a client point of view, only looking at logs can be noticed, that's a bug
+				// still unfixed as TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaiting proves,
+				// when the latter test is fixed, we can safely remove Logf lines below
 				if !strings.Contains(spew.Sdump(xerr), "panic happened") {
 					t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
 				}
 			default:
 				t.Errorf("Unexpected error: %v", xerr)
+				t.FailNow()
 			}
 		} else {
 			require.NotNil(t, res)
-			if len(bailout) == 80 {
+			if len(bailout) == chansize {
 				streak++
 				if streak > 5 {
 					break
@@ -133,11 +144,11 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 		// If not..., well...
 
 		reminder := false
-		if len(bailout) != 80 { // this means panic
+		if len(bailout) != chansize { // this means panic
 			reminder = true
 			t.Errorf("Not everyone finished on time !!, panic is coming !!, some tasks will hit a closed channel !!")
 			// if we now do a t.FailNow() we already proved our point (if Wait actually waited, the channel
-			// size should be 80 each time), but if we don't...
+			// size should be chansize each time), but if we don't...
 			// we will see runtime panics on our LOGS !!, but NOT in the code
 			// with a t.FailNow() we also fail, but the test output is less frightening
 			enough = true
@@ -157,12 +168,13 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 	enough := false
 	streak := 0
 	iter := 0
+	chansize := 20
 	for {
 		iter++
-		if iter > 8 {
+		if iter > 40 {
 			break
 		}
-		if enough {
+		if enough || caught {
 			break
 		}
 
@@ -173,8 +185,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 		xerr = overlord.SetID(fmt.Sprintf("/parent-%d", iter))
 		require.Nil(t, xerr)
 
-		bailout := make(chan string, 80) // a buffered channel
-		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
+		bailout := make(chan string, chansize) // a buffered channel
+		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
@@ -194,7 +206,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 					acha <- "Bailing out"
 
 					// flip a coin, true and we panic, false we don't
-					if RandomInt(0, 2) == 1 {
+					if RandomInt(0, 10) > 3 {
 						panic("head")
 					}
 					// tails
@@ -217,7 +229,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 			require.Nil(t, xerr)
 		}()
 
-		res, xerr := overlord.Wait() // 100 ms after this, .Abort() should hit
+		res, xerr := overlord.WaitGroup() // 100 ms after this, .Abort() should hit
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 			switch xerr.(type) {
@@ -228,9 +240,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 				}
 			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 			case *fail.ErrRuntimePanic: // This MUST NEVER HAPPEN in a TaskGroup; the panic should be in the ErrorList returned by Wait()
-				t.Logf("We catched a panic..., good")
-				caught = true
-				break
+				t.Errorf("That shouldn't happen")
+				t.FailNow()
 			case *fail.ErrorList:
 				if !strings.Contains(spew.Sdump(xerr), "panic happened") {
 					t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
@@ -244,7 +255,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 			}
 		} else {
 			require.NotNil(t, res)
-			if len(bailout) == 80 {
+			if len(bailout) == chansize {
 				streak++
 				if streak > 5 {
 					break
@@ -256,17 +267,146 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 		// If not..., well...
 
 		reminder := false
-		if len(bailout) != 80 { // this means panic
+		if len(bailout) != chansize { // this means panic
 			reminder = true
 			t.Errorf("Not everyone finished on time !!, panic is coming !!, some tasks will hit a closed channel !!")
 			// if we now do a t.FailNow() we already proved our point (if Wait actually waited, the channel
-			// size should be 80 each time), but if we don't...
+			// size should be chansize each time), but if we don't...
 			// we will see runtime panics on our LOGS !!, but NOT in the code
 			// with a t.FailNow() we also fail, but the test output is less frightening
 			enough = true
 		}
 
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(2000 * time.Millisecond)
+		if reminder {
+			t.Errorf("by now we should see panics in lines above, panics that only shows in logs and the rest of the code is unaware of")
+		}
+		// Well, we have a problem Waiting, now it's clear, and as a bonus we uncovered a problem communicating panics to function callers
+	}
+
+	if !caught {
+		t.Errorf("We were unable to catch a panic...")
+		t.FailNow()
+	}
+
+	if iter > 10 {
+		t.Errorf("Even if it succeeds form time to time, NO way it works as intented, compare this with next test that detects the panic in a few seconds")
+		t.FailNow()
+	}
+}
+
+// Like the previous test, without .Abort()
+func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaiting(t *testing.T) {
+	caught := false
+	enough := false
+	streak := 0
+	iter := 0
+	chansize := 20
+	for {
+		iter++
+		if iter > 40 {
+			break
+		}
+		if enough || caught {
+			break
+		}
+
+		t.Log("Next") // Each time we iterate we see this line, sometimes this doesn't fail at 1st iteration
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
+		require.Nil(t, xerr)
+		xerr = overlord.SetID(fmt.Sprintf("/parent-%d", iter))
+		require.Nil(t, xerr)
+
+		bailout := make(chan string, chansize) // a buffered channel
+		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
+			_, xerr = overlord.Start(
+				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+					out := 4
+					for { // do some work, then look for aborted, again and again
+						// some work
+						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+						if t.Aborted() {
+							// Cleaning up first before leaving... ;)
+							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+							break
+						}
+						out--
+						if out < 0 {
+							break
+						}
+					}
+
+					// We are using the classic 'send on closed channel' trick to see if Wait actually waits until everyone is DONE.
+					// If it does we will never see a panic, but if Abort doesn't mean TellYourChildrenToAbort but
+					// actually means AbortYourChildrenAndQuitNOWWithoutWaiting, then we have a problem
+					acha := parameters.(chan string)
+					acha <- "Bailing out"
+
+					// flip a coin, true and we panic, false we don't
+					if RandomInt(0, 10) > 3 {
+						panic("head")
+					}
+					// tails
+
+					return "who cares", nil
+				}, bailout, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
+			)
+			require.Nil(t, xerr)
+		}
+
+		// after this, some tasks will already be looking for ABORT signals
+		time.Sleep(time.Duration(65) * time.Millisecond)
+
+		res, xerr := overlord.WaitGroup() // 100 ms after this, .Abort() should hit
+		if xerr != nil {
+			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
+			switch xerr.(type) {
+			case *fail.ErrAborted:
+				cause := xerr.Cause()
+				if !strings.Contains(spew.Sdump(cause), "panic happened") {
+					t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
+				}
+			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
+			case *fail.ErrRuntimePanic: // This MUST NEVER HAPPEN in a TaskGroup; the panic should be in the ErrorList returned by Wait()
+				t.Errorf("That shouldn't happen")
+				t.FailNow()
+			case *fail.ErrorList:
+				if !strings.Contains(spew.Sdump(xerr), "panic happened") {
+					t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
+				} else {
+					t.Logf("We catched a panic..., good")
+					caught = true
+					break
+				}
+			default:
+				t.Errorf("Unexpected error: %v", xerr)
+			}
+		} else {
+			require.NotNil(t, res)
+			if len(bailout) == chansize {
+				streak++
+				if streak > 5 {
+					break
+				}
+				continue
+			}
+		}
+		close(bailout) // If Wait actually waits, this is closed AFTER all Tasks filled the channel, so no panics
+		// If not..., well...
+
+		reminder := false
+		if len(bailout) != chansize { // this means panic
+			reminder = true
+			t.Errorf("Not everyone finished on time !!, panic is coming !!, some tasks will hit a closed channel !!")
+			// if we now do a t.FailNow() we already proved our point (if Wait actually waited, the channel
+			// size should be chansize each time), but if we don't...
+			// we will see runtime panics on our LOGS !!, but NOT in the code
+			// with a t.FailNow() we also fail, but the test output is less frightening
+			enough = true
+		}
+
+		time.Sleep(2000 * time.Millisecond)
 		if reminder {
 			t.Errorf("by now we should see panics in lines above, panics that only shows in logs and the rest of the code is unaware of")
 		}
@@ -284,6 +424,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 	enough := false
 	iter := 0
 	streak := 0
+	chansize := 10
 	for {
 		iter++
 		if iter > 12 {
@@ -301,8 +442,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		require.Nil(t, xerr)
 
 		var failureCounter int32
-		bailout := make(chan string, 80) // a buffered channel
-		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
+		bailout := make(chan string, chansize) // a buffered channel
+		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
@@ -354,8 +495,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 				if cause != nil {
 					t.Logf("TaskGroup reported error cause '%s': %v", reflect.TypeOf(cause).String(), cause)
 				}
+				// if it's unexpected and it happens -> error, and we can finish the test
 				if strings.Contains(spew.Sdump(cause), "panic happened") {
-					t.Logf("TaskGroup reported panic in cause!!!")
+					t.Errorf("TaskGroup reported panic in cause!!!")
+					t.FailNow()
 				}
 				consequences := xerr.Consequences()
 				if len(consequences) > 0 {
@@ -386,7 +529,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 				}
 			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 			case *fail.ErrRuntimePanic:
-				t.Logf("We catched a panic!!!")
+				t.Errorf("That shouldn't happen")
+				t.FailNow()
 			case *fail.ErrorList:
 				errorList := cerr.ToErrorSlice()
 				if len(errorList) > 0 {
@@ -415,7 +559,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 			}
 		} else {
 			require.NotNil(t, res)
-			if len(bailout) == 80 {
+			if len(bailout) == chansize {
 				streak++
 				if streak > 5 {
 					break
@@ -427,11 +571,11 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		// If not..., well...
 
 		reminder := false
-		if len(bailout) != 80 { // this means panic
+		if len(bailout) != chansize { // this means panic
 			reminder = true
 			t.Errorf("Not everyone finished on time !!, panic is coming !!, some tasks will hit a closed channel !!")
 			// if we now do a t.FailNow() we already proved our point (if Wait actually waited, the channel
-			// size should be 80 each time), but if we don't...
+			// size should be chansize each time), but if we don't...
 			// we will see runtime panics on our LOGS !!, but NOT in the code
 			// with a t.FailNow() we also fail, but the test output is less frightening
 			enough = true
@@ -452,9 +596,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 	enough := false
 	iter := 0
 	streak := 0
+	chansize := 10
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 12 {
 			break
 		}
 		if enough {
@@ -468,8 +613,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		xerr = overlord.SetID(fmt.Sprintf("parent-%d", iter))
 		require.Nil(t, xerr)
 
-		bailout := make(chan string, 80) // a buffered channel
-		for ind := 0; ind < 80; ind++ {  // with the same number of tasks, good
+		bailout := make(chan string, chansize) // a buffered channel
+		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 					for { // do some work, then look for aborted, again and again
@@ -510,7 +655,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 				}
 			// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 			case *fail.ErrRuntimePanic:
-				t.Logf("We catched a panic...")
+				t.Errorf("That shouldn't happen")
+				t.FailNow()
 			case *fail.ErrorList:
 				if !strings.Contains(spew.Sdump(xerr), "panic happened") {
 					t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
@@ -520,7 +666,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 			}
 		} else {
 			require.NotNil(t, res)
-			if len(bailout) == 80 {
+			if len(bailout) == chansize {
 				streak++
 				if streak > 5 {
 					break
@@ -533,17 +679,17 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		// If not..., well...
 
 		reminder := false
-		if len(bailout) != 80 { // this means panic
+		if len(bailout) != chansize { // this means panic
 			reminder = true
 			t.Errorf("Not everyone finished on time !!, panic is coming !!, some tasks will hit a closed channel !!")
 			// if we now do a t.FailNow() we already proved our point (if Wait actually waited, the channel
-			// size should be 80 each time), but if we dont...
+			// size should be chansize each time), but if we dont...
 			// we will see runtime panics on our LOGS !!, but NOT in the code
 			// with a t.FailNow() we also fail, but the test output is less frightening
 			enough = true
 		}
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(2000 * time.Millisecond)
 		if reminder {
 			t.Errorf("by now we should see panics in lines above, panics that only shows in logs and the rest of the code is unaware of")
 		}
@@ -562,17 +708,19 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 	iter := 0
 	for {
 		iter++
-		if iter > 100 {
+		if iter > 20 {
 			break
 		}
 
-		rescueStdout := os.Stdout
-		r, w, _ := os.Pipe()
-		os.Stdout = w
-
-		overlord, xerr := NewTaskGroup()
-		require.NotNil(t, overlord)
+		overlord, xerr := NewTaskGroupWithParent(nil)
+		if xerr != nil {
+			t.Errorf("Error creating taskGroup: %v", xerr)
+		}
 		require.Nil(t, xerr)
+		if overlord == nil {
+			t.Errorf("Error creating taskGroup")
+		}
+		require.NotNil(t, overlord)
 		xerr = overlord.SetID("/parent")
 		require.Nil(t, xerr)
 
@@ -587,7 +735,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 			}
 		}
 
-		time.Sleep(time.Duration(200) * time.Millisecond)
+		time.Sleep(time.Duration(100) * time.Millisecond)
 		// overlord should have finished a loooong time ago...
 
 		// but we abort anyway
@@ -622,15 +770,10 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		} else {
 			if len(res) != len(previousRes) {
 				t.Errorf("Not consistent, before: %d, now: %d", len(previousRes), len(res))
+				t.Logf("Recovered this: %v", res)
 				t.FailNow()
 			}
 			previousRes = res
 		}
-
-		t.Logf("Recovered this: %v", res)
-
-		_ = w.Close()
-		_, _ = ioutil.ReadAll(r)
-		os.Stdout = rescueStdout
 	}
 }

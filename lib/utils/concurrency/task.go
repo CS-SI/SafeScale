@@ -650,7 +650,6 @@ func (instance *task) IsSuccessful() (bool, fail.Error) {
 		return false, fail.InvalidInstanceError()
 	}
 
-
 	switch instance.status {
 	case DONE:
 		instance.lock.RLock()
@@ -816,7 +815,7 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 	case RUNNING:
 		var (
 			result TaskResult
-			c chan struct{}
+			c      chan struct{}
 		)
 		waiterTask, xerr := NewTaskWithParent(instance, InheritParentIDOption, AmendID("WaitForHelper"))
 		if xerr != nil {
@@ -827,10 +826,10 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				t.DisarmAbortSignal()
 
 				var done bool
-				for ; !t.Aborted() && !done; {
+				for !t.Aborted() && !done {
 					done, result, innerXErr = instance.TryWait()
 					if !done {
-						time.Sleep(1*time.Millisecond) // FIXME: hardcoded value :-(
+						time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
 					}
 				}
 				if done {
