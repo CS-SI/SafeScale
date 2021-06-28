@@ -63,12 +63,14 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+					weWereAborted := false
 					for { // do some work, then look for aborted, again and again
 						// some work
 						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
 						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
 							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+							weWereAborted = true
 							break
 						}
 					}
@@ -78,6 +80,11 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 					// actually means AbortYourChildrenAndQuitNOWWithoutWaiting, then we have a problem
 					acha := parameters.(chan string)
 					acha <- "Bailing out"
+
+					if weWereAborted {
+						return "", fail.AbortedError(nil, "we were killed")
+					}
+
 					return "who cares", nil
 				}, bailout, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
 			)
@@ -171,7 +178,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 	chansize := 20
 	for {
 		iter++
-		if iter > 40 {
+		if iter > 20 {
 			break
 		}
 		if enough || caught {
@@ -189,12 +196,14 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+					weWereAborted := false
 					for { // do some work, then look for aborted, again and again
 						// some work
 						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
 						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
 							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+							weWereAborted = true
 							break
 						}
 					}
@@ -210,6 +219,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 						panic("head")
 					}
 					// tails
+
+					if weWereAborted {
+						return "", fail.AbortedError(nil, "we were killed")
+					}
 
 					return "who cares", nil
 				}, bailout, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
@@ -277,7 +290,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 			enough = true
 		}
 
-		time.Sleep(2000 * time.Millisecond)
+		time.Sleep(800 * time.Millisecond)
 		if reminder {
 			t.Errorf("by now we should see panics in lines above, panics that only shows in logs and the rest of the code is unaware of")
 		}
@@ -289,7 +302,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 		t.FailNow()
 	}
 
-	if iter > 10 {
+	if iter > 6 {
 		t.Errorf("Even if it succeeds form time to time, NO way it works as intented, compare this with next test that detects the panic in a few seconds")
 		t.FailNow()
 	}
@@ -304,7 +317,7 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 	chansize := 20
 	for {
 		iter++
-		if iter > 40 {
+		if iter > 20 {
 			break
 		}
 		if enough || caught {
@@ -322,6 +335,7 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+					weWereAborted := false
 					out := 4
 					for { // do some work, then look for aborted, again and again
 						// some work
@@ -329,6 +343,7 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
 							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+							weWereAborted = true
 							break
 						}
 						out--
@@ -348,6 +363,10 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 						panic("head")
 					}
 					// tails
+
+					if weWereAborted {
+						return "", fail.AbortedError(nil, "we were killed")
+					}
 
 					return "who cares", nil
 				}, bailout, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
@@ -446,12 +465,14 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+					weWereAborted := false
 					for { // do some work, then look for aborted, again and again
 						// some work
 						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
 						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
 							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+							weWereAborted = true
 							break
 						}
 					}
@@ -461,6 +482,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 					// actually means AbortYourChildrenAndQuitNOWWithoutWaiting, then we have a problem
 					acha := parameters.(chan string)
 					acha <- "Bailing out"
+
+					if weWereAborted {
+						return "", fail.AbortedError(nil, "we were killed")
+					}
 
 					// flip a coin, true and we panic, false we don't
 					if RandomInt(0, 2) == 1 {
@@ -617,12 +642,14 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+					weWereAborted := false
 					for { // do some work, then look for aborted, again and again
 						// some work
 						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
 						if t.Aborted() {
 							// Cleaning up first before leaving... ;)
 							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+							weWereAborted = true
 							break
 						}
 					}
@@ -631,6 +658,11 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 					// actually means AbortYourChildrenAndQuitNOWWithoutWaiting, then we have a problem
 					acha := parameters.(chan string)
 					acha <- "Bailing out"
+
+					if weWereAborted {
+						return "", fail.AbortedError(nil, "we were killed")
+					}
+
 					return "who cares", nil
 				}, bailout,
 				InheritParentIDOption, AmendID(fmt.Sprintf("child-%d", ind)),
