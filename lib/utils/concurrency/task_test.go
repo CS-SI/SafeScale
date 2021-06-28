@@ -591,15 +591,23 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 		_, xerr = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			dur := time.Duration(sleep*10) * time.Millisecond
 			tempo := dur / 100
-			var i int
+			var (
+				i int
+				aborted bool
+			)
 			for ; i < 100; i++ {
-				if t.Aborted() {
+				aborted = t.Aborted()
+				if aborted {
 					break
 				}
 				time.Sleep(tempo)
 			}
 
 			fmt.Printf("%s: sleeped %v\n", singleID, time.Duration(i)*tempo+time.Duration(sleep)*10*time.Millisecond)
+			if aborted {
+				return "Ahhhh (aborted)", fail.AbortedError(nil)
+			}
+
 			return "Ahhhh", nil
 		}, nil)
 		require.Nil(t, xerr)
@@ -704,26 +712,26 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 
 	// tests are right, errorExpected it what it should be
 	// previous versions got the work done fast enough, now we don't, why ?
-	// funk(1, 5, 1, true)
+	funk(1, 5, 1, true)
 	funk(2, 5, 8, false)   // this is a performance degradation, it worked before, look at the 2 next tests, this test should work like the next ones, it does not because the timings of Wait are degraded
-	// funk(3, 5, 80, false)  // this test and the previous should be equivalent
-	// funk(4, 50, 80, false) // *10 the timings (vs 5, 8) and the result changes ??
-	// funk(5, 50, 10, true)
-	// funk(6, 50, 80, false)
-	// funk(7, 50, 300, false)
-	// funk(8, 50, 3000, false)
-	// funk(9, 50, 6000, false)
-	// funk(10, 50, 48, true) // also look at this tests, from test 12 to 17 there should be no errors, but we are not fast / precise enough -> errors
-	// funk(11, 50, 49, true)
-	// funk(12, 50, 51, false) // Abort arrived before end of Task!
-	// funk(13, 50, 52, false)
-	// funk(14, 50, 53, false)
-	// funk(15, 50, 54, false)
-	// funk(16, 50, 55, false)
-	// funk(17, 50, 56, false) // if we go far enough, no errors
-	// funk(18, 50, 57, false) // if we go far enough, no errors
-	// funk(19, 50, 58, false) // if we go far enough, no errors
-	// funk(20, 50, 59, false) // if we go far enough, no errors
+	funk(3, 5, 80, false)  // this test and the previous should be equivalent
+	funk(4, 50, 80, false) // *10 the timings (vs 5, 8) and the result changes ??
+	funk(5, 50, 10, true)
+	funk(6, 50, 80, false)
+	funk(7, 50, 300, false)
+	funk(8, 50, 3000, false)
+	funk(9, 50, 6000, false)
+	funk(10, 50, 48, true) // also look at this tests, from test 12 to 17 there should be no errors, but we are not fast / precise enough -> errors
+	funk(11, 50, 49, true)
+	funk(12, 50, 51, false) // Abort arrived before end of Task!
+	funk(13, 50, 52, false)
+	funk(14, 50, 53, false)
+	funk(15, 50, 54, false)
+	funk(16, 50, 55, false)
+	funk(17, 50, 56, false) // if we go far enough, no errors
+	funk(18, 50, 57, false) // if we go far enough, no errors
+	funk(19, 50, 58, false) // if we go far enough, no errors
+	funk(20, 50, 59, false) // if we go far enough, no errors
 }
 
 func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
@@ -913,38 +921,35 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 	require.Nil(t, xerr)
 
 	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		var aborted bool
 		for {
 			time.Sleep(time.Duration(10) * time.Millisecond)
-			status, xerr := t.GetStatus()
-			if xerr != nil {
-				return "Big failure...", nil
-			}
-			if status == ABORTED || status == TIMEOUT {
+			aborted = t.Aborted()
+			if aborted {
 				break
 			}
 
 			fmt.Println("Forever young...")
 		}
+		if aborted {
+			fmt.Println("There can be only one...")
+			return "There can be only one", fail.AbortedError(nil)
+		}
+
 		return "I want to be forever young", nil
 	}, nil, time.Duration(200)*time.Millisecond)
 	require.Nil(t, xerr)
 
 	_, xerr = single.Wait()
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrTimeout); !ok {
-			t.Errorf("Where are the timeout errors ??: %s", spew.Sdump(xerr))
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			// expected
+		default:
+			t.Errorf("Unexpected error %v (%s)", xerr, reflect.TypeOf(xerr).String())
 		}
 	}
 	require.NotNil(t, xerr)
-
-	stat, err := single.GetStatus()
-	if err != nil {
-		t.Errorf("Problem retrieving status ?")
-	}
-
-	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ??, that's the textbook definition of a timeout")
-	}
 
 	// Nothing wrong should happen after this point...
 	time.Sleep(time.Duration(100) * time.Millisecond)
@@ -964,7 +969,7 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 		t.Fail()
 	}
 
-	if !strings.Contains(nah[len(nah)-2], "Aborted") {
+	if !strings.Contains(nah[len(nah)-2], "only one") {
 		t.Fail()
 	}
 }
@@ -1010,7 +1015,7 @@ func TestStartWithTimeoutWithTimeToFinish(t *testing.T) {
 		for {
 			time.Sleep(time.Duration(10) * time.Millisecond)
 			if t.Aborted() {
-				break
+				return nil, fail.AbortedError(nil)
 			}
 			fmt.Println("Forever young...")
 		}

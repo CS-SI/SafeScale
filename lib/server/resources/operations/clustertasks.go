@@ -178,7 +178,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		if xerr != nil && !req.KeepOnFailure {
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
-			
+
 			logrus.Debugf("Cleaning up on failure, deleting Hosts...")
 			var list map[uint]*propertiesv3.ClusterNode
 			derr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
