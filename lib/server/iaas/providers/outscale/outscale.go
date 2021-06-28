@@ -140,13 +140,13 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		ObjectStorage: outscale.StorageConfiguration{
 			AccessKey: get(objstorage, "AccessKey", get(identity, "AccessKey")),
 			SecretKey: get(objstorage, "SecretKey", get(identity, "SecretKey")),
-			Endpoint:  get(objstorage, "Endpoint", fmt.Sprintf("https://osu.%s.outscale.com", get(compute, "Region"))),
+			Endpoint:  get(objstorage, "Endpoint", fmt.Sprintf("https://oos.%s.outscale.com", get(compute, "Region"))),
 			Type:      get(objstorage, "Type", "s3"),
 		},
 		Metadata: outscale.MetadataConfiguration{
 			AccessKey: get(metadata, "AccessKey", get(objstorage, "AccessKey", get(identity, "AccessKey"))),
 			SecretKey: get(metadata, "SecretKey", get(objstorage, "SecretKey", get(identity, "SecretKey"))),
-			Endpoint:  get(metadata, "Endpoint", get(objstorage, "Endpoint", fmt.Sprintf("https://osu.%s.outscale.com", get(compute, "Region")))),
+			Endpoint:  get(metadata, "Endpoint", get(objstorage, "Endpoint", fmt.Sprintf("https://oos.%s.outscale.com", get(compute, "Region")))),
 			Type:      get(metadata, "Type", get(objstorage, "Type", "s3")),
 			Bucket:    get(metadata, "Bucket", "0.safescale"),
 			CryptKey:  get(metadata, "CryptKey", "safescale"),

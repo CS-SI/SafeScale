@@ -111,6 +111,7 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { //nolint
 
 	config := osc.NewConfiguration()
 	config.BasePath = options.Compute.URL
+	config.Scheme = "https"
 	client := osc.NewAPIClient(config)
 	auth := context.WithValue(context.Background(), osc.ContextAWSv4, osc.AWSv4{
 		AccessKey: options.Identity.AccessKey,
