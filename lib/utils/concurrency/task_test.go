@@ -848,7 +848,7 @@ func TestCheckTimeoutStatus(t *testing.T) {
 	require.Nil(t, xerr)
 
 	if sta != TIMEOUT {
-		t.Errorf("Automagically aborted ??, where is the timeout ?, this is the textbook definition")
+		t.Errorf("Automagically aborted ??, where is the timeout ?, this is the textbook definition of a timeout")
 		t.FailNow()
 	}
 
@@ -885,7 +885,7 @@ func TestCheckTimeoutStatus(t *testing.T) {
 	}
 }
 
-func TestOneShot(t *testing.T) {
+func TestStartWithTimeoutWithTimeToFinish(t *testing.T) {
 	single, xerr := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
@@ -915,6 +915,47 @@ func TestOneShot(t *testing.T) {
 	_, xerr = single.Wait()
 	if xerr == nil {
 		t.Errorf("Wait should have failed but didn't")
+	} else {
+		if _, ok := xerr.(*fail.ErrAborted); !ok {
+			t.Errorf("This should have failed by design with an Abortion error")
+		}
+	}
+}
+
+func TestStartWithTimeoutThatTimeouts(t *testing.T) {
+	single, xerr := NewTask()
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		for {
+			time.Sleep(time.Duration(10) * time.Millisecond)
+			status, _ := t.GetStatus()
+			if status == ABORTED || status == TIMEOUT {
+				break
+			}
+			fmt.Println("Forever young...")
+		}
+		return "I want to be forever young", nil
+	}, nil, time.Duration(100)*time.Millisecond)
+	require.Nil(t, xerr)
+
+	// sleep more than duration defined in the timeout...
+	time.Sleep(time.Duration(150) * time.Millisecond)
+
+	// Abort, but too late, task already finished with timeout (hopefully)
+	xerr = single.Abort()
+	if xerr != nil {
+		t.Errorf("There was a failure aborting: %v", xerr)
+	}
+
+	_, xerr = single.Wait()
+	if xerr == nil {
+		t.Errorf("Wait should have failed but didn't")
+	} else {
+		if _, ok := xerr.(*fail.ErrTimeout); !ok {
+			t.Errorf("This should have failed by design with a Timeout error")
+		}
 	}
 }
 
