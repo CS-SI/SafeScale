@@ -28,6 +28,109 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestIntrospection(t *testing.T) {
+	overlord, err := NewTaskGroupWithParent(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	for ind := 0; ind < 800; ind++ {
+		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+			t.FailNow()
+		}
+	}
+
+	time.Sleep(20 * time.Millisecond)
+
+	num, err := overlord.GetStarted()
+	require.Nil(t, err)
+	if num != 800 {
+		t.Errorf("Problem reporting # of started tasks")
+	}
+
+	id, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, id)
+
+	sign := overlord.GetSignature()
+	require.NotEmpty(t, sign)
+
+	ok, err := overlord.IsSuccessful()
+	require.NotNil(t, err)
+
+	res, err := overlord.Wait()
+	require.Nil(t, err)
+	require.NotEmpty(t, res)
+
+	ok, err = overlord.IsSuccessful()
+	require.Nil(t, err)
+	require.True(t, ok)
+}
+
+func TestIntrospectionWithErrors(t *testing.T) {
+	overlord, err := NewTaskGroupWithParent(nil)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	for ind := 0; ind < 800; ind++ {
+		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+			t.FailNow()
+		}
+	}
+
+	_, err = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		return "waiting game", fail.NewError("something happened")
+	}, nil)
+	if err != nil {
+		t.Errorf("Unexpected: %s", err)
+		t.FailNow()
+	}
+
+	time.Sleep(20 * time.Millisecond)
+
+	num, err := overlord.GetStarted()
+	require.Nil(t, err)
+	if num != 800 {
+		t.Errorf("Problem reporting # of started tasks")
+	}
+
+	id, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, id)
+
+	sign := overlord.GetSignature()
+	require.NotEmpty(t, sign)
+
+	ok, err := overlord.IsSuccessful()
+	require.NotNil(t, err)
+
+	res, err := overlord.Wait()
+	require.NotNil(t, err)
+	require.NotEmpty(t, res)
+
+	ok, err = overlord.IsSuccessful()
+	require.Nil(t, err)
+	require.False(t, ok)
+}
+
 func TestChildrenWaitingGameOnlyAWhile(t *testing.T) {
 	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
