@@ -35,6 +35,34 @@ import (
 
 // NOTICE The whole file task_test.go MUST pass UT flawlessly before using it confidently in foreman.go and controller.go
 
+func TestCreateVoidTask(t *testing.T) {
+	ta, err := VoidTask()
+	require.NotNil(t, ta)
+	require.Nil(t, err)
+}
+
+func TestWaitReadyTask(t *testing.T) {
+	ta, err := VoidTask()
+	require.NotNil(t, ta)
+	require.Nil(t, err)
+
+	su, err := ta.IsSuccessful()
+	require.False(t, su)
+	require.NotNil(t, err)
+
+	_, tr, err := ta.WaitFor(10 * time.Second)
+	require.Nil(t, tr)
+	require.NotNil(t, err)
+
+	_, tr, err = ta.TryWait()
+	require.Nil(t, tr)
+	require.NotNil(t, err)
+
+	tr, err = ta.Wait()
+	require.Nil(t, tr)
+	require.NotNil(t, err)
+}
+
 func TestNewTask(t *testing.T) {
 	got, err := NewUnbreakableTask()
 	require.NotNil(t, got)
@@ -274,7 +302,7 @@ func TestWaitingForGame(t *testing.T) {
 
 	waited := 0
 	for _, itta := range tarray {
-		good, res, err := itta.WaitFor(8 * time.Second)
+		good, res, err := itta.WaitFor(2 * time.Second)
 		require.Nil(t, err)
 		require.NotNil(t, res)
 		require.True(t, good)

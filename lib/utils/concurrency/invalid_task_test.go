@@ -104,6 +104,12 @@ func TestInvalidTask(t *testing.T) {
 	require.NotNil(t, err)
 }
 
+func TestInvalidTaskCtx(t *testing.T) {
+	ta, err := NewTaskWithContext(nil)
+	require.Nil(t, ta)
+	require.NotNil(t, err)
+}
+
 func TestInvalidTaskGroup(t *testing.T) {
 	got := tgGenerator()
 
