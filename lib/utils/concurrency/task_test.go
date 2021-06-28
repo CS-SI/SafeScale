@@ -150,7 +150,7 @@ func TestOneWaitingForGame(t *testing.T) {
 		t.Errorf("Shouldn't happen")
 	}
 
-	good, res, err := got.WaitFor(8 * time.Second)
+	good, res, err := got.WaitFor(4 * time.Second)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.True(t, good)
@@ -302,7 +302,7 @@ func TestWaitingForGame(t *testing.T) {
 
 	waited := 0
 	for _, itta := range tarray {
-		good, res, err := itta.WaitFor(2 * time.Second)
+		good, res, err := itta.WaitFor(4 * time.Second)
 		require.Nil(t, err)
 		require.NotNil(t, res)
 		require.True(t, good)

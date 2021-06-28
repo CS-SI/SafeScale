@@ -101,6 +101,12 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaitingFor
 			// let's have fun
 			xerr := overlord.Abort()
 			require.Nil(t, xerr)
+
+			// did we abort ?
+			aborted := overlord.Aborted()
+			if !aborted {
+				t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
+			}
 		}()
 
 		_, res, xerr := overlord.WaitFor(5 * time.Second) // 100 ms after this, .Abort() should hit
@@ -245,6 +251,12 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 			// let's have fun
 			xerr := overlord.Abort()
 			require.Nil(t, xerr)
+
+			// did we abort ?
+			aborted := overlord.Aborted()
+			if !aborted {
+				t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
+			}
 		}()
 
 		res, xerr := overlord.WaitGroup() // 100 ms after this, .Abort() should hit
@@ -520,6 +532,12 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 			// let's have fun
 			xerr := overlord.Abort()
 			require.Nil(t, xerr)
+
+			// did we abort ?
+			aborted := overlord.Aborted()
+			if !aborted {
+				t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
+			}
 		}()
 
 		_, res, xerr := overlord.WaitFor(5 * time.Second) // 100 ms after this, .Abort() should hit
@@ -687,6 +705,12 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitForLater(t *testin
 		xerr = overlord.Abort()
 		require.Nil(t, xerr)
 
+		// did we abort ?
+		aborted := overlord.Aborted()
+		if !aborted {
+			t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
+		}
+
 		_, res, xerr := overlord.WaitFor(5 * time.Second)
 		if xerr != nil {
 			t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
@@ -786,6 +810,12 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 		if xerr != nil {
 			t.Errorf("Failed to abort")
 			t.FailNow()
+		}
+
+		// did we abort ?
+		aborted := overlord.Aborted()
+		if !aborted {
+			t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
 		}
 
 		// the question here, is why we fail ?
