@@ -80,7 +80,7 @@ func TestCallingReadyTaskGroup(t *testing.T) {
 }
 
 func TestChildrenWaitingGameEnoughTime(t *testing.T) {
-	for iter := 0; iter < 100 ; iter++ {
+	for iter := 0; iter < 100; iter++ {
 		overlord, xerr := NewTaskGroupWithParent(nil)
 		require.NotNil(t, overlord)
 		require.Nil(t, xerr)
@@ -105,7 +105,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 		}
 		childrenStartDuration := time.Since(begin)
 		t.Logf("Launching children took %v", childrenStartDuration)
-		timeout := 450*time.Millisecond
+		timeout := 450 * time.Millisecond
 		t.Logf("Waiting for %v", timeout)
 		// Waits that all children have started to access max safely
 		begin = time.Now()
@@ -408,7 +408,8 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	for ind := 0; ind < 10; ind++ {
+	for ind := 0; ind < 100; ind++ {
+		fmt.Println("Iterating...")
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := time.Duration(RandomInt(300, 500)) * time.Millisecond
 			fmt.Printf("Entering (sleeping %v)\n", rint)
@@ -439,49 +440,49 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
-	overlord, xerr := NewTaskGroup()
-	require.NotNil(t, overlord)
-	require.Nil(t, xerr)
+	for j := 0; j < 100; j++ {
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
+		require.Nil(t, xerr)
 
-	theID, xerr := overlord.GetID()
-	require.Nil(t, xerr)
-	require.NotEmpty(t, theID)
+		theID, xerr := overlord.GetID()
+		require.Nil(t, xerr)
+		require.NotEmpty(t, theID)
 
-	fmt.Println("Begin")
+		for ind := 0; ind < 10; ind++ {
+			_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				rint := time.Duration(RandomInt(30, 50)) * 10 * time.Millisecond
 
-	for ind := 0; ind < 10; ind++ {
-		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := time.Duration(RandomInt(30, 50))*10*time.Millisecond
-			fmt.Printf("Entering (sleeping %v)\n", rint)
-
-			tempo := rint /100
-			for i := 0; i < 100; i++ {
-				if t.Aborted() {
-					break
+				tempo := rint / 100
+				for i := 0; i < 100; i++ {
+					if t.Aborted() {
+						break
+					}
+					time.Sleep(tempo)
 				}
-				time.Sleep(tempo)
+				return "waiting game", nil
+			}, nil)
+			if xerr != nil {
+				t.Errorf("Unexpected error: %v", xerr)
+				t.FailNow()
 			}
-			fmt.Println("Exiting")
-			return "waiting game", nil
-		}, nil)
-		if xerr != nil {
-			t.Errorf("Unexpected error: %v", xerr)
 		}
-	}
 
-	time.Sleep(10 * time.Millisecond)
-	begin := time.Now()
-	xerr = overlord.Abort()
-	require.Nil(t, xerr)
-	end := time.Since(begin)
-	t.Logf("Abort() lasted %v\n", end)
+		time.Sleep(10 * time.Millisecond)
+		begin := time.Now()
+		xerr = overlord.Abort()
+		require.Nil(t, xerr)
+		end := time.Since(begin)
+		t.Logf("Abort() lasted %v\n", end)
 
-	_, xerr = overlord.Wait()
-	require.NotNil(t, xerr)
-	end = time.Since(begin)
-	t.Logf("Wait() lasted %v\n", end)
-	if end >= (time.Millisecond * 100) {
-		t.Errorf("It should have finished near 100 ms but it didn't!!")
+		_, xerr = overlord.Wait()
+		require.NotNil(t, xerr)
+		end = time.Since(begin)
+		t.Logf("Wait() lasted %v\n", end)
+		if end >= (time.Millisecond * 100) { // this is twice the maximum time...
+			t.Errorf("It should have finished near 100 ms but it didn't!!")
+			t.FailNow()
+		}
 	}
 }
 
@@ -502,7 +503,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 
 		fmt.Println("Begin")
 
-		for ind := 0; ind < 10; ind++ {
+		for ind := 0; ind < 100; ind++ {
 			fmt.Println("Iterating...")
 			rint := time.Duration(rand.Intn(20)+30) * 10 * time.Millisecond
 			_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
@@ -526,7 +527,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 
 		begin := time.Now()
 		go func() {
-			time.Sleep(350 * time.Millisecond)
+			time.Sleep(310 * time.Millisecond)
 			if xerr := overlord.Abort(); xerr != nil {
 				t.Fail()
 			}
