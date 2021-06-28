@@ -287,6 +287,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 		fnNOP := func(t Task, _ TaskParameters) (TaskResult, fail.Error) {
 			for !t.Aborted() {
 				time.Sleep(50 * time.Millisecond) // FIXME: hardcoded value :-(
+				return nil, fail.AbortedError(nil)
 			}
 			return nil, nil
 		}
@@ -378,38 +379,25 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 	case ABORTED:
 		fallthrough
 	case RUNNING:
+		previousErr := instance.task.err
 		results, childrenErrors = instance.waitChildren()
 		if len(childrenErrors) == 0 {
 			instance.children.ended = true
 		}
 
-		// var errors []error
 		instance.task.lock.Lock()
-		// If all children have finished, the parent task has no valid error (Abort() may be submitted after all children terminate)
-		if instance.children.ended {
-			instance.task.err = nil
-		}
 		instance.result = results
-		instance.task.lock.Unlock()
 
 		// parent task is running, we need to abort it, even if abort was disable, now that all the children have terminated
-		instance.task.lock.Lock()
-		previousErr := instance.task.err
-		abortSaved := instance.task.abortDisengaged
-		instance.task.abortDisengaged = false
+		xerr := instance.task.forceAbort()
+		if xerr != nil {
+			logrus.Tracef("ignored error aborting task: %v", xerr)
+		}
 		instance.task.lock.Unlock()
 
-		taErr := instance.task.Abort()
-		if taErr != nil {
-			logrus.Tracef("ignored error aborting task: %v", taErr)
-		}
-		_, tawErr := instance.task.Wait()
-		if tawErr != nil {
-			logrus.Tracef("ignored error waiting for task: %v", tawErr)
-		}
+		_, _ = instance.task.Wait() // will get *fail.ErrErrAborted, we know that, we asked for
 
 		instance.task.lock.Lock()
-		instance.task.abortDisengaged = abortSaved
 		if len(childrenErrors) > 0 {
 			switch previousErr.(type) {
 			case *fail.ErrAborted:
@@ -420,15 +408,6 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 				}
 			default:
 				previousErr = instance.buildErrorList(childrenErrors)
-			}
-		} else {
-			// If all children have terminated before the Abort, we have to ignore the abort error
-			if instance.children.ended {
-				switch previousErr.(type) {
-				case *fail.ErrAborted:
-					previousErr = nil
-				default:
-				}
 			}
 		}
 		instance.task.err = previousErr
@@ -747,12 +726,16 @@ func (instance *taskGroup) Abort() fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	if !instance.task.Aborted() {
+	instance.task.lock.RLock()
+	armed := !instance.task.abortDisengaged
+	instance.task.lock.RUnlock()
+	if armed && !instance.task.Aborted() {
 		if xerr := instance.task.Abort(); xerr != nil {
 			return xerr
 		}
 	}
 
+	// If abort signal is disarmed or already called, consider execution successful
 	return nil
 }
 
@@ -762,7 +745,26 @@ func (instance *taskGroup) Aborted() bool {
 		return false
 	}
 
-	return instance.task.Aborted()
+	instance.task.lock.RLock()
+	defer instance.task.lock.RUnlock()
+
+	switch instance.task.status {
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		return true
+
+	case RUNNING:
+		fallthrough
+	case DONE:
+		switch instance.task.err.(type) {
+		case *fail.ErrAborted, *fail.ErrTimeout:
+			return true
+		default:
+		}
+	}
+
+	return false
 }
 
 // New creates a subtask from current task

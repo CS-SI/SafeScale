@@ -17,6 +17,7 @@
 package concurrency
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -111,30 +112,33 @@ func TestRealTryCharges(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
+	xerr := overlord.SetID("/parent")
+	require.Nil(t, xerr)
+
 	theID, err := overlord.GetID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	gorrs := 800
+	gorrs := 8//00
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(RandomInt(200, 250)) * time.Millisecond)
 			return "waiting game", nil
-		}, nil)
+		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/chil-%d", ind)))
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		}
 	}
 
 	for {
-		done, res, err := overlord.TryWaitGroup()
+		done, res, xerr := overlord.TryWaitGroup()
 		if !done {
-			require.Nil(t, err)
+			require.Nil(t, xerr)
 			require.Nil(t, res)
 			require.False(t, done)
 		} else {
-			require.Nil(t, err)
+			require.Nil(t, xerr)
 			break
 		}
 	}

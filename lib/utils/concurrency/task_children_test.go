@@ -27,85 +27,90 @@ import (
 
 // make sure children cannot wait after father is aborted
 func TestTaskFatherAbortion(t *testing.T) {
-	parent, err := NewTaskGroup()
+	parent, xerr := NewTaskGroup()
 	_ = parent.SetID("/parent")
 	require.NotNil(t, parent)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
+
+	xerr = parent.SetID("/parent")
+	require.Nil(t, xerr)
 
 	count := 0
 
-	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	child, xerr := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		fmt.Println("child started.")
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		if t.Aborted() {
 			fmt.Println("child aborts.")
-			return "A", nil
+			return "A", fail.AbortedError(nil)
 		}
 		count++
 		fmt.Println("child done.")
 		return "B", nil
 	}, nil, InheritParentIDOption, AmendID("/child"))
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
-	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	sibling, xerr := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		fmt.Println("sibling started.")
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		if t.Aborted() {
 			fmt.Println("sibling aborts.")
-			return "A", nil
+			return "A", fail.AbortedError(nil)
 		}
 		count++
 		fmt.Println("sibling done.")
 		return "B", nil
 	}, nil, InheritParentIDOption, AmendID("/sibling"))
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
 	time.Sleep(time.Duration(50) * time.Millisecond)
 
-	err = parent.Abort()
-	require.Nil(t, err)
+	xerr = parent.Abort()
+	require.Nil(t, xerr)
 
-	_, err = child.Wait()
-	require.NotNil(t, err)
-	_, err = sibling.Wait()
-	require.NotNil(t, err)
+	_, xerr = child.Wait()
+	require.NotNil(t, xerr)
+	_, xerr = sibling.Wait()
+	require.NotNil(t, xerr)
 
 	require.Equal(t, 0, count)
 }
 
 // if a children doesn't listen to abort, it keeps running
 func TestTaskFatherAbortionNoAbort(t *testing.T) {
-	parent, err := NewTaskGroup()
+	parent, xerr := NewTaskGroup()
 	require.NotNil(t, parent)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
+	xerr = parent.SetID("/parent")
+	require.Nil(t, xerr)
 
 	count := make(chan int, 4)
 
-	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	child, xerr := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		count <- 1
 		return "B", nil
-	}, nil)
-	require.Nil(t, err)
+	}, nil, InheritParentIDOption, AmendID("/child"))
+	require.Nil(t, xerr)
 
-	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	sibling, xerr := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		count <- 1
 		return "B", nil
-	}, nil)
-	require.Nil(t, err)
+	}, nil, InheritParentIDOption, AmendID("/sibling)"))
+	require.Nil(t, xerr)
 
 	time.Sleep(time.Duration(50) * time.Millisecond)
 
-	err = parent.Abort()
-	require.Nil(t, err)
+	xerr = parent.Abort()
+	require.Nil(t, xerr)
 
-	_, err = child.Wait()
-	require.NotNil(t, err)
-	_, err = sibling.Wait()
-	require.NotNil(t, err)
+	_, xerr = child.Wait()
+	require.Nil(t, xerr)
+	_, xerr = sibling.Wait()
+	require.Nil(t, xerr)
 
 	// the subtasks keep working because don't listen to abort
 	time.Sleep(time.Duration(600) * time.Millisecond)
@@ -114,35 +119,36 @@ func TestTaskFatherAbortionNoAbort(t *testing.T) {
 
 // make sure that if subtasks listen, aborting a parent also aborts its children
 func TestTaskFatherAbortionLater(t *testing.T) {
-	parent, err := NewTaskGroup()
+	parent, xerr := NewTaskGroup()
 	require.NotNil(t, parent)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
+
+	xerr = parent.SetID("/parent")
+	require.Nil(t, xerr)
 
 	count := make(chan int, 4)
 
-	child, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	_, xerr = parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		if t.Aborted() {
-			return "A", nil
+			return "A", fail.AbortedError(nil)
 		}
 		count <- 1
 		return "B", nil
-	}, nil)
-	require.Nil(t, err)
-	_ = child
+	}, nil, InheritParentIDOption, AmendID("/child"))
+	require.Nil(t, xerr)
 
-	sibling, err := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	_, xerr = parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		if t.Aborted() {
-			return "A", nil
+			return "A", fail.AbortedError(nil)
 		}
 		count <- 1
 		return "B", nil
 	}, nil)
-	require.Nil(t, err)
-	_ = sibling
+	require.Nil(t, xerr)
 
 	go func() {
 		time.Sleep(time.Duration(200) * time.Millisecond)
@@ -151,8 +157,8 @@ func TestTaskFatherAbortionLater(t *testing.T) {
 		return
 	}()
 
-	_, err = parent.WaitGroup()
-	require.NotNil(t, err)
+	_, xerr = parent.WaitGroup()
+	require.NotNil(t, xerr)
 
 	require.Equal(t, 0, len(count))
 }

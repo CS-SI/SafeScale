@@ -110,12 +110,14 @@ type task struct {
 
 	controllerTerminatedCh chan struct{} // Used to signal Wait() (and siblings) the controller of the go routine has terminated
 	runTerminatedCh        chan struct{} // Used by go routine to signal it has done its processing
-	abortCh                chan struct{}     // Used to signal the routine it has to stop processing
+	abortCh                chan struct{} // Used to signal the routine it has to stop processing
 
 	err    fail.Error
 	result TaskResult
 
-	abortDisengaged bool
+	abortDisengaged      bool
+	runTerminated        bool // used to keep track of run terminated state
+	controllerTerminated bool // used to keep track of controller terminated state
 }
 
 const (
@@ -235,7 +237,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	} else {
 		childContext, cancel = context.WithCancel(parentTask.(*task).ctx)
 	}
-	t := &task{
+	instance := &task{
 		cancel:                 cancel,
 		status:                 READY,
 		abortCh:                make(chan struct{}, 1),
@@ -255,7 +257,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 					if xerr != nil {
 						return nil, xerr
 					}
-					t.id = id
+					instance.id = id
 				}
 			}
 		}
@@ -267,7 +269,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 			return nil, fail.Wrap(err, "failed to create a new task")
 		}
 
-		t.id = u.String()
+		instance.id = u.String()
 	}
 
 	if len(options) > 0 {
@@ -276,15 +278,15 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 			case keywordAmendID:
 				value, ok := v.Value().(string)
 				if ok {
-					t.id += "+" + value
+					instance.id += "+" + value
 				}
 			}
 		}
 	}
 
-	t.ctx = context.WithValue(childContext, KeyForTaskInContext, t)
+	instance.ctx = context.WithValue(childContext, KeyForTaskInContext, instance)
 
-	return t, nil
+	return instance, nil
 }
 
 // IsNull ...
@@ -461,10 +463,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 	defer func() {
 		instance.lock.Lock()
 		close(instance.controllerTerminatedCh)
-		if instance.cancel != nil {
-			// Make sure cancel() is called at the end of the task
-			instance.cancel()
-		}
+		instance.controllerTerminated = true
 		instance.lock.Unlock()
 	}()
 
@@ -498,9 +497,11 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		for !finish {
 			select {
 			case <-instance.ctx.Done():
-				xerr := instance.processCancel(traceR)
-				if xerr != nil {
-					return xerr
+				if len(instance.runTerminatedCh) == 0 {
+					xerr := instance.processCancel(traceR)
+					if xerr != nil {
+						return xerr
+					}
 				}
 
 			case <-instance.runTerminatedCh:
@@ -564,9 +565,11 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 // processDone operates when go routine terminates
 func (instance *task) processDone(traceR *tracer) {
 	traceR.trace("receiving done signal from go routine")
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
-	instance.controllerTerminatedCh <- struct{}{}
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	t.abortDisengaged = true // We are stopping controller, so disarm Abort signal, it doesn't make sense anymore
+	t.controllerTerminatedCh <- struct{}{}
 }
 
 // processAbort operates when Abort has been requested
@@ -592,6 +595,10 @@ func (instance *task) processAbort(traceR *tracer) fail.Error {
 		if instance.status != TIMEOUT {
 			instance.status = ABORTED
 		}
+		if instance.cancel != nil {
+			// cancel is called to propagate the signal to children
+			instance.cancel()
+		}
 	} else {
 		traceR.trace("abort signal is disengaged, ignored")
 	}
@@ -602,12 +609,13 @@ func (instance *task) processAbort(traceR *tracer) fail.Error {
 // processTimeout operates when timeout occurs
 func (instance *task) processTimeout(timeout time.Duration) {
 	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
 	if instance.status != ABORTED {
-		instance.abortCh <- true
+		instance.abortCh <- struct{}{}
 		instance.err = fail.TimeoutError(instance.err, timeout)
 		instance.status = TIMEOUT
 	}
-	instance.lock.Unlock()
 }
 
 // run executes the function 'action'
@@ -617,7 +625,8 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 			instance.lock.Lock()
 			defer instance.lock.Unlock()
 
-			fmt.Printf("panic happened in Task %s\n", instance.id)
+			instance.runTerminatedCh <- struct{}{}
+			close(instance.runTerminatedCh)
 			if instance.err != nil {
 				_ = instance.err.AddConsequence(fail.RuntimePanicError("panic happened: %v", err))
 			} else {
@@ -625,8 +634,6 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 			}
 			instance.result = nil
 			instance.status = DONE
-			instance.runTerminatedCh <- false
-			close(instance.runTerminatedCh)
 		}
 	}()
 
@@ -635,10 +642,11 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	instance.runTerminatedCh <- struct{}{}
+	close(instance.runTerminatedCh)
+	instance.runTerminated = true
 	instance.err = xerr
 	instance.result = result
-	instance.runTerminatedCh <- true
-	close(instance.runTerminatedCh)
 }
 
 // Run starts task, waits its completion then return the error code
@@ -744,7 +752,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			return instance.result, instance.err
 		}
 
-		return instance.result, fail.AbortedError(nil)
+		return instance.result, nil
 
 	case RUNNING:
 		<-instance.controllerTerminatedCh
@@ -754,7 +762,6 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 
 		instance.status = DONE
 		return instance.result, instance.err
-
 
 	case UNKNOWN:
 		fallthrough
@@ -905,6 +912,9 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 // call of Wait() may still be needed, it's still the responsibility of the executed code in task to stop
 // early on Abort.
 // returns an error if abort signal send fails
+//
+// Note: a TaskAction, when .Aborted() returns true, _MUST_ return an error to signify its end on Abort (it does not have
+// to be a fail.AbortedError(), but cannot be nil).
 func (instance *task) Abort() (err fail.Error) {
 	if instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -913,14 +923,25 @@ func (instance *task) Abort() (err fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	// If controller is terminated, consider Abort signal received successfully (but Task.Wait() will not return a *fail.ErrAborted)
+	if instance.controllerTerminated {
+		return nil
+	}
+
+	// If abort signal is disengaged, return an error
 	if instance.abortDisengaged {
 		return fail.NotAvailableError("abort signal is disengaged on task %s", instance.id)
 	}
 
+	return instance.forceAbort()
+}
+
+// forceAbort is the weaponized arm of Abort(), that does the job without taking care if abort signal is disarmed
+func (instance *task) forceAbort() (err fail.Error) {
 	switch instance.status {
 	case RUNNING:
 		// Tell controller to stop goroutine
-		instance.abortCh <- true
+		instance.abortCh <- struct{}{}
 		close(instance.abortCh)
 		instance.status = ABORTED
 
@@ -957,7 +978,23 @@ func (instance *task) Aborted() bool {
 		return false
 	}
 
-	return instance.status == ABORTED || instance.status == TIMEOUT
+	switch instance.status {
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		return true
+
+	case RUNNING:
+		fallthrough
+	case DONE:
+		switch instance.err.(type) {
+		case *fail.ErrAborted, *fail.ErrTimeout:
+			return true
+		default:
+		}
+	}
+
+	return false
 }
 
 // Abortable tells if task can be aborted

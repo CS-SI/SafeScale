@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -189,12 +190,13 @@ func TestSomethingFails(t *testing.T) {
 	_, xerr = overlord.WaitGroup()
 	require.NotNil(t, xerr)
 	if xerr != nil {
-		if eab, ok := xerr.(*fail.ErrorList); ok {
-			if len(eab.ToErrorSlice()) != 2 {
-				t.Fail()
+		switch cerr := xerr.(type) {
+		case *fail.ErrorList:
+			if len(cerr.ToErrorSlice()) != 2 {
+					t.Fail()
 			}
-		} else {
-			t.FailNow()
+		default:
+			t.Errorf("Unexpected error %s (%s)", xerr.Error(), reflect.TypeOf(xerr).String())
 		}
 	}
 }
