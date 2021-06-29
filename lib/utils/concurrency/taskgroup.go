@@ -759,8 +759,19 @@ func (instance *taskGroup) Abort() fail.Error {
 	}
 
 	instance.task.lock.RLock()
+	status := instance.task.status
 	armed := !instance.task.abortDisengaged
 	instance.task.lock.RUnlock()
+
+	// If taskgroup is not started, go directly to Abort
+	if status == READY {
+		instance.task.lock.Lock()
+		instance.task.status = ABORTED
+		instance.task.err = fail.AbortedError(nil)
+		instance.task.lock.Unlock()
+		return nil
+	}
+
 	if armed && !instance.task.Aborted() {
 		if xerr := instance.task.Abort(); xerr != nil {
 			return xerr

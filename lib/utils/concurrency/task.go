@@ -443,7 +443,7 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 				}
 				instance.lock.Unlock()
 			}
-			instance.contextCleanup()
+			// instance.contextCleanup()
 		}()
 	}
 	return instance, nil
@@ -761,10 +761,9 @@ func (instance *task) IsSuccessful() (bool, fail.Error) {
 // Wait awaits for the task to end, and returns the error (or nil) of the execution
 // Returns:
 // - TaskResult, nil: the Task ended normally and provide a Result
-// - nil, *fail.ErrAborted: the Task has been aborted; *fail.ErrAborted.Consequences() may contain error(s) happening after the signal has been received by the Task
-// - nil, *fail.ErrTimeout: the Task has reached its execution delay
-// - TaskResult, <other error>: the Task runs successfully but returned an error; the TaskResult usage is dependant of the TaskAction content
-
+// - TaskResult, *fail.ErrAborted: the Task has been aborted; *fail.ErrAborted.Consequences() may contain error(s) happening after the signal has been received by the Task
+// - TaskResult, *fail.ErrTimeout: the Task has reached its execution timeout
+// - TaskResult, <other error>: the Task runs successfully but returned an error
 func (instance *task) Wait() (TaskResult, fail.Error) {
 	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -775,76 +774,76 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 	status := instance.status
 	instance.lock.RUnlock()
 
-	switch status {
-	case READY: // Waiting a ready task always succeed by design
-		return nil, fail.InconsistentError("cannot wait a Task that has not been started")
+	for {
+		switch status {
+		case READY: // Waiting a ready task always succeed by design
+			return nil, fail.InconsistentError("cannot wait a Task that has not been started")
 
-	case DONE:
-		instance.lock.RLock()
-		defer instance.lock.RUnlock()
+		case TIMEOUT:
+			<-instance.controllerTerminatedCh
 
-		return instance.result, instance.err
+			instance.lock.Lock()
 
-	case TIMEOUT:
-		<-instance.controllerTerminatedCh
-
-		instance.lock.Lock()
-		defer instance.lock.Unlock()
-
-		instance.status = DONE
-		instance.result = nil
-		var forgedError fail.Error
-		if instance.err != nil {
-			switch instance.err.(type) {
-			case *fail.ErrTimeout:
-				forgedError = instance.err
-			default:
+			var forgedError fail.Error
+			if instance.err != nil {
+				switch instance.err.(type) {
+				case *fail.ErrTimeout:
+					forgedError = instance.err
+				default:
+					forgedError = fail.TimeoutError(nil, 0)
+					_ = forgedError.AddConsequence(instance.err)
+				}
+			} else {
 				forgedError = fail.TimeoutError(nil, 0)
-				_ = forgedError.AddConsequence(instance.err)
 			}
-		} else {
-			forgedError = fail.TimeoutError(nil, 0)
-		}
-		instance.err = forgedError
-		return nil, instance.err
+			instance.err = forgedError
+			instance.status, status = DONE, DONE
+			instance.lock.Unlock()
+			continue
 
-	case ABORTED:
-		<-instance.controllerTerminatedCh
+		case ABORTED:
+			<-instance.controllerTerminatedCh
 
-		instance.lock.Lock()
-		defer instance.lock.Unlock()
-
-		instance.status = DONE
-
-		// In case of ABORT, if an error is already there, the TASK has ended, so just return this error with the result
-		if instance.err != nil {
-			switch instance.err.(type) {
-			case *fail.ErrAborted, *fail.ErrTimeout:
-				// leave the abort or timeout error alone
-			default:
-				// return abort error with instance.err as consequence (happened after Abort has been ackknowledged by TaskAction)
-				forgedError := fail.AbortedError(nil)
-				_ = forgedError.AddConsequence(instance.err)
-				instance.err = forgedError
+			instance.lock.Lock()
+			// In case of ABORT, if an error is already there, the TASK has ended, so just return this error with the result
+			if instance.err != nil {
+				switch instance.err.(type) {
+				case *fail.ErrAborted, *fail.ErrTimeout:
+					// leave the abort or timeout error alone
+				default:
+					// return abort error with instance.err as consequence (happened after Abort has been ackknowledged by TaskAction)
+					forgedError := fail.AbortedError(nil)
+					_ = forgedError.AddConsequence(instance.err)
+					instance.err = forgedError
+				}
 			}
+			instance.status, status = DONE, DONE
+			instance.lock.Unlock()
+			continue
+
+		case RUNNING:
+			<-instance.controllerTerminatedCh
+
+			// Reload status, it may have changed since the controller terminated
+			instance.lock.RLock()
+			status = instance.status
+			instance.lock.RUnlock()
+			if status != RUNNING {
+				continue
+			}
+			instance.status, status = DONE, DONE
+			continue
+
+		case DONE:
+			instance.lock.RLock()
+			defer instance.lock.RUnlock()
 			return instance.result, instance.err
+
+		case UNKNOWN:
+			fallthrough
+		default:
+			return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%d)", tid, status)
 		}
-
-		return instance.result, nil
-
-	case RUNNING:
-		<-instance.controllerTerminatedCh
-
-		instance.lock.Lock()
-		defer instance.lock.Unlock()
-
-		instance.status = DONE
-		return instance.result, instance.err
-
-	case UNKNOWN:
-		fallthrough
-	default:
-		return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%d)", tid, status)
 	}
 }
 
