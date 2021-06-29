@@ -746,7 +746,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 				return
 			}
 		} else {
-			t.Errorf("waitgroup didn't fail and it should")
+			t.Errorf("WaitGroup didn't fail and it should")
 			failure = true
 			return
 		}

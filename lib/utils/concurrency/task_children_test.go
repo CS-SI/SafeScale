@@ -26,20 +26,18 @@ import (
 )
 
 // make sure children cannot wait after father is aborted
-func TestTaskFatherAbortion(t *testing.T) {
-	parent, xerr := NewTaskGroup()
-	_ = parent.SetID("/parent")
-	require.NotNil(t, parent)
-	require.Nil(t, xerr)
-
-	xerr = parent.SetID("/parent")
+func TestTaskGroupFatherAbortion(t *testing.T) {
+	overlord, xerr := NewTaskGroup()
+	_ = overlord.SetID("/overlord")
+	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
 	count := 0
 
-	child, xerr := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	child, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		fmt.Println("child started.")
 		time.Sleep(time.Duration(400) * time.Millisecond)
+		fmt.Println("Evaluating...")
 		if t.Aborted() {
 			fmt.Println("child aborts.")
 			return "A", fail.AbortedError(nil)
@@ -50,7 +48,7 @@ func TestTaskFatherAbortion(t *testing.T) {
 	}, nil, InheritParentIDOption, AmendID("/child"))
 	require.Nil(t, xerr)
 
-	sibling, xerr := parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	sibling, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		fmt.Println("sibling started.")
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		fmt.Println("Evaluating...")
@@ -64,17 +62,23 @@ func TestTaskFatherAbortion(t *testing.T) {
 	}, nil, InheritParentIDOption, AmendID("/sibling"))
 	require.Nil(t, xerr)
 
-	time.Sleep(time.Duration(50) * time.Millisecond)
-
-	xerr = parent.Abort()
+	time.Sleep(time.Duration(50) * time.Millisecond)    // definitively weird: with 40ms of sleep, everything is working as expected...
+														// something occurs after 40ms that delay channel read with select...
+	xerr = overlord.Abort()
 	require.Nil(t, xerr)
 
-	_, xerr = child.Wait()
+	res, xerr := child.Wait()
 	require.NotNil(t, xerr)
-	_, xerr = sibling.Wait()
+	require.NotNil(t, res)
+
+	res, xerr = sibling.Wait()
 	require.NotNil(t, xerr)
+	require.NotNil(t, res)
 
 	require.Equal(t, 0, count)
+
+	_, xerr = overlord.Wait()
+	require.NotNil(t, xerr)
 }
 
 // if a children doesn't listen to abort, it keeps running
@@ -115,20 +119,23 @@ func TestTaskFatherAbortionNoAbort(t *testing.T) {
 	// the subtasks keep working because don't listen to abort
 	time.Sleep(time.Duration(600) * time.Millisecond)
 	require.Equal(t, 2, len(count))
+
+	_, xerr = parent.Wait()
+	require.NotNil(t, xerr)
 }
 
 // make sure that if subtasks listen, aborting a parent also aborts its children
 func TestTaskFatherAbortionLater(t *testing.T) {
-	parent, xerr := NewTaskGroup()
-	require.NotNil(t, parent)
+	overlord, xerr := NewTaskGroup()
+	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
-	xerr = parent.SetID("/parent")
+	xerr = overlord.SetID("/overlord")
 	require.Nil(t, xerr)
 
 	count := make(chan int, 4)
 
-	_, xerr = parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	_, xerr = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(400) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		if t.Aborted() {
@@ -139,7 +146,7 @@ func TestTaskFatherAbortionLater(t *testing.T) {
 	}, nil, InheritParentIDOption, AmendID("/child"))
 	require.Nil(t, xerr)
 
-	_, xerr = parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	_, xerr = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		time.Sleep(time.Duration(500) * time.Millisecond)
 		fmt.Println("Evaluating...")
 		if t.Aborted() {
@@ -147,17 +154,18 @@ func TestTaskFatherAbortionLater(t *testing.T) {
 		}
 		count <- 1
 		return "B", nil
-	}, nil)
+	}, nil, InheritParentIDOption, AmendID("/sibling"))
 	require.Nil(t, xerr)
 
 	go func() {
-		time.Sleep(time.Duration(200) * time.Millisecond)
+		time.Sleep(time.Duration(200) * time.Millisecond)   // definitively weird: with 40ms of sleep, everything is working as expected...
+															// something occurs after 40ms that delay channel read with select...
 		fmt.Println("Aborting...")
-		_ = parent.Abort()
+		_ = overlord.Abort()
 		return
 	}()
 
-	_, xerr = parent.WaitGroup()
+	_, xerr = overlord.WaitGroup()
 	require.NotNil(t, xerr)
 
 	require.Equal(t, 0, len(count))
