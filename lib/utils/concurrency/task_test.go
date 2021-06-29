@@ -156,7 +156,8 @@ func TestOneWaitingForGame(t *testing.T) {
 	require.True(t, good)
 }
 
-func TestTaskReuse(t *testing.T) {
+// TestTaskCantBeReused ensures that a started Task cannot be reused
+func TestTaskCantBeReused(t *testing.T) {
 	got, err := NewUnbreakableTask()
 	require.NotNil(t, got)
 	require.Nil(t, err)
@@ -185,7 +186,7 @@ func TestTaskReuse(t *testing.T) {
 		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
 		return "waiting game", nil
 	}, nil, 10*time.Millisecond)
-	if err != nil {
+	if err == nil {
 		// If by design a task cannot be reused, its error should be more specific
 		t.Errorf("shouldn't happen: %v", err)
 	}
@@ -218,25 +219,25 @@ func TestResultCheck(t *testing.T) {
 
 	res, err := got.Wait()
 	require.NotNil(t, err)
-	require.Empty(t, res)
+	require.NotNil(t, res)
 
 	tr, xerr := got.GetResult()
 	require.Nil(t, xerr)
-	// Why would be this a problem ?, GetResult() was coded when the only states were RUNNING and DONE, long long time aga
+	// Why would be this a problem ?, GetResult() was coded when the only states were RUNNING and DONE, long long time ago
 	// this is no longer true, GetResult needs review
 	require.NotNil(t, tr)
 }
 
 func TestResultCheckOfAbortedTask(t *testing.T) {
-	got, err := NewTask()
+	got, xerr := NewTask()
 	require.NotNil(t, got)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
-	theID, err := got.GetID()
-	require.Nil(t, err)
+	theID, xerr := got.GetID()
+	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+	_, xerr = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		tempo := time.Duration(RandomInt(50, 250)) * time.Millisecond
 		for i := 0; i < 100; i++ {
 			if t.Aborted() {
@@ -246,28 +247,34 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		}
 		return "waiting game", nil
 	}, nil, 400*time.Millisecond)
-	if err != nil {
+	if xerr != nil {
 		t.Errorf("Shouldn't happen")
 	}
 
-	err = got.Abort()
-	require.Nil(t, err)
+	xerr = got.Abort()
+	require.Nil(t, xerr)
 
-	st, err := got.GetStatus()
+	st, xerr := got.GetStatus()
+	require.Nil(t, xerr)
 	if st != ABORTED {
 		t.FailNow()
 	}
 
+	// Using GetResult() is invalid, Task has not been waited
 	tr, xerr := got.GetResult()
+	require.NotNil(t, xerr)
+	require.Nil(t, tr)
+
+	res, xerr := got.Wait()
+	require.NotNil(t, xerr)
+	require.NotNil(t, res)
+	// Now that we waited the Task, GetResult() returns useful information
+
+	tr, xerr = got.GetResult()
 	require.Nil(t, xerr)
-	// Why would be this a problem ?, GetResult() was coded when the only states were RUNNING and DONE, long long time aga
-	// this is no longer true, GetResult needs review
 	require.NotNil(t, tr)
 
-	_, err = got.Wait()
-	require.NotNil(t, err)
-
-	st, err = got.GetStatus()
+	st, xerr = got.GetStatus()
 	if st != DONE {
 		t.FailNow()
 	}
