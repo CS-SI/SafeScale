@@ -928,21 +928,15 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 	require.Nil(t, xerr)
 
 	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		var aborted bool
 		for {
 			time.Sleep(time.Duration(10) * time.Millisecond)
-			aborted = t.Aborted()
-			if aborted {
-				break
+			if t.Aborted() {
+				fmt.Println("There can be only one...")
+				return "There can be only one", fail.AbortedError(nil)
 			}
 
 			fmt.Println("Forever young...")
 		}
-		if aborted {
-			fmt.Println("There can be only one...")
-			return "There can be only one", fail.AbortedError(nil)
-		}
-
 		return "I want to be forever young", nil
 	}, nil, time.Duration(200)*time.Millisecond)
 	require.Nil(t, xerr)
@@ -970,13 +964,15 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 	// Aborted
 
 	outString := string(out)
-	nah := strings.Split(outString, "\n")
+	// nah := strings.Split(outString, "\n")
 
-	if !strings.Contains(nah[len(nah)-3], "Forever young") {
+	// if !strings.Contains(nah[len(nah)-3], "Forever young") {
+	if !strings.Contains(outString, "Forever young") {
 		t.Fail()
 	}
 
-	if !strings.Contains(nah[len(nah)-2], "only one") {
+//	if !strings.Contains(nah[len(nah)-2], "only one") {
+	if !strings.Contains(outString, "only one") {
 		t.Fail()
 	}
 }
@@ -1154,17 +1150,18 @@ func TestAbortButThisTimeUsingTrueAbortChannel(t *testing.T) {
 
 	outString := string(out)
 
-	nah := strings.Split(outString, "\n")
+	// nah := strings.Split(outString, "\n")
 
-	if !strings.Contains(nah[len(nah)-4], "Forever young") {
+	// if !strings.Contains(nah[len(nah)-4], "Forever young") {
+	if !strings.Contains(outString, "Forever young") {
 		t.Fail()
 	}
 
-	if !strings.Contains(nah[len(nah)-3], "I'm Gotham's reckoning") {
+	if !strings.Contains(outString, "I'm Gotham's reckoning") {
 		t.Fail()
 	}
 
-	if !strings.Contains(nah[len(nah)-2], "Aborted") {
+	if !strings.Contains(outString, "Aborted") {
 		t.Fail()
 	}
 
