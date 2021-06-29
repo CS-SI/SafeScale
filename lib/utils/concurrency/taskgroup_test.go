@@ -30,60 +30,60 @@ import (
 )
 
 func TestIntrospection(t *testing.T) {
-	overlord, xerr := NewTaskGroupWithParent(nil)
-	require.NotNil(t, overlord)
-	require.Nil(t, xerr)
-	xerr = overlord.SetID("/parent")
-	require.Nil(t, xerr)
+	for i := 0; i < 10; i++ {
 
-	theID, xerr := overlord.GetID()
-	require.Nil(t, xerr)
-	require.NotEmpty(t, theID)
+		overlord, err := NewTaskGroupWithParent(nil)
+		require.NotNil(t, overlord)
+		require.Nil(t, err)
 
-	for ind := 0; ind < 800; ind++ {
-		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			wat := time.Duration(RandomInt(50, 250)) * time.Millisecond
-			tempo := wat / 100
-			for i := 0; i < 100; i++ {
-				if t.Aborted() {
-					return "aborting", fail.AbortedError(nil, "killed by parent")
+		theID, err := overlord.GetID()
+		require.Nil(t, err)
+		require.NotEmpty(t, theID)
+
+		for ind := 0; ind < 800; ind++ {
+			_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				wat := time.Duration(RandomInt(50, 250)) * time.Millisecond
+				tempo := wat / 100
+				for i := 0; i < 100; i++ {
+					if t.Aborted() {
+						return "aborting", fail.AbortedError(nil, "killed by parent")
+					}
+					time.Sleep(tempo)
 				}
-				time.Sleep(tempo)
+				return "waiting game", nil
+			}, nil)
+			if err != nil {
+				t.Errorf("Unexpected: %s", err)
+				t.FailNow()
 			}
-			return "waiting game", nil
-		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
-		if xerr != nil {
-			t.Errorf("Unexpected: %s", xerr)
-			t.FailNow()
 		}
+
+		time.Sleep(20 * time.Millisecond)
+
+		num, err := overlord.GetStarted()
+		require.Nil(t, err)
+		if num != 800 {
+			t.Errorf("Problem reporting # of started tasks")
+		}
+
+		id, err := overlord.GetID()
+		require.Nil(t, err)
+		require.NotEmpty(t, id)
+
+		sign := overlord.GetSignature()
+		require.NotEmpty(t, sign)
+
+		ok, err := overlord.IsSuccessful()
+		require.NotNil(t, err)
+
+		res, err := overlord.Wait()
+		require.Nil(t, err)
+		require.NotEmpty(t, res)
+
+		ok, err = overlord.IsSuccessful()
+		require.Nil(t, err)
+		require.True(t, ok)
 	}
-
-	time.Sleep(20 * time.Millisecond)
-
-	num, xerr := overlord.GetStarted()
-	require.Nil(t, xerr)
-	if num != 800 {
-		t.Errorf("Problem reporting # of started tasks")
-	}
-
-	id, xerr := overlord.GetID()
-	require.Nil(t, xerr)
-	require.NotEmpty(t, id)
-
-	sign := overlord.GetSignature()
-	require.NotEmpty(t, sign)
-
-	ok, xerr := overlord.IsSuccessful()
-	require.NotNil(t, xerr)
-	require.False(t, ok)
-
-	res, xerr := overlord.Wait()
-	require.Nil(t, xerr)
-	require.NotEmpty(t, res)
-
-	ok, xerr = overlord.IsSuccessful()
-	require.Nil(t, xerr)
-	require.True(t, ok)
 }
 
 func TestIntrospectionWithErrors(t *testing.T) {
