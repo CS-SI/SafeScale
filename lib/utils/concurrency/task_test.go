@@ -186,8 +186,8 @@ func TestTaskCantBeReused(t *testing.T) {
 		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
 		return "waiting game", nil
 	}, nil, 10*time.Millisecond)
-	if err == nil {
-		// If by design a task cannot be reused, its error should be more specific
+	if err != nil {
+		// If by design a task cannot be reused, its error should be more specific, not ready could also happen in other situations
 		t.Errorf("shouldn't happen: %v", err)
 	}
 
@@ -599,7 +599,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 			dur := time.Duration(sleep*10) * time.Millisecond
 			tempo := dur / 100
 			var (
-				i int
+				i       int
 				aborted bool
 			)
 			for ; i < 100; i++ {
@@ -664,11 +664,11 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 		single, xerr := NewTaskWithContext(ctx)
 		require.NotNil(t, single)
 		require.Nil(t, xerr)
-		
+
 		xerr = single.SetID(fmt.Sprintf("single-%d", ind))
 		require.Nil(t, xerr)
-		
-		begin:= time.Now()
+
+		begin := time.Now()
 		var singleEnd time.Duration
 		single, xerr = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			singleBegin := time.Now()

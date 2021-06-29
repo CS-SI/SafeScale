@@ -39,6 +39,13 @@ import (
 // This is not what happens (even if that's the easy case where children actually listen and don't block themselves fighting for resources)...
 // Let's take a look...
 func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Test panicked")
+			t.FailNow()
+		}
+	}()
+
 	streak := 0
 	enough := false
 	iter := 0
@@ -171,6 +178,13 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 
 // Like the previous test, but adding panics into it
 func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaiting(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Test panicked")
+			t.FailNow()
+		}
+	}()
+
 	caught := false
 	enough := false
 	streak := 0
@@ -316,6 +330,13 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 
 // Like the previous test, without .Abort()
 func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaiting(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Test panicked")
+			t.FailNow()
+		}
+	}()
+
 	caught := false
 	enough := false
 	streak := 0
@@ -446,6 +467,13 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 
 // Like previous tests but also with errors
 func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Test panicked")
+			t.FailNow()
+		}
+	}()
+
 	enough := false
 	iter := 0
 	streak := 0
@@ -624,6 +652,13 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 // runs .Abort first, then Wait
 // It fails, however it's unclear if it should work..: by design, what should happen if we abort 1st before running the wait ?
 func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Test panicked")
+			t.FailNow()
+		}
+	}()
+
 	enough := false
 	iter := 0
 	streak := 0
@@ -741,6 +776,13 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 // non-deterministic ?? what ??, yes, run it enough times and you will have different outcomes, seriously
 // sometimes the wait fails, sometimes doesn't, sometimes we have an empty result map, sometimes a populated map...
 func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Test panicked")
+			t.FailNow()
+		}
+	}()
+
 	var previousRes map[string]TaskResult
 	var previousErr error
 	iter := 0
