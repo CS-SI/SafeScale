@@ -416,13 +416,21 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 			res, xerr := overlord.WaitGroup() // 100 ms after this, .Abort() should hit
 			if xerr != nil {
 				t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
-				switch xerr.(type) {
+				switch cerr := xerr.(type) {
 				case *fail.ErrAborted:
 					consequences := xerr.Consequences()
 					if strings.Contains(spew.Sdump(consequences), "panic happened") {
 						caught = true
 					} else {
 						t.Logf("What ?? the panic was just swallowed in the logs ??, the code making the call doesn't know ???, or we just stopped waiting even before the panic happened ??...")
+					}
+				case *fail.ErrRuntimePanic:
+					t.Errorf("RuntimePanic directly from WaitGroup() Should not occur!")
+				case *fail.ErrorList:
+					for _, v := range cerr.ToErrorSlice() {
+						if strings.Contains(spew.Sdump(v), "panic happened") {
+							caught = true
+						}
 					}
 				}
 			} else {
