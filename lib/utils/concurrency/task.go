@@ -422,32 +422,46 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	if instance.status != READY {
-		return nil, fail.NewError("cannot start task '%s': not ready", instance.id)
-	}
-
-	if action == nil {
-		instance.status = DONE
-	} else {
-		instance.status = RUNNING
-		instance.runTerminatedCh = make(chan bool, 1)
-		instance.abortCh = make(chan bool, 1)
-		instance.controllerTerminatedCh = make(chan struct{}, 1)
-		go func() {
-			ctrlErr := instance.controller(action, params, timeout)
-			if ctrlErr != nil {
-				instance.lock.Lock()
-				if instance.err != nil {
-					_ = instance.err.AddConsequence(fail.Wrap(ctrlErr, "unexpected error running the Task controller"))
-				} else {
-					instance.err = fail.Wrap(ctrlErr, "unexpected error running the Task controller")
+	switch instance.status {
+	case READY:
+		if action == nil {
+			instance.status = DONE
+		} else {
+			instance.status = RUNNING
+			instance.runTerminatedCh = make(chan struct{}, 1)
+			instance.abortCh = make(chan struct{}, 1)
+			instance.controllerTerminatedCh = make(chan struct{}, 1)
+			go func() {
+				ctrlErr := instance.controller(action, params, timeout)
+				if ctrlErr != nil {
+					instance.lock.Lock()
+					if instance.err != nil {
+						_ = instance.err.AddConsequence(fail.Wrap(ctrlErr, "unexpected error running the Task controller"))
+					} else {
+						instance.err = fail.Wrap(ctrlErr, "unexpected error running the Task controller")
+					}
+					instance.lock.Unlock()
 				}
-				instance.lock.Unlock()
-			}
-			// instance.contextCleanup()
-		}()
+				// instance.contextCleanup()
+			}()
+		}
+		return instance, nil
+
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		fallthrough
+	case RUNNING:
+		return nil, fail.NewError("cannot start on Task '%s': already running", instance.id)
+
+	case DONE:
+		return nil, fail.NewError("cannot reuse Task '%s'", instance.id)
+
+	case UNKNOWN:
+		fallthrough
+	default:
+		return nil, fail.NewError("cannot start Task '%s': unknown status (%d)", instance.id, instance.status)
 	}
-	return instance, nil
 }
 
 // controller controls the start, termination and possibly abortion of the action
