@@ -103,6 +103,12 @@ func TestRealCharges(t *testing.T) {
 	}
 
 	fast, res, xerr := overlord.WaitFor(280 * time.Millisecond)
+	if len(res.(map[string]TaskResult)) == 0 {
+		// recovering partial records lead to a race condition, should we try ?
+		t.Errorf("This is open for interpretation, if we do a WaitFor and quit before finish waiting, should we offer partial results of those functions that finished, or not ?")
+	}
+	// what's the meaning of the boolean returned by .WaitFor ?
+	// we aborted, according to the docs it should be true; are the docs wrong ?
 	require.True(t, fast)
 	require.NotEmpty(t, res) // recovering partial records lead to a race condition, should we try ?
 	require.NotNil(t, xerr)
