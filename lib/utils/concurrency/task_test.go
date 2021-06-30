@@ -939,7 +939,6 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 
 			fmt.Println("Forever young...")
 		}
-		return "I want to be forever young", nil
 	}, nil, time.Duration(200)*time.Millisecond)
 	require.Nil(t, xerr)
 
@@ -1024,7 +1023,6 @@ func TestStartWithTimeoutWithTimeToFinish(t *testing.T) {
 			}
 			fmt.Println("Forever young...")
 		}
-		return "I want to be forever young", nil
 	}, nil, time.Duration(400)*time.Millisecond)
 	require.Nil(t, xerr)
 

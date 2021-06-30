@@ -23,11 +23,11 @@ import (
 	"sync"
 	"sync/atomic"
 
+	shielded2 "github.com/CS-SI/SafeScale/lib/utils/data/shielded"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -52,7 +52,7 @@ type MetadataCore struct {
 	//	concurrency.TaskedLock `json:"-"`
 
 	lock       sync.RWMutex
-	shielded   *concurrency.Shielded
+	shielded   *shielded2.Shielded
 	properties *serialize.JSONProperties
 	observers  map[string]observer.Observer
 
@@ -97,7 +97,7 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		kind:       kind,
 		folder:     fld,
 		properties: props,
-		shielded:   concurrency.NewShielded(instance),
+		shielded:   shielded2.NewShielded(instance),
 		observers:  map[string]observer.Observer{},
 	}
 	switch kind {
@@ -313,7 +313,7 @@ func (c *MetadataCore) Carry(clonable data.Clonable) (xerr fail.Error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.shielded = concurrency.NewShielded(clonable)
+	c.shielded = shielded2.NewShielded(clonable)
 	c.loaded = true
 
 	xerr = c.updateIdentity()

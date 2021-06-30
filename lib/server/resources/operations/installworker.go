@@ -1064,7 +1064,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 				controller: primaryKongController,
 				rule:       r.(map[interface{}]interface{}),
 				variables:  &primaryGatewayVariables,
-			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%s/host/%s/apply", primaryKongController.GetHostname())))
+			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/apply", primaryKongController.GetHostname())))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to apply proxy rules")
@@ -1118,7 +1118,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 					controller: secondaryKongController,
 					rule:       rule,
 					variables:  &secondaryGatewayVariables,
-				}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%s/host/%s/apply", secondaryKongController.GetHostname())))
+				}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/apply", secondaryKongController.GetHostname())))
 				if xerr != nil {
 					return xerr
 				}

@@ -14,16 +14,17 @@
  * limitations under the License.
  */
 
-package concurrency
+package shielded
 
 import (
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	datatests "github.com/CS-SI/SafeScale/lib/utils/data/tests"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -37,7 +38,7 @@ func TestTakiTaki(t *testing.T) {
 	armored := NewShielded(a)
 	// Note: As soon as 'a' is "shielded", it MUST not be accessed directly, only through the Shielded instance (using Inspect and Alter)
 
-	takitaki, err := NewTask()
+	takitaki, err := concurrency.NewTask()
 	if err != nil || takitaki == nil {
 		t.Errorf("Error creating task")
 		t.FailNow()
@@ -47,7 +48,7 @@ func TestTakiTaki(t *testing.T) {
 		t.Errorf("Error setting id")
 	}
 
-	nagasaki, err := NewTask()
+	nagasaki, err := concurrency.NewTask()
 	if err != nil || nagasaki == nil {
 		t.Errorf("Error creating the other task")
 		t.FailNow()
@@ -105,7 +106,7 @@ func TestCriminal(t *testing.T) {
 
 	armored := NewShielded(a)
 
-	criminal, err := NewTask()
+	criminal, err := concurrency.NewTask()
 	if err != nil {
 		t.Errorf("Error creating task")
 		t.FailNow()
@@ -119,7 +120,7 @@ func TestCriminal(t *testing.T) {
 		t.Errorf("Error setting id")
 	}
 
-	estilo, err := NewTask()
+	estilo, err := concurrency.NewTask()
 	if err != nil {
 		t.Errorf("Error creating the other task")
 	}
