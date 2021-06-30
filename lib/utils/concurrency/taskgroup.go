@@ -44,6 +44,7 @@ type TaskGroupGuard interface {
 // TaskGroup is the task group interface
 type TaskGroup interface {
 	TaskCore
+	TaskGuard
 	TaskGroupGuard
 
 	GetGroupStatus() (map[TaskStatus][]string, fail.Error)
