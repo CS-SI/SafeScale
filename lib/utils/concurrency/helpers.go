@@ -48,8 +48,12 @@ func RandomInt(min, max int) int {
 	return mrand.Intn(max-min) + min
 }
 
-func taskgen(low int, high int, latency int, probError float32, probPanic float32) TaskAction {
-	return func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+func taskgen(low int, high int, latency int, probError float32, probPanic float32, actionHandlesPanicByItself bool) TaskAction {
+	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
+		if actionHandlesPanicByItself {
+			defer fail.OnPanic(&xerr)
+		}
+		weWereAborted := false
 		iterations := int64(high / latency)
 		workTime := time.Duration(RandomInt(low, high)) * time.Millisecond
 		tempo := time.Duration(workTime.Milliseconds()/iterations) * time.Millisecond
@@ -63,20 +67,77 @@ func taskgen(low int, high int, latency int, probError float32, probPanic float3
 			if t.Aborted() {
 				// Cleaning up first before leaving... ;)
 				time.Sleep(time.Duration(RandomInt(3*low, 3*high)) * time.Millisecond)
-				return "aborted", fail.AbortedError(nil)
+				weWereAborted = true
+				break
 			}
 			count++
 		}
 
-		// simulation of error conditions
-		coinFlip := rand.Float32() < probError
+		// simulation of error conditions, starting by panic
+		coinFlip := rand.Float32() < probPanic
+		if coinFlip {
+			panic("it hurts")
+		}
+
+		if weWereAborted {
+			return "useless", fail.AbortedError(nil, "we were killed")
+		}
+
+		coinFlip = rand.Float32() < probError
 		var iErr error = nil
 		if coinFlip {
 			iErr = fmt.Errorf("it was head")
 		}
-		coinFlip = rand.Float32() < probPanic
+
+		return "Ahhhh", fail.ConvertError(iErr)
+	}
+}
+
+func taskgenWithCustomFunc(low int, high int, latency int, probError float32, probPanic float32, actionHandlesPanicByItself bool, custom func() error) TaskAction {
+	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
+		if actionHandlesPanicByItself {
+			defer fail.OnPanic(&xerr)
+		}
+		iterations := int64(high / latency)
+		workTime := time.Duration(RandomInt(low, high)) * time.Millisecond
+		tempo := time.Duration(workTime.Milliseconds()/iterations) * time.Millisecond
+		count := int64(0)
+		var iErr error = nil
+
+		weWereAborted := false
+		for { // do some work, then look for aborted, again and again
+			if count > iterations {
+				break
+			}
+			// some work
+			time.Sleep(tempo) // that is actually the latency between abortion and its check t.Aborted() in the line below
+			if t.Aborted() {
+				// Cleaning up first before leaving... ;)
+				time.Sleep(time.Duration(RandomInt(3*low, 3*high)) * time.Millisecond)
+				weWereAborted = true
+				if custom != nil {
+					_ = custom() // for side-effects
+				}
+			}
+			count++
+		}
+
+		if custom != nil {
+			_ = custom() // for side-effects
+		}
+		// simulation of error conditions, starting by panic
+		coinFlip := rand.Float32() < probPanic
 		if coinFlip {
 			panic("it hurts")
+		}
+
+		if weWereAborted {
+			return "useless", fail.AbortedError(nil, "we were killed")
+		}
+
+		coinFlip = rand.Float32() < probError
+		if coinFlip {
+			iErr = fmt.Errorf("it was head")
 		}
 
 		return "Ahhhh", fail.ConvertError(iErr)

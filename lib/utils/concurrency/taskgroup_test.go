@@ -120,7 +120,7 @@ func TestIntrospectionWithErrors(t *testing.T) {
 	num, err := overlord.GetStarted()
 	require.Nil(t, err)
 	if num != 801 {
-		t.Errorf("Problem reporting # of started tasks: %d (!= 800)", num)
+		t.Errorf("Problem reporting # of started tasks: %d (!= 801)", num)
 	}
 
 	id, err := overlord.GetID()
