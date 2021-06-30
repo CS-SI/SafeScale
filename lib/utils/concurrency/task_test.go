@@ -156,6 +156,26 @@ func TestOneWaitingForGame(t *testing.T) {
 	require.True(t, good)
 }
 
+func TestOneWaitingForGameWithFuncGen(t *testing.T) {
+	got, err := NewUnbreakableTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.Start(taskgen(50, 250, 2, 0, 0), nil)
+	if err != nil {
+		t.Errorf("Shouldn't happen: %v", err)
+	}
+
+	good, res, err := got.WaitFor(4 * time.Second)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.True(t, good)
+}
+
 // TestTaskCantBeReused ensures that a started Task cannot be reused
 func TestTaskCantBeReused(t *testing.T) {
 	got, err := NewUnbreakableTask()
