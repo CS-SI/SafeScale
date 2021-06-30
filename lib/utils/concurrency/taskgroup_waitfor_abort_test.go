@@ -132,7 +132,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaitingFor
 				// remove this (and also the default case), and this test no longer protects us against unintended errors
 				case *fail.ErrRuntimePanic:
 					t.Errorf("That shouldn't ever happen")
-					t.FailNow()
+					t.Fail()
+					return
 				case *fail.ErrorList:
 					// indeed, the test now works, but there were 2 problems:
 					// -wait didn't wait until the end (and the test induced a panic to prove it); this problem is fixed
@@ -280,7 +281,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 				case *fail.ErrRuntimePanic: // This MUST NEVER HAPPEN in a TaskGroup; the panic should be in the ErrorList returned by Wait()
 					t.Errorf("That shouldn't happen")
-					t.FailNow()
+					t.Fail()
+					return
 
 				case *fail.ErrorList:
 					if !strings.Contains(spew.Sdump(xerr), "panic happened") {
@@ -565,7 +567,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 					// if it's unexpected and it happens -> error, and we can finish the test
 					if strings.Contains(spew.Sdump(consequences), "panic happened") {
 						t.Errorf("an unexpected panic occurred!")
-						t.FailNow()
+						t.Fail()
+						return
 					}
 					if len(consequences) > 0 {
 						t.Log("TaskGroup children reported failures:")
@@ -590,15 +593,19 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 									t.Logf("%v (%s)", v, reflect.TypeOf(v).String())
 								}
 							}
+							if counted != int(failureCounter) {
+								t.Errorf("Taskgroup returned error does not report the effective children failure count!!!: %d vs %d", counted, int(failureCounter))
+							}
 						}
 						if counted != int(failureCounter) {
-							t.Errorf("Taskgroup returned error does not report the effective children failure count!!! (counted:%d, reported: %d)", counted, failureCounter)
+							t.Errorf("Taskgroup returned error does not report the effective children failure count!!!: %d vs %d", counted, int(failureCounter))
 						}
 					}
 				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 				case *fail.ErrRuntimePanic:
 					t.Errorf("That shouldn't happen")
-					t.FailNow()
+					t.Fail()
+					return
 				case *fail.ErrorList:
 					errorList := cerr.ToErrorSlice()
 					if len(errorList) > 0 {
@@ -762,7 +769,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitForLater(t *testin
 				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 				case *fail.ErrRuntimePanic:
 					t.Errorf("That shouldn't happen")
-					t.FailNow()
+					t.Fail()
+					return
 				case *fail.ErrorList:
 					if strings.Contains(spew.Sdump(xerr), "panic happened") {
 						t.Logf("unexpected panic occurred!")
@@ -900,14 +908,16 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 								// expected
 							default:
 								t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-								t.FailNow()
+								t.Fail()
+								return
 							}
 						}
 					}
 				} else {
 					if previousErr != nil {
 						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-						t.FailNow()
+						t.Fail()
+						return
 					}
 				}
 			}

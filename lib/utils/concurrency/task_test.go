@@ -165,7 +165,7 @@ func TestOneWaitingForGameWithFuncGen(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	_, err = got.Start(taskgen(50, 250, 2, 0, 0), nil)
+	_, err = got.Start(taskgen(50, 250, 2, 0, 0, false), nil)
 	if err != nil {
 		t.Errorf("Shouldn't happen: %v", err)
 	}

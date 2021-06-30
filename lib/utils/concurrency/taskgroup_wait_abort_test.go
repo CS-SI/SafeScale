@@ -306,7 +306,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 				case *fail.ErrRuntimePanic: // This MUST NEVER HAPPEN in a TaskGroup; the panic should be in the ErrorList returned by Wait()
 					t.Errorf("That shouldn't happen")
-					t.FailNow()
+					t.Fail()
+					return
 
 				case *fail.ErrorList:
 					if !strings.Contains(spew.Sdump(xerr), "panic happened") {
