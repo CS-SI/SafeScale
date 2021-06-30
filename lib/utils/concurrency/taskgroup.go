@@ -101,8 +101,12 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 	defer fail.OnPanic(&err)
 	var t Task
 
+	if ctx == nil {
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil!, use context.TODO() or context.Background() instead!")
+	}
+
 	if parentTask == nil {
-		if ctx == nil {
+		if ctx == context.TODO() {
 			t, err = NewTask()
 		} else {
 			t, err = NewTaskWithContext(ctx)
