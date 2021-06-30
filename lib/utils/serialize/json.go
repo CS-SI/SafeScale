@@ -20,16 +20,16 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data/shielded"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
-	*concurrency.Shielded
+	*shielded.Shielded
 	module, key string
 }
 
@@ -136,7 +136,7 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 	if item, found = x.Properties[key].(*jsonProperty); !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
 		item = &jsonProperty{
-			Shielded: concurrency.NewShielded(zeroValue),
+			Shielded: shielded.NewShielded(zeroValue),
 			module:   x.module,
 			key:      key,
 		}
@@ -182,7 +182,7 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 	if item, found = x.Properties[key].(*jsonProperty); !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
 		item = &jsonProperty{
-			Shielded: concurrency.NewShielded(zeroValue),
+			Shielded: shielded.NewShielded(zeroValue),
 			module:   x.module,
 			key:      key,
 		}
@@ -277,7 +277,7 @@ func (x *JSONProperties) Deserialize( /*task concurrency.Task, */ buf []byte) (x
 		if prop, ok = x.Properties[k].(*jsonProperty); !ok {
 			zeroValue := PropertyTypeRegistry.ZeroValue(x.module, k)
 			item := &jsonProperty{
-				Shielded: concurrency.NewShielded(zeroValue),
+				Shielded: shielded.NewShielded(zeroValue),
 				module:   x.module,
 				key:      k,
 			}

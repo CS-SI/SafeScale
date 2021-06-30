@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package concurrency
+package shielded
 
 import (
 	"encoding/json"
@@ -27,7 +27,7 @@ import (
 // Shielded allows to store data with controlled access to it
 type Shielded struct {
 	witness data.Clonable
-	lock sync.RWMutex
+	lock    sync.RWMutex
 }
 
 // NewShielded creates a new protected data from a cloned witness
@@ -59,7 +59,6 @@ func (instance *Shielded) Inspect(inspector func(clonable data.Clonable) fail.Er
 	if instance.witness == nil {
 		return fail.InvalidInstanceContentError("d.witness", "cannot be nil; use concurrency.NewShielded() to instantiate")
 	}
-
 
 	return inspector(instance.witness.Clone())
 }
