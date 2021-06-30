@@ -184,10 +184,7 @@ func (instance *taskGroup) GetSignature() string {
 		return ""
 	}
 
-	tid, err := instance.GetID()
-	if err != nil {
-		return ""
-	}
+	tid, _ := instance.GetID() // cannot fail, because of instance.isNull above
 
 	return `{taskGroup ` + tid + `}`
 }
@@ -210,7 +207,7 @@ func (instance *taskGroup) GetContext() context.Context {
 	return instance.task.GetContext()
 }
 
-// SetID allows to specify task ID. The uniqueness of the ID through all the tasks
+// SetID allows specifying task ID. The uniqueness of the ID through all the tasks
 // becomes the responsibility of the developer...
 func (instance *taskGroup) SetID(id string) fail.Error {
 	if instance.isNull() {
@@ -299,7 +296,6 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 				}
 				time.Sleep(50 * time.Millisecond) // FIXME: hardcoded value :-(
 			}
-			return nil, nil
 		}
 
 		_, stErr := instance.task.Start(fnNOP, nil)
@@ -773,7 +769,7 @@ func (instance *taskGroup) Abort() fail.Error {
 	status := instance.task.status
 	instance.task.lock.RUnlock()
 
-	// If taskgroup is not started, go directly to Abort
+	// If taskGroup is not started, go directly to Abort
 	if status == READY {
 		instance.task.lock.Lock()
 		instance.task.status = DONE
