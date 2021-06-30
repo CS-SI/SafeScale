@@ -184,7 +184,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 
 	failed := waitTimeout(&wg, 120*time.Second)
 	if failed { // It ended with a deadlock
-		t.Errorf("We heave a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting")
+		t.Errorf("We have a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting")
 		t.Fail()
 	}
 }
@@ -347,7 +347,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 
 	failed := waitTimeout(&wg, 120*time.Second)
 	if failed { // It ended with a deadlock
-		t.Errorf("We heave a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting")
+		t.Errorf("We have a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaiting")
 		t.Fail()
 	}
 }
@@ -495,7 +495,7 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 
 	failed := waitTimeout(&wg, 120*time.Second)
 	if failed { // It ended with a deadlock
-		t.Errorf("We heave a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting")
+		t.Errorf("We have a deadlock in TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaiting")
 		t.Fail()
 	}
 }
@@ -596,7 +596,8 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 					// if it's unexpected and it happens -> error, and we can finish the test
 					if strings.Contains(spew.Sdump(cause), "panic happened") {
 						t.Errorf("TaskGroup reported panic in cause!!!")
-						t.FailNow()
+						t.Fail()
+						return
 					}
 					consequences := xerr.Consequences()
 					if len(consequences) > 0 {
@@ -689,7 +690,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 
 	failed := waitTimeout(&wg, 120*time.Second)
 	if failed { // It ended with a deadlock
-		t.Errorf("We heave a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting")
+		t.Errorf("We have a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting")
 		t.Fail()
 	}
 }
@@ -822,7 +823,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 
 	failed := waitTimeout(&wg, 120*time.Second)
 	if failed { // It ended with a deadlock
-		t.Errorf("We heave a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting")
+		t.Errorf("We have a deadlock in TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater")
 		t.Fail()
 	}
 }
@@ -888,7 +889,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		var res map[string]TaskResult
 		res, xerr = overlord.WaitGroup()
 		if xerr != nil {
-			t.Errorf("Failed to Wait: %v", xerr)
+			t.Logf("Failed to Wait: %v", xerr)
 		}
 
 		// check for error inconsistencies
@@ -896,8 +897,15 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 			previousErr = xerr
 		} else {
 			if xerr != previousErr {
-				t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-				t.FailNow()
+				if xerr != nil && previousErr != nil {
+					if strings.Compare(xerr.Error(), previousErr.Error()) != 0 {
+						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+						t.FailNow()
+					}
+				} else {
+					t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+					t.FailNow()
+				}
 			}
 		}
 
