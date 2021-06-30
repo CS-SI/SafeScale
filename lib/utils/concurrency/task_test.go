@@ -165,9 +165,103 @@ func TestOneWaitingForGameWithFuncGen(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	_, err = got.Start(taskgen(50, 250, 2, 0, 0, 0, false), nil)
+	_, err = got.Start(taskgen(50, 250, 2, 2, 0, 0, false), nil)
 	if err != nil {
 		t.Errorf("Shouldn't happen: %v", err)
+	}
+
+	good, res, err := got.WaitFor(4 * time.Second)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.True(t, good)
+}
+
+func TestChangeIdAdMidFlight(t *testing.T) {
+	got, err := NewUnbreakableTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.Start(taskgen(50, 250, 2, 2, 0, 0, false), nil)
+	if err != nil {
+		t.Errorf("Shouldn't happen: %v", err)
+	}
+
+	err = got.SetID("") // empty is invalid
+	require.NotNil(t, err)
+
+	err = got.SetID("0") // also is zero
+	require.NotNil(t, err)
+
+	err = got.SetID("funny")
+	if err == nil {
+		t.Errorf("Once the task is started, its ID should be immutable, being mutable all the time opens the door to suprises")
+		t.FailNow()
+	}
+
+	good, res, err := got.WaitFor(4 * time.Second)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.True(t, good)
+}
+
+func TestChangeIdAfterAbort(t *testing.T) {
+	got, err := NewTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.Start(taskgen(50, 250, 2, 2, 0, 0, false), nil)
+	if err != nil {
+		t.Errorf("Shouldn't happen: %v", err)
+	}
+
+	err = got.Abort()
+	require.Nil(t, err)
+
+	require.True(t, got.Aborted())
+
+	_, err = got.Wait()
+	require.NotNil(t, err)
+
+	now := time.Now()
+	good, _, err := got.WaitFor(4 * time.Second)
+	require.NotNil(t, err)
+	require.True(t, good)
+	then := time.Since(now)
+	if then > 3900*time.Millisecond {
+		t.Errorf("This should never be a timeout, task was aborted before starting the wait...")
+	}
+	if _, ok := err.(*fail.ErrTimeout); ok {
+		t.Errorf("This should never be a timeout (%v), task was aborted before starting the wait...", err)
+	}
+}
+
+func TestTaskAlreadyRunning(t *testing.T) {
+	got, err := NewUnbreakableTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.Start(taskgen(50, 250, 2, 2, 0, 0, false), nil)
+	if err != nil {
+		t.Errorf("Shouldn't happen: %v", err)
+	}
+
+	_, err = got.Start(taskgenWithCustomFunc(50, 250, 2, 2, 0, 0, false, nil), nil)
+	if err != nil {
+		if !strings.Contains(err.Error(), "already running") {
+			t.Errorf("Shouldn't happen: %v", err)
+		}
 	}
 
 	good, res, err := got.WaitFor(4 * time.Second)
