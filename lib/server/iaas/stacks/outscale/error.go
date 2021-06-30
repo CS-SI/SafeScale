@@ -89,8 +89,8 @@ func qualifyFromCode(code, details string) fail.Error {
 		return fail.DuplicateError("a Security Group with this name already exists")
 	case "9011":
 		return fail.DuplicateError("a keypair with this name already exists")
-	case "9029":
-		return fail.NotAvailableError("the network is still in use")
+	case "9029": // this means the network has associated resources still in use, we have to delete those first
+		return fail.InvalidRequestError("the network is still in use")
 	case "9044":
 		return fail.InvalidRequestError("not included in VPC Targets")
 	case "9058":

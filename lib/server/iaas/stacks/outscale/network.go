@@ -17,6 +17,7 @@
 package outscale
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/outscale/osc-sdk-go/osc"
@@ -335,6 +336,7 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// no Internet Gateway, consider the deletion successful and continue
+			debug.IgnoreError(xerr)
 		default:
 			return xerr
 		}
@@ -588,7 +590,7 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 
 	if len(resp) > 0 {
 		// Remove should succeed only when something goes wrong when deleting VMs
-		logrus.Warnf("found orphan Nics to delete, check if nothing goes wrong deleting Hosts...")
+		logrus.Warnf("found orphan Nics to delete (%s), check if nothing goes wrong deleting Hosts...", spew.Sdump(resp))
 		if xerr = s.deleteNICs(resp); xerr != nil {
 			return xerr
 		}
