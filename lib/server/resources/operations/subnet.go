@@ -1118,7 +1118,7 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 	}
 }
 
-// deleteSubnetAndConfirm deletes the Subnet idnetified by 'id' and wait for deletion confirmation
+// deleteSubnetAndConfirm deletes the Subnet identified by 'id' and wait for deletion confirmation
 func (instance *Subnet) deleteSubnetAndConfirm(id string) fail.Error {
 	svc := instance.GetService()
 	xerr := svc.DeleteSubnet(id)
@@ -1698,16 +1698,16 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	// Leave a chance to abort
 	taskStatus, _ := task.GetStatus()
 	if taskStatus == concurrency.ABORTED {
-			return fail.AbortedError(nil)
-		}
+		return fail.AbortedError(nil)
+	}
 
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
 
-			// 1st delete gateway(s)
+		// 1st delete gateway(s)
 		gwIDs, innerXErr := instance.deleteGateways(as)
 		if innerXErr != nil {
 			return innerXErr

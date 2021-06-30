@@ -234,6 +234,8 @@ func qualifyGophercloudResponseCode(err *gophercloud.ErrUnexpectedResponseCode) 
 		newError = &gophercloud.ErrDefault500{ErrUnexpectedResponseCode: *err}
 	case 503:
 		newError = &gophercloud.ErrDefault503{ErrUnexpectedResponseCode: *err}
+	case 504: // Map also 504 to 503
+		newError = &gophercloud.ErrDefault503{ErrUnexpectedResponseCode: *err}
 	}
 
 	if newError != nil {
@@ -242,7 +244,7 @@ func qualifyGophercloudResponseCode(err *gophercloud.ErrUnexpectedResponseCode) 
 	return fail.NewError("unexpected response code: code: %d, reason: %s", err.Actual, string(err.Body))
 }
 
-// errorMeansServiceUnavailable tells of err contains "service unavailable" (lower/upper/mixed case)
+// errorMeansServiceUnavailable tells if err contains "service unavailable" (lower/upper/mixed case)
 func errorMeansServiceUnavailable(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "service unavailable")
 }

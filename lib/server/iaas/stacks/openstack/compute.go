@@ -1051,6 +1051,8 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				case *fail.ErrInvalidRequest:
 					// If error is "invalid request", no need to retry, it will always be so
 					return retry.StopRetryError(innerErr, "error getting Host %s", hostLabel)
+				case *fail.ErrNotAvailable:
+					return innerErr
 				default:
 					if errorMeansServiceUnavailable(innerErr) {
 						return innerErr
