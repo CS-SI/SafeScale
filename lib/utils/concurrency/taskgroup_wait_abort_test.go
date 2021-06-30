@@ -115,6 +115,12 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 				// let's have fun
 				xerr := overlord.Abort()
 				require.Nil(t, xerr)
+
+				// did we abort ?
+				aborted := overlord.Aborted()
+				if !aborted {
+					t.Logf("We just aborted without error above..., why Aborted() says it's not ?")
+				}
 			}()
 
 			res, xerr := overlord.Wait() // 100 ms after this, .Abort() should hit
@@ -138,6 +144,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 					// remove this (and also the default case), and this test no longer protects us against unintended errors
 					case *fail.ErrRuntimePanic:
 						t.Errorf("That shouldn't ever happen")
+						t.Fail()
 						return
 					case *fail.ErrorList:
 						// VPL: again, why expecting a panic when there is no way to have one if everything is working ?
@@ -282,11 +289,16 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 				// let's have fun
 				xerr := overlord.Abort()
 				require.Nil(t, xerr)
+
+				// did we abort ?
+				aborted := overlord.Aborted()
+				if !aborted {
+					t.Logf("We just aborted without error above..., why Aborted() says it's not ?")
+				}
 			}()
 
 			_, xerr = overlord.WaitGroup() // 100 ms after this, .Abort() should hit
 			if xerr != nil {
-				t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
 				switch cerr := xerr.(type) {
 				case *fail.ErrAborted:
 					consequences := xerr.Consequences()
@@ -585,6 +597,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 							return "mistakes happen", fail.NewError("It was head")
 						}
 
+						// Normally, should never reach this point...
 						return "who cares", nil
 					}, bailout, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
 				)
@@ -601,6 +614,12 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 				// let's have fun
 				xerr := overlord.Abort()
 				require.Nil(t, xerr)
+
+				// did we abort ?
+				aborted := overlord.Aborted()
+				if !aborted {
+					t.Logf("We just aborted without error above..., why Aborted() says it's not ?")
+				}
 			}()
 
 			res, xerr := overlord.Wait() // 100 ms after this, .Abort() should hit
@@ -789,6 +808,12 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 			xerr = overlord.Abort()
 			require.Nil(t, xerr)
 
+			// did we abort ?
+			aborted := overlord.Aborted()
+			if !aborted {
+				t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
+			}
+
 			res, xerr := overlord.Wait()
 			if xerr != nil {
 				t.Logf("Failed to Wait: %s", xerr.Error()) // Of course, we did !!, we induced a panic !! didn't we ?
@@ -801,6 +826,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 				case *fail.ErrRuntimePanic:
 					t.Errorf("That shouldn't happen")
+					t.Fail()
 					return
 				case *fail.ErrorList:
 					if !strings.Contains(spew.Sdump(xerr), "panic happened") {
@@ -890,7 +916,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 			}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 			if err != nil {
 				t.Errorf("Unexpected: %s", err)
-				t.FailNow()
+				return
 			}
 		}
 
@@ -901,7 +927,13 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 		xerr = overlord.Abort()
 		if xerr != nil {
 			t.Errorf("Failed to abort")
-			t.FailNow()
+			return
+		}
+
+		// did we abort ?
+		aborted := overlord.Aborted()
+		if !aborted {
+			t.Errorf("We just aborted without error above..., why Aborted() says it's not ?")
 		}
 
 		// the question here, is why we fail ?
@@ -933,7 +965,8 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 							// same kind of error, good
 						default:
 							t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-							t.FailNow()
+							t.Fail()
+							return
 						}
 					}
 				}

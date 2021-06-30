@@ -141,7 +141,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaitingFor
 					// still unfixed as TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaiting proves,
 					// when the latter test is fixed, we can safely remove Logf lines below
 					if strings.Contains(spew.Sdump(xerr), "panic happened") {
-						t.Logf("a panic occurred, should have not...")
+						t.Errorf("a panic occurred, should have not...")
 					}
 				}
 			}
@@ -277,6 +277,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 							atomic.AddInt32(&cleanCounter, 1)
 						}
 					}
+					caught = true
 
 				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 				case *fail.ErrRuntimePanic: // This MUST NEVER HAPPEN in a TaskGroup; the panic should be in the ErrorList returned by Wait()
@@ -297,6 +298,9 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 						}
 						// break // VPL: why break ?
 					}
+
+				default:
+					t.Errorf("Unexpected error: %v", xerr)
 				}
 			}
 
