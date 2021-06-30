@@ -112,16 +112,35 @@ func TestTaskFatherAbortionNoAbort(t *testing.T) {
 	require.Nil(t, xerr)
 
 	_, xerr = child.Wait()
-	require.Nil(t, xerr)
+	require.NotNil(t, xerr) // parent aborted, child should report aborted error also, even if it doesn't really processed the signal
+	switch xerr.(type) {
+	case *fail.ErrAborted:
+		// expected
+	default:
+		t.Errorf("Unexpected error for child: %v", xerr)
+	}
+
 	_, xerr = sibling.Wait()
-	require.Nil(t, xerr)
+	require.NotNil(t, xerr) // parent aborted, sibling should report aborted error also, even if it doesn't really processed the signal
+	switch xerr.(type) {
+	case *fail.ErrAborted:
+		// expected
+	default:
+		t.Errorf("Unexpected error for sibling: %v", xerr)
+	}
 
 	// the subtasks keep working because don't listen to abort
 	time.Sleep(time.Duration(600) * time.Millisecond)
 	require.Equal(t, 2, len(count))
 
 	_, xerr = parent.Wait()
-	require.NotNil(t, xerr)
+	require.NotNil(t, xerr) // parent aborted, should report aborter error
+	switch xerr.(type) {
+	case *fail.ErrAborted:
+		// expected
+	default:
+		t.Errorf("Unexpected error for sibling: %v", xerr)
+	}
 }
 
 // make sure that if subtasks listen, aborting a parent also aborts its children

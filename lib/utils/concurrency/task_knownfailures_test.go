@@ -73,25 +73,26 @@ func TestRealCharge(t *testing.T) {
 
 // This imitates some of the code found in cluster.go
 func TestRealCharges(t *testing.T) {
-	overlord, err := NewTaskGroupWithParent(nil)
+	overlord, xerr := NewTaskGroupWithParent(nil)
 	require.NotNil(t, overlord)
-	require.Nil(t, err)
+	require.Nil(t, xerr)
 
-	theID, err := overlord.GetID()
-	require.Nil(t, err)
+	theID, xerr := overlord.GetID()
+	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
 	gorrs := 800
 
 	for ind := 0; ind < gorrs; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
-		if err != nil {
-			t.Errorf("Unexpected: %s", err)
+		if xerr != nil {
+			t.Errorf("Unexpected: %s", xerr)
 		}
 		if RandomInt(50, 250) > 200 {
+			fmt.Println("abort")
 			aErr := overlord.Abort()
 			if aErr != nil {
 				t.Errorf("What, Cannot abort ??")
@@ -101,14 +102,10 @@ func TestRealCharges(t *testing.T) {
 		}
 	}
 
-	fast, res, err := overlord.WaitFor(280 * time.Millisecond)
-	if len(res.(map[string]TaskResult)) == 0 {
-		// recovering partial records lead to a race condition, should we try ?
-		t.Errorf("This is open for interpretation, if we do a WaitFor and quit before finish waiting, should we offer partial results of those functions that finished, or not ?")
-	}
-	// what's the meaning of the boolean returned by .WaitFor ?
-	// we aborted, according to the docs it should be true; are the docs wrong ?
+	fast, res, xerr := overlord.WaitFor(280 * time.Millisecond)
 	require.True(t, fast)
+	require.NotEmpty(t, res) // recovering partial records lead to a race condition, should we try ?
+	require.NotNil(t, xerr)
 }
 
 // This imitates some of the code found in cluster.go
