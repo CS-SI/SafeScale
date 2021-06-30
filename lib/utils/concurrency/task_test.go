@@ -586,17 +586,17 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	// is this critical ?, maybe not today but...
 	// big problems have small beginnings...
 
-	// funk(1, 30*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)    // canceled
-	// funk(2, 10*time.Millisecond, 50*time.Millisecond, 30*time.Millisecond, true)    // timeout
+	funk(1, 30*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)    // canceled
+	funk(2, 10*time.Millisecond, 50*time.Millisecond, 30*time.Millisecond, true)    // timeout
 	funk(3, 30*time.Millisecond, 50*time.Millisecond, 80*time.Millisecond, true)    // timeout
-	// funk(4, 80*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)    // canceled
-	// funk(5, 40*time.Millisecond, 20*time.Millisecond, 10*time.Millisecond, true)    // canceled
-	// funk(6, 40*time.Millisecond, 20*time.Millisecond, 30*time.Millisecond, false)   // cancel is triggered AFTER we are done (in 20ms), less that the timeout -> so no error
-	// funk(7, 140*time.Millisecond, 20*time.Millisecond, 40*time.Millisecond, false)  // same thing here
-	// funk(8, 140*time.Millisecond, 20*time.Millisecond, 100*time.Millisecond, false) // same thing here
-	// funk(9, 140*time.Millisecond, 20*time.Millisecond, 120*time.Millisecond, false) // same thing here
-	// funk(10, 140*time.Millisecond, 20*time.Millisecond, 50*time.Millisecond, false) // same thing here
-	// funk(11, 140*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)  // canceled
+	funk(4, 80*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)    // canceled
+	funk(5, 40*time.Millisecond, 20*time.Millisecond, 10*time.Millisecond, true)    // canceled
+	funk(6, 40*time.Millisecond, 20*time.Millisecond, 30*time.Millisecond, false)   // cancel is triggered AFTER we are done (in 20ms), less that the timeout -> so no error
+	funk(7, 140*time.Millisecond, 20*time.Millisecond, 40*time.Millisecond, false)  // same thing here
+	funk(8, 140*time.Millisecond, 20*time.Millisecond, 100*time.Millisecond, false) // same thing here
+	funk(9, 140*time.Millisecond, 20*time.Millisecond, 120*time.Millisecond, false) // same thing here
+	funk(10, 140*time.Millisecond, 20*time.Millisecond, 50*time.Millisecond, false) // same thing here
+	funk(11, 140*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)  // canceled
 }
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
@@ -802,14 +802,14 @@ func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 	}
 
 	_, xerr = single.Wait()
+	require.NotNil(t, xerr)    // Task ended on timeout, before abort signal comes, so an error is expected
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 		default:
-			t.Errorf("Where are the timeout errors ??: %s", spew.Sdump(xerr))
+			t.Errorf("Where is the timeout error ??: %s", spew.Sdump(xerr))
 		}
 	}
-	require.NotNil(t, xerr)
 
 	// Nothing wrong should happen after this point...
 	time.Sleep(time.Duration(100) * time.Millisecond)
@@ -1092,7 +1092,10 @@ func TestStartWithTimeoutThatTimeouts(t *testing.T) {
 	if xerr == nil {
 		t.Errorf("Wait should have failed but didn't")
 	} else {
-		if _, ok := xerr.(*fail.ErrTimeout); !ok {
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			// expected
+		default:
 			t.Errorf("This should have failed by design with a Timeout error")
 		}
 	}

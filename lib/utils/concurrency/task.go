@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -494,7 +495,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		return fail.InvalidInstanceError()
 	}
 
-	traceR := newTracer(instance, true/*tracing.ShouldTrace("concurrency.task")*/)
+	traceR := newTracer(instance, tracing.ShouldTrace("concurrency.task"))
 
 	defer func() {
 		instance.lock.Lock()
@@ -524,7 +525,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				instance.stats.events.cancel = append(instance.stats.events.cancel, eventTime)
 				status := instance.status
 				terminated := len(instance.runTerminatedCh) > 0
-				traceR.trace("{task %s}: controller received cancel signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received cancel signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				if status != ABORTED && status != TIMEOUT && !terminated {
@@ -539,7 +540,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.abort = append(instance.stats.events.abort, eventTime)
-				traceR.trace("{task %s}: controller received abort signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received abort signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				xerr := instance.processAbort(traceR)
@@ -551,7 +552,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.runTerminated = append(instance.stats.events.runTerminated, eventTime)
-				traceR.trace("{task %s}: controller received run termination signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received run termination signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				instance.processTerminated(traceR)
@@ -561,7 +562,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.timeout = append(instance.stats.events.timeout, eventTime)
-				traceR.trace("{task %s}: controller received timeout signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received timeout signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				instance.processTimeout(timeout)
@@ -573,7 +574,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.abort = append(instance.stats.events.abort, eventTime)
-				traceR.trace("{task %s}: controller received abort signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received abort signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				xerr := instance.processAbort(traceR)
@@ -585,7 +586,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.runTerminated = append(instance.stats.events.runTerminated, eventTime)
-				traceR.trace("{task %s}: controller received run termination signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received run termination signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				instance.processTerminated(traceR)
@@ -595,7 +596,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.timeout = append(instance.stats.events.timeout, eventTime)
-				traceR.trace("{task %s}: controller received timeout signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received timeout signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				instance.processTimeout(timeout)
@@ -610,7 +611,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				instance.stats.events.cancel = append(instance.stats.events.cancel, eventTime)
 				status := instance.status
 				terminated := len(instance.runTerminatedCh) > 0
-				traceR.trace("{task %s}: controller received cancel signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received cancel signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				if status != ABORTED && status != TIMEOUT && !terminated{
@@ -629,7 +630,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.abort = append(instance.stats.events.abort, eventTime)
-				traceR.trace("{task %s}: controller received abort signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received abort signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				xerr := instance.processAbort(traceR)
@@ -641,7 +642,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.runTerminated = append(instance.stats.events.runTerminated, eventTime)
-				traceR.trace("{task %s}: controller received run termination signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received run termination signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				instance.processTerminated(traceR)
@@ -654,7 +655,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.abort = append(instance.stats.events.abort, eventTime)
-				traceR.trace("{task %s}: controller received abort signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received abort signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				xerr := instance.processAbort(traceR)
@@ -666,7 +667,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				eventTime := time.Now()
 				instance.lock.Lock()
 				instance.stats.events.runTerminated = append(instance.stats.events.runTerminated, eventTime)
-				traceR.trace("{task %s}: controller received run termination signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				traceR.trace("received run termination signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
 				instance.processTerminated(traceR)
@@ -915,6 +916,9 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			var forgedError fail.Error
 			if instance.err != nil {
 				switch instance.err.(type) {
+				case *fail.ErrAborted:
+					forgedError = fail.TimeoutError(nil, 0)
+					_ = forgedError.AddConsequence(instance.err)
 				case *fail.ErrTimeout:
 					forgedError = instance.err
 				default:

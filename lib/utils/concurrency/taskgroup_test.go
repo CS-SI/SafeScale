@@ -58,7 +58,6 @@ func TestStartAfterDone(t *testing.T) {
 
 func TestIntrospection(t *testing.T) {
 	for i := 0; i < 10; i++ {
-
 		overlord, err := NewTaskGroupWithParent(nil)
 		require.NotNil(t, overlord)
 		require.Nil(t, err)
