@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -99,6 +98,19 @@ type Task interface {
 	TaskGuard
 }
 
+type taskStats struct {
+	runBegin time.Time
+	controllerBegin time.Time
+	runDuration time.Duration
+	controllerDuration time.Duration
+	events struct {
+		cancel        []time.Time
+		timeout       []time.Time
+		abort         []time.Time
+		runTerminated []time.Time
+	}
+}
+
 // task is a structure allowing to identify (indirectly) goroutines
 type task struct {
 	lock sync.RWMutex
@@ -119,6 +131,11 @@ type task struct {
 	cancelDisengaged     bool // used to not react on cancel signal (internal use only, not exposed by API)
 	runTerminated        bool // used to keep track of run terminated state
 	controllerTerminated bool // used to keep track of controller terminated state
+
+	start time.Time
+	duration time.Duration
+
+	stats taskStats
 }
 
 const (
@@ -419,30 +436,37 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 		return nil, fail.InvalidInstanceError()
 	}
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
-
 	switch instance.status {
 	case READY:
 		if action == nil {
+			instance.lock.Lock()
 			instance.status = DONE
+			instance.lock.Unlock()
 		} else {
+			instance.lock.Lock()
 			instance.status = RUNNING
 			instance.runTerminatedCh = make(chan struct{}, 1)
 			instance.abortCh = make(chan struct{}, 1)
 			instance.controllerTerminatedCh = make(chan struct{}, 1)
+			instance.lock.Unlock()
+
 			go func() {
+				instance.lock.Lock()
+				instance.stats.controllerBegin = time.Now()
+				instance.lock.Unlock()
+
 				ctrlErr := instance.controller(action, params, timeout)
+
+				instance.lock.Lock()
+				instance.stats.controllerDuration = time.Since(instance.stats.controllerBegin)
 				if ctrlErr != nil {
-					instance.lock.Lock()
 					if instance.err != nil {
 						_ = instance.err.AddConsequence(fail.Wrap(ctrlErr, "unexpected error running the Task controller"))
 					} else {
 						instance.err = fail.Wrap(ctrlErr, "unexpected error running the Task controller")
 					}
-					instance.lock.Unlock()
 				}
-				// instance.contextCleanup()
+				instance.lock.Unlock()
 			}()
 		}
 		return instance, nil
@@ -470,7 +494,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		return fail.InvalidInstanceError()
 	}
 
-	traceR := newTracer(instance, tracing.ShouldTrace("concurrency.task"))
+	traceR := newTracer(instance, true/*tracing.ShouldTrace("concurrency.task")*/)
 
 	defer func() {
 		instance.lock.Lock()
@@ -478,17 +502,30 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		instance.lock.Unlock()
 	}()
 
-	go instance.run(action, params)
+	go func() {
+		instance.lock.Lock()
+		instance.stats.runBegin = time.Now()
+		instance.lock.Unlock()
+
+		instance.run(action, params)
+
+		instance.lock.Lock()
+		instance.stats.runDuration = time.Since(instance.stats.runBegin)
+		instance.lock.Unlock()
+	}()
 
 	var finish, canceled bool
 	if timeout > 0 {
 		for !finish && !canceled {
 			select {
 			case <-instance.ctx.Done():
-				instance.lock.RLock()
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.cancel = append(instance.stats.events.cancel, eventTime)
 				status := instance.status
 				terminated := len(instance.runTerminatedCh) > 0
-				instance.lock.RUnlock()
+				traceR.trace("{task %s}: controller received cancel signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
 
 				if status != ABORTED && status != TIMEOUT && !terminated {
 					xerr := instance.processCancel(traceR)
@@ -499,32 +536,68 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				canceled = true
 
 			case <-instance.abortCh:
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.abort = append(instance.stats.events.abort, eventTime)
+				traceR.trace("{task %s}: controller received abort signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				xerr := instance.processAbort(traceR)
 				if xerr != nil {
 					return xerr
 				}
 
 			case <-instance.runTerminatedCh:
-				instance.processDone(traceR)
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.runTerminated = append(instance.stats.events.runTerminated, eventTime)
+				traceR.trace("{task %s}: controller received run termination signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
+				instance.processTerminated(traceR)
 				finish = true // stop to react on signals
 
 			case <-time.After(timeout):
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.timeout = append(instance.stats.events.timeout, eventTime)
+				traceR.trace("{task %s}: controller received timeout signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				instance.processTimeout(timeout)
 			}
 		}
 		for !finish {
 			select {
 			case <-instance.abortCh:
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.abort = append(instance.stats.events.abort, eventTime)
+				traceR.trace("{task %s}: controller received abort signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				xerr := instance.processAbort(traceR)
 				if xerr != nil {
 					return xerr
 				}
 
 			case <-instance.runTerminatedCh:
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.runTerminated = append(instance.stats.events.runTerminated, eventTime)
+				traceR.trace("{task %s}: controller received run termination signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				instance.processTerminated(traceR)
 				finish = true // stop to react on signals
 
 			case <-time.After(timeout):
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.timeout = append(instance.stats.events.timeout, eventTime)
+				traceR.trace("{task %s}: controller received timeout signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				instance.processTimeout(timeout)
 			}
 		}
@@ -532,10 +605,14 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		for !finish && !canceled {
 			select {
 			case <-instance.ctx.Done():
-				instance.lock.RLock()
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.cancel = append(instance.stats.events.cancel, eventTime)
 				status := instance.status
 				terminated := len(instance.runTerminatedCh) > 0
-				instance.lock.RUnlock()
+				traceR.trace("{task %s}: controller received cancel signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				if status != ABORTED && status != TIMEOUT && !terminated{
 					xerr := instance.processCancel(traceR)
 					if xerr != nil {
@@ -549,12 +626,24 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				finish = true // stop to react on signals
 
 			case <-instance.abortCh:
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.abort = append(instance.stats.events.abort, eventTime)
+				traceR.trace("{task %s}: controller received abort signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				xerr := instance.processAbort(traceR)
 				if xerr != nil {
 					return xerr
 				}
 
 			case <-instance.runTerminatedCh:
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.runTerminated = append(instance.stats.events.runTerminated, eventTime)
+				traceR.trace("{task %s}: controller received run termination signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				instance.processTerminated(traceR)
 				finish = true // stop to react on signals
 			}
@@ -562,12 +651,24 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		for !finish {
 			select {
 			case <-instance.abortCh:
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.abort = append(instance.stats.events.abort, eventTime)
+				traceR.trace("{task %s}: controller received abort signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				xerr := instance.processAbort(traceR)
 				if xerr != nil {
 					return xerr
 				}
 
 			case <-instance.runTerminatedCh:
+				eventTime := time.Now()
+				instance.lock.Lock()
+				instance.stats.events.runTerminated = append(instance.stats.events.runTerminated, eventTime)
+				traceR.trace("{task %s}: controller received run termination signal after %v\n", instance.id, time.Since(instance.stats.controllerBegin))
+				instance.lock.Unlock()
+
 				instance.processTerminated(traceR)
 				finish = true // stop to react on signals
 			}
@@ -648,8 +749,13 @@ func (instance *task) processAbort(traceR *tracer) fail.Error {
 			_ = abortError.AddConsequence(instance.err)
 			instance.err = abortError
 		}
-	} else {
-		instance.err = fail.AbortedError(nil)
+	} else if !instance.runTerminated {
+		switch instance.status {
+		case ABORTED:
+			instance.err = fail.AbortedError(nil)
+		case TIMEOUT:
+			instance.err = fail.TimeoutError(nil, 0)
+		}
 	}
 	if instance.status != TIMEOUT {
 		instance.status = ABORTED
@@ -668,7 +774,9 @@ func (instance *task) processTimeout(timeout time.Duration) {
 		instance.abortCh <- struct{}{} // VPL: Do not put this inside a lock
 
 		instance.lock.Lock()
-		instance.err = fail.TimeoutError(instance.err, timeout)
+		if !instance.runTerminated {
+			instance.err = fail.TimeoutError(instance.err, timeout)
+		}
 		instance.status = TIMEOUT
 		instance.lock.Unlock()
 	}
@@ -715,6 +823,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 		} else {
 			instance.err = xerr
 		}
+
 	default:
 		if instance.err != nil {
 			switch cerr := instance.err.(type) {
@@ -797,6 +906,9 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			return nil, fail.InconsistentError("cannot wait a Task that has not been started")
 
 		case TIMEOUT:
+			instance.lock.RLock()
+			runTerminated := instance.runTerminated
+			instance.lock.RUnlock()
 			<-instance.controllerTerminatedCh
 
 			instance.lock.Lock()
@@ -806,10 +918,12 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				case *fail.ErrTimeout:
 					forgedError = instance.err
 				default:
-					forgedError = fail.TimeoutError(nil, 0)
-					_ = forgedError.AddConsequence(instance.err)
+					if !runTerminated {
+						forgedError = fail.TimeoutError(nil, 0)
+						_ = forgedError.AddConsequence(instance.err)
+					}
 				}
-			} else {
+			} else if !runTerminated {
 				forgedError = fail.TimeoutError(nil, 0)
 			}
 			instance.err = forgedError
@@ -818,6 +932,9 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			continue
 
 		case ABORTED:
+			instance.lock.RLock()
+			runTerminated := instance.runTerminated
+			instance.lock.RUnlock()
 			<-instance.controllerTerminatedCh
 
 			instance.lock.Lock()
@@ -827,10 +944,12 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				case *fail.ErrAborted, *fail.ErrTimeout:
 					// leave the abort or timeout error alone
 				default:
-					// return abort error with instance.err as consequence (happened after Abort has been ackknowledged by TaskAction)
-					forgedError := fail.AbortedError(nil)
-					_ = forgedError.AddConsequence(instance.err)
-					instance.err = forgedError
+					if !runTerminated {
+						// return abort error with instance.err as consequence (happened after Abort has been ackknowledged by TaskAction)
+						forgedError := fail.AbortedError(nil)
+						_ = forgedError.AddConsequence(instance.err)
+						instance.err = forgedError
+					}
 				}
 			}
 			instance.status, status = DONE, DONE
@@ -838,12 +957,15 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			continue
 
 		case RUNNING:
+			instance.lock.RLock()
+			runTerminated := instance.runTerminated
+			instance.lock.RUnlock()
 			<-instance.controllerTerminatedCh
 
 			// Reload status, it may have changed since the controller terminated
 			instance.lock.Lock()
 			status = instance.status
-			if status == RUNNING {
+			if status == RUNNING || runTerminated {
 				instance.status, status = DONE, DONE
 			}
 			instance.lock.Unlock()
@@ -852,6 +974,8 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 		case DONE:
 			instance.lock.RLock()
 			defer instance.lock.RUnlock()
+
+			fmt.Printf("{task %s}: run lasted %v, controller lasted %v\n", instance.id, instance.stats.runDuration, instance.stats.controllerDuration)
 			return instance.result, instance.err
 
 		case UNKNOWN:

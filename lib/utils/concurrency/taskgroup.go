@@ -296,6 +296,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 				}
 				time.Sleep(50 * time.Millisecond) // FIXME: hardcoded value :-(
 			}
+			return nil, nil //nolint
 		}
 
 		_, stErr := instance.task.Start(fnNOP, nil)
@@ -449,6 +450,9 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 
 // addErrorsAsConsequence adds errors in map 'in' as consequences to the fail.Error 'out'
 func (instance *taskGroup) addErrorsAsConsequence(in map[string]error, out *fail.Error) {
+	if out == nil {
+		return
+	}
 	for i, e := range in {
 		added := false
 		switch cerr := e.(type) {
@@ -644,6 +648,8 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 	instance.task.lock.Unlock()
 
 	// now constructs
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 	return true, instance.result, instance.task.err
 }
 

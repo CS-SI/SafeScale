@@ -17,6 +17,7 @@
 package concurrency
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -115,7 +116,7 @@ func (t *tracer) buildMessage() string {
 // Trace traces a message
 func (t *tracer) trace(msg ...interface{}) *tracer {
 	if !t.isNull() && t.enabled {
-		logrus.Tracef(messagePrefix + t.buildMessage() + ": " + strprocess.FormatStrings(msg...))
+		fmt.Println(messagePrefix + t.buildMessage() + ": " + strprocess.FormatStrings(msg...))
 	}
 	return t
 }
