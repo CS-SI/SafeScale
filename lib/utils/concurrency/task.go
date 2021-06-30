@@ -896,6 +896,8 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
+	traceR := newTracer(instance, tracing.ShouldTrace("concurrency.task"))
+
 	instance.lock.RLock()
 	tid := instance.id
 	status := instance.status
@@ -979,7 +981,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			instance.lock.RLock()
 			defer instance.lock.RUnlock()
 
-			fmt.Printf("{task %s}: run lasted %v, controller lasted %v\n", instance.id, instance.stats.runDuration, instance.stats.controllerDuration)
+			traceR.trace("run lasted %v, controller lasted %v\n", instance.id, instance.stats.runDuration, instance.stats.controllerDuration)
 			return instance.result, instance.err
 
 		case UNKNOWN:
