@@ -17,9 +17,13 @@
 package concurrency
 
 import (
+	"fmt"
 	mrand "math/rand"
 	"sync"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"golang.org/x/exp/rand"
 )
 
 // waitTimeout waits for the WaitGroup for the specified max timeout.
@@ -42,4 +46,39 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 func RandomInt(min, max int) int {
 	// mrand.Seed(time.Now().UnixNano())
 	return mrand.Intn(max-min) + min
+}
+
+func taskgen(low int, high int, latency int, probError float32, probPanic float32) TaskAction {
+	return func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		iterations := int64(high / latency)
+		workTime := time.Duration(RandomInt(low, high)) * time.Millisecond
+		tempo := time.Duration(workTime.Milliseconds()/iterations) * time.Millisecond
+		count := int64(0)
+		for { // do some work, then look for aborted, again and again
+			if count > iterations {
+				break
+			}
+			// some work
+			time.Sleep(tempo) // that is actually the latency between abortion and its check t.Aborted() in the line below
+			if t.Aborted() {
+				// Cleaning up first before leaving... ;)
+				time.Sleep(time.Duration(RandomInt(3*low, 3*high)) * time.Millisecond)
+				return "aborted", fail.AbortedError(nil)
+			}
+			count++
+		}
+
+		// simulation of error conditions
+		coinFlip := rand.Float32() < probError
+		var iErr error = nil
+		if coinFlip {
+			iErr = fmt.Errorf("it was head")
+		}
+		coinFlip = rand.Float32() < probPanic
+		if coinFlip {
+			panic("it hurts")
+		}
+
+		return "Ahhhh", fail.ConvertError(iErr)
+	}
 }
