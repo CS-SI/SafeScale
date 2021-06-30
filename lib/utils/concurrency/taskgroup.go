@@ -282,14 +282,21 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 
 	instance.children.tasks = append(instance.children.tasks, newChild)
 
-	// starts parent Task doing nothing more than waiting for Abort()
+	// starts parent Task doing nothing more than waiting for forceAbort()
 	if status != RUNNING {
 		fnNOP := func(t Task, _ TaskParameters) (TaskResult, fail.Error) {
-			tid, _ := t.GetID()
-			for !t.Aborted() {
-				fmt.Printf("{%s}: fnNOP: Aborted() == true\n", tid)
+			// We disarm the cancel signal because we do not want this task to stop prematurely
+			// Abort() will be used on it to abort in time
+			t.(*task).lock.Lock()
+			t.(*task).cancelDisengaged = true
+			t.(*task).lock.Unlock()
+
+			for {
+				aborted := t.Aborted()
+				if aborted {
+					return nil, fail.AbortedError(nil)
+				}
 				time.Sleep(50 * time.Millisecond) // FIXME: hardcoded value :-(
-				return nil, fail.AbortedError(nil)
 			}
 			return nil, nil
 		}
@@ -330,7 +337,7 @@ func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
 //  - nil, *fail.InconsistentError: if TaskGroup has not started anything
 //  - nil, *fail.Error: if anything wrong occurred during the waiting process
 //  - TaskGroupResult|nil, *fail.ErrorList: if TaskGroup ended properly but some sub-Tasks fail
-//  - TaskGroupResult|nil, *fail.ErrAborted: if TaskGroup has been aborted; ErrAborted Consequences() may contain an ErrorList corresponding to the errors of sub-Tasks
+//  - TaskGroupResult|nil, *fail.ErrAborted: if TaskGroup has been aborted; ErrAborted Consequences() may contain an ErrorList corresponding to the errors of sub-Tasks (if such errors occurred)
 //  - TaskGroupResult|nil, *fail.ErrTimeout: if TaskGroup has reached context deadline
 //  - TaskGroupResult|nil, nil: if TaskGroup finished without error
 //
@@ -393,9 +400,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			}
 
 			// parent task is running, we need to abort it, even if abort was disable, now that all the children have terminated
-			instance.task.lock.Lock()
 			instance.task.forceAbort()
-			instance.task.lock.Unlock()
 
 			_, _ = instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
 
@@ -616,9 +621,7 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 	}
 
 	// parent task is still running, we need to abort it, even if abort was disable, now that all the children have terminated
-	instance.task.lock.Lock()
 	instance.task.forceAbort()
-	instance.task.lock.Unlock()
 
 	_, _ = instance.task.Wait() // will get *fail.ErrErrAborted, we know that, we asked for
 
@@ -658,27 +661,28 @@ func (instance *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fa
 
 // WaitGroupFor waits for the task to end, for 'duration' duration
 // Returns:
-// - true, TaskGroupResult, fail.Error: TaskGroup terminates, but generated an error
-// - true, TaskGroupResult, *failErrAborted: Task terminates on Abort
-// - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out; TaskGroup is aborted in case of timeout (and eventual error after
-//                                 abort signal has been received would be attached to the error as consequence)
+// - true, TaskGroupResult, *failErrAborted: TaskGroup terminated on Abort (and possible generated error after
+//                                           abort signal has been received would be attached to the error as consequence)
+// - true, TaskGroupResult, fail.Error: TaskGroup terminated, but generated an error
+// - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out; TaskGroup is aborted in case of timeout (and possible generated
+//                                 error after abort signal has been received would be attached to the error as consequence)
 func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult, fail.Error) {
 	if instance.isNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
 
-	tid, err := instance.GetID()
-	if err != nil {
-		return false, nil, err
+	tid, xerr := instance.GetID()
+	if xerr != nil {
+		return false, nil, xerr
 	}
 
+	taskStatus, xerr := instance.task.GetStatus()
+	if xerr != nil {
+		return false, nil, xerr
+	}
+
+	var waitGroupErr fail.Error
 	results := make(map[string]TaskResult)
-
-	taskStatus, err := instance.task.GetStatus()
-	if err != nil {
-		return false, nil, err
-	}
-
 	switch taskStatus {
 	case READY:
 		return false, nil, fail.InconsistentError("cannot wait TaskGroup '%s': not started", tid)
@@ -691,25 +695,28 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 	case ABORTED:
 		fallthrough
 	case RUNNING:
-		c := make(chan struct{})
+		doneWaitingCh := make(chan struct{})
 		waiterTask, xerr := NewTaskWithParent(instance.task, InheritParentIDOption, AmendID("WaitGroupForHelper"))
 		if xerr != nil {
 			return false, nil, fail.Wrap(xerr, "failed to create task to wait")
 		}
 		_, xerr = waiterTask.Start(
 			func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
-				// // We do not want abort signal to reach this task
-				// t.DisarmAbortSignal()
+				// We do not want abort signal to reach this task
+				t.(*task).lock.Lock()
+				t.(*task).abortDisengaged = true
+				t.(*task).cancelDisengaged = true
+				t.(*task).lock.Unlock()
 
 				var done bool
 				for !t.Aborted() && !done {
-					done, results, innerXErr = instance.TryWaitGroup()
+					done, results, waitGroupErr = instance.TryWaitGroup()
 					if !done {
 						time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
 					}
 				}
 				if done {
-					c <- struct{}{}
+					doneWaitingCh <- struct{}{}
 				}
 				return nil, nil
 			}, nil,
@@ -718,35 +725,31 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 		if duration > 0 {
 			select {
 			case <-time.After(duration):
-				// // Now we want the waiterTask to react to Abort signal...
-				// waiterTask.(*task).lock.Lock()
-				// waiterTask.(*task).abortDisengaged = false
-				// waiterTask.(*task).lock.Unlock()
-
-				if done, xerr := waiterTask.IsSuccessful(); xerr == nil && done {
-					fmt.Println("waiterTask is done but we reached timeout!!!")
-				}
+				// VPL: too late...
+				// if done, xerr := waiterTask.IsSuccessful(); xerr == nil && done {
+				// 	fmt.Println("waiterTask is done but we reached timeout!!!")
+				// }
 
 				// signal waiterTask to abort (and do not wait for it, it will terminate)
-				xerr := waiterTask.Abort()
-				tout := fail.TimeoutError(xerr, duration, fmt.Sprintf("timeout of %s waiting for TaskGroup '%s'", duration, tid))
+				waiterTask.(*task).forceAbort()
+				forgedError := fail.TimeoutError(nil, duration, fmt.Sprintf("timeout of %s waiting for TaskGroup '%s'", duration, tid))
 
 				// Now send abort signal to TaskGroup
 				xerr = instance.Abort()
 				if xerr != nil {
-					_ = tout.AddConsequence(xerr)
+					_ = forgedError.AddConsequence(xerr)
 				}
 				// We do not wait on TaskGroup after the Abort, because if the TaskActions are badly coded and never
 				// terminate, WaitGroup would not terminate neither... So bad for leaked go routines but this function has to end...
-				return false, nil, tout
+				return false, nil, forgedError
 
-			case <-c:
-				return true, results, err
+			case <-doneWaitingCh:
+				return true, results, waitGroupErr
 			}
 		} else {
 			select { // nolint
-			case <-c:
-				return true, results, err
+			case <-doneWaitingCh:
+				return true, results, waitGroupErr
 			}
 		}
 
@@ -766,14 +769,11 @@ func (instance *taskGroup) Abort() fail.Error {
 	}
 
 	instance.task.lock.RLock()
-	tid := instance.task.id
 	status := instance.task.status
 	instance.task.lock.RUnlock()
-	fmt.Printf("{%s}: in Abort()\n", tid)
 
 	// If taskgroup is not started, go directly to Abort
 	if status == READY {
-		fmt.Printf("{%s}: READY\n", tid)
 		instance.task.lock.Lock()
 		instance.task.status = DONE
 		instance.task.err = fail.AbortedError(nil)
