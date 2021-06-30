@@ -452,15 +452,15 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 	case TIMEOUT:
 		fallthrough
 	case RUNNING:
-		return nil, fail.NewError("cannot start on Task '%s': already running", instance.id)
+		return nil, fail.NotAvailableError("cannot start on Task '%s': already running", instance.id)
 
 	case DONE:
-		return nil, fail.NewError("cannot reuse Task '%s'", instance.id)
+		return nil, fail.NotAvailableError("cannot reuse Task '%s'", instance.id)
 
 	case UNKNOWN:
 		fallthrough
 	default:
-		return nil, fail.NewError("cannot start Task '%s': unknown status (%d)", instance.id, instance.status)
+		return nil, fail.InconsistentError("cannot start Task '%s': unknown status (%d)", instance.id, instance.status)
 	}
 }
 
