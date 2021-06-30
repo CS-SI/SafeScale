@@ -11,3 +11,9 @@ func TestInvalidInternalTaskCtx(t *testing.T) {
 	require.Nil(t, ta)
 	require.NotNil(t, err)
 }
+
+func TestInternalChecks(t *testing.T) {
+	ta, err := newTaskGroup(nil, nil) // It doesn't behave the same way newTask does, it should
+	require.Nil(t, ta)
+	require.NotNil(t, err)
+}
