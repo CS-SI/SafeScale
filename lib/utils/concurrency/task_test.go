@@ -187,8 +187,10 @@ func TestTaskCantBeReused(t *testing.T) {
 		return "waiting game", nil
 	}, nil, 10*time.Millisecond)
 	if err != nil {
-		// If by design a task cannot be reused, its error should be more specific, not ready could also happen in other situations
-		t.Errorf("shouldn't happen: %v", err)
+		if strings.Contains(err.Error(), "not ready") {
+			// If by design a task cannot be reused, its error should be more specific, not ready could also happen in other situations
+			t.Errorf("the error message 'not ready' is misleading, if by design a task cannot be reused we should say so instead of: '%v'", err)
+		}
 	}
 
 	res, err = got.Wait()
@@ -971,7 +973,7 @@ func TestLikeBeforeWithoutLettingFinish(t *testing.T) {
 		t.Fail()
 	}
 
-//	if !strings.Contains(nah[len(nah)-2], "only one") {
+	//	if !strings.Contains(nah[len(nah)-2], "only one") {
 	if !strings.Contains(outString, "only one") {
 		t.Fail()
 	}
