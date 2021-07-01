@@ -314,7 +314,12 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 func (instance *task) IsNull() bool {
 	// FIXME: DATA RACE, access to instance.id by a public function without getting a Lock
 	// TaskGroup has an embedded *task -> data race too
-	return instance == nil || instance.id == ""
+	if instance == nil {
+		return true
+	}
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+	return instance.id == ""
 }
 
 // GetLastError returns the last error of the Task
