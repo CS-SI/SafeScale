@@ -1136,10 +1136,6 @@ func TestStartWithTimeoutAbortedTask(t *testing.T) {
 }
 
 func TestLikeBeforeWithoutAbort(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
 	single, xerr := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
@@ -1195,10 +1191,6 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 
 	// Nothing wrong should happen after this point...
 	time.Sleep(time.Duration(100) * time.Millisecond)
-
-	_ = w.Close()
-	_, _ = ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
 }
 
 func TestLikeBeforeWithoutAbortButContext(t *testing.T) {
