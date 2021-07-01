@@ -459,7 +459,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, fail.InvalidRequestError("the Host '%s' must be on at least one Subnet (even if public)", resourceName)
 	}
 
-	// If no credentials (KeyPair and/or Password) are  supplied create ones
+	// If no credentials (KeyPair and/or Password) are supplied create ones
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to provide credentials for Host")
 	}
@@ -491,14 +491,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 
 	// Determine system disk size based on vcpus count
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(request.TemplateRef)
 	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateRef)
 	}
 
-	rim, xerr := s.InspectImage(request.ImageID)
+	rim, xerr := s.InspectImage(request.ImageRef)
 	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image '%s'", request.ImageRef)
 	}
 
 	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)

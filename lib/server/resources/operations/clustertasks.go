@@ -125,7 +125,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 
 	// Create the Network and Subnet
-	rn, rs, xerr := instance.createNetworkingResources(task, req, gatewaysDef)
+	networkInstance, subnetInstance, xerr := instance.createNetworkingResources(task, req, gatewaysDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -133,33 +133,33 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", rs.GetName())
-			if derr := rs.Delete(context.Background()); derr != nil {
+			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
+			if derr := subnetInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Subnet is considered as a successful deletion, continue
 					debug.IgnoreError(derr)
 				default:
 					cleanFailure = true
-					logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(xerr), rs.GetName())
+					logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(xerr), subnetInstance.GetName())
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(xerr)))
 				}
 			} else {
-				logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(xerr), rs.GetName())
+				logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(xerr), subnetInstance.GetName())
 				if req.NetworkID == "" {
-					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(xerr), rn.GetName())
-					if derr := rn.Delete(context.Background()); derr != nil {
+					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(xerr), networkInstance.GetName())
+					if derr := networkInstance.Delete(context.Background()); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
 							// missing Network is considered as a successful deletion, continue
 							debug.IgnoreError(derr)
 						default:
 							cleanFailure = true
-							logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(xerr), rn.GetName())
+							logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(xerr), networkInstance.GetName())
 							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(xerr)))
 						}
 					} else {
-						logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(xerr), rn.GetName())
+						logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(xerr), networkInstance.GetName())
 					}
 				}
 			}
@@ -167,7 +167,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}()
 
 	// Creates and configures hosts
-	xerr = instance.createHostResources(task, rs, *mastersDef, *nodesDef, req.InitialNodeCount, req.KeepOnFailure)
+	xerr = instance.createHostResources(task, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, req.KeepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -375,7 +375,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		gatewaysDefault *abstract.HostSizingRequirements
 		mastersDefault  *abstract.HostSizingRequirements
 		nodesDefault    *abstract.HostSizingRequirements
-		imageID         string
+		imageQuery      string
 	)
 
 	// if task.Aborted() {
@@ -383,19 +383,25 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	// }
 
 	// Determine default image
-	imageID = req.NodesDef.Image
-	if imageID == "" && instance.makers.DefaultImage != nil {
-		imageID = instance.makers.DefaultImage(instance)
+	imageQuery = req.NodesDef.Image
+	if imageQuery == "" && instance.makers.DefaultImage != nil {
+		imageQuery = instance.makers.DefaultImage(instance)
 	}
-	if imageID == "" {
+	if imageQuery == "" {
 		if cfg, xerr := instance.GetService().GetConfigurationOptions(); xerr == nil {
 			if anon, ok := cfg.Get("DefaultImage"); ok {
-				imageID = anon.(string)
+				imageQuery = anon.(string)
 			}
 		}
 	}
-	if imageID == "" {
-		imageID = "Ubuntu 18.04"
+	if imageQuery == "" {
+		imageQuery = "Ubuntu 18.04"
+	}
+	svc := instance.GetService()
+	abstractImage, xerr := svc.SearchImage(imageQuery)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, nil, nil, xerr
 	}
 
 	// Determine getGateway sizing
@@ -417,7 +423,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	}
 
 	gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
-	gatewaysDef.Image = imageID
+	gatewaysDef.Image = abstractImage.ID
 
 	if !req.GatewaysDef.Equals(emptySizing) {
 		if lower, err := req.GatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
@@ -427,7 +433,6 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 
-	svc := instance.GetService()
 	tmpl, xerr := svc.FindTemplateBySizing(*gatewaysDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -450,7 +455,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 	mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
-	mastersDef.Image = imageID
+	mastersDef.Image = abstractImage.ID
 
 	if !req.MastersDef.Equals(emptySizing) {
 		if lower, err := req.MastersDef.LowerThan(mastersDefault); err == nil && lower {
@@ -485,7 +490,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 	nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
-	nodesDef.Image = imageID
+	nodesDef.Image = abstractImage.ID
 
 	if !req.NodesDef.Equals(emptySizing) {
 		if lower, err := req.NodesDef.LowerThan(nodesDefault); err == nil && lower {
@@ -519,7 +524,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 			defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*gatewaysDef)
 			defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*mastersDef)
 			defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(*nodesDef)
-			defaultsV2.Image = imageID
+			defaultsV2.Image = imageQuery
 			return nil
 		})
 	})
@@ -1488,14 +1493,20 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	hostReq.PublicIP = false
 	hostReq.KeepOnFailure = p.keepOnFailure
+	if p.masterDef.Image != "" {
+		hostReq.ImageRef = p.masterDef.Image
+	}
+	if p.masterDef.Template != "" {
+		hostReq.TemplateRef = p.masterDef.Template
+	}
 
-	rh, xerr := NewHost(instance.GetService())
+	hostInstance, xerr := NewHost(instance.GetService())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	_, xerr = rh.Create(task.GetContext(), hostReq, p.masterDef)
+	_, xerr = hostInstance.Create(task.GetContext(), hostReq, p.masterDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1503,7 +1514,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
-			if derr := rh.Delete(context.Background()); derr != nil {
+			if derr := hostInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Host is considered as a successful deletion, continue
@@ -1523,10 +1534,10 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 			}
 
 			node := nodesV3.ByNumericalID[nodeIdx]
-			node.ID = rh.GetID()
+			node.ID = hostInstance.GetID()
 
 			// Recover public IP of the master if it exists
-			node.PublicIP, innerXErr = rh.GetPublicIP()
+			node.PublicIP, innerXErr = hostInstance.GetPublicIP()
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
@@ -1537,7 +1548,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 			}
 
 			// Recover the private IP of the master that MUST exist
-			node.PrivateIP, innerXErr = rh.GetPrivateIP()
+			node.PrivateIP, innerXErr = hostInstance.GetPrivateIP()
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1555,22 +1566,22 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
 
-	hostLabel = fmt.Sprintf("master #%d (%s)", p.index, rh.GetName())
+	hostLabel = fmt.Sprintf("master #%d (%s)", p.index, hostInstance.GetName())
 
-	xerr = instance.installProxyCacheClient(task.GetContext(), rh, hostLabel)
+	xerr = instance.installProxyCacheClient(task.GetContext(), hostInstance, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Master, rh, hostLabel)
+	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Master, hostInstance, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	logrus.Debugf("[%s] Host creation successful.", hostLabel)
-	return rh, nil
+	return hostInstance, nil
 }
 
 // taskConfigureMasters configure masters
@@ -1921,6 +1932,12 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	hostReq.PublicIP = false
 	hostReq.KeepOnFailure = p.keepOnFailure
+	if p.nodeDef.Image != "" {
+		hostReq.ImageRef = p.nodeDef.Image
+	}
+	if p.nodeDef.Template != "" {
+		hostReq.TemplateRef = p.nodeDef.Template
+	}
 
 	hostInstance, xerr := NewHost(instance.GetService())
 	xerr = debug.InjectPlannedFail(xerr)

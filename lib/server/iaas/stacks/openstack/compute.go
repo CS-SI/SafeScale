@@ -634,7 +634,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nullAHF, nullUDC, xerr
 	}
 
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(request.TemplateRef)
 	if xerr != nil {
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image")
 	}
@@ -690,7 +690,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				}
 			}()
 
-			server, innerXErr = s.rpcCreateServer(request.ResourceName, hostNets, request.TemplateID, request.ImageID, userDataPhase1, azone)
+			server, innerXErr = s.rpcCreateServer(request.ResourceName, hostNets, request.TemplateRef, request.ImageRef, userDataPhase1, azone)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:

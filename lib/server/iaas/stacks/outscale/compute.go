@@ -732,7 +732,7 @@ func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.
 	}()
 
 	isGateway := request.IsGateway // && defaultSubnet != nil && defaultSubnet.Name != abstract.SingleHostNetworkName
-	template, err := s.InspectTemplate(request.TemplateID)
+	template, err := s.InspectTemplate(request.TemplateRef)
 	if err != nil {
 		return err
 	}
@@ -838,7 +838,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
-	vmType, xerr := outscaleTemplateID(request.TemplateID)
+	vmType, xerr := outscaleTemplateID(request.TemplateRef)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
@@ -847,7 +847,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// -- create host --
 	vmsRequest := osc.CreateVmsRequest{
-		ImageId:  request.ImageID,
+		ImageId:  request.ImageRef,
 		UserData: base64.StdEncoding.EncodeToString(buf.Bytes()),
 		VmType:   vmType,
 		SubnetId: subnetID,
@@ -858,7 +858,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		KeypairName: creationKeyPair.Name,
 	}
 
-	tpl, xerr := s.InspectTemplate(request.TemplateID)
+	tpl, xerr := s.InspectTemplate(request.TemplateRef)
 	if xerr != nil {
 		return nil, nil, xerr
 	}

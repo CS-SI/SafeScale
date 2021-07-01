@@ -209,7 +209,7 @@ func (handler *hostHandler) Create(
 	} else {
 		subnetName = req.ResourceName
 	}
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, subnetName, req.ImageID, req.PublicIP, force).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, subnetName, req.ImageRef, req.PublicIP, force).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 	defer fail.OnPanic(&xerr)

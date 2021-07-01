@@ -235,7 +235,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 
 	// Determine system disk size based on vcpus count
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(request.TemplateRef)
 	if xerr != nil {
 		return nullAHF, nullUD, fail.Wrap(xerr, "failed to get image")
 	}
@@ -254,7 +254,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		}
 	}
 
-	rim, xerr := s.InspectImage(request.ImageID)
+	rim, xerr := s.InspectImage(request.ImageRef)
 	if xerr != nil {
 		return nullAHF, nullUD, xerr
 	}

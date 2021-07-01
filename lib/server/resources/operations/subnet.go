@@ -681,49 +681,52 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		return fail.Wrap(xerr, "failed to find appropriate template")
 	}
 
-	originalGwReq := gwSizing.Image
-
 	// define image...
-	if gwSizing.Image == "" {
-		gwSizing.Image = req.Image
-	}
-	if gwSizing.Image == "" {
-		cfg, xerr := svc.GetConfigurationOptions()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+	imageQuery := gwSizing.Image
+	if imageQuery == "" {
+		imageQuery = req.Image
+		if imageQuery == "" {
+			cfg, xerr := svc.GetConfigurationOptions()
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
 			return xerr
 		}
 
-		gwSizing.Image = cfg.GetString("DefaultImage")
-	}
-	if gwSizing.Image == "" {
-		gwSizing.Image = "Ubuntu 18.04"
-	}
-	if req.Image == "" {
-		req.Image = gwSizing.Image
-	}
-
-	img, xerr := svc.SearchImage(gwSizing.Image)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return fail.Wrap(xerr, "failed to find image '%s'", gwSizing.Image)
-	}
-
-	// look for an exact match by ID
-	{
-		imgs, xerr := svc.ListImages(true)
+			imageQuery = cfg.GetString("DefaultImage")
+		}
+		if imageQuery == "" {
+			imageQuery = "Ubuntu 18.04"
+		}
+		img, xerr := svc.SearchImage(imageQuery)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return fail.Wrap(xerr, "failure listing images")
-		}
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// look for an exact match by ID
+				imgs, xerr := svc.ListImages(true)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return fail.Wrap(xerr, "failure listing images")
+				}
 
-		for _, aimg := range imgs {
-			if strings.Compare(aimg.ID, originalGwReq) == 0 {
-				logrus.Tracef("exact match by ID, ignoring jarowinkler results")
-				img = &aimg
-				break
+				img = nil
+				for _, aimg := range imgs {
+					if strings.Compare(aimg.ID, imageQuery) == 0 {
+						logrus.Tracef("exact match by ID, ignoring jarowinkler results")
+						img = &aimg
+						break
+					}
+				}
+				if img == nil {
+					return fail.Wrap(xerr, "failed to find image with ID %s", imageQuery)
+				}
+
+			default:
+				return fail.Wrap(xerr, "failed to find image '%s'", imageQuery)
 			}
 		}
+
+		gwSizing.Image = img.ID
 	}
 
 	subnetName := instance.GetName()
@@ -770,11 +773,11 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	}
 
 	gwRequest := abstract.HostRequest{
-		ImageID:          img.ID,
-		ImageRequest:     originalGwReq,
+		ImageRef:         gwSizing.Image,
+		ImageRequest:     imageQuery,
 		Subnets:          []*abstract.Subnet{as},
 		SSHPort:          req.DefaultSSHPort,
-		TemplateID:       template.ID,
+		TemplateRef:      template.ID,
 		KeepOnFailure:    req.KeepOnFailure,
 		SecurityGroupIDs: sgs,
 		IsGateway:        true,

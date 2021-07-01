@@ -718,7 +718,7 @@ func (svc service) SearchImage(osname string) (*abstract.Image, fail.Error) {
 		normalizedImageName := normalizeString(entry.Name, reg)
 		normalizedImageName = addPadding(normalizedImageName, maxLength)
 		wfScore := smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
-		logrus.Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
+		//logrus.Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
 
 		if minWFScore == -1 || wfScore < minWFScore {
 			if strings.Contains(normalizedImageName, normalizedOSName) {
@@ -784,14 +784,14 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 	hostReq := abstract.HostRequest{
 		ResourceName:   request.ResourceName,
 		HostName:       request.HostName,
-		ImageID:        request.ImageID,
-		ImageRequest:   request.ImageID,
+		ImageRef:       request.ImageRef,
+		ImageRequest:   request.ImageRef,
 		KeyPair:        kp,
 		PublicIP:       request.PublicIP,
 		Subnets:        request.Subnets,
 		DefaultRouteIP: request.DefaultRouteIP,
 		// DefaultGateway: request.DefaultGateway,
-		TemplateID: request.TemplateID,
+		TemplateRef: request.TemplateRef,
 	}
 	host, userData, rerr := svc.CreateHost(hostReq)
 	if rerr != nil {

@@ -604,6 +604,9 @@ func (c *MetadataCore) Reload() (xerr fail.Error) {
 func (c *MetadataCore) reload() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	if c.loaded && !c.committed {
 		return fail.InconsistentError("cannot reload a not committed data")
 	}
