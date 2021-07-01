@@ -425,10 +425,10 @@ func (instance *task) SetID(id string) fail.Error {
 	case RUNNING:
 		fallthrough
 	case TIMEOUT:
-		return fail.InconsistentError("cannot set ID of a started Task")
+		return fail.InconsistentError("cannot set ID of a Task in status (%d)", instance.status)
 
 	case DONE:
-		return fail.InconsistentError("cannot set ID of a terminated Task")
+		return fail.InconsistentError("cannot set ID of a terminated (status %d) Task", instance.status)
 
 	case UNKNOWN:
 		fallthrough
@@ -884,14 +884,14 @@ func (instance *task) IsSuccessful() (bool, fail.Error) {
 		return instance.err == nil, nil
 
 	case READY:
-		return false, fail.InconsistentError("cannot test the success of a Task that has not started")
+		return false, fail.InconsistentError("cannot test the success of a Task (status %d) that has not started", status)
 
 	case ABORTED:
 		fallthrough
 	case TIMEOUT:
 		fallthrough
 	case RUNNING:
-		return false, fail.InvalidRequestError("cannot test the success of a Task that has not been waited")
+		return false, fail.InvalidRequestError("cannot test the success of a Task (status %d) that has not been waited", status)
 
 	case UNKNOWN:
 		fallthrough
