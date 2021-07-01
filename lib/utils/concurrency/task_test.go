@@ -1090,6 +1090,37 @@ func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 	os.Stdout = rescueStdout
 }
 
+func TestStartWithTimeoutTask(t *testing.T) {
+	bg := context.Background()
+	single, xerr := NewTaskWithContext(bg)
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	// timeouts by design
+	single, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
+	require.Nil(t, xerr)
+
+	// wait for it
+	time.Sleep(65 * time.Millisecond)
+
+	stat, err := single.GetStatus()
+	if err != nil {
+		t.Errorf("Problem retrieving status ?")
+	}
+
+	if stat != TIMEOUT {
+		t.Errorf("Where is the timeout ??, that's the textbook definition")
+	}
+
+	_, err = single.Wait()
+	if xerr != nil {
+		if _, ok := xerr.(*fail.ErrTimeout); !ok {
+			t.Errorf("Where are the timeout errors ??: %s", spew.Sdump(xerr))
+		}
+	}
+	require.NotNil(t, xerr)
+}
+
 func TestLikeBeforeWithoutAbort(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
