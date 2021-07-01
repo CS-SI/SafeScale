@@ -697,7 +697,6 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 		xerr = overlord.Abort()
 		require.Nil(t, xerr)
 		end := time.Since(begin)
-		t.Logf("Abort() lasted %v\n", end)
 
 		// did we abort ?
 		aborted := overlord.Aborted()
@@ -708,8 +707,10 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 		_, xerr = overlord.Wait()
 		require.NotNil(t, xerr)
 		end = time.Since(begin)
-		t.Logf("Wait() lasted %v\n", end)
+
 		if end >= (time.Millisecond * 100) { // this is twice the maximum time...
+			t.Logf("Abort() lasted %v\n", end)
+			t.Logf("Wait() lasted %v\n", end)
 			t.Errorf("It should have finished near 100 ms but it didn't!!")
 			t.FailNow()
 		}
