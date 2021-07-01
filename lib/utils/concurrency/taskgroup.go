@@ -393,8 +393,10 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			// parent task is running, we need to abort it, even if abort was disable, now that all the children have terminated
 			instance.task.forceAbort()
 
-			_, _ = instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
-			// FIXME: If so, we can assert the result and have an early warning if it breaks
+			_, check := instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
+			if _, ok := check.(*fail.ErrAborted); !ok {
+				logrus.Tracef("BROKEN ASSUMPTION: %v", check)
+			}
 
 			var forgedError fail.Error
 			if status == ABORTED {
@@ -560,7 +562,10 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 	// parent task is still running, we need to abort it, even if abort was disable, now that all the children have terminated
 	instance.task.forceAbort()
 
-	_, _ = instance.task.Wait() // will get *fail.ErrErrAborted, we know that, we asked for
+	_, check := instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
+	if _, ok := check.(*fail.ErrAborted); !ok {
+		logrus.Tracef("BROKEN ASSUMPTION: %v", check)
+	}
 
 	// build error to return for the parent Task
 	var forgeError fail.Error
