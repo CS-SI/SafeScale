@@ -53,6 +53,13 @@ func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.En
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return 0, "", "", xerr
 	}
 
@@ -178,6 +185,13 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return 0, "", "", xerr
 	}
 
@@ -298,6 +312,13 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}

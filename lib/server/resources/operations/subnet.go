@@ -96,6 +96,13 @@ func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bo
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -404,6 +411,13 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -1330,6 +1344,13 @@ func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -1376,6 +1397,13 @@ func (instance *Subnet) AdoptHost(ctx context.Context, host resources.Host) (xer
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -1450,6 +1478,13 @@ func (instance *Subnet) AbandonHost(ctx context.Context, hostID string) (xerr fa
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -1481,6 +1516,13 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1643,6 +1685,13 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -2120,6 +2169,13 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sg resources.Secu
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -2181,6 +2237,13 @@ func (instance *Subnet) UnbindSecurityGroup(ctx context.Context, sg resources.Se
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -2240,22 +2303,29 @@ func (instance *Subnet) UnbindSecurityGroup(ctx context.Context, sg resources.Se
 func (instance *Subnet) ListSecurityGroups(ctx context.Context, state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	var nullList []*propertiesv1.SecurityGroupBond
+	var emptyList []*propertiesv1.SecurityGroupBond
 	if instance == nil || instance.IsNull() {
-		return nullList, fail.InvalidInstanceError()
+		return emptyList, fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return nullList, fail.InvalidParameterCannotBeNilError("ctx")
+		return emptyList, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nullList, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
+		return emptyList, xerr
 	}
 
 	if task.Aborted() {
-		return nullList, fail.AbortedError(nil, "aborted")
+		return emptyList, fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"), "(%s)", state.String()).Entering()
@@ -2293,6 +2363,13 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, rsg resources.S
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -2383,6 +2460,13 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sg resources.S
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -2533,6 +2617,13 @@ func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abst
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}

@@ -445,6 +445,13 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return -1, "", "", xerr
 	}
 

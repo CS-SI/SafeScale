@@ -40,9 +40,15 @@ import (
 )
 
 // delete effectively remove a Security Group
-func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fail.Error {
-	task, xerr := concurrency.TaskFromContext(ctx)
+func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fail.Error {	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
