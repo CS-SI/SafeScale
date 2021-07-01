@@ -1090,36 +1090,6 @@ func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 	os.Stdout = rescueStdout
 }
 
-func TestStartWithTimeoutTaskNoCtx(t *testing.T) { // this and next tests are the same except the way the task is created
-	single, xerr := NewTask()
-	require.NotNil(t, single)
-	require.Nil(t, xerr)
-
-	// timeouts by design
-	single, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
-	require.Nil(t, xerr)
-
-	// wait for it
-	time.Sleep(65 * time.Millisecond)
-
-	stat, err := single.GetStatus()
-	if err != nil {
-		t.Errorf("Problem retrieving status ?")
-	}
-
-	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
-	}
-
-	_, err = single.Wait()
-	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrTimeout); !ok {
-			t.Errorf("Where are the timeout errors ??: %s", spew.Sdump(xerr))
-		}
-	}
-	require.NotNil(t, xerr)
-}
-
 func TestStartWithTimeoutTask(t *testing.T) {
 	bg := context.Background()
 	single, xerr := NewTaskWithContext(bg)
@@ -1142,12 +1112,23 @@ func TestStartWithTimeoutTask(t *testing.T) {
 		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
 	}
 
-	_, err = single.Wait()
-	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrTimeout); !ok {
-			t.Errorf("Where are the timeout errors ??: %s", spew.Sdump(xerr))
-		}
-	}
+	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
+	require.NotNil(t, xerr)
+}
+
+func TestStartWithTimeoutAbortedTask(t *testing.T) {
+	bg := context.Background()
+	single, xerr := NewTaskWithContext(bg)
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	// timeouts by design
+	single, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
+	require.Nil(t, xerr)
+
+	_ = single.Abort()
+
+	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
 	require.NotNil(t, xerr)
 }
 

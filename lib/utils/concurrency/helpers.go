@@ -18,6 +18,7 @@ package concurrency
 
 import (
 	"fmt"
+	"math"
 	mrand "math/rand"
 	"sync"
 	"time"
@@ -59,7 +60,7 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 		weWereAborted := false
 		iterations := int64(high / latency)
 		rn := randomInt(low, high)
-		tempo := time.Duration(int64(rn)/int64(iterations)) * time.Millisecond
+		tempo := time.Duration(int64(math.Ceil(float64(rn)/float64(iterations)))) * time.Millisecond
 		count := int64(0)
 		// fmt.Printf("Sleeping %d iterations and a time of %s\n", iterations, tempo)
 		for { // do some work, then look for aborted, again and again
@@ -106,7 +107,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 		}
 		iterations := int64(high / latency)
 		rn := randomInt(low, high)
-		tempo := time.Duration(int64(rn)/int64(iterations)) * time.Millisecond
+		tempo := time.Duration(int64(math.Ceil(float64(rn)/float64(iterations)))) * time.Millisecond
 		count := int64(0)
 		var iErr error = nil
 
