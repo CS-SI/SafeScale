@@ -42,7 +42,7 @@ func TestRealCharge(t *testing.T) {
 	started := 0
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if xerr != nil {
@@ -52,7 +52,7 @@ func TestRealCharge(t *testing.T) {
 		} else {
 			started++
 		}
-		if RandomInt(50, 250) > 200 {
+		if randomInt(50, 250) > 200 {
 			xerr = overlord.Abort()
 			if xerr != nil {
 				t.Errorf("What, Cannot abort ??")
@@ -85,13 +85,13 @@ func TestRealCharges(t *testing.T) {
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
-		if RandomInt(50, 250) > 200 {
+		if randomInt(50, 250) > 200 {
 			fmt.Println("abort")
 			aErr := overlord.Abort()
 			if aErr != nil {
@@ -131,7 +131,7 @@ func TestRealTryCharges(t *testing.T) {
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(200, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(200, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 		if err != nil {
@@ -169,7 +169,7 @@ func TestTryWaitRecoversErrorContent(t *testing.T) {
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(200, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(200, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 		if xerr != nil {
@@ -178,7 +178,7 @@ func TestTryWaitRecoversErrorContent(t *testing.T) {
 	}
 
 	_, xerr = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(RandomInt(10, 15)) * time.Millisecond)
+		time.Sleep(time.Duration(randomInt(10, 15)) * time.Millisecond)
 		return "waiting game", fail.NewError("Ouch")
 	}, nil, InheritParentIDOption, AmendID("/ill-child"))
 	if xerr != nil {
@@ -219,7 +219,7 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithTimeout(t *testing.T) {
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(200, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(200, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 		if xerr != nil {
@@ -228,7 +228,7 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithTimeout(t *testing.T) {
 	}
 
 	_, xerr = overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(RandomInt(10, 15)) * time.Millisecond)
+		time.Sleep(time.Duration(randomInt(10, 15)) * time.Millisecond)
 		return "waiting game", fail.NewError("Ouch")
 	}, nil, 12*time.Millisecond, InheritParentIDOption, AmendID("/ill-child"))
 	if xerr != nil {

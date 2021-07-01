@@ -149,7 +149,7 @@ func TestWaitingGame(t *testing.T) {
 		require.NotNil(t, got)
 
 		theTask, err := got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if err == nil {
@@ -186,7 +186,7 @@ func TestOneWaitingForGame(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	_, err = got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 		return "waiting game", nil
 	}, nil)
 	if err != nil {
@@ -212,7 +212,7 @@ func TestOneWaitingForGameTw(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	_, err = got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 		return "waiting game", nil
 	}, nil)
 	if err != nil {
@@ -369,7 +369,7 @@ func TestTaskCantBeReused(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	_, err = got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 		return "waiting game", nil
 	}, nil)
 	if err != nil {
@@ -385,7 +385,7 @@ func TestTaskCantBeReused(t *testing.T) {
 	require.NotNil(t, tr)
 
 	_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 		return "waiting game", nil
 	}, nil, 10*time.Millisecond)
 	if err == nil {
@@ -412,7 +412,7 @@ func TestResultCheck(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 		return "waiting game", nil
 	}, nil, 10*time.Millisecond)
 	if err != nil {
@@ -440,7 +440,7 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	_, xerr = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		tempo := time.Duration(RandomInt(50, 250)) * time.Millisecond
+		tempo := time.Duration(randomInt(50, 250)) * time.Millisecond
 		for i := 0; i < 100; i++ {
 			if t.Aborted() {
 				return "killed", fail.AbortedError(nil, "killed by parent")
@@ -506,7 +506,7 @@ func TestTryWaitOfAbortedTask(t *testing.T) {
 	require.Nil(t, res)
 
 	_, xerr = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		tempo := time.Duration(RandomInt(50, 250)) * time.Millisecond
+		tempo := time.Duration(randomInt(50, 250)) * time.Millisecond
 		for i := 0; i < 100; i++ {
 			if t.Aborted() {
 				return "killed", fail.AbortedError(nil, "killed by parent")
@@ -570,7 +570,7 @@ func TestTryWaitOfOkTask(t *testing.T) {
 	require.Nil(t, res)
 
 	_, xerr = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		tempo := time.Duration(RandomInt(50, 250)) * time.Millisecond
+		tempo := time.Duration(randomInt(50, 250)) * time.Millisecond
 		for i := 0; i < 100; i++ {
 			if t.Aborted() {
 				return "killed", fail.AbortedError(nil, "killed by parent")
@@ -634,7 +634,7 @@ func TestWaitingForGame(t *testing.T) {
 		require.NotNil(t, got)
 
 		theTask, err := got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if err == nil {
@@ -992,7 +992,6 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 		require.Nil(t, xerr)
 
 		begin := time.Now()
-		var singleEnd time.Duration
 		single, xerr = single.Start(taskgen(int(sleep), int(sleep), 4, 0, 0, 0, false), nil)
 		startEnd := time.Since(begin)
 		fmt.Printf("single.Start() took %v\n", startEnd)
@@ -1004,7 +1003,6 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 		}()
 
 		_, xerr = single.Wait()
-		fmt.Printf("Task executes in %v\n", singleEnd)
 		totalEnd := time.Since(begin)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -1043,8 +1041,8 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	funk(10, 50, 48, true)  // latency matters, this sometimes fails
 	funk(11, 50, 49, true)  // latency matters, this sometimes fails
 	funk(12, 50, 51, false) // latency matters, this sometimes fails
-	funk(12, 50, 52, false) // latency matters, this sometimes fails
-	funk(20, 50, 63, false) // if we go far enough, no errors
+	funk(13, 50, 52, false) // latency matters, this sometimes fails
+	funk(14, 50, 63, false) // if we go far enough, no errors
 }
 
 func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
@@ -1492,10 +1490,10 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 				for { // do some work, then look for aborted, again and again
 					// some work
-					time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+					time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
 					if t.Aborted() {
 						// Cleaning up first before leaving... ;)
-						time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+						time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
 						break
 					}
 				}
@@ -1507,7 +1505,7 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 				acha <- "Bailing out"
 
 				// flip a coin, true and we panic, false we don't
-				if RandomInt(0, 2) == 1 {
+				if randomInt(0, 2) == 1 {
 					return "mistakes happen", fail.NewError("It was head")
 				}
 
