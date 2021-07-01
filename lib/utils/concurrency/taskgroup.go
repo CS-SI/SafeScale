@@ -248,68 +248,81 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 		return instance, err
 	}
 
-	// Do not try to start a new Task if TaskGroup is aborted or terminated (all children are done and TaskGroup has been waited)
-	if status != READY && status != RUNNING {
-		return nil, fail.InvalidRequestError("cannot start a new action, TaskGroup is aborted or done (status=%d)", status)
-	}
+	switch status {
+	case DONE:
+		return nil, fail.NotAvailableError("cannot start a new Task in a terminated TaskGroup")
 
-	// instance.last++
-	subtask, err := NewTaskWithParent(instance.task, options...)
-	if err != nil {
-		return nil, err
-	}
-
-	newChild := subTask{
-		task: subtask,
-	}
-
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case "normalize_error":
-				newChild.normalizeError = v.Value().(func(error) error) // FIXME: Unchecked cast
-			default:
-			}
+	case READY:
+		fallthrough
+	case RUNNING:
+		// can start a new Task
+		// instance.last++
+		subtask, err := NewTaskWithParent(instance.task, options...)
+		if err != nil {
+			return nil, err
 		}
-	}
 
-	if timeout > 0 {
-		_, xerr = subtask.StartWithTimeout(action, params, timeout, options...)
-	} else {
-		_, xerr = subtask.Start(action, params)
-	}
-	if xerr != nil {
-		return nil, err
-	}
+		newChild := subTask{
+			task: subtask,
+		}
 
-	instance.children.tasks = append(instance.children.tasks, newChild)
-
-	// starts parent Task doing nothing more than waiting for forceAbort()
-	if status != RUNNING {
-		fnNOP := func(t Task, _ TaskParameters) (TaskResult, fail.Error) {
-			// We disarm the cancel signal because we do not want this task to stop prematurely
-			// Abort() will be used on it to abort in time
-			t.(*task).lock.Lock()
-			t.(*task).cancelDisengaged = true
-			t.(*task).lock.Unlock()
-
-			for {
-				aborted := t.Aborted()
-				if aborted {
-					return nil, fail.AbortedError(nil)
+		if len(options) > 0 {
+			for _, v := range options {
+				switch v.Key() {
+				case "normalize_error":
+					newChild.normalizeError = v.Value().(func(error) error) // FIXME: Unchecked cast
+				default:
 				}
-				time.Sleep(50 * time.Millisecond) // FIXME: hardcoded value :-(
 			}
 		}
 
-		_, stErr := instance.task.Start(fnNOP, nil)
-		if stErr != nil {
-			logrus.Tracef("ignored task start error: %v", stErr)
+		if timeout > 0 {
+			_, xerr = subtask.StartWithTimeout(action, params, timeout, options...)
+		} else {
+			_, xerr = subtask.Start(action, params)
+		}
+		if xerr != nil {
+			return nil, err
 		}
 
-	}
+		instance.children.tasks = append(instance.children.tasks, newChild)
 
-	return subtask, nil
+		// starts parent Task doing nothing more than waiting for forceAbort()
+		if status != RUNNING {
+			fnNOP := func(t Task, _ TaskParameters) (TaskResult, fail.Error) {
+				// We disarm the cancel signal because we do not want this task to stop prematurely
+				// Abort() will be used on it to abort in time
+				t.(*task).lock.Lock()
+				t.(*task).cancelDisengaged = true
+				t.(*task).lock.Unlock()
+
+				for {
+					aborted := t.Aborted()
+					if aborted {
+						return nil, fail.AbortedError(nil)
+					}
+					time.Sleep(50 * time.Millisecond) // FIXME: hardcoded value :-(
+				}
+			}
+
+			_, stErr := instance.task.Start(fnNOP, nil)
+			if stErr != nil {
+				logrus.Tracef("ignored task start error: %v", stErr)
+			}
+
+		}
+		return subtask, nil
+
+	case ABORTED:
+		fallthrough
+	case TIMEOUT:
+		return nil, fail.NotAvailableError("cannot start a new Task in an interrupting TaskGroup")
+
+	case UNKNOWN:
+		fallthrough
+	default:
+		return nil, fail.InconsistentError("cannot start a new Task in TaskGroup: unknown status (%d)", status)
+	}
 }
 
 // IsSuccessful tells if the TaskGroup has been executed without error
