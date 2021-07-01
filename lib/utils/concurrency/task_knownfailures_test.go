@@ -93,7 +93,7 @@ func TestRealCharges(t *testing.T) {
 		}
 		ids[ntId] = ntId
 
-		if RandomInt(50, 250) > 200 {
+		if randomInt(50, 250) > 200 {
 			fmt.Println("abort")
 			aErr := overlord.Abort()
 			if aErr != nil {

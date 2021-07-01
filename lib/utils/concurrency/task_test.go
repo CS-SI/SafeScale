@@ -462,6 +462,9 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		t.FailNow()
 	}
 
+	_, _, xerr = got.WaitFor(4 * time.Millisecond)
+	require.NotNil(t, xerr)
+
 	_, _, xerr = got.WaitFor(50 * time.Millisecond)
 	require.NotNil(t, xerr)
 
@@ -1133,6 +1136,9 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 	if stat != TIMEOUT {
 		t.Errorf("Where is the timeout ??, that's the textbook definition")
 	}
+
+	_, _, xerr = single.WaitFor(4 * time.Millisecond)
+	require.NotNil(t, xerr)
 
 	_, _, xerr = single.WaitFor(50 * time.Millisecond)
 	require.NotNil(t, xerr)
