@@ -42,8 +42,8 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	}
 }
 
-// RandomInt will return a random integer between a specified range.
-func RandomInt(min, max int) int {
+// randomInt will return a random integer between a specified range.
+func randomInt(min, max int) int {
 	if min == max {
 		return min
 	}
@@ -58,7 +58,7 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 		}
 		weWereAborted := false
 		iterations := int64(high / latency)
-		workTime := time.Duration(RandomInt(low, high)) * time.Millisecond
+		workTime := time.Duration(randomInt(low, high)) * time.Millisecond
 		tempo := time.Duration(workTime.Milliseconds() / iterations)
 		count := int64(0)
 		for { // do some work, then look for aborted, again and again
@@ -70,7 +70,7 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 			if t.Aborted() {
 				// Cleaning up first before leaving... ;)
 				if cleanfactor > 0 {
-					time.Sleep(time.Duration(RandomInt(cleanfactor*low, cleanfactor*high)) * time.Millisecond)
+					time.Sleep(time.Duration(randomInt(cleanfactor*low, cleanfactor*high)) * time.Millisecond)
 				}
 				weWereAborted = true
 				break
@@ -104,7 +104,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 			defer fail.OnPanic(&xerr)
 		}
 		iterations := int64(high / latency)
-		workTime := time.Duration(RandomInt(low, high)) * time.Millisecond
+		workTime := time.Duration(randomInt(low, high)) * time.Millisecond
 		tempo := time.Duration(workTime.Milliseconds() / iterations)
 		count := int64(0)
 		var iErr error = nil
@@ -119,7 +119,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 			if t.Aborted() {
 				// Cleaning up first before leaving... ;)
 				if cleanfactor > 0 {
-					time.Sleep(time.Duration(RandomInt(cleanfactor*low, cleanfactor*high)) * time.Millisecond)
+					time.Sleep(time.Duration(randomInt(cleanfactor*low, cleanfactor*high)) * time.Millisecond)
 				}
 				weWereAborted = true
 				_ = custom() // for side-effects

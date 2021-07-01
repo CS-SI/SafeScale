@@ -79,10 +79,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 						weWereAborted := false
 						for { // do some work, then look for aborted, again and again
 							// some work
-							time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+							time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
 							if t.Aborted() {
 								// Cleaning up first before leaving... ;)
-								time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+								time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
 								weWereAborted = true
 								break
 							}
@@ -247,10 +247,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 						weWereAborted := false
 						for { // do some work, then look for aborted, again and again
 							// some work
-							time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+							time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
 							if t.Aborted() {
 								// Cleaning up first before leaving... ;)
-								time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+								time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
 								weWereAborted = true
 								break
 							}
@@ -263,7 +263,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 						acha <- "Bailing out"
 
 						// we throw a loaded dice, 70% of the time we should have a panic
-						if RandomInt(0, 10) > 3 {
+						if randomInt(0, 10) > 3 {
 							atomic.AddInt32(&failureCounter, 1)
 							panic("head")
 						}
@@ -423,10 +423,10 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 						out := 4
 						for { // do some work, then look for aborted, again and again
 							// some work
-							time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+							time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
 							if t.Aborted() {
 								// Cleaning up first before leaving... ;)
-								time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+								time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
 								weWereAborted = true
 								break
 							}
@@ -443,7 +443,7 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 						acha <- "Bailing out"
 
 						// flip a coin, true and we panic, false we don't
-						if RandomInt(0, 10) > 3 {
+						if randomInt(0, 10) > 3 {
 							panic("head")
 						}
 						// tails
@@ -572,10 +572,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 						weWereAborted := false
 						for { // do some work, then look for aborted, again and again
 							// some work
-							time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+							time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
 							if t.Aborted() {
 								// Cleaning up first before leaving... ;)
-								time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+								time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
 								weWereAborted = true
 								break
 							}
@@ -592,7 +592,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 						}
 
 						// flip a coin, true and we panic, false we don't
-						if RandomInt(0, 2) == 1 {
+						if randomInt(0, 2) == 1 {
 							atomic.AddInt32(&failureCounter, 1)
 							return "mistakes happen", fail.NewError("It was head")
 						}
@@ -777,10 +777,10 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 						weWereAborted := false
 						for { // do some work, then look for aborted, again and again
 							// some work
-							time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+							time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
 							if t.Aborted() {
 								// Cleaning up first before leaving... ;)
-								time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+								time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
 								weWereAborted = true
 								break
 							}
@@ -911,7 +911,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 
 		for ind := 0; ind < 10; ind++ {
 			_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				time.Sleep(time.Duration(RandomInt(10, 20)) * time.Millisecond)
+				time.Sleep(time.Duration(randomInt(10, 20)) * time.Millisecond)
 				return "waiting game", nil
 			}, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 			if err != nil {

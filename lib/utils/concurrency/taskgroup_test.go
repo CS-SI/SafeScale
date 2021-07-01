@@ -68,7 +68,7 @@ func TestIntrospection(t *testing.T) {
 
 		for ind := 0; ind < 800; ind++ {
 			_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				wat := time.Duration(RandomInt(50, 250)) * time.Millisecond
+				wat := time.Duration(randomInt(50, 250)) * time.Millisecond
 				tempo := wat / 100
 				for i := 0; i < 100; i++ {
 					if t.Aborted() {
@@ -123,7 +123,7 @@ func TestIntrospectionWithErrors(t *testing.T) {
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if err != nil {
@@ -133,7 +133,7 @@ func TestIntrospectionWithErrors(t *testing.T) {
 	}
 
 	_, err = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 		return "waiting game", fail.NewError("something happened")
 	}, nil)
 	if err != nil {
@@ -179,7 +179,7 @@ func TestChildrenWaitingGameOnlyAWhile(t *testing.T) {
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if err != nil {
@@ -298,7 +298,7 @@ func TestChildrenWaitingGame(t *testing.T) {
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if err != nil {
@@ -325,7 +325,7 @@ func TestChildrenHaveDistinctIDs(t *testing.T) {
 
 	for ind := 0; ind < numTasks; ind++ {
 		subtaskID, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(RandomInt(50, 250)) * time.Millisecond)
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
 		}, nil)
 		if err != nil {
@@ -367,7 +367,7 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := RandomInt(50, 250)
+			rint := randomInt(50, 250)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
 			if rint > 100 {
 				panic("Panic protection is needed")
@@ -410,7 +410,7 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := RandomInt(50, 250)
+			rint := randomInt(50, 250)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
 			if rint > 55 {
 				return "", fail.NewError("suck it")
@@ -439,7 +439,7 @@ func TestChildrenTryWaitingGameWithRandomError(t *testing.T) {
 
 	for ind := 0; ind < 800; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := RandomInt(50, 250)
+			rint := randomInt(50, 250)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
 			if rint > 100 {
 				return "", fail.NewError("suck it")
@@ -491,7 +491,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 					t.FailNow()
 				}
 			}()
-			rint := RandomInt(5, 25)
+			rint := randomInt(5, 25)
 			if rint > 8 {
 				rint += 1000
 			}
@@ -572,14 +572,14 @@ func TestOneErrorOneOk(t *testing.T) {
 
 	_, err = overlord.Start(
 		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := RandomInt(30, 50)
+			rint := randomInt(30, 50)
 			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
 
 			return "waiting game", nil
 		}, nil)
 	_, err = overlord.Start(
 		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := RandomInt(30, 50)
+			rint := randomInt(30, 50)
 			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
 
 			return nil, fail.NewError("Ouch")
@@ -632,7 +632,7 @@ func TestChildrenWaitingGameWithTimeouts(t *testing.T) {
 	for ind := 0; ind < 100; ind++ {
 		fmt.Println("Iterating...")
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := time.Duration(RandomInt(300, 500)) * time.Millisecond
+			rint := time.Duration(randomInt(300, 500)) * time.Millisecond
 			fmt.Printf("Entering (sleeping %v)\n", rint)
 			time.Sleep(rint)
 			return "waiting game", nil
@@ -672,7 +672,7 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 
 		for ind := 0; ind < 10; ind++ {
 			_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				dur := time.Duration(RandomInt(30, 50)) * 10 * time.Millisecond
+				dur := time.Duration(randomInt(30, 50)) * 10 * time.Millisecond
 				tempo := dur / 100
 				for i := 0; i < 100; i++ {
 					if t.Aborted() {

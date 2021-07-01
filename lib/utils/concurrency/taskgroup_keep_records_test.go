@@ -30,14 +30,14 @@ func TestKeepRecords(t *testing.T) {
 		for ind := 0; ind < 5; ind++ { // work with 5 tasks
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-					mylimit := RandomInt(5, 15)
+					mylimit := randomInt(5, 15)
 					for { // iterate only a few times: mylimit
 						// some work
-						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+						time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
 
 						if t.Aborted() || mylimit <= 0 {
 							// Cleaning up first before leaving... ;)
-							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+							time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
 							break
 						}
 
@@ -45,7 +45,7 @@ func TestKeepRecords(t *testing.T) {
 					}
 
 					// flip a coin, true and there is an error, false if it's not
-					if RandomInt(0, 2) == 1 {
+					if randomInt(0, 2) == 1 {
 						return "mistakes happen", fail.NewError("It was head")
 					}
 
@@ -99,14 +99,14 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 		for ind := 0; ind < 10; ind++ { // work with 10 tasks
 			_, xerr = overlord.Start(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-					mylimit := RandomInt(5, 15)
+					mylimit := randomInt(5, 15)
 					for { // iterate only a few times: mylimit
 						// some work
-						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+						time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
 
 						if t.Aborted() || mylimit <= 0 {
 							// Cleaning up first before leaving... ;)
-							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+							time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
 							break
 						}
 
@@ -114,7 +114,7 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 					}
 
 					// flip a coin, true and there is an error, false if it's not
-					if RandomInt(0, 2) == 1 {
+					if randomInt(0, 2) == 1 {
 						return "mistakes happen", fail.NewError("It was head")
 					}
 
@@ -127,14 +127,14 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 		for ind := 0; ind < 10; ind++ { // and 10 unfortunate ones that will likely timeout
 			_, xerr = overlord.StartWithTimeout(
 				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-					mylimit := RandomInt(5, 15)
+					mylimit := randomInt(5, 15)
 					for { // iterate only a few times: mylimit
 						// some work
-						time.Sleep(time.Duration(RandomInt(20, 30)) * time.Millisecond)
+						time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
 
 						if t.Aborted() || mylimit <= 0 {
 							// Cleaning up first before leaving... ;)
-							time.Sleep(time.Duration(RandomInt(100, 800)) * time.Millisecond)
+							time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
 							break
 						}
 
@@ -142,7 +142,7 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 					}
 
 					// flip a coin, true and there is an error, false if it's not
-					if RandomInt(0, 2) == 1 {
+					if randomInt(0, 2) == 1 {
 						return "too late", fail.NewError("It was head")
 					}
 

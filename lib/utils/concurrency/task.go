@@ -196,7 +196,7 @@ func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 		}
 	}
 
-	return VoidTask()
+	return nil, fail.InvalidParameterCannotBeNilError("ctx")
 }
 
 // NewTask creates a new instance of Task
@@ -415,12 +415,26 @@ func (instance *task) SetID(id string) fail.Error {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	if instance.status == ABORTED {
-		return fail.AbortedError(nil, "aborted")
-	}
+	switch instance.status {
+	case READY:
+		instance.id = id
+		return nil
 
-	instance.id = id
-	return nil
+	case ABORTED:
+		fallthrough
+	case RUNNING:
+		fallthrough
+	case TIMEOUT:
+		return fail.InconsistentError("cannot set ID of a started Task")
+
+	case DONE:
+		return fail.InconsistentError("cannot set ID of a terminated Task")
+
+	case UNKNOWN:
+		fallthrough
+	default:
+		return fail.InconsistentError("cannot set ID of the Task: invalid status (%d)", instance.status)
+	}
 }
 
 // Start runs in goroutine the function with parameters
