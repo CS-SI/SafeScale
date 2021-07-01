@@ -349,12 +349,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nullAhf, nullUdc, xerr
 	}
 
-	template, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(request.TemplateRef)
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to get template")
 	}
 
-	rim, xerr := s.InspectImage(request.ImageID)
+	rim, xerr := s.InspectImage(request.ImageRef)
 	if xerr != nil {
 		return nullAhf, nullUdc, xerr
 	}
@@ -390,7 +390,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		DestinationType:     exbfv.DestinationVolume,
 		BootIndex:           "0",
 		DeleteOnTermination: true,
-		UUID:                request.ImageID,
+		UUID:                request.ImageRef,
 		VolumeType:          "SSD",
 		VolumeSize:          template.DiskSize,
 	}
@@ -405,7 +405,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		Name:             request.ResourceName,
 		SecurityGroups:   []string{},
 		Networks:         nets,
-		FlavorRef:        request.TemplateID,
+		FlavorRef:        request.TemplateRef,
 		UserData:         userDataPhase1,
 		AvailabilityZone: az,
 	}

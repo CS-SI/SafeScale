@@ -751,57 +751,56 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)
 	}
 
-	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
-	if hostReq.TemplateID == "" {
-		if hostDef.Template != "" {
-			tmpl, xerr := svc.FindTemplateByName(hostDef.Template)
+	// If TemplateRef is not explicitly provided, search the appropriate template to satisfy 'hostDef'
+	if hostDef.Template == "" {
+		templateQuery := hostReq.TemplateRef
+		if templateQuery != "" {
+			tmpl, xerr := svc.FindTemplateByName(templateQuery)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					// continue
-					debug.IgnoreError(xerr)
+					tmpl, xerr = svc.FindTemplateBySizing(hostDef)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						return nil, xerr
+					}
 				default:
 					return nil, xerr
 				}
-			} else {
-				hostReq.TemplateID = tmpl.ID
 			}
-		}
-	}
-	if hostReq.TemplateID == "" {
-		hostReq.TemplateID, xerr = instance.findTemplateID(hostDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
+			hostDef.Template = tmpl.ID
 		}
 	}
 
-	// If hostReq.ImageID is not explicitly defined, find an image ID corresponding to the content of hostDef.Image
-	if hostReq.ImageID == "" {
-		hostReq.ImageID, xerr = instance.findImageID(&hostDef)
+	// If hostReq.ImageRef is not explicitly defined, find an image ID corresponding to the content of hostDef.Image
+	imageQuery := hostDef.Image
+	if imageQuery == "" {
+		imageQuery = hostReq.ImageRef
+		hostDef.Image, xerr = instance.findImageID(imageQuery)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				imgs, xerr := svc.ListImages(true)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return nil, fail.Wrap(xerr, "failure listing images")
+				}
+
+				for _, v := range imgs {
+					if strings.Compare(v.ID, imageQuery) == 0 {
+						logrus.Tracef("exact match by ID, ignoring jarowinkler results")
+						hostDef.Image = v.ID
+						break
+					}
+				}
+			default:
 			return nil, fail.Wrap(xerr, "failed to find image to use on compute resource")
-		}
-	}
-
-	// look for an exact match by ID
-	{
-		imgs, xerr := svc.ListImages(true)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failure listing images")
-		}
-
-		for _, aimg := range imgs {
-			if strings.Compare(aimg.ID, hostReq.ImageRequest) == 0 {
-				logrus.Tracef("exact match by ID, ignoring jarowinkler results")
-				hostReq.ImageID = aimg.ID
-				break
 			}
 		}
 	}
+	hostReq.ImageRequest = imageQuery
 
 	// identify default Subnet
 	var (
@@ -1048,7 +1047,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 				systemV1.Type = parts[1]
 				systemV1.Flavor = parts[2]
 			}
-			systemV1.Image = hostReq.ImageID
+			systemV1.Image = hostReq.ImageRef
 			return nil
 		})
 	})
@@ -1385,14 +1384,8 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 	return nil
 }
 
-func (instance *Host) findTemplateID(hostDef abstract.HostSizingRequirements) (string, fail.Error) {
+func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequirements) (string, fail.Error) {
 	svc := instance.GetService()
-	if hostDef.Template != "" {
-		if tpl, xerr := svc.FindTemplateByName(hostDef.Template); xerr == nil {
-			return tpl.ID, nil
-		}
-		logrus.Warning(fail.NotFoundError("failed to find template '%s', trying to guess from sizing...", hostDef.Template))
-	}
 
 	template, xerr := svc.FindTemplateBySizing(hostDef)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1403,22 +1396,23 @@ func (instance *Host) findTemplateID(hostDef abstract.HostSizingRequirements) (s
 	return template.ID, nil
 }
 
-func (instance *Host) findImageID(hostDef *abstract.HostSizingRequirements) (string, fail.Error) {
+func (instance *Host) findImageID(imageName string) (string, fail.Error) {
 	svc := instance.GetService()
-	if hostDef.Image == "" {
+	if imageName == "" {
 		cfg, xerr := svc.GetConfigurationOptions()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return "", xerr
 		}
-		hostDef.Image = cfg.GetString("DefaultImage")
+
+		imageName = cfg.GetString("DefaultImage")
 	}
 
 	var img *abstract.Image
 	xerr := retry.WhileUnsuccessfulDelay1Second(
 		func() error {
 			var innerXErr fail.Error
-			img, innerXErr = svc.SearchImage(hostDef.Image)
+			img, innerXErr = svc.SearchImage(imageName)
 			return innerXErr
 		},
 		temporal.GetOperationTimeout(),

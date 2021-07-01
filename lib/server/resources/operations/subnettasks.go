@@ -54,15 +54,15 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	}
 
 	hostReq := params.(taskCreateGatewayParameters).request
-	if hostReq.TemplateID == "" {
-		return nil, fail.InvalidRequestError("params.request.TemplateID cannot be empty string")
+	if hostReq.TemplateRef == "" {
+		return nil, fail.InvalidRequestError("params.request.TemplateRef cannot be empty string")
 	}
 	if len(hostReq.Subnets) == 0 {
 		return nil, fail.InvalidRequestError("params.request.Networks cannot be an empty '[]*abstract.Network'")
 	}
 	hostSizing := params.(taskCreateGatewayParameters).sizing
 
-	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
+	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateRef, hostReq.ImageRef)
 	svc := instance.GetService()
 	hostReq.PublicIP = true
 	hostReq.IsGateway = true
