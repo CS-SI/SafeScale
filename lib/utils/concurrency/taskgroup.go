@@ -63,7 +63,6 @@ type subTasks struct {
 
 // task is a structure allowing to identify (indirectly) goroutines
 type taskGroup struct {
-	// last uint
 	*task
 	result TaskGroupResult
 
@@ -76,6 +75,7 @@ type taskGroup struct {
 
 var (
 	// VPL: for future use, I intend to improve TaskGroup to allow these 2 behaviours
+
 	// FailEarly tells the TaskGroup to fail as soon as a child fails
 	FailEarly = data.NewImmutableKeyValue("fail", "early")
 	// FailLately tells the TaskGroup to end all children before determine if TaskGroup has failed
@@ -267,7 +267,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 		for _, v := range options {
 			switch v.Key() {
 			case "normalize_error":
-				newChild.normalizeError = v.Value().(func(error) error)
+				newChild.normalizeError = v.Value().(func(error) error) // FIXME: Unchecked cast
 			default:
 			}
 		}
@@ -300,7 +300,6 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 				}
 				time.Sleep(50 * time.Millisecond) // FIXME: hardcoded value :-(
 			}
-			return nil, nil //nolint
 		}
 
 		_, stErr := instance.task.Start(fnNOP, nil)
@@ -374,16 +373,6 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			instance.task.lock.RLock()
 			defer instance.task.lock.RUnlock()
 
-			// if instance.task.err != nil {
-			// 	switch cerr := instance.task.err.(type) {
-			// 	case *fail.ErrAborted:
-			// 		consequences := cerr.Consequences()
-			// 		if consequences == nil && instance.children.ended {
-			// 			// situation where we do not want WaitGroup() to return *fail.ErrAborted, because children terminated properly
-			// 			instance.task.err = nil
-			// 		}
-			// 	}
-			// }
 			return instance.result, instance.task.err
 
 		case TIMEOUT:
@@ -405,6 +394,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			instance.task.forceAbort()
 
 			_, _ = instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
+			// FIXME: If so, we can assert the result and have an early warning if it breaks
 
 			var forgedError fail.Error
 			if status == ABORTED {
@@ -435,21 +425,6 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, status)
 		}
 	}
-	//
-	// instance.task.lock.Lock()
-	// defer instance.task.lock.Unlock()
-	//
-	// switch cerr := instance.task.err.(type) {
-	// case *fail.ErrAborted:
-	// 	cause := fail.ConvertError(cerr.Cause())
-	// 	consequences := cerr.Consequences()
-	// 	if cause == nil && instance.children.ended && len(consequences) == 0 {
-	// 		// situation where we do not want WaitGroup() to return *fail.ErrAborted, because children terminated properly
-	// 		instance.task.err = nil
-	// 	}
-	// }
-	// instance.task.status = DONE
-	// return instance.result, instance.task.err
 }
 
 // addErrorsAsConsequence adds errors in map 'in' as consequences to the fail.Error 'out'
@@ -504,49 +479,6 @@ func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
 	childrenCount := len(instance.children.tasks)
 	errorList := make(map[string]error)
 	results := make(TaskGroupResult, childrenCount)
-
-	// doneWaitStates := make(map[int]bool, childrenCount)
-	// for k := range instance.children.tasks {
-	// 	doneWaitStates[k] = false
-	// }
-	// doneWaitCount := 0
-	//
-	// for {
-	// 	for k, s := range instance.children.tasks {
-	// 		if doneWaitStates[k] {
-	// 			continue
-	// 		}
-	//
-	// 		sid, err := s.task.GetID()
-	// 		if err != nil {
-	// 			continue
-	// 		}
-	//
-	// 		done, result, err := s.task.TryWait()
-	// 		if done {
-	// 			if err != nil {
-	// 				if s.normalizeError != nil {
-	// 					if normalizedError := s.normalizeError(err); normalizedError != nil {
-	// 						errorList[sid] = normalizedError
-	// 					}
-	// 				} else {
-	// 					errorList[sid] = err
-	// 				}
-	// 			}
-	//
-	// 			results[sid] = result
-	// 			doneWaitStates[k] = true
-	// 			doneWaitCount++
-	// 			break
-	// 		}
-	//
-	// 		time.Sleep(1 * time.Millisecond)
-	// 	}
-	//
-	// 	if doneWaitCount >= childrenCount {
-	// 		break
-	// 	}
-	// }
 
 	for _, s := range instance.children.tasks {
 		for {

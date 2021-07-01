@@ -100,11 +100,11 @@ type Task interface {
 }
 
 type taskStats struct {
-	runBegin time.Time
-	controllerBegin time.Time
-	runDuration time.Duration
+	runBegin           time.Time
+	controllerBegin    time.Time
+	runDuration        time.Duration
 	controllerDuration time.Duration
-	events struct {
+	events             struct {
 		cancel        []time.Time
 		timeout       []time.Time
 		abort         []time.Time
@@ -133,7 +133,7 @@ type task struct {
 	runTerminated        bool // used to keep track of run terminated state
 	controllerTerminated bool // used to keep track of controller terminated state
 
-	start time.Time
+	start    time.Time
 	duration time.Duration
 
 	stats taskStats
@@ -310,6 +310,8 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 
 // IsNull ...
 func (instance *task) IsNull() bool {
+	// FIXME: DATA RACE, access to instance.id by a public function without getting a Lock
+	// TaskGroup has an embedded *task -> data race too
 	return instance == nil || instance.id == ""
 }
 
@@ -531,8 +533,8 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				if status != ABORTED && status != TIMEOUT && !terminated {
 					xerr := instance.processCancel(traceR)
 					if xerr != nil {
-							return xerr
-						}
+						return xerr
+					}
 				}
 				canceled = true
 
@@ -614,7 +616,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				traceR.trace("received cancel signal after %v\n", time.Since(instance.stats.controllerBegin))
 				instance.lock.Unlock()
 
-				if status != ABORTED && status != TIMEOUT && !terminated{
+				if status != ABORTED && status != TIMEOUT && !terminated {
 					xerr := instance.processCancel(traceR)
 					if xerr != nil {
 						return xerr
@@ -733,7 +735,7 @@ func (instance *task) processTerminated(traceR *tracer) {
 	instance.controllerTerminated = true
 	instance.lock.Unlock()
 	instance.controllerTerminatedCh <- struct{}{}
-	close(instance.controllerTerminatedCh)  // VPL: this channel MUST BE CLOSED
+	close(instance.controllerTerminatedCh) // VPL: this channel MUST BE CLOSED
 }
 
 // processAbort operates when Abort has been requested
@@ -787,8 +789,8 @@ func (instance *task) processTimeout(timeout time.Duration) {
 func (instance *task) run(action TaskAction, params TaskParameters) {
 	defer func() {
 		if err := recover(); err != nil {
-			instance.runTerminatedCh <- struct{}{}  // Note: Do not put this inside a lock
-			close(instance.runTerminatedCh)         // Note: This channel MUST BE CLOSED
+			instance.runTerminatedCh <- struct{}{} // Note: Do not put this inside a lock
+			close(instance.runTerminatedCh)        // Note: This channel MUST BE CLOSED
 
 			instance.lock.Lock()
 			instance.runTerminated = true
@@ -1182,13 +1184,13 @@ func (instance *task) Abort() (err fail.Error) {
 func (instance *task) forceAbort() {
 	instance.lock.Lock()
 	status := instance.status
-	instance.abortDisengaged = false    // If we want to force abort, we MUST make sure the signal can be received
+	instance.abortDisengaged = false // If we want to force abort, we MUST make sure the signal can be received
 	instance.lock.Unlock()
 
 	switch status {
 	case RUNNING:
 		// Tell controller to stop goroutine
-		instance.abortCh <- struct{}{}  // VPL: Do not put this inside a lock
+		instance.abortCh <- struct{}{} // VPL: Do not put this inside a lock
 		instance.lock.Lock()
 		instance.status = ABORTED
 		instance.lock.Unlock()

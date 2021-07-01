@@ -44,6 +44,9 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 
 // RandomInt will return a random integer between a specified range.
 func RandomInt(min, max int) int {
+	if min == max {
+		return min
+	}
 	// mrand.Seed(time.Now().UnixNano())
 	return mrand.Intn(max-min) + min
 }
@@ -82,7 +85,7 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 		}
 
 		if weWereAborted {
-			return "useless", fail.AbortedError(nil, "we were killed")
+			return "", fail.AbortedError(nil, "we were killed") // better to return a 'zero' value as the 1st return value
 		}
 
 		coinFlip = rand.Float32() < probError
@@ -135,7 +138,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 		}
 
 		if weWereAborted {
-			return "useless", fail.AbortedError(nil, "we were killed")
+			return "", fail.AbortedError(nil, "we were killed")
 		}
 
 		coinFlip = rand.Float32() < probError
