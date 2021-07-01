@@ -52,27 +52,35 @@ func randomInt(min, max int) int {
 	return mrand.Intn(max-min) + min
 }
 
+// randomIntWithReseed restarts pseudorandom seed then returns a random integer between a specified range.
+func randomIntWithReseed(min, max int) int {
+	if min == max {
+		return min
+	}
+	mrand.Seed(time.Now().UnixNano())
+	return mrand.Intn(max-min) + min
+}
+
 func taskgen(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool) TaskAction {
 	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
-		traceR := newTracer(t, true)   // change to true to display traces
-
-		weWereAborted := false
-		iterations := int64(high / latency)
-		workTime := time.Duration(randomInt(low, high)) * time.Millisecond
-		tempo := workTime / time.Duration(iterations)
-		begin := time.Now()
-		defer func() {
-			traceR.trace("low=%d, high=%d, workTime=%v, tempo=%v, iterations=%d, took %v", low, high, workTime, tempo, iterations, time.Since(begin))
-		}()
+		traceR := newTracer(t, true) // change to true to display traces
 
 		if actionHandlesPanicByItself {
 			defer fail.OnPanic(&xerr)
 		}
 
+		weWereAborted := false
+		iterations := int64(math.Ceil(float64(float64(high) / float64(latency))))
+		tempo := time.Duration(latency) * time.Millisecond
 		count := int64(0)
+		begin := time.Now()
+		defer func() {
+			traceR.trace("low=%d, high=%d, tempo=%v, iterations=%d, took %v", low, high, tempo, iterations, time.Since(begin))
+		}()
+
 		// fmt.Printf("Sleeping %d iterations and a time of %s\n", iterations, tempo)
 		for { // do some work, then look for aborted, again and again
-			if count == iterations {
+			if count >= iterations {
 				break
 			}
 			// some work
@@ -111,18 +119,23 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 
 func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool, custom func() error) TaskAction {
 	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
+		traceR := newTracer(t, true) // change to true to display traces
+
 		if actionHandlesPanicByItself {
 			defer fail.OnPanic(&xerr)
 		}
-		iterations := int64(high / latency)
-		rn := randomInt(low, high)
-		tempo := time.Duration(int64(math.Ceil(float64(rn)/float64(iterations)))) * time.Millisecond
+		iterations := int64(math.Ceil(float64(float64(high) / float64(latency))))
+		tempo := time.Duration(latency) * time.Millisecond
 		count := int64(0)
 		var iErr error = nil
+		begin := time.Now()
+		defer func() {
+			traceR.trace("low=%d, high=%d, tempo=%v, iterations=%d, took %v", low, high, tempo, iterations, time.Since(begin))
+		}()
 
 		weWereAborted := false
 		for { // do some work, then look for aborted, again and again
-			if count > iterations {
+			if count >= iterations {
 				break
 			}
 			// some work
