@@ -70,7 +70,8 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 		}
 
 		weWereAborted := false
-		iterations := int64(math.Ceil(float64(float64(high) / float64(latency))))
+		rd := randomInt(low, high)
+		iterations := int64(math.Ceil(float64(float64(rd) / float64(latency))))
 		tempo := time.Duration(latency) * time.Millisecond
 		count := int64(0)
 		begin := time.Now()
@@ -124,7 +125,8 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 		if actionHandlesPanicByItself {
 			defer fail.OnPanic(&xerr)
 		}
-		iterations := int64(math.Ceil(float64(float64(high) / float64(latency))))
+		rd := randomInt(low, high)
+		iterations := int64(math.Ceil(float64(float64(rd) / float64(latency))))
 		tempo := time.Duration(latency) * time.Millisecond
 		count := int64(0)
 		var iErr error = nil
