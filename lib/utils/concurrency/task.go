@@ -460,7 +460,11 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 		return nil, fail.InvalidInstanceError()
 	}
 
-	switch instance.status {
+	instance.lock.RLock()
+	status := instance.status
+	instance.lock.RUnlock()
+
+	switch status {
 	case READY:
 		if action == nil {
 			instance.lock.Lock()
