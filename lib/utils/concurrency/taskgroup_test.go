@@ -245,15 +245,15 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 				}
 			}
 			childrenStartDuration := time.Since(begin)
-			if childrenStartDuration > 5*time.Millisecond { // however, it grows with gcpressure
-				t.Logf("Launching children took %v", childrenStartDuration)
-			}
 			timeout := time.Duration(upper+margin) * time.Millisecond
 			// Waits that all children have started to access max safely
 			begin = time.Now()
 			fastEnough, res, xerr := overlord.WaitFor(timeout)
 			waitForRealDuration := time.Since(begin)
 			if !fastEnough {
+				if childrenStartDuration > 5*time.Millisecond { // however, it grows with gcpressure
+					t.Logf("Launching children took %v", childrenStartDuration)
+				}
 				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
 				t.Errorf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
 				failures++
