@@ -489,14 +489,13 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 		return instance, nil
 
 	case ABORTED:
-		fallthrough
+		return nil, fail.NotAvailableError("cannot start on Task '%s': reuse is forbidden: already aborted", instance.id)
 	case TIMEOUT:
-		fallthrough
+		return nil, fail.NotAvailableError("cannot start on Task '%s': reuse is forbidden: already timeout", instance.id)
 	case RUNNING:
-		return nil, fail.NotAvailableError("cannot start on Task '%s': already running", instance.id)
-
+		return nil, fail.NotAvailableError("cannot start on Task '%s': reuse is forbidden: already running", instance.id)
 	case DONE:
-		return nil, fail.NotAvailableError("cannot reuse Task '%s'", instance.id)
+		return nil, fail.NotAvailableError("cannot start on Task '%s': reuse is forbidden: already done", instance.id)
 
 	case UNKNOWN:
 		fallthrough
