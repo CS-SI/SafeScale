@@ -1109,7 +1109,7 @@ func TestStartWithTimeoutTask(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ??, that's the textbook definition")
+		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
 	}
 
 	_, err = single.Wait()

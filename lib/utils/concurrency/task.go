@@ -30,6 +30,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+//go:generate stringer -type=TaskStatus
+
 // TaskStatus ...
 type TaskStatus int
 
