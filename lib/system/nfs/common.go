@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -59,6 +60,14 @@ func getTemplateBox() (*rice.Box, fail.Error) {
 // func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
 func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string, data map[string]interface{}) (string, fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return "", xerr
 	}

@@ -565,7 +565,12 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
 		}
 
-		subtask, xerr := task.Start(w.taskLaunchStep, taskLaunchStepParameters{
+		subtask, xerr := concurrency.NewTaskWithParent(task)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return outcomes, xerr
+		}
+		_, xerr = subtask.Start(w.taskLaunchStep, taskLaunchStepParameters{
 			stepName:  k,
 			stepKey:   stepKey,
 			stepMap:   stepMap,

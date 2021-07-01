@@ -231,6 +231,13 @@ func (instance *Subnet) createGWSecurityGroup(ctx context.Context, network resou
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return nil, xerr
 	}
 

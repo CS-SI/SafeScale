@@ -188,6 +188,13 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error)
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return "", xerr
 	}
 
@@ -227,6 +234,13 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return "", xerr
 	}
@@ -271,6 +285,13 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -314,6 +335,13 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -344,6 +372,13 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -428,6 +463,13 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}

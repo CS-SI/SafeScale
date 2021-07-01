@@ -535,6 +535,14 @@ func (scmd *SSHCommand) Run(ctx context.Context, outs outputs.Enum) (int, string
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -569,6 +577,14 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -931,6 +947,14 @@ func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTt
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -978,6 +1002,14 @@ func (sconf *SSHConfig) newCopyCommand(ctx context.Context, localPath, remotePat
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1046,6 +1078,14 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return "", xerr
 	}
@@ -1140,6 +1180,14 @@ func (sconf *SSHConfig) copy(
 	timeout time.Duration,
 ) (retcode int, stdout string, stderr string, xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return -1, "", "", xerr
 	}

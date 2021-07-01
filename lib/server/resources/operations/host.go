@@ -480,6 +480,13 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -521,6 +528,13 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return state, xerr
 	}
@@ -683,6 +697,13 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1649,6 +1670,13 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -1760,6 +1788,13 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return "", xerr
 	}
@@ -1934,6 +1969,13 @@ func (instance *Host) Delete(ctx context.Context) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -1982,6 +2024,13 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -2346,6 +2395,13 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return -1, "", "", xerr
 	}
 
@@ -2381,6 +2437,13 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -2435,6 +2498,13 @@ func (instance *Host) Push(ctx context.Context, source, target, owner, mode stri
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -2521,6 +2591,13 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -2584,6 +2661,13 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -2656,6 +2740,13 @@ func (instance *Host) Reboot(ctx context.Context) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -2688,6 +2779,13 @@ func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRe
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -2927,6 +3025,13 @@ func (instance *Host) PushStringToFileWithOwnership(ctx context.Context, content
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -3042,6 +3147,13 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -3107,6 +3219,13 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}
@@ -3211,6 +3330,13 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
 		return xerr
 	}
 
@@ -3307,6 +3433,13 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
 	if xerr != nil {
 		return xerr
 	}

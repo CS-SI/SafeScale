@@ -188,14 +188,16 @@ const (
 )
 
 // TaskFromContext extracts the task instance from context
+// If there is no task in the context, returns a VoidTask()
 func TaskFromContext(ctx context.Context) (Task, fail.Error) {
 	if ctx != nil {
 		if ctxValue := ctx.Value(KeyForTaskInContext); ctxValue != nil {
 			if task, ok := ctxValue.(Task); ok {
 				return task, nil
 			}
-			return nil, fail.InconsistentError("context value for 'task' is not a 'concurrency.Task'")
+			return nil, fail.InconsistentError("context value for '%s' is not a 'concurrency.Task'", KeyForTaskInContext)
 		}
+		return nil, fail.NotAvailableError("cannot find a value for '%s' in context", KeyForTaskInContext)
 	}
 
 	return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -1008,7 +1010,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			instance.lock.RLock()
 			defer instance.lock.RUnlock()
 
-			traceR.trace("run lasted %v, controller lasted %v\n", instance.id, instance.stats.runDuration, instance.stats.controllerDuration)
+			traceR.trace("run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration)
 			return instance.result, instance.err
 
 		case UNKNOWN:
