@@ -54,6 +54,17 @@ func randomInt(min, max int) int {
 
 func taskgen(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool) TaskAction {
 	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
+		traceR := newTracer(t, true)   // change to true to display traces
+
+		weWereAborted := false
+		iterations := int64(high / latency)
+		workTime := time.Duration(randomInt(low, high)) * time.Millisecond
+		tempo := workTime / time.Duration(iterations)
+		begin := time.Now()
+		defer func() {
+			traceR.trace("low=%d, high=%d, workTime=%v, tempo=%v, iterations=%d, took %v", low, high, workTime, tempo, iterations, time.Since(begin))
+		}()
+
 		if actionHandlesPanicByItself {
 			defer fail.OnPanic(&xerr)
 		}
@@ -64,12 +75,14 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 		count := int64(0)
 		// fmt.Printf("Sleeping %d iterations and a time of %s\n", iterations, tempo)
 		for { // do some work, then look for aborted, again and again
-			if count > iterations {
+			if count == iterations {
 				break
 			}
 			// some work
 			time.Sleep(tempo) // that is actually the latency between abortion and its check t.Aborted() in the line below
+			count++
 			if t.Aborted() {
+				traceR.trace("aborted after %d iterations (max allowed=%d)", count, iterations)
 				// Cleaning up first before leaving... ;)
 				if cleanfactor > 0 {
 					time.Sleep(time.Duration(randomInt(cleanfactor*low, cleanfactor*high)) * time.Millisecond)
@@ -77,7 +90,6 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 				weWereAborted = true
 				break
 			}
-			count++
 		}
 
 		// simulation of error conditions, starting by panic

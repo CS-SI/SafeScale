@@ -840,8 +840,8 @@ func TestSingleTaskWait(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
-	funk := func(ind int, timeout time.Duration, sleep time.Duration, trigger time.Duration, errorExpected bool) {
-		ctx, cafu := context.WithTimeout(context.TODO(), timeout)
+	funk := func(ind int, timeout int, sleep int, trigger int, errorExpected bool) {
+		ctx, cafu := context.WithTimeout(context.TODO(), time.Duration(timeout)*time.Millisecond)
 		defer cafu()
 
 		single, err := NewTaskWithContext(ctx)
@@ -854,7 +854,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		require.Nil(t, xerr)
 
 		go func() {
-			time.Sleep(trigger)
+			time.Sleep(time.Duration(trigger)*time.Millisecond)
 			cafu()
 		}()
 
@@ -896,22 +896,22 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	// is this critical ?, maybe not today but...
 	// big problems have small beginnings...
 
-	funk(1, 30*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)    // canceled
-	funk(2, 10*time.Millisecond, 50*time.Millisecond, 30*time.Millisecond, true)    // timeout
-	funk(3, 30*time.Millisecond, 50*time.Millisecond, 80*time.Millisecond, true)    // timeout
-	funk(4, 80*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)    // canceled
-	funk(5, 40*time.Millisecond, 20*time.Millisecond, 10*time.Millisecond, true)    // canceled
-	funk(6, 40*time.Millisecond, 20*time.Millisecond, 30*time.Millisecond, false)   // cancel is triggered AFTER we are done (in 20ms), less that the timeout -> so no error
-	funk(7, 140*time.Millisecond, 20*time.Millisecond, 40*time.Millisecond, false)  // same thing here
-	funk(8, 140*time.Millisecond, 20*time.Millisecond, 100*time.Millisecond, false) // same thing here
-	funk(9, 140*time.Millisecond, 20*time.Millisecond, 120*time.Millisecond, false) // same thing here
-	funk(10, 140*time.Millisecond, 20*time.Millisecond, 50*time.Millisecond, false) // same thing here
-	funk(11, 140*time.Millisecond, 50*time.Millisecond, 10*time.Millisecond, true)  // canceled
+	funk(1, 30, 50, 10, true)    // canceled
+	funk(2, 10, 50, 30, true)    // timeout
+	funk(3, 30, 50, 80, true)    // timeout
+	funk(4, 80, 50, 10, true)    // canceled
+	funk(5, 40, 20, 10, true)    // canceled
+	funk(6, 40, 20, 30, false)   // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
+	funk(7, 140, 20, 240/*40*/, false)  // same thing here
+	funk(8, 140, 20, 100, false) // same thing here
+	funk(9, 140, 20, 120, false) // same thing here
+	funk(10, 140, 20, 50, false) // same thing here
+	funk(11, 140, 50, 10, true)  // canceled
 }
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 	funk := func(ind int, timeout uint, sleep uint, trigger uint, errorExpected bool) {
-		ctx, cafu := context.WithDeadline(context.TODO(), time.Now().Add(time.Duration(timeout*10)*time.Millisecond))
+		ctx, cafu := context.WithDeadline(context.TODO(), time.Now().Add(time.Duration(timeout)*time.Millisecond))
 		require.NotNil(t, ctx)
 		require.NotNil(t, cafu)
 
@@ -966,14 +966,14 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 			t.Logf("Failure in test %d: %v, %v, %v, %t: We waited too much! %v > %v", ind, timeout, sleep, trigger, errorExpected, end, tolerated)
 		}
 	}
-	funk(1, 30, 50, 10, true)
-	funk(2, 30, 50, 90, true)
-	funk(3, 50, 30, 10, true)
-	funk(4, 50, 10, 30, false)
-	funk(5, 70, 30, 10, true)
-	funk(6, 40, 10, 30, false)
-	funk(7, 140, 20, 40, false)
-	funk(8, 140, 40, 20, true)
+	funk(1, 30, 50, 10, true)   // cancel (aborted)
+	funk(2, 30, 50, 90, true)   // timeout
+	funk(3, 50, 30, 10, true)   // cancel (aborted)
+	funk(4, 50, 10, 30, false)  // terminate normally
+	funk(5, 70, 30, 10, true)   // cancel (aborted)
+	funk(6, 40, 10, 30, false)  // terminate normally
+	funk(7, 140, 20, 40, false) // terminate normally
+	funk(8, 140, 40, 20, true)  // cancel (aborted)
 }
 
 func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
@@ -990,8 +990,6 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 
 		begin := time.Now()
 		single, xerr = single.Start(taskgen(int(sleep), int(sleep), 4, 0, 0, 0, false), nil)
-		startEnd := time.Since(begin)
-		fmt.Printf("single.Start() took %v\n", startEnd)
 		require.Nil(t, xerr)
 
 		go func() {
@@ -1029,7 +1027,8 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	funk(1, 10, 1, true)
 	funk(2, 10, 5, true)   // latency matters ?
 	funk(3, 10, 6, true)   // this test and the previous should be equivalent
-	funk(4, 10, 11, false) // latency matters ?
+	// VPL: Task took 12.22ms to end, cancel hits at 12.16ms -> Aborted
+	funk(4, 10, 11, true) // latency matters ?
 	funk(5, 50, 10, true)
 	funk(6, 50, 80, false)
 	funk(7, 50, 300, false)
@@ -1037,9 +1036,13 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	funk(9, 50, 6000, false)
 	funk(10, 50, 48, true)  // latency matters, this sometimes fails
 	funk(11, 50, 49, true)  // latency matters, this sometimes fails
-	funk(12, 50, 51, false) // latency matters, this sometimes fails
-	funk(13, 50, 52, false) // latency matters, this sometimes fails
-	funk(14, 50, 63, false) // if we go far enough, no errors
+	// VPL: on macM1, cancel signal hits at 51.80ms, task detects abort at 57.11ms -> Aborted
+	funk(12, 50, 51, true) // latency matters, this sometimes fails
+	// VPL: on macM1, cancel signals hists at 52.13ms, task detects abort at 57.36ms -> Aborted
+	funk(13, 50, 52, true) // latency matters, this sometimes fails
+	funk(14, 50, 60, true) // latency matters, this sometimes fails
+	// VPL: on MBA-m1, task ended its work after 62.71ms, before cancel hits -> no error
+	funk(15, 50, 63, false) // if we go far enough, no errors
 }
 
 func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {

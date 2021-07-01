@@ -512,7 +512,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		return fail.InvalidInstanceError()
 	}
 
-	traceR := newTracer(instance, tracing.ShouldTrace("concurrency.task"))
+	traceR := newTracer(instance, true /*tracing.ShouldTrace("concurrency.task")*/)
 
 	defer func() {
 		instance.lock.Lock()
@@ -700,13 +700,12 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 func (instance *task) processCancel(traceR *tracer) fail.Error {
 	instance.lock.RLock()
 	status := instance.status
-	tid := instance.id
 	doNotAbort := instance.abortDisengaged
 	doNotCancel := instance.cancelDisengaged
 	ctxErr := instance.ctx.Err()
 	instance.lock.RUnlock()
 
-	traceR.trace("receiving signal from context, aborting task '%s'...", tid)
+	traceR.trace("receiving signal from context")
 	if !doNotAbort && !doNotCancel {
 		switch status {
 		case RUNNING:
@@ -809,6 +808,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 
 			instance.lock.Lock()
 			instance.runTerminated = true
+			instance.cancelDisengaged = true
 			if instance.err != nil {
 				_ = instance.err.AddConsequence(fail.RuntimePanicError("panic happened: %v", err))
 			} else {
@@ -822,11 +822,12 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 
 	result, xerr := action(instance, params)
 
-	instance.runTerminatedCh <- struct{}{} // VPL: Do not put this inside a lock
-	// close(instance.runTerminatedCh)
+	instance.runTerminatedCh <- struct{}{}  // VPL: Do not put this inside a lock
+	close(instance.runTerminatedCh)         // VPL: this channel MUST BE CLOSED
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
+	instance.cancelDisengaged = true
 	instance.runTerminated = true
 
 	switch xerr.(type) {
@@ -980,9 +981,9 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			continue
 
 		case RUNNING:
-			instance.lock.RLock()
+			instance.lock.Lock()
 			runTerminated := instance.runTerminated
-			instance.lock.RUnlock()
+			instance.lock.Unlock()
 			<-instance.controllerTerminatedCh
 
 			// Reload status, it may have changed since the controller terminated
