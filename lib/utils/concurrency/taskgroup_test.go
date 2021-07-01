@@ -69,7 +69,7 @@ func TestStartAfterDone(t *testing.T) {
 }
 
 func TestIntrospection(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 4; i++ {
 		overlord, err := NewTaskGroupWithParent(nil)
 		require.NotNil(t, overlord)
 		require.Nil(t, err)
@@ -243,6 +243,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 				_, xerr := overlord.Start(taskgen(lower, upper, latency, 0, 0, 0, false), nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 				if xerr != nil {
 					t.Errorf("Test %d: Unexpected: %s", index, xerr)
+					t.FailNow()
 					return
 				}
 			}
@@ -272,22 +273,22 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 	}
 
 	// Look at the pressure supported by GC
-	funk(1, 100, 50, 250, 250, 20, 100)
-	funk(2, 100, 50, 250, 250, 20, 200)
-	funk(3, 100, 50, 250, 250, 20, 400)
-	funk(4, 100, 50, 250, 250, 20, 800)
+	funk(1, 40, 50, 250, 250, 20, 100)
+	funk(2, 40, 50, 250, 250, 20, 200)
+	funk(3, 40, 50, 250, 250, 20, 400)
+	funk(4, 40, 50, 250, 250, 20, 800)
 
 	// Increasing the upper limit changes the outcome ?
-	funk(5, 100, 50, 250, 250, 20, 400)
-	funk(6, 100, 50, 350, 350, 20, 400)
-	funk(7, 100, 50, 450, 450, 20, 400)
-	funk(8, 100, 50, 550, 550, 20, 400)
+	funk(5, 40, 50, 250, 250, 20, 400)
+	funk(6, 40, 50, 350, 350, 20, 400)
+	funk(7, 40, 50, 450, 450, 20, 400)
+	funk(8, 40, 50, 550, 550, 20, 400)
 
 	// Is the latency ?
-	funk(9, 100, 50, 250, 1, 20, 400)
-	funk(10, 100, 50, 250, 10, 20, 400)
-	funk(11, 100, 50, 250, 50, 20, 400)
-	funk(12, 100, 50, 250, 250, 20, 400)
+	funk(9, 40, 50, 250, 1, 20, 400)
+	funk(10, 40, 50, 250, 10, 20, 400)
+	funk(11, 40, 50, 250, 50, 20, 400)
+	funk(12, 40, 50, 250, 250, 20, 400)
 }
 
 func TestChildrenWaitingGame(t *testing.T) {

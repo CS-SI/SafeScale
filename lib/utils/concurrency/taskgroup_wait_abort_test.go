@@ -58,7 +58,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 		chansize := 10
 		for {
 			iter++
-			if iter > 12 {
+			if iter > 6 {
 				break
 			}
 			if enough {
@@ -185,7 +185,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 				enough = true
 			}
 
-			time.Sleep(2 * time.Second)
+			time.Sleep(600 * time.Millisecond)
 			if reminder {
 				t.Errorf("by now we should see panics in lines above, panics that only shows in logs and the rest of the code is unaware of")
 			}
@@ -550,7 +550,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		chansize := 10
 		for {
 			iter++
-			if iter > 10 {
+			if iter > 6 {
 				break
 			}
 			if enough {
@@ -756,7 +756,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		chansize := 10
 		for {
 			iter++
-			if iter > 12 {
+			if iter > 6 {
 				break
 			}
 			if enough {

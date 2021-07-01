@@ -439,16 +439,7 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	_, xerr = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		tempo := time.Duration(randomInt(50, 250)) * time.Millisecond
-		for i := 0; i < 100; i++ {
-			if t.Aborted() {
-				return "killed", fail.AbortedError(nil, "killed by parent")
-			}
-			time.Sleep(tempo)
-		}
-		return "waiting game", nil
-	}, nil, 400*time.Millisecond)
+	_, xerr = got.StartWithTimeout(taskgenWithCustomFunc(50, 250, 10, 0, 0, 0, false, nil), nil, 400*time.Millisecond)
 	if xerr != nil {
 		t.Errorf("Shouldn't happen")
 	}
@@ -465,10 +456,10 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 	_, _, xerr = got.WaitFor(4 * time.Millisecond)
 	require.NotNil(t, xerr)
 
-	_, _, xerr = got.WaitFor(50 * time.Millisecond)
+	_, _, xerr = got.WaitFor(300 * time.Millisecond)
 	require.NotNil(t, xerr)
 
-	_, xerr = got.StartWithTimeout(taskgen(5, 100, 10, 1, 0, 0, false), nil, 200*time.Millisecond)
+	_, xerr = got.StartWithTimeout(taskgen(50, 100, 10, 1, 0, 0, false), nil, 200*time.Millisecond)
 	require.NotNil(t, xerr)
 
 	_, xerr = got.IsSuccessful()
