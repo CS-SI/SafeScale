@@ -212,7 +212,7 @@ func TestAwfulTaskActionCitizenDisengaged(t *testing.T) {
 	time.Sleep(60 * time.Millisecond)
 
 	// task cannot be aborted, subtasks never return, a WaitGroup here would wait forever
-	ended, _, xerr := overlord.WaitGroupFor(3 * time.Second)
+	ended, _, xerr := overlord.WaitGroupFor(2 * time.Second)
 	if xerr == nil { // It should fail because it's an aborted task...
 		t.FailNow()
 	}
@@ -220,7 +220,7 @@ func TestAwfulTaskActionCitizenDisengaged(t *testing.T) {
 		t.FailNow()
 	}
 
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	_ = w.Close()
 

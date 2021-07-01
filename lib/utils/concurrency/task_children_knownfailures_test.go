@@ -67,7 +67,7 @@ func TestAbortNotStartedTask(t *testing.T) {
 	// Waiting parent should return *fail.ErrAborted
 	res, xerr := parent.Wait()
 	require.NotNil(t, xerr)
-	require.Nil(t, res) 	// Nothing produced, so no result
+	require.Nil(t, res) // Nothing produced, so no result
 
 	// child received abort signal, so it finished abnormally
 	res, xerr = child.Wait()
@@ -76,7 +76,7 @@ func TestAbortNotStartedTask(t *testing.T) {
 }
 
 func TestAbortStartedTaskWithChildren(t *testing.T) {
-	iter := 30
+	iter := 8
 	for i := 0; i < iter; i++ {
 		fmt.Println("--- NEXT ---")
 
@@ -88,7 +88,7 @@ func TestAbortStartedTaskWithChildren(t *testing.T) {
 		require.Nil(t, xerr)
 
 		_, xerr = parent.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(700)*time.Millisecond)
+			time.Sleep(time.Duration(700) * time.Millisecond)
 			return "B", nil
 		}, nil)
 		require.Nil(t, xerr)
@@ -117,23 +117,23 @@ func TestAbortStartedTaskWithChildren(t *testing.T) {
 
 		time.Sleep(time.Duration(50) * time.Millisecond)
 
-		xerr = parent.Abort()   // Abort the stated parent, should succeed
+		xerr = parent.Abort() // Abort the stated parent, should succeed
 		require.Nil(t, xerr)
 
-		time.Sleep(10*time.Millisecond)     // let abort propagation occurs
-		require.True(t, parent.Aborted())   // parent should be aborted
+		time.Sleep(10 * time.Millisecond) // let abort propagation occurs
+		require.True(t, parent.Aborted()) // parent should be aborted
 		require.True(t, child.Aborted())
 		require.True(t, sibling.Aborted())
 
 		res, xerr := parent.Wait()
-		require.NotNil(t, xerr)     // parent aborted, should return *fail.ErrAborted
-		require.NotNil(t, res)      // result produced, must not be nil
+		require.NotNil(t, xerr) // parent aborted, should return *fail.ErrAborted
+		require.NotNil(t, res)  // result produced, must not be nil
 
-		res, xerr = child.Wait()    // parent.Wait() should have told child to terminate on abort
-		require.NotNil(t, xerr)     // should return *fail.ErrAborted
-		require.NotNil(t, res)      // result produced, must bot be nil
+		res, xerr = child.Wait() // parent.Wait() should have told child to terminate on abort
+		require.NotNil(t, xerr)  // should return *fail.ErrAborted
+		require.NotNil(t, res)   // result produced, must bot be nil
 
-		res, xerr = sibling.Wait()  // idem for sibling
+		res, xerr = sibling.Wait() // idem for sibling
 		require.NotNil(t, xerr)
 		require.NotNil(t, res)
 	}
@@ -141,7 +141,7 @@ func TestAbortStartedTaskWithChildren(t *testing.T) {
 
 // Taskgroups work well instead
 func TestAbortFatherTaskGroup(t *testing.T) {
-	iter := 30
+	iter := 8
 	for i := 0; i < iter; i++ {
 		fmt.Println("--- NEXT ---")
 
@@ -218,4 +218,3 @@ func TestAbortFatherTaskGroup(t *testing.T) {
 		require.NotNil(t, res)
 	}
 }
-
