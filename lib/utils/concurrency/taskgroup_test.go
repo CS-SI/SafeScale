@@ -30,41 +30,42 @@ import (
 )
 
 func TestStartAfterDone(t *testing.T) {
-	// FIXME: A deadlock was detected here, now protected by a WaitGroup; add a for here...
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		root, err := RootTask()
-		require.Nil(t, err)
-		require.NotNil(t, root)
+	for i := 0; i < 10; i++ {
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			root, err := RootTask()
+			require.Nil(t, err)
+			require.NotNil(t, root)
 
-		overlord, err := NewTaskGroupWithParent(root)
-		require.Nil(t, err)
-		require.NotNil(t, overlord)
+			overlord, err := NewTaskGroupWithParent(root)
+			require.Nil(t, err)
+			require.NotNil(t, overlord)
 
-		_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
-		require.Nil(t, err)
+			_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
+			require.Nil(t, err)
 
-		time.Sleep(10 * time.Millisecond)
-		_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
-		require.Nil(t, err)
+			time.Sleep(10 * time.Millisecond)
+			_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
+			require.Nil(t, err)
 
-		_, err = overlord.Wait()
-		require.Nil(t, err)
+			_, err = overlord.Wait()
+			require.Nil(t, err)
 
-		ok, _ := overlord.IsSuccessful()
-		require.True(t, ok)
+			ok, _ := overlord.IsSuccessful()
+			require.True(t, ok)
 
-		// already DONE taskgroup, now it should fail
-		_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
-		require.NotNil(t, err)
-	}()
+			// already DONE taskgroup, now it should fail
+			_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
+			require.NotNil(t, err)
+		}()
 
-	runOutOfTime := waitTimeout(&wg, 60*time.Second)
-	if runOutOfTime {
-		t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
-		t.FailNow()
+		runOutOfTime := waitTimeout(&wg, 60*time.Second)
+		if runOutOfTime {
+			t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
+			t.FailNow()
+		}
 	}
 }
 

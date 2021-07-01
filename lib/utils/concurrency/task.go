@@ -75,7 +75,7 @@ type TaskGuard interface {
 	WaitFor(time.Duration) (bool, TaskResult, fail.Error)
 }
 
-// TaskCore is the interface of core methods to control task and taskgroup
+// TaskCore is the interface of core methods to control Task and TaskGroup
 type TaskCore interface {
 	Abort() fail.Error
 	Abortable() (bool, fail.Error)

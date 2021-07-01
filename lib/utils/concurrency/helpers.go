@@ -58,9 +58,10 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 		}
 		weWereAborted := false
 		iterations := int64(high / latency)
-		workTime := time.Duration(randomInt(low, high)) * time.Millisecond
-		tempo := time.Duration(workTime.Milliseconds() / iterations)
+		rn := randomInt(low, high)
+		tempo := time.Duration(int64(rn)/int64(iterations)) * time.Millisecond
 		count := int64(0)
+		// fmt.Printf("Sleeping %d iterations and a time of %s\n", iterations, tempo)
 		for { // do some work, then look for aborted, again and again
 			if count > iterations {
 				break
@@ -104,8 +105,8 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 			defer fail.OnPanic(&xerr)
 		}
 		iterations := int64(high / latency)
-		workTime := time.Duration(randomInt(low, high)) * time.Millisecond
-		tempo := time.Duration(workTime.Milliseconds() / iterations)
+		rn := randomInt(low, high)
+		tempo := time.Duration(int64(rn)/int64(iterations)) * time.Millisecond
 		count := int64(0)
 		var iErr error = nil
 
