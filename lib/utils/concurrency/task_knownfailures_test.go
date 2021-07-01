@@ -41,10 +41,7 @@ func TestRealCharge(t *testing.T) {
 	abortOccurred := false
 	started := 0
 	for ind := 0; ind < gorrs; ind++ {
-		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil)
+		_, xerr := overlord.Start(taskgen(50, 250, 10, 0, 0, 0, false), nil)
 		if xerr != nil {
 			if !overlord.Aborted() {
 				t.Errorf("Unexpected: %s", xerr)
@@ -83,15 +80,20 @@ func TestRealCharges(t *testing.T) {
 
 	gorrs := 800
 
+	ids := make(map[string]string)
+
 	for ind := 0; ind < gorrs; ind++ {
-		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil)
+		nt, xerr := overlord.Start(taskgen(50, 250, 10, 0, 0, 0, false), nil)
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
-		if randomInt(50, 250) > 200 {
+		ntId, xerr := nt.GetID()
+		if xerr != nil {
+			t.Errorf("Unexpected: %v", xerr)
+		}
+		ids[ntId] = ntId
+
+		if RandomInt(50, 250) > 200 {
 			fmt.Println("abort")
 			aErr := overlord.Abort()
 			if aErr != nil {
@@ -107,6 +109,15 @@ func TestRealCharges(t *testing.T) {
 		// recovering partial records lead to a race condition, should we try ?
 		t.Errorf("This is open for interpretation, if we do a WaitFor and quit before finish waiting, should we offer partial results of those functions that finished, or not ?")
 	}
+
+	if len(res.(map[string]TaskResult)) != 800 {
+		for k := range res.(map[string]TaskResult) {
+			if _, ok := ids[k]; !ok {
+				t.Errorf("Task with wrong ID: %s", k)
+			}
+		}
+	}
+
 	// what's the meaning of the boolean returned by .WaitFor ?
 	// we aborted, according to the docs it should be true; are the docs wrong ?
 	require.True(t, fast)
@@ -195,7 +206,6 @@ func TestTryWaitRecoversErrorContent(t *testing.T) {
 			require.False(t, done)
 		} else {
 			require.NotNil(t, xerr)
-			// t.Logf("%s", spew.Sdump(xerr))
 			require.True(t, strings.Contains(spew.Sdump(xerr), "Ouch"))
 			break
 		}
@@ -227,10 +237,7 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithTimeout(t *testing.T) {
 		}
 	}
 
-	_, xerr = overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(randomInt(10, 15)) * time.Millisecond)
-		return "waiting game", fail.NewError("Ouch")
-	}, nil, 12*time.Millisecond, InheritParentIDOption, AmendID("/ill-child"))
+	_, xerr = overlord.StartWithTimeout(taskgen(10, 15, 2, 0, 1, 0, false), nil, 12*time.Millisecond, InheritParentIDOption, AmendID("/ill-child"))
 	if xerr != nil {
 		t.Errorf("Unexpected: %s", xerr)
 	}
@@ -245,8 +252,10 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithTimeout(t *testing.T) {
 			require.False(t, done)
 		} else {
 			require.NotNil(t, xerr)
-			t.Logf("%s", spew.Sdump(xerr))
-			require.True(t, strings.Contains(spew.Sdump(xerr), "Ouch"))
+			if !strings.Contains(spew.Sdump(xerr), "it was head") {
+				t.Errorf("%s", spew.Sdump(xerr))
+			}
+			require.True(t, strings.Contains(spew.Sdump(xerr), "it was head"))
 			break
 		}
 	}

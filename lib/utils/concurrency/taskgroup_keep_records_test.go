@@ -16,7 +16,7 @@ func TestKeepRecords(t *testing.T) {
 
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 4 {
 			break
 		}
 
@@ -85,7 +85,7 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 
 	for {
 		iter++
-		if iter > 20 {
+		if iter > 4 {
 			break
 		}
 

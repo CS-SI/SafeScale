@@ -30,30 +30,42 @@ import (
 )
 
 func TestStartAfterDone(t *testing.T) {
-	root, err := RootTask()
-	require.Nil(t, err)
-	require.NotNil(t, root)
+	// FIXME: A deadlock was detected here, now protected by a WaitGroup; add a for here...
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		root, err := RootTask()
+		require.Nil(t, err)
+		require.NotNil(t, root)
 
-	overlord, err := NewTaskGroupWithParent(root)
-	require.Nil(t, err)
-	require.NotNil(t, overlord)
+		overlord, err := NewTaskGroupWithParent(root)
+		require.Nil(t, err)
+		require.NotNil(t, overlord)
 
-	_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
-	require.Nil(t, err)
+		_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
+		require.Nil(t, err)
 
-	time.Sleep(10 * time.Millisecond)
-	_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
-	require.Nil(t, err)
+		time.Sleep(10 * time.Millisecond)
+		_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
+		require.Nil(t, err)
 
-	_, err = overlord.Wait()
-	require.Nil(t, err)
+		_, err = overlord.Wait()
+		require.Nil(t, err)
 
-	ok, _ := overlord.IsSuccessful()
-	require.True(t, ok)
+		ok, _ := overlord.IsSuccessful()
+		require.True(t, ok)
 
-	// already DONE taskgroup, now it should fail
-	_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
-	require.NotNil(t, err)
+		// already DONE taskgroup, now it should fail
+		_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
+		require.NotNil(t, err)
+	}()
+
+	runOutOfTime := waitTimeout(&wg, 60*time.Second)
+	if runOutOfTime {
+		t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
+		t.FailNow()
+	}
 }
 
 func TestIntrospection(t *testing.T) {
@@ -67,17 +79,7 @@ func TestIntrospection(t *testing.T) {
 		require.NotEmpty(t, theID)
 
 		for ind := 0; ind < 800; ind++ {
-			_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				wat := time.Duration(randomInt(50, 250)) * time.Millisecond
-				tempo := wat / 100
-				for i := 0; i < 100; i++ {
-					if t.Aborted() {
-						return "aborting", fail.AbortedError(nil, "killed by parent")
-					}
-					time.Sleep(tempo)
-				}
-				return "waiting game", nil
-			}, nil)
+			_, err := overlord.Start(taskgen(50, 250, 10, 0, 0, 0, false), nil)
 			if err != nil {
 				t.Errorf("Unexpected: %s", err)
 				t.FailNow()
@@ -259,6 +261,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 				failures++
 				if failures > 4 || failures > 4*rounds/100 {
 					t.Errorf("Test %d: too many failures", index)
+					t.FailNow()
 					return
 				}
 			} else {

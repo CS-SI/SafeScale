@@ -193,7 +193,7 @@ func TestSomethingFails(t *testing.T) {
 		switch cerr := xerr.(type) {
 		case *fail.ErrorList:
 			if len(cerr.ToErrorSlice()) != 2 {
-					t.Fail()
+				t.Fail()
 			}
 		default:
 			t.Errorf("Unexpected error %s (%s)", xerr.Error(), reflect.TypeOf(xerr).String())
@@ -359,12 +359,12 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 	time.Sleep(60 * time.Millisecond)
 
 	// VPL: waiting on a taskgroup running task that cannot end will deadlock... As expected...
-	ended, _, xerr := overlord.WaitGroupFor(20*time.Second)
+	ended, _, xerr := overlord.WaitGroupFor(5 * time.Second)
 	if xerr == nil { // It should fail because it's an aborted task...
 		t.Fail()
 	}
 	if !ended {
-		t.Logf("TaskGroup hasn't ended after 20s")
+		t.Logf("TaskGroup hasn't ended after 5s")
 	}
 	switch xerr.(type) {
 	case *fail.ErrTimeout:

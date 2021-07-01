@@ -462,6 +462,9 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		t.FailNow()
 	}
 
+	_, _, xerr = got.WaitFor(50 * time.Millisecond)
+	require.NotNil(t, xerr)
+
 	_, xerr = got.StartWithTimeout(taskgen(5, 100, 10, 1, 0, 0, false), nil, 200*time.Millisecond)
 	require.NotNil(t, xerr)
 
@@ -1131,6 +1134,9 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		t.Errorf("Where is the timeout ??, that's the textbook definition")
 	}
 
+	_, _, xerr = single.WaitFor(50 * time.Millisecond)
+	require.NotNil(t, xerr)
+
 	_, xerr = single.IsSuccessful()
 	require.NotNil(t, xerr)
 
@@ -1475,7 +1481,7 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 
 	for !enough {
 		iter++
-		if iter > 12 {
+		if iter > 8 {
 			break
 		}
 
@@ -1486,32 +1492,10 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 
 		bailout := make(chan string, 80) // a buffered channel
 
-		_, xerr = single.Start(
-			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				for { // do some work, then look for aborted, again and again
-					// some work
-					time.Sleep(time.Duration(randomInt(20, 30)) * time.Millisecond)
-					if t.Aborted() {
-						// Cleaning up first before leaving... ;)
-						time.Sleep(time.Duration(randomInt(100, 800)) * time.Millisecond)
-						break
-					}
-				}
-
-				// We are using the classic 'send on closed channel' trick to see if Wait actually waits until everyone is DONE.
-				// If it does we will never see a panic, but if Abort doesn't mean TellYourChildrenToAbort but
-				// actually means AbortYourChildrenAndQuitNOWWithoutWaiting, then we have a problem
-				acha := parameters.(chan string)
-				acha <- "Bailing out"
-
-				// flip a coin, true and we panic, false we don't
-				if randomInt(0, 2) == 1 {
-					return "mistakes happen", fail.NewError("It was head")
-				}
-
-				return "who cares", nil
-			}, bailout,
-		)
+		_, xerr = single.Start(taskgenWithCustomFunc(20, 50, 5, 2, 0.5, 0, false, func() error {
+			bailout <- "Bailing out"
+			return nil
+		}), nil)
 		require.Nil(t, xerr)
 
 		// after this, some tasks will already be looking for ABORT signals
@@ -1576,7 +1560,7 @@ func TestAbortThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting(t
 		if panicReported {
 			enough = true
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(600 * time.Millisecond)
 	}
 	if !panicReported {
 		t.Logf("No panic reported, good")

@@ -56,7 +56,13 @@ func TestATaskIsAGroup2(t *testing.T) {
 func TestInvalidTask(t *testing.T) {
 	got := generator()
 
-	err := got.Abort()
+	_, err := got.IsSuccessful()
+	require.NotNil(t, err)
+
+	_, _, err = got.WaitFor(0)
+	require.NotNil(t, err)
+
+	err = got.Abort()
 	require.NotNil(t, err)
 
 	_, err = got.Abortable()

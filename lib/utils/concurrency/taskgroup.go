@@ -130,7 +130,7 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 		for _, v := range options {
 			switch v.Key() {
 			case keywordInheritParentIDOption:
-				// this option orders to copy ParentTask.ID to children; the latter are responsible to update their own ID
+				// this option orders copying ParentTask.ID to children; the latter are responsible to update their own ID
 				value, ok := v.Value().(bool)
 				if ok && value && parentTask != nil {
 					id, xerr := parentTask.GetID()
