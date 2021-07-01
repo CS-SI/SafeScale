@@ -19,6 +19,7 @@ package concurrency
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"sync"
@@ -249,7 +250,8 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 				}
 			}
 			childrenStartDuration := time.Since(begin)
-			timeout := time.Duration(upper+margin) * time.Millisecond
+			upbound := int(math.Ceil(float64(upper)/float64(latency)) * float64(latency))
+			timeout := time.Duration(upbound+margin) * time.Millisecond
 			// Waits that all children have started to access max safely
 			begin = time.Now()
 			fastEnough, res, xerr := overlord.WaitFor(timeout)
@@ -261,7 +263,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
 				t.Errorf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
 				failures++
-				if failures > 4 || failures > 4*rounds/100 {
+				if failures > 4 || (rounds > 100 && failures > 4*rounds/100) {
 					t.Errorf("Test %d: too many failures", index)
 					t.FailNow()
 					return
@@ -274,22 +276,159 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 	}
 
 	// Look at the pressure supported by GC
-	funk(1, 40, 50, 250, 250, 20, 100)
-	funk(2, 40, 50, 250, 250, 20, 200)
-	funk(3, 40, 50, 250, 250, 20, 400)
-	funk(4, 40, 50, 250, 250, 20, 800)
+	funk(1, 40, 50, 250, 20, 40, 10)
+	funk(2, 40, 50, 250, 20, 40, 20)
+	funk(3, 40, 50, 250, 20, 40, 40)
+	funk(4, 40, 50, 250, 20, 40, 80)
 
 	// Increasing the upper limit changes the outcome ?
-	funk(5, 40, 50, 250, 250, 20, 400)
-	funk(6, 40, 50, 350, 350, 20, 400)
-	funk(7, 40, 50, 450, 450, 20, 400)
-	funk(8, 40, 50, 550, 550, 20, 400)
+	funk(5, 40, 50, 250, 20, 40, 400)
+	funk(6, 40, 50, 350, 20, 40, 400)
+	funk(7, 40, 50, 450, 20, 40, 400)
+	funk(8, 40, 50, 550, 20, 40, 400)
 
 	// Is the latency ?
-	funk(9, 40, 50, 250, 1, 20, 400)
-	funk(10, 40, 50, 250, 10, 20, 400)
-	funk(11, 40, 50, 250, 50, 20, 400)
-	funk(12, 40, 50, 250, 250, 20, 400)
+	funk(9, 40, 50, 250, 1, 40, 400)
+	funk(10, 40, 50, 250, 10, 40, 400)
+	funk(11, 40, 50, 250, 50, 40, 400)
+	funk(12, 40, 50, 250, 250, 40, 400)
+}
+
+func TestTimingOnlyOne(t *testing.T) {
+	funk := func(index int, rounds int, lower int, upper int, latency int, margin int, gcpressure int) {
+		failures := 0
+		for iter := 0; iter < rounds; iter++ {
+			overlord, xerr := NewTaskGroupWithParent(nil)
+			require.NotNil(t, overlord)
+			require.Nil(t, xerr)
+			xerr = overlord.SetID("/parent")
+			require.Nil(t, xerr)
+
+			theID, xerr := overlord.GetID()
+			require.Nil(t, xerr)
+			require.NotEmpty(t, theID)
+
+			begin := time.Now()
+			for ind := 0; ind < gcpressure; ind++ {
+				_, xerr := overlord.Start(taskgen(lower, upper, latency, 0, 0, 0, false), nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+				if xerr != nil {
+					t.Errorf("Test %d: Unexpected: %s", index, xerr)
+					t.FailNow()
+					return
+				}
+			}
+			childrenStartDuration := time.Since(begin)
+
+			upbound := int(math.Ceil(float64(upper)/float64(latency)) * float64(latency))
+			timeout := time.Duration(upbound+margin) * time.Millisecond
+			// Waits that all children have started to access max safely
+			begin = time.Now()
+			res, xerr := overlord.Wait()
+			waitRealDuration := time.Since(begin)
+			if waitRealDuration > timeout {
+				if childrenStartDuration > 5*time.Millisecond { // however, it grows with gcpressure
+					t.Logf("Launching children took %v", childrenStartDuration)
+				}
+				t.Logf("Wait really waited %v/%v", waitRealDuration, timeout)
+				t.Errorf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
+				failures++
+			} else {
+				require.Nil(t, xerr)
+				require.NotEmpty(t, res)
+			}
+		}
+	}
+
+	// Look at the pressure supported by GC
+	funk(10, 1, 230, 250, 5, 10, 1)
+	funk(11, 1, 230, 250, 10, 10, 1)
+	funk(12, 1, 230, 250, 20, 10, 1)
+	funk(13, 1, 230, 250, 40, 10, 1)
+	funk(20, 1, 230, 250, 5, 20, 1)
+	funk(21, 1, 230, 250, 10, 20, 1)
+	funk(22, 1, 230, 250, 20, 20, 1)
+	funk(23, 1, 230, 250, 40, 20, 1)
+	funk(30, 1, 230, 250, 5, 30, 1)
+	funk(31, 1, 230, 250, 10, 30, 1)
+	funk(32, 1, 230, 250, 20, 30, 1)
+	funk(33, 1, 230, 250, 40, 30, 1)
+	funk(40, 1, 230, 250, 5, 40, 1)
+	funk(41, 1, 230, 250, 10, 40, 1)
+	funk(42, 1, 230, 250, 20, 40, 1)
+	funk(43, 1, 230, 250, 40, 40, 1)
+	funk(50, 1, 230, 250, 5, 50, 1)
+	funk(51, 1, 230, 250, 10, 50, 1)
+	funk(52, 1, 230, 250, 20, 50, 1)
+	funk(53, 1, 230, 250, 40, 50, 1)
+}
+
+func TestChildrenWaitingGameEnoughTimeAfter(t *testing.T) {
+	funk := func(index int, rounds int, lower int, upper int, latency int, margin int, gcpressure int) {
+		failures := 0
+		for iter := 0; iter < rounds; iter++ {
+			overlord, xerr := NewTaskGroupWithParent(nil)
+			require.NotNil(t, overlord)
+			require.Nil(t, xerr)
+			xerr = overlord.SetID("/parent")
+			require.Nil(t, xerr)
+
+			theID, xerr := overlord.GetID()
+			require.Nil(t, xerr)
+			require.NotEmpty(t, theID)
+
+			begin := time.Now()
+			for ind := 0; ind < gcpressure; ind++ {
+				_, xerr := overlord.Start(taskgen(lower, upper, latency, 0, 0, 0, false), nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+				if xerr != nil {
+					t.Errorf("Test %d: Unexpected: %s", index, xerr)
+					t.FailNow()
+					return
+				}
+			}
+			childrenStartDuration := time.Since(begin)
+
+			upbound := int(math.Ceil(float64(upper)/float64(latency)) * float64(latency))
+			timeout := time.Duration(upbound+margin) * time.Millisecond
+			// Waits that all children have started to access max safely
+			begin = time.Now()
+			res, xerr := overlord.Wait()
+			waitForRealDuration := time.Since(begin)
+			if waitForRealDuration > timeout {
+				if childrenStartDuration > 5*time.Millisecond { // however, it grows with gcpressure
+					t.Logf("Launching children took %v", childrenStartDuration)
+				}
+				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
+				t.Errorf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
+				failures++
+				if failures > 4 || (rounds > 100 && failures > 4*rounds/100) {
+					t.Errorf("Test %d: too many failures", index)
+					t.FailNow()
+					return
+				}
+			} else {
+				require.Nil(t, xerr)
+				require.NotEmpty(t, res)
+			}
+		}
+	}
+
+	// Look at the pressure supported by GC
+	funk(1, 40, 50, 250, 20, 40, 100)
+	funk(2, 40, 50, 250, 20, 40, 200)
+	funk(3, 40, 50, 250, 20, 40, 300)
+	funk(4, 40, 50, 250, 20, 40, 400)
+
+	// Increasing the upper limit changes the outcome ?
+	funk(5, 40, 50, 250, 20, 40, 400)
+	funk(6, 40, 50, 350, 20, 40, 400)
+	funk(7, 40, 50, 450, 20, 40, 400)
+	funk(8, 40, 50, 550, 20, 40, 400)
+
+	// Is the latency ?
+	funk(9, 40, 50, 250, 1, 40, 400)
+	funk(10, 40, 50, 250, 10, 40, 400)
+	funk(11, 40, 50, 250, 50, 40, 400)
+	funk(12, 40, 50, 250, 250, 40, 400)
 }
 
 func TestChildrenWaitingGame(t *testing.T) {
@@ -676,17 +815,7 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 		require.NotEmpty(t, theID)
 
 		for ind := 0; ind < 10; ind++ {
-			_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				dur := time.Duration(randomInt(30, 50)) * 10 * time.Millisecond
-				tempo := dur / 100
-				for i := 0; i < 100; i++ {
-					if t.Aborted() {
-						return nil, fail.AbortedError(nil)
-					}
-					time.Sleep(tempo)
-				}
-				return "waiting game", nil
-			}, nil)
+			_, xerr := overlord.Start(taskgen(30, 50, 5, 0, 0, 0, false), nil)
 			if xerr != nil {
 				t.Errorf("Unexpected error: %v", xerr)
 				t.FailNow()

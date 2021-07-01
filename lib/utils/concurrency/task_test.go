@@ -854,7 +854,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 		require.Nil(t, xerr)
 
 		go func() {
-			time.Sleep(time.Duration(trigger)*time.Millisecond)
+			time.Sleep(time.Duration(trigger) * time.Millisecond)
 			cafu()
 		}()
 
@@ -896,17 +896,17 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	// is this critical ?, maybe not today but...
 	// big problems have small beginnings...
 
-	funk(1, 30, 50, 10, true)    // canceled
-	funk(2, 10, 50, 30, true)    // timeout
-	funk(3, 30, 50, 80, true)    // timeout
-	funk(4, 80, 50, 10, true)    // canceled
-	funk(5, 40, 20, 10, true)    // canceled
-	funk(6, 40, 20, 30, false)   // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
-	funk(7, 140, 20, 240/*40*/, false)  // same thing here
-	funk(8, 140, 20, 100, false) // same thing here
-	funk(9, 140, 20, 120, false) // same thing here
-	funk(10, 140, 20, 50, false) // same thing here
-	funk(11, 140, 50, 10, true)  // canceled
+	funk(1, 30, 50, 10, true)           // canceled
+	funk(2, 10, 50, 30, true)           // timeout
+	funk(3, 30, 50, 80, true)           // timeout
+	funk(4, 80, 50, 10, true)           // canceled
+	funk(5, 40, 20, 10, true)           // canceled
+	funk(6, 40, 20, 30, false)          // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
+	funk(7, 140, 20, 240 /*40*/, false) // same thing here
+	funk(8, 140, 20, 100, false)        // same thing here
+	funk(9, 140, 20, 120, false)        // same thing here
+	funk(10, 140, 20, 50, false)        // same thing here
+	funk(11, 140, 50, 10, true)         // canceled
 }
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
@@ -989,7 +989,7 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 		require.Nil(t, xerr)
 
 		begin := time.Now()
-		single, xerr = single.Start(taskgen(int(sleep), int(sleep), 4, 0, 0, 0, false), nil)
+		single, xerr = single.Start(taskgen(int(sleep), int(sleep), 5, 0, 0, 0, false), nil)
 		require.Nil(t, xerr)
 
 		go func() {
@@ -1025,8 +1025,8 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	// tests are right, errorExpected it what it should be
 	// previous versions got the work done fast enough, now we don't, why ?
 	funk(1, 10, 1, true)
-	funk(2, 10, 5, true)   // latency matters ?
-	funk(3, 10, 6, true)   // this test and the previous should be equivalent
+	funk(2, 10, 5, true) // latency matters ?
+	funk(3, 10, 6, true) // this test and the previous should be equivalent
 	// VPL: Task took 12.22ms to end, cancel hits at 12.16ms -> Aborted
 	funk(4, 10, 11, true) // latency matters ?
 	funk(5, 50, 10, true)
@@ -1034,37 +1034,23 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	funk(7, 50, 300, false)
 	funk(8, 50, 3000, false)
 	funk(9, 50, 6000, false)
-	funk(10, 50, 48, true)  // latency matters, this sometimes fails
-	funk(11, 50, 49, true)  // latency matters, this sometimes fails
+	funk(10, 50, 48, true) // latency matters, this sometimes fails
+	funk(11, 50, 49, true) // latency matters, this sometimes fails
 	// VPL: on macM1, cancel signal hits at 51.80ms, task detects abort at 57.11ms -> Aborted
 	funk(12, 50, 51, true) // latency matters, this sometimes fails
-	// VPL: on macM1, cancel signals hists at 52.13ms, task detects abort at 57.36ms -> Aborted
+	// VPL: on macM1, cancel signals hits at 52.13ms, task detects abort at 57.36ms -> Aborted
 	funk(13, 50, 52, true) // latency matters, this sometimes fails
 	funk(14, 50, 60, true) // latency matters, this sometimes fails
-	// VPL: on MBA-m1, task ended its work after 62.71ms, before cancel hits -> no error
+	// VPL: on macM1, task ended its work after 62.71ms, before cancel hits -> no error
 	funk(15, 50, 63, false) // if we go far enough, no errors
 }
 
 func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
 	single, xerr := NewTask()
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
 
-	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		for {
-			time.Sleep(time.Duration(10) * time.Millisecond)
-
-			if t.Aborted() {
-				return "Big failure...", fail.AbortedError(nil)
-			}
-
-			fmt.Println("Forever young...")
-		}
-	}, nil, time.Duration(200)*time.Millisecond)
+	single, xerr = single.StartWithTimeout(taskgen(100, 250, 10, 0, 0, 0, false), nil, time.Duration(90)*time.Millisecond)
 	require.Nil(t, xerr)
 
 	time.Sleep(time.Duration(300) * time.Millisecond)
@@ -1084,13 +1070,6 @@ func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
 			t.Errorf("Where is the timeout error ??: %s", spew.Sdump(xerr))
 		}
 	}
-
-	// Nothing wrong should happen after this point...
-	time.Sleep(time.Duration(100) * time.Millisecond)
-
-	_ = w.Close()
-	_, _ = ioutil.ReadAll(r)
-	os.Stdout = rescueStdout
 }
 
 func TestStartWithTimeoutTask(t *testing.T) {
@@ -1112,7 +1091,7 @@ func TestStartWithTimeoutTask(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%v), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
 	}
 
 	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
@@ -1140,24 +1119,10 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
 
-	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		for {
-			time.Sleep(time.Duration(10) * time.Millisecond)
-			status, xerr := t.GetStatus()
-			if xerr != nil {
-				return "Big failure...", nil
-			}
-			if status == ABORTED || status == TIMEOUT {
-				break
-			}
-
-			fmt.Println("Forever young...")
-		}
-		return "I want to be forever young", nil
-	}, nil, time.Duration(200)*time.Millisecond)
+	single, xerr = single.StartWithTimeout(taskgen(100, 200, 10, 0, 0, 0, false), nil, time.Duration(90)*time.Millisecond)
 	require.Nil(t, xerr)
 
-	time.Sleep(time.Duration(300) * time.Millisecond)
+	time.Sleep(time.Duration(800) * time.Millisecond)
 	// by now single should have finished with timeouts, so...
 
 	stat, err := single.GetStatus()
@@ -1166,10 +1131,12 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%v), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
 	}
 
-	_, _, xerr = single.WaitFor(4 * time.Millisecond)
+	// We are in timeout state, so this should return false, nil, *fail.ErrTimeout
+	rv, _, xerr := single.WaitFor(4 * time.Millisecond)
+	require.False(t, rv)
 	require.NotNil(t, xerr)
 
 	_, _, xerr = single.WaitFor(50 * time.Millisecond)
@@ -1178,7 +1145,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 	_, xerr = single.IsSuccessful()
 	require.NotNil(t, xerr)
 
-	_, xerr = single.StartWithTimeout(taskgen(5, 100, 10, 1, 0, 0, false), nil, 200*time.Millisecond)
+	_, xerr = single.StartWithTimeout(taskgen(5, 100, 10, 1, 0, 0, false), nil, 90*time.Millisecond)
 	require.NotNil(t, xerr)
 
 	_, xerr = single.Wait()
@@ -1191,6 +1158,47 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 
 	// Nothing wrong should happen after this point...
 	time.Sleep(time.Duration(100) * time.Millisecond)
+}
+
+func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
+	funk := func(timing int) {
+		single, xerr := NewTask()
+		require.NotNil(t, single)
+		require.Nil(t, xerr)
+
+		single, xerr = single.StartWithTimeout(taskgen(100, 200, 10, 0, 0, 0, false), nil, time.Duration(90)*time.Millisecond)
+		require.Nil(t, xerr)
+
+		time.Sleep(time.Duration(timing) * time.Millisecond)
+		// by now single should have finished with timeouts, so...
+
+		stat, err := single.GetStatus()
+		if err != nil {
+			t.Errorf("Problem retrieving status ?")
+		}
+
+		if stat != TIMEOUT {
+			t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+		}
+
+		// We are in timeout state, so this should return false, nil, *fail.ErrTimeout
+		rv, _, xerr := single.WaitFor(4 * time.Millisecond)
+		require.False(t, rv)
+		require.NotNil(t, xerr)
+
+		_, xerr = single.Wait()
+		if xerr != nil {
+			if _, ok := xerr.(*fail.ErrTimeout); !ok {
+				t.Errorf("Where are the timeout errors ??: %s", spew.Sdump(xerr))
+			}
+		}
+		require.NotNil(t, xerr)
+	}
+
+	funk(250)
+	funk(300)
+	funk(400)
+	funk(500)
 }
 
 func TestLikeBeforeWithoutAbortButContext(t *testing.T) {
