@@ -51,7 +51,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaitingFor
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 12 {
+			if iter > 6 {
 				break
 			}
 			if enough {
@@ -160,7 +160,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaitingFor
 				enough = true
 			}
 
-			time.Sleep(2 * time.Second)
+			time.Sleep(600 * time.Millisecond)
 			if reminder {
 				t.Errorf("by now we should see panics in lines above, panics that only shows in logs and the rest of the code is unaware of")
 			}
@@ -495,7 +495,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 12 {
+			if iter > 6 {
 				break
 			}
 			if enough {
@@ -846,7 +846,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 15 {
+			if iter > 6 {
 				break
 			}
 

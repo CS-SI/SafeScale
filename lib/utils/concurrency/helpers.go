@@ -122,7 +122,9 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 					time.Sleep(time.Duration(randomInt(cleanfactor*low, cleanfactor*high)) * time.Millisecond)
 				}
 				weWereAborted = true
-				_ = custom() // for side-effects
+				if custom != nil {
+					_ = custom() // for side-effects
+				}
 				break
 			}
 			count++
