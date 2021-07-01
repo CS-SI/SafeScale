@@ -512,7 +512,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 		return fail.InvalidInstanceError()
 	}
 
-	traceR := newTracer(instance, true /*tracing.ShouldTrace("concurrency.task")*/)
+	traceR := newTracer(instance, false /*tracing.ShouldTrace("concurrency.task")*/)
 
 	defer func() {
 		instance.lock.Lock()

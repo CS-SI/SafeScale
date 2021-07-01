@@ -1112,7 +1112,7 @@ func TestStartWithTimeoutTask(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%v), that's the textbook definition", stat)
 	}
 
 	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
@@ -1170,7 +1170,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 	}
 
 	if stat != TIMEOUT {
-		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+		t.Errorf("Where is the timeout ?? (%v), that's the textbook definition", stat)
 	}
 
 	_, _, xerr = single.WaitFor(4 * time.Millisecond)
