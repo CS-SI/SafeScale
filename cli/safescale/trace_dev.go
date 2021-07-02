@@ -1,3 +1,5 @@
+// +build !release
+
 /*
  * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
@@ -17,7 +19,8 @@
 package main
 
 // appTrace contains the default parts that we want to trace
-var appTrace = `{
+func appTrace() string {
+	return `{
     "concurrency": {
         "lock": false,
         "task": false
@@ -27,3 +30,4 @@ var appTrace = `{
         "cluster": true
     }
 }`
+}
