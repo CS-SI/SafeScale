@@ -23,7 +23,7 @@ func appTrace() string {
 	return `{
     "concurrency": {
         "lock": false,
-        "task": true
+        "task": false
     },
     "ssh": {},
     "listeners": {},

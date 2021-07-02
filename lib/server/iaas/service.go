@@ -696,7 +696,8 @@ func (svc service) SearchImage(osname string) (*abstract.Image, fail.Error) {
 		return nil, fail.NotFoundError("unable to find an image matching '%s'", osname)
 	}
 
-	reg, err := regexp.Compile("[^A-Z0-9.]")
+	// reg, err := regexp.Compile("[^A-Z0-9.]")
+	reg, err := regexp.Compile("[^A-Z0-9]")
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
@@ -717,11 +718,11 @@ func (svc service) SearchImage(osname string) (*abstract.Image, fail.Error) {
 	for i, entry := range imgs {
 		normalizedImageName := normalizeString(entry.Name, reg)
 		normalizedImageName = addPadding(normalizedImageName, maxLength)
-		wfScore := smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
-		//logrus.Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
+		if strings.Contains(normalizedImageName, normalizedOSName) {
+			wfScore := smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
+			logrus.Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
 
-		if minWFScore == -1 || wfScore < minWFScore {
-			if strings.Contains(normalizedImageName, normalizedOSName) {
+			if minWFScore == -1 || wfScore < minWFScore {
 				minWFScore = wfScore
 				wfSelect = i
 			}
