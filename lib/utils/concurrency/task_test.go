@@ -1055,7 +1055,7 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	funk(10, 50, 10, 48, true) // latency matters, this sometimes fails
 	funk(11, 50, 10, 49, true) // latency matters, this sometimes fails
 	// VPL: on macM1, cancel signal hits at 51.80ms, task detects abort at 57.11ms -> Aborted
-	funk(12, 50, 10, 52, false) // latency matters, this sometimes fails
+	funk(12, 50, 10, 52, true) // latency matters, this sometimes fails
 	// VPL: on macM1, cancel signals hits at 52.13ms, task detects abort at 57.36ms -> Aborted
 	funk(13, 50, 10, 53, false) // latency matters, this sometimes fails
 	funk(14, 50, 10, 60, false) // latency matters, this sometimes fails
