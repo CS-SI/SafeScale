@@ -441,10 +441,7 @@ func TestStates(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 4; ind++ {
-		_, err := overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil, 20*time.Millisecond)
+		_, err := overlord.StartWithTimeout(taskgen(200, 250, 50, 0, 0, 0, false), nil, 60*time.Millisecond)
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		}
