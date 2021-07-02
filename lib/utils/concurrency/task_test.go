@@ -984,7 +984,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 }
 
 func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
-	funk := func(ind int, sleep uint, trigger uint, errorExpected bool) {
+	funk := func(ind int, sleep uint, lat uint, trigger uint, errorExpected bool) {
 		fmt.Printf("--- funk #%d ---\n", ind)
 
 		ctx, cafu := context.WithCancel(context.TODO())
@@ -996,7 +996,7 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 		require.Nil(t, xerr)
 
 		begin := time.Now()
-		single, xerr = single.Start(taskgen(int(sleep), int(sleep), 5, 0, 0, 0, false), nil)
+		single, xerr = single.Start(taskgen(int(sleep), int(sleep), int(lat), 0, 0, 0, false), nil)
 		require.Nil(t, xerr)
 
 		go func() {
@@ -1031,25 +1031,27 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 
 	// tests are right, errorExpected it what it should be
 	// previous versions got the work done fast enough, now we don't, why ?
-	funk(1, 10, 1, true)
-	funk(2, 10, 5, true) // latency matters ?
-	funk(3, 10, 6, true) // this test and the previous should be equivalent
+	// if trigger >= (sleep + latency) and we have an error (we should NOT), this is failure
+	funk(1, 10, 2, 1, true)
+	funk(2, 10, 2, 5, true) // latency matters ?
+	funk(3, 10, 2, 6, true) // this test and the previous should be equivalent
 	// VPL: Task took 12.22ms to end, cancel hits at 12.16ms -> Aborted
-	funk(4, 10, 11, true) // latency matters ?
-	funk(5, 50, 10, true)
-	funk(6, 50, 80, false)
-	funk(7, 50, 300, false)
-	funk(8, 50, 3000, false)
-	funk(9, 50, 6000, false)
-	funk(10, 50, 48, true) // latency matters, this sometimes fails
-	funk(11, 50, 49, true) // latency matters, this sometimes fails
+	funk(4, 10, 2, 12, false) // latency matters ?
+	funk(5, 10, 2, 13, false)
+	funk(6, 50, 2, 80, false)
+	funk(7, 50, 2, 300, false)
+	funk(8, 50, 2, 3000, false)
+	funk(9, 50, 2, 6000, false)
+	funk(10, 50, 2, 48, true) // latency matters, this sometimes fails
+	funk(11, 50, 2, 49, true) // latency matters, this sometimes fails
 	// VPL: on macM1, cancel signal hits at 51.80ms, task detects abort at 57.11ms -> Aborted
-	funk(12, 50, 51, true) // latency matters, this sometimes fails
+	funk(12, 50, 2, 52, false) // latency matters, this sometimes fails
 	// VPL: on macM1, cancel signals hits at 52.13ms, task detects abort at 57.36ms -> Aborted
-	funk(13, 50, 52, true) // latency matters, this sometimes fails
-	funk(14, 50, 60, true) // latency matters, this sometimes fails
+	funk(13, 50, 2, 53, false) // latency matters, this sometimes fails
+	funk(14, 50, 2, 60, false) // latency matters, this sometimes fails
 	// VPL: on macM1, task ended its work after 62.71ms, before cancel hits -> no error
-	funk(15, 50, 63, false) // if we go far enough, no errors
+	funk(15, 50, 2, 63, false) // if we go far enough, no errors
+	funk(15, 50, 2, 73, false) // if we go far enough, no errors
 }
 
 func TestDoesAbortReallyAbortOrIsJustFakeNews(t *testing.T) {
