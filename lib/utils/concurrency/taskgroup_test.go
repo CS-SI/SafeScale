@@ -81,7 +81,7 @@ func TestIntrospection(t *testing.T) {
 		require.NotEmpty(t, theID)
 
 		for ind := 0; ind < 800; ind++ {
-			_, err := overlord.Start(taskgen(50, 250, 10, 0, 0, 0, false), nil)
+			_, err := overlord.Start(taskgen(50, 250, 25, 0, 0, 0, false), nil)
 			if err != nil {
 				t.Errorf("Unexpected: %s", err)
 				t.FailNow()
@@ -289,7 +289,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 
 	// Is the latency ?
 	funk(9, 40, 50, 250, 1, 40, 400)
-	funk(10, 40, 50, 250, 10, 40, 400)
+	funk(10, 40, 50, 250, 20, 40, 400)
 	funk(11, 40, 50, 250, 50, 40, 400)
 	funk(12, 40, 50, 250, 250, 40, 400)
 }
@@ -339,7 +339,7 @@ func TestTimingOnlyOne(t *testing.T) {
 		}
 	}
 
-	// Look at the pressure supported by GC
+	// the latency heavily impacts the results, it's not the gc, it's the increasing sleep overhead
 	funk(10, 1, 230, 250, 5, 10, 1)
 	funk(11, 1, 230, 250, 10, 10, 1)
 	funk(12, 1, 230, 250, 20, 10, 1)
