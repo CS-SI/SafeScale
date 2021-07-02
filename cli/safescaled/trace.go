@@ -20,7 +20,7 @@ package main
 var appTrace = `{
     "concurrency": {
         "lock": false,
-        "task": true
+        "task": false
     },
     "ssh": {},
     "listeners": {},
