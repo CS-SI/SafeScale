@@ -61,6 +61,30 @@ func randomIntWithReseed(min, max int) int {
 	return mrand.Intn(max-min) + min
 }
 
+func validTest(st int, latency int) bool {
+	iterations := int64(math.Ceil(float64(float64(st) / float64(latency))))
+	tempo := time.Duration(latency) * time.Millisecond
+	count := int64(0)
+	begin := time.Now()
+
+	for { // do some work, then look for aborted, again and again
+		if count >= iterations {
+			break
+		}
+		// some work
+		time.Sleep(tempo) // that is actually the latency between abortion and its check t.Aborted() in the line below
+		count++
+	}
+
+	elapsed := time.Since(begin)
+	if elapsed > time.Duration(st+latency)*time.Millisecond {
+		// fmt.Printf("this happened %d, %d, %d, %s\n", st, latency, iterations, elapsed)
+		return false
+	}
+
+	return true
+}
+
 func taskgen(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool) TaskAction {
 	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
 		traceR := newTracer(t, true) // change to true to display traces
@@ -71,15 +95,24 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 
 		weWereAborted := false
 		rd := randomInt(low, high)
+
+		/*
+			if !validTest(high, latency) {
+				fmt.Printf("This is a dangerous configuration: %d, %d\n", high, latency)
+				return "", fail.AbortedError(nil, "inconsistent")
+			}
+		*/
+
 		iterations := int64(math.Ceil(float64(float64(rd) / float64(latency))))
-		tempo := time.Duration(latency) * time.Millisecond
+		tempo := time.Duration(math.Min(float64(latency), float64(high))) * time.Millisecond
 		count := int64(0)
 		begin := time.Now()
 		defer func() {
 			traceR.trace("low=%d, high=%d, tempo=%v, iterations=%d, took %v", low, high, tempo, iterations, time.Since(begin))
 		}()
 
-		// fmt.Printf("Sleeping %d iterations and a time of %s\n", iterations, tempo)
+		wrongTest := false
+		realTime := time.Now()
 		for { // do some work, then look for aborted, again and again
 			if count >= iterations {
 				break
@@ -88,6 +121,10 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 			time.Sleep(tempo) // that is actually the latency between abortion and its check t.Aborted() in the line below
 			count++
 			if t.Aborted() {
+				// if so, we shouldn't be still running, sleep adds too much overhead
+				if time.Since(realTime) > time.Duration(rd+latency)*time.Millisecond {
+					wrongTest = true
+				}
 				traceR.trace("aborted after %d iterations (max allowed=%d)", count, iterations)
 				// Cleaning up first before leaving... ;)
 				if cleanfactor > 0 {
@@ -105,6 +142,9 @@ func taskgen(low int, high int, latency int, cleanfactor int, probError float32,
 		}
 
 		if weWereAborted {
+			if wrongTest {
+				return "", fail.AbortedError(nil, "inconsistent")
+			}
 			return "", fail.AbortedError(nil, "we were killed") // better to return a 'zero' value as the 1st return value
 		}
 
@@ -126,8 +166,16 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 			defer fail.OnPanic(&xerr)
 		}
 		rd := randomInt(low, high)
+
+		/*
+			if !validTest(high, latency) {
+				fmt.Printf("This is a dangerous configuration: %d, %d\n", rd, latency)
+				return "", fail.AbortedError(nil, "inconsistent")
+			}
+		*/
+
 		iterations := int64(math.Ceil(float64(float64(rd) / float64(latency))))
-		tempo := time.Duration(latency) * time.Millisecond
+		tempo := time.Duration(math.Min(float64(latency), float64(high))) * time.Millisecond
 		count := int64(0)
 		var iErr error = nil
 		begin := time.Now()

@@ -275,7 +275,7 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithTimeout(t *testing.T) {
 	gorrs := 800
 
 	for ind := 0; ind < gorrs; ind++ {
-		_, xerr := overlord.StartWithTimeout(taskgen(200, 250, 10, 0, 0, 0, false), nil, 190*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+		_, xerr := overlord.StartWithTimeout(taskgen(200, 250, 40, 0, 0, 0, false), nil, 190*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
@@ -357,7 +357,7 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithErrors(t *testing.T) {
 	gorrs := 800
 
 	for ind := 0; ind < gorrs; ind++ {
-		_, xerr := overlord.StartWithTimeout(taskgen(200, 250, 10, 0, 0.75, 0, false), nil, 190*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+		_, xerr := overlord.StartWithTimeout(taskgen(200, 250, 40, 0, 0.75, 0, false), nil, 190*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
