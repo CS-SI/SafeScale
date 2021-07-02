@@ -175,15 +175,18 @@ func (c *MetadataCore) Inspect(callback resources.Callback) (xerr fail.Error) {
 		return fail.InvalidInstanceContentError("c.properties", "cannot be nil")
 	}
 
-	c.lock.RLock()
-	defer c.lock.RUnlock()
 
 	// Reload reloads data from Object Storage to be sure to have the last revision
+	c.lock.Lock()
 	xerr = c.reload()
+	c.lock.Unlock()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to reload metadata")
 	}
+
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
 	return c.shielded.Inspect(func(clonable data.Clonable) fail.Error {
 		return callback(clonable, c.properties)
@@ -603,9 +606,6 @@ func (c *MetadataCore) Reload() (xerr fail.Error) {
 // Note: must be called after locking the instance
 func (c *MetadataCore) reload() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
 
 	if c.loaded && !c.committed {
 		return fail.InconsistentError("cannot reload a not committed data")
