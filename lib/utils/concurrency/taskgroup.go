@@ -618,7 +618,9 @@ func (instance *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fa
 
 // WaitGroupFor waits for the task to end, for 'duration' duration
 // Returns:
-// - true, TaskGroupResult, *failErrAborted: TaskGroup terminated on Abort (and possible generated error after
+// - true, TaskGroupResult, nil: Wait worked and TaskGroup generated no error
+// - false, nil, *fail.ErrInconsistent: cannot wait on a TaskGroup not started
+// - true, TaskGroupResult, *fail.ErrAborted: TaskGroup terminated on Abort (and possible generated error after
 //                                           abort signal has been received would be attached to the error as consequence)
 // - true, TaskGroupResult, fail.Error: TaskGroup terminated, but generated an error
 // - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out; TaskGroup is aborted in case of timeout (and possible generated
