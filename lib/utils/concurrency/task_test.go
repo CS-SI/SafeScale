@@ -251,6 +251,13 @@ func TestOneWaitingForGameWithFuncGen(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.True(t, good)
+
+	suc, err := got.IsSuccessful()
+	require.True(t, suc)
+	require.Nil(t, err)
+
+	err = got.SetID("small changes")
+	require.NotNil(t, err)
 }
 
 func TestChangeIdAtMidFlight(t *testing.T) {
@@ -1133,6 +1140,9 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 	if stat != TIMEOUT {
 		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
 	}
+
+	xerr = single.SetID("small changes")
+	require.NotNil(t, xerr)
 
 	// We are in timeout state, so this should return false, nil, *fail.ErrTimeout
 	rv, _, xerr := single.WaitFor(4 * time.Millisecond)
