@@ -321,7 +321,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	case UNKNOWN:
 		fallthrough
 	default:
-		return nil, fail.InconsistentError("cannot start a new Task in TaskGroup: unknown status (%d)", status)
+		return nil, fail.InconsistentError("cannot start a new Task in TaskGroup: unknown status (%s)", status)
 	}
 }
 
@@ -437,7 +437,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			return nil, fail.InconsistentError("cannot wait on TaskGroup in 'UNKNOWN' state")
 
 		default:
-			return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%d)", tid, status)
+			return nil, fail.ForbiddenError("cannot wait task group '%s': not running (%s)", tid, status)
 		}
 	}
 }
@@ -550,7 +550,7 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 		return false, nil, xerr
 	}
 	if taskStatus != RUNNING && taskStatus != ABORTED {
-		return false, nil, fail.NewError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
+		return false, nil, fail.NewError("cannot wait task group '%s': not running (%s)", tid, taskStatus)
 	}
 
 	instance.children.lock.RLock()
@@ -713,7 +713,7 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 	case UNKNOWN:
 		fallthrough
 	default:
-		return false, nil, fail.InvalidRequestError("cannot wait task group '%s': not running (%d)", tid, taskStatus)
+		return false, nil, fail.InvalidRequestError("cannot wait task group '%s': not running (%s)", tid, taskStatus)
 	}
 }
 
