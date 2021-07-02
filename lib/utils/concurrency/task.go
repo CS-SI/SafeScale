@@ -651,7 +651,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				canceled = true
 
 			case <-instance.runTerminatedCh:
-				instance.processDone(traceR)
+				instance.processTerminated(traceR)
 				finish = true // stop to react on signals
 
 			case <-instance.abortCh:
@@ -750,7 +750,6 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 			return fail.InconsistentError("invalid Task state '%s'", status)
 		}
 	}
-	instance.lock.Unlock()
 	return nil
 }
 

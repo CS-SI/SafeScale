@@ -193,7 +193,7 @@ func (instance *taskGroup) GetSignature() string {
 	return `{taskGroup ` + tid + `}`
 }
 
-// GetStatus returns the current task status
+// GetStatus returns the current status of the TaskGroup (ie the parent Task running the children)
 func (instance *taskGroup) GetStatus() (TaskStatus, fail.Error) {
 	if instance.isNull() {
 		return TaskStatus(0), fail.InvalidInstanceError()
@@ -784,7 +784,7 @@ func (instance *taskGroup) New() (Task, fail.Error) {
 	return newTask(context.TODO(), instance.task)
 }
 
-// GetGroupStatus returns the status of all tasks running in TaskGroup
+// GetGroupStatus returns a map of the status of all children running in TaskGroup, ordered by TaskStatus
 func (instance *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
