@@ -2655,13 +2655,6 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			cleaningErrors = append(cleaningErrors, xerr)
 		}
 	}
-
-		_, xerr = tg.WaitGroup()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			cleaningErrors = append(cleaningErrors, xerr)
-		}
-	}
 	if len(cleaningErrors) > 0 {
 		return fail.Wrap(fail.NewErrorList(cleaningErrors), "failed to delete Hosts")
 	}
