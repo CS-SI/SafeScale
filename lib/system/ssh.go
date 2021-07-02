@@ -1048,9 +1048,7 @@ func createSCPCommand(sconf *SSHConfig, localPath, remotePath string, isUpload b
 		return "", nil, fail.Wrap(err, "unable to create temporary key file")
 	}
 
-	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(
-		" -oSendEnv='IAM=%s'", sconf.Hostname,
-	) + " -v"
+	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", sconf.Hostname)
 
 	sshCmdString := fmt.Sprintf("scp -i %s %s -P %d ", f.Name(), options, sconf.Port)
 	if isUpload {
