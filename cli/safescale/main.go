@@ -142,7 +142,7 @@ func main() {
 		// Define trace settings of the application (what to trace if trace is wanted)
 		// TODO: is it the good behavior ? Shouldn't we fail ?
 		// If trace settings cannot be registered, report it but do not fail
-		err := tracing.RegisterTraceSettings(appTrace)
+		err := tracing.RegisterTraceSettings(appTrace())
 		if err != nil {
 			logrus.Errorf(err.Error())
 		}

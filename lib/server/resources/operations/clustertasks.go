@@ -439,7 +439,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		return nil, nil, nil, xerr
 	}
 
-	gatewaysDef.Template = tmpl.Name
+	gatewaysDef.Template = tmpl.ID
 
 	// Determine master sizing
 	if instance.makers.DefaultMasterSizing != nil {
@@ -473,7 +473,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		if xerr != nil {
 			return nil, nil, nil, xerr
 		}
-		mastersDef.Template = tmpl.Name
+		mastersDef.Template = tmpl.ID
 	}
 
 	// Determine node sizing
@@ -510,7 +510,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		if xerr != nil {
 			return nil, nil, nil, xerr
 		}
-		nodesDef.Template = tmpl.Name
+		nodesDef.Template = tmpl.ID
 	}
 
 	// Updates property

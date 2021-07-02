@@ -68,7 +68,7 @@ func work(c *cli.Context) {
 
 	// NOTE: is it the good behavior ? Shouldn't we fail ?
 	// If trace settings cannot be registered, report it but do not fail
-	err := tracing.RegisterTraceSettings(appTrace)
+	err := tracing.RegisterTraceSettings(appTrace())
 	if err != nil {
 		logrus.Errorf(err.Error())
 	}
