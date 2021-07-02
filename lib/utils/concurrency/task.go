@@ -434,15 +434,15 @@ func (instance *task) SetID(id string) fail.Error {
 	case RUNNING:
 		fallthrough
 	case TIMEOUT:
-		return fail.InconsistentError("cannot set ID of a Task in status (%d)", instance.status)
+		return fail.InconsistentError("cannot set ID of a Task in status (%s)", instance.status)
 
 	case DONE:
-		return fail.InconsistentError("cannot set ID of a terminated (status %d) Task", instance.status)
+		return fail.InconsistentError("cannot set ID of a terminated (status %s) Task", instance.status)
 
 	case UNKNOWN:
 		fallthrough
 	default:
-		return fail.InconsistentError("cannot set ID of the Task: invalid status (%d)", instance.status)
+		return fail.InconsistentError("cannot set ID of the Task: invalid status (%s)", instance.status)
 	}
 }
 
@@ -513,7 +513,7 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 	case UNKNOWN:
 		fallthrough
 	default:
-		return nil, fail.InconsistentError("cannot start Task '%s': unknown status (%d)", instance.id, instance.status)
+		return nil, fail.InconsistentError("cannot start Task '%s': unknown status (%s)", instance.id, instance.status)
 	}
 }
 
@@ -747,7 +747,7 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 		case UNKNOWN: // by definition, this status is invalid
 			fallthrough
 		default:
-			return fail.InconsistentError("invalid Task state '%d'", status)
+			return fail.InconsistentError("invalid Task state '%s'", status)
 		}
 	}
 	instance.lock.Unlock()
@@ -833,8 +833,8 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 
 	result, xerr := action(instance, params)
 
-	instance.runTerminatedCh <- struct{}{}  // VPL: Do not put this inside a lock
-	close(instance.runTerminatedCh)         // VPL: this channel MUST BE CLOSED
+	instance.runTerminatedCh <- struct{}{} // VPL: Do not put this inside a lock
+	close(instance.runTerminatedCh)        // VPL: this channel MUST BE CLOSED
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -898,14 +898,14 @@ func (instance *task) IsSuccessful() (bool, fail.Error) {
 		return instance.err == nil, nil
 
 	case READY:
-		return false, fail.InconsistentError("cannot test the success of a Task (status %d) that has not started", status)
+		return false, fail.InconsistentError("cannot test the success of a Task (status %s) that has not started", status)
 
 	case ABORTED:
 		fallthrough
 	case TIMEOUT:
 		fallthrough
 	case RUNNING:
-		return false, fail.InvalidRequestError("cannot test the success of a Task (status %d) that has not been waited", status)
+		return false, fail.InvalidRequestError("cannot test the success of a Task (status %s) that has not been waited", status)
 
 	case UNKNOWN:
 		fallthrough
@@ -1016,7 +1016,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 		case UNKNOWN:
 			fallthrough
 		default:
-			return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%d)", tid, status)
+			return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%s)", tid, status)
 		}
 	}
 }
@@ -1069,7 +1069,7 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 	case UNKNOWN:
 		fallthrough
 	default:
-		return false, nil, fail.NewError("cannot wait task '%s': unknown status (%d)", tid, status)
+		return false, nil, fail.NewError("cannot wait task '%s': unknown status (%s)", tid, status)
 	}
 }
 
@@ -1157,7 +1157,7 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 	case UNKNOWN:
 		fallthrough
 	default:
-		return false, nil, fail.NewError("cannot wait Task '%s': unknown status (%d)", tid, status)
+		return false, nil, fail.NewError("cannot wait Task '%s': unknown status (%s)", tid, status)
 	}
 }
 
