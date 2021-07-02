@@ -1217,10 +1217,12 @@ func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
 		require.NotNil(t, xerr)
 	}
 
-	funk(250)
-	funk(300)
-	funk(400)
 	funk(500)
+	funk(400)
+	funk(300)
+	funk(290)
+	funk(250)
+	funk(240)
 }
 
 func TestLikeBeforeWithoutAbortButContext(t *testing.T) {
