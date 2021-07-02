@@ -540,6 +540,10 @@ func TestTryWaitOfAbortedTask(t *testing.T) {
 	res, xerr = got.Wait()
 	require.NotNil(t, xerr)
 	require.NotNil(t, res)
+
+	res, xerr = got.Wait()
+	require.NotNil(t, xerr)
+	require.NotNil(t, res)
 	// Now that we waited the Task, GetResult() returns useful information
 
 	tr, xerr := got.GetResult()
