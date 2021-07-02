@@ -431,6 +431,145 @@ func TestChildrenWaitingGameEnoughTimeAfter(t *testing.T) {
 	funk(12, 40, 50, 250, 250, 40, 400)
 }
 
+func TestStates(t *testing.T) {
+	overlord, err := NewTaskGroup()
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	for ind := 0; ind < 4; ind++ {
+		_, err := overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil, 20*time.Millisecond)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+		}
+	}
+
+	aborted := overlord.Aborted()
+	require.False(t, aborted)
+
+	res, err := overlord.Wait()
+	require.NotNil(t, err)
+	require.NotEmpty(t, res)
+
+	// We have waited, and no problem, so are we DONE ?
+	st, err := overlord.GetStatus()
+	require.Nil(t, err)
+	if st != DONE {
+		t.Errorf("We should be DONE but we are: %s", st)
+	}
+
+	aborted = overlord.Aborted()
+	if !aborted {
+		t.Errorf("We should be DONE here, so aborted should be true")
+	}
+	require.True(t, aborted)
+
+	st, err = overlord.GetStatus()
+	require.Nil(t, err)
+	require.NotNil(t, st)
+
+	gst, err := overlord.GetGroupStatus()
+	require.Nil(t, err)
+	require.NotNil(t, gst)
+
+	require.Equal(t, st, gst) // this is unclear, why both a GetStatus and a GetGroupStatus ?
+}
+
+func TestTimeoutState(t *testing.T) {
+	overlord, err := NewTaskGroup()
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	for ind := 0; ind < 4; ind++ {
+		_, err := overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil, 20*time.Millisecond)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+		}
+	}
+
+	time.Sleep(400 * time.Millisecond)
+
+	st, err := overlord.GetStatus()
+	require.Nil(t, err)
+	require.NotNil(t, st)
+
+	if st != TIMEOUT {
+		t.Errorf("This should be a TIMEOUT and it's not: %s", st)
+	}
+
+	res, err := overlord.Wait()
+	require.NotNil(t, err)
+	require.NotEmpty(t, res)
+
+	st, err = overlord.GetStatus()
+	require.Nil(t, err)
+	require.NotNil(t, st)
+
+	if st != TIMEOUT {
+		t.Errorf("This should be a TIMEOUT and it's not: %s", st)
+	}
+}
+
+func TestGrTimeoutState(t *testing.T) {
+	overlord, err := NewTaskGroup()
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	theID, err := overlord.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	for ind := 0; ind < 4; ind++ {
+		_, err := overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil, 20*time.Millisecond)
+		if err != nil {
+			t.Errorf("Unexpected: %s", err)
+		}
+	}
+
+	time.Sleep(400 * time.Millisecond)
+
+	st, err := overlord.GetGroupStatus()
+	require.Nil(t, err)
+	require.NotNil(t, st)
+
+	numChildren, err := overlord.GetStarted()
+	require.Nil(t, err)
+
+	t.Errorf("How do I know what's the taskgroup status ?, and how to work with it ? it's undocumented")
+	if len(st[TIMEOUT]) != int(numChildren) {
+		t.Errorf("Everything should be a timeout")
+	}
+
+	res, err := overlord.Wait()
+	require.NotNil(t, err)
+	require.NotEmpty(t, res)
+
+	st, err = overlord.GetGroupStatus()
+	require.Nil(t, err)
+	require.NotNil(t, st)
+
+	t.Errorf("How do I know what's the taskgroup status ?, and how to work with it ? it's undocumented")
+	if len(st[DONE]) != int(numChildren) {
+		t.Errorf("Everything should be a timeout")
+	}
+}
+
 func TestChildrenWaitingGame(t *testing.T) {
 	overlord, err := NewTaskGroup()
 	require.NotNil(t, overlord)
