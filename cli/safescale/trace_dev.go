@@ -20,10 +20,11 @@ package main
 
 // appTrace contains the default parts that we want to trace
 func appTrace() string {
-	return `{
+	return `
+{
     "concurrency": {
         "lock": false,
-        "task": false,
+        "task": false
     },
     "ssh": {},
     "resources": {
