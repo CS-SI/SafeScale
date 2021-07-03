@@ -68,6 +68,7 @@ func work(c *cli.Context) {
 
 	// NOTE: is it the good behavior ? Shouldn't we fail ?
 	// If trace settings cannot be registered, report it but do not fail
+	// FIXME: introduce use of configuration file with autoreload on change
 	err := tracing.RegisterTraceSettings(appTrace())
 	if err != nil {
 		logrus.Errorf(err.Error())
