@@ -599,14 +599,12 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 	tracer.Trace("host='%s', command=\n%s\n", scmd.hostname, scmd.runCmdString)
 	defer tracer.Exiting()
 
-	subtask, xerr := concurrency.NewTaskWithParent(task)
+	subtask, xerr := concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/ssh/run"))
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
 
-	if _, xerr = subtask.StartWithTimeout(
-		scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout,
-	); xerr != nil {
+	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
 		return -1, "", "", xerr
 	}
 
@@ -618,7 +616,7 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		default:
 		}
 
-		// FIXME: This kind of resource exhaustion deserves its own handling and it own kind of error
+		// FIXME: This kind of resource exhaustion deserves its own handling and its own kind of error
 		{
 			if strings.Contains(xerr.Error(), "annot allocate memory") {
 				return -1, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")
