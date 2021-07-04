@@ -387,7 +387,9 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
 				continue
 			}
-			outcomes.AddOne(k, outcome.(resources.UnitResult))
+			if outcome != nil {
+				outcomes.AddOne(k, outcome.(resources.UnitResult))
+			}
 
 			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok

@@ -257,8 +257,9 @@ mrproper: clean
 	@(git clean -xdf -e .idea -e vendor -e .vscode || true)
 
 install:
-	@($(CP) -f $(EXECS) $(GOBIN) || true)
-	@($(CP) -f $(COVEREXECS) $(GOBIN) > /dev/null 2>&1 || true)
+	@(for i in $(EXECS); do echo $$i; $(RM) -f "$(GOPATH)/bin/$$i"; done)
+	@($(CP) -f $(EXECS) $(GOPATH)/bin || true)
+	@($(CP) -f $(COVEREXECS) $(GOPATH)/bin > /dev/null 2>&1 || true)
 
 installci:
 	@(mkdir -p $(CIBIN) || true)
