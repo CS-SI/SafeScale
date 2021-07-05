@@ -1289,15 +1289,6 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.Name, lansg.GetName(), req.ResourceName)
 					}
 
-					//goland:noinspection ALL
-					defer func(sgInstance resources.SecurityGroup) {
-						sgInstance.Released()
-					}(lansg)
-
-					if innerXErr = lansg.BindToHost(ctx, instance, resources.SecurityGroupEnable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
-						return fail.Wrap(innerXErr, "failed to apply Subnet '%s' internal Security Group '%s' to Host '%s'", otherAbstractSubnet.GetName(), lansg.GetName(), req.ResourceName)
-					}
-
 					// register security group in properties
 					item := &propertiesv1.SecurityGroupBond{
 						ID:         lansg.GetID(),
