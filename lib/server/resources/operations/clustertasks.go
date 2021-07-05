@@ -1494,10 +1494,10 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	hostReq.PublicIP = false
 	hostReq.KeepOnFailure = p.keepOnFailure
 	if p.masterDef.Image != "" {
-		hostReq.ImageRef = p.masterDef.Image
+		hostReq.ImageID = p.masterDef.Image
 	}
 	if p.masterDef.Template != "" {
-		hostReq.TemplateRef = p.masterDef.Template
+		hostReq.TemplateID = p.masterDef.Template
 	}
 
 	hostInstance, xerr := NewHost(instance.GetService())
@@ -1933,10 +1933,10 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	hostReq.PublicIP = false
 	hostReq.KeepOnFailure = p.keepOnFailure
 	if p.nodeDef.Image != "" {
-		hostReq.ImageRef = p.nodeDef.Image
+		hostReq.ImageID = p.nodeDef.Image
 	}
 	if p.nodeDef.Template != "" {
-		hostReq.TemplateRef = p.nodeDef.Template
+		hostReq.TemplateID = p.nodeDef.Template
 	}
 
 	hostInstance, xerr := NewHost(instance.GetService())

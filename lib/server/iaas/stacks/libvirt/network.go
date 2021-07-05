@@ -330,8 +330,8 @@ func (s stack) DeleteNetwork(ref string) fail.Error {
 // 	defer debug.NewTracer(nil, "", true).Entering().Exiting()
 //
 // 	network := req.Networking
-// 	templateID := req.TemplateRef
-// 	imageID := req.ImageRef
+// 	templateID := req.TemplateID
+// 	imageID := req.ImageID
 // 	keyPair := req.KeyPair
 // 	gwName := req.Name
 //
@@ -348,10 +348,10 @@ func (s stack) DeleteNetwork(ref string) fail.Error {
 // 	}
 //
 // 	hostReq := abstract.HostRequest{
-// 		ImageRef:      imageID,
+// 		ImageID:      imageID,
 // 		KeyPair:      keyPair,
 // 		ResourceName: gwName,
-// 		TemplateRef:   templateID,
+// 		TemplateID:   templateID,
 // 		Networks:     []*abstract.Networking{network},
 // 		PublicIP:     true,
 // 	}

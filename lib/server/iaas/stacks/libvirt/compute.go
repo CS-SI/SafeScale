@@ -729,8 +729,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	hostName := request.HostName
 	networks := request.Networks
 	publicIP := request.PublicIP
-	templateID := request.TemplateRef
-	imageID := request.ImageRef
+	templateID := request.TemplateID
+	imageID := request.ImageID
 	keyPair := request.KeyPair
 
 	userData = userdata.NewContent()
@@ -750,7 +750,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nil, nil, userData, fail.InvalidParameterError("request.templateID", "cannot be empty string")
 	}
 	if imageID == "" {
-		return nil, nil, userData, fail.InvalidParameterError("request.ImageRef", "cannot be empty string")
+		return nil, nil, userData, fail.InvalidParameterError("request.ImageID", "cannot be empty string")
 	}
 	hostC, _, xerr := s.getHostAndDomainFromRef(resourceName)
 	host.Core = hostC

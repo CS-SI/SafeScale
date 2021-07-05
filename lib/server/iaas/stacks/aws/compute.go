@@ -490,15 +490,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
-	// Determine system disk size based on vcpus count
-	template, xerr := s.InspectTemplate(request.TemplateRef)
+	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateRef)
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get host template '%s'", request.TemplateID)
 	}
 
-	rim, xerr := s.InspectImage(request.ImageRef)
+	rim, xerr := s.InspectImage(request.ImageID)
 	if xerr != nil {
-		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image '%s'", request.ImageRef)
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
 	}
 
 	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)

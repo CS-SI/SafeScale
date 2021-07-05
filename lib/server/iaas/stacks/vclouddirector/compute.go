@@ -311,7 +311,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 			}
 			for _, item := range cat.Catalog.CatalogItems {
 				for _, deepItem := range item.CatalogItem {
-					if deepItem.ID == request.ImageRef {
+					if deepItem.ID == request.ImageID {
 						itemName = deepItem.Name
 					}
 				}
@@ -329,7 +329,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 		return nullAhf, userData, fail.NewError("no catalog found")
 	}
 
-	logrus.Warningf("Selected image: [%s]", request.ImageRef)
+	logrus.Warningf("Selected image: [%s]", request.ImageID)
 
 	catalogitem, err := catalog.FindCatalogItem(itemName)
 	if err != nil {
@@ -340,9 +340,9 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 	}
 
 	// Determine system disk size based on vcpus count
-	template, xerr := s.GetTemplate(request.TemplateRef)
+	template, xerr := s.GetTemplate(request.TemplateID)
 	if xerr != nil {
-		return nullAhf, userData, fail.Wrap(xerr, "failed to get image: %s", request.TemplateRef)
+		return nullAhf, userData, fail.Wrap(xerr, "failed to get image: %s", request.TemplateID)
 	}
 	_ = template
 

@@ -211,10 +211,10 @@ func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, 
 		require.Nil(t, err)
 
 		gwRequest := abstract.HostRequest{
-			ImageRef:     img.ID,
+			ImageID:      img.ID,
 			Subnets:      []*abstract.Subnet{subnet},
 			KeyPair:      keypair,
-			TemplateRef:  tpls[0].ID,
+			TemplateID:   tpls[0].ID,
 			ResourceName: "gw-" + name,
 			IsGateway:    true,
 		}
@@ -242,8 +242,8 @@ func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstr
 		Subnets:        []*abstract.Subnet{subnet},
 		DefaultRouteIP: "",
 		PublicIP:       public,
-		TemplateRef:    tpls[0].ID,
-		ImageRef:       img.ID,
+		TemplateID:     tpls[0].ID,
+		ImageID:        img.ID,
 		KeyPair:        nil,
 		Password:       "",
 		DiskSize:       0,
@@ -262,8 +262,8 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 	img, xerr := tester.Service.SearchImage("Ubuntu 18.04")
 	assert.Nil(t, xerr)
 	gwRequest := abstract.HostRequest{
-		ImageRef:     img.ID,
-		TemplateRef:  tpls[0].ID,
+		ImageID:      img.ID,
+		TemplateID:   tpls[0].ID,
 		Subnets:      []*abstract.Subnet{subnet},
 		ResourceName: "gw-" + subnet.Name,
 		IsGateway:    true,
