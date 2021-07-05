@@ -423,7 +423,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
-		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
+		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
@@ -684,7 +684,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	// define image...
 	imageQuery := gwSizing.Image
 	if imageQuery == "" {
-		imageQuery = req.Image
+		imageQuery = req.ImageRef
 		if imageQuery == "" {
 			cfg, xerr := svc.GetConfigurationOptions()
 			xerr = debug.InjectPlannedFail(xerr)
@@ -2632,7 +2632,7 @@ func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abst
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
-		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.Image, req.HA,
+		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
