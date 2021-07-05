@@ -180,27 +180,30 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 				return NullService(), fail.Wrap(err, "error connecting to Object Storage location to store metadata")
 			}
 
-			anon, found := serviceCfg.Get("MetadataBucketName")
-			if !found {
-				return NullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
+			if metadataLocationConfig.BucketName == "" {
+				anon, found := serviceCfg.Get("MetadataBucketName")
+				if !found {
+					return NullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
+				}
+				var ok bool
+				metadataLocationConfig.BucketName, ok = anon.(string)
+				if !ok {
+					return NullService(), fail.InvalidRequestError("invalid bucket name, it's not a string")
+				}
 			}
-			bucketName, ok := anon.(string)
-			if !ok {
-				return NullService(), fail.InvalidRequestError("invalid bucket name, it's not a string")
-			}
-			found, err = metadataLocation.FindBucket(bucketName)
+			found, err = metadataLocation.FindBucket(metadataLocationConfig.BucketName)
 			if err != nil {
 				return NullService(), fail.Wrap(err, "error accessing metadata location: %s")
 			}
 
 			if found {
-				metadataBucket, err = metadataLocation.InspectBucket(bucketName)
+				metadataBucket, err = metadataLocation.InspectBucket(metadataLocationConfig.BucketName)
 				if err != nil {
 					return NullService(), err
 				}
 			} else {
 				// create bucket
-				metadataBucket, err = metadataLocation.CreateBucket(bucketName)
+				metadataBucket, err = metadataLocation.CreateBucket(metadataLocationConfig.BucketName)
 				if err != nil {
 					return NullService(), err
 				}
@@ -208,7 +211,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 				// Creates metadata version file
 				if metadataVersion != "" {
 					content := bytes.NewBuffer([]byte(metadataVersion))
-					_, xerr := metadataLocation.WriteObject(bucketName, "version", content, int64(content.Len()), nil)
+					_, xerr := metadataLocation.WriteObject(metadataLocationConfig.BucketName, "version", content, int64(content.Len()), nil)
 					if xerr != nil {
 						return NullService(), fail.Wrap(xerr, "failed to create version object in metadata Bucket")
 					}
@@ -593,6 +596,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		config.Credentials = string(d1)
 	}
 
+	config.BucketName, _ = metadata["MetadataBucketName"].(string)
 	return config, nil
 }
 
