@@ -135,11 +135,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			"Hdd": volumespeed.Hdd,
 			"Ssd": volumespeed.Ssd,
 		},
-		MetadataBucket:   metadataBucketName,
-		DNSList:          cloudferroDNSServers,
-		DefaultImage:     defaultImage,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:           metadataBucketName,
+		DNSList:                  cloudferroDNSServers,
+		DefaultImage:             defaultImage,
+		OperatorUsername:         operatorUsername,
+		ProviderName:             providerName,
+		DefaultSecurityGroupName: "default",
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
