@@ -302,7 +302,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	if sizing == nil {
 		sizing = &abstract.HostSizingRequirements{MinGPU: -1}
 	}
-	sizing.Image = in.GetImageId()
 
 	// Determine if the Subnet(s) to use exist
 	// Because of legacy, the subnet can be fully identified by network+subnet, or can be identified by network+network,
@@ -373,6 +372,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		Single:        in.GetSingle(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 		Subnets:       subnets,
+		ImageRef:      in.GetImageId(),
 	}
 
 	hostInstance, xerr := hostfactory.New(job.GetService())

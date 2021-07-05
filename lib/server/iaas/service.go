@@ -785,14 +785,14 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 	hostReq := abstract.HostRequest{
 		ResourceName:   request.ResourceName,
 		HostName:       request.HostName,
-		ImageRef:       request.ImageRef,
-		ImageRequest:   request.ImageRef,
+		ImageID:        request.ImageID,
+		ImageRef:       request.ImageID,
 		KeyPair:        kp,
 		PublicIP:       request.PublicIP,
 		Subnets:        request.Subnets,
 		DefaultRouteIP: request.DefaultRouteIP,
 		// DefaultGateway: request.DefaultGateway,
-		TemplateRef: request.TemplateRef,
+		TemplateID: request.TemplateID,
 	}
 	host, userData, rerr := svc.CreateHost(hostReq)
 	if rerr != nil {

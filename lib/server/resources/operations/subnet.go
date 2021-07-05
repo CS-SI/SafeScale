@@ -773,11 +773,11 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	}
 
 	gwRequest := abstract.HostRequest{
-		ImageRef:         gwSizing.Image,
-		ImageRequest:     imageQuery,
+		ImageID:          gwSizing.Image,
+		ImageRef:         imageQuery,
 		Subnets:          []*abstract.Subnet{as},
 		SSHPort:          req.DefaultSSHPort,
-		TemplateRef:      template.ID,
+		TemplateID:       template.ID,
 		KeepOnFailure:    req.KeepOnFailure,
 		SecurityGroupIDs: sgs,
 		IsGateway:        true,
