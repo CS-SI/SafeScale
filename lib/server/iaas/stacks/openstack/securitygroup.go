@@ -197,19 +197,21 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	var r *secgroups.SecGroup
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			if r, innerErr = secgroups.Get(s.NetworkClient, asg.ID).Extract(); innerErr != nil {
-				innerErr = NormalizeError(innerErr)
-				switch innerErr.(type) { //nolint
-				case *fail.ErrNotFound: // If not found by id, try to get id of security group by name
-					var id string
-					id, innerErr = getSGIDFromName(s.NetworkClient, asg.Name)
-					if innerErr != nil {
-						return innerErr
-					}
-
-					r, innerErr = secgroups.Get(s.NetworkClient, id).Extract()
+			var id string
+			switch {
+			case asg.ID != "":
+				id = asg.ID
+			case asg.Name != "":
+				// FIXME: returning *groups.secgroup may be more convenient; currently, we read twice the same record
+				id, innerErr = getSGIDFromName(s.NetworkClient, asg.Name)
+				if innerErr != nil {
+					return innerErr
 				}
 			}
+			if id == "" {
+				return fail.NotFoundError("failed to query Security Group %s", asgLabel)
+			}
+			r, innerErr = secgroups.Get(s.NetworkClient, id).Extract()
 			return innerErr
 		},
 		NormalizeError,
