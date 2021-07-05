@@ -765,11 +765,11 @@ func (s *stack) DeleteNetwork(ref string) fail.Error {
 //	}
 //
 //	hostReq := abstract.HostRequest{
-//		ImageRef:      req.ImageRef,
+//		ImageID:      req.ImageID,
 //		KeyPair:      req.KeyPair,
 //		HostName:     req.Name,
 //		ResourceName: gwname,
-//		TemplateRef:   req.TemplateRef,
+//		TemplateID:   req.TemplateID,
 //		Networks:     []*abstract.Networking{req.Networking},
 //		PublicIP:     true,
 //	}
@@ -789,7 +789,7 @@ func (s *stack) DeleteNetwork(ref string) fail.Error {
 //	// Updates IPAddress Property propsv1.HostSizing
 //	err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(func(clonable data.Clonable) error {
 //		hostSizingV1 := clonable.(*propsv1.HostSizing)
-//		hostSizingV1.Template = req.TemplateRef
+//		hostSizingV1.Template = req.TemplateID
 //		return nil
 //	})
 //	if err != nil {

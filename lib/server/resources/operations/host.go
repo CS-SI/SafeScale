@@ -751,29 +751,24 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)
 	}
 
-	// If TemplateRef is not explicitly provided, search the appropriate template to satisfy 'hostDef'
-	if hostDef.Template == "" {
-		templateQuery := hostReq.TemplateRef
-		if templateQuery != "" {
-			tmpl, xerr := svc.FindTemplateByName(templateQuery)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					tmpl, xerr = svc.FindTemplateBySizing(hostDef)
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						return nil, xerr
-					}
-				default:
-					return nil, xerr
-				}
-			}
-			hostDef.Template = tmpl.ID
+	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
+	templateQuery := hostDef.Template
+	if templateQuery == "" {
+		tmpl, xerr := svc.FindTemplateBySizing(hostDef)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
 		}
-	}
 
-	// If hostReq.ImageRef is not explicitly defined, find an image ID corresponding to the content of hostDef.Image
+		hostDef.Template = tmpl.ID
+	}
+	if hostDef.Template == "" {
+		return nil, fail.NotFoundError("failed to find template to match requested sizing")
+	}
+	hostReq.TemplateRef = templateQuery
+	hostReq.TemplateID = hostDef.Template
+
+	// If hostReq.ImageID is not explicitly defined, find an image ID corresponding to the content of hostDef.Image
 	imageQuery := hostDef.Image
 	if imageQuery == "" {
 		imageQuery = hostReq.ImageRef
@@ -800,7 +795,11 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			}
 		}
 	}
-	hostReq.ImageRequest = imageQuery
+	if hostDef.Image == "" {
+		return nil, fail.NotFoundError("failed to find image to use on compute resource")
+	}
+	hostReq.ImageRef = imageQuery
+	hostReq.ImageID = hostDef.Image
 
 	// identify default Subnet
 	var (
@@ -1047,7 +1046,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 				systemV1.Type = parts[1]
 				systemV1.Flavor = parts[2]
 			}
-			systemV1.Image = hostReq.ImageRef
+			systemV1.Image = hostReq.ImageID
 			return nil
 		})
 	})

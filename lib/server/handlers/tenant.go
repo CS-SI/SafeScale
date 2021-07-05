@@ -334,7 +334,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 		ResourceName: hostName,
 		Subnets:      []*abstract.Subnet{handler.abstractSubnet},
 		PublicIP:     false,
-		TemplateRef:  template.ID,
+		TemplateID:   template.ID,
 	}
 	def := abstract.HostSizingRequirements{
 		Image: defaultScanImage,
