@@ -59,6 +59,7 @@ type Config struct {
 	AvailabilityZone string
 	ProjectID        string
 	Credentials      string
+	BucketName       string
 }
 
 // Location ...
