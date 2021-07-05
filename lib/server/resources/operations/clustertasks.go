@@ -628,7 +628,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		NetworkID:     rn.GetID(),
 		CIDR:          req.CIDR,
 		HA:            !gwFailoverDisabled,
-		Image:         gatewaysDef.Image,
+		ImageRef:      gatewaysDef.Image,
 		KeepOnFailure: false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 	}
 

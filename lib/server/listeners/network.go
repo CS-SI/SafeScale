@@ -132,7 +132,6 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		if sizing == nil {
 			sizing = &abstract.HostSizingRequirements{MinGPU: -1}
 		}
-		sizing.Image = in.GetGateway().GetImageId()
 
 		rs, xerr := subnetfactory.New(svc)
 		if xerr != nil {
@@ -144,6 +143,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			CIDR:           subnetNet.String(),
 			KeepOnFailure:  in.GetKeepOnFailure(),
 			DefaultSSHPort: in.GetGateway().GetSshPort(),
+			ImageRef:       in.GetGateway().GetImageId(),
 		}
 		xerr = rs.Create(job.GetContext(), req, in.GetGateway().GetName(), sizing)
 		if xerr != nil {
