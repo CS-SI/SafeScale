@@ -780,7 +780,12 @@ func (instance *taskGroup) Aborted() bool {
 		case *fail.ErrAborted, *fail.ErrTimeout:
 			return true
 		default:
+			return false
 		}
+	case READY: // this is really bad
+		return false
+	case UNKNOWN: // this is bad
+		return false
 	}
 
 	return false

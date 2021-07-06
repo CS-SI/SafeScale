@@ -1116,6 +1116,9 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 					var done bool
 					for !t.Aborted() && !done {
 						done, result, innerXErr = instance.TryWait()
+						if innerXErr != nil {
+							logrus.Warnf("ignoring internal error: %v", innerXErr)
+						}
 						if !done {
 							time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
 						}
