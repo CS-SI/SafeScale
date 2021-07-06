@@ -301,7 +301,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 					if aborted {
 						return nil, fail.AbortedError(nil)
 					}
-					time.Sleep(50 * time.Millisecond) // FIXME: hardcoded value :-(
+					time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
 				}
 			}
 
@@ -360,6 +360,11 @@ func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
 //       It's highly recommended to use Task.Aborted() in the body of a TaskAction to check
 //       for abortion signal and quit the go routine accordingly to reduce the risk.
 func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
+	fnBegin := time.Now()
+	defer func() {
+		fmt.Printf("taskGroup.WaitGroup() took %v\n", time.Since(fnBegin))
+	}()
+
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -397,16 +402,20 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			// previousErr := instance.task.err
 			// instance.task.lock.RUnlock()
 
+			begin := time.Now()
 			results, childrenErrors = instance.waitChildren()
+			fmt.Printf("waitChildren took %v\n", time.Since(begin))
 			instance.result = results
 			if len(childrenErrors) == 0 {
 				instance.children.ended = true
 			}
 
 			// parent task is running, we need to abort it, even if abort was disable, now that all the children have terminated
+			begin = time.Now()
 			instance.task.forceAbort()
 
 			_, check := instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
+			fmt.Printf("instance.task ended in %v\n", time.Since(begin))
 			if _, ok := check.(*fail.ErrAborted); !ok {
 				logrus.Tracef("BROKEN ASSUMPTION: %v", check)
 			}
