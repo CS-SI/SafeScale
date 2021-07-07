@@ -38,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 )
 
@@ -306,7 +307,9 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 				return nil, xerr
 			}
 
-			outcomes.AddOne(h.GetName(), outcome.(resources.UnitResult))
+			if outcome != nil {
+				outcomes.AddOne(h.GetName(), outcome.(resources.UnitResult))
+			}
 
 			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
@@ -421,6 +424,12 @@ type runOnHostParameters struct {
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
 func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+
+	defer func() {
+		if result != nil {
+			logrus.Warnf("TBR: task result: %s", spew.Sdump(result)) // TBR, remove this later
+		}
+	}()
 
 	var ok bool
 	if params == nil {
