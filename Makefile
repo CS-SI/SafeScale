@@ -46,7 +46,6 @@ allcover: all
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 
-#release: logclean ground getdevdeps mod releasetags sdk generate lib safemintest cli minimock err vet releasearchive
 release: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
 
@@ -56,7 +55,7 @@ releasetags:
 
 releasearchive:
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";
-	@tar --strip-components=2 -zcf safescale-$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz cli/safescale/safescale cli/safescaled/safescaled
+	@tar -zcf safescale-$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz -C cli/safescale safescale -C ../../cli/safescaledsafescaled
 
 fastall: begin
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build assumes all dependencies are already there and code generation is also up to date $(NO_COLOR)\n";
