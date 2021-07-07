@@ -294,7 +294,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rn, xerr := networkfactory.Load(svc, ref)
+	networkInstance, xerr := networkfactory.Load(svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -325,7 +325,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 			return empty, xerr
 		}
 	}
-	if xerr = rn.Delete(job.Context()); xerr != nil {
+	if xerr = networkInstance.Delete(job.GetContext()); xerr != nil {
 		return empty, xerr
 	}
 

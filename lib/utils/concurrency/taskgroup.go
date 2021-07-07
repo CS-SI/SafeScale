@@ -625,16 +625,16 @@ func (instance *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fa
 	return instance.WaitGroupFor(duration)
 }
 
-// WaitGroupFor waits for the task to end, for 'duration' duration
+// WaitGroupFor waits for the task to end, for 'timeout' duration
+// Note: if 'timeout' is reached, the TaskGroup IS NOT ABORTED. You have to abort then wait for it explicitly if needed.
 // Returns:
 // - true, TaskGroupResult, nil: Wait worked and TaskGroup generated no error
-// - false, nil, *fail.ErrInconsistent: cannot wait on a TaskGroup not started
-// - true, TaskGroupResult, *fail.ErrAborted: TaskGroup terminated on Abort (and possible generated error after
-//                                           abort signal has been received would be attached to the error as consequence)
+// - true, TaskGroupResult, *fail.ErrAborted: TaskGroup terminated on Abort (and possible generated error, after
+//                                            abort signal has been received, would be attached to the error as consequence)
 // - true, TaskGroupResult, fail.Error: TaskGroup terminated, but generated an error
-// - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out; TaskGroup is aborted in case of timeout (and possible generated
-//                                 error after abort signal has been received would be attached to the error as consequence)
-func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult, fail.Error) {
+// - false, nil, *fail.ErrInconsistent: cannot wait on a TaskGroup not started
+// - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out
+func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupResult, fail.Error) {
 	if instance.isNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
@@ -690,9 +690,9 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 			}, nil,
 		)
 
-		if duration > 0 {
+		if timeout > 0 {
 			select {
-			case <-time.After(duration):
+			case <-time.After(timeout):
 				// VPL: too late...
 				// if done, xerr := waiterTask.IsSuccessful(); xerr == nil && done {
 				// 	fmt.Println("waiterTask is done but we reached timeout!!!")
@@ -700,15 +700,15 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 
 				// signal waiterTask to abort (and do not wait for it, it will terminate)
 				waiterTask.(*task).forceAbort()
-				forgedError := fail.TimeoutError(nil, duration, fmt.Sprintf("timeout of %s waiting for TaskGroup '%s'", duration, tid))
+				forgedError := fail.TimeoutError(nil, timeout, fmt.Sprintf("timeout of %s waiting for TaskGroup '%s'", timeout, tid))
 
-				// Now send abort signal to TaskGroup
-				xerr = instance.Abort()
-				if xerr != nil {
-					_ = forgedError.AddConsequence(xerr)
-				}
-				// We do not wait on TaskGroup after the Abort, because if the TaskActions are badly coded and never
-				// terminate, WaitGroup would not terminate neither... So bad for leaked go routines but this function has to end...
+				// // Now send abort signal to TaskGroup
+				// xerr = instance.Abort()
+				// if xerr != nil {
+				// 	_ = forgedError.AddConsequence(xerr)
+				// }
+				// // We do not wait on TaskGroup after the Abort, because if the TaskActions are badly coded and never
+				// // terminate, WaitGroup would not terminate neither... So bad for leaked go routines but this function has to end...
 				return false, nil, forgedError
 
 			case <-doneWaitingCh:

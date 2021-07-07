@@ -1068,7 +1068,7 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 }
 
 // WaitFor waits for the task to end, for 'duration' duration.
-// Note: if timeout occurred, the task is not aborted. You have to abort it yourself if needed.
+// Note: if timeout occurred, the task is not aborted. You have to abort then wait for it explicitly if needed.
 // - true, TaskResult, fail.Error: Task terminates, but TaskAction returned an error
 // - true, TaskResult, *failErrAborted: Task terminates on Abort
 // - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
@@ -1098,15 +1098,16 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 		fallthrough
 	case RUNNING:
 		if duration > 0 {
-			var result TaskResult
 			doneWaitingCh := make(chan struct{}, 1)
-			waiterTask, xerr := NewTaskWithParent(instance, InheritParentIDOption, AmendID("WaitForHelper"))
+			waiterTask, xerr := NewTask()
 			if xerr != nil {
 				return false, nil, fail.Wrap(xerr, "failed to create helper Task to WaitFor")
 			}
+			var result TaskResult
 			_, xerr = waiterTask.Start(
 				func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
 					// t.DisarmAbortSignal()
+//					t.(*task).cancelDisengaged = true
 
 					var done bool
 					for !t.Aborted() && !done {
@@ -1126,11 +1127,12 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				}, nil,
 			)
 			if xerr != nil {
-				return false, nil, xerr
+				return false, result, xerr
 			}
 
 			select {
 			case <-doneWaitingCh:
+				result, xerr := instance.Wait()
 				return true, result, xerr
 
 			case <-time.After(duration):
@@ -1142,11 +1144,11 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				defer instance.lock.RUnlock()
 				return false, instance.result, tout // FIXME: DATA RACE
 			}
+		} else {
+			// No duration, do task.Wait()
+			result, xerr := instance.Wait()
+			return true, result, xerr
 		}
-
-		// No duration, do task.Wait()
-		result, xerr := instance.Wait()
-		return true, result, xerr
 
 	case UNKNOWN:
 		fallthrough
