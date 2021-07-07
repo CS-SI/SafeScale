@@ -1231,12 +1231,12 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 		return nil, xerr
 	}
 
-	// Installs proxycache server on gateway (if not disabled)
-	xerr = instance.installProxyCacheServer(task.GetContext(), p.Host, hostLabel)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
+	// // Installs proxycache server on gateway (if not disabled)
+	// xerr = instance.installProxyCacheServer(task.GetContext(), p.Host, hostLabel)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	// Installs requirements as defined by Cluster Flavor (if it exists)
 	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Gateway, p.Host, hostLabel)
@@ -1569,11 +1569,11 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	hostLabel = fmt.Sprintf("master #%d (%s)", p.index, hostInstance.GetName())
 
-	xerr = instance.installProxyCacheClient(task.GetContext(), hostInstance, hostLabel)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
+	// xerr = instance.installProxyCacheClient(task.GetContext(), hostInstance, hostLabel)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Master, hostInstance, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -2004,11 +2004,11 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	hostLabel = fmt.Sprintf("node #%d (%s)", p.index, hostInstance.GetName())
 
-	xerr = instance.installProxyCacheClient(task.GetContext(), hostInstance, hostLabel)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
+	// xerr = instance.installProxyCacheClient(task.GetContext(), hostInstance, hostLabel)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Node, hostInstance, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
