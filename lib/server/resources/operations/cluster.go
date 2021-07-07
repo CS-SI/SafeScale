@@ -1323,11 +1323,10 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute
 
-	var newHosts []resources.Host
 	defer func() {
-		if xerr != nil && len(newHosts) > 0 {
+		if xerr != nil && len(hosts) > 0 {
 			logrus.Debugf("Cleaning up on failure, deleting Nodes...")
-			if derr := instance.deleteHosts(task, newHosts); derr != nil {
+			if derr := instance.deleteHosts(task, hosts); derr != nil {
 				logrus.Errorf("Cleaning up on failure, failed to delete Nodes")
 				_ = xerr.AddConsequence(derr)
 			} else {
@@ -1348,25 +1347,22 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			timeout:       timeout,
 			keepOnFailure: false,
 		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", i)))
-		if xerr != nil {
-			return nil, xerr
-		}
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
-	res, err := tg.WaitGroup()
+	res, xerr := tg.WaitGroup()
 	if res != nil {
 		for _, v := range res {
 			if aHost, ok := v.(resources.Host); ok {
-				newHosts = append(newHosts, aHost)
+				hosts = append(hosts, aHost)
 			}
 		}
 	}
-	err = debug.InjectPlannedFail(err)
-	if err != nil {
-		return nil, fail.NewErrorWithCause(err, "errors occurred on %s node%s addition", nodeTypeStr, strprocess.Plural(uint(len(errors))))
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, fail.NewErrorWithCause(xerr, "errors occurred on %s node%s addition", nodeTypeStr, strprocess.Plural(uint(len(errors))))
 	}
 
 	// Now configure new nodes
