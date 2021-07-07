@@ -267,7 +267,7 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 // Stop shutdowns a entire cluster (including the gateways)
 func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError("cannot stop cluster", &err)
+	defer fail.OnExitWrapError(&err, "cannot stop cluster")
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -353,7 +353,7 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 // Expand adds node(s) to a cluster
 func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResizeRequest) (_ *protocol.ClusterNodeListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError("cannot expand cluster", &err)
+	defer fail.OnExitWrapError(&err, "cannot expand cluster")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()

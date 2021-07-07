@@ -754,6 +754,9 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
 	templateQuery := hostDef.Template
 	if templateQuery == "" {
+		templateQuery = hostReq.TemplateRef
+	}
+	if templateQuery == "" {
 		tmpl, xerr := svc.FindTemplateBySizing(hostDef)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -772,12 +775,11 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	imageQuery := hostDef.Image
 	if imageQuery == "" {
 		imageQuery = hostReq.ImageRef
+		hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(svc, imageQuery)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
-	hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(svc, imageQuery)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	hostDef.Image = hostReq.ImageID
 
 	// identify default Subnet
