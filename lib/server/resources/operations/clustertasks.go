@@ -375,7 +375,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		gatewaysDefault *abstract.HostSizingRequirements
 		mastersDefault  *abstract.HostSizingRequirements
 		nodesDefault    *abstract.HostSizingRequirements
-		imageQuery      string
+		imageQuery, imageID      string
 	)
 
 	// if task.Aborted() {
@@ -383,6 +383,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	// }
 
 	// Determine default image
+
 	imageQuery = req.NodesDef.Image
 	if imageQuery == "" && instance.makers.DefaultImage != nil {
 		imageQuery = instance.makers.DefaultImage(instance)
@@ -398,7 +399,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		imageQuery = "Ubuntu 18.04"
 	}
 	svc := instance.GetService()
-	abstractImage, xerr := svc.SearchImage(imageQuery)
+	_, imageID, xerr = determineImageID(svc, imageQuery)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
@@ -423,7 +424,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	}
 
 	gatewaysDef := complementSizingRequirements(&req.GatewaysDef, *gatewaysDefault)
-	gatewaysDef.Image = abstractImage.ID
+	gatewaysDef.Image = imageID
 
 	if !req.GatewaysDef.Equals(emptySizing) {
 		if lower, err := req.GatewaysDef.LowerThan(gatewaysDefault); err == nil && lower {
@@ -455,7 +456,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 	mastersDef := complementSizingRequirements(&req.MastersDef, *mastersDefault)
-	mastersDef.Image = abstractImage.ID
+	mastersDef.Image = imageID
 
 	if !req.MastersDef.Equals(emptySizing) {
 		if lower, err := req.MastersDef.LowerThan(mastersDefault); err == nil && lower {
@@ -490,7 +491,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		}
 	}
 	nodesDef := complementSizingRequirements(&req.NodesDef, *nodesDefault)
-	nodesDef.Image = abstractImage.ID
+	nodesDef.Image = imageID
 
 	if !req.NodesDef.Equals(emptySizing) {
 		if lower, err := req.NodesDef.LowerThan(nodesDefault); err == nil && lower {
@@ -1932,6 +1933,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	hostReq.PublicIP = false
 	hostReq.KeepOnFailure = p.keepOnFailure
+
 	if p.nodeDef.Image != "" {
 		hostReq.ImageID = p.nodeDef.Image
 	}

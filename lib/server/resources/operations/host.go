@@ -768,38 +768,17 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	hostReq.TemplateRef = templateQuery
 	hostReq.TemplateID = hostDef.Template
 
-	// If hostReq.ImageID is not explicitly defined, find an image ID corresponding to the content of hostDef.Image
+	// If hostDef.Image is not explicitly defined, find an image ID corresponding to the content of hostDef.ImageRef
 	imageQuery := hostDef.Image
 	if imageQuery == "" {
 		imageQuery = hostReq.ImageRef
-		hostDef.Image, xerr = instance.findImageID(imageQuery)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				imgs, xerr := svc.ListImages(true)
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					return nil, fail.Wrap(xerr, "failure listing images")
-				}
+	}
+	hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(svc, imageQuery)
+	if xerr != nil {
+		return nil, xerr
+	}
 
-				for _, v := range imgs {
-					if strings.Compare(v.ID, imageQuery) == 0 {
-						logrus.Tracef("exact match by ID, ignoring jarowinkler results")
-						hostDef.Image = v.ID
-						break
-					}
-				}
-			default:
-			return nil, fail.Wrap(xerr, "failed to find image to use on compute resource")
-			}
-		}
-	}
-	if hostDef.Image == "" {
-		return nil, fail.NotFoundError("failed to find image to use on compute resource")
-	}
-	hostReq.ImageRef = imageQuery
-	hostReq.ImageID = hostDef.Image
+	hostDef.Image = hostReq.ImageID
 
 	// identify default Subnet
 	var (
@@ -1087,6 +1066,54 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 
 	logrus.Infof("Host '%s' created successfully", instance.GetName())
 	return userdataContent, nil
+}
+
+func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.Error) {
+	if imageRef == "" {
+		cfg, xerr := svc.GetConfigurationOptions()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return "", "", xerr
+		}
+
+		imageRef = cfg.GetString("DefaultImage")
+	}
+
+	var img *abstract.Image
+	xerr := retry.WhileUnsuccessfulDelay1Second(
+		func() error {
+			var innerXErr fail.Error
+			img, innerXErr = svc.SearchImage(imageRef)
+			return innerXErr
+		},
+		temporal.GetOperationTimeout(),
+	)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			img = nil
+			imgs, xerr := svc.ListImages(true)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return "", "", fail.Wrap(xerr, "failure listing images")
+			}
+
+			for _, v := range imgs {
+				if strings.Compare(v.ID, imageRef) == 0 {
+					logrus.Tracef("exact match by ID, ignoring jarowinkler results")
+					img = &v
+					break
+				}
+			}
+		default:
+		}
+	}
+	if img == nil || img.ID == "" {
+		return "", "", fail.Wrap(xerr, "failed to find image ID corresponding to '%s' to use on compute resource", imageRef)
+	}
+
+	return imageRef, img.ID, nil
 }
 
 // setSecurityGroups sets the Security Groups for the host
@@ -1386,33 +1413,34 @@ func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequiremen
 	return template.ID, nil
 }
 
-func (instance *Host) findImageID(imageName string) (string, fail.Error) {
-	svc := instance.GetService()
-	if imageName == "" {
-		cfg, xerr := svc.GetConfigurationOptions()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return "", xerr
-		}
-
-		imageName = cfg.GetString("DefaultImage")
-	}
-
-	var img *abstract.Image
-	xerr := retry.WhileUnsuccessfulDelay1Second(
-		func() error {
-			var innerXErr fail.Error
-			img, innerXErr = svc.SearchImage(imageName)
-			return innerXErr
-		},
-		temporal.GetOperationTimeout(),
-	)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-	return img.ID, nil
-}
+// VPL: deprecated, replaced by determineImageID()
+// func (instance *Host) findImageID(imageName string) (string, fail.Error) {
+// 	svc := instance.GetService()
+// 	if imageName == "" {
+// 		cfg, xerr := svc.GetConfigurationOptions()
+// 		xerr = debug.InjectPlannedFail(xerr)
+// 		if xerr != nil {
+// 			return "", xerr
+// 		}
+//
+// 		imageName = cfg.GetString("DefaultImage")
+// 	}
+//
+// 	var img *abstract.Image
+// 	xerr := retry.WhileUnsuccessfulDelay1Second(
+// 		func() error {
+// 			var innerXErr fail.Error
+// 			img, innerXErr = svc.SearchImage(imageName)
+// 			return innerXErr
+// 		},
+// 		temporal.GetOperationTimeout(),
+// 	)
+// 	xerr = debug.InjectPlannedFail(xerr)
+// 	if xerr != nil {
+// 		return "", xerr
+// 	}
+// 	return img.ID, nil
+// }
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
 func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) fail.Error {
