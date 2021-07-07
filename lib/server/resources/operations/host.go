@@ -3583,6 +3583,7 @@ func ReserveCIDRForSingleHost(networkInstance resources.Network) (string, uint, 
 			derr := FreeCIDRForSingleHost(networkInstance, index)
 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, networkInstance.GetName()))
 			if derr != nil {
+				_ = xerr.AddConsequence(derr)
 			}
 		}
 	}()
