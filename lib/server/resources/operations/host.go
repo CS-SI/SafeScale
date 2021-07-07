@@ -784,7 +784,6 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	
         hostDef.Image = hostReq.ImageID
     }
-	hostDef.Image = hostReq.ImageID
 
 	// identify default Subnet
 	var (
