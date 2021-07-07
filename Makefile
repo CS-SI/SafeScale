@@ -46,7 +46,6 @@ allcover: all
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 
-#release: logclean ground getdevdeps mod releasetags sdk generate lib safemintest cli minimock err vet releasearchive
 release: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
 
