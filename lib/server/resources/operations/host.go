@@ -781,7 +781,9 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		if xerr != nil {
 			return nil, xerr
 		}
-	}
+	
+        hostDef.Image = hostReq.ImageID
+    }
 	hostDef.Image = hostReq.ImageID
 
 	// identify default Subnet
