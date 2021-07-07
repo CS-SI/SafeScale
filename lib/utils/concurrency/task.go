@@ -18,7 +18,6 @@ package concurrency
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1073,7 +1072,7 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 }
 
 // WaitFor waits for the task to end, for 'duration' duration.
-// Note: if timeout occurred, the task is not aborted. You have to abort it yourself if needed.
+// Note: if timeout occurred, the task is not aborted. You have to abort then wait for it explicitly if needed.
 // - true, TaskResult, fail.Error: Task terminates, but TaskAction returned an error
 // - true, TaskResult, *failErrAborted: Task terminates on Abort
 // - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
@@ -1103,15 +1102,16 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 		fallthrough
 	case RUNNING:
 		if duration > 0 {
-			var result TaskResult
 			doneWaitingCh := make(chan struct{}, 1)
-			waiterTask, xerr := NewTaskWithParent(instance, InheritParentIDOption, AmendID("WaitForHelper"))
+			waiterTask, xerr := NewTask()
 			if xerr != nil {
 				return false, nil, fail.Wrap(xerr, "failed to create helper Task to WaitFor")
 			}
+			var result TaskResult
 			_, xerr = waiterTask.Start(
 				func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
 					// t.DisarmAbortSignal()
+//					t.(*task).cancelDisengaged = true
 
 					var done bool
 					for !t.Aborted() && !done {
@@ -1131,30 +1131,26 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				}, nil,
 			)
 			if xerr != nil {
-				return false, nil, xerr
+				return false, result, xerr
 			}
 
 			select {
 			case <-doneWaitingCh:
+				result, xerr := instance.Wait()
 				return true, result, xerr
 
 			case <-time.After(duration):
 				// signal waiterTask to abort (and do not wait for it, it will terminate)
 				waiterTask.(*task).forceAbort()
-				tout := fail.TimeoutError(xerr, duration, fmt.Sprintf("timeout of %s waiting for Task '%s'", duration, tid))
 
-				// Timeout has been reached, send abort signal to instance
-				instance.forceAbort()
-				// We do not wait on Task after the Abort, because if the TaskAction is badly coded and never
-				// terminate, Wait would not terminate neither... So bad for leaked go routines but this function has to end...
-
-				return false, nil, tout
+				tout := fail.TimeoutError(xerr, duration, "timeout of %s waiting for Task '%s'", duration, tid)
+				return false, instance.result, tout
 			}
+		} else {
+			// No duration, do task.Wait()
+			result, xerr := instance.Wait()
+			return true, result, xerr
 		}
-
-		// No duration, do task.Wait()
-		result, xerr := instance.Wait()
-		return true, result, xerr
 
 	case UNKNOWN:
 		fallthrough

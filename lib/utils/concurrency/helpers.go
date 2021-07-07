@@ -214,7 +214,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 		}
 
 		if weWereAborted {
-			return "", fail.AbortedError(nil, "we were killed")
+			return "we were killed", fail.AbortedError(nil, "we were killed")
 		}
 
 		coinFlip = rand.Float32() < probError

@@ -480,7 +480,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 				if k == instance.GetName() {
 					found = true
 					// the single subnet present is a subnet named like the Network, delete it first
-					rs, xerr := LoadSubnet(svc, "", v)
+					subnetInstance, xerr := LoadSubnet(svc, "", v)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
@@ -491,8 +491,8 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 							return xerr
 						}
 					} else {
-						subnetName := rs.GetName()
-						xerr = rs.Delete(ctx)
+						subnetName := subnetInstance.GetName()
+						xerr = subnetInstance.Delete(ctx)
 						xerr = debug.InjectPlannedFail(xerr)
 						if xerr != nil {
 							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
