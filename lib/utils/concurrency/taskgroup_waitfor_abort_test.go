@@ -605,9 +605,6 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 									t.Logf("%v (%s)", v, reflect.TypeOf(v).String())
 								}
 							}
-							if counted != int(failureCounter) {
-								t.Errorf("Taskgroup returned error does not report the effective children failure count!!!: %d vs %d", counted, int(failureCounter))
-							}
 						}
 						if counted != int(failureCounter) {
 							t.Errorf("Taskgroup returned error does not report the effective children failure count!!!: %d vs %d", counted, int(failureCounter))
