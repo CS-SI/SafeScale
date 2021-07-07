@@ -1308,8 +1308,11 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	nodeDef := complementHostDefinition(def, *nodeDefaultDefinition)
-	if nodeDef.Image == "" {
-		nodeDef.Image = hostImage
+
+	svc := instance.GetService()
+	_, nodeDef.Image, xerr = determineImageID(svc, hostImage)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	var (
