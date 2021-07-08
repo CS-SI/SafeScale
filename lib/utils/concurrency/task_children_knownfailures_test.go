@@ -129,7 +129,7 @@ func TestAbortStartedTaskWithChildren(t *testing.T) {
 		res, xerr := parent.Wait()
 		require.NotNil(t, xerr) // parent aborted, should return *fail.ErrAborted
 		if res == nil {
-			t.Errorf("result is nil, itr shouldn't (xerr = %v (%s))", xerr, reflect.TypeOf(xerr).String())
+			t.Errorf("result is nil, it shouldn't (xerr = %v (%s))", xerr, reflect.TypeOf(xerr).String())
 		}
 		require.NotNil(t, res) // result produced, must not be nil
 
