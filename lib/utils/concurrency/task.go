@@ -1141,6 +1141,8 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				waiterTask.(*task).forceAbort()
 
 				tout := fail.TimeoutError(xerr, duration, "timeout of %s waiting for Task '%s'", duration, tid)
+				instance.lock.RLock()
+				defer instance.lock.RUnlock()
 				return false, instance.result, tout // FIXME: DATA RACE
 			}
 		} else {
