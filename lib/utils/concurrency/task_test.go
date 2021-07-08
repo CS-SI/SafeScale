@@ -455,71 +455,80 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		xerr = got.Abort()
 		require.Nil(t, xerr)
 
-	aborted := got.Aborted()
-	require.True(t, aborted)
+		aborted := got.Aborted()
+		require.True(t, aborted)
 
-	// Waiting task for 4 ms (must fail)
-	done, res, xerr := got.WaitFor(4 * time.Millisecond)
-	require.NotNil(t, xerr)     // task not terminated, but WaitFor timed out, xerr not nil and must be a *fail.ErrTimeout
-	switch xerr.(type) {
-	case *fail.ErrTimeout:
-		// expected
-	default:
-		t.Errorf("Unexpected error: %v", xerr)
+		// Waiting task for 4 ms (must fail)
+		done, res, xerr := got.WaitFor(1 * time.Millisecond)
+		require.NotNil(t, xerr) // task not terminated, but WaitFor timed out, xerr not nil and must be a *fail.ErrTimeout
+		if !done {
+			switch xerr.(type) {
+			case *fail.ErrTimeout:
+				// expected
+			default:
+				t.Errorf("Unexpected error: %v", xerr)
+			}
+		} else {
+			switch xerr.(type) {
+			case *fail.ErrAborted:
+				// expected
+			default:
+				t.Errorf("Unexpected error: %v", xerr)
+			}
+		}
+		require.NotEmpty(t, res)  // aborted or timeout, we may have something in the result
+
+		// Waiting for task for 300 more ms (must succeed; we've waiting 304 ms for a workload that must end after 250 ms max)
+		done, res, xerr = got.WaitFor(300 * time.Millisecond)
+		require.NotNil(t, xerr) // task ended on Abort, xerr not nil and must be *fail.ErrAborted
+		switch xerr.(type) {
+		case *fail.ErrAborted:
+			// expected
+		default:
+			t.Errorf("Unexpected error: %v", xerr)
+		}
+		require.True(t, done)  // done must be true
+		require.NotNil(t, res) // res must be not nil
+
+		// VPL: starting a new workload on a running/terminated task is inconsistent
+		_, xerr = got.StartWithTimeout(taskgen(50, 100, 10, 1, 0, 0, false), nil, 200*time.Millisecond)
+		require.NotNil(t, xerr)
+		switch xerr.(type) {
+		case *fail.ErrInconsistent:
+			// expected
+		default:
+			t.Errorf("Unexpected error: %v", xerr)
+		}
+
+		// VPL: we waited 304ms, more than the 250 ms maximum of execution of the task. So when we arrive here, the task has ended...
+		success, xerr := got.IsSuccessful()
+		require.Nil(t, xerr)      // VPL: got is done, even if we tried previously to start a new workload, so xerr == nil
+		require.False(t, success) // VPL: success has to be false
+
+		// Using GetResult() is valid, Task is terminated
+		tr, xerr := got.GetResult()
+		require.Nil(t, xerr)  // GetResult succeeds, task is terminated
+		require.NotNil(t, tr) // tr is not nil, contain "we were killed"
+
+		// Wit on a done Task. Everything is under control
+		res, xerr = got.Wait()
+		require.NotNil(t, xerr) // xerr is not nil
+		require.NotNil(t, res)  // res is not nil
+
+		// Now that we waited the Task, GetResult() returns useful information
+		tr, xerr = got.GetResult()
+		require.Nil(t, xerr)
+		require.NotNil(t, tr)
+
+		status, xerr := got.GetStatus()
+		require.Nil(t, xerr)
+		if status != DONE {
+			t.FailNow()
+		}
+
+		aborted = got.Aborted()
+		require.True(t, aborted)
 	}
-	require.False(t, done)      // done must be false
-	require.Nil(t, res)      // aborted, we may have something in the result
-
-	// Waiting for task for 300 more ms (must succeed; we've waiting 304 ms for a workload that must end after 250 ms max)
-	done, res, xerr = got.WaitFor(300 * time.Millisecond)
-	require.NotNil(t, xerr)     // task ended on Abort, xerr not nil and must be *fail.ErrAborted
-	switch xerr.(type) {
-	case *fail.ErrAborted:
-		// expected
-	default:
-		t.Errorf("Unexpected error: %v", xerr)
-	}
-	require.True(t, done)      // done must be true
-	require.NotNil(t, res)     // res must be not nil
-
-	// VPL: starting a new workload on a running/terminated task is inconsistent
-	_, xerr = got.StartWithTimeout(taskgen(50, 100, 10, 1, 0, 0, false), nil, 200*time.Millisecond)
-	require.NotNil(t, xerr)
-	switch xerr.(type) {
-	case *fail.ErrInconsistent:
-		// expected
-	default:
-		t.Errorf("Unexpected error: %v", xerr)
-	}
-
-	// VPL: we waited 304ms, more than the 250 ms maximum of execution of the task. So when we arrive here, the task has ended...
-	success, xerr := got.IsSuccessful()
-	require.Nil(t, xerr)        // VPL: got is done, even if we tried previously to start a new workload, so xerr == nil
-	require.False(t, success)   // VPL: success has to be false
-
-	// Using GetResult() is valid, Task is terminated
-	tr, xerr := got.GetResult()
-	require.Nil(t, xerr)    // GetResult succeeds, task is terminated
-	require.NotNil(t, tr)   // tr is not nil, contain "we were killed"
-
-	// Wit on a done Task. Everything is under control
-	res, xerr = got.Wait()
-	require.NotNil(t, xerr) // xerr is not nil
-	require.NotNil(t, res)  // res is not nil
-
-	// Now that we waited the Task, GetResult() returns useful information
-	tr, xerr = got.GetResult()
-	require.Nil(t, xerr)
-	require.NotNil(t, tr)
-
-	status, xerr := got.GetStatus()
-	require.Nil(t, xerr)
-	if status != DONE {
-		t.FailNow()
-	}
-
-	aborted = got.Aborted()
-	require.True(t, aborted)
 }
 
 func TestTryWaitOfAbortedTask(t *testing.T) {
@@ -1187,41 +1196,42 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		xerr = single.SetID("small changes")
 		require.NotNil(t, xerr)
 
-	// VPL: when we reach this code, task has been timed out and terminated. WaitFor then succeeds (rv == true), and xerr contains *fail.ErrTimeout
-	//      Ti the question: how we make the difference between a timeout from Task and a timeout from WaitFor ? rv is the answer. In the former case, rv should be true, in the latter case it should be false
-	rv, _, xerr := single.WaitFor(16 * time.Millisecond)
-	require.True(t, rv)     // rv must be true
-	require.NotNil(t, xerr) // xerr must be not nil
-	switch xerr.(type) {
-	case *fail.ErrTimeout:
+		// VPL: when we reach this code, task has been timed out and terminated. WaitFor then succeeds (rv == true), and xerr contains *fail.ErrTimeout
+		//      Ti the question: how we make the difference between a timeout from Task and a timeout from WaitFor ? rv is the answer. In the former case, rv should be true, in the latter case it should be false
+		rv, _, xerr := single.WaitFor(16 * time.Millisecond)
+		require.True(t, rv)     // rv must be true
+		require.NotNil(t, xerr) // xerr must be not nil
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
 		// expected
 		default:
 			t.Errorf("Unexpected error: %v", xerr)
-	}
+		}
 
 		_, _, xerr = single.WaitFor(50 * time.Millisecond)
 		require.NotNil(t, xerr)
 
-	success, xerr := single.IsSuccessful()
-	require.Nil(t, xerr)    // VPL: IsSuccessful() is able to say if Task succeeded or not, so why waiting for a xerr != nil ?
-	require.False(t, success)
+		success, xerr := single.IsSuccessful()
+		require.Nil(t, xerr) // VPL: IsSuccessful() is able to say if Task succeeded or not, so why waiting for a xerr != nil ?
+		require.False(t, success)
 
-	_, xerr = single.StartWithTimeout(taskgen(5, 100, 10, 1, 0, 0, false), nil, 90*time.Millisecond)
-	require.NotNil(t, xerr)
-	switch xerr.(type) {
-	case *fail.ErrInconsistent:
-		// expected
-	default:
-		t.Errorf("Unesxpected error: %v", xerr)
-	}
+		_, xerr = single.StartWithTimeout(taskgen(5, 100, 10, 1, 0, 0, false), nil, 90*time.Millisecond)
+		require.NotNil(t, xerr)
+		switch xerr.(type) {
+		case *fail.ErrInconsistent:
+			// expected
+		default:
+			t.Errorf("Unesxpected error: %v", xerr)
+		}
 
-	_, xerr = single.Wait()
-	require.NotNil(t, xerr)
-	switch xerr.(type) {
-	case *fail.ErrTimeout:
-		// expected
-	default:
-		t.Errorf("Where is the timeout error??: %s", spew.Sdump(xerr))
+		_, xerr = single.Wait()
+		require.NotNil(t, xerr)
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			// expected
+		default:
+			t.Errorf("Where is the timeout error??: %s", spew.Sdump(xerr))
+		}
 	}
 }
 
