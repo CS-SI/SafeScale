@@ -773,7 +773,7 @@ func (instance *taskGroup) Aborted() bool {
 		default:
 			return false
 		}
-	case READY: // this is really bad
+	case READY: // this is awful
 		return false
 	case UNKNOWN: // this is bad
 		return false

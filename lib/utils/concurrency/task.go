@@ -862,7 +862,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 			instance.err = xerr
 		}
 	}
-	instance.result = result
+	instance.result = result // FIXME: DATA RACE
 }
 
 // Run starts task, waits its completion then return the error code
@@ -978,7 +978,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 					// leave the abort or timeout error alone
 				default:
 					if !runTerminated {
-						// return abort error with instance.err as consequence (happened after Abort has been ackknowledged by TaskAction)
+						// return abort error with instance.err as consequence (happened after Abort has been acknowledged by TaskAction)
 						forgedError := fail.AbortedError(nil)
 						_ = forgedError.AddConsequence(instance.err)
 						instance.err = forgedError
@@ -1110,9 +1110,6 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 			var result TaskResult
 			_, xerr = waiterTask.Start(
 				func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
-					// t.DisarmAbortSignal()
-//					t.(*task).cancelDisengaged = true
-
 					var done bool
 					for !t.Aborted() && !done {
 						done, result, innerXErr = instance.TryWait()
@@ -1144,7 +1141,7 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				waiterTask.(*task).forceAbort()
 
 				tout := fail.TimeoutError(xerr, duration, "timeout of %s waiting for Task '%s'", duration, tid)
-				return false, instance.result, tout
+				return false, instance.result, tout // FIXME: DATA RACE
 			}
 		} else {
 			// No duration, do task.Wait()
