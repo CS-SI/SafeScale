@@ -31,6 +31,7 @@ import (
 	boh2 "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors/boh"
 	k8s2 "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors/k8s"
 	rice "github.com/GeertJohan/go.rice"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -937,6 +938,8 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
+	var problems []error
+
 	// Start gateway(s)
 	taskGroup, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -947,14 +950,22 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 	_, xerr = taskGroup.Start(instance.taskStartHost, gatewayID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return xerr
+		problems = append(problems, xerr)
+		abErr := taskGroup.Abort()
+		if abErr != nil {
+			logrus.Warnf("problem aborting taskgroup: %v", abErr)
+		}
 	}
 
 	if secondaryGatewayID != "" {
 		_, xerr = taskGroup.Start(instance.taskStartHost, secondaryGatewayID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
+			problems = append(problems, xerr)
+			abErr := taskGroup.Abort()
+			if abErr != nil {
+				logrus.Warnf("problem aborting taskgroup: %v", abErr)
+			}
 		}
 	}
 
@@ -963,17 +974,29 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 		_, xerr = taskGroup.Start(instance.taskStartHost, n)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
+			problems = append(problems, xerr)
+			abErr := taskGroup.Abort()
+			if abErr != nil {
+				logrus.Warnf("problem aborting taskgroup: %v", abErr)
+			}
+			break
 		}
 	}
+
 	// Start nodes
 	for _, n := range nodes {
 		_, xerr = taskGroup.Start(instance.taskStartHost, n)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
+			problems = append(problems, xerr)
+			abErr := taskGroup.Abort()
+			if abErr != nil {
+				logrus.Warnf("problem aborting taskgroup: %v", abErr)
+			}
+			break
 		}
 	}
+
 	_, xerr = taskGroup.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1148,25 +1171,46 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 			return innerXErr
 		}
 
+		// FIXME: if there's a problem starting things don't return, note the problem, break if needed, then abort and wait.
+		var problems []error
+
 		for _, n := range nodes {
 			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
-				return innerXErr
+				problems = append(problems, innerXErr)
+				abErr := taskGroup.Abort()
+				if abErr != nil {
+					logrus.Warnf("problem aborting taskgroup: %v", abErr)
+				}
+				break
 			}
 		}
 		// Stop masters
 		for _, n := range masters {
 			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
-				return innerXErr
+				problems = append(problems, innerXErr)
+				abErr := taskGroup.Abort()
+				if abErr != nil {
+					logrus.Warnf("problem aborting taskgroup: %v", abErr)
+				}
+				break
 			}
 		}
 		// Stop gateway(s)
 		if _, innerXErr = taskGroup.Start(instance.taskStopHost, gatewayID); innerXErr != nil {
-			return innerXErr
+			problems = append(problems, innerXErr)
+			abErr := taskGroup.Abort()
+			if abErr != nil {
+				logrus.Warnf("problem aborting taskgroup: %v", abErr)
+			}
 		}
 
 		if secondaryGatewayID != "" {
 			if _, innerXErr = taskGroup.Start(instance.taskStopHost, secondaryGatewayID); innerXErr != nil {
-				return innerXErr
+				problems = append(problems, innerXErr)
+				abErr := taskGroup.Abort()
+				if abErr != nil {
+					logrus.Warnf("problem aborting taskgroup: %v", abErr)
+				}
 			}
 		}
 
@@ -1349,9 +1393,14 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", i)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return nil, xerr
+			abErr := tg.Abort()
+			if abErr != nil {
+				logrus.Warnf("error aborting a task: %v", abErr)
+			}
+			break
 		}
 	}
+
 	res, xerr := tg.WaitGroup()
 	if res != nil {
 		for _, v := range res {
@@ -2987,7 +3036,10 @@ func (instance *Cluster) configureNodesFromList(task concurrency.Task, hosts []r
 			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/configure", hosts[i].GetName())))
 			ierr = debug.InjectPlannedFail(ierr)
 			if ierr != nil {
-				_ = tg.Abort()
+				abErr := tg.Abort()
+				if abErr != nil {
+					logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				}
 				break
 			}
 		}
