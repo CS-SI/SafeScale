@@ -87,7 +87,7 @@ func validTest(st int, latency int) bool {
 
 func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool, custom func(chan string) error) TaskAction {
 	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
-		traceR := newTracer(t, true) // change to true to display traces
+		traceR := newTracer(t, false) // change to true to display traces
 
 		type internalRes struct {
 			ir  interface{}
