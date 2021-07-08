@@ -1140,12 +1140,10 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				waiterTask.(*task).forceAbort()
 				tout := fail.TimeoutError(xerr, duration, fmt.Sprintf("timeout of %s waiting for Task '%s'", duration, tid))
 
-				// Timeout has been reached, send abort signal to instance
-				instance.forceAbort()
-				// We do not wait on Task after the Abort, because if the TaskAction is badly coded and never
-				// terminate, Wait would not terminate neither... So bad for leaked go routines but this function has to end...
-
-				return false, nil, tout
+				tout := fail.TimeoutError(xerr, duration, "timeout of %s waiting for Task '%s'", duration, tid)
+				instance.lock.RLock()
+				defer instance.lock.RUnlock()
+				return false, instance.result, tout // FIXME: DATA RACE
 			}
 		}
 
