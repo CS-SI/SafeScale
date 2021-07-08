@@ -81,7 +81,7 @@ func TestIntrospection(t *testing.T) {
 		require.Nil(t, err)
 		require.NotEmpty(t, theID)
 
-		for ind := 0; ind < 200; ind++ {
+		for ind := 0; ind < 50; ind++ {
 			_, err := overlord.Start(taskgen(50, 250, 25, 0, 0, 0, false), nil)
 			if err != nil {
 				t.Errorf("Unexpected: %s", err)
@@ -93,7 +93,7 @@ func TestIntrospection(t *testing.T) {
 
 		num, err := overlord.GetStarted()
 		require.Nil(t, err)
-		if num != 200 {
+		if num != 50 {
 			t.Errorf("Problem reporting # of started tasks")
 		}
 
@@ -126,7 +126,7 @@ func TestIntrospectionWithErrors(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	for ind := 0; ind < 200; ind++ {
+	for ind := 0; ind < 50; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
@@ -150,8 +150,8 @@ func TestIntrospectionWithErrors(t *testing.T) {
 
 	num, err := overlord.GetStarted()
 	require.Nil(t, err)
-	if num != 201 {
-		t.Errorf("Problem reporting # of started tasks: %d (!= 201)", num)
+	if num != 51 {
+		t.Errorf("Problem reporting # of started tasks: %d (!= 51)", num)
 	}
 
 	id, err := overlord.GetID()
@@ -182,7 +182,7 @@ func TestChildrenWaitingGameOnlyAWhile(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	for ind := 0; ind < 200; ind++ {
+	for ind := 0; ind < 50; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
@@ -584,7 +584,7 @@ func TestChildrenWaitingGame(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	for ind := 0; ind < 200; ind++ {
+	for ind := 0; ind < 50; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
 			return "waiting game", nil
@@ -653,7 +653,7 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	for ind := 0; ind < 200; ind++ {
+	for ind := 0; ind < 50; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := randomInt(50, 250)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
@@ -696,7 +696,7 @@ func TestChildrenWaitingGameWithRandomError(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	for ind := 0; ind < 200; ind++ {
+	for ind := 0; ind < 50; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := randomInt(50, 250)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
@@ -725,7 +725,7 @@ func TestChildrenTryWaitingGameWithRandomError(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	for ind := 0; ind < 200; ind++ {
+	for ind := 0; ind < 50; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := randomInt(50, 250)
 			time.Sleep(time.Duration(rint) * time.Millisecond)
@@ -771,7 +771,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 
 	var tasks []Task
 
-	for ind := 0; ind < 200; ind++ {
+	for ind := 0; ind < 50; ind++ {
 		rt, err := overlord.Start(func(ta Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			defer func() { // sometimes this test panics, breaking coverage collection..., so no more panics
 				if r := recover(); r != nil {
