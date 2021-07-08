@@ -30,6 +30,46 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestStartAfterDoneWFZero(t *testing.T) {
+	for i := 0; i < 10; i++ {
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			root, err := RootTask()
+			require.Nil(t, err)
+			require.NotNil(t, root)
+
+			overlord, err := NewTaskGroupWithParent(root)
+			require.Nil(t, err)
+			require.NotNil(t, overlord)
+
+			_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
+			require.Nil(t, err)
+
+			time.Sleep(10 * time.Millisecond)
+			_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
+			require.Nil(t, err)
+
+			_, _, err = overlord.WaitFor(0)
+			require.Nil(t, err)
+
+			ok, _ := overlord.IsSuccessful()
+			require.True(t, ok)
+
+			// already DONE taskgroup, now it should fail
+			_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
+			require.NotNil(t, err)
+		}()
+
+		runOutOfTime := waitTimeout(&wg, 60*time.Second)
+		if runOutOfTime {
+			t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
+			t.FailNow()
+		}
+	}
+}
+
 func TestStartAfterDoneWF(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		wg := sync.WaitGroup{}
@@ -755,10 +795,10 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingWF(t *testing.T) {
 		require.NotNil(t, xerr)
 		end = time.Since(begin)
 
-		if end >= (time.Millisecond * 100) { // this is twice the maximum time...
+		if end >= (time.Millisecond * 200) { // this is 4x the maximum time... // FIXME: Move to another testset
 			t.Logf("Abort() lasted %v\n", end)
 			t.Logf("Wait() lasted %v\n", end)
-			t.Errorf("It should have finished near 100 ms but it didn't!!")
+			t.Errorf("It should have finished near 200 ms but it didn't!!")
 			t.FailNow()
 		}
 	}
@@ -851,8 +891,8 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallelWF(t *testing.T) {
 
 		fmt.Println("Here we are")
 
-		if end >= (time.Millisecond * 1000) {
-			t.Errorf("It should have finished near 1000 ms but it didn't, it was %v !!", end)
+		if end >= (time.Millisecond * 1200) {
+			t.Errorf("It should have finished near 1200 ms but it didn't, it was %v !!", end)
 		}
 	}()
 
