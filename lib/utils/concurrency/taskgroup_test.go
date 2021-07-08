@@ -222,23 +222,33 @@ func TestTimingOnlyOneWF(t *testing.T) {
 				}
 			}
 			childrenStartDuration := time.Since(begin)
-
 			upbound := int(math.Ceil(float64(upper)/float64(latency)) * float64(latency))
 			timeout := time.Duration(upbound+margin) * time.Millisecond
 			// Waits that all children have started to access max safely
 			begin = time.Now()
-			_, res, xerr := overlord.WaitFor(5 * time.Second)
-			waitRealDuration := time.Since(begin)
-			if waitRealDuration > timeout {
+			fastEnough, res, xerr := overlord.WaitFor(timeout)
+			waitForRealDuration := time.Since(begin)
+			if !fastEnough {
 				if childrenStartDuration > 5*time.Millisecond { // however, it grows with gcpressure
 					t.Logf("Launching children took %v", childrenStartDuration)
 				}
-				t.Logf("Wait really waited %v/%v", waitRealDuration, timeout)
-				t.Logf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
+				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
+				t.Errorf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
 				failures++
+				if failures > 4 || (rounds > 100 && failures > 4*rounds/100) {
+					t.Errorf("Test %d: too many failures", index)
+					t.FailNow()
+					return
+				}
 			} else {
-				require.Nil(t, xerr)
-				require.NotEmpty(t, res)
+				if xerr != nil {
+					t.Errorf("unexpecter error: %v", xerr)
+				}
+				if res == nil {
+					t.Errorf("unexpected empty result")
+				}
+//				require.Nil(t, xerr)
+//				require.NotEmpty(t, res)
 			}
 		}
 	}
