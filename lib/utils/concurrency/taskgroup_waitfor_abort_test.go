@@ -186,7 +186,6 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaitingFor
 func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaitingFor(t *testing.T) {
 	caught := false
 	enough := false
-	//streak := 0
 	iter := 0
 	chansize := 20
 

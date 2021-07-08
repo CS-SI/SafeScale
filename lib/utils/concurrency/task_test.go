@@ -41,6 +41,15 @@ func TestCreateVoidTask(t *testing.T) {
 	require.Nil(t, err)
 }
 
+func TestCreateVoidTaskCheckResult(t *testing.T) {
+	ta, err := VoidTask()
+	require.NotNil(t, ta)
+	require.Nil(t, err)
+
+	_, err = ta.GetResult()
+	require.NotNil(t, err)
+}
+
 func TestCreateTaskWithParent(t *testing.T) {
 	ta, err := VoidTask()
 	require.NotNil(t, ta)
@@ -438,7 +447,7 @@ func TestResultCheck(t *testing.T) {
 }
 
 func TestResultCheckOfAbortedTask(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 100; i++ {
 		got, xerr := NewTask()
 		require.NotNil(t, got)
 		require.Nil(t, xerr)
@@ -476,7 +485,7 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 				t.Errorf("Unexpected error: %v", xerr)
 			}
 		}
-		require.NotEmpty(t, res)  // aborted or timeout, we may have something in the result
+		require.NotEmpty(t, res) // aborted or timeout, we may have something in the result // FIXME: Sometimes is nil
 
 		// Waiting for task for 300 more ms (must succeed; we've waiting 304 ms for a workload that must end after 250 ms max)
 		done, res, xerr = got.WaitFor(300 * time.Millisecond)
