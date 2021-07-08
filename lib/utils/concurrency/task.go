@@ -858,7 +858,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 			instance.err = xerr
 		}
 	}
-	instance.result = result // FIXME: DATA RACE
+	instance.result = result
 }
 
 // Run starts task, waits its completion then return the error code

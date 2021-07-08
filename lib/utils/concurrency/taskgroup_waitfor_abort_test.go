@@ -540,15 +540,15 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 						acha := parameters.(chan string)
 						acha <- "Bailing out"
 
-						if weWereAborted {
-							return "", fail.AbortedError(nil, "we were killed")
-						}
-
 						// flip a coin, true and we panic, false we don't
 						if randomInt(0, 2) == 1 {
 							fmt.Printf("%s: fail!\n", tid)
 							atomic.AddInt32(&failureCounter, 1)
 							return "mistakes happen", fail.NewError("It was head")
+						}
+
+						if weWereAborted {
+							return "", fail.AbortedError(nil, "we were killed")
 						}
 
 						// Normally, should never reach this point...
@@ -602,14 +602,21 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 							case *fail.ErrAborted:
 								consequences := cerr.Consequences()
 								if len(consequences) > 0 {
-									t.Logf("aborted with consequence: %v (%s)", v, reflect.TypeOf(v).String())
+									for _, v := range consequences {
+										switch v.(type) {
+										case *fail.ErrUnqualified:
+											counted++
+										default:
+										}
+									}
+									t.Logf("%s: %v", reflect.TypeOf(v).String(), v)
 									logged = true
 								}
 							default:
-								counted++
+								// counted++
 							}
 							if !logged {
-								t.Logf("%v (%s)", v, reflect.TypeOf(v).String())
+								t.Logf("(%s): %v", reflect.TypeOf(v).String(), v)
 							}
 						}
 						if counted != int(failureCounter) {
