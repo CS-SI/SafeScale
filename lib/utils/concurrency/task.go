@@ -862,7 +862,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 			instance.err = xerr
 		}
 	}
-	instance.result = result // FIXME: DATA RACE
+	instance.result = result
 }
 
 // Run starts task, waits its completion then return the error code
@@ -1143,7 +1143,7 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				tout := fail.TimeoutError(xerr, duration, "timeout of %s waiting for Task '%s'", duration, tid)
 				instance.lock.RLock()
 				defer instance.lock.RUnlock()
-				return false, instance.result, tout // FIXME: DATA RACE
+				return false, instance.result, tout
 			}
 		} else {
 			// No duration, do task.Wait()
