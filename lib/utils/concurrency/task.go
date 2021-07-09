@@ -18,7 +18,6 @@ package concurrency
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1134,7 +1133,6 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 			case <-time.After(duration):
 				// signal waiterTask to abort (and do not wait for it, it will terminate)
 				waiterTask.(*task).forceAbort()
-				tout := fail.TimeoutError(xerr, duration, fmt.Sprintf("timeout of %s waiting for Task '%s'", duration, tid))
 
 				tout := fail.TimeoutError(xerr, duration, "timeout of %s waiting for Task '%s'", duration, tid)
 				instance.lock.RLock()
