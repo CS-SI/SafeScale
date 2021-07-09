@@ -24,6 +24,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
@@ -1240,7 +1241,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.DeleteNode(clusterName, 0)
+		err = clientSession.Cluster.DeleteNode(clusterName, hostName,0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1265,7 +1266,18 @@ var clusterNodeStopCommand = &cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err = clientSession.Cluster.StopNode(clusterName, hostName,0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		return clitools.SuccessResponse(nil)
 	},
 }
 
@@ -1285,8 +1297,18 @@ var clusterNodeStartCommand = &cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
-	},
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err = clientSession.Cluster.StartNode(clusterName, hostName,0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		return clitools.SuccessResponse(nil)	},
 }
 
 // clusterNodeStateCmd handles 'deploy cluster <clustername> state'
@@ -1304,7 +1326,24 @@ var clusterNodeStateCommand = &cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		resp, err := clientSession.Cluster.StateNode(clusterName, hostName,0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+
+		formatted := make(map[string]interface{})
+		formatted["name"] = resp.Name
+		converted := converters.HostStateFromProtocolToEnum(resp.Status)
+		formatted["status_code"] = converted
+		formatted["status_label"] = converted.String()
+		return clitools.SuccessResponse(formatted)
 	},
 }
 
