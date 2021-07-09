@@ -650,10 +650,6 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 				}
 				canceled = true
 
-			case <-instance.runTerminatedCh:
-				instance.processTerminated(traceR)
-				finish = true // stop to react on signals
-
 			case <-instance.abortCh:
 				eventTime := time.Now()
 				instance.lock.Lock()
