@@ -857,6 +857,89 @@ func TestNewMethod(t *testing.T) {
 	overlord, err = NewTaskGroupWithContext(context.Background())
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
+
+	ctx := overlord.GetContext()
+	require.NotNil(t, ctx)
+}
+
+func TestNewMethodOptions(t *testing.T) {
+	task, err := NewTask()
+	require.NotNil(t, task)
+	require.Nil(t, err)
+	overlord, err := NewTaskGroupWithParent(task, InheritParentIDOption)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+	other, err := overlord.New()
+	require.NotNil(t, other)
+	require.Nil(t, err)
+
+	overlord, err = NewTaskGroupWithContext(context.Background())
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	ctx := overlord.GetContext()
+	require.NotNil(t, ctx)
+}
+
+func TestNewMethodPTGOptions(t *testing.T) {
+	task, err := NewTaskGroup()
+	require.NotNil(t, task)
+	require.Nil(t, err)
+	overlord, err := NewTaskGroupWithParent(task, InheritParentIDOption)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+	other, err := overlord.New()
+	require.NotNil(t, other)
+	require.Nil(t, err)
+
+	overlord, err = NewTaskGroupWithContext(context.Background())
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	ctx := overlord.GetContext()
+	require.NotNil(t, ctx)
+}
+
+func TestNewMethodPTGAmendOptions(t *testing.T) {
+	task, err := NewTaskGroup()
+	require.NotNil(t, task)
+	require.Nil(t, err)
+	overlord, err := NewTaskGroupWithParent(task, AmendID("expectations"))
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+	other, err := overlord.New()
+	require.NotNil(t, other)
+	require.Nil(t, err)
+
+	overlord, err = NewTaskGroupWithContext(context.Background())
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	ctx := overlord.GetContext()
+	require.NotNil(t, ctx)
+}
+
+func TestNewMethodOptionsAborted(t *testing.T) {
+	task, err := NewTask()
+	require.NotNil(t, task)
+	require.Nil(t, err)
+
+	_, err = task.Start(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			rint := randomInt(30, 50)
+			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
+
+			return "waiting game", nil
+		}, nil)
+
+	err = task.Abort()
+	require.Nil(t, err)
+
+	_, _ = task.Wait()
+
+	overlord, err := NewTaskGroupWithParent(task, InheritParentIDOption)
+	require.Nil(t, overlord)
+	require.NotNil(t, err)
 }
 
 func TestOneErrorOneOk(t *testing.T) {
