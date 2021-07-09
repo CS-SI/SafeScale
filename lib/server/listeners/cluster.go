@@ -76,6 +76,7 @@ func (s *ClusterListener) List(ctx context.Context, in *protocol.Reference) (hl 
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return converters.ClusterListFromAbstractToProtocol(list), nil
 }
 
@@ -117,6 +118,7 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	req, xerr := converters.ClusterRequestFromProtocolToAbstract(in)
 	if xerr != nil {
@@ -173,11 +175,13 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	st, xerr := instance.GetState()
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return converters.ClusterStateFromAbstractToProtocol(st), nil
 }
 
@@ -220,6 +224,7 @@ func (s *ClusterListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	return instance.ToProtocol()
 }
@@ -260,6 +265,7 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	return empty, instance.Start(task.GetContext())
 }
@@ -303,6 +309,7 @@ func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (emp
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	return empty, instance.Stop(task.GetContext())
 }
@@ -346,6 +353,7 @@ func (s *ClusterListener) Delete(ctx context.Context, in *protocol.ClusterDelete
 	if xerr != nil {
 		return nil, xerr
 	}
+	// Note: no .Released, the instance will be deleted
 
 	return empty, instance.Delete(task.GetContext(), in.GetForce())
 }
@@ -398,6 +406,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	resp, xerr := instance.AddNodes(task.GetContext(), uint(in.Count), *sizing)
 	if xerr != nil {
@@ -457,6 +466,7 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	count := uint(in.GetCount())
 	if count == 0 {
@@ -520,6 +530,7 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	list, xerr := instance.ListNodes(task.GetContext())
 	if xerr != nil {
@@ -576,7 +587,35 @@ func (s *ClusterListener) InspectNode(ctx context.Context, in *protocol.ClusterN
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError()
+	clusterInstance, xerr := clusterfactory.Load(job.GetService(), in.GetName())
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer clusterInstance.Released()
+
+	nodeList, xerr := clusterInstance.ListNodes(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var id string
+	for _, v := range nodeList {
+		if v.ID == nodeRef || v.Name == nodeRef {
+			id = v.ID
+			break
+		}
+	}
+	if id == "" {
+		return nil, fail.NotFoundError("failed to find node %s in Cluster", nodeRefLabel)
+	}
+
+	hostInstance, xerr := hostfactory.Load(job.GetService(), id)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer hostInstance.Released()
+
+	return hostInstance.ToProtocol()
 }
 
 // DeleteNode removes node(s) from a cluster
@@ -615,8 +654,36 @@ func (s *ClusterListener) DeleteNode(ctx context.Context, in *protocol.ClusterNo
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	_ = nodeRef // VPL: waiting for code...
-	return empty, fail.NotImplementedError()
+	clusterInstance, xerr := clusterfactory.Load(job.GetService(), clusterName)
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer clusterInstance.Released()
+
+	nodeList, xerr := clusterInstance.ListNodes(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var id string
+	for _, v := range nodeList {
+		if v.ID == nodeRef || v.Name == nodeRef {
+			id = v.ID
+			break
+		}
+	}
+	if id == "" {
+		return nil, fail.NotFoundError("failed to find node %s in Cluster", nodeRefLabel)
+	}
+
+	hostInstance, xerr := hostfactory.Load(job.GetService(), id)
+	if xerr != nil {
+		return empty, xerr
+	}
+	// Note: no hostInstance.Released(), the Host will be deleted; so be the cache entry
+
+	xerr = clusterInstance.DeleteSpecificNode(ctx, hostInstance.GetID(), "")
+	return empty, xerr
 }
 
 // StopNode stops a node of the cluster
@@ -641,11 +708,11 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 
 	clusterName := in.GetName()
 	if clusterName == "" {
-		return nil, fail.InvalidRequestError("cluster name is missing")
+		return empty, fail.InvalidRequestError("cluster name is missing")
 	}
 	nodeRef, nodeRefLabel := srvutils.GetReference(in.GetHost())
 	if nodeRef == "" {
-		return nil, status.Errorf(codes.FailedPrecondition, "neither name nor id of node is provided")
+		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id of node is provided")
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/cluster/%s/node/%s/stop", clusterName, nodeRef))
@@ -658,7 +725,36 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return empty, fail.NotImplementedError()
+	clusterInstance, xerr := clusterfactory.Load(job.GetService(), clusterName)
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer clusterInstance.Released()
+
+	nodeList, xerr := clusterInstance.ListNodes(ctx)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	var id string
+	for _, v := range nodeList {
+		if v.ID == nodeRef || v.Name == nodeRef {
+			id = v.ID
+			break
+		}
+	}
+	if id == "" {
+		return empty, fail.NotFoundError("failed to find node %s in Cluster", nodeRefLabel)
+	}
+
+	hostInstance, xerr := hostfactory.Load(job.GetService(), id)
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer hostInstance.Released()
+
+	xerr = hostInstance.Stop(ctx)
+	return empty, xerr
 }
 
 // StartNode starts a stopped node of the cluster
@@ -700,11 +796,40 @@ func (s *ClusterListener) StartNode(ctx context.Context, in *protocol.ClusterNod
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return empty, fail.NotImplementedError()
+	clusterInstance, xerr := clusterfactory.Load(job.GetService(), clusterName)
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer clusterInstance.Released()
+
+	nodeList, xerr := clusterInstance.ListNodes(ctx)
+	if xerr != nil {
+		return empty, xerr
+	}
+
+	var id string
+	for _, v := range nodeList {
+		if v.ID == nodeRef || v.Name == nodeRef {
+			id = v.ID
+			break
+		}
+	}
+	if id == "" {
+		return empty, fail.NotFoundError("failed to find node %s in Cluster", nodeRefLabel)
+	}
+
+	hostInstance, xerr := hostfactory.Load(job.GetService(), id)
+	if xerr != nil {
+		return empty, xerr
+	}
+	defer hostInstance.Released()
+
+	xerr = hostInstance.Start(ctx)
+	return empty, xerr
 }
 
 // StateNode returns the state of a node of the cluster
-func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.ClusterStateResponse, err error) {
+func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNodeRequest) (_ *protocol.HostStatus, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot get cluster node state")
 
@@ -741,7 +866,40 @@ func (s *ClusterListener) StateNode(ctx context.Context, in *protocol.ClusterNod
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError()
+	clusterInstance, xerr := clusterfactory.Load(job.GetService(), clusterName)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer clusterInstance.Released()
+
+	nodeList, xerr := clusterInstance.ListNodes(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var id string
+	for _, v := range nodeList {
+		if v.ID == nodeRef || v.Name == nodeRef {
+			id = v.ID
+			break
+		}
+	}
+	if id == "" {
+		return nil, fail.NotFoundError("failed to find node %s in Cluster", nodeRefLabel)
+	}
+
+	hostInstance, xerr := hostfactory.Load(job.GetService(), id)
+	if xerr != nil {
+		return nil, xerr
+	}
+	defer hostInstance.Released()
+
+	state, xerr := hostInstance.ForceGetState(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return converters.HostStatusFromAbstractToProtocol(hostInstance.GetName(), state), nil
 }
 
 // ListMasters returns the list of masters of the cluster
@@ -783,6 +941,7 @@ func (s *ClusterListener) ListMasters(ctx context.Context, in *protocol.Referenc
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	list, xerr := instance.ListMasters(task.GetContext())
 	if xerr != nil {
@@ -836,11 +995,13 @@ func (s *ClusterListener) FindAvailableMaster(ctx context.Context, in *protocol.
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	master, xerr := instance.FindAvailableMaster(task.GetContext())
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer master.Released()
 
 	out, xerr := master.ToProtocol()
 	if xerr != nil {
@@ -894,6 +1055,7 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer instance.Released()
 
 	var masterID string
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -924,6 +1086,7 @@ func (s *ClusterListener) InspectMaster(ctx context.Context, in *protocol.Cluste
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer master.Released()
 
 	out, xerr := master.ToProtocol()
 	if xerr != nil {
