@@ -1042,6 +1042,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	defer func() {
 		if xerr != nil {
 			instance.undoUpdateSubnets(hostReq, &xerr)
@@ -1646,12 +1647,12 @@ func (instance *Host) undoUpdateSubnets(req abstract.HostRequest, errorPtr *fail
 				hostName := instance.GetName()
 
 				for _, as := range req.Subnets {
-					rs, innerXErr := LoadSubnet(instance.MetadataCore.GetService(), "", as.ID)
+					subnetInstance, innerXErr := LoadSubnet(instance.MetadataCore.GetService(), "", as.ID)
 					if innerXErr != nil {
 						return innerXErr
 					}
 
-					innerXErr = rs.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+					innerXErr = subnetInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 						return props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 							subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
 							if !ok {

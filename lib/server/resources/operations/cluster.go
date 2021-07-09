@@ -1323,19 +1323,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute
 
-	defer func() {
-		if xerr != nil && len(hosts) > 0 {
-			logrus.Debugf("Cleaning up on failure, deleting Nodes...")
-			if derr := instance.deleteHosts(task, hosts); derr != nil {
-				logrus.Errorf("Cleaning up on failure, failed to delete Nodes")
-				_ = xerr.AddConsequence(derr)
-			} else {
-				logrus.Debugf("Cleaning up on failure, successfully deleted Nodes")
-			}
-		}
-	}()
-
-	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/expand/%d", count)))
+	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)))
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2703,7 +2691,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// --- Deletes the Network, Subnet and gateway ---
-	networkInstance, deleteNetwork, subnetInstance, xerr := instance.extractNetworkingInfo(ctx)
+	networkInstance, deleteNetwork, subnetInstance, xerr := instance.extractNetworkingInfo()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2804,7 +2792,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 }
 
 // extractNetworkingInfo returns the ID of the network from properties, taking care of ascending compatibility
-func (instance *Cluster) extractNetworkingInfo(ctx context.Context) (networkInstance resources.Network, deleteNetwork bool, subnetInstance resources.Subnet, xerr fail.Error) {
+func (instance *Cluster) extractNetworkingInfo() (networkInstance resources.Network, deleteNetwork bool, subnetInstance resources.Subnet, xerr fail.Error) {
 	networkInstance, subnetInstance = nil, nil
 	deleteNetwork = false
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {

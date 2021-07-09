@@ -1893,7 +1893,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove master from Cluster metadata", ActionFromError(xerr)))
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove node from Cluster metadata", ActionFromError(xerr)))
 			}
 		}
 	}()
