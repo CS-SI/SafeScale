@@ -270,8 +270,11 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 			for _, v := range options {
 				switch v.Key() {
 				case "normalize_error":
-					newChild.normalizeError = v.Value().(func(error) error) // FIXME: Unchecked cast
+					if casted, ok := v.Value().(func(error) error); ok {
+						newChild.normalizeError = casted
+					}
 				default:
+					logrus.Tracef("Ignored subtask option: %s", v.Key())
 				}
 			}
 		}

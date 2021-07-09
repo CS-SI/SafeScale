@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/stretchr/testify/require"
 )
@@ -163,7 +164,7 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 					}
 
 					return "who cares about timeout", nil
-				}, nil, 100*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-with-timeout-%d", ind)),
+				}, nil, 100*time.Millisecond, InheritParentIDOption, Normalizer(), AmendID(fmt.Sprintf("/child-with-timeout-%d", ind)),
 			)
 			require.Nil(t, xerr)
 		}
@@ -192,4 +193,17 @@ func TestKeepRecordsWhenTimeouts(t *testing.T) {
 			require.NotEmpty(t, res)
 		}
 	}
+}
+
+func Normalizer() data.ImmutableKeyValue {
+	return data.NewImmutableKeyValue("normalize_error", func(err error) error {
+		if err != nil {
+			switch err.(type) {
+			case *fail.ErrNotFound:
+				return nil
+			default:
+			}
+		}
+		return err
+	})
 }
