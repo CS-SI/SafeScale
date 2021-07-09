@@ -31,9 +31,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
@@ -48,7 +48,7 @@ const (
 	curlPatch = "curl -kSsl -X PATCH --url https://localhost:8444/%s -H \"Content-Type:application/json\" -w \"\\n%%{http_code}\" -d @- <<'EOF'\n%s\nEOF\n"
 )
 
-var kongProxyCheckedCache = utils.NewMapCache()
+var kongProxyCheckedCache cache.Cache
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
@@ -61,7 +61,7 @@ type KongController struct {
 	gatewayPublicIP  string
 }
 
-// NewKongController ...
+// NewKongController creates a controller for Kong
 func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.Subnet, addressPrimaryGateway bool) (*KongController, fail.Error) {
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
@@ -73,12 +73,12 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		return nil, fail.InvalidParameterCannotBeNilError("subnet")
 	}
 
-	// Check if 'edgeproxy4subnet' feature is installed on host
-	rp, xerr := NewFeature(svc, "edgeproxy4subnet")
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
+	// // Check if 'edgeproxy4subnet' feature is installed on host
+	// featureInstance, xerr := NewFeature(svc, "edgeproxy4subnet")
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	addressedGateway, xerr := subnet.InspectGateway(addressPrimaryGateway)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -86,27 +86,47 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		return nil, xerr
 	}
 
-	present := false
-	if anon, ok := kongProxyCheckedCache.Get(subnet.GetName()); ok {
-		present = anon.(bool)
-	} else {
-		setErr := kongProxyCheckedCache.SetBy(subnet.GetName(), func() (interface{}, fail.Error) {
-			results, xerr := rp.Check(ctx, addressedGateway, data.Map{}, resources.FeatureSettings{})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return false, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
-			}
-			if !results.Successful() {
-				return false, fail.NotFoundError("feature 'edgeproxy4subnet' is not installed on gateway '%s'", addressedGateway.GetName())
-			}
-
-			return true, nil
-		})
-		if setErr != nil {
-			return nil, setErr
+	var present bool
+	for _, v := range addressedGateway.InstalledFeatures() {
+		if v == "edgeproxy4subnet" {
+			present = true
+			break
 		}
-		present = true
 	}
+
+	//
+	// entry, xerr := kongProxyCheckedCache.GetEntry(subnet.GetName())
+	// if xerr == nil {
+	// 	present = entry.Content().(cache.Bool).Value()
+	// } else {
+	// 	xerr := kongProxyCheckedCache.ReserveEntry(subnet.GetName())
+	// 	if xerr != nil {
+	// 		return nil, xerr
+	// 	}
+	//
+	// 	defer func() {
+	// 		if xerr != nil {
+	// 			derr := kongProxyCheckedCache.FreeEntry(subnet.GetName())
+	// 			if derr != nil {
+	// 				_ = xerr.AddConsequence(derr)
+	// 			}
+	// 		}
+	// 	}()
+	//
+	// 	results, xerr := featureInstance.Check(ctx, addressedGateway, data.Map{}, resources.FeatureSettings{})
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		return nil, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
+	// 	}
+	// 	if !results.Successful() {
+	// 		return nil, fail.NotFoundError("feature 'edgeproxy4subnet' is not installed on gateway '%s'", addressedGateway.GetName())
+	// 	}
+	// 	entry, xerr = kongProxyCheckedCache.CommitEntry(subnet.GetName(), cache.NewBool(subnet.GetName(), true))
+	// 	if xerr != nil {
+	// 		return nil, xerr
+	// 	}
+	// 	present = true
+	// }
 	if !present {
 		return nil, fail.NotFoundError("'edgeproxy4subnet' feature is not installed on gateway '%s'", addressedGateway.GetName())
 	}
@@ -120,6 +140,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	ctrl.gatewayPublicIP, xerr = addressedGateway.GetPublicIP()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -138,7 +159,7 @@ func (k *KongController) GetHostname() string {
 }
 
 // Apply applies the rule to Kong proxy
-// Currently, support rule types service, route and upstream
+// Currently, support rule types 'service', 'route' and 'upstream'
 // Returns rule name and error
 func (k *KongController) Apply(rule map[interface{}]interface{}, values *data.Map) (string, fail.Error) {
 	ruleType, ok := rule["type"].(string)
@@ -509,5 +530,13 @@ func (k *KongController) parseResult(result string) (map[string]interface{}, str
 			return response, httpcode, fail.NewError("post failed: HTTP error code=%s: %s", httpcode, msg.(string))
 		}
 		return response, httpcode, fail.NewError("post failed with HTTP error code '%s'", httpcode)
+	}
+}
+
+func init() {
+	var xerr fail.Error
+	kongProxyCheckedCache, xerr = cache.NewCache("proxychecks")
+	if xerr != nil {
+		panic(xerr)
 	}
 }
