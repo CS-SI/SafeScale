@@ -64,12 +64,12 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	defer job.Close()
 
 	all := in.GetAll()
-	task := job.GetTask()
+	task := job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	list, xerr := securitygroupfactory.List(task.GetContext(), job.GetService(), all)
+	list, xerr := securitygroupfactory.List(task.GetContext(), job.Service(), all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -108,8 +108,8 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -173,12 +173,12 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 	}
 	defer job.Close()
 
-	task := job.GetTask()
+	task := job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.New(job.GetService())
+	rsg, xerr := securitygroupfactory.New(job.Service())
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -226,12 +226,12 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 	}
 	defer job.Close()
 
-	task := job.GetTask()
+	task := job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -279,12 +279,12 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 	}
 	defer job.Close()
 
-	task := job.GetTask()
+	task := job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -326,13 +326,13 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(job.GetService(), sgRef)
+	rsg, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -383,13 +383,13 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.security-group"), "(%s)", sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(job.GetService(), sgRef)
+	rsg, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -440,13 +440,13 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s, %v)", refLabel, rule).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.security-group"), "(%s, %v)", refLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -492,9 +492,9 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 		return nil, err
 	}
 	defer job.Close()
-	// task := job.GetTask()
+	// task := job.Task()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -545,13 +545,13 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.security-group"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rsg, xerr := securitygroupfactory.Load(job.GetService(), ref)
+	rsg, xerr := securitygroupfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}

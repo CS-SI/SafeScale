@@ -76,8 +76,8 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.feature"), "(%s, %s)", targetType, targetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -137,8 +137,8 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -238,10 +238,10 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
-	tracer := debug.NewTracer(job.GetTask(), true /*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -316,8 +316,8 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 		return empty, err
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
 	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.feature")*/, "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()

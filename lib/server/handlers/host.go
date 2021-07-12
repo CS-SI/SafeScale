@@ -73,12 +73,12 @@ func (handler *hostHandler) Start(ref string) (xerr fail.Error) {
 		return fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.Service(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -97,12 +97,12 @@ func (handler *hostHandler) Stop(ref string) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.Service(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -121,12 +121,12 @@ func (handler *hostHandler) Reboot(ref string) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.Service(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -145,13 +145,13 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s', %v)", ref, sizing).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 	defer fail.OnPanic(&xerr)
 
-	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -197,7 +197,7 @@ func (handler *hostHandler) Create(
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("req.Name")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 
 	var subnetName string
 	if !req.Single {
@@ -234,14 +234,14 @@ func (handler *hostHandler) List(all bool) (hosts abstract.HostList, xerr fail.E
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	return hostfactory.List(task, handler.job.GetService(), all)
+	return hostfactory.List(task, handler.job.Service(), all)
 	//if all {
-	//	return handler.job.GetService().ListHosts(true)
+	//	return handler.job.Service().ListHosts(true)
 	//}
 	//
 	//objh, xerr := hostfactory.New(handler.job.GetService())
@@ -269,12 +269,12 @@ func (handler *hostHandler) Inspect(ref string) (host resources.Host, xerr fail.
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.Service(), ref)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("host", ref)
@@ -297,13 +297,13 @@ func (handler *hostHandler) Delete(ref string) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 	defer fail.OnPanic(&xerr)
 
-	objh, xerr := hostfactory.Load(task, handler.job.GetService(), ref)
+	objh, xerr := hostfactory.Load(task, handler.job.Service(), ref)
 	if xerr != nil {
 		return xerr
 	}
@@ -322,7 +322,7 @@ func (handler *hostHandler) SSH(ref string) (sshConfig *system.SSHConfig, xerr f
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 

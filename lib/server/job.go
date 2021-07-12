@@ -32,14 +32,15 @@ import (
 
 // Job is the interface of a daemon job
 type Job interface {
-	GetID() string
-	GetName() string
-	GetContext() context.Context
-	GetTask() concurrency.Task
-	GetTenant() string
-	GetService() iaas.Service
-	GetDuration() time.Duration
+	ID() string
+	Name() string
+	Context() context.Context
+	Task() concurrency.Task
+	Tenant() string
+	Service() iaas.Service
+	Duration() time.Duration
 	String() string
+
 	Abort() fail.Error
 	Aborted() bool
 	Close()
@@ -108,10 +109,13 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		return nil, xerr
 	}
 
+	// attach task instance to the context
+	ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task)
+
 	nj := job{
 		description: description,
 		uuid:        id,
-		ctx:         task.GetContext(),
+		ctx:         ctx,
 		task:        task,
 		cancel:      cancel,
 		service:     svc,
@@ -132,8 +136,8 @@ func (j *job) isNull() bool {
 	return j == nil || j.uuid == ""
 }
 
-// GetID returns the id of the job (ie the uuid of gRPC message)
-func (j job) GetID() string {
+// ID returns the id of the job (ie the uuid of gRPC message)
+func (j job) ID() string {
 	if j.isNull() {
 		return ""
 	}
@@ -141,8 +145,8 @@ func (j job) GetID() string {
 	return j.uuid
 }
 
-// GetName returns the name (== id) of the job
-func (j job) GetName() string {
+// Name returns the name (== id) of the job
+func (j job) Name() string {
 	if j.isNull() {
 		return ""
 	}
@@ -150,8 +154,8 @@ func (j job) GetName() string {
 	return j.uuid
 }
 
-// GetTenant returns the tenant to use
-func (j job) GetTenant() string {
+// Tenant returns the tenant to use
+func (j job) Tenant() string {
 	if j.isNull() {
 		return ""
 	}
@@ -159,8 +163,8 @@ func (j job) GetTenant() string {
 	return j.tenant
 }
 
-// GetContext returns the context of the job (should be the same than the one of the task)
-func (j job) GetContext() context.Context {
+// Context returns the context of the job (should be the same than the one of the task)
+func (j job) Context() context.Context {
 	if j.isNull() {
 		return nil
 	}
@@ -168,8 +172,8 @@ func (j job) GetContext() context.Context {
 	return j.ctx
 }
 
-// GetTask returns the task instance
-func (j job) GetTask() concurrency.Task {
+// Task returns the task instance
+func (j job) Task() concurrency.Task {
 	if j.isNull() {
 		return nil
 	}
@@ -177,8 +181,8 @@ func (j job) GetTask() concurrency.Task {
 	return j.task
 }
 
-// GetService returns the service instance
-func (j job) GetService() iaas.Service {
+// Service returns the service instance
+func (j job) Service() iaas.Service {
 	if j.isNull() {
 		return iaas.NullService()
 	}
@@ -186,8 +190,8 @@ func (j job) GetService() iaas.Service {
 	return j.service
 }
 
-// GetDuration returns the duration of the job
-func (j job) GetDuration() time.Duration {
+// Duration returns the duration of the job
+func (j job) Duration() time.Duration {
 	if j.isNull() {
 		return 0
 	}
@@ -246,7 +250,7 @@ func register(job Job) fail.Error {
 	mutexJobManager.Lock()
 	defer mutexJobManager.Unlock()
 
-	jobMap[job.GetID()] = job
+	jobMap[job.ID()] = job
 	return nil
 }
 
@@ -256,7 +260,8 @@ func deregister(job Job) fail.Error {
 		return fail.InvalidParameterCannotBeNilError("job")
 	}
 
-	if uuid := job.GetID(); uuid != "" {
+	uuid := job.ID()
+	if uuid != "" {
 		mutexJobManager.Lock()
 		defer mutexJobManager.Unlock()
 
@@ -291,7 +296,7 @@ func AbortJobByID(id string) (xerr fail.Error) {
 func ListJobs() map[string]string {
 	listMap := map[string]string{}
 	for uuid, job := range jobMap {
-		listMap[uuid] = job.GetName()
+		listMap[uuid] = job.Name()
 	}
 	return listMap
 }

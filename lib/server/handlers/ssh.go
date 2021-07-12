@@ -79,8 +79,8 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.GetTask()
-	svc := handler.job.GetService()
+	task := handler.job.Task()
+	svc := handler.job.Service()
 
 	_, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
@@ -273,7 +273,7 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 		return fail.InvalidParameterError("hostParam", "cannot be nil!")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
@@ -301,13 +301,13 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("cmd")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
-	host, xerr := hostfactory.Load(handler.job.GetService(), hostRef)
+	host, xerr := hostfactory.Load(handler.job.Service(), hostRef)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -340,7 +340,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 // run executes command on the host
 func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	// Create the command
-	sshCmd, xerr := ssh.NewCommand(handler.job.GetTask().GetContext(), cmd)
+	sshCmd, xerr := ssh.NewCommand(handler.job.Task().GetContext(), cmd)
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
@@ -356,7 +356,7 @@ func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 		}
 	}()
 
-	return sshCmd.RunWithTimeout(handler.job.GetTask().GetContext(), outputs.DISPLAY, duration)
+	return sshCmd.RunWithTimeout(handler.job.Task().GetContext(), outputs.DISPLAY, duration)
 }
 
 func extracthostName(in string) (string, fail.Error) {
@@ -410,7 +410,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
@@ -457,7 +457,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		upload = true
 	}
 
-	host, xerr := hostfactory.Load(handler.job.GetService(), hostName)
+	host, xerr := hostfactory.Load(handler.job.Service(), hostName)
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
@@ -468,6 +468,6 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return -1, "", "", xerr
 	}
 
-	cRc, cStcOut, cStdErr, cErr := ssh.Copy(handler.job.GetTask().GetContext(), remotePath, localPath, upload)
+	cRc, cStcOut, cStdErr, cErr := ssh.Copy(handler.job.Task().GetContext(), remotePath, localPath, upload)
 	return cRc, cStcOut, cStdErr, cErr
 }

@@ -73,7 +73,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	sharePath := in.GetPath()
@@ -86,7 +86,7 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 	if in.OptionsAsString == "" && in.Options != nil {
 		in.OptionsAsString = converters.NFSExportOptionsFromProtocolToString(in.Options)
 	}
-	svc := job.GetService()
+	svc := job.Service()
 	rh, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return nil, xerr
@@ -137,13 +137,13 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.share"), "('%s')", shareName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := sharefactory.Load(job.GetService(), shareName)
+	rs, xerr := sharefactory.Load(job.Service(), shareName)
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -178,7 +178,7 @@ func (s *ShareListener) List(ctx context.Context, in *protocol.Reference) (_ *pr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.share")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.share")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -228,7 +228,7 @@ func (s *ShareListener) Mount(ctx context.Context, in *protocol.ShareMountDefini
 
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -271,7 +271,7 @@ func (s *ShareListener) Unmount(ctx context.Context, in *protocol.ShareMountDefi
 
 	hostPath := in.GetPath()
 	shareType := in.GetType()
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.share"), "(%s, '%s', '%s', %s)", hostRefLabel, shareRef, hostPath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -308,7 +308,7 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.share"), "('%s')", shareRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
