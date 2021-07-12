@@ -77,10 +77,11 @@ type Cluster struct {
 	makers              clusterflavors2.Makers
 }
 
-// ClusterNullValue returns a *Cluster representing a null value
-func ClusterNullValue() *Cluster {
-	return &Cluster{MetadataCore: NullCore()}
-}
+// VPL: not used
+// // ClusterNullValue returns a *Cluster representing a null value
+// func ClusterNullValue() *Cluster {
+// 	return &Cluster{MetadataCore: NullCore()}
+// }
 
 // NewCluster ...
 func NewCluster(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
@@ -444,34 +445,35 @@ func (instance *Cluster) updateCachedInformation() {
 	instance.installMethods.Store(index, installmethod.None)
 }
 
-// convertDefaultsV1ToDefaultsV2 converts propertiesv1.ClusterDefaults to propertiesv2.ClusterDefaults
-func convertClusterDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, defaultsV2 *propertiesv2.ClusterDefaults) {
-	defaultsV2.Image = defaultsV1.Image
-	defaultsV2.GatewaySizing = propertiesv2.HostSizingRequirements{
-		MinCores:    defaultsV1.GatewaySizing.Cores,
-		MinCPUFreq:  defaultsV1.GatewaySizing.CPUFreq,
-		MinGPU:      defaultsV1.GatewaySizing.GPUNumber,
-		MinRAMSize:  defaultsV1.GatewaySizing.RAMSize,
-		MinDiskSize: defaultsV1.GatewaySizing.DiskSize,
-		Replaceable: defaultsV1.GatewaySizing.Replaceable,
-	}
-	defaultsV2.MasterSizing = propertiesv2.HostSizingRequirements{
-		MinCores:    defaultsV1.MasterSizing.Cores,
-		MinCPUFreq:  defaultsV1.MasterSizing.CPUFreq,
-		MinGPU:      defaultsV1.MasterSizing.GPUNumber,
-		MinRAMSize:  defaultsV1.MasterSizing.RAMSize,
-		MinDiskSize: defaultsV1.MasterSizing.DiskSize,
-		Replaceable: defaultsV1.MasterSizing.Replaceable,
-	}
-	defaultsV2.NodeSizing = propertiesv2.HostSizingRequirements{
-		MinCores:    defaultsV1.NodeSizing.Cores,
-		MinCPUFreq:  defaultsV1.NodeSizing.CPUFreq,
-		MinGPU:      defaultsV1.NodeSizing.GPUNumber,
-		MinRAMSize:  defaultsV1.NodeSizing.RAMSize,
-		MinDiskSize: defaultsV1.NodeSizing.DiskSize,
-		Replaceable: defaultsV1.NodeSizing.Replaceable,
-	}
-}
+// VPL: not used
+// // convertDefaultsV1ToDefaultsV2 converts propertiesv1.ClusterDefaults to propertiesv2.ClusterDefaults
+// func convertClusterDefaultsV1ToDefaultsV2(defaultsV1 *propertiesv1.ClusterDefaults, defaultsV2 *propertiesv2.ClusterDefaults) {
+// 	defaultsV2.Image = defaultsV1.Image
+// 	defaultsV2.GatewaySizing = propertiesv2.HostSizingRequirements{
+// 		MinCores:    defaultsV1.GatewaySizing.Cores,
+// 		MinCPUFreq:  defaultsV1.GatewaySizing.CPUFreq,
+// 		MinGPU:      defaultsV1.GatewaySizing.GPUNumber,
+// 		MinRAMSize:  defaultsV1.GatewaySizing.RAMSize,
+// 		MinDiskSize: defaultsV1.GatewaySizing.DiskSize,
+// 		Replaceable: defaultsV1.GatewaySizing.Replaceable,
+// 	}
+// 	defaultsV2.MasterSizing = propertiesv2.HostSizingRequirements{
+// 		MinCores:    defaultsV1.MasterSizing.Cores,
+// 		MinCPUFreq:  defaultsV1.MasterSizing.CPUFreq,
+// 		MinGPU:      defaultsV1.MasterSizing.GPUNumber,
+// 		MinRAMSize:  defaultsV1.MasterSizing.RAMSize,
+// 		MinDiskSize: defaultsV1.MasterSizing.DiskSize,
+// 		Replaceable: defaultsV1.MasterSizing.Replaceable,
+// 	}
+// 	defaultsV2.NodeSizing = propertiesv2.HostSizingRequirements{
+// 		MinCores:    defaultsV1.NodeSizing.Cores,
+// 		MinCPUFreq:  defaultsV1.NodeSizing.CPUFreq,
+// 		MinGPU:      defaultsV1.NodeSizing.GPUNumber,
+// 		MinRAMSize:  defaultsV1.NodeSizing.RAMSize,
+// 		MinDiskSize: defaultsV1.NodeSizing.DiskSize,
+// 		Replaceable: defaultsV1.NodeSizing.Replaceable,
+// 	}
+// }
 
 // IsNull tells if the instance should be considered as a null value
 func (instance *Cluster) IsNull() bool {
@@ -1203,7 +1205,7 @@ func (instance *Cluster) GetState() (state clusterstate.Enum, xerr fail.Error) {
 }
 
 // AddNode adds a node
-func (instance *Cluster) AddNode(ctx context.Context, def abstract.HostSizingRequirements) (_ resources.Host, xerr fail.Error) {
+func (instance *Cluster) AddNode(ctx context.Context, def abstract.HostSizingRequirements, keepOnFailure bool) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -1230,7 +1232,7 @@ func (instance *Cluster) AddNode(ctx context.Context, def abstract.HostSizingReq
 		return HostNullValue(), fail.AbortedError(nil, "aborted")
 	}
 
-	nodes, xerr := instance.AddNodes(ctx, 1, def)
+	nodes, xerr := instance.AddNodes(ctx, 1, def, keepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return HostNullValue(), xerr
@@ -1240,7 +1242,7 @@ func (instance *Cluster) AddNode(ctx context.Context, def abstract.HostSizingReq
 }
 
 // AddNodes adds several nodes
-func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements) (_ []resources.Host, xerr fail.Error) {
+func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, keepOnFailure bool) (_ []resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -1316,9 +1318,8 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	var (
-		nodeTypeStr string
-		errors      []string
-		hosts       []resources.Host
+		errors []string
+		nodes  []*propertiesv3.ClusterNode
 	)
 
 	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute
@@ -1333,40 +1334,76 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			index:         i,
 			nodeDef:       nodeDef,
 			timeout:       timeout,
-			keepOnFailure: false,
+			keepOnFailure: keepOnFailure,
 		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", i)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
+
 	res, xerr := tg.WaitGroup()
 	if res != nil {
 		for _, v := range res {
-			if aHost, ok := v.(resources.Host); ok {
-				hosts = append(hosts, aHost)
+			if item, ok := v.(*propertiesv3.ClusterNode); ok {
+				nodes = append(nodes, item)
 			}
 		}
 	}
+
+	// Starting from here, if exiting with error, delete created nodes if allowed (cf. keepOnFailure)
+	defer func() {
+		if xerr != nil && !keepOnFailure && len(nodes) > 0 {
+			// Note: using context.Background() disable cancellation mecanism for a workload that needs to go to the end
+			tg, derr := concurrency.NewTaskGroupWithContext(context.Background())
+			if derr != nil {
+				_ = xerr.AddConsequence(derr)
+			}
+			derr = tg.SetID("/onfailure")
+			if derr != nil {
+				_ = xerr.AddConsequence(derr)
+			}
+
+			for _, v := range nodes {
+				_, derr = tg.Start(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v})
+				if derr != nil {
+					_ = xerr.AddConsequence(derr)
+				}
+			}
+			_, derr = tg.WaitGroup()
+			if derr != nil {
+				_ = xerr.AddConsequence(derr)
+			}
+		}
+	}()
+
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, fail.NewErrorWithCause(xerr, "errors occurred on %s node%s addition", nodeTypeStr, strprocess.Plural(uint(len(errors))))
+		return nil, fail.NewErrorWithCause(xerr, "errors occurred on node%s addition", strprocess.Plural(uint(len(errors))))
 	}
 
 	// Now configure new nodes
-	xerr = instance.configureNodesFromList(task, hosts)
+	xerr = instance.configureNodesFromList(task, nodes)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// At last join nodes to Cluster
-	xerr = instance.joinNodesFromList(ctx, hosts)
+	xerr = instance.joinNodesFromList(ctx, nodes)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
+	hosts := make([]resources.Host, len(nodes))
+	for _, v := range nodes {
+		hostInstance, xerr := LoadHost(instance.GetService(), v.ID)
+		if xerr != nil {
+			return nil, xerr
+		}
+		hosts = append(hosts, hostInstance)
+	}
 	return hosts, nil
 }
 
@@ -2959,7 +2996,7 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 }
 
 // configureNodesFromList configures nodes from a list
-func (instance *Cluster) configureNodesFromList(task concurrency.Task, hosts []resources.Host) (xerr fail.Error) {
+func (instance *Cluster) configureNodesFromList(task concurrency.Task, nodes []*propertiesv3.ClusterNode) (xerr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
@@ -2967,7 +3004,7 @@ func (instance *Cluster) configureNodesFromList(task concurrency.Task, hosts []r
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	length := len(hosts)
+	length := len(nodes)
 	if length > 0 {
 		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
 		if xerr != nil {
@@ -2977,8 +3014,8 @@ func (instance *Cluster) configureNodesFromList(task concurrency.Task, hosts []r
 		for i := 0; i < length; i++ {
 			_, ierr := tg.Start(instance.taskConfigureNode, taskConfigureNodeParameters{
 				Index: uint(i + 1),
-				Host:  hosts[i],
-			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/configure", hosts[i].GetName())))
+				Node:  nodes[i],
+			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/configure", nodes[i].Name)))
 			ierr = debug.InjectPlannedFail(ierr)
 			if ierr != nil {
 				_ = tg.Abort()
@@ -2996,7 +3033,7 @@ func (instance *Cluster) configureNodesFromList(task concurrency.Task, hosts []r
 }
 
 // joinNodesFromList makes nodes from a list join the Cluster
-func (instance *Cluster) joinNodesFromList(ctx context.Context, hosts []resources.Host) fail.Error {
+func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propertiesv3.ClusterNode) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3026,7 +3063,12 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, hosts []resource
 	// Joins to Cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the Cluster Flavor)
 	if instance.makers.JoinMasterToCluster != nil {
-		for _, hostInstance := range hosts {
+		for _, v := range nodes {
+			hostInstance, xerr := LoadHost(instance.GetService(), v.ID)
+			if xerr != nil {
+				return xerr
+			}
+
 			xerr = instance.makers.JoinNodeToCluster(instance, hostInstance)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {

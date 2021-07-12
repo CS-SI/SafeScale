@@ -1967,6 +1967,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		}
 	}()
 
+	var node *propertiesv3.ClusterNode
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -1974,7 +1975,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			node := nodesV3.ByNumericalID[nodeIdx]
+			node = nodesV3.ByNumericalID[nodeIdx]
 			node.ID = hostInstance.GetID()
 			node.PublicIP, innerXErr = hostInstance.GetPublicIP()
 			if innerXErr != nil {
@@ -2017,7 +2018,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	}
 
 	logrus.Debugf("[%s] Host creation successful.", hostLabel)
-	return hostInstance, nil
+	return node, nil
 }
 
 // taskConfigureNodes configures nodes
@@ -2052,39 +2053,21 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 
 	logrus.Debugf("[Cluster %s] configuring nodes...", clusterName)
 
-	var (
-		// i    uint
-		errs []error
-	)
-
 	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	svc := instance.GetService()
 	for i, node := range list {
 		if node.ID == "" {
 			continue
 		}
 
-		host, xerr := LoadHost(svc, node.ID)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			errs = append(errs, fail.Wrap(xerr, "failed to get metadata of Host '%s'", node.Name))
-			continue
-		}
-
-		//goland:noinspection ALL
-		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
-		}(host)
-
 		_, xerr = tg.Start(instance.taskConfigureNode, taskConfigureNodeParameters{
 			Index: i + 1,
-			Host:  host,
-		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/configure", host.GetName())))
+			Node:  node,
+		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/configure", node.Name)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -2093,9 +2076,6 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 
 	_, xerr = tg.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
-	if len(errs) > 0 {
-		return nil, fail.NewErrorList(errs)
-	}
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -2106,7 +2086,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 
 type taskConfigureNodeParameters struct {
 	Index uint
-	Host  resources.Host
+	Node  *propertiesv3.ClusterNode
 }
 
 // taskConfigureNode configure one node
@@ -2128,22 +2108,33 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	if p.Index < 1 {
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
-	if p.Host == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
+	if p.Node == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("params.Node")
 	}
 
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Host.GetName()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Node.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	hostLabel := fmt.Sprintf("node #%d (%s)", p.Index, p.Host.GetName())
+	hostLabel := fmt.Sprintf("node #%d (%s)", p.Index, p.Node.Name)
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
+	hostInstance, xerr := LoadHost(instance.GetService(), p.Node.ID)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to get metadata of node '%s'", p.Node.Name)
+	}
+
+	//goland:noinspection ALL
+	defer func(item resources.Host) {
+		item.Released()
+	}(hostInstance)
+
 	// Docker and docker-compose installation is mandatory on all nodes
-	xerr = instance.installDocker(task.GetContext(), p.Host, hostLabel)
+	xerr = instance.installDocker(task.GetContext(), hostInstance, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2153,12 +2144,13 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	if instance.makers.ConfigureNode == nil {
 		return nil, nil
 	}
-	xerr = instance.makers.ConfigureNode(instance, p.Index, p.Host)
+	xerr = instance.makers.ConfigureNode(instance, p.Index, hostInstance)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Error(xerr.Error())
 		return nil, xerr
 	}
+
 	logrus.Debugf("[%s] configuration successful.", hostLabel)
 	return nil, nil
 }

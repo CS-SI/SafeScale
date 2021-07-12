@@ -393,7 +393,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	}
 	defer instance.Released()
 
-	resp, xerr := instance.AddNodes(job.Context(), uint(in.Count), *sizing)
+	resp, xerr := instance.AddNodes(job.Context(), uint(in.Count), *sizing, in.GetKeepOnFailure())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -407,6 +407,7 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 		}
 
 		out.Nodes = append(out.Nodes, h)
+		v.Released()
 	}
 	return out, nil
 }

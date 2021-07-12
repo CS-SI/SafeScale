@@ -688,6 +688,11 @@ var clusterExpandCommand = &cli.Command{
 	<operator> can be =,<,> (except for disk where valid operators are only = or >)
 	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
 		},
+		&cli.BoolFlag{
+			Name:    "keep-on-failure",
+			Aliases: []string{"k"},
+			Usage:   `do not delete resources on failure`,
+		},
 	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
@@ -701,6 +706,7 @@ var clusterExpandCommand = &cli.Command{
 			count = 1
 		}
 		los := c.String("os")
+		keepOnFailure := c.Bool("keep-on-failure")
 
 		var (
 			nodesDef   string
@@ -715,10 +721,11 @@ var clusterExpandCommand = &cli.Command{
 		}
 
 		req := protocol.ClusterResizeRequest{
-			Name:       clusterName,
-			Count:      int32(count),
-			NodeSizing: nodesDef,
-			ImageId:    los,
+			Name:          clusterName,
+			Count:         int32(count),
+			NodeSizing:    nodesDef,
+			ImageId:       los,
+			KeepOnFailure: keepOnFailure,
 		}
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -1240,7 +1247,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.DeleteNode(clusterName, nodeList,0)
+		err = clientSession.Cluster.DeleteNode(clusterName, nodeList, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1272,7 +1279,7 @@ var clusterNodeStopCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.StopNode(clusterName, hostName,0)
+		err = clientSession.Cluster.StopNode(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1304,12 +1311,13 @@ var clusterNodeStartCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.StartNode(clusterName, hostName,0)
+		err = clientSession.Cluster.StartNode(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
-		return clitools.SuccessResponse(nil)	},
+		return clitools.SuccessResponse(nil)
+	},
 }
 
 // clusterNodeStateCmd handles 'deploy cluster <clustername> state'
@@ -1334,7 +1342,7 @@ var clusterNodeStateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Cluster.StateNode(clusterName, hostName,0)
+		resp, err := clientSession.Cluster.StateNode(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1455,7 +1463,7 @@ var clusterMasterStopCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.StopMaster(clusterName, hostName,0)
+		err = clientSession.Cluster.StopMaster(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1487,12 +1495,13 @@ var clusterMasterStartCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.StartMaster(clusterName, hostName,0)
+		err = clientSession.Cluster.StartMaster(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
-		return clitools.SuccessResponse(nil)	},
+		return clitools.SuccessResponse(nil)
+	},
 }
 
 // clusterMasterNodeStateCmd handles 'safescale cluster master state <clustername> <mastername>'
@@ -1517,7 +1526,7 @@ var clusterMasterStateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Cluster.StateMaster(clusterName, hostName,0)
+		resp, err := clientSession.Cluster.StateMaster(clusterName, hostName, 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
