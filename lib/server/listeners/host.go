@@ -605,12 +605,12 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(job.Service(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.Delete(task.GetContext()); xerr != nil {
+	if xerr = hostInstance.Delete(task.GetContext()); xerr != nil {
 		return empty, xerr
 	}
 
