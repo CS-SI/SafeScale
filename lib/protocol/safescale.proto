@@ -867,8 +867,11 @@ service ClusterService {
 	rpc StartNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
 	rpc StateNode(ClusterNodeRequest) returns (HostStatus){}
 	rpc ListMasters(Reference) returns (ClusterNodeListResponse){}
-	rpc FindAvailableMaster(Reference) returns (Host){}
 	rpc InspectMaster(ClusterNodeRequest) returns (Host){}
+	rpc StopMaster(ClusterNodeRequest) returns (google.protobuf.Empty){}
+	rpc StartMaster(ClusterNodeRequest) returns (google.protobuf.Empty){}
+	rpc StateMaster(ClusterNodeRequest) returns (HostStatus){}
+	rpc FindAvailableMaster(Reference) returns (Host){}
 }
 
 // Feature services
