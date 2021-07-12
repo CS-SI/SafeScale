@@ -23,7 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// reservation is a struct to simulate a content of a Entry to "reserve" a key
+// reservation is a struct to simulate a content of an Entry to "reserve" a key
 type reservation struct {
 	key       string
 	observers map[string]observer.Observer
@@ -73,6 +73,6 @@ func (rc reservation) Released() {
 
 func (rc reservation) Destroyed() {
 	for _, ob := range rc.observers {
-		ob.MarkAsFreed(rc.key)
+		ob.MarkAsDeleted(rc.key)
 	}
 }

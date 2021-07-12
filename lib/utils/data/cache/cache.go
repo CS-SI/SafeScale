@@ -100,6 +100,16 @@ func (instance *cache) GetEntry(key string) (*Entry, fail.Error) {
 
 	// FIXME: if entry is reserved, do we leave a chance to the 'reserver' to commit or free the entry? How? Observer?
 	if _, ok := instance.reserved[key]; ok {
+		ce, ok := instance.cache[key]
+		if !ok {
+			return nil, fail.InconsistentError("reserved entry '%s' in %s cache does not have a corresponding cache entry", key, instance.GetName())
+		}
+
+		err := ce.Content().(reservation).AddObserver(instance)
+		if err != nil {
+			return nil, fail.Wrap(err, "failed to add %s cache as observer of reservation for key '%s'", instance.GetName(), key)
+		}
+
 		return nil, fail.NotAvailableError("entry '%s' is reserved in %s cache and cannot be use until freed or committed", key, instance.GetName())
 	}
 	if ce, ok := instance.cache[key]; ok {
@@ -167,11 +177,11 @@ func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Ent
 	// content may bring new key, based on content.GetID(), than the key reserved; we have to check if this new key has not been reserved by someone else...
 	if content.GetID() != key {
 		if _, ok := instance.reserved[content.GetID()]; ok {
-			return nil, fail.InconsistentError("the cache entry '%s' in cache %s, corresponding to the ID of the content, is reserved; content cannot be committed", content.GetID(), instance.GetName())
+			return nil, fail.InconsistentError("the cache entry '%s' in %s cache, corresponding to the ID of the content, is reserved; content cannot be committed", content.GetID(), instance.GetName())
 		}
 	}
 
-	// Everything seems ok, we can update
+	// Everything is fine, we can update
 	var ok bool
 	if ce, ok = instance.cache[key]; ok {
 		// FIXME: this has to be tested with a specific unit test

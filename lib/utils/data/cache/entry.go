@@ -21,14 +21,18 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 )
 
 // Entry is a struct containing information about a cache entry
 type Entry struct {
+	observer.Observer
+
 	content     data.ImmutableKeyValue
 	use         uint
 	lastUpdated time.Time
 	mu          *sync.Mutex
+	wg          *sync.WaitGroup
 }
 
 // newEntry allocates a new cache entry
