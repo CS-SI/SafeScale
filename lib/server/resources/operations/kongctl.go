@@ -24,6 +24,8 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -73,12 +75,6 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		return nil, fail.InvalidParameterCannotBeNilError("subnet")
 	}
 
-	// // Check if 'edgeproxy4subnet' feature is installed on host
-	// featureInstance, xerr := NewFeature(svc, "edgeproxy4subnet")
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
 
 	addressedGateway, xerr := subnet.InspectGateway(addressPrimaryGateway)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -87,14 +83,56 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	}
 
 	var present bool
-	for _, v := range addressedGateway.InstalledFeatures() {
-		if v == "edgeproxy4subnet" {
+	installedFeatures := addressedGateway.InstalledFeatures()
+	for _, v := range installedFeatures {
+		if v == "edgeproxy4subnet" || v == "reverseproxy" {
 			present = true
 			break
 		}
 	}
+	if !present {
+		// try an active check and update InstalledFeatures if found
+		// Check if 'edgeproxy4subnet' feature is installed on host
+		featureInstance, xerr := NewFeature(svc, "edgeproxy4subnet")
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
 
-	//
+		results, xerr := featureInstance.Check(ctx, addressedGateway, data.Map{}, resources.FeatureSettings{})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
+		}
+
+		if results.Successful() {
+			xerr = addressedGateway.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) (innerXErr fail.Error) {
+					featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+					if !ok{
+						return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					item := propertiesv1.NewHostInstalledFeature()
+					item.HostContext = true
+					item.Requires, innerXErr = featureInstance.GetRequirements()
+					if innerXErr != nil {
+						return innerXErr
+					}
+					featuresV1.Installed[featureInstance.GetName()] = item
+					return nil
+				})
+			})
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			present = true
+		}
+
+
+	}
+
 	// entry, xerr := kongProxyCheckedCache.GetEntry(subnet.GetName())
 	// if xerr == nil {
 	// 	present = entry.Content().(cache.Bool).Value()
