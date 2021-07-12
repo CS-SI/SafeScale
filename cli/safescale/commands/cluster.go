@@ -1223,15 +1223,12 @@ var clusterNodeDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
-		if err != nil {
-			return clitools.FailureResponse(err)
-		}
-
+		var nodeList []string
+		nodeList = c.Args().Tail()
 		yes := c.Bool("yes")
 		force := c.Bool("force")
 
-		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node '%s' of the cluster '%s'", hostName, clusterName)) {
+		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node%s '%s' of the cluster '%s'", strprocess.Plural(uint(len(nodeList))), strings.Join(nodeList, ","), clusterName)) {
 			return clitools.SuccessResponse("Aborted")
 		}
 		if force {
@@ -1243,7 +1240,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.DeleteNode(clusterName, hostName,0)
+		err = clientSession.Cluster.DeleteNode(clusterName, nodeList,0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))

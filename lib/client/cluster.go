@@ -17,11 +17,15 @@
 package client
 
 import (
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // var sshCfgCache = cache.NewMapCache()
@@ -373,12 +377,12 @@ func (c cluster) InspectNode(clusterName string, nodeRef string, duration time.D
 }
 
 // DeleteNode ...
-func (c cluster) DeleteNode(clusterName string, nodeRef string, duration time.Duration) error {
+func (c cluster) DeleteNode(clusterName string, nodes []string, duration time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
-	if nodeRef == "" {
-		return fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
+	if len(nodes) == 0 {
+		return fail.InvalidParameterError("nodes", "cannot be an empty slice")
 	}
 
 	c.session.Connect()
@@ -390,8 +394,43 @@ func (c cluster) DeleteNode(clusterName string, nodeRef string, duration time.Du
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: nodeRef}})
-	return err
+
+	var (
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
+	)
+
+	nodeDeleter := func(ref string) {
+		defer wg.Done()
+
+		if _, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: ref}}); err != nil {
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
+		}
+	}
+
+	if len(nodes) > 1 {
+		// We want to check first if tenant is set when there are more than 1 node, to avoid multiple message claiming there is no tenant set...
+		tenantService := protocol.NewTenantServiceClient(c.session.connection)
+		_, err := tenantService.Get(ctx, &googleprotobuf.Empty{})
+		if err != nil {
+			return err
+		}
+	}
+
+	wg.Add(len(nodes))
+	for _, target := range nodes {
+		go nodeDeleter(target)
+	}
+	wg.Wait()
+
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+	}
+
+	return nil
 }
 
 // StartNode ...
