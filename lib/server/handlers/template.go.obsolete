@@ -59,16 +59,16 @@ func (handler *templateHandler) List(scannedOnly, all bool) (*protocol.TemplateL
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.template"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	originalList, xerr := handler.job.GetService().ListTemplates(all)
+	originalList, xerr := handler.job.Service().ListTemplates(all)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 	authOpts, xerr := svc.GetAuthenticationOptions()
 	if xerr != nil {
 		return nil, xerr
@@ -155,11 +155,11 @@ func (handler *templateHandler) Inspect(templateRef string) (_ *protocol.HostTem
 		return nil, fail.InvalidParameterCannotBeNilError("templateRef")
 	}
 
-	tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.template")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.template")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 
 	authOpts, xerr := svc.GetAuthenticationOptions()
 	if xerr != nil {

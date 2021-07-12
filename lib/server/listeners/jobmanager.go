@@ -55,11 +55,11 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 		}
 	}
 	newctx, cancel := context.WithCancel(ctx)
-
 	job, xerr := server.NewJob(newctx, cancel, tenant.Service, jobDescription)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return job, nil
 }
 

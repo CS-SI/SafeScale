@@ -79,8 +79,8 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -163,8 +163,8 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%v, %v)", in.Network, in.All).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -235,12 +235,12 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	}
 	defer job.Close()
 
-	task := job.GetTask()
+	task := job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnet, xerr := subnetfactory.Load(job.GetService(), networkRef, subnetRef)
+	subnet, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -284,8 +284,8 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
 	tracer := debug.NewTracer(task, true, "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -360,10 +360,10 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRef, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRef, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -433,10 +433,10 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -502,10 +502,10 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -563,10 +563,10 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -617,10 +617,10 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	task := job.Task()
+	svc := job.Service()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s)", networkRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

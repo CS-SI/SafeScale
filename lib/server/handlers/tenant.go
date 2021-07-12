@@ -171,12 +171,12 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	svc := handler.job.GetService()
-	task := handler.job.GetTask()
+	svc := handler.job.Service()
+	task := handler.job.Task()
 
 	isScannable, err := handler.checkScannable()
 	if err != nil {
@@ -315,8 +315,8 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 
 func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (xerr fail.Error) {
 
-	svc := handler.job.GetService()
-	task := handler.job.GetTask()
+	svc := handler.job.Service()
+	task := handler.job.Task()
 	tenantName := svc.GetName()
 
 	hostName := scannedHostPrefix + template.Name
@@ -390,7 +390,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 }
 
 func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.ScanResultList, xerr fail.Error) {
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 
 	var resultList []*protocol.ScanResult
 
@@ -420,7 +420,7 @@ func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.
 }
 
 func (handler *tenantHandler) checkScannable() (isScannable bool, xerr fail.Error) {
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 
 	params := svc.GetTenantParameters()
 
@@ -444,7 +444,7 @@ func (handler *tenantHandler) dumpTemplates() (xerr fail.Error) {
 		Templates []abstract.HostTemplate `json:"templates,omitempty"`
 	}
 
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 	templates, xerr := svc.ListTemplates(false)
 	if xerr != nil {
 		return xerr
@@ -476,7 +476,7 @@ func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
 		Images []abstract.Image `json:"images,omitempty"`
 	}
 
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 	images, xerr := svc.ListImages(false)
 	if xerr != nil {
 		return xerr
@@ -500,8 +500,8 @@ func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
 }
 
 func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr fail.Error) {
-	task := handler.job.GetTask()
-	svc := handler.job.GetService()
+	task := handler.job.Task()
+	svc := handler.job.Service()
 	network, xerr = networkfactory.Load(svc, scanNetworkName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
@@ -525,8 +525,8 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 }
 
 func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.Subnet, xerr fail.Error) {
-	task := handler.job.GetTask()
-	svc := handler.job.GetService()
+	task := handler.job.Task()
+	svc := handler.job.Service()
 	subnet, xerr = subnetfactory.Load(svc, scanNetworkName, scanSubnetName)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
@@ -636,7 +636,7 @@ func createCPUInfo(output string) (_ *CPUInfo, xerr fail.Error) {
 }
 
 func (handler *tenantHandler) collect() (xerr fail.Error) {
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 
 	authOpts, xerr := svc.GetAuthenticationOptions()
 	if xerr != nil {

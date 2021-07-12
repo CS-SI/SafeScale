@@ -63,11 +63,11 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 
 	scannedOnly := in.GetScannedOnly()
 	all := in.GetAll()
-	tracer := debug.NewTracer(job.GetTask(), true, "(scannedOnly=%v, all=%v)", scannedOnly, all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true, "(scannedOnly=%v, all=%v)", scannedOnly, all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	svc := job.GetService()
+	svc := job.Service()
 	originalList, xerr := svc.ListTemplates(all)
 	if xerr != nil {
 		return nil, xerr
@@ -161,7 +161,7 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 	}
 	defer job.Close()
 
-	task := job.GetTask()
+	task := job.Task()
 
 	sizing := in.GetSizing()
 	tracer := debug.NewTracer(task, true, "%s", sizing).WithStopwatch().Entering()
@@ -173,7 +173,7 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 		return nil, xerr
 	}
 
-	templates, xerr := job.GetService().ListTemplatesBySizing(*ahsr, false)
+	templates, xerr := job.Service().ListTemplatesBySizing(*ahsr, false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -213,11 +213,11 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.template"), "('%s')", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.template"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	svc := job.GetService()
+	svc := job.Service()
 	authOpts, xerr := svc.GetAuthenticationOptions()
 	if xerr != nil {
 		return nil, xerr

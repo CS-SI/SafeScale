@@ -74,7 +74,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
 	all := in.GetAll()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.volume"), "(%v)", all).WithStopwatch().Entering()
@@ -127,7 +127,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
 	speed := in.GetSpeed()
 	size := in.GetSize()
@@ -191,7 +191,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.volume"),
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"),
 		"(%s, %s, '%s', %s, %s)", volumeRefLabel, hostRefLabel, mountPath, filesystem, doNotFormatStr,
 	).WithStopwatch().Entering()
 	defer tracer.Exiting()
@@ -241,7 +241,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.volume"), "(%s, %s)", volumeRefLabel, hostRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "(%s, %s)", volumeRefLabel, hostRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -284,7 +284,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.GetTask(), true, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -325,7 +325,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
+	task := job.Task()
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.volume"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
