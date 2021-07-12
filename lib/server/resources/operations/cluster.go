@@ -2446,34 +2446,40 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	hostInstance, xerr := LoadHost(instance.GetService(), nodeRef, HostLightOption)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return xerr
-	}
-
-	// Leave node from Cluster, if master is not null
-	if master != nil && !master.IsNull() {
-		xerr = instance.leaveNodesFromList([]resources.Host{hostInstance}, master)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// Host already deleted, consider as a success, continue
+		default:
 			return xerr
 		}
-		if instance.makers.UnconfigureNode != nil {
-			xerr = instance.makers.UnconfigureNode(instance, hostInstance, master)
+	} else {
+		// host still exists, leave it from Cluster, if master is not null
+		if master != nil && !master.IsNull() {
+			xerr = instance.leaveNodesFromList([]resources.Host{hostInstance}, master)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
-		}
-	}
 
-	// Finally delete host
-	xerr = hostInstance.Delete(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// Host seems already deleted, so it's a success
-		default:
-			return xerr
+			if instance.makers.UnconfigureNode != nil {
+				xerr = instance.makers.UnconfigureNode(instance, hostInstance, master)
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					return xerr
+				}
+			}
+		}
+
+		// Finally delete host
+		xerr = hostInstance.Delete(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// Host seems already deleted, so it's a success
+			default:
+				return xerr
+			}
 		}
 	}
 
