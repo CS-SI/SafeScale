@@ -343,7 +343,6 @@ func (instance *Host) updateCachedInformation() fail.Error {
 				return innerXErr
 			}
 
-			instance.lock.Lock()
 			instance.sshProfile = &system.SSHConfig{
 				Port:                   int(ahc.SSHPort),
 				IPAddress:              instance.accessIP,
@@ -353,7 +352,6 @@ func (instance *Host) updateCachedInformation() fail.Error {
 				GatewayConfig:          primaryGatewayConfig,
 				SecondaryGatewayConfig: secondaryGatewayConfig,
 			}
-			instance.lock.Unlock()
 		}
 
 		var index uint8
