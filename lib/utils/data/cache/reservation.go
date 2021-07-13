@@ -31,18 +31,13 @@ type reservation struct {
 	committedCh chan struct{}
 }
 
-// NewReservation creates an instance of reservation
-func NewReservation(key string) (reservation, fail.Error) {
-	if key == "" {
-		return reservation{}, fail.InvalidParameterCannotBeEmptyStringError("key")
-	}
-
-	out := reservation{
+// newReservation creates an instance of reservation
+func newReservation(key string) *reservation {
+	return &reservation{
 		key:         key,
 		freedCh:     make(chan struct{}, 1),
 		committedCh: make(chan struct{}, 1),
 	}
-	return out, nil
 }
 
 // GetID returns the key of the reservation

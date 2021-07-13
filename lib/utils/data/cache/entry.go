@@ -31,7 +31,7 @@ type Entry struct {
 	content     data.ImmutableKeyValue
 	use         uint
 	lastUpdated time.Time
-	mu          *sync.Mutex
+	lock        *sync.RWMutex
 	wg          *sync.WaitGroup
 }
 
@@ -39,7 +39,7 @@ type Entry struct {
 func newEntry(content Cacheable) Entry {
 	ce := Entry{
 		content: data.NewImmutableKeyValue(content.GetID(), content),
-		mu:      &sync.Mutex{},
+		lock:    &sync.RWMutex{},
 		use:     0,
 	}
 	return ce
@@ -47,24 +47,24 @@ func newEntry(content Cacheable) Entry {
 
 // GetKey returns the key of the cache entry
 func (ce *Entry) GetKey() string {
-	ce.mu.Lock()
-	defer ce.mu.Unlock()
+	ce.lock.RLock()
+	defer ce.lock.RUnlock()
 
 	return ce.content.Key()
 }
 
 // Content returns the content of the cache
 func (ce *Entry) Content() interface{} {
-	ce.mu.Lock()
-	defer ce.mu.Unlock()
+	ce.lock.RLock()
+	defer ce.lock.RUnlock()
 
 	return ce.content.Value()
 }
 
 // LockContent increments the counter of use of cache entry
 func (ce *Entry) LockContent() uint {
-	ce.mu.Lock()
-	defer ce.mu.Unlock()
+	ce.lock.Lock()
+	defer ce.lock.Unlock()
 
 	ce.use++
 	return ce.use
@@ -72,8 +72,8 @@ func (ce *Entry) LockContent() uint {
 
 // UnlockContent decrements the counter of use of cache entry
 func (ce *Entry) UnlockContent() uint {
-	ce.mu.Lock()
-	defer ce.mu.Unlock()
+	ce.lock.Lock()
+	defer ce.lock.Unlock()
 
 	ce.use--
 	return ce.use
@@ -81,16 +81,8 @@ func (ce *Entry) UnlockContent() uint {
 
 // LockCount returns the current count of locks of the content
 func (ce *Entry) LockCount() uint {
-	ce.mu.Lock()
-	defer ce.mu.Unlock()
+	ce.lock.Lock()
+	defer ce.lock.Unlock()
 
 	return ce.use
-}
-
-func (ce *Entry) lock() {
-	ce.mu.Lock()
-}
-
-func (ce *Entry) unlock() {
-	ce.mu.Unlock()
 }

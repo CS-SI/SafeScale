@@ -133,18 +133,18 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 
 	}
 
-	// entry, xerr := kongProxyCheckedCache.GetEntry(subnet.GetName())
+	// entry, xerr := kongProxyCheckedCache.Entry(subnet.GetName())
 	// if xerr == nil {
 	// 	present = entry.Content().(cache.Bool).Value()
 	// } else {
-	// 	xerr := kongProxyCheckedCache.ReserveEntry(subnet.GetName())
+	// 	xerr := kongProxyCheckedCache.Reserve(subnet.GetName())
 	// 	if xerr != nil {
 	// 		return nil, xerr
 	// 	}
 	//
 	// 	defer func() {
 	// 		if xerr != nil {
-	// 			derr := kongProxyCheckedCache.FreeEntry(subnet.GetName())
+	// 			derr := kongProxyCheckedCache.Free(subnet.GetName())
 	// 			if derr != nil {
 	// 				_ = xerr.AddConsequence(derr)
 	// 			}
@@ -159,7 +159,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 	// 	if !results.Successful() {
 	// 		return nil, fail.NotFoundError("feature 'edgeproxy4subnet' is not installed on gateway '%s'", addressedGateway.GetName())
 	// 	}
-	// 	entry, xerr = kongProxyCheckedCache.CommitEntry(subnet.GetName(), cache.NewBool(subnet.GetName(), true))
+	// 	entry, xerr = kongProxyCheckedCache.Commit(subnet.GetName(), cache.NewBool(subnet.GetName(), true))
 	// 	if xerr != nil {
 	// 		return nil, xerr
 	// 	}
