@@ -20,6 +20,7 @@ package cache
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -98,25 +99,33 @@ func (instance *cache) GetEntry(key string) (*Entry, fail.Error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	// FIXME: if entry is reserved, do we leave a chance to the 'reserver' to commit or free the entry? How? Observer?
 	if _, ok := instance.reserved[key]; ok {
 		ce, ok := instance.cache[key]
 		if !ok {
 			return nil, fail.InconsistentError("reserved entry '%s' in %s cache does not have a corresponding cache entry", key, instance.GetName())
 		}
 
-		err := ce.Content().(reservation).AddObserver(instance)
-		if err != nil {
-			return nil, fail.Wrap(err, "failed to add %s cache as observer of reservation for key '%s'", instance.GetName(), key)
+		reservation, ok := ce.Content().(reservation)
+		if !ok {
+			return nil, fail.InconsistentError("'reservation' expected, '%s' provided", reflect.TypeOf(ce.Content()).String())
 		}
 
+		select {
+		case <-reservation.freed():
+			return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
+		case <-reservation.committed():
+			ce, ok := instance.cache[key]
+			if ok {
+				return ce, nil
+			}
+		}
 		return nil, fail.NotAvailableError("entry '%s' is reserved in %s cache and cannot be use until freed or committed", key, instance.GetName())
 	}
 	if ce, ok := instance.cache[key]; ok {
 		return ce, nil
 	}
 
-	return nil, fail.NotFoundError("failed to find cache entry with key '%s' in %s cache", key, instance.GetName())
+	return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
 }
 
 // ReserveEntry locks an entry identified by key for update
