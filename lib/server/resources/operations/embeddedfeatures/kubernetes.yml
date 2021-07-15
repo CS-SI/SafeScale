@@ -83,10 +83,10 @@ feature:
                             masters: one
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
-                                [ $(sfKubectl get nodes -A | wc -l) -gt 1 ] || sfFail 194
+                                [ $(sfKubectl get nodes -A | wc -l) -gt 1 ] || sfFail 194 "no nodes joined yet"
                                 sfExit
                             fi
-                            sfFail 195
+                            sfFail 195 "master didn't join (no .joined file)"
 
             add:
                 pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,final
@@ -97,7 +97,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             # Enabling kernel modules required by Kubernetes
                             for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh br_netfilter; do

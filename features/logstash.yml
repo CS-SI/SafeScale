@@ -50,7 +50,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            docker pull logstash:7.1.1
+                            sfRetry 5m 5 docker pull logstash:7.1.1
 
                     config:
                         targets:
@@ -144,7 +144,7 @@ feature:
                             OPTIONS=
                             {{ end }}
                             echo "docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1
 
                     ready:
                         targets:
@@ -175,7 +175,7 @@ feature:
                             OPTIONS=
                             {{ end }}
                             echo "docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
                             sfExit
 
                     remove:

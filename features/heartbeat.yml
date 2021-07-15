@@ -134,7 +134,7 @@ feature:
                             nodes: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
                             sfStandardRetry "sfDoesDockerRunContainer docker.elastic.co/beats/heartbeatbeat:{{ .Version }} heartbeat4safescale_agent_1" || sfFail 194
                             sfExit
 
@@ -149,7 +149,7 @@ feature:
                             nodes: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
                             sfExit
 
                     cleanup:
