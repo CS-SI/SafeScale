@@ -98,6 +98,7 @@ func (instance *cache) GetEntry(key string) (*Entry, fail.Error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
+	// FIXME: if entry is reserved, do we leave a chance to the 'reserver' to commit or free the entry? How? Observer?
 	if _, ok := instance.reserved[key]; ok {
 		return nil, fail.NotAvailableError("entry '%s' is reserved in %s cache and cannot be use until freed or committed", key, instance.GetName())
 	}

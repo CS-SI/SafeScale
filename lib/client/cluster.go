@@ -372,3 +372,78 @@ func (c cluster) ListNodes(clusterName string, duration time.Duration) (*protoco
 	}
 	return list, nil
 }
+
+// DeleteNode ...
+func (c cluster) DeleteNode(clusterName string, nodeRef string, duration time.Duration) error {
+	if clusterName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	_, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: nodeRef}})
+	return err
+}
+
+// StartNode ...
+func (c cluster) StartNode(clusterName string, nodeRef string, duration time.Duration) error {
+	if clusterName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	_, err := service.StartNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: nodeRef}})
+	return err
+}
+
+// StopNode ...
+func (c cluster) StopNode(clusterName string, nodeRef string, duration time.Duration) error {
+	if clusterName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	_, err := service.StopNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: nodeRef}})
+	return err
+}
+
+// StateNode ...
+func (c cluster) StateNode(clusterName string, nodeRef string, duration time.Duration) (*protocol.HostStatus, error) {
+	if clusterName == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	return service.StateNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: nodeRef}})
+}
