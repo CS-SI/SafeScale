@@ -56,7 +56,9 @@ feature:
         - EnableAudit=false
         - ExternalLoadBalancerHostname=
         - Hardening=true
-        - KubeVersion=1.20.7
+        - KubeVersion=1.20.9
+        # - CalicoVersion=v3.19.1
+        - FlannelVersion=v0.13.0
         - OIDCClientName=default
         - OIDCGroupName=user_groups
         - OIDCRealm=
@@ -701,11 +703,11 @@ feature:
                             case {{ .CNI }} in
                                 flannel)
                                     # Apply Flannel yaml
-                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/v0.12.0/Documentation/kube-flannel.yml || sfFail 221
+                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/{{.FlannelVersion}}/Documentation/kube-flannel.yml || sfFail 221
                                     ;;
                                 calico)
                                     # Download Calico yaml
-                                    wget https://docs.projectcalico.org/archive/v3.15/manifests/calico.yaml -P ${SF_TMPDIR} || sfFail 222
+                                    wget https://docs.projectcalico.org/manifests/calico.yaml -P ${SF_TMPDIR} || sfFail 222
 
                                     # Configure Pods subnet
                                     sed -i 's/# - name: CALICO_IPV4POOL_CIDR/- name: CALICO_IPV4POOL_CIDR/g' ${SF_TMPDIR}/calico.yaml
@@ -716,11 +718,16 @@ feature:
                                     sed -i '/.*- name: CALICO_IPV4POOL_IPIP/,//s/.*value: "Always"/              value: "Never"/' ${SF_TMPDIR}/calico.yaml
                                     # Enable VXLAN
                                     sed -i '/.*- name: CALICO_IPV4POOL_VXLAN/,//s/.*value: "Never"/              value: "Always"/' ${SF_TMPDIR}/calico.yaml
+                                    # change calico backend
+                                    sed -i 's/calico_backend: "bird"/calico_backend: "vxlan"/' ${SF_TMPDIR}/calico.yaml
+                                    # update liveness and readyness
+                                    sed -i 's/.*- -bird-live//' ${SF_TMPDIR}/calico.yaml
+                                    sed -i 's/.*- -bird-ready//' ${SF_TMPDIR}/calico.yaml
                                     {{ end }}
 
                                     # Apply Calico yaml
                                     sfKubectl apply -f ${SF_TMPDIR}/calico.yaml || sfFail 223
-                                    rm ${SF_TMPDIR}/calico.yaml
+                                    #rm ${SF_TMPDIR}/calico.yaml
                                     ;;
                             esac
 
