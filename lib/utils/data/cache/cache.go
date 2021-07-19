@@ -20,6 +20,7 @@ package cache
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -31,23 +32,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Cache interface describing what a struct must implement to be considered as a Cache
+// Cache interface describing what a struct must implement to be considered as a cache
 type Cache interface {
 	observer.Observer
 
-	GetEntry(key string) (*Entry, fail.Error) // returns a cache entry from its key
-
-	// ReserveEntry locks an entry identified by key for update
-	// if entry does not exist, create an empty one
-	ReserveEntry(key string) fail.Error
-
-	// CommitEntry fills a previously reserved entry by 'key' with 'content'
-	// The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry),
-	// because content.GetID() has to be the final key.
-	CommitEntry(key string, content Cacheable) (*Entry, fail.Error)
-
-	FreeEntry(key string) fail.Error                 // frees a cache entry (removing the reservation from cache)
-	AddEntry(content Cacheable) (*Entry, fail.Error) // adds a content in cache (doing ReserveEntry+CommitEntry in a whole)
+	Entry(key string) (*Entry, fail.Error)                     // returns a cache entry from its key
+	Reserve(key string) fail.Error                             // reserve an entry in the cache
+	Commit(key string, content Cacheable) (*Entry, fail.Error) // Commit fills a previously reserved entry by 'key' with 'content'
+	Free(key string) fail.Error                                // frees a cache entry (removing the reservation from cache)
+	Add(content Cacheable) (*Entry, fail.Error)                // adds a content in cache (doing Reserve+Commit in a whole with content ID as key)
 }
 
 type cache struct {
@@ -87,7 +80,7 @@ func (instance *cache) GetName() string {
 }
 
 // GetEntry returns a cache entry from its key
-func (instance *cache) GetEntry(key string) (*Entry, fail.Error) {
+func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -98,20 +91,56 @@ func (instance *cache) GetEntry(key string) (*Entry, fail.Error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	// FIXME: if entry is reserved, do we leave a chance to the 'reserver' to commit or free the entry? How? Observer?
-	if _, ok := instance.reserved[key]; ok {
-		return nil, fail.NotAvailableError("entry '%s' is reserved in %s cache and cannot be use until freed or committed", key, instance.GetName())
-	}
+	// If key is found in cache, returns corresponding *cache.Entry
 	if ce, ok := instance.cache[key]; ok {
 		return ce, nil
 	}
 
-	return nil, fail.NotFoundError("failed to find cache entry with key '%s' in %s cache", key, instance.GetName())
+	// If key is reserved, we may have to wait reservation committed or freed to determine if
+	if _, ok := instance.reserved[key]; ok {
+		ce, ok := instance.cache[key]
+		if !ok {
+			return nil, fail.InconsistentError("reserved entry '%s' in %s cache does not have a corresponding cache entry", key, instance.GetName())
+		}
+
+		reservation, ok := ce.Content().(*reservation)
+		if !ok {
+			// May have transitioned from reservation content to real content, first check that there is no more reservation...
+			if _, ok := instance.reserved[key]; ok {
+				return nil, fail.InconsistentError("'*cache.reservation' expected, '%s' provided", reflect.TypeOf(ce.Content()).String())
+			}
+
+			// ... and second if cache entry exists, return it
+			if ce, ok := instance.cache[key]; ok {
+				return ce, nil
+			}
+		} else {
+			select {
+			case <-reservation.freed():
+				// do nothing more than returning entry not found at the end of the function
+			case <-reservation.committed():
+				ce, ok := instance.cache[key]
+				if ok {
+					return ce, nil
+				}
+				// Note: there is no timeout in this select because from here, we have no clue about the time that a Free() or Commit() may take to be called
+				// FIXME: add a timeout in Reserve() that will be set from the code that know how long the operation may take
+			}
+		}
+	}
+
+	return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
 }
 
-// ReserveEntry locks an entry identified by key for update
-// if entry does not exist, create an empty one
-func (instance *cache) ReserveEntry(key string) (xerr fail.Error) {
+/*
+ReserveEntry locks an entry identified by key for update
+
+Returns:
+	nil: reservation succeeded
+	*fail.ErrNotAvailable; if entry is already reserved
+	*fail.ErrDuplicate: if entry is already present
+*/
+func (instance *cache) Reserve(key string) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -134,16 +163,25 @@ func (instance *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
 		return fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry with key '%s' in the %s cache", key, instance.GetName()), 0))
 	}
 
-	ce := newEntry(&reservation{key: key})
-	ce.lock()
+	ce := newEntry(newReservation(key))
 	instance.cache[key] = &ce
 	instance.reserved[key] = struct{}{}
 	return nil
 }
 
-// CommitEntry fills a previously reserved entry with content
-// The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.GetID() has to be the final key.
-func (instance *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
+/*
+CommitEntry fills a previously reserved entry with content
+The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry()), because content.GetID() has to be the final key.
+
+Returns:
+	nil, *fail.ErrNotFound: the cache entry identified by 'key' is not reserved
+	nil, *fail.ErrNotAvailable: the content of the cache entry cannot be committed, because the content ID has changed and this new key has already been reserved
+	nil, *fail.ErrDuplicate: the content of the cache entry cannot be committed, because the content ID has changed and this new key is already present in the cache
+	*Entry, nil: content committed successfully
+
+Note: if CommitEntry fails, yoiu still have to call FreeEntry to release the reservation
+*/
+func (instance *cache) Commit(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -159,43 +197,65 @@ func (instance *cache) CommitEntry(key string, content Cacheable) (ce *Entry, xe
 
 // unsafeCommitEntry is the workforce of CommitEntry, without locking
 // The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.GetID() has to be the final key.
-func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (ce *Entry, xerr fail.Error) {
+func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (_ *Entry, xerr fail.Error) {
 	if _, ok := instance.reserved[key]; !ok {
-		return nil, fail.NotAvailableError("the cache entry '%s' is not reserved", key)
+		return nil, fail.NotFoundError("the cache entry '%s' is not reserved", key)
 	}
 
-	// content may bring new key, based on content.GetID(), than the key reserved; we have to check if this new key has not been reserved by someone else...
-	if content.GetID() != key {
-		if _, ok := instance.reserved[content.GetID()]; ok {
-			return nil, fail.InconsistentError("the cache entry '%s' in cache %s, corresponding to the ID of the content, is reserved; content cannot be committed", content.GetID(), instance.GetName())
+	// content may bring new key, based on content.GetID(), different from the key reserved; we have to check if this new key has not been reserved by someone else...
+	newContentKey := content.GetID()
+	if newContentKey != key {
+		if _, ok := instance.reserved[newContentKey]; ok {
+			return nil, fail.NotAvailableError("the cache entry '%s' in %s cache, corresponding to the new ID of the content, is reserved; content cannot be committed", newContentKey, instance.name)
+		}
+		if _, ok := instance.cache[content.GetID()]; ok {
+			return nil, fail.DuplicateError("the cache entry '%s' in %s cache, corresponding to the new ID of the content, is already used; content cannot be committed", newContentKey, instance.name)
 		}
 	}
 
-	// Everything seems ok, we can update
-	var ok bool
-	if ce, ok = instance.cache[key]; ok {
-		// FIXME: this has to be tested with a specific unit test
+	// Everything is fine, we can update
+	cacheEntry, ok := instance.cache[key]
+	if ok {
+		oldContent := cacheEntry.Content()
+		r, ok := oldContent.(*reservation)
+		if !ok {
+			return nil, fail.InconsistentError("'*cache.reservation' expected, '%s' provided", reflect.TypeOf(oldContent).String())
+		}
+
+		// TODO: this has to be tested with a specific unit test
 		err := content.AddObserver(instance)
 		if err != nil {
 			return nil, fail.ConvertError(err)
 		}
-		// if there was an error after this point we should Remove the observer
 
-		ce.content = data.NewImmutableKeyValue(content.GetID(), content)
+		// Update cache entry with real content
+		cacheEntry.lock.Lock()
+		cacheEntry.content = data.NewImmutableKeyValue(newContentKey, content)
+		cacheEntry.lock.Unlock()
+
 		// reserved key may have to change accordingly with the ID of content
 		delete(instance.cache, key)
 		delete(instance.reserved, key)
-		instance.cache[content.GetID()] = ce
-		ce.unlock()
+		instance.cache[newContentKey] = cacheEntry
 
-		return ce, nil
+		// signal potential waiter on Entry() that reservation has been committed
+		if r.committedCh != nil {
+			r.committedCh <- struct{}{}
+			close(r.committedCh)
+		}
+
+		return cacheEntry, nil
 	}
 
-	return nil, fail.NotFoundError("failed to find cache entry identified by '%s' in cache %s", key, instance.GetName())
+	return nil, fail.InconsistentError("the reservation does not have a corresponding entry identified by '%s' in %s cache", key, instance.GetName())
 }
 
 // FreeEntry unlocks the cache entry and removes the reservation
-func (instance *cache) FreeEntry(key string) (xerr fail.Error) {
+// return:
+//  nil: reservation removed
+//  *fail.ErrNotAvailable: the cache entry identified by 'key' is not reserved
+//  *fail.InconsistentError: the cache entry of the reservation should have been *cache.reservation, and is not
+func (instance *cache) Free(key string) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -220,16 +280,27 @@ func (instance *cache) unsafeFreeEntry(key string) fail.Error {
 		ok bool
 	)
 	if ce, ok = instance.cache[key]; ok {
+		r, ok := ce.Content().(*reservation)
+		if !ok {
+			return fail.InconsistentError("'*cache.reservation' expected, '%s' provided", reflect.TypeOf(ce.Content()).String())
+		}
+
+		// Cleanup key from cache and reservations
 		delete(instance.cache, key)
 		delete(instance.reserved, key)
-		ce.unlock()
+
+		// Signal potential waiters the reservation has been freed
+		if r.freedCh != nil {
+			r.freedCh <- struct{}{}
+			close(r.freedCh)
+		}
 	}
 
 	return nil
 }
 
-// AddEntry adds a content in cache
-func (instance *cache) AddEntry(content Cacheable) (_ *Entry, xerr fail.Error) {
+// Add adds a content in cache
+func (instance *cache) Add(content Cacheable) (_ *Entry, xerr fail.Error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -241,9 +312,11 @@ func (instance *cache) AddEntry(content Cacheable) (_ *Entry, xerr fail.Error) {
 	defer instance.lock.Unlock()
 
 	id := content.GetID()
-	if xerr := instance.unsafeReserveEntry(id); xerr != nil {
+	xerr = instance.unsafeReserveEntry(id)
+	if xerr != nil {
 		return nil, xerr
 	}
+
 	defer func() {
 		if xerr != nil {
 			if derr := instance.unsafeFreeEntry(id); derr != nil {
@@ -274,8 +347,8 @@ func (instance *cache) SignalChange(key string) {
 	defer instance.lock.RUnlock()
 
 	if ce, ok := instance.cache[key]; ok {
-		ce.lock()
-		defer ce.unlock()
+		ce.lock.Lock()
+		defer ce.lock.Unlock()
 
 		ce.lastUpdated = time.Now()
 	}

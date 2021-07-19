@@ -19,11 +19,13 @@ package cache
 //go:generate minimock -o ../mocks/mock_cacheable.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Cacheable
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 )
 
 // Cacheable is the interface a struct must satisfy to be able to be cached
 type Cacheable interface {
+	data.Identifiable
 	observer.Observable
 
 	Released()  // Tells cache handler the instance is no more used, giving a chance to free this instance from cache
