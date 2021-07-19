@@ -351,7 +351,7 @@ func (instance *task) GetResult() (TaskResult, fail.Error) {
 	return instance.result, nil
 }
 
-// GetID returns a unique id for the task
+// GetID returns an unique id for the task
 func (instance *task) GetID() (string, fail.Error) {
 	if instance.IsNull() {
 		return "", fail.InvalidInstanceError()
@@ -648,10 +648,6 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 					}
 				}
 				canceled = true
-
-			case <-instance.runTerminatedCh:
-				instance.processTerminated(traceR)
-				finish = true // stop to react on signals
 
 			case <-instance.abortCh:
 				eventTime := time.Now()
@@ -1006,6 +1002,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 
 		case DONE:
 			instance.lock.RLock()
+			//goland:noinspection GoDeferInLoop
 			defer instance.lock.RUnlock()
 
 			traceR.trace("run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration)
@@ -1117,7 +1114,7 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 							logrus.Warnf("ignoring internal error: %v", innerXErr)
 						}
 						if !done {
-							time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
+							time.Sleep(1 * time.Microsecond) // FIXME: hardcoded value :-(
 						}
 					}
 					if done {

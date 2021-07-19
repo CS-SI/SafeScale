@@ -456,7 +456,7 @@ func TestStates(t *testing.T) {
 	aborted := overlord.Aborted()
 	require.False(t, aborted)
 
-	res, xerr := overlord.Wait()
+	res, xerr := overlord.WaitGroup()
 	require.NotNil(t, xerr)
 	require.NotEmpty(t, res)
 
@@ -470,7 +470,7 @@ func TestStates(t *testing.T) {
 	// VPL: (status == DONE) + (xerr is ErrorList) = TaskGroup finished normally with TaskAction(s) in TIMEOUT error(s)
 	aborted = overlord.Aborted()
 	if aborted {
-		t.Errorf("We should be DONE here, so aborted should be true") // VPL: no link between DONE and Abort...
+		t.Errorf("We should be DONE here, so aborted should be true (according to taskgroup.go:776)")
 	}
 	require.False(t, aborted)
 
@@ -582,6 +582,9 @@ func TestGrTimeoutState(t *testing.T) {
 	t.Logf("How do I know what's the taskgroup status ?, and how to work with it ? it's undocumented")
 	if len(st[DONE]) != int(numChildren) {
 		t.Errorf("Everything should be a timeout")
+	}
+	if len(st[TIMEOUT]) != 0 {
+		t.Errorf("There should be a timeout somewhere")
 	}
 }
 
@@ -857,6 +860,89 @@ func TestNewMethod(t *testing.T) {
 	overlord, err = NewTaskGroupWithContext(context.Background())
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
+
+	ctx := overlord.GetContext()
+	require.NotNil(t, ctx)
+}
+
+func TestNewMethodOptions(t *testing.T) {
+	task, err := NewTask()
+	require.NotNil(t, task)
+	require.Nil(t, err)
+	overlord, err := NewTaskGroupWithParent(task, InheritParentIDOption)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+	other, err := overlord.New()
+	require.NotNil(t, other)
+	require.Nil(t, err)
+
+	overlord, err = NewTaskGroupWithContext(context.Background())
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	ctx := overlord.GetContext()
+	require.NotNil(t, ctx)
+}
+
+func TestNewMethodPTGOptions(t *testing.T) {
+	task, err := NewTaskGroup()
+	require.NotNil(t, task)
+	require.Nil(t, err)
+	overlord, err := NewTaskGroupWithParent(task, InheritParentIDOption)
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+	other, err := overlord.New()
+	require.NotNil(t, other)
+	require.Nil(t, err)
+
+	overlord, err = NewTaskGroupWithContext(context.Background())
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	ctx := overlord.GetContext()
+	require.NotNil(t, ctx)
+}
+
+func TestNewMethodPTGAmendOptions(t *testing.T) {
+	task, err := NewTaskGroup()
+	require.NotNil(t, task)
+	require.Nil(t, err)
+	overlord, err := NewTaskGroupWithParent(task, AmendID("expectations"))
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+	other, err := overlord.New()
+	require.NotNil(t, other)
+	require.Nil(t, err)
+
+	overlord, err = NewTaskGroupWithContext(context.Background())
+	require.NotNil(t, overlord)
+	require.Nil(t, err)
+
+	ctx := overlord.GetContext()
+	require.NotNil(t, ctx)
+}
+
+func TestNewMethodOptionsAborted(t *testing.T) {
+	task, err := NewTask()
+	require.NotNil(t, task)
+	require.Nil(t, err)
+
+	_, err = task.Start(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			rint := randomInt(30, 50)
+			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
+
+			return "waiting game", nil
+		}, nil)
+
+	err = task.Abort()
+	require.Nil(t, err)
+
+	_, _ = task.Wait()
+
+	overlord, err := NewTaskGroupWithParent(task, InheritParentIDOption)
+	require.Nil(t, overlord)
+	require.NotNil(t, err)
 }
 
 func TestOneErrorOneOk(t *testing.T) {
