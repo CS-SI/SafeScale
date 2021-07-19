@@ -152,7 +152,7 @@ func TestIntrospectionWF(t *testing.T) {
 
 		ok, err = overlord.IsSuccessful()
 		require.Nil(t, err)
-		require.True(t, ok)
+		require.True(t, ok) // FIXME: It failed
 	}
 }
 

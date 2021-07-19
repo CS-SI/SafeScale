@@ -304,7 +304,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 					if aborted {
 						return nil, fail.AbortedError(nil)
 					}
-					time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
+					time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
 				}
 			}
 

@@ -313,8 +313,6 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 
 // IsNull ...
 func (instance *task) IsNull() bool {
-	// FIXME: DATA RACE, access to instance.id by a public function without getting a Lock
-	// TaskGroup has an embedded *task -> data race too
 	if instance == nil {
 		return true
 	}
@@ -1114,7 +1112,7 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 							logrus.Warnf("ignoring internal error: %v", innerXErr)
 						}
 						if !done {
-							time.Sleep(1 * time.Microsecond) // FIXME: hardcoded value :-(
+							time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
 						}
 					}
 					if done {

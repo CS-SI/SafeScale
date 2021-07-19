@@ -322,7 +322,7 @@ func TestTimingOnlyOne(t *testing.T) {
 				t.Logf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
 				failures++
 			} else {
-				if xerr != nil { // FIXME: It happens
+				if xerr != nil {
 					t.Errorf("Wait should not have failed with: %v", xerr)
 				}
 				if res == nil {
