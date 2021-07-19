@@ -71,10 +71,14 @@ function reset_fw() {
 		sfApt install -q -y firewalld 2>&1 || failure 206 "failure updating firewalld"
 
 		echo "Stopping ufw"
-		systemctl stop ufw || failure 206 "failure stopping ufw"
-		systemctl disable ufw || failure 206 "failure disabling ufw"
-		sfApt purge -q -y ufw 2>&1 || failure 206 "failure purging ufw"
+		# systemctl stop ufw || failure 206 "failure stopping ufw"
+		systemctl stop ufw || :
+		# systemctl disable ufw || failure 206 "failure disabling ufw"
+		systemctl disable ufw || :
+		# sfApt purge -q -y ufw 2>&1 || failure 206 "failure purging ufw"
+		sfApt purge -q -y ufw 2>&1 || :
 		;;
+
 	debian)
 		echo "Reset firewall"
 		sfApt update &>/dev/null || failure 206 "failure running apt update"
