@@ -299,7 +299,7 @@ func (instance *cache) unsafeFreeEntry(key string) fail.Error {
 	return nil
 }
 
-// Addy adds a content in cache
+// Add adds a content in cache
 func (instance *cache) Add(content Cacheable) (_ *Entry, xerr fail.Error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
