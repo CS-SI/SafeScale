@@ -113,7 +113,7 @@ feature:
                             ENTRYPOINT ["/my-docker-entrypoint.sh"]
                             CMD ["kong", "docker-start"]
                             EOF
-                            sfRetry 5m 5 docker build --network=host -t edgeproxy4subnet:latest ${SF_ETCDIR}/edgeproxy4subnet
+                            sfRetry 15m 5 docker build --network=host -t edgeproxy4subnet:latest ${SF_ETCDIR}/edgeproxy4subnet
 
                             # cat >${SF_ETCDIR}/edgeproxy4subnet/konga.userdb.data <<-EOF
                             # module.exports = [

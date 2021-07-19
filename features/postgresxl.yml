@@ -375,7 +375,7 @@ feature:
                             ENTRYPOINT ["/docker-entrypoint.sh"]
                             EOF
 
-                            sfRetry 5m 5 docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl:latest ${SF_ETCDIR}/postgresxl/build || sfFail 192
+                            sfRetry 15m 5 docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl:latest ${SF_ETCDIR}/postgresxl/build || sfFail 192
                             yes | docker image prune || true
                             sfExit
 

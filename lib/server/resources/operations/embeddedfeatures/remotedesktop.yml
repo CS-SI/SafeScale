@@ -498,7 +498,7 @@ feature:
                             EOF
 
                             # build image
-                            sfRetry 5m 5 docker build --network=host -t safescale/remotedesktop:latest ${SF_ETCDIR}/remotedesktop/build || sfFail 202
+                            sfRetry 15m 5 docker build --network=host -t safescale/remotedesktop:latest ${SF_ETCDIR}/remotedesktop/build || sfFail 202
                             sfExit
 
                     start:

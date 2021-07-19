@@ -171,7 +171,7 @@ feature:
 
                             CMD ["kong", "docker-start"]
                             EOF
-                            sfRetry 5m 5 docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || sfFail 192
+                            sfRetry 15m 5 docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || sfFail 192
                             sfExit
 
                     stack:
