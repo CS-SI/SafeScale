@@ -385,15 +385,15 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	// Determine default image
 
 	imageQuery = req.NodesDef.Image
-	if imageQuery == "" && instance.makers.DefaultImage != nil {
-		imageQuery = instance.makers.DefaultImage(instance)
-	}
 	if imageQuery == "" {
 		if cfg, xerr := instance.GetService().GetConfigurationOptions(); xerr == nil {
 			if anon, ok := cfg.Get("DefaultImage"); ok {
 				imageQuery = anon.(string)
 			}
 		}
+	}
+	if imageQuery == "" && instance.makers.DefaultImage != nil {
+		imageQuery = instance.makers.DefaultImage(instance)
 	}
 	if imageQuery == "" {
 		imageQuery = "Ubuntu 18.04"
