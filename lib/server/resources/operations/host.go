@@ -127,6 +127,18 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		return nil, xerr
 	}
 
+	updateCachedInformation := true
+	if len(options) > 0 {
+		for _, v := range options {
+			switch v.Key() {
+			case "light":
+				updateCachedInformation = false
+			default:
+				logrus.Warningf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+			}
+		}
+	}
+
 	cacheOptions := []data.ImmutableKeyValue{
 		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
 			hostInstance, innerXErr := NewHost(svc)
@@ -137,6 +149,15 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 			// TODO: MetadataCore.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
 			if innerXErr = hostInstance.Read(ref); innerXErr != nil {
 				return nil, innerXErr
+			}
+
+			if updateCachedInformation {
+				hostInstance.lock.Lock()
+				xerr = hostInstance.updateCachedInformation()
+				hostInstance.lock.Unlock()
+				if xerr != nil {
+					return hostInstance, xerr
+				}
 			}
 
 			return hostInstance, nil
@@ -163,23 +184,26 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		_ = ce.UnlockContent()
 	}()
 
-	updateCachedInformation := true
-	if len(options) > 0 {
-		for _, v := range options {
-			switch v.Key() {
-			case "light":
-				updateCachedInformation = false
-			default:
-				logrus.Warningf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
-			}
-		}
-	}
-	if updateCachedInformation {
-		xerr = hostInstance.(*Host).updateCachedInformation()
-		if xerr != nil {
-			return hostInstance, xerr
-		}
-	}
+	// VPL: cut and moved at more appropriate places
+	// updateCachedInformation := true
+	// if len(options) > 0 {
+	// 	for _, v := range options {
+	// 		switch v.Key() {
+	// 		case "light":
+	// 			updateCachedInformation = false
+	// 		default:
+	// 			logrus.Warningf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+	// 		}
+	// 	}
+	// }
+	// if updateCachedInformation {
+	// 	hostInstance.(*Host).lock.Lock()
+	// 	xerr = hostInstance.(*Host).updateCachedInformation()
+	// 	hostInstance.(*Host).lock.Unlock()
+	// 	if xerr != nil {
+	// 		return hostInstance, xerr
+	// 	}
+	// }
 	return hostInstance, nil
 }
 
