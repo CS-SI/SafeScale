@@ -1396,7 +1396,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		return nil, xerr
 	}
 
-	hosts := make([]resources.Host, len(nodes))
+	hosts := make([]resources.Host, 0, len(nodes))
 	for _, v := range nodes {
 		hostInstance, xerr := LoadHost(instance.GetService(), v.ID)
 		if xerr != nil {

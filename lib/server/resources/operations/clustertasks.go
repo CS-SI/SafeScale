@@ -1875,7 +1875,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
 
-	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
+	// Starting from here, if exiting with error, remove entry from nodes in the metadata
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
 			// Disable abort signal during the clean up

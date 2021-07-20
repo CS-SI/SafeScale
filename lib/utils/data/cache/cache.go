@@ -91,11 +91,6 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	// If key is found in cache, returns corresponding *cache.Entry
-	if ce, ok := instance.cache[key]; ok {
-		return ce, nil
-	}
-
 	// If key is reserved, we may have to wait reservation committed or freed to determine if
 	if _, ok := instance.reserved[key]; ok {
 		ce, ok := instance.cache[key]
@@ -109,24 +104,21 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 			if _, ok := instance.reserved[key]; ok {
 				return nil, fail.InconsistentError("'*cache.reservation' expected, '%s' provided", reflect.TypeOf(ce.Content()).String())
 			}
-
-			// ... and second if cache entry exists, return it
-			if ce, ok := instance.cache[key]; ok {
-				return ce, nil
-			}
 		} else {
+			// Note: there is no timeout in this select because from here, we have no clue about the time that a Free() or Commit() may take to be called
+			// FIXME: add a timeout in Reserve() that will be set from the code that know how long the operation may take
 			select {
 			case <-reservation.freed():
-				// do nothing more than returning entry not found at the end of the function
+				return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
 			case <-reservation.committed():
-				ce, ok := instance.cache[key]
-				if ok {
-					return ce, nil
-				}
-				// Note: there is no timeout in this select because from here, we have no clue about the time that a Free() or Commit() may take to be called
-				// FIXME: add a timeout in Reserve() that will be set from the code that know how long the operation may take
+				// acknowledge commit, and continue
 			}
 		}
+	}
+
+	// If key is found in cache, returns corresponding *cache.Entry
+	if ce, ok := instance.cache[key]; ok {
+		return ce, nil
 	}
 
 	return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
