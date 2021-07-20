@@ -55,7 +55,7 @@ releasetags:
 
 releasearchive:
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";
-	@tar -zcf safescale-$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz -C cli/safescale safescale -C ../../cli/safescaled safescaled
+	@tar -zcf safescale-v$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz -C cli/safescale safescale -C ../../cli/safescaled safescaled
 
 fastall: begin
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build assumes all dependencies are already there and code generation is also up to date $(NO_COLOR)\n";
