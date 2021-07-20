@@ -313,8 +313,6 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 
 // IsNull ...
 func (instance *task) IsNull() bool {
-	// FIXME: DATA RACE, access to instance.id by a public function without getting a Lock
-	// TaskGroup has an embedded *task -> data race too
 	if instance == nil {
 		return true
 	}
@@ -974,7 +972,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 					// leave the abort or timeout error alone
 				default:
 					if !runTerminated {
-						// return abort error with instance.err as consequence (happened after Abort has been ackknowledged by TaskAction)
+						// return abort error with instance.err as consequence (happened after Abort has been acknowledged by TaskAction)
 						forgedError := fail.AbortedError(nil)
 						_ = forgedError.AddConsequence(instance.err)
 						instance.err = forgedError
@@ -1002,6 +1000,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 
 		case DONE:
 			instance.lock.RLock()
+			//goland:noinspection GoDeferInLoop
 			defer instance.lock.RUnlock()
 
 			traceR.trace("run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration)
@@ -1068,7 +1067,7 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 }
 
 // WaitFor waits for the task to end, for 'duration' duration.
-// Note: if timeout occurred, the task is not aborted. You have to abort it yourself if needed.
+// Note: if timeout occurred, the task is not aborted. You have to abort then wait for it explicitly if needed.
 // - true, TaskResult, fail.Error: Task terminates, but TaskAction returned an error
 // - true, TaskResult, *failErrAborted: Task terminates on Abort
 // - false, nil, *fail.ErrTimeout: WaitFor has timed out; Task is aborted in this case (and eventual error after
@@ -1098,21 +1097,22 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 		fallthrough
 	case RUNNING:
 		if duration > 0 {
-			var result TaskResult
 			doneWaitingCh := make(chan struct{}, 1)
-			waiterTask, xerr := NewTaskWithParent(instance, InheritParentIDOption, AmendID("WaitForHelper"))
+			waiterTask, xerr := NewTask()
 			if xerr != nil {
 				return false, nil, fail.Wrap(xerr, "failed to create helper Task to WaitFor")
 			}
+			var result TaskResult
 			_, xerr = waiterTask.Start(
 				func(t Task, _ TaskParameters) (_ TaskResult, innerXErr fail.Error) {
-					// t.DisarmAbortSignal()
-
 					var done bool
 					for !t.Aborted() && !done {
 						done, result, innerXErr = instance.TryWait()
+						if innerXErr != nil {
+							logrus.Warnf("ignoring internal error: %v", innerXErr)
+						}
 						if !done {
-							time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
+							time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
 						}
 					}
 					if done {
@@ -1123,11 +1123,12 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				}, nil,
 			)
 			if xerr != nil {
-				return false, nil, xerr
+				return false, result, xerr
 			}
 
 			select {
 			case <-doneWaitingCh:
+				result, xerr := instance.Wait()
 				return true, result, xerr
 
 			case <-time.After(duration):
@@ -1137,13 +1138,13 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				tout := fail.TimeoutError(xerr, duration, "timeout of %s waiting for Task '%s'", duration, tid)
 				instance.lock.RLock()
 				defer instance.lock.RUnlock()
-				return false, instance.result, tout // FIXME: DATA RACE
+				return false, instance.result, tout
 			}
+		} else {
+			// No duration, do task.Wait()
+			result, xerr := instance.Wait()
+			return true, result, xerr
 		}
-
-		// No duration, do task.Wait()
-		result, xerr := instance.Wait()
-		return true, result, xerr
 
 	case UNKNOWN:
 		fallthrough
