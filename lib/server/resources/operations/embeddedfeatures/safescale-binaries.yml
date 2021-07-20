@@ -64,7 +64,7 @@ feature:
                         timeout: 15
                         run: |
                             cd /var/tmp/SafeScale
-                            docker build --network host -f build.docker.yml .
+                            sfRetry 15m 5 docker build --network host -f build.docker.yml .
 
                             sfExit
 

@@ -498,7 +498,7 @@ feature:
                             EOF
 
                             # build image
-                            docker build --network=host -t safescale/remotedesktop:latest ${SF_ETCDIR}/remotedesktop/build || sfFail 202
+                            sfRetry 15m 5 docker build --network=host -t safescale/remotedesktop:latest ${SF_ETCDIR}/remotedesktop/build || sfFail 202
                             sfExit
 
                     start:
@@ -562,7 +562,7 @@ feature:
                             # Starts remotedesktop container                          #
                             ###########################################################
                             echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail
                             sfExit
 
             remove:
@@ -574,7 +574,7 @@ feature:
                             masters: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
                             docker image rm -f safescale/remotedesktop:latest || sfFail 193
                             rm -rf ${SF_ETCDIR}/remotedesktop
                             sfExit

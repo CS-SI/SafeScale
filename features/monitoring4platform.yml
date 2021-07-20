@@ -352,7 +352,7 @@ feature:
                             ENTRYPOINT ["/prometheus-am-executor"]
                             EOF
 
-                            docker build --network host -t safescale/am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || sfFail 193
+                            sfRetry 15m 5 docker build --network host -t safescale/am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || sfFail 193
                             sfExit
 
                     alertmanager:

@@ -40,6 +40,13 @@ import (
 // This is not what happens (even if that's the easy case where children actually listen and don't block themselves fighting for resources)...
 // Let's take a look...
 func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaitingFor(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Test panicked")
+			t.FailNow()
+		}
+	}()
+
 	// streak := 0
 	enough := false
 	iter := 0
@@ -179,7 +186,6 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaitingFor
 func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWaitingFor(t *testing.T) {
 	caught := false
 	enough := false
-	//streak := 0
 	iter := 0
 	chansize := 20
 
@@ -533,7 +539,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 						acha := parameters.(chan string)
 						acha <- "Bailing out"
 
-						// flip a coin, true and we return an error, false we don't
+						// flip a coin, true and we panic, false we don't
 						if randomInt(0, 2) == 1 {
 							fmt.Printf("%s: fail!\n", tid)
 							atomic.AddInt32(&failureCounter, 1)
@@ -569,49 +575,55 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 				}
 			}()
 
-			_, res, xerr := overlord.WaitFor(5 * time.Second) // 100 ms after this, .Abort() should hit
+			// FIXME Look at test TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting
+			_, res, xerr := overlord.WaitFor(25 * time.Second) // 100 ms after this, .Abort() should hit
 			if xerr != nil {
 				t.Logf("Wait reports a failure that should contain %d child failures: %s", failureCounter, reflect.TypeOf(xerr).String()) // Of course, we did, we generated an error, didn't we ?
-				counted := 0
 				switch cerr := xerr.(type) {
 				case *fail.ErrAborted:
-					consequences := cerr.Consequences()
+					cause := xerr.Cause()
+					if cause != nil {
+						t.Logf("TaskGroup reported error cause '%s': %v", reflect.TypeOf(cause).String(), cause)
+					}
 					// if it's unexpected and it happens -> error, and we can finish the test
-					if strings.Contains(spew.Sdump(consequences), "panic happened") {
-						t.Errorf("an unexpected panic occurred!")
+					if strings.Contains(spew.Sdump(cause), "panic happened") {
+						t.Errorf("TaskGroup reported panic in cause!!!")
 						t.Fail()
 						return
 					}
+					consequences := xerr.Consequences()
 					if len(consequences) > 0 {
+						counted := 0
 						t.Log("TaskGroup children reported failures:")
 						for _, v := range consequences {
 							logged := false
 							switch cerr := v.(type) {
 							case *fail.ErrAborted:
 								consequences := cerr.Consequences()
-								logged = true
 								if len(consequences) > 0 {
-									t.Logf("aborted with consequence: %v (%s)", v, reflect.TypeOf(v).String())
 									for _, v := range consequences {
-										if strings.Contains(spew.Sdump(v), "It was head") {
-											logged = true
+										switch v.(type) {
+										case *fail.ErrUnqualified:
 											counted++
+										default:
 										}
 									}
-								} else {
-									t.Logf("aborted without consequences")
+									t.Logf("%s: %v", reflect.TypeOf(v).String(), v)
+									logged = true
 								}
-								if !logged {
-									t.Logf("%v (%s)", v, reflect.TypeOf(v).String())
-								}
+							default:
+								// counted++
 							}
-							if counted != int(failureCounter) {
-								t.Errorf("Taskgroup returned error does not report the effective children failure count!!!: %d vs %d", counted, int(failureCounter))
+							if !logged {
+								t.Logf("(%s): %v", reflect.TypeOf(v).String(), v)
 							}
 						}
 						if counted != int(failureCounter) {
 							t.Errorf("Taskgroup returned error does not report the effective children failure count!!!: %d vs %d", counted, int(failureCounter))
 						}
+					}
+					if strings.Contains(spew.Sdump(consequences), "panic happened") {
+						t.Logf("no panic reported by TaskGroup children")
 					}
 				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 				case *fail.ErrRuntimePanic:
@@ -629,27 +641,13 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 								consequences := cerr.Consequences()
 								if len(consequences) > 0 {
 									t.Logf("aborted with consequence: %v (%s)", v, reflect.TypeOf(v).String())
-									for _, v := range consequences {
-										if strings.Contains(spew.Sdump(v), "It was head") {
-											logged = true
-											counted++
-										}
-									}
-								} else {
-									t.Logf("aborted without consequences")
-								}
-								if !logged {
-									t.Logf("%v (%s)", v, reflect.TypeOf(v).String())
+									logged = true
 								}
 							default:
-								t.Logf("error: %v", v)
 							}
 							if !logged {
 								t.Logf("%v (%s)", v, reflect.TypeOf(v).String())
 							}
-						}
-						if counted != int(failureCounter) {
-							t.Errorf("Taskgroup returned error does not report the effective children failure count!!! (counted:%d, reported: %d)", counted, failureCounter)
 						}
 					}
 					if strings.Contains(spew.Sdump(xerr), "panic happened") {

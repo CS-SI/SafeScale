@@ -423,7 +423,7 @@ feature:
                             CMD ["postgres"]
                             EOF
 
-                            docker build --network host -t safescale/pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || sfFail 192
+                            sfRetry 15m 5 docker build --network host -t safescale/pgsql4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgsql || sfFail 192
                             sfExit
 
                     pgpool-img:
@@ -489,7 +489,7 @@ feature:
                             ENTRYPOINT ["/sbin/tini", "--", "/my-docker-entrypoint.sh"]
                             EOF
 
-                            docker build --network host -t pgpool4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgpool || sfFail 192
+                            sfRetry 15m 5 docker build --network host -t pgpool4platform:latest ${SF_ETCDIR}/postgresql4platform/build/pgpool || sfFail 192
                             sfExit
 
                     stack:

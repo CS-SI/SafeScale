@@ -518,7 +518,22 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	} else {
 		cmd = fmt.Sprintf("sudo -- bash -c 'sync; chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
 	}
-	return host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
+
+	// If is 126, try again 6 times, if not return the error
+	rounds := 6
+	for {
+		rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
+		if rc != 126 || rounds == 0 {
+			return rc, stdout, stderr, err
+		}
+
+		if !strings.Contains(stdout, "bad interpreter") {
+			return rc, stdout, stderr, err
+		}
+
+		rounds = rounds - 1
+		time.Sleep(temporal.GetMinDelay())
+	}
 }
 
 // installNodeRequirements ...

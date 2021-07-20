@@ -1,3 +1,19 @@
+/*
+ * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package concurrency
 
 import (
@@ -43,8 +59,6 @@ func TestATaskIsAGroup(t *testing.T) {
 	require.False(t, IsATaskGroup(task{}))
 }
 
-// that IS a problem (considering the 2 above tests and the one below), now we have to be extra careful in cluster and clustertasks (because of TaskActions)
-// also, uncomment line 149 of this file to see another problem (variance of return types), the easy way out of this is remove taskgroup Wait keeping only WaitGroup
 func TestAGroupIsATask2(t *testing.T) {
 	require.True(t, IsATask(&taskGroup{}))
 }
@@ -57,6 +71,9 @@ func TestInvalidTask(t *testing.T) {
 	got := generator()
 
 	_, err := got.IsSuccessful()
+	require.NotNil(t, err)
+
+	_, err = got.GetResult()
 	require.NotNil(t, err)
 
 	_, _, err = got.WaitFor(0)

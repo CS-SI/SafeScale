@@ -375,7 +375,7 @@ feature:
                             ENTRYPOINT ["/docker-entrypoint.sh"]
                             EOF
 
-                            docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl:latest ${SF_ETCDIR}/postgresxl/build || sfFail 192
+                            sfRetry 15m 5 docker build --network host --build-arg PARALLEL=$PARALLEL -t postgresxl:latest ${SF_ETCDIR}/postgresxl/build || sfFail 192
                             yes | docker image prune || true
                             sfExit
 
@@ -630,7 +630,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/postgresxl/stack.yml postgresxl || sfFail 194
+                            sfRetry 10m 5 docker stack deploy -c ${SF_ETCDIR}/postgresxl/stack.yml postgresxl || sfFail 194
                             sfStandardRetry "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-master" || sfFail 195
                             sfStandardRetry "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-slave" || sfFail 196
                             sfStandardRetry "sfDoesDockerRunService postgresxl:latest postgresxl_gtm-proxy" || sfFail 197

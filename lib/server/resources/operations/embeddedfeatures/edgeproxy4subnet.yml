@@ -113,7 +113,7 @@ feature:
                             ENTRYPOINT ["/my-docker-entrypoint.sh"]
                             CMD ["kong", "docker-start"]
                             EOF
-                            docker build --network=host -t edgeproxy4subnet:latest ${SF_ETCDIR}/edgeproxy4subnet
+                            sfRetry 15m 5 docker build --network=host -t edgeproxy4subnet:latest ${SF_ETCDIR}/edgeproxy4subnet
 
                             # cat >${SF_ETCDIR}/edgeproxy4subnet/konga.userdb.data <<-EOF
                             # module.exports = [
@@ -260,7 +260,7 @@ feature:
                             gateways: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
                             sfRetry 5m 5 "sfDoesDockerRunContainer edgeproxy4subnet:latest edgeproxy4subnet_proxy_1" || sfFail 194
                             sfExit
 
@@ -273,7 +273,7 @@ feature:
                         run: |
                             if [ -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml ]; then
                                 echo "docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                                docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
+                                sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
                                 # docker secret rm safescale.edgeproxy.db_password &>/dev/null
                                 docker image rm -f edgeproxy4subnet:latest
                                 rm -rf ${SF_ETCDIR}/edgeproxy4subnet
@@ -281,13 +281,13 @@ feature:
                             else
                                 if [ -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml ]; then
                                     echo "docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                                    docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
+                                    sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
                                     docker image rm -f kong4gateway:latest
                                     rm -rf ${SF_ETCDIR}/kong4gateway
                                 fi
                                 if [ -f ${SF_ETCDIR}/kong/docker-compose.yml ]; then
                                     echo "docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml -p kong rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                                    docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml -p kong rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 197
+                                    sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml -p kong rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 197
                                     docker image rm -f kong:latest
                                     rm -rf ${SF_ETCDIR}/kong
                                 fi
