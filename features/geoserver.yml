@@ -266,7 +266,7 @@ feature:
                             CMD ["/my-docker-entrypoint.sh"]
                             EOF
 
-                            docker build --network host -t safescale/geoserver:latest ${SF_ETCDIR}/geoserver/build || sfFail 193
+                            sfRetry 15m 5 docker build --network host -t safescale/geoserver:latest ${SF_ETCDIR}/geoserver/build || sfFail 193
                             sfExit
 
                     secret:

@@ -41,7 +41,7 @@ feature:
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     rm -f /tmp/docker-fail.txt || true
                                     op=-1
-                                    docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                                    sfRetry 5m 5 docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
                                     if [[ $op -ne 0 ]]; then
                                         sfFail $op "$(cat /tmp/docker-fail.txt)"
                                     fi
@@ -53,7 +53,7 @@ feature:
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     rm -f /tmp/docker-fail.txt || true
                                     op=-1
-                                    docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                                    sfRetry 5m 5 docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
                                     if [[ $op -ne 0 ]]; then
                                         sfFail $op "$(cat /tmp/docker-fail.txt)"
                                     fi
@@ -65,7 +65,7 @@ feature:
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     rm -f /tmp/docker-fail.txt || true
                                     op=-1
-                                    docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                                    sfRetry 5m 5 docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
                                     if [[ $op -ne 0 ]]; then
                                         sfFail $op "$(cat /tmp/docker-fail.txt)"
                                     fi
@@ -292,7 +292,7 @@ feature:
                             sleep $(sfDefaultDelay)
                             rm -f /tmp/docker-fail.txt || true
                             op=-1
-                            sfStandardRetry "docker pull hello-world 2>>/tmp/fail.txt 7>>/tmp/fail.txt" && op=$? || op=$?
+                            sfRetry 5m 5 "docker pull hello-world 2>>/tmp/fail.txt 7>>/tmp/fail.txt" && op=$? || op=$?
                             if [[ $op -ne 0 ]]; then
                                 sfFail 214 "$(cat /tmp/docker-fail.txt)\nexit code $op"
                             fi

@@ -51,7 +51,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            docker pull strapdata/elassandra:6
+                            sfRetry 5m 5 docker pull strapdata/elassandra:6
 
                     config:
                         targets:
@@ -104,7 +104,7 @@ feature:
                             OPTIONS=
                             {{ end }}
                             echo "docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1
 
                     ready:
                         targets:
@@ -134,7 +134,7 @@ feature:
                             OPTIONS=
                             {{ end }}
                             echo "docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS rm --stop -v --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1  || sfFail 192
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/elassandra/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1  || sfFail 192
 
                     remove:
                         targets:

@@ -175,7 +175,7 @@ feature:
                             OPTIONS=
                             {{ end -}}
                             echo "docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1  || sfFail 198
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1  || sfFail 198
                             sfExit
 
                     running:
@@ -217,7 +217,7 @@ feature:
                                 OPTIONS=
                                 {{ end -}}
                                 echo "docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                                docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 203
+                                sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 203
                             fi
                             sfExit
 

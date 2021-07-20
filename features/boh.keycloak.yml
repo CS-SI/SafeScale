@@ -282,7 +282,7 @@ feature:
                             ENTRYPOINT [ "/my-docker-entrypoint.sh" ]
                             EOF
 
-                            docker build --network host -t safescale/keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || sfFail 192
+                            sfRetry 15m 5 docker build --network host -t safescale/keycloak4platform:latest ${SF_ETCDIR}/keycloak4platform/build || sfFail 192
                             sfExit
 
                     secrets:

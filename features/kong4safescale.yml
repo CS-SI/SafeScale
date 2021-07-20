@@ -171,7 +171,7 @@ feature:
 
                             CMD ["kong", "docker-start"]
                             EOF
-                            docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || sfFail 192
+                            sfRetry 15m 5 docker build --network host -t kong4safescale:latest ${SF_ETCDIR}/kong4safescale/build || sfFail 192
                             sfExit
 
                     stack:
@@ -302,7 +302,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || sfFail 194
+                            sfRetry 10m 5 docker stack deploy -c ${SF_ETCDIR}/kong4safescale/stack.yml kong4safescale || sfFail 194
                             sfStandardRetry "sfDoesDockerRunService kong4safescale:latest kong4safescale_proxy" || sfFail 195
                             sfExit
 
