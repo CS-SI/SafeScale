@@ -1758,9 +1758,16 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	}
 
 	logrus.Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
+
 	// Reboot Host
-	command := "sudo systemctl reboot"
-	_, _, _, _ = instance.UnsafeRun(ctx, command, outputs.COLLECT, 10*time.Second, 30*time.Second)
+	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
+	rebootCtx, cancelReboot := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancelReboot()
+	_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
+	if xerr != nil {
+		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
+	}
+	time.Sleep(5 * time.Second)
 
 	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 0)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1781,8 +1788,14 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 
 		// Reboot Host
 		logrus.Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
-		command = "sudo systemctl reboot"
-		_, _, _, _ = instance.UnsafeRun(ctx, command, outputs.COLLECT, 10*time.Second, 30*time.Second)
+		command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
+		rebootCtx, cancelReboot := context.WithTimeout(ctx, 3*time.Minute)
+		defer cancelReboot()
+		_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
+		if xerr != nil {
+			logrus.Debugf("there was an error sending the reboot command: %v", xerr)
+		}
+		time.Sleep(5 * time.Second)
 
 		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, 0)
 		xerr = debug.InjectPlannedFail(xerr)
