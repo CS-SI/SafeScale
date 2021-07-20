@@ -293,7 +293,7 @@ func (e *errorCore) Error() string {
 		msgFinal += e.annotationFormatter(e.annotations)
 	}
 
- 	return msgFinal
+	return msgFinal
 }
 
 // UnformattedError returns a human-friendly error explanation
@@ -382,7 +382,16 @@ type ErrTimeout struct {
 
 // TimeoutError returns an ErrTimeout instance
 func TimeoutError(cause error, dur time.Duration, msg ...interface{}) *ErrTimeout {
-	r := newError(cause, nil, msg...)
+	message := strprocess.FormatStrings(msg...)
+	if dur > 0 {
+		limitMsg := fmt.Sprintf("(timeout: %s)", dur)
+		if message != "" {
+			message += " "
+		}
+		message += limitMsg
+	}
+
+	r := newError(cause, nil, message)
 	r.grpcCode = codes.DeadlineExceeded
 	return &ErrTimeout{
 		errorCore: r,
