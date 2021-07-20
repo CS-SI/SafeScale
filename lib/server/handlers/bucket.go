@@ -54,11 +54,11 @@ func (handler *bucketHandler) List() (rv []string, xerr fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(handler.job.GetTask(), true, "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Task(), true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	r, xerr := handler.job.GetService().ListBuckets(objectstorage.RootPath)
+	r, xerr := handler.job.Service().ListBuckets(objectstorage.RootPath)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -74,12 +74,12 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 	rb, xerr := bucketfactory.Load(svc, name)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
@@ -106,12 +106,12 @@ func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	rb, xerr := bucketfactory.Load(handler.job.GetService(), name)
+	rb, xerr := bucketfactory.Load(handler.job.Service(), name)
 	if xerr != nil {
 		return xerr
 	}
@@ -127,12 +127,12 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fa
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('"+name+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	rb, xerr = bucketfactory.Load(handler.job.GetService(), name)
+	rb, xerr = bucketfactory.Load(handler.job.Service(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -151,7 +151,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (xerr fai
 		return fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
@@ -163,7 +163,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (xerr fai
 	}()
 
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(handler.job.GetService(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.Service(), bucketName)
 	if xerr != nil {
 		return xerr
 	}
@@ -183,7 +183,7 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (xerr fail.Er
 		return fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
@@ -195,7 +195,7 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (xerr fail.Er
 	}()
 
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(handler.job.GetService(), bucketName)
+	rb, xerr := bucketfactory.Load(handler.job.Service(), bucketName)
 	if xerr != nil {
 		return xerr
 	}

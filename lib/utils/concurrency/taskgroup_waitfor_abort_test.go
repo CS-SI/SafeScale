@@ -575,6 +575,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 				}
 			}()
 
+			// FIXME Look at test TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWaiting
 			_, res, xerr := overlord.WaitFor(25 * time.Second) // 100 ms after this, .Abort() should hit
 			if xerr != nil {
 				t.Logf("Wait reports a failure that should contain %d child failures: %s", failureCounter, reflect.TypeOf(xerr).String()) // Of course, we did, we generated an error, didn't we ?

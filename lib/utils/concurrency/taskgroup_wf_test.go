@@ -322,7 +322,7 @@ func TestTimingOnlyOne(t *testing.T) {
 				t.Logf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
 				failures++
 			} else {
-				if xerr != nil {
+				if xerr != nil { // FIXME: It happens
 					t.Errorf("Wait should not have failed with: %v", xerr)
 				}
 				if res == nil {
@@ -456,7 +456,7 @@ func TestStates(t *testing.T) {
 	aborted := overlord.Aborted()
 	require.False(t, aborted)
 
-	res, xerr := overlord.WaitGroup()
+	res, xerr := overlord.Wait()
 	require.NotNil(t, xerr)
 	require.NotEmpty(t, res)
 
@@ -470,7 +470,7 @@ func TestStates(t *testing.T) {
 	// VPL: (status == DONE) + (xerr is ErrorList) = TaskGroup finished normally with TaskAction(s) in TIMEOUT error(s)
 	aborted = overlord.Aborted()
 	if aborted {
-		t.Errorf("We should be DONE here, so aborted should be true (according to taskgroup.go:776)")
+		t.Errorf("We should be DONE here, so aborted should be true") // VPL: no link between DONE and Abort...
 	}
 	require.False(t, aborted)
 
@@ -582,9 +582,6 @@ func TestGrTimeoutState(t *testing.T) {
 	t.Logf("How do I know what's the taskgroup status ?, and how to work with it ? it's undocumented")
 	if len(st[DONE]) != int(numChildren) {
 		t.Errorf("Everything should be a timeout")
-	}
-	if len(st[TIMEOUT]) != 0 {
-		t.Errorf("There should be a timeout somewhere")
 	}
 }
 

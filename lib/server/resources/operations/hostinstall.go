@@ -316,8 +316,30 @@ func (instance *Host) UnregisterFeature(feat string) (xerr fail.Error) {
 // InstalledFeatures returns a list of installed features
 // satisfies interface install.Targetable
 func (instance *Host) InstalledFeatures() []string {
-	var list []string
-	return list
+	if instance == nil {
+		return []string{}
+	}
+
+	var out []string
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			for k := range featuresV1.Installed {
+				out = append(out, k)
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		logrus.Error(xerr.Error())
+		return []string{}
+	}
+	return out
+
 }
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target

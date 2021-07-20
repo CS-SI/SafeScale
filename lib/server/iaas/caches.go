@@ -64,14 +64,14 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 	}
 
 	// Search in the cache by ID
-	if ce, xerr = rc.byID.GetEntry(key); xerr == nil {
+	if ce, xerr = rc.byID.Entry(key); xerr == nil {
 		return ce, nil
 	}
 
 	// Not found, search an entry in the cache by name to get id and search again by id
 	rc.lock.Lock()
 	if id, ok := rc.byName[key]; ok {
-		if ce, xerr = rc.byID.GetEntry(id); xerr == nil {
+		if ce, xerr = rc.byID.Entry(id); xerr == nil {
 			rc.lock.Unlock()
 			return ce, nil
 		}
@@ -128,7 +128,7 @@ func (rc *ResourceCache) ReserveEntry(key string) fail.Error {
 
 // unsafeReserveEntry sets a cache entry to reserve the key and returns the Entry associated
 func (rc *ResourceCache) unsafeReserveEntry(key string) fail.Error {
-	return rc.byID.ReserveEntry(key)
+	return rc.byID.Reserve(key)
 }
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter
@@ -148,7 +148,7 @@ func (rc *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *c
 
 // unsafeCommitEntry confirms the entry in the cache with the content passed as parameter
 func (rc *ResourceCache) unsafeCommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if ce, xerr = rc.byID.CommitEntry(key, content); xerr != nil {
+	if ce, xerr = rc.byID.Commit(key, content); xerr != nil {
 		return nil, xerr
 	}
 
@@ -173,7 +173,7 @@ func (rc *ResourceCache) FreeEntry(key string) fail.Error {
 
 // unsafeFreeEntry removes the reservation in cache
 func (rc *ResourceCache) unsafeFreeEntry(key string) fail.Error {
-	return rc.byID.FreeEntry(key)
+	return rc.byID.Free(key)
 }
 
 // AddEntry ...
@@ -185,7 +185,7 @@ func (rc *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, xer
 	rc.lock.Lock()
 	defer rc.lock.Unlock()
 
-	if ce, xerr = rc.byID.AddEntry(content); xerr != nil {
+	if ce, xerr = rc.byID.Add(content); xerr != nil {
 		return nil, xerr
 	}
 

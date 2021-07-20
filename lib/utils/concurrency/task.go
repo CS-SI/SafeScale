@@ -349,7 +349,7 @@ func (instance *task) GetResult() (TaskResult, fail.Error) {
 	return instance.result, nil
 }
 
-// GetID returns an unique id for the task
+// GetID returns a unique id for the task
 func (instance *task) GetID() (string, fail.Error) {
 	if instance.IsNull() {
 		return "", fail.InvalidInstanceError()
