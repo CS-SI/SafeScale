@@ -325,7 +325,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 			return empty, xerr
 		}
 	}
-	if xerr = networkInstance.Delete(job.GetContext()); xerr != nil {
+	if xerr = networkInstance.Delete(job.Context()); xerr != nil {
 		return empty, xerr
 	}
 
