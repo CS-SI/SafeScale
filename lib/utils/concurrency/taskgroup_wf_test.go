@@ -118,59 +118,74 @@ func TestIntrospection(t *testing.T) {
 }
 
 func TestIntrospectionWithErrors(t *testing.T) {
-	overlord, err := NewTaskGroupWithParent(nil)
-	require.NotNil(t, overlord)
-	require.Nil(t, err)
+	wg := sync.WaitGroup{}
+	wg.Add(1)
 
-	theID, err := overlord.GetID()
-	require.Nil(t, err)
-	require.NotEmpty(t, theID)
+	go func() {
+		defer wg.Done()
 
-	for ind := 0; ind < 50; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		overlord, err := NewTaskGroupWithParent(nil)
+		require.NotNil(t, overlord)
+		require.Nil(t, err)
+
+		theID, err := overlord.GetID()
+		require.Nil(t, err)
+		require.NotEmpty(t, theID)
+
+		for ind := 0; ind < 50; ind++ {
+			_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil)
+			if err != nil {
+				t.Errorf("Unexpected: %s", err)
+				t.Fail()
+				return
+			}
+		}
+
+		_, err = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
+			return "waiting game", fail.NewError("something happened")
 		}, nil)
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
-			t.FailNow()
+			t.Fail()
+			return
 		}
-	}
 
-	_, err = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-		return "waiting game", fail.NewError("something happened")
-	}, nil)
-	if err != nil {
-		t.Errorf("Unexpected: %s", err)
+		time.Sleep(49 * time.Millisecond)
+
+		num, err := overlord.GetStarted()
+		require.Nil(t, err)
+		if num != 51 {
+			t.Errorf("Problem reporting # of started tasks: %d (!= 51)", num)
+		}
+
+		id, err := overlord.GetID()
+		require.Nil(t, err)
+		require.NotEmpty(t, id)
+
+		sign := overlord.GetSignature()
+		require.NotEmpty(t, sign)
+
+		ok, err := overlord.IsSuccessful()
+		require.NotNil(t, err)
+
+		res, err := overlord.Wait()
+		require.NotNil(t, err)
+		require.NotEmpty(t, res)
+
+		ok, err = overlord.IsSuccessful()
+		require.Nil(t, err)
+		require.False(t, ok)
+	}()
+
+	failed := waitTimeout(&wg, 3*time.Second)
+	if failed {
+		t.Error("We have a deadlock in TestIntrospectionWithErrors")
 		t.FailNow()
 	}
-
-	time.Sleep(49 * time.Millisecond)
-
-	num, err := overlord.GetStarted()
-	require.Nil(t, err)
-	if num != 51 {
-		t.Errorf("Problem reporting # of started tasks: %d (!= 51)", num)
-	}
-
-	id, err := overlord.GetID()
-	require.Nil(t, err)
-	require.NotEmpty(t, id)
-
-	sign := overlord.GetSignature()
-	require.NotEmpty(t, sign)
-
-	ok, err := overlord.IsSuccessful()
-	require.NotNil(t, err)
-
-	res, err := overlord.Wait()
-	require.NotNil(t, err)
-	require.NotEmpty(t, res)
-
-	ok, err = overlord.IsSuccessful()
-	require.Nil(t, err)
-	require.False(t, ok)
 }
 
 func TestChildrenWaitingGameOnlyAWhile(t *testing.T) {
@@ -456,7 +471,7 @@ func TestStates(t *testing.T) {
 	aborted := overlord.Aborted()
 	require.False(t, aborted)
 
-	res, xerr := overlord.Wait()
+	res, xerr := overlord.WaitGroup()
 	require.NotNil(t, xerr)
 	require.NotEmpty(t, res)
 
@@ -470,7 +485,7 @@ func TestStates(t *testing.T) {
 	// VPL: (status == DONE) + (xerr is ErrorList) = TaskGroup finished normally with TaskAction(s) in TIMEOUT error(s)
 	aborted = overlord.Aborted()
 	if aborted {
-		t.Errorf("We should be DONE here, so aborted should be true") // VPL: no link between DONE and Abort...
+		t.Errorf("We should be DONE here, so aborted should be true (according to taskgroup.go:776)")
 	}
 	require.False(t, aborted)
 
@@ -582,6 +597,9 @@ func TestGrTimeoutState(t *testing.T) {
 	t.Logf("How do I know what's the taskgroup status ?, and how to work with it ? it's undocumented")
 	if len(st[DONE]) != int(numChildren) {
 		t.Errorf("Everything should be a timeout")
+	}
+	if len(st[TIMEOUT]) != 0 {
+		t.Errorf("There should be a timeout somewhere")
 	}
 }
 

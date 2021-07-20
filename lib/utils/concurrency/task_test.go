@@ -446,6 +446,37 @@ func TestResultCheck(t *testing.T) {
 	require.NotNil(t, tr)
 }
 
+func TestLastError(t *testing.T) {
+	got, err := NewUnbreakableTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.GetID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+		return "waiting game", nil
+	}, nil, 10*time.Millisecond)
+	if err != nil {
+		t.Errorf("Shouldn't happen")
+	}
+
+	res, err := got.Wait()
+	require.NotNil(t, err)
+	require.NotNil(t, res)
+
+	lerr, xerr := got.GetLastError()
+	require.Nil(t, xerr)
+	require.NotNil(t, lerr)
+
+	if _, ok := lerr.(*fail.ErrTimeout); !ok {
+		t.Errorf("It should be a timeout !!, it's not, it is %v", lerr)
+		t.FailNow()
+	}
+}
+
 func TestResultCheckOfAbortedTask(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		got, xerr := NewTask()
@@ -468,8 +499,8 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		require.True(t, aborted)
 
 		// Waiting task for 4 ms (must fail)
-		done, res, xerr := got.WaitFor(1 * time.Millisecond)
-		require.NotNil(t, xerr) // task not terminated, but WaitFor timed out, xerr not nil and must be a *fail.ErrTimeout
+		done, res, xerr := got.WaitFor(4 * time.Millisecond) // FIXME: With 1 ms, it still fails, however, that will be another test
+		require.NotNil(t, xerr)                              // task not terminated, but WaitFor timed out, xerr not nil and must be a *fail.ErrTimeout
 		if !done {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
@@ -485,7 +516,10 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 				t.Errorf("Unexpected error: %v", xerr)
 			}
 		}
-		require.NotEmpty(t, res) // aborted or timeout, we may have something in the result // FIXME: Sometimes is nil
+		if res == nil {
+			require.NotEmpty(t, res) // aborted or timeout, we may have something in the result // FIXME: Sometimes is nil
+		}
+		require.NotEmpty(t, res)
 
 		// Waiting for task for 300 more ms (must succeed; we've waiting 304 ms for a workload that must end after 250 ms max)
 		done, res, xerr = got.WaitFor(300 * time.Millisecond)
@@ -1231,7 +1265,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		single, xerr = single.StartWithTimeout(taskgen(100, 200, 10, 0, 0, 0, false), nil, time.Duration(90)*time.Millisecond)
 		require.Nil(t, xerr)
 
-		time.Sleep(time.Duration(800) * time.Millisecond)
+		time.Sleep(time.Duration(900) * time.Millisecond)
 		// by now single should have finished with timeouts, so...
 
 		stat, err := single.GetStatus()

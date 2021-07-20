@@ -304,7 +304,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 					if aborted {
 						return nil, fail.AbortedError(nil)
 					}
-					time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
+					time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
 				}
 			}
 
@@ -387,6 +387,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 
 		case DONE:
 			instance.task.lock.RLock()
+			//goland:noinspection GoDeferInLoop
 			defer instance.task.lock.RUnlock()
 
 			return instance.result, instance.task.err
@@ -674,7 +675,7 @@ func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupR
 				for !t.Aborted() && !done {
 					done, results, waitGroupErr = instance.TryWaitGroup()
 					if !done {
-						time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
+						time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
 					}
 				}
 				if done {
