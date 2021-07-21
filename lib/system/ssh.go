@@ -110,15 +110,14 @@ func IsSCPRetryable(code int) bool {
 
 // SSHConfig helper to manage ssh session
 type SSHConfig struct {
-	Hostname               string
-	IPAddress              string
-	Port                   int
-	User                   string
-	PrivateKey             string
-	LocalPort              int
-	GatewayConfig          *SSHConfig
-	SecondaryGatewayConfig *SSHConfig
-	// cmdTpl                 string
+	Hostname               string     `json:"hostname"`
+	IPAddress              string     `json:"ip_address"`
+	Port                   int        `json:"port"`
+	User                   string     `json:"user"`
+	PrivateKey             string     `json:"private_key"`
+	LocalPort              int        `json:"-"`
+	GatewayConfig          *SSHConfig `json:"primary_gateway_config,omitempty"`
+	SecondaryGatewayConfig *SSHConfig `json:"secondary_gateway_config,omitempty"`
 }
 
 // IsNull tells if the instance is a null value

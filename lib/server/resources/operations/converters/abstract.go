@@ -257,6 +257,7 @@ func SSHConfigFromAbstractToProtocol(in system.SSHConfig) *protocol.SshConfig {
 		pbSecondaryGateway = SSHConfigFromAbstractToProtocol(*in.SecondaryGatewayConfig)
 	}
 	return &protocol.SshConfig{
+		HostName:         in.Hostname,
 		User:             in.User,
 		Host:             in.IPAddress,
 		PrivateKey:       in.PrivateKey,
