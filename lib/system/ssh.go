@@ -294,6 +294,8 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 	return f, nil
 }
 
+// isTunnelReady tests if the port used for the tunnel is reserved
+// If yes, the tunnel is ready, otherwise it failed
 func isTunnelReady(port int) bool {
 	// Try to create a server with the port
 	server, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
@@ -321,6 +323,13 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if scfg.GatewayConfig.Port == 0 {
+		scfg.GatewayConfig.Port = 22
+	}
+	if scfg.SecondaryGatewayConfig.Port == 0 {
+		scfg.SecondaryGatewayConfig.Port = 22
 	}
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10"
