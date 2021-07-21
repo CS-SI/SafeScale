@@ -209,7 +209,7 @@ var tenantMetadataUpgradeCommand = &cli.Command{
 		results, err := clientSession.Tenant.Upgrade(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
 		}
 		return clitools.SuccessResponse(results)
 	},

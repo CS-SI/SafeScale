@@ -241,7 +241,7 @@ var networkCreate = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "os",
-			Value: "Ubuntu 18.04",
+			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the gateway",
 		},
 		&cli.StringFlag{
@@ -996,7 +996,7 @@ var subnetCreate = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:  "os",
-			Value: "Ubuntu 18.04",
+			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the gateway",
 		},
 		&cli.StringFlag{
