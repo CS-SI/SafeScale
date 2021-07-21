@@ -131,7 +131,7 @@ func (t tenant) Upgrade(name string, timeout time.Duration) ([]string, error) {
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
 	results, err := service.Upgrade(ctx, &protocol.TenantUpgradeRequest{Name: name, Force: false})
-	if results == nil && len(results.Actions) > 0 {
+	if results != nil && len(results.Actions) > 0 {
 		return results.Actions, err
 	}
 	return nil, err
