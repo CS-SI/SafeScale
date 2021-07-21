@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
@@ -34,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -261,9 +261,10 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 		result["primary_gateway_ip"] = c.Network.GatewayIp
 		result["endpoint_ip"] = c.Network.EndpointIp
 		result["primary_public_ip"] = c.Network.EndpointIp
+		result["secondary_gateway_ip"] = sgwpubip
 		if sgwpubip = c.Network.SecondaryPublicIp; sgwpubip != "" {
-			result["secondary_gateway_ip"] = sgwpubip
 			result["secondary_public_ip"] = sgwpubip
+			result["secondary_gateway_ip"] = c.Network.SecondaryGatewayIp
 		}
 	}
 
@@ -294,36 +295,6 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 
 	result["last_state"] = c.State
 	result["admin_login"] = "cladm"
-
-	// // Add information not directly in cluster GetConfig()
-	// // TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
-	// found := false
-	// if c.DisabledFeatures != nil && len(c.DisabledFeatures.Features) > 0 {
-	// 	for _, v := range c.DisabledFeatures.Features {
-	// 		if v.Name == "remotedesktop" {
-	// 			found = true
-	// 			break
-	// 		}
-	// 	}
-	// 	if !found {
-	// 		remoteDesktops := map[string][]string{}
-	// 		const urlFmt = "https://%s/_platform/remotedesktop/%s/"
-	// 		for _, v := range nodes["masters"] {
-	// 			urls := []string{fmt.Sprintf(urlFmt, result["EndpointIP"], v.Name)}
-	// 			if sgwpubip != "" {
-	// 				// VPL: no public VIP IP yet, so don't repeat primary gateway public IP
-	// 				// urls = append(urls, fmt.Sprintf(+urlFmt, netCfg.PrimaryPublicIP, host.Name))
-	// 				urls = append(urls, fmt.Sprintf(urlFmt, sgwpubip, v.Name))
-	// 			}
-	// 			remoteDesktops[v.Name] = urls
-	// 		}
-	// 		result["remote_desktop"] = remoteDesktops
-	// 	}
-	// }
-	// if found {
-	// 	result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale cluster add-feature %s remotedesktop'.",
-	// 		clusterName)
-	// }
 
 	return result, nil
 }
