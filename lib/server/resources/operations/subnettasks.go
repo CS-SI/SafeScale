@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -203,8 +204,14 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 
 	// intermediate gateway reboot
 	logrus.Infof("Rebooting gateway '%s'", gwname)
-	command := "sudo systemctl reboot"
-	_, _, _, _ = objgw.Run(task.GetContext(), command, outputs.COLLECT, 10*time.Second, 30*time.Second)
+	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
+	rebootCtx, cancelReboot := context.WithTimeout(task.GetContext(), 3*time.Minute)
+	defer cancelReboot()
+	_, _, _, xerr = objgw.Run(rebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
+	if xerr != nil {
+		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
+	}
+	time.Sleep(5 * time.Second)
 
 	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, 0)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -221,8 +228,14 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 
 	// Final gateway reboot
 	logrus.Infof("Rebooting gateway '%s'", gwname)
-	command = "sudo systemctl reboot"
-	_, _, _, xerr = objgw.Run(task.GetContext(), command, outputs.COLLECT, 10*time.Second, 30*time.Second)
+	command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
+	lastRebootCtx, lastCancelReboot := context.WithTimeout(task.GetContext(), 3*time.Minute)
+	defer lastCancelReboot()
+	_, _, _, xerr = objgw.Run(lastRebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
+	if xerr != nil {
+		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
+	}
+	time.Sleep(5 * time.Second)
 
 	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, time.Duration(0))
 	xerr = debug.InjectPlannedFail(xerr)

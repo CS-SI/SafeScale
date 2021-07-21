@@ -902,10 +902,10 @@ function early_packages_update() {
 function install_packages() {
 	case $LINUX_KIND in
 	ubuntu | debian)
-		sfApt install -y -qq jq zip time &>/dev/null || failure 213 "failure installing utility packages: jq zip time"
+		sfApt install -y -qq jq zip time at &>/dev/null || failure 213 "failure installing utility packages: jq zip time at"
 		;;
 	redhat | centos)
-		yum install --enablerepo=epel -y -q wget jq time zip &>/dev/null || failure 214 "failure installing utility packages: jq zip time"
+		yum install --enablerepo=epel -y -q wget jq zip time at &>/dev/null || failure 214 "failure installing utility packages: jq zip time at"
 		;;
 	*)
 		failure 215 "Unsupported Linux distribution '$LINUX_KIND'!"
