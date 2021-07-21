@@ -256,12 +256,15 @@ func SSHConfigFromAbstractToProtocol(in system.SSHConfig) *protocol.SshConfig {
 	if in.SecondaryGatewayConfig != nil {
 		pbSecondaryGateway = SSHConfigFromAbstractToProtocol(*in.SecondaryGatewayConfig)
 	}
+	if in.Port == 0 {
+		in.Port = 22
+	}
 	return &protocol.SshConfig{
 		HostName:         in.Hostname,
 		User:             in.User,
 		Host:             in.IPAddress,
-		PrivateKey:       in.PrivateKey,
 		Port:             int32(in.Port),
+		PrivateKey:       in.PrivateKey,
 		Gateway:          pbPrimaryGateway,
 		SecondaryGateway: pbSecondaryGateway,
 	}

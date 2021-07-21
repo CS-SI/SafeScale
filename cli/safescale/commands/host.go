@@ -479,7 +479,9 @@ func formatSSHConfig(in system.SSHConfig) (map[string]interface{}, fail.Error) {
 	if anon, ok := out["secondary_gateway_config"]; ok && anon == nil {
 		delete(out, "secondary_gateway_config")
 	}
-
+	if anon, ok := out["port"]; ok && anon.(float64) == 0 {
+		out["port"] = 22
+	}
 	return out, nil
 }
 
