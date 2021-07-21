@@ -36,6 +36,8 @@ import (
 )
 
 const (
+	opentelekomDefaultImage = "Ubuntu 20.04"
+
 	identityEndpointTemplate string = "https://iam.%s.otc.t-systems.com"
 )
 
@@ -86,6 +88,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = opentelekomDefaultImage
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -127,6 +134,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		ProviderName:       providerName,
 		DefaultNetworkName: vpcName,
 		DefaultNetworkCIDR: vpcCIDR,
+		DefaultImage:       defaultImage,
 	}
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
 	if xerr != nil {

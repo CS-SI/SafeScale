@@ -203,8 +203,8 @@ A List of images, each image is made up of :
                 "method"    : "GoogleDrive",
                 "id"        : "1wKr6Kf8LkRJnWKjzpUnWeAwp-FZFyJ3M"
             },
-            "imagePath" : "/home/user/SafeScale/ubuntu1604_diskimage.qcow2",
-            "imageName" : "Ubuntu 16.04",
+            "imagePath" : "/home/user/SafeScale/ubuntu1804_diskimage.qcow2",
+            "imageName" : "Ubuntu 18.04",
             "imageID"   : "9c7e752d-43da-44f2-992e-3294b2326aa4",
             "disk"      : "/dev/sda1"
         },
@@ -213,8 +213,8 @@ A List of images, each image is made up of :
                 "method"    : "GoogleDrive",
                 "id"        : "1lQbL0I08_4vkOZKnksnTpYV9XBsQTA0Q"
             },
-            "imagePath" : "/home/user/SafeScale/ubuntu1804_diskimage.qcow2",
-            "imageName" : "Ubuntu 18.04",
+            "imagePath" : "/home/user/SafeScale/ubuntu2004_diskimage.qcow2",
+            "imageName" : "Ubuntu 20.04",
             "imageID"   : "58390614-e8c1-442c-bbe8-5e8e7790a5aa",
             "disk"      : "/dev/sda2"
         }

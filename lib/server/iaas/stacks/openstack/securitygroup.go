@@ -531,6 +531,7 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 			if innerXErr != nil {
 				return innerXErr
 			}
+
 			return nil
 		},
 		NormalizeError,

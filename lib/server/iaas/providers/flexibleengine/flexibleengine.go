@@ -38,6 +38,8 @@ import (
 )
 
 const (
+	flexibleEngineDefaultImage = "Ubuntu 20.04"
+
 	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com/v3"
 )
 
@@ -114,6 +116,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = flexibleEngineDefaultImage
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -155,6 +162,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		DefaultSecurityGroupName: "default",
 		DefaultNetworkName:       vpcName,
 		DefaultNetworkCIDR:       vpcCIDR,
+		DefaultImage:             defaultImage,
 		// WhitelistTemplateRegexp: whitelistTemplatePattern,
 		// BlacklistTemplateRegexp: blacklistTemplatePattern,
 		// WhitelistImageRegexp:    whitelistImagePattern,

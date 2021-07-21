@@ -396,7 +396,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		imageQuery = instance.makers.DefaultImage(instance)
 	}
 	if imageQuery == "" {
-		imageQuery = "Ubuntu 18.04"
+		imageQuery = "Ubuntu 20.04"
 	}
 	svc := instance.GetService()
 	_, imageID, xerr = determineImageID(svc, imageQuery)

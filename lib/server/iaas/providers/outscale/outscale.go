@@ -30,6 +30,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
+const (
+	outscaleDefaultImage = "Ubuntu 20.04"
+)
+
 // provider is integration of outscale IaaS API
 // see https://docs.outscale.com/api
 type provider struct {
@@ -129,7 +133,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			Subregion:          get(compute, "Subregion"),
 			DNSList:            getList(compute, "DNSList"),
 			DefaultTenancy:     get(compute, "DefaultTenancy", "default"),
-			DefaultImage:       get(compute, "DefaultImage"),
+			DefaultImage:       get(compute, "DefaultImage", outscaleDefaultImage),
 			DefaultVolumeSpeed: volumeSpeed(get(compute, "DefaultVolumeSpeed", "Hdd")),
 			OperatorUsername:   get(compute, "OperatorUsername", "safescale"),
 		},

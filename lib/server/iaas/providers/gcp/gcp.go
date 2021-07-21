@@ -30,6 +30,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
+const (
+	gcpDefaultImage = "Ubuntu 20.04"
+)
+
 // provider is the provider implementation of the Gcp provider
 type provider struct {
 	api.Stack
@@ -108,6 +112,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	projectName, _ := computeCfg["ProjectName"].(string)
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = gcpDefaultImage
+	}
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {

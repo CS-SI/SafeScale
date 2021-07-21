@@ -695,7 +695,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			imageQuery = cfg.GetString("DefaultImage")
 		}
 		if imageQuery == "" {
-			imageQuery = "Ubuntu 18.04"
+			imageQuery = "Ubuntu 20.04"
 		}
 		img, xerr := svc.SearchImage(imageQuery)
 		xerr = debug.InjectPlannedFail(xerr)

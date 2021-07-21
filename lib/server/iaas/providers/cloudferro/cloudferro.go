@@ -36,7 +36,7 @@ import (
 
 var (
 	cloudferroIdentityEndpoint = "https://cf2.cloudferro.com:5000/v3"
-	cloudferroDefaultImage     = "Ubuntu 18.04"
+	cloudferroDefaultImage     = "Ubuntu 20.04"
 	cloudferroDNSServers       = []string{"185.48.234.234", "185.48.234.238"}
 )
 

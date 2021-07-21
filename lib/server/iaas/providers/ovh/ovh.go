@@ -38,6 +38,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
+const (
+	ovhDefaultImage = "Ubuntu 20.04"
+)
+
 type gpuCfg struct {
 	GPUNumber int
 	GPUType   string
@@ -130,6 +134,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = ovhDefaultImage
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
@@ -171,6 +180,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		OperatorUsername:         operatorUsername,
 		ProviderName:             providerName,
 		DefaultSecurityGroupName: "default",
+		DefaultImage:             defaultImage,
 	}
 
 	serviceVersions := map[string]string{"volume": "v1"}

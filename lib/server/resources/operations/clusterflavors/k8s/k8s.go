@@ -87,7 +87,7 @@ func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
 }
 
 func defaultImage(_ resources.Cluster) string {
-	return "Ubuntu 18.04"
+	return "Ubuntu 20.04"
 }
 
 func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
