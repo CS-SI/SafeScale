@@ -23,6 +23,7 @@ import (
 	"reflect"
 
 	"github.com/sirupsen/logrus"
+	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -30,7 +31,33 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-// normalizeError translates AWS error to SafeScale one
+func normalizeOperationError(oe *compute.OperationError) fail.Error {
+	if oe == nil {
+		return nil
+	}
+
+	if len(oe.Errors) == 0 {
+		return nil
+	}
+
+	var errors []error
+	for _, operr := range oe.Errors {
+		if operr != nil {
+			ne := fail.NewError(operr.Message)
+			ne.Annotate("code", operr.Code)
+
+			errors = append(errors, ne)
+		}
+	}
+
+	if len(errors) == 0 {
+		return nil
+	}
+
+	return fail.NewErrorList(errors)
+}
+
+// normalizeError translates GCP error to SafeScale one
 func normalizeError(err error) fail.Error {
 	if err == nil {
 		return nil
