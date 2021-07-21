@@ -1078,7 +1078,7 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			}
 
 			if lastState == hoststate.Error {
-				return retry.StopRetryError(abstract.ResourceNotAvailableError("host", hostLabel), "")
+				return retry.StopRetryError(fail.NotAvailableError("state of Host '%s' is 'ERROR'", hostLabel))
 			}
 
 			if lastState != hoststate.Starting && lastState != hoststate.Stopping {
