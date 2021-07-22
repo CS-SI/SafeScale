@@ -636,7 +636,7 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 		}
 	}
 
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
@@ -659,6 +659,7 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {

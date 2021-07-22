@@ -269,7 +269,7 @@ func (s Stack) DeleteVolume(id string) (xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
 	var timeout = temporal.GetOperationTimeout()
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
@@ -285,6 +285,7 @@ func (s Stack) DeleteVolume(id string) (xerr fail.Error) {
 			}
 			return innerXErr
 		},
+		temporal.GetDefaultDelay(),
 		timeout,
 	)
 	if xerr != nil {

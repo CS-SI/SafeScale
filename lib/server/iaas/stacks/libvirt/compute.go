@@ -572,7 +572,7 @@ func (s stack) getNetworkV2FromDomain(domain *libvirt.Domain) (*propertiesv2.Hos
 
 	for _, iface := range domainDescription.Devices.Interfaces {
 		if iface.Source.Network != nil {
-			err = retry.WhileUnsuccessfulDelay5Seconds(
+			err = retry.WhileUnsuccessful(
 				func() error {
 					for _, network := range networks {
 						name, err := network.GetName()
@@ -616,6 +616,7 @@ func (s stack) getNetworkV2FromDomain(domain *libvirt.Domain) (*propertiesv2.Hos
 					}
 					return fail.NotFoundError("no local IP matching inteface '%s' found", iface.Alias)
 				},
+				temporal.GetDefaultDelay(),
 				temporal.GetHostTimeout(),
 			)
 			if err != nil {

@@ -689,8 +689,8 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			cfg, xerr := svc.GetConfigurationOptions()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-			return xerr
-		}
+				return xerr
+			}
 
 			imageQuery = cfg.GetString("DefaultImage")
 		}
@@ -1158,7 +1158,7 @@ func (instance *Subnet) deleteSubnetAndConfirm(id string) fail.Error {
 			return xerr
 		}
 	}
-	return retry.WhileUnsuccessfulDelay1Second(
+	return retry.WhileUnsuccessful(
 		func() error {
 			_, xerr := svc.InspectSubnet(id)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -1172,6 +1172,7 @@ func (instance *Subnet) deleteSubnetAndConfirm(id string) fail.Error {
 			}
 			return nil
 		},
+		temporal.GetMinDelay(),
 		temporal.GetContextTimeout(),
 	)
 }

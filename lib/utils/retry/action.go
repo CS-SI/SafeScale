@@ -224,23 +224,6 @@ func WhileUnsuccessfulWithHardTimeoutWithNotifier(run func() error, delay time.D
 	}.loopWithHardTimeout(timeout)
 }
 
-// WhileUnsuccessfulDelay1Second retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
-// waiting 1 second after each try, expiring after 'timeout'
-func WhileUnsuccessfulDelay1Second(run func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessful(run, time.Second, timeout)
-}
-
-// WhileUnsuccessfulDelay5Seconds retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
-// waiting 5 seconds after each try, expiring after 'timeout'
-func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessful(run, 5*time.Second, timeout)
-}
-
-// WhileUnsuccessfulDelay5SecondsTimeout ...
-func WhileUnsuccessfulDelay5SecondsTimeout(run func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessfulWithHardTimeout(run, 5*time.Second, timeout)
-}
-
 // WhileUnsuccessfulWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
 // waiting 'delay' after each try, expiring after 'timeout'
 func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout time.Duration, notify Notify) fail.Error {
@@ -464,18 +447,6 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 		Notify:  nil,
 		Timeout: timeout,
 	}.loopWithSoftTimeout()
-}
-
-// WhileSuccessfulDelay1Second retries while 'run' is successful (ie 'run' returns an error == nil),
-// waiting 1 second after each try, expiring after a duration of 'timeout'.
-func WhileSuccessfulDelay1Second(run func() error, timeout time.Duration) fail.Error {
-	return WhileSuccessful(run, time.Second, timeout)
-}
-
-// WhileSuccessfulDelay5Seconds retries while 'run' is successful (ie 'run' returns an error == nil),
-// waiting 5 seconds after each try, expiring after a duration of 'timeout'.
-func WhileSuccessfulDelay5Seconds(run func() error, timeout time.Duration) fail.Error {
-	return WhileSuccessful(run, 5*time.Second, timeout)
 }
 
 // WhileSuccessfulWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),

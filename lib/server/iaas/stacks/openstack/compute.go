@@ -667,7 +667,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		hostPorts    []ports.Port
 		createdPorts []string
 	)
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
 
@@ -750,6 +750,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetLongOperationTimeout(),
 	)
 	if xerr != nil {
@@ -1270,7 +1271,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			// If check succeeds but state is Error, retry the deletion.
 			// If check fails and error is not 'not found', retry
 			var state hoststate.Enum = hoststate.Unknown
-			innerXErr := retry.WhileUnsuccessfulDelay5Seconds(
+			innerXErr := retry.WhileUnsuccessful(
 				func() error {
 					server, gerr := s.rpcGetServer(ahf.Core.ID)
 					if gerr != nil {
@@ -1287,6 +1288,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					}
 					return fail.NewError("host %s state is '%s'", hostRef, server.Status)
 				},
+				temporal.GetDefaultDelay(),
 				temporal.GetContextTimeout(),
 			)
 			if innerXErr != nil {

@@ -154,7 +154,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	}()
 
 	filename := utils.TempFolder + "/" + name
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			retcode, stdout, stderr, innerXErr := sshconfig.Copy(ctx, filename, f.Name(), true)
 			if innerXErr != nil {
@@ -167,6 +167,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetHostTimeout(),
 	)
 	if xerr != nil {
@@ -181,7 +182,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	}
 
 	// if k != nil {
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			sshCmd, innerXErr := sshconfig.NewSudoCommand(ctx, "which scp")
 			if innerXErr != nil {
@@ -195,6 +196,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetHostTimeout(),
 	)
 	if xerr != nil {

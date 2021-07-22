@@ -116,7 +116,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 		retcode        int
 		stdout, stderr string
 	)
-	xerr := retry.WhileUnsuccessfulDelay5Seconds(
+	xerr := retry.WhileUnsuccessful(
 		func() error {
 			// Create the command
 			sshCmd, innerXErr := ssh.NewCommand(ctx, cmd)
@@ -154,6 +154,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		timeout+time.Minute,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -207,7 +208,7 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		retcode        int
 		stdout, stderr string
 	)
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
 			if retcode, stdout, stderr, innerXErr = instance.sshProfile.Copy(ctx, target, source, true); innerXErr != nil {
@@ -220,6 +221,7 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		2*timeout,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
