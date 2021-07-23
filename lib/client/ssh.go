@@ -45,6 +45,7 @@ type ssh struct {
 
 // Run executes the command
 func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
+	const invalid = -1
 	var (
 		retcode        int
 		stdout, stderr string
@@ -52,7 +53,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 
 	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {
-		return -1, "", "", err
+		return invalid, "", "", err
 	}
 
 	if connectionTimeout < DefaultConnectionTimeout {
@@ -64,7 +65,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	// Create the command
@@ -118,9 +119,9 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return -1, "", "", fail.ConvertError(retryErr.Cause())
+			return invalid, "", "", fail.ConvertError(retryErr.Cause())
 		default:
-			return -1, "", "", retryErr
+			return invalid, "", "", retryErr
 		}
 	}
 	return retcode, stdout, stderr, nil
@@ -173,11 +174,12 @@ func extractPath(in string) (string, fail.Error) {
 
 // Copy ...
 func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
+	const invalid = -1
 	if from == "" {
-		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
+		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
 	}
 	if to == "" {
-		return -1, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
+		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
 
 	hostName := ""
@@ -186,28 +188,28 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 	// Try extract host
 	hostFrom, xerr := extracthostName(from)
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 	hostTo, xerr := extracthostName(to)
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	// IPAddress checks
 	if hostFrom != "" && hostTo != "" {
-		return -1, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet")
+		return invalid, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet")
 	}
 	if hostFrom == "" && hostTo == "" {
-		return -1, "", "", fail.NotImplementedError("no host name specified neither in from nor to")
+		return invalid, "", "", fail.NotImplementedError("no host name specified neither in from nor to")
 	}
 
 	fromPath, rerr := extractPath(from)
 	if rerr != nil {
-		return -1, "", "", rerr
+		return invalid, "", "", rerr
 	}
 	toPath, rerr := extractPath(to)
 	if rerr != nil {
-		return -1, "", "", rerr
+		return invalid, "", "", rerr
 	}
 
 	if hostFrom != "" {
@@ -224,7 +226,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 
 	sshCfg, xerr := s.getHostSSHConfig(hostName)
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if executionTimeout < temporal.GetHostTimeout() {
@@ -239,7 +241,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 
 	task, xerr := s.session.GetTask()
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 	ctx := task.GetContext()
 
@@ -268,7 +270,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 	if retryErr != nil {
 		switch cErr := retryErr.(type) { // nolint
 		case *retry.ErrTimeout:
-			return -1, "", "", cErr
+			return invalid, "", "", cErr
 		}
 	}
 	return retcode, stdout, stderr, retryErr

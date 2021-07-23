@@ -45,9 +45,10 @@ import (
 // UnsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
 func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+	const invalid = -1
 
 	if cmd == "" {
-		return 0, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
+		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -60,11 +61,11 @@ func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.En
 		}
 	}
 	if xerr != nil {
-		return 0, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
-		return 0, "", "", fail.AbortedError(nil, "aborted")
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	if connectionTimeout < temporal.GetConnectSSHTimeout() {
@@ -174,12 +175,13 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 // Note: must be used with wisdom
 func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+	const invalid = -1
 
 	if source == "" {
-		return 0, "", "", fail.InvalidParameterError("source", "cannot be empty string")
+		return invalid, "", "", fail.InvalidParameterError("source", "cannot be empty string")
 	}
 	if target == "" {
-		return 0, "", "", fail.InvalidParameterError("target", "cannot be empty string")
+		return invalid, "", "", fail.InvalidParameterError("target", "cannot be empty string")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -192,11 +194,11 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		}
 	}
 	if xerr != nil {
-		return 0, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
-		return 0, "", "", fail.AbortedError(nil, "aborted")
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	if timeout < temporal.GetHostTimeout() {
