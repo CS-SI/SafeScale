@@ -325,6 +325,9 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		}
 	}
 
+	if scfg.Port == 0 {
+		scfg.Port = 22
+	}
 	if scfg.GatewayConfig.Port == 0 {
 		scfg.GatewayConfig.Port = 22
 	}

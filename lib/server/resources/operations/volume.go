@@ -936,7 +936,9 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 	disks := strings.Split(stdout, "\n")
 	set := mapset.NewThreadUnsafeSet()
 	for _, k := range disks {
-		set.Add(k)
+		if k != "" {
+			set.Add(k)
+		}
 	}
 	return set, nil
 }

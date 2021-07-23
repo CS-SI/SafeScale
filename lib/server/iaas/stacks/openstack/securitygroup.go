@@ -372,10 +372,12 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
+
 	asg, _, xerr = stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
 		return nullASG, xerr
 	}
+
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
 		if xerr != nil {

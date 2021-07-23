@@ -311,9 +311,17 @@ func (tv toV21_05_0) upgradeHosts(svc iaas.Service) fail.Error {
 
 // upgradeHostMetadataIfNeeded upgrades Host properties if needed
 func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail.Error {
-	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if !props.Lookup(hostproperty.NetworkV2) {
 			logrus.Tracef("Upgrading metadata of Host '%s'", instance.GetName())
+
+			abstractHostCore, ok := clonable.(*abstract.HostCore)
+			if !ok {
+				return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			if abstractHostCore.SSHPort == 0 {
+				abstractHostCore.SSHPort = 22
+			}
 
 			// upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2
 			var hnV1 *propertiesv1.HostNetwork
