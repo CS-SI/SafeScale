@@ -899,7 +899,7 @@ var clusterHelmCommand = &cli.Command{
 				if idx == 0 {
 					return cli.NewExitError("helm init is forbidden", int(exitcode.InvalidArgument))
 				}
-			case "search", "repo", "help":
+			case "search", "repo", "help", "install":
 				if idx == 0 {
 					useTLS = ""
 				}
