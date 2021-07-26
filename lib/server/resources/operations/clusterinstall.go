@@ -431,15 +431,16 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 // ExecuteScript executes the script template with the parameters on target Host
 func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+	const invalid = -1
 
 	if instance == nil || instance.IsNull() {
-		return -1, "", "", fail.InvalidInstanceError()
+		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if tmplName == "" {
-		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
+		return invalid, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
 	}
 	if host == nil {
-		return -1, "", "", fail.InvalidParameterCannotBeNilError("host")
+		return invalid, "", "", fail.InvalidParameterCannotBeNilError("host")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -452,7 +453,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 		}
 	}
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
@@ -462,14 +463,14 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	box, err := getTemplateBox()
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return -1, "", "", fail.ConvertError(err)
+		return invalid, "", "", fail.ConvertError(err)
 	}
 
 	// Configures reserved_BashLibrary template var
 	bashLibrary, xerr := system.GetBashLibrary()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 
@@ -491,7 +492,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	script, path, xerr := realizeTemplate(box, tmplName, data, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return -1, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)
+		return invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)
 	}
 
 	hidesOutput := strings.Contains(script, "set +x\n")
@@ -508,7 +509,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	// executes remote file

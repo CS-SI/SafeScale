@@ -2433,15 +2433,16 @@ func (instance *Host) GetSSHConfig() (_ *system.SSHConfig, xerr fail.Error) {
 // Run tries to execute command 'cmd' on the Host
 func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+	const invalid = -1
 
 	if instance == nil || instance.IsNull() {
-		return 0, "", "", fail.InvalidInstanceError()
+		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return -1, "", "", fail.InvalidParameterCannotBeNilError("ctx")
+		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if cmd == "" {
-		return -1, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
+		return invalid, "", "", fail.InvalidParameterError("cmd", "cannot be empty string")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -2454,11 +2455,11 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 		}
 	}
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
-		return 0, "", "", fail.AbortedError(nil, "aborted")
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(cmd='%s', outs=%s)", outs.String()).Entering()
@@ -2473,18 +2474,19 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 // Pull downloads a file from Host
 func (instance *Host) Pull(ctx context.Context, target, source string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+	const invalid = -1
 
 	if instance == nil || instance.IsNull() {
-		return 0, "", "", fail.InvalidInstanceError()
+		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return 0, "", "", fail.InvalidParameterCannotBeNilError("ctx")
+		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
 	if target == "" {
-		return 0, "", "", fail.InvalidParameterCannotBeEmptyStringError("target")
+		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("target")
 	}
 	if source == "" {
-		return 0, "", "", fail.InvalidParameterCannotBeEmptyStringError("source")
+		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("source")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -2497,11 +2499,11 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 		}
 	}
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
-		return 0, "", "", fail.AbortedError(nil, "aborted")
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(target=%s,source=%s)", target, source).Entering()
@@ -2540,12 +2542,13 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 // Push uploads a file to Host
 func (instance *Host) Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+	const invalid = -1
 
 	if instance == nil || instance.IsNull() {
-		return 0, "", "", fail.InvalidInstanceError()
+		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return 0, "", "", fail.InvalidParameterCannotBeNilError("ctx")
+		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -2558,11 +2561,11 @@ func (instance *Host) Push(ctx context.Context, source, target, owner, mode stri
 		}
 	}
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
-		return 0, "", "", fail.AbortedError(nil, "aborted")
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner, mode).Entering()

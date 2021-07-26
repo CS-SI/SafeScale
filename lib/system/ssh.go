@@ -538,11 +538,12 @@ func (scmd *SSHCommand) Start() fail.Error {
 //
 // WARNING : This function CAN lock, use .RunWithTimeout instead
 func (scmd *SSHCommand) Run(ctx context.Context, outs outputs.Enum) (int, string, string, fail.Error) {
+	const invalid = -1
 	if scmd == nil {
-		return -1, "", "", fail.InvalidInstanceError()
+		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return -1, "", "", fail.InvalidParameterCannotBeNilError("ctx")
+		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -555,11 +556,11 @@ func (scmd *SSHCommand) Run(ctx context.Context, outs outputs.Enum) (int, string
 		}
 	}
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
-		return -1, "", "", fail.AbortedError(nil, "aborted")
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s)", outs.String()).WithStopwatch().Entering()
@@ -580,11 +581,12 @@ func (scmd *SSHCommand) Run(ctx context.Context, outs outputs.Enum) (int, string
 //       you risk to call twice os/exec.Wait, which may panic
 // FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
 func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+	const invalid = -1
 	if scmd == nil {
-		return -1, "", "", fail.InvalidInstanceError()
+		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if ctx == nil {
-		return -1, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
+		return invalid, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -597,11 +599,11 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		}
 	}
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
-		return -1, "", "", fail.AbortedError(nil, "aborted")
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	tracer := debug.NewTracer(
@@ -612,11 +614,11 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 
 	subtask, xerr := concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/ssh/run"))
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	r, xerr := subtask.Wait()
@@ -630,23 +632,23 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		// FIXME: This kind of resource exhaustion deserves its own handling and its own kind of error
 		{
 			if strings.Contains(xerr.Error(), "annot allocate memory") {
-				return -1, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")
+				return invalid, "", "", fail.AbortedError(xerr, "problem allocating memory, pointless to retry")
 			}
 
 			if strings.Contains(xerr.Error(), "esource temporarily unavailable") {
-				return -1, "", "", fail.AbortedError(xerr, "not enough resources, pointless to retry")
+				return invalid, "", "", fail.AbortedError(xerr, "not enough resources, pointless to retry")
 			}
 		}
 
 		tracer.Trace("run failed: %v", xerr)
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if result, ok := r.(data.Map); ok {
 		tracer.Trace("run succeeded, retcode=%d", result["retcode"].(int))
 		return result["retcode"].(int), result["stdout"].(string), result["stderr"].(string), nil
 	}
-	return -1, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")
+	return invalid, "", "", fail.InconsistentError("'result' should have been of type 'data.Map'")
 }
 
 type taskExecuteParameters struct {
@@ -1186,6 +1188,7 @@ func (sconf *SSHConfig) copy(
 	isUpload bool,
 	timeout time.Duration,
 ) (retcode int, stdout string, stderr string, xerr fail.Error) {
+	const invalid = -1
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1196,16 +1199,16 @@ func (sconf *SSHConfig) copy(
 		}
 	}
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
-		return -1, "", "", fail.AbortedError(nil, "aborted")
+		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
 	sshCommand, xerr := sconf.newCopyCommand(ctx, localPath, remotePath, isUpload)
 	if xerr != nil {
-		return -1, "", "", fail.Wrap(xerr, "failed to create copy command")
+		return invalid, "", "", fail.Wrap(xerr, "failed to create copy command")
 	}
 
 	// Do not forget to close sshCommand, allowing the SSH tunnel close and corresponding process cleanup
