@@ -16,7 +16,7 @@
 
 package cache
 
-//go:generate minimock -o ../mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.Cache
+//go:generate minimock -o ../mocks/mock_clonable.go -i github.com/CS-SI/SafeScale/lib/utils/data/cache.cache
 
 import (
 	"fmt"
@@ -26,22 +26,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
-
-// Cache interface describing what a struct must implement to be considered as a cache
-type Cache interface {
-	observer.Observer
-
-	Entry(key string) (*Entry, fail.Error)                     // returns a cache entry from its key
-	Reserve(key string) fail.Error                             // reserve an entry in the cache
-	Commit(key string, content Cacheable) (*Entry, fail.Error) // Commit fills a previously reserved entry by 'key' with 'content'
-	Free(key string) fail.Error                                // frees a cache entry (removing the reservation from cache)
-	Add(content Cacheable) (*Entry, fail.Error)                // adds a content in cache (doing Reserve+Commit in a whole with content ID as key)
-}
 
 type cache struct {
 	name atomic.Value
@@ -79,7 +69,7 @@ func (instance *cache) GetName() string {
 	return instance.name.Load().(string)
 }
 
-// GetEntry returns a cache entry from its key
+// Entry returns a cache entry from its key
 func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
@@ -125,14 +115,14 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 }
 
 /*
-ReserveEntry locks an entry identified by key for update
+Reserve locks an entry identified by key for update
 
 Returns:
 	nil: reservation succeeded
 	*fail.ErrNotAvailable; if entry is already reserved
 	*fail.ErrDuplicate: if entry is already present
 */
-func (instance *cache) Reserve(key string) (xerr fail.Error) {
+func (instance *cache) Reserve(key string, options ...data.ImmutableKeyValue) (xerr fail.Error) {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -143,11 +133,11 @@ func (instance *cache) Reserve(key string) (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.unsafeReserveEntry(key)
+	return instance.unsafeReserveEntry(key, options...)
 }
 
 // unsafeReserveEntry is the workforce of ReserveEntry, without locking
-func (instance *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
+func (instance *cache) unsafeReserveEntry(key string, options ...data.ImmutableKeyValue) (xerr fail.Error) {
 	if _, ok := instance.reserved[key]; ok {
 		return fail.NotAvailableError("the entry '%s' of %s cache is already reserved", key, instance.GetName())
 	}
@@ -155,14 +145,29 @@ func (instance *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
 		return fail.DuplicateError(callstack.DecorateWith("", "", fmt.Sprintf("there is already an entry with key '%s' in the %s cache", key, instance.GetName()), 0))
 	}
 
-	ce := newEntry(newReservation(key))
+	var ok bool
+	reserveDuration := time.Duration(0)
+	for _, v := range options {
+		k := v.Key()
+		switch k {
+		case cacheReserveDurationOption:
+			reserveDuration, ok = v.Value().(time.Duration)
+			if !ok {
+				return fail.InvalidParameterError(fmt.Sprintf("options.%s", cacheReserveDurationOption), "must be a 'time.Duration'")
+			}
+		default:
+			logrus.Warningf("unknown option '%s' used in cache.Reserve(); ignored", k)
+		}
+	}
+
+	ce := newEntry(newReservation(key, reserveDuration))
 	instance.cache[key] = &ce
 	instance.reserved[key] = struct{}{}
 	return nil
 }
 
 /*
-CommitEntry fills a previously reserved entry with content
+Commit fills a previously reserved entry with content
 The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry()), because content.ID() has to be the final key.
 
 Returns:
