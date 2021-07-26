@@ -38,7 +38,7 @@ type cache struct {
 
 	lock     sync.RWMutex
 	cache    map[string]*Entry
-	reserved map[string]struct{}
+	reserved map[string]*Entry
 }
 
 // NewCache creates a new cache
@@ -49,7 +49,7 @@ func NewCache(name string) (Cache, fail.Error) {
 
 	cacheInstance := &cache{
 		cache:    map[string]*Entry{},
-		reserved: map[string]struct{}{},
+		reserved: map[string]*Entry{},
 	}
 	cacheInstance.name.Store(name)
 	return cacheInstance, nil
@@ -95,13 +95,38 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 				return nil, fail.InconsistentError("'*cache.reservation' expected, '%s' provided", reflect.TypeOf(ce.Content()).String())
 			}
 		} else {
-			// Note: there is no timeout in this select because from here, we have no clue about the time that a Free() or Commit() may take to be called
-			// FIXME: add a timeout in Reserve() that will be set from the code that know how long the operation may take
-			select {
-			case <-reservation.freed():
-				return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
-			case <-reservation.committed():
-				// acknowledge commit, and continue
+			if reservation.duration > 0 {
+				if reservation.duration < time.Since(reservation.created) {
+					// reservation expired, clean up
+					xerr := instance.reservationExpired(key)
+					if xerr != nil {
+						return nil, xerr
+					}
+					return nil, fail.TimeoutError(nil, reservation.duration, "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName())
+				}
+			}
+			waitFor := reservation.duration - time.Since(reservation.created)
+			if waitFor > 0 {
+				select {
+				case <-reservation.freed():
+					return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
+				case <-reservation.committed():
+					// acknowledge commit, and continue
+				case <-time.After(waitFor):
+					// reservation expired, clean up
+					xerr := instance.reservationExpired(key)
+					if xerr != nil {
+						return nil, xerr
+					}
+					return nil, fail.TimeoutError(nil, reservation.duration, "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName())
+				}
+			} else {
+				select {
+				case <-reservation.freed():
+					return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
+				case <-reservation.committed():
+					// acknowledge commit, and continue
+				}
 			}
 		}
 	}
@@ -112,6 +137,12 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 	}
 
 	return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
+}
+
+func (instance *cache) reservationExpired(key string) fail.Error {
+	instance.lock.RUnlock()
+	defer instance.lock.RLock()
+	return instance.Free(key)
 }
 
 /*
@@ -161,8 +192,9 @@ func (instance *cache) unsafeReserveEntry(key string, options ...data.ImmutableK
 	}
 
 	ce := newEntry(newReservation(key, reserveDuration))
-	instance.cache[key] = &ce
-	instance.reserved[key] = struct{}{}
+	pce := &ce
+	instance.cache[key] = pce
+	instance.reserved[key] = pce
 	return nil
 }
 
@@ -196,17 +228,33 @@ func (instance *cache) Commit(key string, content Cacheable) (ce *Entry, xerr fa
 // The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.ID() has to be the final key.
 func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (_ *Entry, xerr fail.Error) {
 	if _, ok := instance.reserved[key]; !ok {
-		return nil, fail.NotFoundError("the cache entry '%s' is not reserved", key)
+		return nil, fail.NotFoundError("the cache entry '%s' is not reserved (may have expired)", key)
 	}
 
 	// content may bring new key, based on content.ID(), different from the key reserved; we have to check if this new key has not been reserved by someone else...
+	var reservedEntry *Entry
 	newContentKey := content.GetID()
 	if newContentKey != key {
-		if _, ok := instance.reserved[newContentKey]; ok {
+		var ok bool
+		if reservedEntry, ok = instance.reserved[newContentKey]; ok {
 			return nil, fail.NotAvailableError("the cache entry '%s' in %s cache, corresponding to the new ID of the content, is reserved; content cannot be committed", newContentKey, instance.name)
 		}
 		if _, ok := instance.cache[content.GetID()]; ok {
 			return nil, fail.DuplicateError("the cache entry '%s' in %s cache, corresponding to the new ID of the content, is already used; content cannot be committed", newContentKey, instance.name)
+		}
+	}
+	if reservedEntry != nil {
+		reserved, ok := reservedEntry.Content().(*reservation)
+		if ok {
+			if reserved.duration < time.Since(reserved.created) {
+				// reservation has expired...
+				cleanErr := fail.TimeoutError(nil, reserved.duration, "reservation of key '%s' in %s cache has expired")
+				derr := instance.unsafeFreeEntry(key)
+				if derr != nil {
+					_ = cleanErr.AddConsequence(derr)
+				}
+				return nil, cleanErr
+			}
 		}
 	}
 

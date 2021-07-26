@@ -35,6 +35,7 @@ type reservation struct {
 	freedCh     chan struct{}
 	committedCh chan struct{}
 	duration    time.Duration
+	created     time.Time
 }
 
 // newReservation creates an instance of reservation
@@ -44,6 +45,7 @@ func newReservation(key string, duration time.Duration) *reservation {
 		freedCh:     make(chan struct{}, 1),
 		committedCh: make(chan struct{}, 1),
 		duration:    duration,
+		created:     time.Now(),
 	}
 }
 
