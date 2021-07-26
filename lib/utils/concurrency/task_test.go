@@ -46,7 +46,7 @@ func TestCreateVoidTaskCheckResult(t *testing.T) {
 	require.NotNil(t, ta)
 	require.Nil(t, err)
 
-	_, err = ta.GetResult()
+	_, err = ta.Result()
 	require.NotNil(t, err)
 }
 
@@ -77,7 +77,7 @@ func TestInjectAndExtractFromContext(t *testing.T) {
 
 	nt, err := TaskFromContext(ctxv)
 	require.Nil(t, err)
-	rid, err := nt.GetID()
+	rid, err := nt.ID()
 	require.Nil(t, err)
 	require.Equal(t, "hold", rid)
 
@@ -120,7 +120,7 @@ func TestNewTask(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -129,7 +129,7 @@ func TestNewTask(t *testing.T) {
 	require.NotNil(t, theTask)
 
 	if theTask != nil {
-		if stat, ok := theTask.GetStatus(); ok == nil {
+		if stat, ok := theTask.Status(); ok == nil {
 			if stat != DONE {
 				t.Errorf("Task should be DONE")
 			}
@@ -146,7 +146,7 @@ func TestWaitingGame(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -176,7 +176,7 @@ func TestWaitingGame(t *testing.T) {
 		waited++
 	}
 
-	aerr, xerr := got.GetLastError()
+	aerr, xerr := got.LastError()
 	require.Nil(t, xerr)
 	require.Nil(t, aerr)
 
@@ -190,7 +190,7 @@ func TestOneWaitingForGame(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -216,7 +216,7 @@ func TestOneWaitingForGameTw(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -247,7 +247,7 @@ func TestOneWaitingForGameWithFuncGen(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -274,7 +274,7 @@ func TestChangeIdAtMidFlight(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -307,7 +307,7 @@ func TestChangeIdAfterAbort(t *testing.T) {
 		require.NotNil(t, got)
 		require.Nil(t, err)
 
-		theID, err := got.GetID()
+		theID, err := got.ID()
 		require.Nil(t, err)
 		require.NotEmpty(t, theID)
 
@@ -352,7 +352,7 @@ func TestTaskAlreadyRunning(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -380,7 +380,7 @@ func TestTaskCantBeReused(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -396,7 +396,7 @@ func TestTaskCantBeReused(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, res)
 
-	tr, xerr := got.GetResult()
+	tr, xerr := got.Result()
 	require.Nil(t, xerr)
 	require.NotNil(t, tr)
 
@@ -413,7 +413,7 @@ func TestTaskCantBeReused(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, res)
 
-	tr, xerr = got.GetResult()
+	tr, xerr = got.Result()
 	require.Nil(t, xerr)
 	require.NotNil(t, tr)
 }
@@ -423,7 +423,7 @@ func TestResultCheck(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -439,10 +439,10 @@ func TestResultCheck(t *testing.T) {
 	require.NotNil(t, err)
 	require.NotNil(t, res)
 
-	tr, xerr := got.GetResult()
+	tr, xerr := got.Result()
 	require.Nil(t, xerr)
-	// Why would be this a problem ?, GetResult() was coded when the only states were RUNNING and DONE, long long time ago
-	// this is no longer true, GetResult needs review
+	// Why would be this a problem ?, Result() was coded when the only states were RUNNING and DONE, long long time ago
+	// this is no longer true, Result needs review
 	require.NotNil(t, tr)
 }
 
@@ -451,7 +451,7 @@ func TestLastError(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -467,7 +467,7 @@ func TestLastError(t *testing.T) {
 	require.NotNil(t, err)
 	require.NotNil(t, res)
 
-	lerr, xerr := got.GetLastError()
+	lerr, xerr := got.LastError()
 	require.Nil(t, xerr)
 	require.NotNil(t, lerr)
 
@@ -483,7 +483,7 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		require.NotNil(t, got)
 		require.Nil(t, xerr)
 
-		theID, xerr := got.GetID()
+		theID, xerr := got.ID()
 		require.Nil(t, xerr)
 		require.NotEmpty(t, theID)
 
@@ -548,9 +548,9 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		require.Nil(t, xerr)      // VPL: got is done, even if we tried previously to start a new workload, so xerr == nil
 		require.False(t, success) // VPL: success has to be false
 
-		// Using GetResult() is valid, Task is terminated
-		tr, xerr := got.GetResult()
-		require.Nil(t, xerr)  // GetResult succeeds, task is terminated
+		// Using Result() is valid, Task is terminated
+		tr, xerr := got.Result()
+		require.Nil(t, xerr)  // Result succeeds, task is terminated
 		require.NotNil(t, tr) // tr is not nil, contain "we were killed"
 
 		// Wit on a done Task. Everything is under control
@@ -558,12 +558,12 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		require.NotNil(t, xerr) // xerr is not nil
 		require.NotNil(t, res)  // res is not nil
 
-		// Now that we waited the Task, GetResult() returns useful information
-		tr, xerr = got.GetResult()
+		// Now that we waited the Task, Result() returns useful information
+		tr, xerr = got.Result()
 		require.Nil(t, xerr)
 		require.NotNil(t, tr)
 
-		status, xerr := got.GetStatus()
+		status, xerr := got.Status()
 		require.Nil(t, xerr)
 		if status != DONE {
 			t.FailNow()
@@ -579,7 +579,7 @@ func TestTryWaitOfAbortedTask(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, xerr)
 
-	theID, xerr := got.GetID()
+	theID, xerr := got.ID()
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
@@ -605,7 +605,7 @@ func TestTryWaitOfAbortedTask(t *testing.T) {
 	xerr = got.Abort()
 	require.Nil(t, xerr)
 
-	st, xerr := got.GetStatus()
+	st, xerr := got.Status()
 	require.Nil(t, xerr)
 	if st != ABORTED {
 		t.FailNow()
@@ -623,13 +623,13 @@ func TestTryWaitOfAbortedTask(t *testing.T) {
 	res, xerr = got.Wait()
 	require.NotNil(t, xerr)
 	require.NotNil(t, res)
-	// Now that we waited the Task, GetResult() returns useful information
+	// Now that we waited the Task, Result() returns useful information
 
-	tr, xerr := got.GetResult()
+	tr, xerr := got.Result()
 	require.Nil(t, xerr)
 	require.NotNil(t, tr)
 
-	st, xerr = got.GetStatus()
+	st, xerr = got.Status()
 	if st != DONE {
 		t.FailNow()
 	}
@@ -647,7 +647,7 @@ func TestTryWaitOfOkTask(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, xerr)
 
-	theID, xerr := got.GetID()
+	theID, xerr := got.ID()
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
@@ -670,7 +670,7 @@ func TestTryWaitOfOkTask(t *testing.T) {
 		t.Errorf("Shouldn't happen")
 	}
 
-	st, xerr := got.GetStatus()
+	st, xerr := got.Status()
 	require.Nil(t, xerr)
 	if st != RUNNING {
 		t.Errorf("This should be RUNNING")
@@ -685,13 +685,13 @@ func TestTryWaitOfOkTask(t *testing.T) {
 	res, xerr = got.Wait()
 	require.NotNil(t, xerr)
 	require.NotNil(t, res)
-	// Now that we waited the Task, GetResult() returns useful information
+	// Now that we waited the Task, Result() returns useful information
 
-	tr, xerr := got.GetResult()
+	tr, xerr := got.Result()
 	require.Nil(t, xerr)
 	require.NotNil(t, tr)
 
-	st, xerr = got.GetStatus()
+	st, xerr = got.Status()
 	if st != DONE {
 		t.FailNow()
 	}
@@ -709,7 +709,7 @@ func TestWaitingForGame(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -750,7 +750,7 @@ func TestWaitingForGameZero(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -842,7 +842,7 @@ func TestSingleTaskTryWaitCoreTask(t *testing.T) {
 	err = nil
 	for {
 		time.Sleep(time.Duration(80) * time.Millisecond)
-		ctx := single.GetContext()
+		ctx := single.Context()
 		require.NotNil(t, ctx)
 
 		if singleReplacement, err := NewTaskWithContext(ctx); err == nil {
@@ -1227,7 +1227,7 @@ func TestStartWithTimeoutTask(t *testing.T) {
 	// wait for it
 	time.Sleep(65 * time.Millisecond)
 
-	stat, err := single.GetStatus()
+	stat, err := single.Status()
 	if err != nil {
 		t.Errorf("Problem retrieving status ?")
 	}
@@ -1268,7 +1268,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		time.Sleep(time.Duration(900) * time.Millisecond)
 		// by now single should have finished with timeouts, so...
 
-		stat, err := single.GetStatus()
+		stat, err := single.Status()
 		if err != nil {
 			t.Errorf("Problem retrieving status ?")
 		}
@@ -1331,7 +1331,7 @@ func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
 		time.Sleep(time.Duration(timing) * time.Millisecond)
 		// by now single should have finished with timeouts, so...
 
-		stat, xerr := single.GetStatus()
+		stat, xerr := single.Status()
 		if xerr != nil {
 			t.Errorf("Problem retrieving status ?")
 		}
@@ -1381,7 +1381,7 @@ func TestLikeBeforeWithoutAbortButContext(t *testing.T) {
 	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		for {
 			time.Sleep(time.Duration(10) * time.Millisecond)
-			status, xerr := t.GetStatus()
+			status, xerr := t.Status()
 			if xerr != nil {
 				return "Big failure...", nil
 			}
@@ -1401,7 +1401,7 @@ func TestLikeBeforeWithoutAbortButContext(t *testing.T) {
 	time.Sleep(time.Duration(300) * time.Millisecond)
 	// by now single should have finished with timeouts, so...
 
-	stat, err := single.GetStatus()
+	stat, err := single.Status()
 	if err != nil {
 		t.Errorf("Problem retrieving status ?")
 	}

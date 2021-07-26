@@ -40,7 +40,7 @@ func TestWaitingGameWF(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -70,7 +70,7 @@ func TestWaitingGameWF(t *testing.T) {
 		waited++
 	}
 
-	aerr, xerr := got.GetLastError()
+	aerr, xerr := got.LastError()
 	require.Nil(t, xerr)
 	require.Nil(t, aerr)
 
@@ -85,7 +85,7 @@ func TestChangeIdAfterAbortWF(t *testing.T) {
 		require.NotNil(t, got)
 		require.Nil(t, err)
 
-		theID, err := got.GetID()
+		theID, err := got.ID()
 		require.Nil(t, err)
 		require.NotEmpty(t, theID)
 
@@ -130,7 +130,7 @@ func TestResultCheckWF(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -146,7 +146,7 @@ func TestResultCheckWF(t *testing.T) {
 	require.NotNil(t, err)
 	require.NotNil(t, res)
 
-	tr, xerr := got.GetResult()
+	tr, xerr := got.Result()
 	require.Nil(t, xerr)
 	require.NotNil(t, tr)
 }
@@ -156,7 +156,7 @@ func TestResultCheckWithoutWF(t *testing.T) {
 	require.NotNil(t, got)
 	require.Nil(t, err)
 
-	theID, err := got.GetID()
+	theID, err := got.ID()
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
@@ -172,7 +172,7 @@ func TestResultCheckWithoutWF(t *testing.T) {
 	require.NotNil(t, err)
 	require.NotNil(t, res)
 
-	tr, xerr := got.GetResult()
+	tr, xerr := got.Result()
 	require.Nil(t, xerr)
 	require.NotNil(t, tr)
 }
@@ -457,7 +457,7 @@ func TestLikeBeforeWithoutAbortButContextWF(t *testing.T) {
 	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 		for {
 			time.Sleep(time.Duration(10) * time.Millisecond)
-			status, xerr := t.GetStatus()
+			status, xerr := t.Status()
 			if xerr != nil {
 				return "Big failure...", nil
 			}
@@ -477,7 +477,7 @@ func TestLikeBeforeWithoutAbortButContextWF(t *testing.T) {
 	time.Sleep(time.Duration(300) * time.Millisecond)
 	// by now single should have finished with timeouts, so...
 
-	stat, err := single.GetStatus()
+	stat, err := single.Status()
 	if err != nil {
 		t.Errorf("Problem retrieving status ?")
 	}

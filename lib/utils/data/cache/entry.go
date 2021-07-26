@@ -45,8 +45,8 @@ func newEntry(content Cacheable) Entry {
 	return ce
 }
 
-// GetKey returns the key of the cache entry
-func (ce *Entry) GetKey() string {
+// Key returns the key of the cache entry
+func (ce *Entry) Key() string {
 	ce.lock.RLock()
 	defer ce.lock.RUnlock()
 

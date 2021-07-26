@@ -163,7 +163,7 @@ func (instance *cache) unsafeReserveEntry(key string) (xerr fail.Error) {
 
 /*
 CommitEntry fills a previously reserved entry with content
-The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry()), because content.GetID() has to be the final key.
+The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry()), because content.ID() has to be the final key.
 
 Returns:
 	nil, *fail.ErrNotFound: the cache entry identified by 'key' is not reserved
@@ -188,13 +188,13 @@ func (instance *cache) Commit(key string, content Cacheable) (ce *Entry, xerr fa
 }
 
 // unsafeCommitEntry is the workforce of CommitEntry, without locking
-// The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.GetID() has to be the final key.
+// The key retained at the end in the cache may be different to the one passed in parameter (and used previously in ReserveEntry), because content.ID() has to be the final key.
 func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (_ *Entry, xerr fail.Error) {
 	if _, ok := instance.reserved[key]; !ok {
 		return nil, fail.NotFoundError("the cache entry '%s' is not reserved", key)
 	}
 
-	// content may bring new key, based on content.GetID(), different from the key reserved; we have to check if this new key has not been reserved by someone else...
+	// content may bring new key, based on content.ID(), different from the key reserved; we have to check if this new key has not been reserved by someone else...
 	newContentKey := content.GetID()
 	if newContentKey != key {
 		if _, ok := instance.reserved[newContentKey]; ok {

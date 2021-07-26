@@ -41,15 +41,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type toV21_05_0 struct{}
+type toV21_05_0 struct{
+	dryRun bool
+}
 
-func (tv toV21_05_0) Upgrade(svc iaas.Service, from string) fail.Error {
+func (tv toV21_05_0) Upgrade(svc iaas.Service, from string, dryRun bool) fail.Error {
 	if svc == nil {
 		return fail.InvalidParameterCannotBeNilError("svc")
 	}
 
 	logrus.Infof("Upgrading metadata from version '%s' to version 'v21.05.0'", from)
 
+	tv.dryRun = dryRun
 	xerr := tv.upgradeNetworks(svc)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -102,6 +105,7 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) fail.Error {
 func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(instance resources.Network) fail.Error {
 	networkName := instance.GetName()
 	subnetName := networkName
+
 	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		abstractNetwork, ok := clonable.(*abstract.Network)
 		if !ok {

@@ -74,7 +74,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		return nil, xerr
 	}
 
-	userData, createXErr := rgw.Create(task.GetContext(), hostReq, hostSizing) // createXErr is tested later
+	userData, createXErr := rgw.Create(task.Context(), hostReq, hostSizing) // createXErr is tested later
 
 	// Set link to Subnet before testing if Host has been successfully created;
 	// in case of failure, we need to have registered the gateway ID in Subnet in case KeepOnFailure is requested, to
@@ -85,7 +85,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		// If Host resources has been created and error occured after (and KeepOnFailure is requested), rgw.GetID() does contain the ID of the Host
+		// If Host resources has been created and error occured after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
 		if id := rgw.GetID(); id != "" {
 			as.GatewayIDs = append(as.GatewayIDs, id)
 		}
@@ -108,7 +108,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			defer task.DisarmAbortSignal()()
 
 			logrus.Debugf("Cleaning up on failure, deleting gateway '%s' Host resource...", hostReq.ResourceName)
-			derr := rgw.Delete(task.GetContext())
+			derr := rgw.Delete(task.Context())
 			if derr != nil {
 				msgRoot := "Cleaning up on failure, failed to delete gateway '%s'"
 				switch derr.(type) {
@@ -190,13 +190,13 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
-	xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData)
+	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, userData)
+	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, userData)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -205,7 +205,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	// intermediate gateway reboot
 	logrus.Infof("Rebooting gateway '%s'", gwname)
 	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
-	rebootCtx, cancelReboot := context.WithTimeout(task.GetContext(), 3*time.Minute)
+	rebootCtx, cancelReboot := context.WithTimeout(task.Context(), 3*time.Minute)
 	defer cancelReboot()
 	_, _, _, xerr = objgw.Run(rebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
 	if xerr != nil {
@@ -213,14 +213,14 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 	time.Sleep(5 * time.Second)
 
-	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE4_SYSTEM_FIXES, 0)
+	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, 0)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// final phase...
-	xerr = objgw.runInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, userData)
+	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE5_FINAL, userData)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -229,7 +229,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	// Final gateway reboot
 	logrus.Infof("Rebooting gateway '%s'", gwname)
 	command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
-	lastRebootCtx, lastCancelReboot := context.WithTimeout(task.GetContext(), 3*time.Minute)
+	lastRebootCtx, lastCancelReboot := context.WithTimeout(task.Context(), 3*time.Minute)
 	defer lastCancelReboot()
 	_, _, _, xerr = objgw.Run(lastRebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
 	if xerr != nil {
@@ -237,7 +237,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 	time.Sleep(5 * time.Second)
 
-	_, xerr = objgw.waitInstallPhase(task.GetContext(), userdata.PHASE5_FINAL, time.Duration(0))
+	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE5_FINAL, time.Duration(0))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

@@ -94,7 +94,7 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	return rb.Create(task.GetContext(), name)
+	return rb.Create(task.Context(), name)
 }
 
 // Delete a bucket
@@ -115,7 +115,7 @@ func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	return rb.Delete(task.GetContext())
+	return rb.Delete(task.Context())
 }
 
 // Inspect a bucket
@@ -168,7 +168,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (xerr fai
 		return xerr
 	}
 
-	return rb.Mount(task.GetContext(), hostName, path)
+	return rb.Mount(task.Context(), hostName, path)
 }
 
 // Unmount a bucket
@@ -200,5 +200,5 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (xerr fail.Er
 		return xerr
 	}
 
-	return rb.Unmount(task.GetContext(), hostName)
+	return rb.Unmount(task.Context(), hostName)
 }

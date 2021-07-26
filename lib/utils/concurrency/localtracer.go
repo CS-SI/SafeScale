@@ -51,7 +51,7 @@ const (
 // newTracer creates a new tracer instance
 func newTracer(task Task, enabled bool) *tracer {
 	t := tracer{
-		taskSig: task.GetSignature(),
+		taskSig: task.Signature(),
 		enabled: enabled,
 	}
 

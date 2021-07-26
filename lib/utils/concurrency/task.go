@@ -80,12 +80,12 @@ type TaskCore interface {
 	Abortable() (bool, fail.Error)
 	Aborted() bool
 	DisarmAbortSignal() func()
-	GetID() (string, fail.Error)
-	GetSignature() string
-	GetStatus() (TaskStatus, fail.Error)
-	GetContext() context.Context
-	GetLastError() (error, fail.Error)
-	GetResult() (TaskResult, fail.Error)
+	ID() (string, fail.Error)
+	Signature() string
+	Status() (TaskStatus, fail.Error)
+	Context() context.Context
+	LastError() (error, fail.Error)
+	Result() (TaskResult, fail.Error)
 	IsSuccessful() (bool, fail.Error)
 	SetID(string) fail.Error
 
@@ -275,7 +275,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 				value, ok := v.Value().(bool)
 				if ok && value && parentTask != nil {
 					generateID = false
-					id, xerr := parentTask.GetID()
+					id, xerr := parentTask.ID()
 					if xerr != nil {
 						return nil, xerr
 					}
@@ -321,8 +321,8 @@ func (instance *task) IsNull() bool {
 	return instance.id == ""
 }
 
-// GetLastError returns the last error of the Task
-func (instance *task) GetLastError() (error, fail.Error) { // nolint
+// LastError returns the last error of the Task
+func (instance *task) LastError() (error, fail.Error) { // nolint
 	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -333,8 +333,8 @@ func (instance *task) GetLastError() (error, fail.Error) { // nolint
 	return instance.err, nil
 }
 
-// GetResult returns the result of the ended task
-func (instance *task) GetResult() (TaskResult, fail.Error) {
+// Result returns the result of the ended task
+func (instance *task) Result() (TaskResult, fail.Error) {
 	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -349,8 +349,8 @@ func (instance *task) GetResult() (TaskResult, fail.Error) {
 	return instance.result, nil
 }
 
-// GetID returns an unique id for the task
-func (instance *task) GetID() (string, fail.Error) {
+// ID returns an unique id for the task
+func (instance *task) ID() (string, fail.Error) {
 	if instance.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
@@ -361,9 +361,9 @@ func (instance *task) GetID() (string, fail.Error) {
 	return instance.id, nil
 }
 
-// GetSignature builds the "signature" of the task passed as parameter,
+// Signature builds the "signature" of the task passed as parameter,
 // ie a string representation of the task ID in the format "{task <id>}".
-func (instance *task) GetSignature() string {
+func (instance *task) Signature() string {
 	if instance.IsNull() {
 		return ""
 	}
@@ -371,18 +371,18 @@ func (instance *task) GetSignature() string {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.getSignature()
+	return instance.signature()
 }
 
-func (instance *task) getSignature() string {
+func (instance *task) signature() string {
 	if instance.id != "" {
 		return `{task ` + instance.id + `}`
 	}
 	return ""
 }
 
-// GetStatus returns the current task status
-func (instance *task) GetStatus() (TaskStatus, fail.Error) {
+// Status returns the current task status
+func (instance *task) Status() (TaskStatus, fail.Error) {
 	if instance.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
@@ -393,8 +393,8 @@ func (instance *task) GetStatus() (TaskStatus, fail.Error) {
 	return instance.status, nil
 }
 
-// GetContext returns the context associated to the task
-func (instance *task) GetContext() context.Context {
+// Context returns the context associated to the task
+func (instance *task) Context() context.Context {
 	if instance.IsNull() {
 		return context.TODO()
 	}

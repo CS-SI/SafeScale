@@ -93,7 +93,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 			defer fail.OnPanic(&xerr)
 		}
 
-		ctx := t.GetContext()
+		ctx := t.Context()
 
 		weWereAborted := false
 		rd := randomInt(low, high)

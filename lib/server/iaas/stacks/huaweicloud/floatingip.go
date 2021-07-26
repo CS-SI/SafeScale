@@ -117,7 +117,7 @@ type createResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a get operation. Call its Extract
+// Result represents the result of a get operation. Call its Extract
 // method to interpret it as a FloatingIP.
 type getResult struct {
 	commonResult

@@ -221,7 +221,7 @@ func (j job) Aborted() bool {
 		return false
 	}
 
-	status, _ := j.task.GetStatus()
+	status, _ := j.task.Status()
 	return status == concurrency.ABORTED
 }
 

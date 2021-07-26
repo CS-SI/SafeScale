@@ -87,7 +87,7 @@ func TestRealCharges(t *testing.T) {
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
-		ntId, xerr := nt.GetID()
+		ntId, xerr := nt.ID()
 		if xerr != nil {
 			t.Errorf("Unexpected: %v", xerr)
 		}

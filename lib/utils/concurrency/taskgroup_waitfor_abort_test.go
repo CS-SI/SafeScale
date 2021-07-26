@@ -520,7 +520,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 			for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 				_, xerr = overlord.Start(
 					func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-						tid, _ := t.GetID()
+						tid, _ := t.ID()
 						weWereAborted := false
 						for { // do some work, then look for aborted, again and again
 							// some work

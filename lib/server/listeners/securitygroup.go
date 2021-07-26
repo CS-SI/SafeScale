@@ -69,7 +69,7 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	list, xerr := securitygroupfactory.List(task.GetContext(), job.Service(), all)
+	list, xerr := securitygroupfactory.List(task.Context(), job.Service(), all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -130,7 +130,7 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 		return nil, xerr
 	}
 
-	xerr = rsg.Create(task.GetContext(), rn.GetID(), name, in.Description, rules)
+	xerr = rsg.Create(task.Context(), rn.GetID(), name, in.Description, rules)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -183,7 +183,7 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 		return empty, xerr
 	}
 
-	xerr = rsg.Clear(task.GetContext())
+	xerr = rsg.Clear(task.Context())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -236,7 +236,7 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 		return empty, xerr
 	}
 
-	xerr = rsg.Reset(task.GetContext())
+	xerr = rsg.Reset(task.Context())
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -337,7 +337,7 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 		return empty, xerr
 	}
 
-	xerr = rsg.Delete(task.GetContext(), in.GetForce())
+	xerr = rsg.Delete(task.Context(), in.GetForce())
 	if xerr != nil {
 		return empty, xerr
 	}
@@ -394,7 +394,7 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 		return nil, xerr
 	}
 
-	xerr = rsg.AddRule(task.GetContext(), rule)
+	xerr = rsg.AddRule(task.Context(), rule)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -451,7 +451,7 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 		return nil, xerr
 	}
 
-	xerr = rsg.DeleteRule(task.GetContext(), rule)
+	xerr = rsg.DeleteRule(task.Context(), rule)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -559,7 +559,7 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	out := &protocol.SecurityGroupBondsResponse{}
 	switch loweredKind {
 	case "all", "host", "hosts":
-		bonds, xerr := rsg.GetBoundHosts(task.GetContext())
+		bonds, xerr := rsg.GetBoundHosts(task.Context())
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -568,7 +568,7 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 	}
 	switch loweredKind {
 	case "all", "subnet", "subnets", "network", "networks":
-		bonds, xerr := rsg.GetBoundSubnets(task.GetContext())
+		bonds, xerr := rsg.GetBoundSubnets(task.Context())
 		if xerr != nil {
 			return nil, xerr
 		}

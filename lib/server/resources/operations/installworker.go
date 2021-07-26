@@ -659,7 +659,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	// Determine list of hosts concerned by the step
 	var hostsList []resources.Host
 	if w.target.TargetType() == featuretargettype.Host {
-		hostsList, xerr = w.identifyHosts(task.GetContext(), map[string]string{"hosts": "1"})
+		hostsList, xerr = w.identifyHosts(task.Context(), map[string]string{"hosts": "1"})
 	} else {
 		anon, ok = p.stepMap[yamlTargetsKeyword]
 		if ok {
@@ -680,7 +680,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlTargetsKeyword)
 		}
 
-		hostsList, xerr = w.identifyHosts(task.GetContext(), stepT)
+		hostsList, xerr = w.identifyHosts(task.Context(), stepT)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

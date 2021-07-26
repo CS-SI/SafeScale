@@ -22,7 +22,7 @@ import (
 )
 
 type Mutator interface {
-	Upgrade(iaas.Service, string) fail.Error
+	Upgrade(iaas.Service, string, bool) fail.Error
 }
 
 type mutator struct {
@@ -44,8 +44,8 @@ var (
 	}
 )
 
-// GetMutatorFor returns the function that can upgrade to version 'to'
-func GetMutatorFor(version string) (Mutator, string, fail.Error) {
+// MutatorForVersion returns the function that can upgrade to version 'to'
+func MutatorForVersion(version string) (Mutator, string, fail.Error) {
 	if version == "" {
 		return nil, "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}

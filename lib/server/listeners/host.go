@@ -111,7 +111,7 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rh.Start(task.GetContext()); xerr != nil {
+	if xerr = rh.Start(task.Context()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -159,7 +159,7 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 		return empty, xerr
 	}
 
-	if xerr = rh.Stop(task.GetContext()); xerr != nil {
+	if xerr = rh.Stop(task.Context()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -205,7 +205,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 		return empty, xerr
 	}
 
-	if xerr = rh.Reboot(task.GetContext()); xerr != nil {
+	if xerr = rh.Reboot(task.Context()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -244,7 +244,7 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 
 	// handler := handlers.NewHostHandler(job)
 	// hosts, xerr := handler.List(all)
-	hosts, xerr := hostfactory.List(task.GetContext(), job.Service(), all)
+	hosts, xerr := hostfactory.List(task.Context(), job.Service(), all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -380,7 +380,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		return nil, xerr
 	}
 
-	if _, xerr = hostInstance.Create(task.GetContext(), hostReq, *sizing); xerr != nil {
+	if _, xerr = hostInstance.Create(task.Context(), hostReq, *sizing); xerr != nil {
 		return nil, xerr
 	}
 
@@ -456,7 +456,7 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		logrus.Warn("Asking for less resource... is not going to happen")
 	}
 
-	if xerr = rh.Resize(task.GetContext(), sizing); xerr != nil {
+	if xerr = rh.Resize(task.Context(), sizing); xerr != nil {
 		return nil, xerr
 	}
 
@@ -610,7 +610,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 		return empty, xerr
 	}
 
-	if xerr = hostInstance.Delete(task.GetContext()); xerr != nil {
+	if xerr = hostInstance.Delete(task.Context()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -724,7 +724,7 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 		enable = resources.SecurityGroupEnable
 	}
 
-	if xerr = rh.BindSecurityGroup(task.GetContext(), sg, enable); xerr != nil {
+	if xerr = rh.BindSecurityGroup(task.Context(), sg, enable); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil
@@ -783,7 +783,7 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 
-	if xerr = rh.UnbindSecurityGroup(task.GetContext(), sg); xerr != nil {
+	if xerr = rh.UnbindSecurityGroup(task.Context(), sg); xerr != nil {
 		return empty, xerr
 	}
 
@@ -843,7 +843,7 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, xerr
 	}
 
-	if xerr = rh.EnableSecurityGroup(task.GetContext(), sg); xerr != nil {
+	if xerr = rh.EnableSecurityGroup(task.Context(), sg); xerr != nil {
 		return empty, xerr
 	}
 
@@ -917,7 +917,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		}
 	}
 
-	if xerr = rh.DisableSecurityGroup(task.GetContext(), sg); xerr != nil {
+	if xerr = rh.DisableSecurityGroup(task.Context(), sg); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// considered as a success

@@ -88,7 +88,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 		return nil, xerr
 	}
 
-	retcode, stdout, stderr, xerr := rh.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := rh.Run(task.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -172,9 +172,9 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		return nil, xerr
 	}
 	if pull {
-		retcode, stdout, stderr, xerr = rh.Pull(task.GetContext(), hostPath, localPath, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = rh.Pull(task.Context(), hostPath, localPath, temporal.GetLongOperationTimeout())
 	} else {
-		retcode, stdout, stderr, xerr = rh.Push(task.GetContext(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = rh.Push(task.Context(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
 	}
 	if xerr != nil {
 		return nil, xerr

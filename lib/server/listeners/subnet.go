@@ -123,11 +123,11 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	if xerr != nil {
 		return nil, xerr
 	}
-	if xerr = rs.Create(task.GetContext(), req, gwName, sizing); xerr != nil {
+	if xerr = rs.Create(task.Context(), req, gwName, sizing); xerr != nil {
 		return nil, xerr
 	}
 
-	if xerr = rn.AdoptSubnet(task.GetContext(), rs); xerr != nil {
+	if xerr = rn.AdoptSubnet(task.Context(), rs); xerr != nil {
 		return nil, xerr
 	}
 
@@ -185,7 +185,7 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 		}
 		networkID = rn.GetID()
 	}
-	list, xerr := subnetfactory.List(task.GetContext(), svc, networkID, in.GetAll())
+	list, xerr := subnetfactory.List(task.Context(), svc, networkID, in.GetAll())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -299,7 +299,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	if rs, xerr = subnetfactory.Load(svc, networkRef, subnetRef); xerr == nil {
 		subnetID = rs.GetID()
 		if rn, xerr = rs.InspectNetwork(); xerr == nil {
-			xerr = rs.Delete(task.GetContext())
+			xerr = rs.Delete(task.Context())
 		}
 	}
 	if xerr != nil {
@@ -313,7 +313,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	}
 
 	if rn != nil {
-		if xerr = rn.AbandonSubnet(task.GetContext(), subnetID); xerr != nil {
+		if xerr = rn.AbandonSubnet(task.Context(), subnetID); xerr != nil {
 			return empty, xerr
 		}
 	}
@@ -384,7 +384,7 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		enable = resources.SecurityGroupEnable
 	}
 
-	if xerr = rs.BindSecurityGroup(task.GetContext(), sg, enable); xerr != nil {
+	if xerr = rs.BindSecurityGroup(task.Context(), sg, enable); xerr != nil {
 		return empty, xerr
 	}
 
@@ -448,13 +448,13 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 
 	var rs resources.Subnet
 	if rs, xerr = subnetfactory.Load(svc, networkRef, subnetRef); xerr == nil {
-		xerr = rs.UnbindSecurityGroup(task.GetContext(), sg)
+		xerr = rs.UnbindSecurityGroup(task.Context(), sg)
 	}
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If Subnet does not exist, try to see if there is metadata in Security Group to clean up
-			if xerr = sg.UnbindFromSubnetByReference(task.GetContext(), subnetRef); xerr != nil {
+			if xerr = sg.UnbindFromSubnetByReference(task.Context(), subnetRef); xerr != nil {
 				return empty, xerr
 			}
 		default:
@@ -517,7 +517,7 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.EnableSecurityGroup(task.GetContext(), sg); xerr != nil {
+	if xerr = rs.EnableSecurityGroup(task.Context(), sg); xerr != nil {
 		return empty, xerr
 	}
 
@@ -578,7 +578,7 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.DisableSecurityGroup(task.GetContext(), sg); xerr != nil {
+	if xerr = rs.DisableSecurityGroup(task.Context(), sg); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil
@@ -631,7 +631,7 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 		return nil, xerr
 	}
 
-	bonds, xerr := rs.ListSecurityGroups(task.GetContext(), state)
+	bonds, xerr := rs.ListSecurityGroups(task.Context(), state)
 	if xerr != nil {
 		return nil, xerr
 	}

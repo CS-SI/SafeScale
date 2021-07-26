@@ -32,7 +32,7 @@ const (
 )
 
 // Upgrade realizes the metadata upgrade from version 'from' to version 'to'
-func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
+func Upgrade(svc iaas.Service, from, to string, dryRun, doNotBackup bool) fail.Error {
 	if from == "" {
 		from = FirstMetadataVersion
 	}
@@ -57,7 +57,7 @@ func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
 		fromVersionList []string
 	)
 	for {
-		fn, next, xerr := GetMutatorFor(from)
+		fn, next, xerr := MutatorForVersion(from)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -80,7 +80,7 @@ func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
 	}
 
 	for k, fn := range mutatorList {
-		xerr := fn.Upgrade(svc, fromVersionList[k])
+		xerr := fn.Upgrade(svc, fromVersionList[k], dryRun)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr)

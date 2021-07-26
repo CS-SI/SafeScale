@@ -233,7 +233,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	defer func() {
-		derr := network.Delete(task.GetContext())
+		derr := network.Delete(task.Context())
 		if derr != nil {
 			logrus.Warnf("Error deleting network '%s'", network.GetID())
 		}
@@ -340,7 +340,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 		Image: defaultScanImage,
 	}
 
-	if _, xerr = host.Create(task.GetContext(), req, def); xerr != nil {
+	if _, xerr = host.Create(task.Context(), req, def); xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
 	}
 
@@ -356,7 +356,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 		}
 	}()
 
-	_, cout, _, xerr := host.Run(task.GetContext(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
+	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
 	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 	}
@@ -516,7 +516,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 			Name: scanNetworkName,
 			CIDR: scanNetworkCIDR,
 		}
-		if xerr = network.Create(task.GetContext(), req); xerr != nil {
+		if xerr = network.Create(task.Context(), req); xerr != nil {
 			return nil, xerr
 		}
 		return network, xerr
@@ -546,7 +546,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 		subnetHostSizing := abstract.HostSizingRequirements{
 			MinGPU: -1,
 		}
-		if xerr = subnet.Create(task.GetContext(), req, "", &subnetHostSizing); xerr != nil {
+		if xerr = subnet.Create(task.Context(), req, "", &subnetHostSizing); xerr != nil {
 			return nil, xerr
 		}
 

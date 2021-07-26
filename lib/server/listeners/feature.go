@@ -91,7 +91,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 			return empty, xerr
 		}
 
-		list, xerr := rc.ListInstalledFeatures(task.GetContext())
+		list, xerr := rc.ListInstalledFeatures(task.Context())
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -164,7 +164,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 			return empty, xerr
 		}
 
-		results, xerr := feat.Check(task.GetContext(), rh, featureVariables, featureSettings)
+		results, xerr := feat.Check(task.Context(), rh, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot check feature")
 		}
@@ -178,7 +178,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 			return empty, xerr
 		}
 
-		results, xerr := feat.Check(task.GetContext(), rc, featureVariables, featureSettings)
+		results, xerr := feat.Check(task.Context(), rc, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot check feature")
 		}
@@ -257,7 +257,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 			return empty, xerr
 		}
 
-		results, xerr := feat.Add(task.GetContext(), rh, featureVariables, featureSettings)
+		results, xerr := feat.Add(task.Context(), rh, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -271,7 +271,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 			return empty, xerr
 		}
 
-		results, xerr := feat.Add(task.GetContext(), rc, featureVariables, featureSettings)
+		results, xerr := feat.Add(task.Context(), rc, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -335,7 +335,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 			return empty, xerr
 		}
 
-		results, xerr := feat.Remove(task.GetContext(), rh, featureVariables, featureSettings)
+		results, xerr := feat.Remove(task.Context(), rh, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot remove feature")
 		}
@@ -349,7 +349,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 			return empty, xerr
 		}
 
-		results, xerr := feat.Remove(task.GetContext(), rc, featureVariables, featureSettings)
+		results, xerr := feat.Remove(task.Context(), rc, featureVariables, featureSettings)
 		if xerr != nil {
 			return empty, fail.Wrap(xerr, "cannot remove feature")
 		}

@@ -69,7 +69,7 @@ func NewTracer(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
 		enabled: enable,
 	}
 	if task != nil {
-		t.taskSig = task.GetSignature()
+		t.taskSig = task.Signature()
 	}
 
 	message := strprocess.FormatStrings(msg...)

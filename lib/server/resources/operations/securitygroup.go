@@ -485,7 +485,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			}
 		}
 
-		if count, xerr := tg.GetStarted(); xerr == nil && count > 0 {
+		if count, xerr := tg.Started(); xerr == nil && count > 0 {
 			_, xerr = tg.WaitGroup()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -493,7 +493,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			}
 		}
 
-		if count, xerr := tg.GetStarted(); xerr == nil && count > 0 {
+		if count, xerr := tg.Started(); xerr == nil && count > 0 {
 			_, xerr = tg.WaitGroup()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {

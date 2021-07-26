@@ -192,7 +192,7 @@ func (instance *SecurityGroup) taskEnableOnHost(task concurrency.Task, params co
 			return nil, innerXErr
 		}
 	} else {
-		xerr := rh.EnableSecurityGroup(task.GetContext(), instance)
+		xerr := rh.EnableSecurityGroup(task.Context(), instance)
 		rh.Released()
 		return nil, xerr
 	}
@@ -231,7 +231,7 @@ func (instance *SecurityGroup) taskDisableOnHost(task concurrency.Task, params c
 			return nil, innerXErr
 		}
 	} else {
-		xerr := rh.DisableSecurityGroup(task.GetContext(), instance)
+		xerr := rh.DisableSecurityGroup(task.Context(), instance)
 		rh.Released()
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

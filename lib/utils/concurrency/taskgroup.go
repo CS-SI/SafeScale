@@ -33,7 +33,7 @@ type TaskGroupResult = map[string]TaskResult
 
 // TaskGroupGuard is the task group interface defining method to wait the TaskGroup
 type TaskGroupGuard interface {
-	GetStarted() (uint, fail.Error)
+	Started() (uint, fail.Error)
 	TryWaitGroup() (bool, map[string]TaskResult, fail.Error)
 	WaitGroup() (map[string]TaskResult, fail.Error)
 	WaitGroupFor(time.Duration) (bool, map[string]TaskResult, fail.Error)
@@ -47,7 +47,7 @@ type TaskGroup interface {
 	TaskGuard
 	TaskGroupGuard
 
-	GetGroupStatus() (map[TaskStatus][]string, fail.Error)
+	GroupStatus() (map[TaskStatus][]string, fail.Error)
 }
 
 type subTask struct {
@@ -133,7 +133,7 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 				// this option orders copying ParentTask.ID to children; the latter are responsible to update their own ID
 				value, ok := v.Value().(bool)
 				if ok && value && parentTask != nil {
-					id, xerr := parentTask.GetID()
+					id, xerr := parentTask.ID()
 					if xerr != nil {
 						return nil, xerr
 					}
@@ -179,11 +179,11 @@ func (instance *taskGroup) GetID() (string, fail.Error) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	return instance.task.GetID()
+	return instance.task.ID()
 }
 
-// GetSignature builds the "signature" of the task group, ie a string representation of the task ID in the format "{taskgroup <id>}".
-func (instance *taskGroup) GetSignature() string {
+// Signature builds the "signature" of the task group, ie a string representation of the task ID in the format "{taskgroup <id>}".
+func (instance *taskGroup) Signature() string {
 	if instance.isNull() {
 		return ""
 	}
@@ -193,22 +193,22 @@ func (instance *taskGroup) GetSignature() string {
 	return `{taskGroup ` + tid + `}`
 }
 
-// GetStatus returns the current status of the TaskGroup (ie the parent Task running the children)
-func (instance *taskGroup) GetStatus() (TaskStatus, fail.Error) {
+// Status returns the current status of the TaskGroup (ie the parent Task running the children)
+func (instance *taskGroup) Status() (TaskStatus, fail.Error) {
 	if instance.isNull() {
 		return TaskStatus(0), fail.InvalidInstanceError()
 	}
 
-	return instance.task.GetStatus()
+	return instance.task.Status()
 }
 
-// GetContext returns the current task status
-func (instance *taskGroup) GetContext() context.Context {
+// Context returns the TaskGroup context
+func (instance *taskGroup) Context() context.Context {
 	if instance.isNull() {
 		return context.TODO()
 	}
 
-	return instance.task.GetContext()
+	return instance.task.Context()
 }
 
 // SetID allows specifying task ID. The uniqueness of the ID through all the tasks
@@ -243,7 +243,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	instance.children.lock.Lock()
 	defer instance.children.lock.Unlock()
 
-	status, err := instance.GetStatus()
+	status, err := instance.Status()
 	if err != nil {
 		return instance, err
 	}
@@ -373,7 +373,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 	}
 
 	for {
-		status, xerr := instance.GetStatus()
+		status, xerr := instance.Status()
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -498,7 +498,7 @@ func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
 
 	for _, s := range instance.children.tasks {
 		for {
-			sid, err := s.task.GetID()
+			sid, err := s.task.ID()
 			if err != nil {
 				break
 			}
@@ -546,7 +546,7 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 		return false, nil, xerr
 	}
 
-	taskStatus, xerr := instance.task.GetStatus()
+	taskStatus, xerr := instance.task.Status()
 	if xerr != nil {
 		return false, nil, xerr
 	}
@@ -636,7 +636,7 @@ func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupR
 		return false, nil, xerr
 	}
 
-	taskStatus, xerr := instance.task.GetStatus()
+	taskStatus, xerr := instance.task.Status()
 	if xerr != nil {
 		return false, nil, xerr
 	}
@@ -795,8 +795,8 @@ func (instance *taskGroup) New() (Task, fail.Error) {
 	return newTask(context.TODO(), instance.task)
 }
 
-// GetGroupStatus returns a map of the status of all children running in TaskGroup, ordered by TaskStatus
-func (instance *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error) {
+// GroupStatus returns a map of the status of all children running in TaskGroup, ordered by TaskStatus
+func (instance *taskGroup) GroupStatus() (map[TaskStatus][]string, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -806,8 +806,8 @@ func (instance *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error
 
 	status := make(map[TaskStatus][]string)
 	for _, sub := range instance.children.tasks {
-		if tid, err := sub.task.GetID(); err == nil {
-			st, _ := sub.task.GetStatus()
+		if tid, err := sub.task.ID(); err == nil {
+			st, _ := sub.task.Status()
 			if len(status[st]) == 0 {
 				status[st] = []string{}
 			}
@@ -817,8 +817,8 @@ func (instance *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error
 	return status, nil
 }
 
-// GetStarted returns the number of subtasks started in the TaskGroup
-func (instance *taskGroup) GetStarted() (uint, fail.Error) {
+// Started returns the number of subtasks started in the TaskGroup
+func (instance *taskGroup) Started() (uint, fail.Error) {
 	if instance.isNull() {
 		return 0, fail.InvalidInstanceError()
 	}

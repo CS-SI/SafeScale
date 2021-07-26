@@ -91,7 +91,7 @@ func TestIntrospection(t *testing.T) {
 
 		time.Sleep(20 * time.Millisecond)
 
-		num, err := overlord.GetStarted()
+		num, err := overlord.Started()
 		require.Nil(t, err)
 		if num != 50 {
 			t.Errorf("Problem reporting # of started tasks")
@@ -101,7 +101,7 @@ func TestIntrospection(t *testing.T) {
 		require.Nil(t, err)
 		require.NotEmpty(t, id)
 
-		sign := overlord.GetSignature()
+		sign := overlord.Signature()
 		require.NotEmpty(t, sign)
 
 		ok, err := overlord.IsSuccessful()
@@ -156,7 +156,7 @@ func TestIntrospectionWithErrors(t *testing.T) {
 
 		time.Sleep(49 * time.Millisecond)
 
-		num, err := overlord.GetStarted()
+		num, err := overlord.Started()
 		require.Nil(t, err)
 		if num != 51 {
 			t.Errorf("Problem reporting # of started tasks: %d (!= 51)", num)
@@ -166,7 +166,7 @@ func TestIntrospectionWithErrors(t *testing.T) {
 		require.Nil(t, err)
 		require.NotEmpty(t, id)
 
-		sign := overlord.GetSignature()
+		sign := overlord.Signature()
 		require.NotEmpty(t, sign)
 
 		ok, err := overlord.IsSuccessful()
@@ -476,7 +476,7 @@ func TestStates(t *testing.T) {
 	require.NotEmpty(t, res)
 
 	// We have waited, and no problem, so are we DONE ?
-	st, xerr := overlord.GetStatus()
+	st, xerr := overlord.Status()
 	require.Nil(t, xerr)
 	if st != DONE {
 		t.Errorf("We should be DONE but we are: %s", st)
@@ -489,18 +489,18 @@ func TestStates(t *testing.T) {
 	}
 	require.False(t, aborted)
 
-	st, xerr = overlord.GetStatus()
+	st, xerr = overlord.Status()
 	require.Nil(t, xerr)
 	require.NotNil(t, st)
 
-	gst, xerr := overlord.GetGroupStatus()
+	gst, xerr := overlord.GroupStatus()
 	require.Nil(t, xerr)
 	require.NotNil(t, gst)
 
-	// VPL: tg.GetStatus() returns the status of the TaskGroup (ie the parent Task launching the children)
-	//      tg.GetGroupStatus() returns the current status of each child of the TaskGroup
+	// VPL: tg.Status() returns the status of the TaskGroup (ie the parent Task launching the children)
+	//      tg.GroupStatus() returns the current status of each child of the TaskGroup
 	//      maybe we should rename it to GetChildrenStatus()?
-	require.NotEqual(t, st, gst) // this is unclear, why both a GetStatus and a GetGroupStatus ?
+	require.NotEqual(t, st, gst) // this is unclear, why both a Status and a GroupStatus ?
 }
 
 func TestTimeoutState(t *testing.T) {
@@ -528,9 +528,9 @@ func TestTimeoutState(t *testing.T) {
 	time.Sleep(400 * time.Millisecond)
 
 	// VPL: Actually, you point at something to think about: some of the statuses are purely internal, like TIMEOUT, ABORTED.
-	//      GetStatus() should only return READY, RUNNING or DONE. TIMEOUT and ABORTED are transient status that should
+	//      Status() should only return READY, RUNNING or DONE. TIMEOUT and ABORTED are transient status that should
 	//      move towards DONE.
-	st, xerr := overlord.GetStatus()
+	st, xerr := overlord.Status()
 	require.Nil(t, xerr)
 	require.NotNil(t, st)
 	if st != RUNNING {
@@ -541,7 +541,7 @@ func TestTimeoutState(t *testing.T) {
 	require.NotNil(t, xerr) // VPL: all children ended on Timeout, but all terminates normally... So xerr is ErrorList
 	require.NotEmpty(t, res)
 
-	st, xerr = overlord.GetStatus()
+	st, xerr = overlord.Status()
 	require.Nil(t, xerr)
 	require.NotNil(t, st)
 	if st != DONE {
@@ -572,11 +572,11 @@ func TestGrTimeoutState(t *testing.T) {
 
 	time.Sleep(400 * time.Millisecond)
 
-	st, xerr := overlord.GetGroupStatus()
+	st, xerr := overlord.GroupStatus()
 	require.Nil(t, xerr)
 	require.NotNil(t, st)
 
-	numChildren, xerr := overlord.GetStarted()
+	numChildren, xerr := overlord.Started()
 	require.Nil(t, xerr)
 
 	spew.Dump(st)
@@ -589,7 +589,7 @@ func TestGrTimeoutState(t *testing.T) {
 	require.NotNil(t, xerr)
 	require.NotEmpty(t, res)
 
-	st, xerr = overlord.GetGroupStatus()
+	st, xerr = overlord.GroupStatus()
 	require.Nil(t, xerr)
 	require.NotNil(t, st)
 
@@ -647,7 +647,7 @@ func TestChildrenHaveDistinctIDs(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		} else {
-			theID, _ := subtaskID.GetID()
+			theID, _ := subtaskID.ID()
 			dictOfIDs[theID] = ind
 		}
 	}
@@ -842,7 +842,7 @@ func TestChildrenWaitingGameWithWait4EverTasks(t *testing.T) {
 
 	select {
 	case <-time.After(time.Duration(300) * time.Millisecond):
-		stats, statsErr := overlord.GetGroupStatus()
+		stats, statsErr := overlord.GroupStatus()
 		if statsErr != nil {
 			t.Fatal(statsErr)
 		}
@@ -876,7 +876,7 @@ func TestNewMethod(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	ctx := overlord.GetContext()
+	ctx := overlord.Context()
 	require.NotNil(t, ctx)
 }
 
@@ -895,7 +895,7 @@ func TestNewMethodOptions(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	ctx := overlord.GetContext()
+	ctx := overlord.Context()
 	require.NotNil(t, ctx)
 }
 
@@ -914,7 +914,7 @@ func TestNewMethodPTGOptions(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	ctx := overlord.GetContext()
+	ctx := overlord.Context()
 	require.NotNil(t, ctx)
 }
 
@@ -933,7 +933,7 @@ func TestNewMethodPTGAmendOptions(t *testing.T) {
 	require.NotNil(t, overlord)
 	require.Nil(t, err)
 
-	ctx := overlord.GetContext()
+	ctx := overlord.Context()
 	require.NotNil(t, ctx)
 }
 

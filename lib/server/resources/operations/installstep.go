@@ -452,7 +452,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
 			RemoteRights: "ug+rw-x,o-rwx",
 		}
-		xerr = rfcItem.UploadString(task.GetContext(), is.OptionsFileContent, p.Host)
+		xerr = rfcItem.UploadString(task.Context(), is.OptionsFileContent, p.Host)
 		_ = os.Remove(rfcItem.Local)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -473,7 +473,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	rfcItem := remotefile.Item{
 		Remote: filename,
 	}
-	xerr = rfcItem.UploadString(task.GetContext(), command, p.Host)
+	xerr = rfcItem.UploadString(task.Context(), command, p.Host)
 	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -493,7 +493,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	var outrun string
 	var outerr string
 	for {
-		retcode, outrun, outerr, xerr = p.Host.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
 		// Executes the script on the remote host
 		if retcode != 126 || rounds == 0 {
 			xerr = debug.InjectPlannedFail(xerr)

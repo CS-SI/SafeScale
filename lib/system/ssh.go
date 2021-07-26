@@ -331,7 +331,7 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 	if scfg.GatewayConfig.Port == 0 {
 		scfg.GatewayConfig.Port = 22
 	}
-	if scfg.SecondaryGatewayConfig.Port == 0 {
+	if scfg.SecondaryGatewayConfig != nil && scfg.SecondaryGatewayConfig.Port == 0 {
 		scfg.SecondaryGatewayConfig.Port = 22
 	}
 
@@ -684,7 +684,7 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 		"stderr":  "",
 	}
 
-	ctx := task.GetContext()
+	ctx := task.Context()
 
 	// Prepare command
 	scmd.cmd = exec.CommandContext(ctx, "bash", "-c", scmd.runCmdString)

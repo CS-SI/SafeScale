@@ -241,7 +241,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 	if xerr != nil {
 		return -1, "", "", xerr
 	}
-	ctx := task.GetContext()
+	ctx := task.Context()
 
 	var (
 		retcode        int
@@ -393,7 +393,7 @@ func (s ssh) WaitReady( /*ctx context.Context, */ hostName string, timeout time.
 	if xerr != nil {
 		return xerr
 	}
-	ctx := task.GetContext()
+	ctx := task.Context()
 
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")

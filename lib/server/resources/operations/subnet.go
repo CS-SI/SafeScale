@@ -834,7 +834,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		return fail.InconsistentError("task results shouldn't be nil")
 	}
 
-	id, xerr := primaryTask.GetID()
+	id, xerr := primaryTask.ID()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		groupXErr = xerr
@@ -915,7 +915,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	}
 
 	if req.HA {
-		id, xerr := secondaryTask.GetID()
+		id, xerr := secondaryTask.ID()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if groupXErr == nil {
@@ -1031,7 +1031,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		}
 
 		if secondaryGateway != nil {
-			// as.SecondaryGatewayID = secondaryGateway.GetID()
+			// as.SecondaryGatewayID = secondaryGateway.ID()
 			primaryUserdata.SecondaryGatewayPrivateIP, innerXErr = secondaryGateway.GetPrivateIP()
 			if innerXErr != nil {
 				return innerXErr

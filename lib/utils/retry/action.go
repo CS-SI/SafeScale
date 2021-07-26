@@ -390,7 +390,7 @@ func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum)
 				case string:
 					ctxID = rt
 				case concurrency.TaskCore:
-					ctxID, _ = rt.GetID()
+					ctxID, _ = rt.ID()
 				}
 			}
 		}

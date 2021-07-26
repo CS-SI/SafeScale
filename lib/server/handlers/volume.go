@@ -82,7 +82,7 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, xerr f
 	if xerr != nil {
 		return nil, xerr
 	}
-	xerr = objv.Browse(task.GetContext(), func(volume *abstract.Volume) fail.Error {
+	xerr = objv.Browse(task.Context(), func(volume *abstract.Volume) fail.Error {
 		rv, innerXErr := volumefactory.Load(handler.job.Service(), volume.ID)
 		if innerXErr != nil {
 			return innerXErr
@@ -147,7 +147,7 @@ func (handler *volumeHandler) Delete(ref string) (xerr fail.Error) {
 		return xerr
 	}
 
-	return volumeInstance.Delete(task.GetContext())
+	return volumeInstance.Delete(task.Context())
 }
 
 // Inspect returns the volume identified by ref and its attachment (if any)

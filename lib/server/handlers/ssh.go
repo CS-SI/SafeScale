@@ -282,7 +282,7 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 	if xerr != nil {
 		return xerr
 	}
-	_, xerr = ssh.WaitServerReady(task.GetContext(), "ready", timeout)
+	_, xerr = ssh.WaitServerReady(task.Context(), "ready", timeout)
 	return xerr
 }
 
@@ -340,7 +340,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 // run executes command on the host
 func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	// Create the command
-	sshCmd, xerr := ssh.NewCommand(handler.job.Task().GetContext(), cmd)
+	sshCmd, xerr := ssh.NewCommand(handler.job.Task().Context(), cmd)
 	if xerr != nil {
 		return 0, "", "", xerr
 	}
@@ -356,7 +356,7 @@ func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 		}
 	}()
 
-	return sshCmd.RunWithTimeout(handler.job.Task().GetContext(), outputs.DISPLAY, duration)
+	return sshCmd.RunWithTimeout(handler.job.Task().Context(), outputs.DISPLAY, duration)
 }
 
 func extracthostName(in string) (string, fail.Error) {
@@ -468,6 +468,6 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return -1, "", "", xerr
 	}
 
-	cRc, cStcOut, cStdErr, cErr := ssh.Copy(handler.job.Task().GetContext(), remotePath, localPath, upload)
+	cRc, cStcOut, cStdErr, cErr := ssh.Copy(handler.job.Task().Context(), remotePath, localPath, upload)
 	return cRc, cStcOut, cStdErr, cErr
 }

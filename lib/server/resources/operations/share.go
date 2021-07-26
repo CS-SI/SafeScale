@@ -651,7 +651,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 		return nil, xerr
 	}
 
-	// serverID = rhServer.GetID()
+	// serverID = rhServer.ID()
 	// serverName = rhServer.GetName()
 	serverPrivateIP, xerr := rhServer.GetPrivateIP()
 	if xerr != nil {
@@ -1040,7 +1040,7 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 	)
 
 	// -- Retrieve info about the Share --
-	// Note: we do not use GetName() and GetID() to avoid 2 consecutive instance.Inspect()
+	// Note: we do not use GetName() and ID() to avoid 2 consecutive instance.Inspect()
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {

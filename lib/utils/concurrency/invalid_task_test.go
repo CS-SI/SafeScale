@@ -73,7 +73,7 @@ func TestInvalidTask(t *testing.T) {
 	_, err := got.IsSuccessful()
 	require.NotNil(t, err)
 
-	_, err = got.GetResult()
+	_, err = got.Result()
 	require.NotNil(t, err)
 
 	_, _, err = got.WaitFor(0)
@@ -89,21 +89,21 @@ func TestInvalidTask(t *testing.T) {
 
 	_ = got.DisarmAbortSignal()
 
-	_, err = got.GetID()
+	_, err = got.ID()
 	require.NotNil(t, err)
 
-	_ = got.GetSignature()
+	_ = got.Signature()
 
-	_, err = got.GetStatus()
+	_, err = got.Status()
 	require.NotNil(t, err)
 
-	_ = got.GetContext()
+	_ = got.Context()
 	require.NotNil(t, err)
 
-	_, err = got.GetLastError()
+	_, err = got.LastError()
 	require.NotNil(t, err)
 
-	_, err = got.GetResult()
+	_, err = got.Result()
 	require.NotNil(t, err)
 
 	err = got.SetID("")
@@ -147,21 +147,21 @@ func TestInvalidTaskGroup(t *testing.T) {
 
 	_ = got.DisarmAbortSignal()
 
-	_, err = got.GetID()
+	_, err = got.ID()
 	require.NotNil(t, err)
 
-	_ = got.GetSignature()
+	_ = got.Signature()
 
-	_, err = got.GetStatus()
+	_, err = got.Status()
 	require.NotNil(t, err)
 
-	_ = got.GetContext()
+	_ = got.Context()
 	require.NotNil(t, err)
 
-	_, err = got.GetLastError()
+	_, err = got.LastError()
 	require.NotNil(t, err)
 
-	_, err = got.GetResult()
+	_, err = got.Result()
 	require.NotNil(t, err)
 
 	err = got.SetID("")

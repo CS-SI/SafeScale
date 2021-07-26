@@ -50,7 +50,7 @@ import (
 // taskCreateCluster is the TaskAction that creates a Cluster
 func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	req := params.(abstract.ClusterRequest)
-	ctx := task.GetContext()
+	ctx := task.Context()
 
 	// Check if Cluster exists in metadata; if yes, error
 	existing, xerr := LoadCluster(instance.GetService(), req.Name)
@@ -543,7 +543,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		return nil, nil, fail.AbortedError(nil, "aborted")
 	}
 
-	ctx := context.WithValue(task.GetContext(), concurrency.KeyForTaskInContext, task)
+	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task)
 
 	// Determine if getGateway Failover must be set
 	caps := instance.GetService().GetCapabilities()
@@ -754,7 +754,7 @@ func (instance *Cluster) createHostResources(
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	ctx := task.GetContext()
+	ctx := task.Context()
 	startedTasks := []concurrency.Task{}
 
 	defer func() {
@@ -763,7 +763,7 @@ func (instance *Cluster) createHostResources(
 			defer task.DisarmAbortSignal()()
 
 			taskID := func(t concurrency.Task) string {
-				tid, cleanErr := t.GetID()
+				tid, cleanErr := t.ID()
 				if cleanErr != nil {
 					_ = xerr.AddConsequence(cleanErr)
 					tid = "<unknown>"
@@ -1218,28 +1218,28 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 
 	logrus.Debugf("[%s] starting installation...", hostLabel)
 
-	_, xerr = p.Host.WaitSSHReady(task.GetContext(), temporal.GetHostTimeout())
+	_, xerr = p.Host.WaitSSHReady(task.Context(), temporal.GetHostTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Installs docker and docker-compose on gateway
-	xerr = instance.installDocker(task.GetContext(), p.Host, hostLabel)
+	xerr = instance.installDocker(task.Context(), p.Host, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// // Installs proxycache server on gateway (if not disabled)
-	// xerr = instance.installProxyCacheServer(task.GetContext(), p.Host, hostLabel)
+	// xerr = instance.installProxyCacheServer(task.Context(), p.Host, hostLabel)
 	// xerr = debug.InjectPlannedFail(xerr)
 	// if xerr != nil {
 	// 	return nil, xerr
 	// }
 
 	// Installs requirements as defined by Cluster Flavor (if it exists)
-	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Gateway, p.Host, hostLabel)
+	xerr = instance.installNodeRequirements(task.Context(), clusternodetype.Gateway, p.Host, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1507,7 +1507,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, xerr
 	}
 
-	_, xerr = hostInstance.Create(task.GetContext(), hostReq, p.masterDef)
+	_, xerr = hostInstance.Create(task.Context(), hostReq, p.masterDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1569,13 +1569,13 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	hostLabel = fmt.Sprintf("master #%d (%s)", p.index, hostInstance.GetName())
 
-	// xerr = instance.installProxyCacheClient(task.GetContext(), hostInstance, hostLabel)
+	// xerr = instance.installProxyCacheClient(task.Context(), hostInstance, hostLabel)
 	// xerr = debug.InjectPlannedFail(xerr)
 	// if xerr != nil {
 	// 	return nil, xerr
 	// }
 
-	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Master, hostInstance, hostLabel)
+	xerr = instance.installNodeRequirements(task.Context(), clusternodetype.Master, hostInstance, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1714,7 +1714,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
 	// install docker feature (including docker-compose)
-	xerr = instance.installDocker(task.GetContext(), p.Host, hostLabel)
+	xerr = instance.installDocker(task.Context(), p.Host, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1947,7 +1947,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, xerr
 	}
 
-	_, xerr = hostInstance.Create(task.GetContext(), hostReq, p.nodeDef)
+	_, xerr = hostInstance.Create(task.Context(), hostReq, p.nodeDef)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2005,13 +2005,13 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	hostLabel = fmt.Sprintf("node #%d (%s)", p.index, hostInstance.GetName())
 
-	// xerr = instance.installProxyCacheClient(task.GetContext(), hostInstance, hostLabel)
+	// xerr = instance.installProxyCacheClient(task.Context(), hostInstance, hostLabel)
 	// xerr = debug.InjectPlannedFail(xerr)
 	// if xerr != nil {
 	// 	return nil, xerr
 	// }
 
-	xerr = instance.installNodeRequirements(task.GetContext(), clusternodetype.Node, hostInstance, hostLabel)
+	xerr = instance.installNodeRequirements(task.Context(), clusternodetype.Node, hostInstance, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2134,7 +2134,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	}(hostInstance)
 
 	// Docker and docker-compose installation is mandatory on all nodes
-	xerr = instance.installDocker(task.GetContext(), hostInstance, hostLabel)
+	xerr = instance.installDocker(task.Context(), hostInstance, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2263,7 +2263,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}()
 
 	logrus.Debugf("Deleting Node '%s'", nodeName)
-	xerr = instance.deleteNode(task.GetContext(), p.node, p.master)
+	xerr = instance.deleteNode(task.Context(), p.node, p.master)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2324,7 +2324,7 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	}
 
 	logrus.Debugf("Deleting Master '%s'", p.node.Name)
-	xerr = instance.deleteMaster(task.GetContext(), host)
+	xerr = instance.deleteMaster(task.Context(), host)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
