@@ -1343,7 +1343,7 @@ func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
 		// VPL: No. At the time we do WaitFor(), the Task is timed out. So WaitFor will make it transition to DONE state, rv is true, and xerr is *fail.ErrTimeout
 		rv, _, xerr := single.WaitFor(4 * time.Millisecond)
 		require.True(t, rv)
-		require.NotNil(t, xerr)
+		require.NotNil(t, xerr) // FIXME: It failed
 
 		_, xerr = single.Wait()
 		require.NotNil(t, xerr)

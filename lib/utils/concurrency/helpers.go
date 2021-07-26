@@ -77,12 +77,7 @@ func validTest(st int, latency int) bool {
 	}
 
 	elapsed := time.Since(begin)
-	if elapsed > time.Duration(st+latency)*time.Millisecond {
-		// fmt.Printf("this happened %d, %d, %d, %s\n", st, latency, iterations, elapsed)
-		return false
-	}
-
-	return true
+	return elapsed <= time.Duration(st+latency)*time.Millisecond
 }
 
 func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool, custom func(chan string) error) TaskAction {

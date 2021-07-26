@@ -55,7 +55,7 @@ func TestStartAfterDoneWFZero(t *testing.T) {
 			require.Nil(t, err)
 
 			ok, _ := overlord.IsSuccessful()
-			require.True(t, ok)
+			require.True(t, ok) // FIXME: It failed
 
 			// already DONE taskgroup, now it should fail
 			_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
@@ -517,8 +517,14 @@ func TestGrTimeoutStateWF(t *testing.T) {
 	spew.Dump(st)
 	t.Logf("How do I know what's the taskgroup status ?, and how to work with it ? it's undocumented")
 	if len(st[DONE]) != int(numChildren) {
-		t.Errorf("Everything should be a timeout")
+		t.Errorf("Everything should be DONE")
 	}
+
+	lerr, xerr := overlord.GetLastError()
+	require.Nil(t, xerr)
+	require.NotNil(t, lerr)
+	t.Logf(spew.Sdump(lerr))
+
 }
 
 func TestChildrenWaitingGameWF(t *testing.T) {

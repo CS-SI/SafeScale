@@ -38,16 +38,18 @@ JSONTOML := github.com/pelletier/go-toml
 BUILD_TAGS = 
 export BUILD_TAGS
 
-#all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
-all: logclean ground getdevdeps mod sdk generate lib cli minimock err vet
+all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 allcover: all
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 
-release: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
+release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
+
+releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc SUCCESSFUL $(NO_COLOR)\n";
 
 releasetags:
 	@echo "settings go build tags for release"
@@ -55,7 +57,7 @@ releasetags:
 
 releasearchive:
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";
-	@tar -zcf safescale-v$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz -C cli/safescale safescale -C ../../cli/safescaled safescaled
+	@tar caf safescale-$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz cli/safescale/safescale cli/safescaled/safescaled
 
 fastall: begin
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build assumes all dependencies are already there and code generation is also up to date $(NO_COLOR)\n";
@@ -273,7 +275,7 @@ godocs:
 
 convey:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running goconvey in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(goconvey -port 8082 . &)
+	@(cd lib && cd utils && goconvey -port 8082 . &)
 
 conveystop:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Stopping goconvey in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -294,21 +296,28 @@ generate: sdk
 mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
+	@$(GO) clean -testcache
 	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/concurrency/... 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/retry/... 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/data/... 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
 safemintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
+	@$(GO) clean -testcache
 	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/concurrency/... -p 1 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/retry/... -p 1 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/data/... -p 1 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
 test: begin # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 900s -v ./... > test_results.log || true
+	@$(GO) clean -testcache
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 900s -v ./lib/utils/... -p 1 2>&1 > test_results.log || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
@@ -346,7 +355,7 @@ metalint: begin generate
 metalint-mini: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --color never--enable=deadcode --enable=staticcheck --enable=structcheck --enable=typecheck --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=megacheck --enable=gocritic --enable=depguard --enable=dogsled run || true
+	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --color never --enable=errcheck --enable=ineffassign --enable=interfacer --enable=depguard --enable=dogsled run || true
 
 metalint-full: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -388,7 +397,7 @@ help: with_git
 	@printf "%b" "$(NO_COLOR)";
 	@echo '  help         - Prints this help message'
 	@echo '  godocs       - Runs godoc in background at port 6060.'
-	@echo '                 Go to (http://localhost:6060/pkg/github.com/CS-SI/)'
+	@echo '                 Go to (http://localhost:6060/pkg/github.com/CS-SI/SafeScale/)'
 	@echo '  install      - Copies all binaries to $(GOPATH)/bin'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)TESTING TARGETS:$(NO_COLOR)\n";
@@ -398,7 +407,7 @@ help: with_git
 	@echo '  vet          - Runs all checks'
 	@echo '  err          - Looks for unhandled errors'
 	@echo '  test         - Runs all unit tests'
-	@echo '  convey       - Runs goconvey in lib dir'
+	@echo '  convey       - Runs goconvey in lib/utils dir'
 	@echo '  coverage     - Collects coverage info from unit tests'
 	@echo '  show-cov     - Displays coverage info in firefox'
 	@echo ''

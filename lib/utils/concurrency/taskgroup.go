@@ -372,9 +372,6 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 		return nil, xerr
 	}
 
-	childrenErrors := make(map[string]error)
-	results := make(TaskGroupResult, len(instance.children.tasks))
-
 	for {
 		status, xerr := instance.GetStatus()
 		if xerr != nil {
@@ -401,7 +398,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			// previousErr := instance.task.err
 			// instance.task.lock.RUnlock()
 
-			results, childrenErrors = instance.waitChildren()
+			results, childrenErrors := instance.waitChildren()
 			instance.result = results
 			if len(childrenErrors) == 0 {
 				instance.children.ended = true
@@ -675,7 +672,7 @@ func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupR
 				for !t.Aborted() && !done {
 					done, results, waitGroupErr = instance.TryWaitGroup()
 					if !done {
-						time.Sleep(1 * time.Millisecond) // FIXME: hardcoded value :-(
+						time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
 					}
 				}
 				if done {
@@ -684,6 +681,9 @@ func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupR
 				return nil, nil
 			}, nil,
 		)
+		if xerr != nil {
+			return false, nil, fail.Wrap(xerr, "failed to start task to wait")
+		}
 
 		if timeout > 0 {
 			select {
