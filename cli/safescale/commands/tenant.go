@@ -193,6 +193,12 @@ const tenantMetadataUpgradeLabel = "upgrade"
 var tenantMetadataUpgradeCommand = &cli.Command{
 	Name:  tenantMetadataUpgradeLabel,
 	Usage: "Upgrade tenant metadata if needed",
+	// Flags: []cli.Flag{
+	// 	&cli.BoolFlag{
+	// 		Name: "dry-run",
+	// 		Aliases: []string{"n"},
+	// 	},
+	// },
 	Action: func(c *cli.Context) error {
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -206,7 +212,8 @@ var tenantMetadataUpgradeCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		results, err := clientSession.Tenant.Upgrade(c.Args().First(), temporal.GetExecutionTimeout())
+		//dryRun := c.Bool("dry-run")
+		results, err := clientSession.Tenant.Upgrade(c.Args().First(), false/*dryRun*/, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
