@@ -18,9 +18,14 @@ package cache
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+)
+
+const (
+	reservationInfiniteDuration = time.Duration(0)
 )
 
 // reservation is a struct to simulate a content of an Entry to "reserve" a key
@@ -29,14 +34,16 @@ type reservation struct {
 	observers   map[string]observer.Observer
 	freedCh     chan struct{}
 	committedCh chan struct{}
+	duration    time.Duration
 }
 
 // newReservation creates an instance of reservation
-func newReservation(key string) *reservation {
+func newReservation(key string, duration time.Duration) *reservation {
 	return &reservation{
 		key:         key,
 		freedCh:     make(chan struct{}, 1),
 		committedCh: make(chan struct{}, 1),
+		duration:    duration,
 	}
 }
 
