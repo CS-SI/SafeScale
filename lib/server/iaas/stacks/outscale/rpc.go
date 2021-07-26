@@ -18,7 +18,6 @@ package outscale
 
 import (
 	"github.com/antihax/optional"
-
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -37,10 +36,13 @@ func (s stack) rpcReadSecurityGroups(networkID string, sgIDs []string) ([]osc.Se
 	}
 	var resp osc.ReadSecurityGroupsResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, innerErr = s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &opts)
-			return innerErr
+		func() (err error) {
+			dr, hr, innerErr := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &opts)
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -100,10 +102,13 @@ func (s stack) rpcReadSecurityGroupByName(networkID, name string) (osc.SecurityG
 	}
 	var resp osc.ReadSecurityGroupsResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, innerErr = s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &opts)
-			return innerErr
+		func() (err error) {
+			dr, hr, innerErr := s.client.SecurityGroupApi.ReadSecurityGroups(s.auth, &opts)
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -131,10 +136,13 @@ func (s stack) rpcReadVMs(vmIDs []string) ([]osc.Vm, fail.Error) {
 	}
 	var resp osc.ReadVmsResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, innerErr = s.client.VmApi.ReadVms(s.auth, &query)
-			return innerErr
+		func() (err error) {
+			dr, hr, innerErr := s.client.VmApi.ReadVms(s.auth, &query)
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -215,9 +223,12 @@ func (s stack) rpcReadVMByName(name string) (osc.Vm, fail.Error) {
 	var resp osc.ReadVmsResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.VmApi.ReadVms(s.auth, &opts)
-			return err
+			dr, hr, innerErr := s.client.VmApi.ReadVms(s.auth, &opts)
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -254,9 +265,11 @@ func (s stack) rpcDeleteVms(vmIDs []string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, innerErr := s.client.VmApi.DeleteVms(s.auth, &opts)
-			return innerErr
+			_, hr, innerErr := s.client.VmApi.DeleteVms(s.auth, &opts)
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -276,9 +289,12 @@ func (s stack) rpcCreateNetwork(name, cidr string) (osc.Net, fail.Error) {
 	var resp osc.CreateNetResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.NetApi.CreateNet(s.auth, &opts)
-			return err
+			dr, hr, innerXerr := s.client.NetApi.CreateNet(s.auth, &opts)
+			if innerXerr != nil {
+				return newOutscaleError(hr, innerXerr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -314,9 +330,11 @@ func (s stack) rpcUpdateNet(networkID, dhcpOptionsSetID string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.NetApi.UpdateNet(s.auth, &opts)
-			return err
+			_, hr, err := s.client.NetApi.UpdateNet(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -334,9 +352,11 @@ func (s stack) rpcDeleteNetwork(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, innerErr := s.client.NetApi.DeleteNet(s.auth, &opts)
-			return innerErr
+			_, hr, innerErr := s.client.NetApi.DeleteNet(s.auth, &opts)
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -358,9 +378,11 @@ func (s stack) rpcCreateTags(id string, tags map[string]string) ([]osc.ResourceT
 	}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, innerErr := s.client.TagApi.CreateTags(s.auth, &opts)
-			return innerErr
+			_, hr, innerErr := s.client.TagApi.CreateTags(s.auth, &opts)
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -382,9 +404,11 @@ func (s stack) rpcDeleteSubnet(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.SubnetApi.DeleteSubnet(s.auth, &opts)
-			return err
+			_, hr, err := s.client.SubnetApi.DeleteSubnet(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -411,9 +435,12 @@ func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (osc.Subnet, fail.Error
 	var resp osc.CreateSubnetResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.SubnetApi.CreateSubnet(s.auth, &createRequest)
-			return err
+			dr, hr, innerXerr := s.client.SubnetApi.CreateSubnet(s.auth, &createRequest)
+			if innerXerr != nil {
+				return newOutscaleError(hr, innerXerr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -437,9 +464,11 @@ func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (osc.Subnet, fail.Error
 	}
 	xerr = stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.SubnetApi.UpdateSubnet(s.auth, &updateRequest)
-			return err
+			_, hr, err := s.client.SubnetApi.UpdateSubnet(s.auth, &updateRequest)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -474,9 +503,12 @@ func (s stack) rpcReadSubnets(networkID string, ids []string) ([]osc.Subnet, fai
 	var resp osc.ReadSubnetsResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.SubnetApi.ReadSubnets(s.auth, &opts)
-			return err
+			dr, hr, innerXerr := s.client.SubnetApi.ReadSubnets(s.auth, &opts)
+			if innerXerr != nil {
+				return newOutscaleError(hr, innerXerr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -529,9 +561,12 @@ func (s stack) rpcReadTagsOfResource(resourceID string) (map[string]string, fail
 	var resp osc.ReadTagsResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.TagApi.ReadTags(s.auth, &opts)
-			return err
+			dr, hr, innerXerr := s.client.TagApi.ReadTags(s.auth, &opts)
+			if innerXerr != nil {
+				return newOutscaleError(hr, innerXerr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -560,9 +595,12 @@ func (s stack) rpcReadNics(subnetID, hostID string) ([]osc.Nic, fail.Error) {
 	var resp osc.ReadNicsResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.NicApi.ReadNics(s.auth, &opts)
-			return err
+			dr, hr, innerXerr := s.client.NicApi.ReadNics(s.auth, &opts)
+			if innerXerr != nil {
+				return newOutscaleError(hr, innerXerr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -606,9 +644,12 @@ func (s stack) rpcCreateNic(subnetID, name, description string, sgs []string) (o
 	var resp osc.CreateNicResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.NicApi.CreateNic(s.auth, &opts)
-			return err
+			dr, hr, innerXerr := s.client.NicApi.CreateNic(s.auth, &opts)
+			if innerXerr != nil {
+				return newOutscaleError(hr, innerXerr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -645,14 +686,20 @@ func (s stack) rpcDeleteNic(id string) fail.Error {
 			NicId: id,
 		}),
 	}
-	return stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.NicApi.DeleteNic(s.auth, &opts)
-			return err
+			_, hr, err := s.client.NicApi.DeleteNic(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
+	if xerr != nil {
+		return xerr
+	}
+	return nil
 }
 
 func (s stack) rpcLinkNic(vmID, nicID string, order int32) fail.Error {
@@ -672,9 +719,11 @@ func (s stack) rpcLinkNic(vmID, nicID string, order int32) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.NicApi.LinkNic(s.auth, &opts)
-			return err
+			_, hr, err := s.client.NicApi.LinkNic(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -689,10 +738,13 @@ func (s stack) rpcCreateDhcpOptions(name string, dnsServers, ntpServers []string
 	}
 	var resp osc.CreateDhcpOptionsResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.DhcpOptionApi.CreateDhcpOptions(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, innerXerr := s.client.DhcpOptionApi.CreateDhcpOptions(s.auth, &opts)
+			if innerXerr != nil {
+				return newOutscaleError(hr, innerXerr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -725,9 +777,12 @@ func (s stack) rpcReadDhcpOptionsByID(id string) ([]osc.DhcpOptionsSet, fail.Err
 	var resp osc.ReadDhcpOptionsResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.DhcpOptionApi.ReadDhcpOptions(s.auth, &opts)
-			return err
+			dr, hr, innerXerr := s.client.DhcpOptionApi.ReadDhcpOptions(s.auth, &opts)
+			if innerXerr != nil {
+				return newOutscaleError(hr, innerXerr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -752,9 +807,11 @@ func (s stack) rpcDeleteDhcpOptions(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.DhcpOptionApi.DeleteDhcpOptions(s.auth, &opts)
-			return err
+			_, hr, err := s.client.DhcpOptionApi.DeleteDhcpOptions(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -772,9 +829,12 @@ func (s stack) rpcCreateFlexibleGpu(model string) (osc.FlexibleGpu, fail.Error) 
 	var resp osc.CreateFlexibleGpuResponse
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &createFlexibleGpuOpts)
-			return err
+			dr, hr, innerXerr := s.client.FlexibleGpuApi.CreateFlexibleGpu(s.auth, &createFlexibleGpuOpts)
+			if innerXerr != nil {
+				return newOutscaleError(hr, innerXerr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -793,9 +853,11 @@ func (s stack) rpcLinkFlexibleGpu(gpuID, vmID string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.FlexibleGpuApi.LinkFlexibleGpu(s.auth, &opts)
-			return err
+			_, hr, err := s.client.FlexibleGpuApi.LinkFlexibleGpu(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -813,9 +875,11 @@ func (s stack) rpcDeleteFlexibleGpu(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.FlexibleGpuApi.DeleteFlexibleGpu(s.auth, &opts)
-			return err
+			_, hr, err := s.client.FlexibleGpuApi.DeleteFlexibleGpu(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -838,9 +902,11 @@ func (s stack) rpcUpdateVMSecurityGroups(id string, sgs []string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.VmApi.UpdateVm(s.auth, &opts)
-			return err
+			_, hr, err := s.client.VmApi.UpdateVm(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -858,10 +924,13 @@ func (s stack) rpcCreateVolume(name string, size int32, iops int32, speed string
 	}
 	var resp osc.CreateVolumeResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.VolumeApi.CreateVolume(s.auth, &createVolumeOpts)
-			return err
+		func() error {
+			dr, hr, err := s.client.VolumeApi.CreateVolume(s.auth, &createVolumeOpts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -901,10 +970,13 @@ func (s stack) rpcReadVolumes(ids []string) ([]osc.Volume, fail.Error) {
 	}
 	var resp osc.ReadVolumesResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.VolumeApi.ReadVolumes(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.VolumeApi.ReadVolumes(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -956,10 +1028,13 @@ func (s stack) rpcReadVolumeByName(name string) (osc.Volume, fail.Error) {
 	}
 	var resp osc.ReadVolumesResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.VolumeApi.ReadVolumes(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.VolumeApi.ReadVolumes(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -987,9 +1062,11 @@ func (s stack) rpcDeleteVolume(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.VolumeApi.DeleteVolume(s.auth, &opts)
-			return err
+			_, hr, err := s.client.VolumeApi.DeleteVolume(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1014,9 +1091,11 @@ func (s stack) rpcLinkVolume(volumeID, hostID, deviceName string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.VolumeApi.LinkVolume(s.auth, &opts)
-			return err
+			_, hr, err := s.client.VolumeApi.LinkVolume(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1034,9 +1113,11 @@ func (s stack) rpcUnlinkVolume(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.VolumeApi.UnlinkVolume(s.auth, &opts)
-			return err
+			_, hr, err := s.client.VolumeApi.UnlinkVolume(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1058,9 +1139,11 @@ func (s stack) rpcLinkInternetService(networkID, internetServiceID string) fail.
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.InternetServiceApi.LinkInternetService(s.auth, &opts)
-			return err
+			_, hr, err := s.client.InternetServiceApi.LinkInternetService(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1078,9 +1161,11 @@ func (s stack) rpcDeleteInternetService(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.InternetServiceApi.DeleteInternetService(s.auth, &opts)
-			return err
+			_, hr, err := s.client.InternetServiceApi.DeleteInternetService(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1093,10 +1178,13 @@ func (s stack) rpcCreateInternetService(name string) (osc.InternetService, fail.
 
 	var resp osc.CreateInternetServiceResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
-			return err
+		func() error {
+			dr, hr, err := s.client.InternetServiceApi.CreateInternetService(s.auth, nil)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1138,9 +1226,11 @@ func (s stack) rpcUnlinkInternetService(networkID, internetServiceID string) fai
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.InternetServiceApi.UnlinkInternetService(s.auth, &opts)
-			return err
+			_, hr, err := s.client.InternetServiceApi.UnlinkInternetService(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1158,10 +1248,13 @@ func (s stack) rpcReadInternetServices(ids []string) ([]osc.InternetService, fai
 	}
 	var resp osc.ReadInternetServicesResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.InternetServiceApi.ReadInternetServices(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.InternetServiceApi.ReadInternetServices(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1189,9 +1282,11 @@ func (s stack) rpcCreateRoute(internetServiceID, routeTableID, destination strin
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.RouteApi.CreateRoute(s.auth, &opts)
-			return err
+			_, hr, err := s.client.RouteApi.CreateRoute(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1209,10 +1304,13 @@ func (s stack) rpcReadRouteTablesOfNetworks(networkIDs []string) ([]osc.RouteTab
 	}
 	var resp osc.ReadRouteTablesResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.RouteTableApi.ReadRouteTables(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.RouteTableApi.ReadRouteTables(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1265,10 +1363,13 @@ func (s stack) rpcReadNets(ids []string) ([]osc.Net, fail.Error) {
 		resp       osc.ReadNetsResponse
 	)
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.NetApi.ReadNets(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.NetApi.ReadNets(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1318,10 +1419,13 @@ func (s stack) rpcReadNetByName(name string) (osc.Net, fail.Error) {
 	}
 	var resp osc.ReadNetsResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.NetApi.ReadNets(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.NetApi.ReadNets(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1355,10 +1459,13 @@ func (s stack) rpcCreateSecurityGroup(networkID, name, description string) (osc.
 	}
 	var resp osc.CreateSecurityGroupResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.SecurityGroupApi.CreateSecurityGroup(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.SecurityGroupApi.CreateSecurityGroup(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1380,9 +1487,11 @@ func (s stack) rpcDeleteSecurityGroup(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &opts)
-			return err
+			_, hr, err := s.client.SecurityGroupApi.DeleteSecurityGroup(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1408,9 +1517,11 @@ func (s stack) rpcCreateSecurityGroupRules(id, flow string, rules []osc.Security
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &opts)
-			return err
+			_, hr, err := s.client.SecurityGroupRuleApi.CreateSecurityGroupRule(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1440,9 +1551,11 @@ func (s stack) rpcDeleteSecurityGroupRules(id, flow string, rules []osc.Security
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &opts)
-			return err
+			_, hr, err := s.client.SecurityGroupRuleApi.DeleteSecurityGroupRule(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1464,9 +1577,11 @@ func (s stack) rpcCreateKeypair(name string, publicKey string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.KeypairApi.CreateKeypair(s.auth, &opts)
-			return err
+			_, hr, err := s.client.KeypairApi.CreateKeypair(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1484,10 +1599,13 @@ func (s stack) rpcReadKeypairs(names []string) ([]osc.Keypair, fail.Error) {
 	}
 	var resp osc.ReadKeypairsResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.KeypairApi.ReadKeypairs(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.KeypairApi.ReadKeypairs(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1535,9 +1653,11 @@ func (s stack) rpcDeleteKeypair(name string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.KeypairApi.DeleteKeypair(s.auth, &opts)
-			return err
+			_, hr, err := s.client.KeypairApi.DeleteKeypair(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1555,10 +1675,13 @@ func (s stack) rpcReadImages(ids []string) ([]osc.Image, fail.Error) {
 	}
 	var resp osc.ReadImagesResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.ImageApi.ReadImages(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.ImageApi.ReadImages(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1610,9 +1733,11 @@ func (s stack) rpcLinkPublicIP(ipID, nicID string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.PublicIpApi.LinkPublicIp(s.auth, &opts)
-			return err
+			_, hr, err := s.client.PublicIpApi.LinkPublicIp(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1630,9 +1755,11 @@ func (s stack) rpcDeletePublicIPByID(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &opts)
-			return err
+			_, hr, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1646,9 +1773,11 @@ func (s stack) rpcDeletePublicIPByIP(ip string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &opts)
-			return err
+			_, hr, err := s.client.PublicIpApi.DeletePublicIp(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1657,10 +1786,13 @@ func (s stack) rpcDeletePublicIPByIP(ip string) fail.Error {
 func (s stack) rpcCreatePublicIP() (osc.PublicIp, fail.Error) {
 	var resp osc.CreatePublicIpResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
-			return err
+		func() error {
+			dr, hr, err := s.client.PublicIpApi.CreatePublicIp(s.auth, nil)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1673,12 +1805,15 @@ func (s stack) rpcCreatePublicIP() (osc.PublicIp, fail.Error) {
 func (s stack) rpcCreateVMs(request osc.CreateVmsRequest) ([]osc.Vm, fail.Error) {
 	var resp osc.CreateVmsResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (innerErr error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, innerErr = s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
+		func() (err error) {
+			dr, hr, innerErr := s.client.VmApi.CreateVms(s.auth, &osc.CreateVmsOpts{
 				CreateVmsRequest: optional.NewInterface(request),
 			})
-			return innerErr
+			if innerErr != nil {
+				return newOutscaleError(hr, innerErr)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1703,10 +1838,13 @@ func (s stack) rpcReadPublicIPsOfVM(id string) ([]osc.PublicIp, fail.Error) {
 	}
 	var resp osc.ReadPublicIpsResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.PublicIpApi.ReadPublicIps(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.PublicIpApi.ReadPublicIps(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
@@ -1732,9 +1870,11 @@ func (s stack) rpcStopVMs(ids []string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.VmApi.StopVms(s.auth, &opts)
-			return err
+			_, hr, err := s.client.VmApi.StopVms(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1752,9 +1892,11 @@ func (s stack) rpcStartVMs(ids []string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.VmApi.StartVms(s.auth, &opts)
-			return err
+			_, hr, err := s.client.VmApi.StartVms(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1773,9 +1915,11 @@ func (s stack) rpcRebootVMs(ids []string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.VmApi.RebootVms(s.auth, &opts)
-			return err
+			_, hr, err := s.client.VmApi.RebootVms(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1797,9 +1941,11 @@ func (s stack) rpcUpdateVMType(id string, typ string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			// FIXME: *http.Response must be taken into account for retries
-			_, _, err := s.client.VmApi.UpdateVm(s.auth, &opts)
-			return err
+			_, hr, err := s.client.VmApi.UpdateVm(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			return nil
 		},
 		normalizeError,
 	)
@@ -1815,10 +1961,13 @@ func (s stack) rpcReadNicsOfVM(id string) ([]osc.Nic, fail.Error) {
 	}
 	var resp osc.ReadNicsResponse
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			// FIXME: *http.Response must be taken into account for retries
-			resp, _, err = s.client.NicApi.ReadNics(s.auth, &opts)
-			return err
+		func() error {
+			dr, hr, err := s.client.NicApi.ReadNics(s.auth, &opts)
+			if err != nil {
+				return newOutscaleError(hr, err)
+			}
+			resp = dr
+			return nil
 		},
 		normalizeError,
 	)
