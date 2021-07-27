@@ -539,7 +539,7 @@ func TestErrCheckPanicNoTimeout(t *testing.T) {
 		t.FailNow()
 	}
 
-	reason := fail.Cause(xerr)
+	reason := fail.RootCause(xerr)
 	if reason == nil {
 		t.Errorf("it MUST have a cause")
 		t.FailNow()
@@ -575,15 +575,15 @@ func TestErrCheckNoTimeout(t *testing.T) {
 		t.FailNow()
 	}
 
-	reason := fail.Cause(xerr)
+	reason := fail.RootCause(xerr)
 	if reason == nil {
 		t.Errorf("it MUST have a cause")
 		t.FailNow()
 	}
 
-	// In this case the Cause and the RootCause are the same because we have only 1 level of nesting
 	otherReason := fail.Cause(xerr)
-	if _, ok := otherReason.(*fail.ErrNotFound); !ok {
+	if _, ok := otherReason.(fail.Error); ok {
+		t.Errorf("the cause MUST be a wrap, here it's not: %v", otherReason)
 		t.FailNow()
 	}
 

@@ -198,9 +198,17 @@ func RootCause(err error) (resp error) {
 	return lastUnwrap(err)
 }
 
-// Cause returns the cause of an error if it implements the causer interface
+// Cause returns the direct cause of an error if it implements the causer interface and that cause is not-nil
+// in any other case, returns the unmodified error 'err'
 func Cause(err error) (resp error) {
-	return lastUnwrap(err)
+	if ci, ok := err.(causer); ok {
+		cau := ci.Cause()
+		if cau != nil {
+			return cau
+		}
+		return err
+	}
+	return err
 }
 
 // ConvertError converts an error to a fail.Error

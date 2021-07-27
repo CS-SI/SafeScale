@@ -549,3 +549,43 @@ func TestNiceLoop(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+func TestHelperCauseFunction(t *testing.T) {
+	aerr := AbortedError(fmt.Errorf("this was painful: %w", fmt.Errorf("this broke my heart")))
+	direct_cause := aerr.Cause()
+	indirect_cause := Cause(aerr)
+
+	assert.EqualValues(t, direct_cause, indirect_cause)
+}
+
+func TestHelperRootCauseFunction(t *testing.T) {
+	aerr := AbortedError(fmt.Errorf("this was painful: %w", fmt.Errorf("this broke my heart")))
+	direct_cause := aerr.RootCause()
+	indirect_cause := RootCause(aerr)
+
+	assert.EqualValues(t, direct_cause, indirect_cause)
+}
+
+func TestLastUnwrap(t *testing.T) {
+	aerr := AbortedError(fmt.Errorf("this was painful: %w", fmt.Errorf("this broke my heart")))
+	recovered := lastUnwrap(aerr)
+	indirect_recovered := RootCause(aerr)
+
+	assert.EqualValues(t, recovered, indirect_recovered)
+
+	recovered = lastUnwrapOrNil(aerr)
+	assert.EqualValues(t, recovered, indirect_recovered)
+}
+
+func TestLastUnwrapOrNil(t *testing.T) {
+	aerr := AbortedError(nil, "why is so complicated ?")
+	recovered := lastUnwrap(aerr)
+	indirect_recovered := RootCause(aerr)
+	assert.NotNil(t, indirect_recovered)
+	assert.NotNil(t, recovered)
+
+	assert.EqualValues(t, recovered, indirect_recovered)
+
+	recovered = lastUnwrapOrNil(aerr)
+	assert.Nil(t, recovered)
+}
