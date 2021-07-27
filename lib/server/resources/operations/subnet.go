@@ -114,21 +114,21 @@ func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bo
 		return svc.ListSubnets(networkID)
 	}
 
-	rs, xerr := NewSubnet(svc)
+	subnetInstance, xerr := NewSubnet(svc)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	// recover subnets from metadata
+	// recover Subnets from metadata
 	var list []*abstract.Subnet
-	xerr = rs.Browse(ctx, func(as *abstract.Subnet) fail.Error {
+	xerr = subnetInstance.Browse(ctx, func(abstractSubnet *abstract.Subnet) fail.Error {
 		if task.Aborted() {
 			return fail.AbortedError(nil, "aborted")
 		}
 
-		if networkID == "" || as.Network == networkID {
-			list = append(list, as)
+		if networkID == "" || abstractSubnet.Network == networkID {
+			list = append(list, abstractSubnet)
 		}
 		return nil
 	})

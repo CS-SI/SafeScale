@@ -147,69 +147,6 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 	return rn, nil
 }
 
-// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
-// // upgradeNetworkMetadatasIfNeeded upgrades properties to most recent version
-// func (instance *network) upgradeNetworkMetadataIfNeeded() fail.Error {
-// 	xerr := instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-// 		abstractNetwork, ok := clonable.(*abstract.Network)
-// 		if !ok {
-// 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 		}
-//
-// 		if !props.Lookup(networkproperty.SubnetsV1) {
-// 			svc := instance.GetService()
-//
-// 			// -- creates Subnet in metadata --
-// 			rs, xerr := NewSubnet(svc)
-// 			xerr = debug.InjectPlannedFail(xerr)
-// 			if xerr != nil {
-// 				return xerr
-// 			}
-// 			abstractSubnet, xerr := svc.InspectSubnetByName(instance.GetName(), instance.GetName())
-// 			if xerr != nil {
-// 				return xerr
-// 			}
-//
-// 			abstractSubnet.Network = abstractNetwork.ID
-// 			abstractSubnet.IPVersion = ipversion.IPv4
-// 			abstractSubnet.DNSServers = abstractNetwork.DNSServers
-// 			abstractSubnet.Domain = abstractNetwork.Domain
-// 			abstractSubnet.VIP = abstractNetwork.VIP
-// 			abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.GatewayID)
-// 			if abstractNetwork.SecondaryGatewayID != "" {
-// 				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.SecondaryGatewayID)
-// 			}
-// 			abstractSubnet.State = subnetstate.Ready
-// 			xerr = rs.(*subnet).carry(abstractSubnet)
-// 			xerr = debug.InjectPlannedFail(xerr)
-// 			if xerr != nil {
-// 				return xerr
-// 			}
-//
-// 			// -- add reference to subnet in network properties --
-// 			xerr = props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-// 				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
-// 				}
-// 				subnetsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
-// 				subnetsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
-// 				return nil
-// 			})
-//
-// 			// -- finally clear deprecated field of abstractNetwork --
-// 			abstractNetwork.VIP = nil
-// 			abstractNetwork.GatewayID, abstractNetwork.SecondaryGatewayID = "", ""
-// 			abstractNetwork.Domain = ""
-// 			return nil
-// 		}
-//
-// 		// called when nothing has been changed, to prevent useless metadata update
-// 		return fail.AlteredNothingError()
-// 	})
-// 	return xerr
-// }
-
 // IsNull tells if the instance corresponds to subnet Null Value
 func (instance *Network) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
@@ -284,7 +221,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 		}
 
 		if routable {
-			return fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose an appropriate CIDR (RFC1918)")
+			return fail.InvalidRequestError("cannot create such a Networking, CIDR must not be routable; please choose abstractNetwork appropriate CIDR (RFC1918)")
 		}
 	}
 
@@ -294,7 +231,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	// Create the Network
 	logrus.Debugf("Creating Network '%s' with CIDR '%s'...", req.Name, req.CIDR)
-	an, xerr := svc.CreateNetwork(req)
+	abstractNetwork, xerr := svc.CreateNetwork(req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -302,7 +239,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	defer func() {
 		if xerr != nil && !req.KeepOnFailure {
-			derr := svc.DeleteNetwork(an.ID)
+			derr := svc.DeleteNetwork(abstractNetwork.ID)
 			derr = debug.InjectPlannedFail(derr)
 			if derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
@@ -316,7 +253,8 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	// Write subnet object metadata
 	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
-	return instance.carry(an)
+	abstractNetwork.Imported = false
+	return instance.carry(abstractNetwork)
 }
 
 // carry registers clonable as core value and deals with cache
@@ -362,6 +300,76 @@ func (instance *Network) carry(clonable data.Clonable) (xerr fail.Error) {
 	cacheEntry.LockContent()
 
 	return nil
+}
+
+// Import imports an existing Network in SafeScale metadata
+func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if instance == nil || instance.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+		default:
+		}
+	}
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	tracer := debug.NewTracer(task, true, "('%s')", ref).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	// Check if Network already exists and is managed by SafeScale
+	svc := instance.GetService()
+	if existing, xerr := LoadNetwork(svc, ref); xerr == nil {
+		existing.Released()
+		return fail.DuplicateError("cannot import Network '%s': there is already such a Network in metadata", ref)
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	// Verify if the subnet already exist and in this case is not managed by SafeScale
+	abstractNetwork, xerr := svc.InspectNetworkByName(ref)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			abstractNetwork, xerr = svc.InspectNetwork(ref)
+		default:
+			return xerr
+		}
+	}
+	if xerr != nil {
+		return xerr
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	// Write subnet object metadata
+	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
+	abstractNetwork.Imported = true
+	return instance.carry(abstractNetwork)
 }
 
 // Browse walks through all the metadata objects in subnet
@@ -446,7 +454,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 	defer instance.lock.Unlock()
 
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		an, ok := clonable.(*abstract.Network)
+		abstractNetwork, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
@@ -507,36 +515,39 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 			return fail.InvalidRequestError("failed to delete Network '%s', %d Subnets still inside", instance.GetName(), subnetsLen)
 		}
 
-		// delete Network, with tolerance
-		if innerXErr = svc.DeleteNetwork(an.ID); innerXErr != nil {
-			switch innerXErr.(type) {
-			case *fail.ErrNotFound:
-				// If Network does not exist anymore on the provider side, do not fail to cleanup the metadata: log and continue
-				logrus.Debugf("failed to find Network on provider side, cleaning up metadata.")
-			case *fail.ErrTimeout:
-				logrus.Error("cannot delete Network due to a timeout")
-				errWaitMore := retry.WhileUnsuccessfulDelay1Second(
-					func() error {
-						recNet, recErr := svc.InspectNetwork(an.ID)
-						if recNet != nil {
-							return fmt.Errorf("still there")
-						}
+		// delete Network if not imported, with tolerance
+		if !abstractNetwork.Imported {
+			innerXErr = svc.DeleteNetwork(abstractNetwork.ID)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// If Network does not exist anymore on the provider side, do not fail to cleanup the metadata: log and continue
+					logrus.Debugf("failed to find Network on provider side, cleaning up metadata.")
+				case *fail.ErrTimeout:
+					logrus.Error("cannot delete Network due to a timeout")
+					errWaitMore := retry.WhileUnsuccessfulDelay1Second(
+						func() error {
+							recNet, recErr := svc.InspectNetwork(abstractNetwork.ID)
+							if recNet != nil {
+								return fmt.Errorf("still there")
+							}
 
-						if _, ok := recErr.(*fail.ErrNotFound); ok {
-							return nil
-						}
+							if _, ok := recErr.(*fail.ErrNotFound); ok {
+								return nil
+							}
 
-						return fail.Wrap(recErr, "another kind of error")
-					},
-					temporal.GetContextTimeout(),
-				)
-				if errWaitMore != nil {
-					_ = innerXErr.AddConsequence(errWaitMore)
+							return fail.Wrap(recErr, "another kind of error")
+						},
+						temporal.GetContextTimeout(),
+					)
+					if errWaitMore != nil {
+						_ = innerXErr.AddConsequence(errWaitMore)
+						return innerXErr
+					}
+				default:
+					logrus.Errorf(innerXErr.Error())
 					return innerXErr
 				}
-			default:
-				logrus.Errorf(innerXErr.Error())
-				return innerXErr
 			}
 		}
 		return nil
