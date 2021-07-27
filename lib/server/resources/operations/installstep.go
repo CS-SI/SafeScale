@@ -486,16 +486,22 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -x -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
 	}
 
-	// FIXME, If retcode is 126, iterate a few times...
-
-	rounds := 6
+	// If retcode is 126, iterate a few times...
+	rounds := 10
 	var retcode int
 	var outrun string
 	var outerr string
 	for {
 		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+		if retcode == 126 {
+			logrus.Debugf("Text busy happened")
+		}
+
 		// Executes the script on the remote host
 		if retcode != 126 || rounds == 0 {
+			if retcode == 126 {
+				logrus.Warnf("Text busy killed the script")
+			}
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				_ = xerr.Annotate("stdout", outrun)
@@ -505,14 +511,28 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 				break
 			}
 		}
-		if !strings.Contains(outrun, "bad interpreter") {
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				_ = xerr.Annotate("stdout", outrun)
-				_ = xerr.Annotate("stderr", outerr)
-				return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
-			} else {
-				break
+
+		if !(strings.Contains(outrun, "bad interpreter") || strings.Contains(outerr, "bad interpreter")) {
+			if xerr == nil {
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					_ = xerr.Annotate("stdout", outrun)
+					_ = xerr.Annotate("stderr", outerr)
+					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
+				} else {
+					break
+				}
+			}
+
+			if !strings.Contains(xerr.Error(), "bad interpreter") {
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					_ = xerr.Annotate("stdout", outrun)
+					_ = xerr.Annotate("stderr", outerr)
+					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
+				} else {
+					break
+				}
 			}
 		}
 

@@ -521,15 +521,28 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	}
 
 	// If is 126, try again 6 times, if not return the error
-	rounds := 6
+	rounds := 10
 	for {
 		rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
+		if rc == 126 {
+			logrus.Debugf("Text busy happened")
+		}
+
 		if rc != 126 || rounds == 0 {
+			if rc == 126 {
+				logrus.Warnf("Text busy killed the script")
+			}
 			return rc, stdout, stderr, err
 		}
 
-		if !strings.Contains(stdout, "bad interpreter") {
-			return rc, stdout, stderr, err
+		if !(strings.Contains(stdout, "bad interpreter") || strings.Contains(stderr, "bad interpreter")) {
+			if err == nil {
+				return rc, stdout, stderr, err
+			}
+
+			if !strings.Contains(err.Error(), "bad interpreter") {
+				return rc, stdout, stderr, err
+			}
 		}
 
 		rounds = rounds - 1
