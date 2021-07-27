@@ -290,9 +290,7 @@ func (s Stack) DeleteVolume(id string) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
-			if xerr.Cause() != nil {
-				xerr = fail.ConvertError(xerr.Cause())
-			}
+			xerr = fail.ConvertError(fail.Cause(xerr))
 		}
 	}
 	return xerr

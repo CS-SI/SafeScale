@@ -429,9 +429,9 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHC, fail.ConvertError(retryErr.Cause())
+			return nullAHC, fail.ConvertError(fail.Cause(retryErr))
 		case *retry.ErrTimeout:
-			return nullAHC, fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", ahf.GetID(), timeout)
+			return nullAHC, fail.Wrap(fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", ahf.GetID(), timeout)
 		default:
 			return nullAHC, retryErr
 		}
@@ -600,9 +600,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHF, nullUDC, fail.ConvertError(xerr.Cause())
+			return nullAHF, nullUDC, fail.ConvertError(fail.Cause(xerr))
 		case *fail.ErrTimeout:
-			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "failed to create Host because of timeout")
+			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "failed to create Host because of timeout")
 		default:
 			return nullAHF, nullUDC, xerr
 		}
@@ -1039,7 +1039,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", hostRef, temporal.GetHostCleanupTimeout())
+			return fail.Wrap(fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef, temporal.GetHostCleanupTimeout())
 		default:
 			return retryErr
 		}
@@ -1084,7 +1084,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout waiting to get information of host '%s' after %v", hostRef, temporal.GetHostCleanupTimeout())
+			return fail.Wrap(fail.Cause(retryErr), "timeout waiting to get information of host '%s' after %v", hostRef, temporal.GetHostCleanupTimeout())
 		default:
 			return retryErr
 		}

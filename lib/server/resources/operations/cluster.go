@@ -1067,7 +1067,7 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 			case *retry.ErrTimeout:
 				xerr = fail.Wrap(xerr, "timeout waiting Cluster transitioning from state Stopping to Stopped")
 			case *retry.ErrStopRetry:
-				xerr = fail.ConvertError(xerr.Cause())
+				xerr = fail.ConvertError(fail.Cause(xerr))
 			}
 		}
 		return xerr
@@ -2771,7 +2771,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout, *fail.ErrAborted:
-				xerr = fail.ConvertError(xerr.Cause())
+				xerr = fail.ConvertError(fail.Cause(xerr))
 			default:
 			}
 		}
@@ -2811,9 +2811,9 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
-				xerr = fail.ConvertError(xerr.Cause())
+				xerr = fail.ConvertError(fail.Cause(xerr))
 			case *fail.ErrAborted:
-				xerr = fail.ConvertError(xerr.Cause())
+				xerr = fail.ConvertError(fail.Cause(xerr))
 			}
 		}
 		xerr = debug.InjectPlannedFail(xerr)

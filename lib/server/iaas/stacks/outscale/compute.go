@@ -540,7 +540,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return nullAHC, fail.ConvertError(xerr.Cause())
+			return nullAHC, fail.ConvertError(fail.Cause(xerr))
 		case *retry.ErrStopRetry:
 			return nullAHC, fail.NotFoundError("failed to find Host %s", hostLabel)
 		default:
@@ -925,7 +925,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(xerr.Cause())
+			xerr = fail.ConvertError(fail.Cause(xerr))
 		default:
 		}
 	}

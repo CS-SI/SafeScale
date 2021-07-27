@@ -1687,12 +1687,9 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			if retryErr.Cause() != nil {
-				return fail.ConvertError(retryErr.Cause())
-			}
-			return retryErr
+			return fail.ConvertError(fail.Cause(retryErr))
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout waiting to get host %s information after %v", instance.InstanceId, temporal.GetHostCleanupTimeout())
+			return fail.Wrap(fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId, temporal.GetHostCleanupTimeout())
 		default:
 			return retryErr
 		}

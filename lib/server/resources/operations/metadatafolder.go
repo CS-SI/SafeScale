@@ -310,7 +310,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 			if innerXErr != nil {
 				switch innerXErr.(type) { //nolint
 				case *retry.ErrTimeout:
-					innerXErr = fail.Wrap(innerXErr.Cause(), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
+					innerXErr = fail.Wrap(fail.Cause(innerXErr), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
 				}
 			}
 			return innerXErr
@@ -330,7 +330,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 	if xerr != nil {
 		switch xerr.(type) { //nolint
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
+			xerr = fail.ConvertError(fail.Wrap(fail.Cause(xerr), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
 		}
 	}
 	return xerr

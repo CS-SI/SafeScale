@@ -452,7 +452,7 @@ func (instance *taskGroup) addErrorsAsConsequence(in map[string]error, out *fail
 		added := false
 		switch cerr := e.(type) {
 		case *fail.ErrAborted:
-			cause := fail.ConvertError(cerr.Cause())
+			cause := fail.ConvertError(fail.Cause(cerr))
 			if cause != nil {
 				_ = (*out).AddConsequence(fail.Wrap(cause, "%s", i))
 				added = true
@@ -472,7 +472,7 @@ func (instance *taskGroup) buildErrorList(in map[string]error) fail.Error {
 		added := false
 		switch cerr := e.(type) {
 		case *fail.ErrAborted:
-			cause := fail.ConvertError(cerr.Cause())
+			cause := fail.ConvertError(fail.Cause(cerr))
 			if cause != nil {
 				errors = append(errors, fail.Wrap(cause, "%s", child))
 				added = true

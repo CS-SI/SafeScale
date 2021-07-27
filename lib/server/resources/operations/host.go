@@ -1553,7 +1553,7 @@ func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return status, fail.Wrap(xerr.Cause(), "failed to wait for SSH on Host '%s' to be ready after %s (phase %s): %s", instance.GetName(), temporal.FormatDuration(duration), phase, status)
+			return status, fail.Wrap(fail.Cause(xerr), "failed to wait for SSH on Host '%s' to be ready after %s (phase %s): %s", instance.GetName(), temporal.FormatDuration(duration), phase, status)
 		default:
 		}
 		if abstract.IsProvisioningError(xerr) {
@@ -2362,7 +2362,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
-					innerXErr = fail.ConvertError(innerXErr.Cause())
+					innerXErr = fail.ConvertError(fail.Cause(innerXErr))
 				default:
 				}
 			}
@@ -2690,7 +2690,7 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted:
-			if cerr := fail.ConvertError(xerr.Cause()); cerr != nil {
+			if cerr := fail.ConvertError(fail.Cause(xerr)); cerr != nil {
 				return cerr
 			}
 			return xerr
@@ -2762,7 +2762,7 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted:
-			if cerr := fail.ConvertError(xerr.Cause()); cerr != nil {
+			if cerr := fail.ConvertError(fail.Cause(xerr)); cerr != nil {
 				return cerr
 			}
 			return xerr

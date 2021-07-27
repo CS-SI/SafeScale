@@ -516,7 +516,7 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 	if xerr = s.rpcDeleteSubnetByName(subn.Name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return fail.Wrap(xerr.Cause(), "timeout waiting for Subnet '%s' deletion", subn.Name)
+			return fail.Wrap(fail.Cause(xerr), "timeout waiting for Subnet '%s' deletion", subn.Name)
 		default:
 			return xerr
 		}

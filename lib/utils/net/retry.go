@@ -66,9 +66,9 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 	if xerr != nil {
 		switch realErr := xerr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(realErr.Cause())
+			xerr = fail.ConvertError(fail.Cause(realErr))
 		case *retry.ErrTimeout:
-			xerr = fail.ConvertError(realErr.Cause())
+			xerr = fail.ConvertError(fail.Cause(realErr))
 		}
 	}
 	return xerr
@@ -103,30 +103,14 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 			// FIXME: net.Error, and by extension url.Error have methods to check if the error is temporary -Temporary()-, or it's a timeout -Timeout()-, we should use the information to make decisions
 
 			// In this case, handle those net.Error accordingly
-			if realErr.Cause() != nil {
-				// FIXME: Cause might be nil unless using an accessor like the Cause function from v20.06, now missing in develop branch; look at cause use cases in develop branch and consider reintroducing it
-				switch cause := realErr.Cause().(type) { // nolint
-				case *url.Error:
-					return normalizeURLError(cause)
-				case net.Error:
-					return realErr
-				// If error is *fail.ErrNotAvailable, *fail.ErrOverflow or *fail.ErrOverload, leave a chance to retry
-				case *fail.ErrNotAvailable, fail.ErrNotAvailable, *fail.ErrOverflow, fail.ErrOverflow, *fail.ErrOverload, fail.ErrOverload:
-					return realErr
-				}
-			} else {
-				switch realErr.(type) { // nolint
-				// If error is *fail.ErrNotAvailable, *fail.ErrOverflow or *fail.ErrOverload, leave a chance to retry
-				case *fail.ErrNotAvailable, *fail.ErrOverflow, *fail.ErrOverload:
-					return realErr
-				case net.Error: // this also covers *url.Error, if the URL needs a specific error treatment, add a case BEFORE this line
-					return realErr
-				}
-			}
-
+			cause := fail.Cause(realErr)
+			switch thecause := cause.(type) { // nolint
+			case *url.Error:
+				return normalizeURLError(thecause)
+			case net.Error:
+				return realErr
 			// If error is *fail.ErrNotAvailable, *fail.ErrOverflow or *fail.ErrOverload, leave a chance to retry
-			switch realErr.(type) {
-			case *fail.ErrNotAvailable, *fail.ErrOverflow, *fail.ErrOverload:
+			case *fail.ErrNotAvailable, fail.ErrNotAvailable, *fail.ErrOverflow, fail.ErrOverflow, *fail.ErrOverload, fail.ErrOverload:
 				return realErr
 			default:
 				return retry.StopRetryError(realErr)

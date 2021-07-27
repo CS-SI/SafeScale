@@ -666,7 +666,7 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 		case *retry.ErrTimeout:
 			return abstract.ResourceTimeoutError("subnet", id, temporal.GetContextTimeout())
 		case *retry.ErrStopRetry:
-			return fail.Wrap(retryErr.Cause(), "failed to delete subnet after %v", temporal.GetContextTimeout())
+			return fail.Wrap(fail.Cause(retryErr), "failed to delete subnet after %v", temporal.GetContextTimeout())
 		default:
 			return retryErr
 		}

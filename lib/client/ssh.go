@@ -119,7 +119,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return invalid, "", "", fail.ConvertError(retryErr.Cause())
+			return invalid, "", "", fail.ConvertError(fail.Cause(retryErr))
 		default:
 			return invalid, "", "", retryErr
 		}

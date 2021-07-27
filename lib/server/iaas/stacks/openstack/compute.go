@@ -694,7 +694,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
-					innerXErr = fail.ConvertError(innerXErr.Cause())
+					innerXErr = fail.ConvertError(fail.Cause(innerXErr))
 				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(innerXErr)
 				}
@@ -755,13 +755,9 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			if cerr := xerr.Cause(); cerr != nil {
-				xerr = fail.ConvertError(cerr)
-			}
+			xerr = fail.ConvertError(fail.Cause(xerr))
 		case *retry.ErrStopRetry:
-			if cerr := xerr.Cause(); cerr != nil {
-				xerr = fail.ConvertError(cerr)
-			}
+			xerr = fail.ConvertError(fail.Cause(xerr))
 		}
 		return nullAHF, nullUDC, xerr
 	}
@@ -1093,9 +1089,9 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *fail.ErrTimeout:
-			retryErr = fail.TimeoutError(retryErr.Cause(), timeout, "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
+			retryErr = fail.TimeoutError(fail.Cause(retryErr), timeout, "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
 		case *fail.ErrAborted:
-			retryErr = fail.ConvertError(retryErr.Cause())
+			retryErr = fail.ConvertError(fail.Cause(retryErr))
 		}
 	}
 	if retryErr != nil {
@@ -1304,7 +1300,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		switch xerr.(type) {
 		case *retry.ErrTimeout, *retry.ErrStopRetry:
 			// On timeout or abort, recover the error cause
-			xerr = fail.ConvertError(xerr.Cause())
+			xerr = fail.ConvertError(fail.Cause(xerr))
 		}
 	}
 	if xerr != nil {
