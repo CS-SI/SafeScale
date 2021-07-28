@@ -731,6 +731,11 @@ feature:
                                     ;;
                             esac
 
+                            # add interfaces to trusted zone of the firewall
+                            sfFirewall --zone=trusted --add-interface=cni0 --permanent || sfFail 224 "failed to add cni0 interface to firewalld trusted zone"
+                            sfFirewall --zone=trusted --add-interface={{.CNI}.1 --permanent || sfFail 225 "failed to add {{.CNI}}.1 interface to firewalld trusted zone"
+                            sfFirewallReload || sfFail 226 "failed to reload firewalld configuration for cni driver {{.CNI}}"
+
                             touch /etc/kubernetes/.joined
                             sfExit 0
 
