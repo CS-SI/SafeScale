@@ -139,6 +139,8 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 
 	v := viper.New()
 	v.AddConfigPath(".")
+	v.AddConfigPath("./features")
+	v.AddConfigPath("./.safescale/features")
 	v.AddConfigPath("$HOME/.safescale/features")
 	v.AddConfigPath("$HOME/.config/safescale/features")
 	v.AddConfigPath("/etc/safescale/features")

@@ -530,8 +530,12 @@ func (instance *Cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	if instance == nil {
 		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")

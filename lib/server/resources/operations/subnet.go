@@ -401,9 +401,12 @@ func (instance *Subnet) Carry(clonable data.Clonable) (xerr fail.Error) {
 func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: do not use .isNull() here
+	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
 		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")

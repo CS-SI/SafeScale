@@ -708,11 +708,12 @@ func (instance *Host) GetState() (state hoststate.Enum) {
 func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (_ *userdata.Content, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
+	if !instance.IsNull() {
+		return nil, fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	hostname := instance.GetName()
 	if hostname != "" {
