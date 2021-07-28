@@ -406,6 +406,10 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		return fail.InvalidInstanceError()
 	}
 	if !instance.IsNull() {
+		subnetName := instance.GetName()
+		if subnetName != "" {
+			return fail.NotAvailableError("already carrying Subnet '%s'", subnetName)
+		}
 		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {

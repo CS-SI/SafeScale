@@ -202,6 +202,12 @@ func (instance *Share) IsNull() bool {
 
 // carry creates metadata and add Volume to service cache
 func (instance *Share) carry(clonable data.Clonable) (xerr fail.Error) {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
@@ -317,6 +323,10 @@ func (instance *Share) Create(
 		return fail.InvalidInstanceError()
 	}
 	if !instance.IsNull() {
+		shareName := instance.GetName()
+		if shareName != "" {
+			return fail.NotAvailableError("already carrying Share '%s'", shareName)
+		}
 		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {

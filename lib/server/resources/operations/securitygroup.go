@@ -180,8 +180,11 @@ func (instance *SecurityGroup) IsNull() bool {
 
 // Carry overloads rv.core.Carry() to add Volume to service cache
 func (instance *SecurityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
-	if instance == nil || instance.IsNull() {
+	if instance == nil {
 		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
@@ -289,6 +292,10 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		return fail.InvalidInstanceError()
 	}
 	if !instance.IsNull() {
+		sgName := instance.GetName()
+		if sgName != "" {
+			return fail.NotAvailableError("already carrying SecurityGroup '%s'", sgName)
+		}
 		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {

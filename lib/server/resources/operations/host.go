@@ -440,6 +440,12 @@ func (instance *Host) IsNull() bool {
 
 // carry ...
 func (instance *Host) carry(clonable data.Clonable) (xerr fail.Error) {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
@@ -713,11 +719,11 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, fail.InvalidInstanceError()
 	}
 	if !instance.IsNull() {
+		hostname := instance.GetName()
+		if hostname != "" {
+			return nil, fail.NotAvailableError("already carrying Host '%s'", hostname)
+		}
 		return nil, fail.InvalidInstanceContentError("instance", "is not null value")
-	}
-	hostname := instance.GetName()
-	if hostname != "" {
-		return nil, fail.NotAvailableError("already carrying Host '%s'", hostname)
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)

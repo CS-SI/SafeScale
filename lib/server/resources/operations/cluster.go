@@ -126,6 +126,7 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 			if innerXErr != nil {
 				return nil, innerXErr
 			}
+
 			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement)
 			if innerXErr = rc.Read(name); innerXErr != nil {
 				return nil, innerXErr
@@ -482,6 +483,12 @@ func (instance *Cluster) IsNull() bool {
 
 // carry ...
 func (instance *Cluster) carry(clonable data.Clonable) (xerr fail.Error) {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	}
 	identifiable, ok := clonable.(data.Identifiable)
 	if !ok {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
@@ -535,6 +542,10 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 		return fail.InvalidInstanceError()
 	}
 	if !instance.IsNull() {
+		clusterName := instance.GetName()
+		if clusterName != "" {
+			return fail.NotAvailableError("already carrying Cluster '%s'", clusterName)
+		}
 		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {

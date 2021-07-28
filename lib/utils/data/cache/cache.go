@@ -242,7 +242,7 @@ func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (_ *Entr
 	return nil, fail.InconsistentError("the reservation does not have a corresponding entry identified by '%s' in %s cache", key, instance.GetName())
 }
 
-// FreeEntry unlocks the cache entry and removes the reservation
+// Free unlocks the cache entry and removes the reservation
 // return:
 //  nil: reservation removed
 //  *fail.ErrNotAvailable: the cache entry identified by 'key' is not reserved

@@ -161,6 +161,10 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 		return fail.InvalidInstanceError()
 	}
 	if !instance.IsNull() {
+		networkName := instance.GetName()
+		if networkName != "" {
+			return fail.NotAvailableError("already carrying Network '%s'", networkName)
+		}
 		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
@@ -263,6 +267,12 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 // carry registers clonable as core value and deals with cache
 func (instance *Network) carry(clonable data.Clonable) (xerr fail.Error) {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	}
 	identifiable, ok := clonable.(data.Identifiable)
 	if !ok {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")

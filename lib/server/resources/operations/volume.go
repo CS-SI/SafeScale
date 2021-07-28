@@ -152,6 +152,12 @@ func (instance *volume) IsNull() bool {
 
 // carry overloads rv.core.Carry() to add Volume to service cache
 func (instance *volume) carry(clonable data.Clonable) (xerr fail.Error) {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
@@ -411,6 +417,10 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		return fail.InvalidInstanceError()
 	}
 	if !instance.IsNull() {
+		volumeName := instance.GetName()
+		if volumeName != "" {
+			return fail.NotAvailableError("already carrying Subnet '%s'", volumeName)
+		}
 		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
