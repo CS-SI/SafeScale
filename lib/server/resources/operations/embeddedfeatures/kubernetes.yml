@@ -91,7 +91,7 @@ feature:
                             sfFail 195 "master didn't join (no .joined file)"
 
             add:
-                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,final
+                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,final
                 steps:
                     sysconf:
                         targets:
@@ -731,11 +731,6 @@ feature:
                                     ;;
                             esac
 
-                            # add interfaces to trusted zone of the firewall
-                            sfFirewall --zone=trusted --add-interface=cni0 --permanent || sfFail 224 "failed to add cni0 interface to firewalld trusted zone"
-                            sfFirewall --zone=trusted --add-interface={{.CNI}.1 --permanent || sfFail 225 "failed to add {{.CNI}}.1 interface to firewalld trusted zone"
-                            sfFirewallReload || sfFail 226 "failed to reload firewalld configuration for cni driver {{.CNI}}"
-
                             touch /etc/kubernetes/.joined
                             sfExit 0
 
@@ -808,6 +803,17 @@ feature:
 
                             touch /etc/kubernetes/.joined
                             sfExit
+
+                    fw:
+                        targets:
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            # add interfaces to trusted zone of the firewall
+                            sfFirewall --zone=trusted --add-interface=cni0 --permanent || sfFail 224 "failed to add cni0 interface to firewalld trusted zone"
+                            sfFirewall --zone=trusted --add-interface={{.CNI}.1 --permanent || sfFail 225 "failed to add {{.CNI}}.1 interface to firewalld trusted zone"
+                            sfFirewallReload || sfFail 226 "failed to reload firewalld configuration for cni driver {{.CNI}}"
 
                     final:
                         targets:
