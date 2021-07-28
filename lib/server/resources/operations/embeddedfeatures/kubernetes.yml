@@ -91,7 +91,7 @@ feature:
                             sfFail 195 "master didn't join (no .joined file)"
 
             add:
-                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,final
+                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
                 steps:
                     sysconf:
                         targets:
@@ -801,7 +801,6 @@ feature:
                             [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 235
                             eval $NODE_JOIN_CMD || sfFail 236
 
-                            touch /etc/kubernetes/.joined
                             sfExit
 
                     fw:
@@ -810,12 +809,17 @@ feature:
                             masters: all
                             nodes: all
                         run: |
+                            [ -f /etc/kubernetes/.joined ] && sfExit
+
                             # add interfaces to trusted zone of the firewall
                             sfFirewall --zone=trusted --add-interface=cni0 --permanent || sfFail 224 "failed to add cni0 interface to firewalld trusted zone"
                             sfFirewall --zone=trusted --add-interface={{.CNI}.1 --permanent || sfFail 225 "failed to add {{.CNI}}.1 interface to firewalld trusted zone"
                             sfFirewallReload || sfFail 226 "failed to reload firewalld configuration for cni driver {{.CNI}}"
 
-                    final:
+                            touch /etc/kubernetes/.joined
+                            sfExit
+
+                    supplemental:
                         targets:
                             masters: one
                         run: |
@@ -840,6 +844,15 @@ feature:
                                     fi
                                 fi
                             fi
+                            sfExit
+
+                    final:
+                        targets:
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            [ ! -f /etc/kubernetes/.joined ] && touch /etc/kubernetes/.joined
                             sfExit
 
             remove:
