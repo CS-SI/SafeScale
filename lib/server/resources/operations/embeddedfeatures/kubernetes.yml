@@ -721,8 +721,8 @@ feature:
                                     # change calico backend
                                     sed -i 's/calico_backend: "bird"/calico_backend: "vxlan"/' ${SF_TMPDIR}/calico.yaml
                                     # update liveness and readyness
-                                    sed -i 's/.*- -bird-live//' ${SF_TMPDIR}/calico.yaml
-                                    sed -i 's/.*- -bird-ready//' ${SF_TMPDIR}/calico.yaml
+                                    sed -i 's/.*- -bird-live\n//' ${SF_TMPDIR}/calico.yaml
+                                    sed -i 's/.*- -bird-ready\n//' ${SF_TMPDIR}/calico.yaml
                                     {{ end }}
 
                                     # Apply Calico yaml

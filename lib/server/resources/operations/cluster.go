@@ -1382,6 +1382,14 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		return nil, fail.NewErrorWithCause(xerr, "errors occurred on node%s addition", strprocess.Plural(uint(len(errors))))
 	}
 
+	// configure what has to be done Cluster-wide
+	if instance.makers.ConfigureCluster != nil {
+		xerr = instance.makers.ConfigureCluster(ctx, instance)
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
+
 	// Now configure new nodes
 	xerr = instance.configureNodesFromList(task, nodes)
 	xerr = debug.InjectPlannedFail(xerr)
