@@ -113,7 +113,7 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
 	}
 
 	return owningInstance.Browse(context.Background(), func(abstractCurrentNetwork *abstract.Network) fail.Error {
-		if abstractCurrentNetwork.Name == abstractOwningNetwork.Name || abstractCurrentNetwork.ID == abstractOwningNetwork.ID {
+		if abstractOwningNetwork != nil && (abstractCurrentNetwork.Name == abstractOwningNetwork.Name || abstractCurrentNetwork.ID == abstractOwningNetwork.ID) {
 			return nil
 		}
 
@@ -135,7 +135,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 	var (
 		networkName, subnetName string
 	)
-	if owningInstance == nil {
+	if owningInstance == nil || owningInstance.IsNull() {
 		owningInstance = currentInstance
 	}
 	networkName = owningInstance.GetName()

@@ -1921,7 +1921,7 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 	if len(subnet.GatewayIDs) > 0 {
 		// FIXME: parallelize
 		for _, v := range subnet.GatewayIDs {
-			rh, xerr := LoadHost(svc, v)
+			hostInstance, xerr := LoadHost(svc, v)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {
@@ -1933,12 +1933,12 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 					return ids, xerr
 				}
 			} else {
-				name := rh.GetName()
+				name := hostInstance.GetName()
 				logrus.Debugf("Deleting gateway '%s'...", name)
 
 				// delete Host
-				ids = append(ids, rh.GetID())
-				xerr := rh.(*Host).RelaxedDeleteHost(context.Background())
+				ids = append(ids, hostInstance.GetID())
+				xerr := hostInstance.(*Host).RelaxedDeleteHost(context.Background())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {

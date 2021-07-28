@@ -175,6 +175,8 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 		xerr = nil
 	}
 
+	logrus.Debugf("loaded feature '%s' (%s)", casted.GetDisplayFilename(), casted.GetFilename())
+
 	// if we can log the sha256 of the feature, do it
 	filename := v.ConfigFileUsed()
 	if filename != "" {
