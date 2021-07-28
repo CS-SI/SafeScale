@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils"
@@ -243,7 +244,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, fail.E
 			err.Argument = "ServiceClient"
 			return nil, err
 		}
-		flavorID, err := flavors.IDFromName(sc, opts.FlavorName)
+		flavorID, err := IDFromName(sc, opts.FlavorName)
 		if err != nil {
 			return nil, err
 		}
@@ -251,6 +252,45 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, fail.E
 	}
 
 	return map[string]interface{}{"server": b}, nil
+}
+
+// IDFromName is a convienience function that returns a flavor's ID given its
+// name.
+func IDFromName(client *gc.ServiceClient, name string) (string, error) {
+	count := 0
+	id := ""
+	allPages, err := flavors.ListDetail(client, nil).AllPages()
+	if err != nil {
+		return "", err
+	}
+
+	all, err := flavors.ExtractFlavors(allPages)
+	if err != nil {
+		return "", err
+	}
+
+	for _, f := range all {
+		if f.Name == name {
+			count++
+			id = f.ID
+		}
+	}
+
+	switch count {
+	case 0:
+		err := &gc.ErrResourceNotFound{}
+		err.ResourceType = "flavor"
+		err.Name = name
+		return "", err
+	case 1:
+		return id, nil
+	default:
+		err := &gc.ErrMultipleResourcesFound{}
+		err.ResourceType = "flavor"
+		err.Name = name
+		err.Count = count
+		return "", err
+	}
 }
 
 // CreateHost creates a new host
@@ -378,11 +418,18 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		VolumeType:          "SSD",
 		VolumeSize:          template.DiskSize,
 	}
+
 	// Defines server
 	userDataPhase1, err := userData.Generate("phase1")
 	if err != nil {
 		return nil, userData, err
 	}
+
+	// FIXME: Change volume size
+	metadata := make(map[string]string)
+	metadata["ManagedBy"] = "safescale"
+	metadata["DeclaredInBucket"] = s.cfgOpts.MetadataBucket
+
 	srvOpts := serverCreateOpts{
 		Name:             request.ResourceName,
 		SecurityGroups:   []string{s.SecurityGroup.Name},
@@ -390,7 +437,9 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		FlavorRef:        request.TemplateID,
 		UserData:         userDataPhase1,
 		AvailabilityZone: az,
+		Metadata:         metadata,
 	}
+
 	// Defines host "Extension bootfromvolume" options
 	bdOpts := bootdiskCreateOptsExt{
 		CreateOptsBuilder: srvOpts,
@@ -512,8 +561,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		err = retryErr
-		return nil, userData, err
+		return nil, userData, retryErr
 	}
 	if host == nil {
 		return nil, userData, fail.Errorf(fmt.Sprintf("unexpected problem creating host"), nil)
@@ -658,19 +706,94 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 			return nil, err
 		}
 
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			// FIXME: Get creation time and/or metadata
+			logrus.Warn(spew.Sdump(server))
+			logrus.Warn(spew.Sdump(server.Created))
+		}
+
 		err = s.complementHost(host, server)
 		if err != nil {
 			return nil, err
 		}
 
-		if !host.OK() {
-			logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+			if !host.OK() {
+				logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
+			}
 		}
 	default:
 		host.LastState = serverState
 	}
 
 	return host, err
+}
+
+// getMetadata retrieves host metadata
+// hostParam can be an ID of host, or an instance of *abstract.Host; any other type will return an utils.ErrInvalidParameter
+func (s *Stack) getMetadata(hostParam interface{}, timeout time.Duration) (_ map[string]string, xerr fail.Error) {
+	var host *abstract.Host
+
+	switch hostParam := hostParam.(type) {
+	case string:
+		host = abstract.NewHost()
+		host.ID = hostParam
+	case *abstract.Host:
+		host = hostParam
+	}
+	if host == nil {
+		return nil, fail.InvalidParameterError(
+			"hostParam", "must be a not-empty string or a *abstract.Host!",
+		)
+	}
+
+	hostRef := host.Name
+	if hostRef == "" {
+		hostRef = host.ID
+	}
+
+	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
+	var lastState map[string]string
+
+	retryErr := retry.WhileUnsuccessful(
+		func() error {
+			server, err := servers.Get(s.ComputeClient, host.ID).Extract()
+			if err != nil {
+				return openstack.ReinterpretGophercloudErrorCode(
+					err, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
+						return fail.AbortedError("", ferr)
+					},
+				)
+			}
+
+			if server == nil {
+				return fail.Errorf("error getting host, nil response from gophercloud", nil)
+			}
+
+			lastState = server.Metadata
+
+			return nil
+		},
+		temporal.GetMinDelay(),
+		timeout,
+	)
+	if retryErr != nil {
+		if _, ok := retryErr.(retry.ErrTimeout); ok {
+			return nil, abstract.TimeoutError(
+				fmt.Sprintf(
+					"timeout waiting to get host '%s' information after %v", hostRef, timeout,
+				), timeout,
+			)
+		}
+
+		if aborted, ok := retryErr.(retry.ErrAborted); ok {
+			return nil, aborted.Cause()
+		}
+
+		return nil, retryErr
+	}
+
+	return lastState, nil
 }
 
 // complementHost complements Host data with content of server parameter
@@ -689,14 +812,6 @@ func (s *Stack) complementHost(host *abstract.Host, server *servers.Server) erro
 	}
 
 	host.LastState = toHostState(server.Status)
-	// VPL: I don't get the point of this...
-	// switch host.LastState {
-	// case hoststate.STARTED, hoststate.STOPPED:
-	//	// continue
-	// default:
-	//	logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
-	// }
-	// ENDVPL
 
 	// Updates Host Property propsv1.HostDescription
 	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(
@@ -851,9 +966,10 @@ func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 			}
 
 			for _, srv := range list {
+				theSrv := srv
 				h := abstract.NewHost()
-				h.ID = srv.ID
-				err := s.complementHost(h, &srv)
+				h.ID = theSrv.ID
+				err := s.complementHost(h, &theSrv)
 				if err != nil {
 					return false, err
 				}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -271,11 +271,46 @@ func New(
 
 	// Get provider network ID from network service
 	if cfg.ProviderNetwork != "" {
-		s.ProviderNetworkID, err = networks.IDFromName(s.NetworkClient, cfg.ProviderNetwork)
+		s.ProviderNetworkID, err = IDFromName(s.NetworkClient, cfg.ProviderNetwork)
 		if err != nil {
 			return nil, fail.Errorf(fmt.Sprintf("%s", ProviderErrorToString(err)), err)
 		}
 	}
 
 	return &s, nil
+}
+
+func IDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
+	count := 0
+	id := ""
+
+	listOpts := networks.ListOpts{
+		Name: name,
+	}
+
+	pages, err := networks.List(client, listOpts).AllPages()
+	if err != nil {
+		return "", err
+	}
+
+	all, err := networks.ExtractNetworks(pages)
+	if err != nil {
+		return "", err
+	}
+
+	for _, s := range all {
+		if s.Name == name {
+			count++
+			id = s.ID
+		}
+	}
+
+	switch count {
+	case 0:
+		return "", gophercloud.ErrResourceNotFound{Name: name, ResourceType: "network"}
+	case 1:
+		return id, nil
+	default:
+		return "", gophercloud.ErrMultipleResourcesFound{Name: name, Count: count, ResourceType: "network"}
+	}
 }

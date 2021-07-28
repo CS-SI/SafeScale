@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -157,9 +157,10 @@ func (s *Stack) findVPCID() (*string, fail.Error) {
 		return nil, fail.Errorf(fmt.Sprintf("error listing routers: %s", openstack.ProviderErrorToString(err)), err)
 	}
 	for _, r := range routers {
-		if r.Name == s.authOpts.VPCName {
+		theR := r
+		if theR.Name == s.authOpts.VPCName {
 			found = true
-			router = &r
+			router = &theR
 			break
 		}
 	}
