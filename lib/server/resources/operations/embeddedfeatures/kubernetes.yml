@@ -171,7 +171,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             {{ if eq .Hardening "true" }}
                                 {{ if eq .EnableAudit "true" }}
@@ -224,7 +224,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
@@ -270,7 +270,7 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             {{ if .ClusterControlplaneUsesVIP }}
                             case $(sfGetFact "linux_kind") in
@@ -410,7 +410,7 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             mkdir -p /etc/kubernetes/pki
                             if [ -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
@@ -426,7 +426,7 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             mkdir -p /etc/kubernetes/kubeadm
 
@@ -698,7 +698,7 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             case {{ .CNI }} in
                                 flannel)
@@ -721,8 +721,8 @@ feature:
                                     # change calico backend
                                     sed -i 's/calico_backend: "bird"/calico_backend: "vxlan"/' ${SF_TMPDIR}/calico.yaml
                                     # update liveness and readyness
-                                    sed -i 's/.*- -bird-live\n//' ${SF_TMPDIR}/calico.yaml
-                                    sed -i 's/.*- -bird-ready\n//' ${SF_TMPDIR}/calico.yaml
+                                    sed -i '/.*- -bird-live/d' ${SF_TMPDIR}/calico.yaml
+                                    sed -i '/.*- -bird-ready/d' ${SF_TMPDIR}/calico.yaml
                                     {{ end }}
 
                                     # Apply Calico yaml
@@ -731,15 +731,13 @@ feature:
                                     ;;
                             esac
 
-                            touch /etc/kubernetes/.joined
                             sfExit 0
 
                     cpx-init:
                         targets:
                             masters: all
                         run: |
-                            # Don't try to init a kubernetes cluster already running
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             sfDropzonePop ${SF_TMPDIR} || sfFail 224 "failure creating drop zone"
                             sfDropzoneClean || sfFail 224 "failure cleaning drop zone"
@@ -764,7 +762,7 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             MASTERIP=
                             for m in {{ range .ClusterMasterIPs }}{{.}} {{ end -}}; do
@@ -787,7 +785,7 @@ feature:
                         targets:
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             MASTERIP=
                             for m in {{ range .ClusterMasterIPs }}{{.}} {{ end -}}; do
@@ -809,21 +807,27 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             # add interfaces to trusted zone of the firewall
-                            sfFirewall --zone=trusted --add-interface=cni0 --permanent || sfFail 224 "failed to add cni0 interface to firewalld trusted zone"
-                            sfFirewall --zone=trusted --add-interface={{.CNI}}.1 --permanent || sfFail 225 "failed to add {{.CNI}}.1 interface to firewalld trusted zone"
+                            case {{.CNI}} in
+                                flannel)
+                                    sfFirewall --zone=trusted --add-interface=cni0 --permanent || sfFail 224 "failed to add cni0 interface to firewalld trusted zone"
+                                    sfFirewall --zone=trusted --add-interface={{.CNI}}.1 --permanent || sfFail 225 "failed to add {{.CNI}}.1 interface to firewalld trusted zone"
+                                    ;;
+                                calico)
+                                    sfFirewall --zone=trusted --add-interface=calico.vxlan --permanent || sfFail 225 "failed to add calico.vxlan interface to firewalld trusted zone"
+                                    ;;                                   ;;
+                            esac
                             sfFirewallReload || sfFail 226 "failed to reload firewalld configuration for cni driver {{.CNI}}"
 
-                            touch /etc/kubernetes/.joined
                             sfExit
 
                     supplemental:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             # Allows pods to start on master if there is only one master or if it's explicitely requested
                             if [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ]; then
