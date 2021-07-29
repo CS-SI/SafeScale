@@ -320,8 +320,11 @@ func (instance *Network) carry(clonable data.Clonable) (xerr fail.Error) {
 func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	if instance == nil {
 		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
