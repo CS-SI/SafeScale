@@ -477,7 +477,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return stepResult{err: xerr}, nil
+		return stepResult{err: xerr}, xerr
 	}
 
 	if !hidesOutput {
