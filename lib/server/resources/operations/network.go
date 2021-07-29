@@ -390,6 +390,10 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Network) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
+	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}

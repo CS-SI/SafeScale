@@ -696,8 +696,8 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			cfg, xerr := svc.GetConfigurationOptions()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-			return xerr
-		}
+				return xerr
+			}
 
 			imageQuery = cfg.GetString("DefaultImage")
 		}
@@ -1343,7 +1343,10 @@ func (instance *Subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resource
 func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subnet) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate rs
+	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}

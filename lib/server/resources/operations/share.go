@@ -259,7 +259,10 @@ func (instance *Share) carry(clonable data.Clonable) (xerr fail.Error) {
 func (instance *Share) Browse(ctx context.Context, callback func(string, string) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate instance
+	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
