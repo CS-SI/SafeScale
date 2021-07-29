@@ -237,7 +237,7 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
+	// Note: Do not test with IsNull here, as Browse may be used from null value
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}

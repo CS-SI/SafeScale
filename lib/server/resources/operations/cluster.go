@@ -638,7 +638,7 @@ func (instance *Cluster) bootstrap(flavor clusterflavor.Enum) (xerr fail.Error) 
 func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate instance with .IsNull()
+	// Note: Do not test with Isnull here, as Browse may be used from null value
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
