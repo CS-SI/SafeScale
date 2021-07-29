@@ -442,7 +442,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	command, xerr := replaceVariablesInString(is.Script, p.Variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return stepResult{err: fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)}, nil
+		return stepResult{err: fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)}, xerr
 	}
 
 	// If options file is defined, upload it to the remote rh
@@ -456,7 +456,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		_ = os.Remove(rfcItem.Local)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return stepResult{err: xerr}, nil
+			return stepResult{err: xerr}, xerr
 		}
 	}
 
