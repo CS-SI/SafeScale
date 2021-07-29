@@ -49,7 +49,8 @@ feature:
     parameters:
         - AllowPodsOnMasters=false
         - AllowPodsOnGateways=false
-        - CNI=calico
+        - CNI=flannel
+        #- CNI=calico
         - CalicoNetworking=vxlan
         - ClusterControlplaneEndpointIP
         - Dashboard=true
