@@ -692,6 +692,7 @@ feature:
                             sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 220 "failure checking scheduler"
 
                             echo "cp1 init done"
+                            touch /etc/kubernetes/.cp1
                             sfExit
 
                     cni:
@@ -738,6 +739,7 @@ feature:
                             masters: all
                         run: |
                             [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
+                            [ -f /etc/kubernetes/.cp1 ] && sfExit
 
                             sfDropzonePop ${SF_TMPDIR} || sfFail 224 "failure creating drop zone"
                             sfDropzoneClean || sfFail 224 "failure cleaning drop zone"
@@ -816,8 +818,8 @@ feature:
                                     sfFirewall --zone=trusted --add-interface={{.CNI}}.1 --permanent || sfFail 225 "failed to add {{.CNI}}.1 interface to firewalld trusted zone"
                                     ;;
                                 calico)
-                                    sfFirewall --zone=trusted --add-interface=calico.vxlan --permanent || sfFail 225 "failed to add calico.vxlan interface to firewalld trusted zone"
-                                    ;;                                   ;;
+                                    sfFirewall --zone=trusted --add-interface=vxlan.calico --permanent || sfFail 225 "failed to add vxlan.calico interface to firewalld trusted zone"
+                                    ;;
                             esac
                             sfFirewallReload || sfFail 226 "failed to reload firewalld configuration for cni driver {{.CNI}}"
 
