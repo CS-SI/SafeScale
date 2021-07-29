@@ -152,6 +152,14 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 			// 	return nullCluster(), xerr
 			// }
 
+			flavor, innerXErr := rc.GetFlavor()
+			if innerXErr != nil {
+				return nil, innerXErr
+			}
+			innerXErr = rc.(*Cluster).bootstrap(flavor)
+			if innerXErr != nil {
+				return nil, innerXErr
+			}
 			rc.(*Cluster).updateCachedInformation()
 
 			return rc, nil
@@ -3370,7 +3378,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 
 			first := length - count
 			toRemove = nodesV3.PrivateNodes[first:]
-			nodesV3.PrivateNodes = nodesV3.PrivateNodes[:first-1]
+			nodesV3.PrivateNodes = nodesV3.PrivateNodes[:first]
 			for _, v := range toRemove {
 				if node, ok := nodesV3.ByNumericalID[v]; ok {
 					removedNodes = append(removedNodes, node)

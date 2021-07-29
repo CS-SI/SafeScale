@@ -453,8 +453,8 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			RemoteRights: "ug+rw-x,o-rwx",
 		}
 		xerr = rfcItem.UploadString(task.Context(), is.OptionsFileContent, p.Host)
-		_ = os.Remove(rfcItem.Local)
 		xerr = debug.InjectPlannedFail(xerr)
+		_ = os.Remove(rfcItem.Local)
 		if xerr != nil {
 			return stepResult{err: xerr}, xerr
 		}
