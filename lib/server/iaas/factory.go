@@ -17,6 +17,7 @@
 package iaas
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -183,7 +184,7 @@ func UseService(tenantName string) (newService Service, err error) {
 			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
 		}
 
-		// Initializes Metadata Object Storage (may be different than the Object Storage)
+		// Initializes Metadata Object Storage (may be different from the Object Storage)
 		var (
 			metadataBucket   objectstorage.Bucket
 			metadataCryptKey *crypt.Key
@@ -250,6 +251,13 @@ func UseService(tenantName string) (newService Service, err error) {
 			metadataBucket: metadataBucket,
 			metadataKey:    metadataCryptKey,
 		}
+
+		// validate metadata version
+		err = checkMetadataVersion(newS)
+		if err != nil {
+			return nil, err
+		}
+
 		return newS, validateRegexps(newS /*tenantClient*/, tenant)
 	}
 
@@ -259,7 +267,30 @@ func UseService(tenantName string) (newService Service, err error) {
 	return nil, abstract.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
-// validatRegexps validates regexp values from tenants file
+//checkMetadataVersion checks metadata version, if it's not our version, we stop
+func checkMetadataVersion(s *service) error {
+	var buffer bytes.Buffer
+	_, err := s.GetMetadataBucket().ReadObject("version", &buffer, 0, 0)
+	if err != nil {
+		return nil
+	}
+	data := string(buffer.Bytes())
+
+	ourVersion := fmt.Sprintf("v%s", Version)
+	if strings.HasPrefix(data, ourVersion) {
+		return nil
+	}
+
+	if strings.Contains(ourVersion, ".") {
+		if strings.HasPrefix(data, ourVersion[0:strings.LastIndex(ourVersion, ".")]) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("cannot continue: the minimum version of Safescale binaries needed to work correctly with this bucket is '%s'. (current binary '%s')", data, ourVersion)
+}
+
+// validateRegexps validates regexp values from tenants file
 func validateRegexps(svc *service, tenant map[string]interface{}) error {
 	compute, ok := tenant["compute"].(map[string]interface{})
 	if !ok {
