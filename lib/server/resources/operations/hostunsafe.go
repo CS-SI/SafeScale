@@ -82,9 +82,7 @@ func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.En
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
-			if cerr := xerr.Cause(); cerr != nil {
-				xerr = fail.ConvertError(cerr)
-			}
+			xerr = fail.ConvertError(fail.Cause(xerr))
 		case *fail.ErrTimeout:
 			if cerr := xerr.Cause(); cerr != nil {
 				switch cerr.(type) {
@@ -161,11 +159,9 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "failed to execute command '%s' after '%s'", cmd, temporal.FormatDuration(timeout))
+			xerr = fail.Wrap(fail.Cause(xerr), "failed to execute command '%s' after '%s'", cmd, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
-			if xerr.Cause() != nil {
-				xerr = fail.ConvertError(xerr.Cause())
-			}
+			xerr = fail.ConvertError(fail.Cause(xerr))
 		}
 	}
 	return retcode, stdout, stderr, xerr
@@ -245,7 +241,7 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
-				xerr = fail.Wrap(xerr.Cause(), "failed to update access rights in %v delay", timeout)
+				xerr = fail.Wrap(fail.Cause(xerr), "failed to update access rights in %v delay", timeout)
 			default:
 			}
 		}

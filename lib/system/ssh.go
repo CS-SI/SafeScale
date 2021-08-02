@@ -625,7 +625,7 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			xerr = fail.Wrap(xerr.Cause(), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
+			xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
 		default:
 		}
 
@@ -850,7 +850,7 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 			if xerr != nil {
 				switch xerr.(type) { // nolint
 				case *retry.ErrTimeout:
-					xerr = fail.ConvertError(xerr.Cause())
+					xerr = fail.ConvertError(fail.Cause(xerr))
 				}
 				return nil, xerr
 			}

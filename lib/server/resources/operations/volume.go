@@ -388,9 +388,7 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			if xerr.Cause() != nil {
-				xerr = fail.ConvertError(xerr.Cause())
-			}
+			xerr = fail.ConvertError(fail.Cause(xerr))
 		default:
 		}
 	}

@@ -417,7 +417,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, x
 		if retryErr != nil {
 			switch retryErr.(type) {
 			case *fail.ErrTimeout:
-				return nullAS, fail.Wrap(retryErr.Cause(), "timeout")
+				return nullAS, fail.Wrap(fail.Cause(retryErr), "timeout")
 			default:
 				return nullAS, retryErr
 			}

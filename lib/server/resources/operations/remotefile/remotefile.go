@@ -113,7 +113,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
 		case *retry.ErrStopRetry:
-			return fail.Wrap(realErr.Cause(), "failed to copy file to remote host '%s'", host.GetName())
+			return fail.Wrap(fail.Cause(realErr), "failed to copy file to remote host '%s'", host.GetName())
 		case *retry.ErrTimeout:
 			return fail.Wrap(realErr, "timeout trying to copy file to '%s:%s'", host.GetName(), rfc.Remote)
 		}
