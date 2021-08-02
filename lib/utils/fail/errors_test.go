@@ -42,6 +42,15 @@ func generateNilNewError() *errorCore {
 	return nil
 }
 
+func testAFailErrorisAnError(t *testing.T) {
+	var what error
+	tfe := NewError("ouch")
+	what = tfe
+	if what == nil {
+		t.Errorf("Cannot be")
+	}
+}
+
 func TestNormalUsage(t *testing.T) {
 	av := TimeoutError(nil, 2*time.Minute, "ouch")
 	if av != nil {
