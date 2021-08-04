@@ -335,9 +335,9 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		scfg.SecondaryGatewayConfig.Port = 22
 	}
 
-	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10"
+	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
-		"ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
+		"timeout 2400s ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
 		f.Name(),
 		localPort,
 		scfg.IPAddress,
@@ -896,7 +896,7 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 	}
 
 	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", sconf.Hostname)
-	sshCmdString := fmt.Sprintf("ssh -i %s %s -p %d %s@%s", f.Name(), options, sconf.Port, sconf.User, sconf.IPAddress)
+	sshCmdString := fmt.Sprintf("timeout 2400s ssh -i %s %s -p %d %s@%s", f.Name(), options, sconf.Port, sconf.User, sconf.IPAddress)
 
 	if shell == "" {
 		shell = "bash"
