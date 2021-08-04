@@ -1546,15 +1546,20 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 }
 
 func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase, timeout time.Duration) (string, fail.Error) {
+	givenTimeout := int(timeout.Minutes())
 	sshDefaultTimeout := int(temporal.GetHostTimeout().Minutes())
-	if sshDefaultTimeoutCandidate := os.Getenv("SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
+	if givenTimeout > sshDefaultTimeout {
+		sshDefaultTimeout = givenTimeout
+	}
+
+	// this overrides the default timeout of max(GetHostTimeout, timeout)
+	if sshDefaultTimeoutCandidate := os.Getenv("SAFESCALE_SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
 		if num, err := strconv.Atoi(sshDefaultTimeoutCandidate); err == nil {
 			logrus.Debugf("Using custom timeout of %d minutes", num)
 			sshDefaultTimeout = num
 		}
 	}
 
-	// FIXME: configurable timeout here
 	duration := time.Duration(sshDefaultTimeout) * time.Minute
 	status, xerr := instance.sshProfile.WaitServerReady(ctx, string(phase), time.Duration(sshDefaultTimeout)*time.Minute)
 	xerr = debug.InjectPlannedFail(xerr)
