@@ -64,7 +64,7 @@ func TestStartAfterDoneWFZero(t *testing.T) {
 
 		runOutOfTime := waitTimeout(&wg, 60*time.Second)
 		if runOutOfTime {
-			t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
+			t.Errorf("Failure: there is a deadlock in TestStartAfterDoneWFZero !")
 			t.FailNow()
 		}
 	}
@@ -104,7 +104,7 @@ func TestStartAfterDoneWF(t *testing.T) {
 
 		runOutOfTime := waitTimeout(&wg, 60*time.Second)
 		if runOutOfTime {
-			t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
+			t.Errorf("Failure: there is a deadlock in TestStartAfterDoneWF !") // FIXME: It happened
 			t.FailNow()
 		}
 	}
@@ -907,7 +907,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallelWF(t *testing.T) {
 		if failure {
 			t.FailNow()
 		}
-		t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
+		t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallelWF !")
 		t.FailNow()
 	}
 	if failure {

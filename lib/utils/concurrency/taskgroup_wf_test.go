@@ -65,7 +65,7 @@ func TestStartAfterDone(t *testing.T) {
 
 		runOutOfTime := waitTimeout(&wg, 60*time.Second)
 		if runOutOfTime {
-			t.Errorf("Failure: there is a deadlock in TestChildrenWaitingGameWithTimeoutsButAbortingInParallel !")
+			t.Errorf("Failure: there is a deadlock in TestStartAfterDone !")
 			t.FailNow()
 		}
 	}
@@ -700,7 +700,7 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	require.NotNil(t, err)
 	require.NotEmpty(t, res)
 
-	cause := fail.RootCause(err)
+	cause := fail.RootCause(err) // FIXME: DATA RACE
 	if cause == nil {
 		t.FailNow()
 	}

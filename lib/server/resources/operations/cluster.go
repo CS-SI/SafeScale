@@ -1348,7 +1348,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		nodes  []*propertiesv3.ClusterNode
 	)
 
-	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute
+	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute // FIXME: Guess what happens with a large number of nodes...
 
 	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)))
 	if xerr != nil {
