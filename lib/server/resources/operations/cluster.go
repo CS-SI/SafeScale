@@ -1348,7 +1348,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		nodes  []*propertiesv3.ClusterNode
 	)
 
-	timeout := temporal.GetExecutionTimeout() + time.Duration(count)*time.Minute
+	timeout := 2 * temporal.GetHostCreationTimeout() // More than enough
 
 	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)))
 	if xerr != nil {
@@ -2689,8 +2689,10 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			}),
 		}
 
+		foundSomething := false
 		for _, v := range nodes {
 			if n, ok := all[v]; ok {
+				foundSomething = true
 				completedOptions := append(options, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", n.Name)))
 				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, completedOptions...)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -2703,6 +2705,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 
 		for _, v := range masters {
 			if n, ok := all[v]; ok {
+				foundSomething = true
 				completedOptions := append(options, concurrency.AmendID(fmt.Sprintf("/master/%s/delete", n.Name)))
 				_, xerr := tg.Start(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, completedOptions...)
 				xerr = debug.InjectPlannedFail(xerr)
@@ -2713,10 +2716,12 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			}
 		}
 
-		_, xerr = tg.WaitGroup()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			cleaningErrors = append(cleaningErrors, xerr)
+		if foundSomething {
+			_, xerr = tg.WaitGroup()
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				cleaningErrors = append(cleaningErrors, xerr)
+			}
 		}
 	}
 	if len(cleaningErrors) > 0 {

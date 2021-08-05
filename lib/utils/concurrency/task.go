@@ -840,7 +840,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 			case *fail.ErrAborted:
 				// leave instance.err as it is
 			default:
-				_ = cerr.AddConsequence(xerr)
+				_ = cerr.AddConsequence(xerr) // FIXME: DATA RACE
 			}
 		} else {
 			instance.err = xerr

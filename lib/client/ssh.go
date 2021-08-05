@@ -89,7 +89,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 				}
 			}(sshCmd)
 
-			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, executionTimeout)
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, executionTimeout) // FIXME: What if ssh never returns ?
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
