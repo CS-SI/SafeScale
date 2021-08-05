@@ -1478,7 +1478,7 @@ func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequiremen
 // }
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
-func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) fail.Error {
+func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration) fail.Error {
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1494,7 +1494,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 
 	command := fmt.Sprintf("sudo bash %s; exit $?", file)
 	// Executes the script on the remote Host
-	retcode, stdout, stderr, xerr := instance.UnsafeRun(ctx, command, outputs.COLLECT, 0, 0)
+	retcode, stdout, stderr, xerr := instance.UnsafeRun(ctx, command, outputs.COLLECT, 0, timeout)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply configuration phase '%s'", phase)
@@ -1744,7 +1744,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	}
 
 	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure networking and security
-	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent)
+	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, 6*time.Minute)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1793,10 +1793,15 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations/subnet.go)
 	if !userdataContent.IsGateway {
 		// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
-		xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent)
+		xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, 3*time.Minute) // FIXME: This needs a timeout
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return xerr
+			theCause := fail.Cause(xerr)
+			if _, ok := theCause.(*fail.ErrTimeout); !ok {
+				return xerr
+			}
+
+			debug.IgnoreError(xerr)
 		}
 
 		// Reboot Host
@@ -1817,7 +1822,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		}
 
 		// execute userdata.PHASE5_FINAL script to final install/configure of the Host (no need to reboot)
-		xerr = instance.runInstallPhase(ctx, userdata.PHASE5_FINAL, userdataContent)
+		xerr = instance.runInstallPhase(ctx, userdata.PHASE5_FINAL, userdataContent, 3*time.Minute)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr

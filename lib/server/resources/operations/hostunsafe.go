@@ -137,12 +137,16 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 			}(sshCmd)
 
 			retcode = -1
-			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout); innerXErr != nil {
+			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout); innerXErr != nil { // FIXME: What if this never returns ?
 				switch innerXErr.(type) {
 				case *fail.ErrExecution:
 					// Adds stdout and stderr as annotations to innerXErr
 					_ = innerXErr.Annotate("stdout", stdout)
 					_ = innerXErr.Annotate("stderr", stderr)
+				case *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidRequest, *fail.ErrInvalidParameter:
+					return retry.StopRetryError(innerXErr, "invalid")
+				case *fail.ErrRuntimePanic:
+					return retry.StopRetryError(innerXErr, "panicked")
 				default:
 				}
 				return innerXErr

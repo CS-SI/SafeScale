@@ -1143,7 +1143,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 				}
 			}(sshCmd)
 
-			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout)
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout) // FIXME: What if this never returns
 			if innerXErr != nil {
 				return innerXErr
 			}

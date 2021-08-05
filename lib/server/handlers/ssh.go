@@ -359,7 +359,7 @@ func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 		}
 	}()
 
-	return sshCmd.RunWithTimeout(handler.job.Task().Context(), outputs.DISPLAY, duration)
+	return sshCmd.RunWithTimeout(handler.job.Task().Context(), outputs.DISPLAY, duration) // FIXME: What if this never returns ?
 }
 
 func extracthostName(in string) (string, fail.Error) {
