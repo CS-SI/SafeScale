@@ -849,7 +849,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 		return nil
 	case clusterstate.Starting:
 		// If the Cluster is in state Starting, wait for it to finish its start procedure
-		xerr = retry.WhileUnsuccessfulDelay5Seconds(
+		xerr = retry.WhileUnsuccessful(
 			func() error {
 				state, innerErr := instance.unsafeGetState()
 				if innerErr != nil {
@@ -862,6 +862,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 
 				return fail.NewError("current state of Cluster is '%s'", state.String())
 			},
+			temporal.GetDefaultDelay(),
 			5*time.Minute, // FIXME: hardcoded timeout
 		)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1068,7 +1069,7 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 	case clusterstate.Stopped:
 		return nil
 	case clusterstate.Stopping:
-		xerr = retry.WhileUnsuccessfulDelay5Seconds(
+		xerr = retry.WhileUnsuccessful(
 			func() error {
 				state, innerErr := instance.unsafeGetState()
 				if innerErr != nil {
@@ -1085,6 +1086,7 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 
 				return nil
 			},
+			temporal.GetDefaultDelay(),
 			5*time.Minute, // FIXME: hardcoded timeout
 		)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2792,7 +2794,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	if subnetInstance != nil && !subnetInstance.IsNull() {
 		subnetName := subnetInstance.GetName()
 		logrus.Debugf("Cluster Deleting Subnet '%s'", subnetName)
-		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
+		xerr = retry.WhileUnsuccessfulWithHardTimeout(
 			func() error {
 				if innerXErr := subnetInstance.Delete(ctx); innerXErr != nil {
 					switch innerXErr.(type) {
@@ -2804,6 +2806,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 				}
 				return nil
 			},
+			temporal.GetDefaultDelay(),
 			temporal.GetHostTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2832,7 +2835,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	if networkInstance != nil && !networkInstance.IsNull() && deleteNetwork {
 		networkName := networkInstance.GetName()
 		logrus.Debugf("Deleting Network '%s'...", networkName)
-		xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
+		xerr = retry.WhileUnsuccessfulWithHardTimeout(
 			func() error {
 				if innerXErr := networkInstance.Delete(ctx); innerXErr != nil {
 					switch innerXErr.(type) {
@@ -2844,6 +2847,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 				}
 				return nil
 			},
+			temporal.GetDefaultDelay(),
 			temporal.GetHostTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)

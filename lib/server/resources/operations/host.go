@@ -1115,12 +1115,13 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 	}
 
 	var img *abstract.Image
-	xerr := retry.WhileUnsuccessfulDelay1Second(
+	xerr := retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
 			img, innerXErr = svc.SearchImage(imageRef)
 			return innerXErr
 		},
+		temporal.GetMinDelay(),
 		temporal.GetOperationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -2334,7 +2335,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 
 		// Delete Host
 		waitForDeletion := true
-		innerXErr = retry.WhileUnsuccessfulDelay1Second(
+		innerXErr = retry.WhileUnsuccessful(
 			func() error {
 				if derr := svc.DeleteHost(instance.GetID()); derr != nil {
 					switch derr.(type) {
@@ -2349,7 +2350,8 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				}
 				return nil
 			},
-			time.Minute*5, // FIXME: hardcoded timeout
+			temporal.GetMinDelay(),
+			temporal.GetHostCleanupTimeout(),
 		)
 		if innerXErr != nil {
 			return innerXErr
@@ -2357,7 +2359,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 
 		// wait for effective Host deletion
 		if waitForDeletion {
-			innerXErr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
+			innerXErr = retry.WhileUnsuccessfulWithHardTimeout(
 				func() error {
 					state, stateErr := svc.GetHostState(instance.GetID())
 					if stateErr != nil {
@@ -2375,7 +2377,8 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					}
 					return nil
 				},
-				time.Minute*2, // FIXME: hardcoded duration
+				temporal.GetDefaultDelay(),
+				temporal.GetOperationTimeout(),
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -2538,7 +2541,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 		retcode        int
 		stdout, stderr string
 	)
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
 			if retcode, stdout, stderr, innerXErr = instance.sshProfile.Copy(ctx, target, source, false); innerXErr != nil {
@@ -2552,7 +2555,8 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 			}
 			return nil
 		},
-		2*timeout,
+		temporal.GetDefaultDelay(),
+		2*timeout, // FIXME: Harcoded
 	)
 	return retcode, stdout, stderr, xerr
 }
@@ -2694,7 +2698,7 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			if task.Aborted() {
 				return fail.AbortedError(nil, "aborted")
@@ -2702,6 +2706,7 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 
 			return svc.WaitHostState(hostID, hoststate.Started, temporal.GetHostTimeout())
 		},
+		temporal.GetDefaultDelay(),
 		5*time.Minute,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -2765,7 +2770,7 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			if task.Aborted() {
 				return fail.AbortedError(nil, "aborted")
@@ -2773,8 +2778,8 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 
 			return svc.WaitHostState(hostID, hoststate.Stopped, temporal.GetHostTimeout())
 		},
-		// FIXME: hardcoded value
-		5*time.Minute,
+		temporal.GetDefaultDelay(),
+		5*time.Minute, // FIXME: harcoded
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

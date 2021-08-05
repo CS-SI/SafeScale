@@ -508,7 +508,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)", hostLabel, state.String(), timeout).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
+	xerr = retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
 			st, innerXErr := s.hostState(ahf.Core.ID)
 			if innerXErr != nil {
@@ -535,6 +535,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				return fail.NewError("wrong state: %s", st)
 			}
 		},
+		temporal.GetDefaultDelay(),
 		timeout,
 	)
 	if xerr != nil {
@@ -885,7 +886,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 
 	var vm osc.Vm
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			resp, innerXErr := s.rpcCreateVMs(vmsRequest)
 			if innerXErr != nil {
@@ -920,6 +921,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			_, innerXErr = s.WaitHostState(vm.VmId, hoststate.Started, temporal.GetHostTimeout())
 			return innerXErr
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetLongOperationTimeout(),
 	)
 	if xerr != nil {

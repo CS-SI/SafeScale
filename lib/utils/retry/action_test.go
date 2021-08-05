@@ -58,7 +58,7 @@ func complexSleepyFailure() error {
 }
 
 func CreateErrorWithNConsequences(n uint) (xerr fail.Error) {
-	xerr = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*10*time.Millisecond)
+	xerr = WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	if xerr != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -69,15 +69,15 @@ func CreateErrorWithNConsequences(n uint) (xerr fail.Error) {
 }
 
 func CreateSkippableError() (xerr fail.Error) {
-	xerr = WhileSuccessfulDelay1Second(func() error {
+	xerr = WhileSuccessful(func() error {
 		fmt.Println("Around the world...")
 		return StopRetryError(fail.NotFoundError("wrong place"), "no more")
-	}, 60*time.Millisecond)
+	}, 1*time.Second, 60*time.Millisecond)
 	return xerr
 }
 
 func CreateComplexErrorWithNConsequences(n uint) (xerr fail.Error) {
-	xerr = WhileUnsuccessfulDelay1Second(complexSleepyFailure, time.Duration(5)*10*time.Millisecond)
+	xerr = WhileUnsuccessful(complexSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	if xerr != nil {
 		for loop := uint(0); loop < n; loop++ {
 			nerr := fmt.Errorf("random cleanup problem")
@@ -111,7 +111,7 @@ func CreateDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
 		}
 	}()
 
-	xerr = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*10*time.Millisecond)
+	xerr = WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	return xerr
 }
 
@@ -125,7 +125,7 @@ func CreateWrappedDeferredErrorWithNConsequences(n uint) (xerr fail.Error) {
 		}
 	}()
 
-	xerr = WhileUnsuccessfulDelay1Second(quickSleepyFailure, time.Duration(5)*10*time.Millisecond)
+	xerr = WhileUnsuccessful(quickSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	return xerr
 }
 
@@ -457,11 +457,12 @@ func genAbortedError() error {
 func TestErrCheckTimeout(t *testing.T) {
 	// This HAS to timeout after 5 seconds because genHappy never fails,
 	// so xerr at the end should be some kind of timeoutError
-	xerr := WhileSuccessfulDelay1Second(
+	xerr := WhileSuccessful(
 		func() error {
 			innerXErr := genHappy()
 			return innerXErr
 		},
+		1*time.Second,
 		5*time.Second,
 	)
 	if xerr == nil {
@@ -485,13 +486,66 @@ func TestErrCheckTimeout(t *testing.T) {
 	}
 }
 
+func TestErrCheckStdError(t *testing.T) {
+	iteration := 0
+	xerr := WhileUnsuccessful(
+		func() error {
+			iteration = iteration + 1
+			return fail.NewError("It failed %d", iteration)
+		},
+		10*time.Millisecond, 60*time.Millisecond)
+	if xerr != nil {
+		xerr = fail.Wrap(xerr, "the checking failed")
+	}
+
+	if xerr != nil {
+		t.Logf(xerr.Error())
+		if !strings.Contains(xerr.Error(), "failed 7") {
+			t.FailNow()
+		}
+	}
+}
+
+func TestErrCheckStopStdError(t *testing.T) {
+	iteration := 0
+	var errCause error
+	xerr := WhileUnsuccessful(
+		func() error {
+			iteration = iteration + 1
+			if iteration == 4 {
+				return StopRetryError(fail.NewError("It failed %d", iteration), "last error before stopping retries was")
+			}
+			return fail.NewError("It failed %d", iteration)
+		},
+		10*time.Millisecond, 60*time.Millisecond)
+	if xerr != nil {
+		errCause = fail.RootCause(xerr)
+		xerr = fail.Wrap(xerr, "the checking failed")
+	}
+
+	if xerr != nil {
+		t.Logf(xerr.Error())
+		if !strings.Contains(xerr.Error(), "failed 4") {
+			t.FailNow()
+		}
+	}
+
+	if errCause != nil {
+		t.Logf(errCause.Error())
+		if !strings.Contains(errCause.Error(), "failed 4") {
+			t.FailNow()
+		}
+	}
+}
+
 func TestErrCheckAbortedNoTimeout(t *testing.T) {
 	// This doesn't timeout, because we send a panic, but we should be able to track its origin...
-	xerr := WhileUnsuccessfulDelay1Second(
+	xerr := WhileUnsuccessful(
 		func() error {
 			innerXErr := genAbortedError()
 			return innerXErr
 		},
+		time.Second,
 		5*time.Second,
 	)
 	if xerr == nil {
@@ -523,11 +577,12 @@ func TestErrCheckAbortedNoTimeout(t *testing.T) {
 func TestErrCheckPanicNoTimeout(t *testing.T) {
 	// This doesn't timeout, because we send an abortion, but we should be able to track its origin...
 	// previous test, TestErrCheckAbortedNoTimeout, works as expected, this does not
-	xerr := WhileUnsuccessfulDelay1Second(
+	xerr := WhileUnsuccessful(
 		func() error {
 			innerXErr := genHandledPanic()
 			return innerXErr
 		},
+		time.Second,
 		5*time.Second,
 	)
 	if xerr == nil {
@@ -559,11 +614,12 @@ func TestErrCheckPanicNoTimeout(t *testing.T) {
 func TestErrCheckNoTimeout(t *testing.T) {
 	// This HAS to timeout after 5 seconds because genSad always fails,
 	// so xerr at the end should be some kind of timeoutError
-	xerr := WhileUnsuccessfulDelay1Second(
+	xerr := WhileUnsuccessful(
 		func() error {
 			innerXErr := genSad()
 			return innerXErr
 		},
+		time.Second,
 		5*time.Second,
 	)
 	if xerr == nil {

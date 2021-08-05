@@ -546,7 +546,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					logrus.Debugf("failed to find Network on provider side, cleaning up metadata.")
 				case *fail.ErrTimeout:
 					logrus.Error("cannot delete Network due to a timeout")
-					errWaitMore := retry.WhileUnsuccessfulDelay1Second(
+					errWaitMore := retry.WhileUnsuccessful(
 						func() error {
 							recNet, recErr := svc.InspectNetwork(abstractNetwork.ID)
 							if recNet != nil {
@@ -559,6 +559,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 							return fail.Wrap(recErr, "another kind of error")
 						},
+						temporal.GetMinDelay(),
 						temporal.GetContextTimeout(),
 					)
 					if errWaitMore != nil {

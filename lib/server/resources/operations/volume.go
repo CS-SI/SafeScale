@@ -642,7 +642,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				// Check if there is no other device mounted in the path (or in subpath)
 				for _, i := range hostMountsV1.LocalMountsByPath {
 					if task.Aborted() {
-						return fail.AbortedError(fmt.Errorf("aborted"))
+						return fail.AbortedError(nil, "aborted")
 					}
 
 					if strings.Index(i.Path, mountPoint) == 0 {
@@ -651,7 +651,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				}
 				for _, i := range hostMountsV1.RemoteMountsByPath {
 					if task.Aborted() {
-						return fail.AbortedError(fmt.Errorf("aborted"))
+						return fail.AbortedError(nil, "aborted")
 					}
 
 					if strings.Index(i.Path, mountPoint) == 0 {
@@ -711,7 +711,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 	// -- acknowledge the volume is really attached to host --
 	var newDisk mapset.Set
-	retryErr := retry.WhileUnsuccessfulDelay1Second(
+	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			newDiskSet, xerr := listAttachedDevices(ctx, host)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -726,6 +726,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			}
 			return nil
 		},
+		temporal.GetMinDelay(),
 		2*time.Minute,
 	)
 	if retryErr != nil {
@@ -920,7 +921,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 
 	hostName := host.GetName()
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
-	retryErr := retry.WhileUnsuccessfulDelay1Second(
+	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			if task.Aborted() {
 				return retry.StopRetryError(fmt.Errorf("aborted"))
@@ -939,6 +940,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 			}
 			return nil
 		},
+		temporal.GetMinDelay(),
 		2*time.Minute,
 	)
 	if retryErr != nil {

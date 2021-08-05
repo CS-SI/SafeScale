@@ -832,7 +832,7 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 						case *fail.ErrNotAvailable: // When this happens, resources are close to exhaustion
 							failures++
 							if failures > 6 { // TODO: retry lib should provide some kind of circuit-breaker pattern
-								return fail.AbortedError(xerr, "not enough resources, pointless to retry")
+								return retry.StopRetryError(xerr, "not enough resources, pointless to retry")
 							}
 							return xerr
 						default:
@@ -1122,7 +1122,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	)
 
 	begins := time.Now()
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
 			sshCmd, innerXErr := sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
@@ -1155,6 +1155,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		timeout+time.Minute,
 	)
 	if retryErr != nil {

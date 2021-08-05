@@ -549,7 +549,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	logrus.Debugf("requesting host resource creation...")
 
 	// Retry creation until success, for 10 minutes
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			var (
 				server    *abstract.HostCore
@@ -595,6 +595,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetLongOperationTimeout(),
 	)
 	if xerr != nil {

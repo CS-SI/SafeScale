@@ -433,7 +433,7 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 	defer c.lock.Unlock()
 
 	if c.kindSplittedStore {
-		xerr = retry.WhileUnsuccessfulDelay1Second(
+		xerr = retry.WhileUnsuccessful(
 			func() error {
 				if innerXErr := c.readByID(id); innerXErr != nil {
 					switch innerXErr.(type) {
@@ -445,10 +445,11 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
+			temporal.GetMinDelay(),
 			temporal.GetContextTimeout(),
 		)
 	} else {
-		xerr = retry.WhileUnsuccessfulDelay1Second(
+		xerr = retry.WhileUnsuccessful(
 			func() error {
 				if innerXErr := c.readByName(id); innerXErr != nil {
 					switch innerXErr.(type) {
@@ -460,6 +461,7 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
+			temporal.GetMinDelay(),
 			temporal.GetContextTimeout(),
 		)
 	}
@@ -505,7 +507,7 @@ func (c *MetadataCore) readByID(id string) fail.Error {
 func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
 	timeout := temporal.GetCommunicationTimeout()
 
-	xerr = retry.WhileUnsuccessfulDelay1Second(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			if innerXErr := c.readByID(ref); innerXErr != nil {
 				innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -530,6 +532,7 @@ func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
 			}
 			return nil
 		},
+		temporal.GetMinDelay(),
 		timeout,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -634,7 +637,7 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 			return fail.InconsistentError("field 'id' is not set with string")
 		}
 
-		xerr = retry.WhileUnsuccessfulDelay1Second(
+		xerr = retry.WhileUnsuccessful(
 			func() error {
 				if innerXErr := c.readByID(id); innerXErr != nil {
 					switch innerXErr.(type) {
@@ -646,6 +649,7 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
+			temporal.GetMinDelay(),
 			2*temporal.GetMetadataTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -663,7 +667,7 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 			return fail.InconsistentError("field 'name' is not set with string")
 		}
 
-		xerr = retry.WhileUnsuccessfulDelay1Second(
+		xerr = retry.WhileUnsuccessful(
 			func() error {
 				if innerXErr := c.readByName(name); innerXErr != nil {
 					switch innerXErr.(type) {
@@ -675,6 +679,7 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
+			temporal.GetMinDelay(),
 			temporal.GetContextTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)

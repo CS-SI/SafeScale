@@ -433,7 +433,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		r      servers.CreateResult
 		server *servers.Server
 	)
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() (innerErr error) {
@@ -499,6 +499,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
@@ -904,7 +905,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			// If check fails and error isn't 'resource not found', retry
 			if resourcePresent {
 				var host *servers.Server
-				innerRetryErr := retry.WhileUnsuccessfulDelay5Seconds(
+				innerRetryErr := retry.WhileUnsuccessful(
 					func() error {
 						commRetryErr := stacks.RetryableRemoteCall(
 							func() (innerErr error) {
@@ -927,6 +928,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						}
 						return commRetryErr
 					},
+					temporal.GetDefaultDelay(),
 					temporal.GetHostCleanupTimeout(),
 				)
 				if innerRetryErr != nil {
@@ -1018,7 +1020,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 	)
 
 	// Sometimes, getOpenstackPortID doesn't find network interface, so let's retry in case it's a bad timing issue
-	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
+	retryErr := retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
 			var innerErr fail.Error
 			portID, innerErr = s.getOpenstackPortID(host)
@@ -1030,6 +1032,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetOperationTimeout(),
 	)
 	if retryErr != nil {
