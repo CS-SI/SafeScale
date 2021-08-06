@@ -319,7 +319,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 		return invalid, "", "", xerr
 	}
 
-	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
+	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
 			if handler.job.Aborted() {
 				return retry.StopRetryError(nil, "operation aborted by user")
@@ -328,6 +328,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 			retCode, stdOut, stdErr, xerr = handler.runWithTimeout(ssh, cmd, temporal.GetHostTimeout())
 			return xerr
 		},
+		temporal.GetMinDelay(),
 		temporal.GetHostTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {

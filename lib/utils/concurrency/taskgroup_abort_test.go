@@ -386,3 +386,27 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestAwfulSimpleTaskActionCitizen(t *testing.T) {
+	single, xerr := NewTask()
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	stCh := make(chan string, 100)
+	_, xerr = single.StartWithTimeout(horribleTaskActionCitizen, stCh, 4*time.Second)
+	if xerr == nil { // It should fail because it's an aborted task...
+		t.Fail()
+	}
+
+	_, _, xerr = single.WaitFor(4 * time.Second)
+	if xerr == nil { // It should fail with a timeout
+		t.Fail()
+	}
+
+	switch xerr.(type) {
+	case *fail.ErrTimeout:
+		t.Logf("timeout occurred as expected, Task cannot end the goroutine never returns and also ignores the timeout parameter")
+	default:
+		t.Errorf("unexpected error occurred: %v", xerr)
+	}
+}

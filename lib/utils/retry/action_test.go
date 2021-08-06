@@ -24,7 +24,9 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/stretchr/testify/require"
 )
 
 func quickSleepy() error {
@@ -493,14 +495,14 @@ func TestErrCheckStdError(t *testing.T) {
 			iteration = iteration + 1
 			return fail.NewError("It failed %d", iteration)
 		},
-		10*time.Millisecond, 60*time.Millisecond)
+		10*time.Millisecond, 80*time.Millisecond)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "the checking failed")
 	}
 
 	if xerr != nil {
 		t.Logf(xerr.Error())
-		if !strings.Contains(xerr.Error(), "failed 7") {
+		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(xerr.Error(), "failed 7") || strings.Contains(xerr.Error(), "failed 8")) {
 			t.FailNow()
 		}
 	}
@@ -726,5 +728,81 @@ func TestOtherCustomActionWithTimeout(t *testing.T) {
 	if delta > 2*time.Second {
 		t.Errorf("There was a retry and it should have been none, timeout shoudn't be able to dictate when the retry finishes")
 		t.FailNow()
+	}
+}
+
+func TestAwfulSimpleTaskActionWithSoftRetry(t *testing.T) {
+	single, xerr := concurrency.NewTask()
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	begin := time.Now()
+	stCh := make(chan string, 100)
+	_, xerr = single.StartWithTimeout(
+		func(t concurrency.Task, parameters concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+			xerr := WhileUnsuccessful(
+				func() error {
+					time.Sleep(900 * time.Millisecond)
+					return fmt.Errorf("Nope")
+				}, 0, 40*time.Millisecond)
+			return "", xerr
+		}, stCh, 200*time.Millisecond)
+	if xerr != nil { // It should fail because it's an aborted task...
+		t.Errorf("Failed to start")
+	}
+
+	_, _, xerr = single.WaitFor(700 * time.Millisecond)
+	if xerr == nil { // It should fail with a timeout
+		t.Errorf("This should have failed with a timeout")
+		t.Fail()
+	}
+	if time.Since(begin) > 700*time.Millisecond {
+		t.Logf("The timeouts didn't worked and this is expected")
+	} else {
+		t.Errorf("This somehow failed")
+	}
+
+	switch xerr.(type) {
+	case *fail.ErrTimeout:
+		t.Logf("timeout occurred as expected, Task cannot end the goroutine never returns and also ignores the timeout parameter")
+	default:
+		t.Errorf("unexpected error occurred: %v", xerr)
+	}
+}
+
+func TestAwfulSimpleTaskActionWithHardRetry(t *testing.T) {
+	single, xerr := concurrency.NewTask()
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	begin := time.Now()
+	stCh := make(chan string, 100)
+	_, xerr = single.StartWithTimeout(
+		func(t concurrency.Task, parameters concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+			xerr := WhileUnsuccessfulWithHardTimeout(
+				func() error {
+					time.Sleep(900 * time.Millisecond)
+					return fmt.Errorf("Nope")
+				}, 0, 40*time.Millisecond)
+			return "", xerr
+		}, stCh, 200*time.Millisecond)
+	if xerr != nil { // It should fail because it's an aborted task...
+		t.Errorf("Failed to start")
+	}
+
+	_, _, xerr = single.WaitFor(700 * time.Millisecond)
+	if xerr == nil { // It should fail with a timeout
+		t.Errorf("This should have failed with a timeout")
+		t.Fail()
+	}
+	if time.Since(begin) > 700*time.Millisecond {
+		t.Logf("The timeouts didn't worked")
+	}
+
+	switch xerr.(type) {
+	case *fail.ErrTimeout:
+		t.Logf("timeout occurred as expected, Task cannot end the goroutine never returns and also ignores the timeout parameter")
+	default:
+		t.Errorf("unexpected error occurred: %v", xerr)
 	}
 }

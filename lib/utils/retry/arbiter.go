@@ -152,3 +152,27 @@ func Max(limit uint) Arbiter {
 		return verdict.Undecided, nil
 	}
 }
+
+// Min errors after a limited number of tries, while the last try returned an error
+func Min(limit uint) Arbiter {
+	if limit == 0 {
+		panic("invalid Min configuration")
+	}
+	return func(t Try) (verdict.Enum, fail.Error) {
+		if t.Err != nil {
+			switch cerr := t.Err.(type) {
+			case *ErrStopRetry:
+				return verdict.Abort, cerr
+			case *fail.ErrRuntimePanic:
+				return verdict.Abort, cerr
+			default:
+				if t.Count <= limit {
+					return verdict.Retry, LimitError(t.Err, limit)
+				}
+
+				return verdict.Undecided, fail.ConvertError(t.Err)
+			}
+		}
+		return verdict.Undecided, nil
+	}
+}

@@ -69,7 +69,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	}
 
 	// Create the command
-	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
+	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() (innerErr error) {
 			sshCmd, innerXErr := sshCfg.NewCommand(ctx, command)
 			if innerXErr != nil {
@@ -109,6 +109,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 			}
 			return nil
 		},
+		temporal.GetMinDelay(),
 		connectionTimeout,
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
@@ -302,10 +303,11 @@ func (s ssh) Connect(hostname, username, shell string, timeout time.Duration) er
 		return xerr
 	}
 
-	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
+	return retry.WhileUnsuccessfulWhereRetcode255WithNotify(
 		func() error {
 			return sshCfg.Enter(username, shell)
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
@@ -335,11 +337,12 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 	sshCfg.Port = remotePort
 	sshCfg.LocalPort = localPort
 
-	return retry.WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(
+	return retry.WhileUnsuccessfulWhereRetcode255WithNotify(
 		func() error {
 			_, _, innerErr := sshCfg.CreateTunneling()
 			return innerErr
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetConnectSSHTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {

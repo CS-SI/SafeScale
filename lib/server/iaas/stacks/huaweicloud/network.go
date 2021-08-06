@@ -709,7 +709,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	opts.JSONResponse = &respGet.Body
 	opts.JSONBody = nil
 
-	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
+	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
@@ -726,6 +726,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 			}
 			return normalizeError(err)
 		},
+		temporal.GetMinDelay(),
 		temporal.GetContextTimeout(),
 		func(try retry.Try, v verdict.Enum) {
 			if v != verdict.Done {
