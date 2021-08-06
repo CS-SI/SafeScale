@@ -38,16 +38,14 @@ JSONTOML := github.com/pelletier/go-toml
 BUILD_TAGS = 
 export BUILD_TAGS
 
-#all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
-all: logclean ground getdevdeps mod sdk generate lib cli minimock err vet
+all: logclean ground getdevdeps mod sdk generate lib minimock mintest cli err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 allcover: all
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 
-#release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet releasearchive
-release: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
+release: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock test err vet releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
 
 releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
