@@ -59,11 +59,12 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -132,11 +133,12 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -175,11 +177,12 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -239,7 +242,7 @@ func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 		logrus.Error(fail.InvalidInstanceError().Error())
 		return map[uint8]installmethod.Enum{}
 	}
-	
+
 	out := make(map[uint8]installmethod.Enum)
 	instance.installMethods.Range(func(k, v interface{}) bool {
 		out[k.(uint8)] = v.(installmethod.Enum)

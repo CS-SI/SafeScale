@@ -514,11 +514,12 @@ func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCo
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -563,11 +564,12 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return state, xerr
+			}
 		default:
+			return state, xerr
 		}
-	}
-	if xerr != nil {
-		return state, xerr
 	}
 
 	if task.Aborted() {
@@ -733,11 +735,12 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -787,16 +790,17 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	templateQuery := hostDef.Template
 	if templateQuery == "" {
 		templateQuery = hostReq.TemplateRef
-	}
-	if templateQuery == "" {
-		tmpl, xerr := svc.FindTemplateBySizing(hostDef)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
+		if templateQuery == "" {
+			tmpl, xerr := svc.FindTemplateBySizing(hostDef)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, xerr
+			}
 
-		hostDef.Template = tmpl.ID
+			hostDef.Template = tmpl.ID
+		}
 	}
+
 	if hostDef.Template == "" {
 		return nil, fail.NotFoundError("failed to find template to match requested sizing")
 	}
@@ -1726,11 +1730,12 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -1863,11 +1868,12 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
 		default:
+			return "", xerr
 		}
-	}
-	if xerr != nil {
-		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -2043,11 +2049,12 @@ func (instance *Host) Delete(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2099,11 +2106,12 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2354,7 +2362,14 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 			temporal.GetHostCleanupTimeout(),
 		)
 		if innerXErr != nil {
-			return innerXErr
+			switch innerXErr.(type) {
+			case *retry.ErrStopRetry:
+				return fail.Wrap(innerXErr.Cause(), "stopping retries")
+			case *retry.ErrTimeout:
+				return fail.Wrap(innerXErr.Cause(), "timeout")
+			default:
+				return innerXErr
+			}
 		}
 
 		// wait for effective Host deletion
@@ -2384,13 +2399,11 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
 					innerXErr = fail.ConvertError(fail.Cause(innerXErr))
-				default:
-				}
-			}
-			if innerXErr != nil {
-				switch innerXErr.(type) {
+					if _, ok := innerXErr.(*fail.ErrNotFound); !ok {
+						return innerXErr
+					}
+					debug.IgnoreError(innerXErr)
 				case *fail.ErrNotFound:
-					// continue
 					debug.IgnoreError(innerXErr)
 				default:
 					return innerXErr
@@ -2472,11 +2485,12 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
 		default:
+			return invalid, "", "", xerr
 		}
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -2516,11 +2530,12 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
 		default:
+			return invalid, "", "", xerr
 		}
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -2558,7 +2573,17 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 		temporal.GetDefaultDelay(),
 		2*timeout, // FIXME: Harcoded
 	)
-	return retcode, stdout, stderr, xerr
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return retcode, stdout, stderr, fail.Wrap(xerr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return retcode, stdout, stderr, fail.Wrap(xerr.Cause(), "timeout")
+		default:
+			return retcode, stdout, stderr, xerr
+		}
+	}
+	return retcode, stdout, stderr, nil
 }
 
 // Push uploads a file to Host
@@ -2579,11 +2604,12 @@ func (instance *Host) Push(ctx context.Context, source, target, owner, mode stri
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
 		default:
+			return invalid, "", "", xerr
 		}
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -2671,11 +2697,12 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2743,11 +2770,12 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2821,11 +2849,12 @@ func (instance *Host) Reboot(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2861,11 +2890,12 @@ func (instance *Host) Resize(ctx context.Context, hostSize abstract.HostSizingRe
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host")).WithStopwatch().Entering()
@@ -3106,11 +3136,12 @@ func (instance *Host) PushStringToFileWithOwnership(ctx context.Context, content
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -3228,11 +3259,12 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -3301,11 +3333,12 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -3411,11 +3444,12 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -3515,11 +3549,12 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {

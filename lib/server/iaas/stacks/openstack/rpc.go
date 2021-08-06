@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -124,7 +125,9 @@ func (s Stack) rpcGetMetadataOfInstance(id string) (map[string]string, fail.Erro
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return emptyMap, xerr
+			return emptyMap, fail.Wrap(xerr.Cause(), "timeout")
+		case *retry.ErrStopRetry:
+			return emptyMap, fail.Wrap(xerr.Cause(), "stopping retries")
 		default:
 			return emptyMap, xerr
 		}

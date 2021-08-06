@@ -540,10 +540,10 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	)
 	if xerr != nil {
 		switch xerr.(type) {
-		case *retry.ErrTimeout:
-			return nullAHC, fail.ConvertError(fail.Cause(xerr))
+		case *fail.ErrTimeout:
+			return nullAHC, fail.Wrap(xerr.Cause(), "timeout")
 		case *retry.ErrStopRetry:
-			return nullAHC, fail.NotFoundError("failed to find Host %s", hostLabel)
+			return nullAHC, fail.Wrap(xerr.Cause(), "stopping retries")
 		default:
 			return nullAHC, xerr
 		}
@@ -927,12 +927,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Cause(xerr))
+			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "timeout")
 		default:
+			return nullAHF, nullUDC, xerr
 		}
-	}
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
 	}
 
 	// -- Retrieve default Nic use to create public ip --

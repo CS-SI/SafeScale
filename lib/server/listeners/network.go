@@ -303,16 +303,16 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					an, xerr = svc.InspectNetwork(ref)
+					if xerr != nil {
+						switch xerr.(type) { //nolint
+						case *fail.ErrNotFound:
+							return empty, fail.NotFoundError("failed to find Network %s", refLabel)
+						}
+						return empty, xerr
+					}
 				default:
 					return empty, xerr
 				}
-			}
-			if xerr != nil {
-				switch xerr.(type) { //nolint
-				case *fail.ErrNotFound:
-					return empty, fail.NotFoundError("failed to find Network %s", refLabel)
-				}
-				return empty, xerr
 			}
 
 			if cfg, xerr := svc.GetConfigurationOptions(); xerr == nil {

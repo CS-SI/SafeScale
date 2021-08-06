@@ -72,8 +72,8 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 	out := &abstract.SecurityGroupRule{
 		Direction: direction,
 		Protocol:  in.IpProtocol,
-		PortFrom:  int32(in.FromPortRange),
-		PortTo:    int32(in.ToPortRange),
+		PortFrom:  in.FromPortRange,
+		PortTo:    in.ToPortRange,
 		Targets:   in.IpRanges,
 	}
 	return out
@@ -295,8 +295,8 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ 
 		in.Protocol = "-1"
 	}
 	rule.IpProtocol = in.Protocol
-	rule.FromPortRange = int32(in.PortFrom)
-	rule.ToPortRange = int32(in.PortTo)
+	rule.FromPortRange = in.PortFrom
+	rule.ToPortRange = in.PortTo
 	if rule.FromPortRange == 0 && rule.ToPortRange == 0 {
 		switch in.Protocol {
 		case "icmp", "-1":

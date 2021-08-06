@@ -503,7 +503,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		return nil, userData, retryErr
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return nil, userData, fail.Wrap(retryErr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return nil, userData, fail.Wrap(retryErr.Cause(), "timeout")
+		default:
+			return nil, userData, retryErr
+		}
 	}
 
 	// Starting from here, delete host if exiting with error
@@ -932,12 +939,14 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					temporal.GetHostCleanupTimeout(),
 				)
 				if innerRetryErr != nil {
-					if _, ok := innerRetryErr.(*retry.ErrTimeout); ok {
-						// retry deletion...
-						return fail.Wrap(abstract.ResourceTimeoutError("host", hostRef, temporal.GetContextTimeout()),
-							"host '%s' not deleted after %v", hostRef, temporal.GetContextTimeout())
+					switch innerRetryErr.(type) {
+					case *retry.ErrStopRetry:
+						return fail.Wrap(innerRetryErr.Cause(), "stopping retries")
+					case *retry.ErrTimeout:
+						return fail.Wrap(innerRetryErr.Cause(), "timeout")
+					default:
+						return innerRetryErr
 					}
-					return innerRetryErr
 				}
 			}
 			if !resourcePresent {
@@ -949,8 +958,14 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		temporal.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		logrus.Errorf("failed to remove host '%s': %s", hostRef, outerRetryErr.Error())
-		return outerRetryErr
+		switch outerRetryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return fail.Wrap(outerRetryErr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return fail.Wrap(outerRetryErr.Cause(), "timeout")
+		default:
+			return outerRetryErr
+		}
 	}
 	if !resourcePresent {
 		return abstract.ResourceNotFoundError("host", hostRef)
@@ -1036,7 +1051,14 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 		temporal.GetOperationTimeout(),
 	)
 	if retryErr != nil {
-		return fail.Wrap(retryErr, "failed to enable Router Mode on host '%s'", host.Core.Name)
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return fail.Wrap(retryErr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return fail.Wrap(retryErr.Cause(), "timeout")
+		default:
+			return retryErr
+		}
 	}
 
 	commRetryErr := stacks.RetryableRemoteCall(

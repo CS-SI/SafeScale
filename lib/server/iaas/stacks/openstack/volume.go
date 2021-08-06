@@ -289,12 +289,16 @@ func (s Stack) DeleteVolume(id string) (xerr fail.Error) {
 		timeout,
 	)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "timeout")
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Cause(xerr))
+			return fail.Wrap(xerr.Cause(), "stopping retries")
+		default:
+			return xerr
 		}
 	}
-	return xerr
+	return nil
 }
 
 // CreateVolumeAttachment attaches a volume to an host

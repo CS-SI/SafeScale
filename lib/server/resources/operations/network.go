@@ -177,11 +177,12 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -336,11 +337,12 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -371,12 +373,12 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			abstractNetwork, xerr = svc.InspectNetwork(ref)
+			if xerr != nil {
+				return xerr
+			}
 		default:
 			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -410,11 +412,12 @@ func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Net
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -457,11 +460,12 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -683,11 +687,12 @@ func (instance *Network) AdoptSubnet(ctx context.Context, subnet resources.Subne
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -741,11 +746,12 @@ func (instance *Network) AbandonSubnet(ctx context.Context, subnetID string) (xe
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {

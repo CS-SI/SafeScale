@@ -105,7 +105,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		return nil, xerr
 	}
 
-	if xerr = task.SetID(id+description); xerr != nil {
+	if xerr = task.SetID(id + description); xerr != nil {
 		return nil, xerr
 	}
 

@@ -103,7 +103,14 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 			temporal.GetDefaultDelay(),
 		)
 		if retryErr != nil {
-			return nullAN, retryErr
+			switch retryErr.(type) {
+			case *retry.ErrStopRetry:
+				return nullAN, fail.Wrap(retryErr.Cause(), "stopping retries")
+			case *fail.ErrTimeout:
+				return nullAN, fail.Wrap(retryErr.Cause(), "timeout")
+			default:
+				return nullAN, retryErr
+			}
 		}
 	}
 
@@ -416,8 +423,10 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, x
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
+			case *retry.ErrStopRetry:
+				return nullAS, fail.Wrap(retryErr.Cause(), "stopping retries")
 			case *fail.ErrTimeout:
-				return nullAS, fail.Wrap(fail.Cause(retryErr), "timeout")
+				return nullAS, fail.Wrap(retryErr.Cause(), "timeout")
 			default:
 				return nullAS, retryErr
 			}
@@ -585,12 +594,12 @@ func (s stack) initEC2DescribeSubnetsInput(networkRef string) (*ec2.DescribeSubn
 			case *fail.ErrNotFound:
 				// if not found, try networkRef as a name
 				n, xerr = s.InspectNetworkByName(networkRef)
+				if xerr != nil {
+					return nil, xerr
+				}
 			default:
 				return nil, xerr
 			}
-		}
-		if xerr != nil {
-			return nil, xerr
 		}
 
 		query.Filters = []*ec2.Filter{

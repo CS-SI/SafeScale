@@ -41,7 +41,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type toV21_05_0 struct{
+type toV21_05_0 struct {
 	dryRun bool
 }
 
@@ -102,7 +102,7 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
 				if xerr == nil {
 					xerr = owningInstance.Import(context.Background(), abstractOwningNetwork.ID)
 				}
-				default:
+			default:
 			}
 		}
 	} else {
@@ -201,19 +201,19 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 					sgName := gwSG.GetName()
 					derr := gwSG.Delete(context.Background(), true)
 					if derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 					}
 
 					sgName = internalSG.GetName()
 					derr = internalSG.Delete(context.Background(), true)
 					if derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 					}
 
 					sgName = publicSG.GetName()
 					derr = publicSG.Delete(context.Background(), true)
 					if derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 					}
 				} else {
 					gwSG.Released()
@@ -239,19 +239,19 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				sgName := gwSG.GetName()
 				derr := gwSG.Delete(context.Background(), true)
 				if derr != nil {
-					_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 				}
 
 				sgName = internalSG.GetName()
 				derr = internalSG.Delete(context.Background(), true)
 				if derr != nil {
-					_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 				}
 
 				sgName = publicSG.GetName()
 				derr = publicSG.Delete(context.Background(), true)
 				if derr != nil {
-					_ = innerXErr.AddConsequence(fail.Wrap(derr,"cleaning up on failure, failed to delete Security Group '%s'", sgName))
+					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 				}
 
 				return innerXErr

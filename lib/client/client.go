@@ -83,22 +83,24 @@ func New(server string) (_ *Session, xerr fail.Error) {
 			logrus.Warnf("Content of environment variable SAFESCALED_LISTEN is invalid, ignoring.")
 			server = ""
 		}
-	}
-	// LEGACY: if server is empty, host will be localhost, try to see if env SAFESCALED_PORT is set
-	if server == "" {
-		if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
-			logrus.Warnf("SAFESCALED_PORT is deprecated and will be soon ignored, use SAFESCALED_LISTEN instead.")
-			num, err := strconv.Atoi(portCandidate)
-			if err != nil || num <= 0 {
-				logrus.Warnf("Content of environment variable SAFESCALED_PORT is invalid, must be an int")
-			} else {
-				server = defaultServerHost + ":" + portCandidate
+
+		// LEGACY: if server is empty, host will be localhost, try to see if env SAFESCALED_PORT is set
+		if server == "" {
+			if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
+				logrus.Warnf("SAFESCALED_PORT is deprecated and will be soon ignored, use SAFESCALED_LISTEN instead.")
+				num, err := strconv.Atoi(portCandidate)
+				if err != nil || num <= 0 {
+					logrus.Warnf("Content of environment variable SAFESCALED_PORT is invalid, must be an int")
+				} else {
+					server = defaultServerHost + ":" + portCandidate
+				}
+			}
+
+			if server == "" {
+				// empty string, so default value to server
+				server = defaultServerHost + ":" + defaultServerPort
 			}
 		}
-	}
-	if server == "" {
-		// empty string, so default value to server
-		server = defaultServerHost + ":" + defaultServerPort
 	}
 
 	s := &Session{server: server}

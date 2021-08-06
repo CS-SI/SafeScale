@@ -449,11 +449,12 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
 		default:
+			return invalid, "", "", xerr
 		}
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
@@ -523,7 +524,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	// If is 126, try again 6 times, if not return the error
 	rounds := 10
 	for {
-		rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
+		rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetLongOperationTimeout())
 		if rc == 126 {
 			logrus.Debugf("Text busy happened")
 		}
@@ -537,7 +538,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 
 		if !(strings.Contains(stdout, "bad interpreter") || strings.Contains(stderr, "bad interpreter")) {
 			if err == nil {
-				return rc, stdout, stderr, err
+				return rc, stdout, stderr, nil
 			}
 
 			if !strings.Contains(err.Error(), "bad interpreter") {
@@ -545,7 +546,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 			}
 		}
 
-		rounds = rounds - 1
+		rounds--
 		time.Sleep(temporal.GetMinDelay())
 	}
 }
@@ -639,7 +640,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 		if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
-			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
+			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetLongOperationTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to Host '%s'", host.GetName())

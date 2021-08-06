@@ -216,7 +216,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 // List lists hosts managed by SafeScale only, or all hosts.
 func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (hl *protocol.HostList, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list Hosts")
+	defer fail.OnExitWrapError(&err, "cannot list hosts")
 	defer fail.OnPanic(&err)
 
 	if s == nil {

@@ -507,9 +507,8 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 				_ = xerr.Annotate("stdout", outrun)
 				_ = xerr.Annotate("stderr", outerr)
 				return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
-			} else {
-				break
 			}
+			break
 		}
 
 		if !(strings.Contains(outrun, "bad interpreter") || strings.Contains(outerr, "bad interpreter")) {
@@ -519,9 +518,8 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 					_ = xerr.Annotate("stdout", outrun)
 					_ = xerr.Annotate("stderr", outerr)
 					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
-				} else {
-					break
 				}
+				break
 			}
 
 			if !strings.Contains(xerr.Error(), "bad interpreter") {
@@ -536,7 +534,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			}
 		}
 
-		rounds = rounds - 1
+		rounds--
 		time.Sleep(temporal.GetMinDelay())
 	}
 

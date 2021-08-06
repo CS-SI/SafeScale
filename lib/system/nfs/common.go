@@ -65,11 +65,12 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
 		default:
+			return "", xerr
 		}
-	}
-	if xerr != nil {
-		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -172,13 +173,17 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return "", fail.Wrap(xerr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return "", fail.Wrap(xerr.Cause(), "timeout")
 		case *fail.ErrExecution:
+			return "", xerr
 		default:
-			xerr = fail.ExecutionError(xerr, "failed to copy script to remote host")
-			xerr.Annotate("retcode", 255)
+			yerr := fail.ExecutionError(xerr, "failed to copy script to remote host")
+			_ = yerr.Annotate("retcode", 255)
+			return "", yerr
 		}
-		// return 255, "", "", fail.Wrap(err, "failed to copy script to remote host")
-		return "", xerr
 	}
 
 	// if k != nil {
@@ -200,7 +205,14 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		temporal.GetHostTimeout(),
 	)
 	if xerr != nil {
-		return "", xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return "", fail.Wrap(xerr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return "", fail.Wrap(xerr.Cause(), "timeout")
+		default:
+			return "", xerr
+		}
 	}
 
 	// Execute script on remote host with retries if needed

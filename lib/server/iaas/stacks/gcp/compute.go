@@ -214,10 +214,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		switch xerr.(type) { //nolint
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(defaultSubnet.Network)
+			if xerr != nil {
+				return nullAHF, nullUD, fail.NotFoundError("failed to find Network %s", defaultSubnet.Network)
+			}
+		default:
+			return nullAHF, nullUD, fail.NotFoundError("failed to find Network %s", defaultSubnet.Network)
 		}
-	}
-	if xerr != nil {
-		return nullAHF, nullUD, fail.NotFoundError("failed to find Network %s", defaultSubnet.Network)
 	}
 
 	if request.DefaultRouteIP == "" && !hostMustHavePublicIP {
@@ -332,14 +334,14 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		switch retryErr.(type) { //nolint
+		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHF, nullUD, fail.ConvertError(fail.Cause(retryErr))
+			return nullAHF, nullUD, fail.Wrap(retryErr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return nullAHF, nullUD, fail.Wrap(retryErr.Cause(), "timeout")
+		default:
+			return nullAHF, nullUD, retryErr
 		}
-	}
-	if retryErr != nil {
-		// return nullAHF, nullUD, abstract.ResourceForbiddenError(request.ResourceName, fmt.Sprintf("error creating ahf: %s", desistError.Error()))
-		return nullAHF, nullUD, retryErr
 	}
 
 	logrus.Debugf("Host '%s' created.", ahf.GetName())
@@ -386,11 +388,16 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 		timeout,
 	)
 	if retryErr != nil {
-		if _, ok := retryErr.(*retry.ErrTimeout); ok {
-			return nullAHC, abstract.ResourceTimeoutError("host", ahf.GetName(), timeout)
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry:
+			return nullAHC, fail.Wrap(retryErr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return nullAHC, fail.Wrap(retryErr.Cause(), "timeout")
+		default:
+			return nullAHC, retryErr
 		}
-		return nullAHC, retryErr
 	}
+
 	return ahf.Core, nil
 }
 
@@ -621,9 +628,9 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return fail.ConvertError(fail.Cause(xerr))
+			return fail.Wrap(xerr.Cause(), "stopping retries")
 		case *retry.ErrTimeout:
-			return fail.ConvertError(fail.Cause(xerr))
+			return fail.Wrap(xerr.Cause(), "timeout")
 		default:
 			return xerr
 		}

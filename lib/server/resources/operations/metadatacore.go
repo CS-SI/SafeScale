@@ -45,7 +45,7 @@ const (
 
 	NullMetadataKind = "nil"
 	NullMetadataName = "<NullCore>"
-	NullMetadataID = NullMetadataName
+	NullMetadataID   = NullMetadataName
 )
 
 // MetadataCore contains the core functions of a persistent object

@@ -14,11 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-rm -f /opt/safescale/var/log/node_install_requirements.log
-exec 1<&-
-exec 2<&-
-exec 1<>/opt/safescale/var/log/k8s_install_node.log
-exec 2>&1
+# Redirects outputs to /opt/safescale/var/log/node_install_requirements.log
+LOGFILE=/opt/safescale/var/log/node_install_requirements.log
+
+### All output to one file and all output to the screen
+exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+set -x
 
 {{ .reserved_BashLibrary }}
 

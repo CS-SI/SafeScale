@@ -47,11 +47,12 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {

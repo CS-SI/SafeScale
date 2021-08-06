@@ -64,9 +64,9 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	hostRef := in.GetHost().GetName()
 	if hostRef == "" {
 		hostRef = in.GetHost().GetId()
-	}
-	if hostRef == "" {
-		return nil, fail.InvalidParameterError("in.Host", "host reference is missing")
+		if hostRef == "" {
+			return nil, fail.InvalidParameterError("in.Host", "host reference is missing")
+		}
 	}
 
 	command := in.GetCommand()

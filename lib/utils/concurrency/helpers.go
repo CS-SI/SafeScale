@@ -62,7 +62,7 @@ func randomIntWithReseed(min, max int) int {
 }
 
 func validTest(st int, latency int) bool {
-	iterations := int64(math.Ceil(float64(float64(st) / float64(latency))))
+	iterations := int64(math.Ceil(float64(st) / float64(latency)))
 	tempo := time.Duration(latency) * time.Millisecond
 	count := int64(0)
 	begin := time.Now()
@@ -100,7 +100,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 
 		resch := make(chan internalRes)
 		go func() {
-			iterations := int64(math.Ceil(float64(float64(rd) / float64(latency))))
+			iterations := int64(math.Ceil(float64(rd) / float64(latency)))
 			tempo := time.Duration(math.Min(float64(latency), float64(rd))) * time.Millisecond
 			count := int64(0)
 			begin := time.Now()

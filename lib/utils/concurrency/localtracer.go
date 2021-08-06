@@ -102,7 +102,7 @@ func (t *tracer) exiting() *tracer {
 
 // buildMessage builds the message with available information from stack trace
 func (t *tracer) buildMessage() string {
-	if t.isNull() {
+	if t == nil || t.isNull() {
 		return ""
 	}
 

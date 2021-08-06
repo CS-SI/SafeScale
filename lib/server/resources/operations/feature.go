@@ -343,11 +343,12 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	featureName := f.GetName()
@@ -443,11 +444,12 @@ func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.M
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	featureName := f.GetName()
@@ -542,11 +544,12 @@ func (f *Feature) Remove(ctx context.Context, target resources.Targetable, v dat
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	featureName := f.GetName()

@@ -275,8 +275,10 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	)
 	if xerr != nil {
 		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return emptySlice, fail.Wrap(xerr.Cause(), "stopping retries")
 		case *fail.ErrTimeout:
-			return emptySlice, xerr
+			return emptySlice, fail.Wrap(xerr.Cause(), "timeout")
 		default:
 			return emptySlice, xerr
 		}
@@ -694,7 +696,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
-					innerXErr = fail.ConvertError(fail.Cause(innerXErr))
+					return fail.Wrap(innerXErr.Cause(), "stopping retries")
 				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(innerXErr)
 				}
@@ -756,9 +758,9 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			xerr = fail.ConvertError(fail.Cause(xerr))
+			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "timeout")
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Cause(xerr))
+			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "stopping retries")
 		}
 		return nullAHF, nullUDC, xerr
 	}
@@ -1090,13 +1092,12 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *fail.ErrTimeout:
-			retryErr = fail.TimeoutError(fail.Cause(retryErr), timeout, "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
+			return nullServer, fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
 		case *fail.ErrAborted:
-			retryErr = fail.ConvertError(fail.Cause(retryErr))
+			return nullServer, fail.Wrap(retryErr.Cause(), "stopping retries")
+		default:
+			return nullServer, retryErr
 		}
-	}
-	if retryErr != nil {
-		return nullServer, retryErr
 	}
 	if server == nil {
 		return nullServer, fail.NotFoundError("failed to query Host")
@@ -1288,7 +1289,14 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				temporal.GetContextTimeout(),
 			)
 			if innerXErr != nil {
-				return innerXErr
+				switch innerXErr.(type) {
+				case *retry.ErrStopRetry:
+					return fail.Wrap(innerXErr.Cause(), "stopping retries")
+				case *retry.ErrTimeout:
+					return fail.Wrap(innerXErr.Cause(), "timeout")
+				default:
+					return innerXErr
+				}
 			}
 			if state == hoststate.Error {
 				return fail.NotAvailableError("failed to trigger server deletion, retrying...")
@@ -1299,14 +1307,21 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		temporal.GetHostCleanupTimeout(),
 	)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrTimeout, *retry.ErrStopRetry:
-			// On timeout or abort, recover the error cause
-			xerr = fail.ConvertError(fail.Cause(xerr))
-		}
-	}
-	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { // FIXME: Look at that
+		case *retry.ErrTimeout:
+			cause := xerr.Cause()
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(xerr)
+			} else {
+				return fail.ConvertError(cause)
+			}
+		case *retry.ErrStopRetry:
+			cause := xerr.Cause()
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(xerr)
+			} else {
+				return fail.ConvertError(cause)
+			}
 		case *fail.ErrNotFound:
 			// if host disappeared (rpcListPorts succeeded and host was still there at this moment), consider the error as a successful deletion;
 			// leave a chance to remove ports

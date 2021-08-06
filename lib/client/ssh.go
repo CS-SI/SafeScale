@@ -120,7 +120,9 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return invalid, "", "", fail.ConvertError(fail.Cause(retryErr))
+			return invalid, "", "", fail.Wrap(fail.Cause(retryErr))
+		case *retry.ErrTimeout:
+			return invalid, "", "", fail.Wrap(retryErr)
 		default:
 			return invalid, "", "", retryErr
 		}
@@ -270,6 +272,8 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 	)
 	if retryErr != nil {
 		switch cErr := retryErr.(type) { // nolint
+		case *retry.ErrStopRetry:
+			return invalid, "", "", fail.Wrap(fail.Cause(retryErr))
 		case *retry.ErrTimeout:
 			return invalid, "", "", cErr
 		}

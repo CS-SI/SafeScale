@@ -276,11 +276,12 @@ func (instance *Share) Browse(ctx context.Context, callback func(string, string)
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -348,11 +349,12 @@ func (instance *Share) Create(
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -629,11 +631,12 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -1037,13 +1040,13 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
 	}
-	if xerr != nil {
-		return xerr
-	}
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}

@@ -350,11 +350,12 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(req.NetworkID)
+			if xerr != nil {
+				return nullAS, xerr
+			}
 		default:
+			return nullAS, xerr
 		}
-	}
-	if xerr != nil {
-		return nullAS, xerr
 	}
 
 	// Checks if CIDR is valid for huaweicloud
@@ -734,7 +735,18 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 			}
 		},
 	)
-	return &subnet.Subnet, retryErr
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return nil, fail.Wrap(retryErr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return nil, fail.Wrap(retryErr.Cause(), "timeout")
+		default:
+			return nil, retryErr
+		}
+	}
+
+	return &subnet.Subnet, nil
 }
 
 func fromIntIPVersion(v int) ipversion.Enum {

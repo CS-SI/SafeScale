@@ -99,11 +99,12 @@ func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bo
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -422,11 +423,12 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
@@ -700,9 +702,10 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			}
 
 			imageQuery = cfg.GetString("DefaultImage")
-		}
-		if imageQuery == "" {
-			imageQuery = "Ubuntu 20.04"
+
+			if imageQuery == "" {
+				imageQuery = "Ubuntu 20.04"
+			}
 		}
 		img, xerr := svc.SearchImage(imageQuery)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -846,12 +849,14 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	if xerr != nil {
 		groupXErr = xerr
 	} else {
-		if content, ok := results[id]; !ok {
+		var content concurrency.TaskResult
+		var ok bool
+
+		if content, ok = results[id]; !ok {
 			return fail.InconsistentError("task results does not contain %s", id)
-		} else {
-			if content == nil {
-				return fail.InconsistentError("task result with %s should not be nil", id)
-			}
+		}
+		if content == nil {
+			return fail.InconsistentError("task result with %s should not be nil", id)
 		}
 
 		result, ok := results[id].(data.Map)
@@ -1361,11 +1366,12 @@ func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -1415,11 +1421,12 @@ func (instance *Subnet) AdoptHost(ctx context.Context, host resources.Host) (xer
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -1495,11 +1502,12 @@ func (instance *Subnet) AbandonHost(ctx context.Context, hostID string) (xerr fa
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -1534,11 +1542,12 @@ func (instance *Subnet) ListHosts(ctx context.Context) (_ []resources.Host, xerr
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -1703,11 +1712,12 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2184,11 +2194,12 @@ func (instance *Subnet) BindSecurityGroup(ctx context.Context, sg resources.Secu
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task == nil {
@@ -2252,11 +2263,12 @@ func (instance *Subnet) UnbindSecurityGroup(ctx context.Context, sg resources.Se
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task == nil {
@@ -2329,11 +2341,12 @@ func (instance *Subnet) ListSecurityGroups(ctx context.Context, state securitygr
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptyList, xerr
+			}
 		default:
+			return emptyList, xerr
 		}
-	}
-	if xerr != nil {
-		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -2379,11 +2392,12 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, rsg resources.S
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2476,11 +2490,12 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sg resources.S
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2633,11 +2648,12 @@ func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abst
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),

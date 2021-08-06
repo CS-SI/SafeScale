@@ -282,11 +282,12 @@ func (instance *volume) Browse(ctx context.Context, callback func(*abstract.Volu
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -337,11 +338,12 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -437,11 +439,12 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -540,11 +543,12 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -730,10 +734,14 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 		2*time.Minute,
 	)
 	if retryErr != nil {
-		if _, ok := retryErr.(*retry.ErrTimeout); ok {
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry:
+			return fail.Wrap(retryErr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return fail.Wrap(retryErr.Cause(), "timeout")
+		default:
 			return retryErr
 		}
-		return fail.Wrap(retryErr, fmt.Sprintf("failed to confirm the disk attachment after %s", 2*time.Minute))
 	}
 
 	if task.Aborted() {
@@ -912,11 +920,12 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	hostName := host.GetName()
@@ -944,7 +953,14 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 		2*time.Minute,
 	)
 	if retryErr != nil {
-		return nil, fail.Wrap(retryErr, "failed to get list of connected disks after %s", 2*time.Minute)
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry:
+			return nil, fail.Wrap(retryErr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return nil, fail.Wrap(retryErr.Cause(), "timeout")
+		default:
+			return nil, retryErr
+		}
 	}
 
 	disks := strings.Split(stdout, "\n")
@@ -977,11 +993,12 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {

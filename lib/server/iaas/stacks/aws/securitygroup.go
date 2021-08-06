@@ -344,13 +344,15 @@ func (s stack) InspectSecurityGroupByName(networkRef, name string) (_ *abstract.
 
 	an, xerr := s.InspectNetwork(networkRef)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(networkRef)
+			if xerr != nil {
+				return nullASG, xerr
+			}
+		default:
+			return nullASG, xerr
 		}
-	}
-	if xerr != nil {
-		return nullASG, xerr
 	}
 
 	resp, xerr := s.rpcDescribeSecurityGroupByName(aws.String(an.ID), aws.String(name))

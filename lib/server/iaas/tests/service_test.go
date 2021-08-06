@@ -484,4 +484,3 @@ func Test_service_SearchImageNew_AWS_Centos7(t *testing.T) {
 		t.FailNow()
 	}
 }
-

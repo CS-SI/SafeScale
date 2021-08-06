@@ -505,17 +505,16 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 					msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) exceeded the mark (%s)", duration, a.Timeout), "", 0)
 					logrus.Warnf(msg)
 				}
-			} else if duration > time.Duration(55*a.Timeout/100) {
+			} else if duration > 55*a.Timeout/100 {
 				if count <= minNumRetries {
 					if count == 1 {
 						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) is too close to the mark (%s)", duration, a.Timeout), "", 0)
 						logrus.Warnf(msg)
-					} else {
-						if xerr != nil {
-							msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
-							logrus.Warnf(msg)
-						}
+					} else if xerr != nil {
+						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
+						logrus.Warnf(msg)
 					}
+
 				}
 			}
 		}
@@ -604,17 +603,16 @@ func (a action) loopWithHardTimeout() (xerr fail.Error) {
 					msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) exceeded the mark (%s)", duration, a.Timeout), "", 0)
 					logrus.Warnf(msg)
 				}
-			} else if duration > time.Duration(55*a.Timeout/100) {
+			} else if duration > 55*a.Timeout/100 {
 				if count <= minNumRetries {
 					if count == 1 {
 						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) is too close to the mark (%s)", duration, a.Timeout), "", 0)
 						logrus.Warnf(msg)
-					} else {
-						if xerr != nil {
-							msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
-							logrus.Warnf(msg)
-						}
+					} else if xerr != nil {
+						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
+						logrus.Warnf(msg)
 					}
+
 				}
 			}
 		}

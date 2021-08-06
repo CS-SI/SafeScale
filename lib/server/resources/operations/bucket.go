@@ -197,11 +197,12 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error)
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
 		default:
+			return "", xerr
 		}
-	}
-	if xerr != nil {
-		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -244,11 +245,12 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
 		default:
+			return "", xerr
 		}
-	}
-	if xerr != nil {
-		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -302,11 +304,12 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -352,11 +355,12 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
@@ -390,11 +394,12 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -481,11 +486,12 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {

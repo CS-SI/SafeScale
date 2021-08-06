@@ -140,7 +140,7 @@ func (s subnet) Create(
 		Gateway: &protocol.GatewayDefinition{
 			ImageId:        os,
 			Name:           gwname,
-			SshPort:        uint32(gwport),
+			SshPort:        gwport,
 			SizingAsString: sizing,
 		},
 		KeepOnFailure: keepOnFailure,

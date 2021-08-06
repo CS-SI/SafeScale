@@ -57,11 +57,12 @@ func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.En
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
 		default:
+			return invalid, "", "", xerr
 		}
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -164,12 +165,14 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			xerr = fail.Wrap(fail.Cause(xerr), "failed to execute command '%s' after '%s'", cmd, temporal.FormatDuration(timeout))
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command '%s' after '%s'", cmd, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Cause(xerr))
+			return retcode, stdout, stderr, fail.ConvertError(fail.Cause(xerr))
+		default:
+			return retcode, stdout, stderr, xerr
 		}
 	}
-	return retcode, stdout, stderr, xerr
+	return retcode, stdout, stderr, nil
 }
 
 // UnsafePush is the non goroutine-safe version of Push, with less parameter validation, that do the real work
@@ -191,11 +194,12 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
 		default:
+			return invalid, "", "", xerr
 		}
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -228,7 +232,14 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return retcode, stdout, stderr, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return retcode, stdout, stderr, fail.Wrap(xerr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return retcode, stdout, stderr, fail.Wrap(xerr.Cause(), "timeout")
+		default:
+			return retcode, stdout, stderr, xerr
+		}
 	}
 	if retcode != 0 {
 		return retcode, stdout, stderr, nil
@@ -320,11 +331,12 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -372,6 +384,8 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	_ = os.Remove(f.Name())
 	if retryErr != nil {
 		switch retryErr.(type) {
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(retryErr))
 		case *retry.ErrTimeout:
 			return fail.Wrap(retryErr, "timeout trying to copy temporary file to '%s'", to)
 		default:
@@ -414,16 +428,13 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
-			case *fail.ErrAborted:
-				if cerr := retryErr.Cause(); cerr != nil {
-					retryErr = fail.ConvertError(cerr)
-				}
+			case *retry.ErrStopRetry:
+				return fail.Wrap(retryErr.Cause(), "stopping retries")
 			case *retry.ErrTimeout:
-				return xerr
+				return fail.Wrap(retryErr.Cause(), "timeout")
+			default:
+				return retryErr
 			}
-		}
-		if retryErr != nil {
-			return fail.Wrap(retryErr, "failed to change rights of file '%s' on host '%s'", filename, hostName)
 		}
 	}
 	return nil

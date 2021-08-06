@@ -255,7 +255,7 @@ If subnet id is provided, '--network' is superfluous.
 May be used multiple times, the first occurrence becoming the default subnet by design`,
 		},
 		&cli.StringFlag{
-			Name:  "os",
+			Name: "os",
 			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the host",
 		},

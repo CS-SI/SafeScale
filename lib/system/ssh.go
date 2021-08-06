@@ -337,7 +337,7 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
-		"timeout 2400s ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
+		"timeout 1200s ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
 		f.Name(),
 		localPort,
 		scfg.IPAddress,
@@ -552,11 +552,12 @@ func (scmd *SSHCommand) Run(ctx context.Context, outs outputs.Enum) (int, string
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
 		default:
+			return invalid, "", "", xerr
 		}
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -595,11 +596,12 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
 		default:
+			return invalid, "", "", xerr
 		}
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -849,8 +851,10 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 			)
 			if xerr != nil {
 				switch xerr.(type) { // nolint
+				case *retry.ErrStopRetry:
+					return nil, fail.Wrap(fail.Cause(xerr))
 				case *retry.ErrTimeout:
-					xerr = fail.ConvertError(fail.Cause(xerr))
+					return nil, fail.ConvertError(fail.Cause(xerr))
 				}
 				return nil, xerr
 			}
@@ -896,7 +900,7 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 	}
 
 	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", sconf.Hostname)
-	sshCmdString := fmt.Sprintf("timeout 2400s ssh -i %s %s -p %d %s@%s", f.Name(), options, sconf.Port, sconf.User, sconf.IPAddress)
+	sshCmdString := fmt.Sprintf("timeout 1200s ssh -i %s %s -p %d %s@%s", f.Name(), options, sconf.Port, sconf.User, sconf.IPAddress)
 
 	if shell == "" {
 		shell = "bash"
@@ -963,11 +967,12 @@ func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTt
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -1018,11 +1023,12 @@ func (sconf *SSHConfig) newCopyCommand(ctx context.Context, localPath, remotePat
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -1092,11 +1098,12 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
 		default:
+			return "", xerr
 		}
-	}
-	if xerr != nil {
-		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -1159,7 +1166,14 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		timeout+time.Minute,
 	)
 	if retryErr != nil {
-		return stdout, retryErr
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry:
+			return stdout, fail.Wrap(retryErr.Cause(), "stopping retries")
+		case *retry.ErrTimeout:
+			return stdout, fail.Wrap(retryErr.Cause(), "timeout")
+		default:
+			return stdout, retryErr
+		}
 	}
 
 	logrus.Debugf(
@@ -1196,11 +1210,12 @@ func (sconf *SSHConfig) copy(
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
 		default:
+			return invalid, "", "", xerr
 		}
-	}
-	if xerr != nil {
-		return invalid, "", "", xerr
 	}
 
 	if task.Aborted() {
@@ -1266,16 +1281,6 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 		}
 		return fail.Wrap(xerr, "unable to create command")
 	}
-
-	// bash, err := exec.LookPath("bash")
-	// if err != nil {
-	// 	if keyFile != nil {
-	// 		if nerr := utils.LazyRemove(keyFile.Name()); nerr != nil {
-	// 			logrus.Warnf("Error removing file %v", nerr)
-	// 		}
-	// 	}
-	// 	return fail.Wrap(err, "unable to create command")
-	// }
 
 	defer func() {
 		derr := utils.LazyRemove(keyFile.Name())

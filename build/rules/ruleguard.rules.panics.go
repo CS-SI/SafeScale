@@ -46,7 +46,7 @@ func NetworkDanger(m dsl.Matcher) {
 
 func SecurityGroupDanger(m dsl.Matcher) {
 	m.Import("github.com/CS-SI/SafeScale/lib/server/resources")
-	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.security-group")).Report(`panic danger`)
+	m.Match(`$x.Alter($*_)`, `$x.BrowseFolder($*_)`, `$x.Deserialize($*_)`, `$x.GetService($*_)`, `$x.Inspect($*_)`, `$x.Review($*_)`, `$x.Read($*_)`, `$x.ReadByID($*_)`, `$x.Reload($*_)`, `$x.Serialize($*_)`).Where(m["x"].Type.Is("resources.securitygroup")).Report(`panic danger`)
 }
 
 func ShareDanger(m dsl.Matcher) {

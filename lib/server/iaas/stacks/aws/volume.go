@@ -65,7 +65,6 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	return &volume, nil
 }
 
-
 // InspectVolume ...
 func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
 	nullAV := abstract.NewVolume()
@@ -259,14 +258,13 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-
 	availableDevices := initAvailableDevices()
 	var resp *ec2.VolumeAttachment
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			var (
 				deviceName string
-				innerXErr fail.Error
+				innerXErr  fail.Error
 			)
 			deviceName, availableDevices, innerXErr = s.findNextAvailableDevice(request.HostID, availableDevices)
 			if xerr != nil {
@@ -344,7 +342,7 @@ func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]
 		deviceName = "xvd"
 	}
 	deviceName += availableKeys[0]
-	delete(availableSlots, availableKeys[0])    // selected, remove it from availableSlots for optional next rounds
+	delete(availableSlots, availableKeys[0]) // selected, remove it from availableSlots for optional next rounds
 	return deviceName, availableSlots, nil
 }
 

@@ -372,10 +372,10 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 ) {
 
 	var (
-		gatewaysDefault *abstract.HostSizingRequirements
-		mastersDefault  *abstract.HostSizingRequirements
-		nodesDefault    *abstract.HostSizingRequirements
-		imageQuery, imageID      string
+		gatewaysDefault     *abstract.HostSizingRequirements
+		mastersDefault      *abstract.HostSizingRequirements
+		nodesDefault        *abstract.HostSizingRequirements
+		imageQuery, imageID string
 	)
 
 	// if task.Aborted() {
@@ -1624,7 +1624,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 	var (
 		loadErrors []error
-		 taskErrors []error
+		taskErrors []error
 	)
 	for i, master := range masters {
 		if master.ID == "" {

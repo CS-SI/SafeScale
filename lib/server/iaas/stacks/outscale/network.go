@@ -440,13 +440,14 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(networkRef)
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
 			return nil, xerr
 		}
 	}
-	if xerr != nil {
-		return nil, xerr
-	}
+
 	networkID = an.ID
 
 	resp, xerr := s.rpcReadSubnets(networkID, nil)
@@ -505,9 +506,9 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.E
 
 	if networkRef == "" {
 		networkRef = s.Options.Network.DefaultNetworkName
-	}
-	if networkRef == "" {
-		return nil, fail.InvalidParameterError("networkRef", "cannot be empty string if tenant does not set keyword 'VPCNAME' or 'DefaultNetworkName'")
+		if networkRef == "" {
+			return nil, fail.InvalidParameterError("networkRef", "cannot be empty string if tenant does not set keyword 'VPCNAME' or 'DefaultNetworkName'")
+		}
 	}
 
 	an, xerr := s.InspectNetwork(networkRef)

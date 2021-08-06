@@ -155,7 +155,7 @@ func (c cluster) Delete(clusterName string, force bool, timeout time.Duration) e
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
 	req := &protocol.ClusterDeleteRequest{
-		Name: clusterName,
+		Name:  clusterName,
 		Force: force,
 	}
 	_, err := service.Delete(ctx, req)
@@ -373,7 +373,7 @@ func (c cluster) InspectNode(clusterName string, nodeRef string, duration time.D
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.InspectNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: nodeRef}})
+	return service.InspectNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
 }
 
 // DeleteNode ...
@@ -404,7 +404,7 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, duration time.Du
 	nodeDeleter := func(ref string) {
 		defer wg.Done()
 
-		if _, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: ref}}); err != nil {
+		if _, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: ref}}); err != nil {
 			mutex.Lock()
 			errs = append(errs, err.Error())
 			mutex.Unlock()
@@ -451,7 +451,7 @@ func (c cluster) StartNode(clusterName string, nodeRef string, duration time.Dur
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StartNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: nodeRef}})
+	_, err := service.StartNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
 	return err
 }
 
@@ -473,7 +473,7 @@ func (c cluster) StopNode(clusterName string, nodeRef string, duration time.Dura
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StopNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: nodeRef}})
+	_, err := service.StopNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
 	return err
 }
 
@@ -495,7 +495,7 @@ func (c cluster) StateNode(clusterName string, nodeRef string, duration time.Dur
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.StateNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: nodeRef}})
+	return service.StateNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
 }
 
 // ListMasters ...
@@ -538,7 +538,7 @@ func (c cluster) InspectMaster(clusterName string, masterRef string, duration ti
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.InspectMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: masterRef}})
+	return service.InspectMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
 }
 
 // StartMaster ...
@@ -559,7 +559,7 @@ func (c cluster) StartMaster(clusterName string, masterRef string, duration time
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StartMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: masterRef}})
+	_, err := service.StartMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
 	return err
 }
 
@@ -581,7 +581,7 @@ func (c cluster) StopMaster(clusterName string, masterRef string, duration time.
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.StopMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: masterRef}})
+	_, err := service.StopMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
 	return err
 }
 
@@ -603,5 +603,5 @@ func (c cluster) StateMaster(clusterName string, masterRef string, duration time
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	return service.StateMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host:&protocol.Reference{Name: masterRef}})
+	return service.StateMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
 }

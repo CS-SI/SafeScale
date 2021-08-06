@@ -426,8 +426,6 @@ func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
 		if theErr != nil {
 			litter.Config.HidePrivateFields = false
 			tunnel.errorf("dialSSHConnectionWithTimeout failed: netErr: %s", litter.Sdump(theErr))
-		}
-		if theErr != nil {
 			theErr = convertErrorToTunnelError(theErr)
 			if !expired {
 				if theErr != nil {

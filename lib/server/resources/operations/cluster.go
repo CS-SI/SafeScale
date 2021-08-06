@@ -566,11 +566,12 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -663,11 +664,12 @@ func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.Clu
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -817,11 +819,12 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -867,10 +870,14 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			if _, ok := xerr.(*retry.ErrTimeout); ok {
-				xerr = fail.Wrap(xerr, "timeout waiting Cluster to become started")
+			switch xerr.(type) {
+			case *retry.ErrStopRetry:
+				return fail.Wrap(xerr.Cause(), "stopping retries")
+			case *retry.ErrTimeout:
+				return fail.Wrap(xerr.Cause(), "timeout")
+			default:
+				return xerr
 			}
-			return xerr
 		}
 		return nil
 	case clusterstate.Stopped:
@@ -1038,11 +1045,12 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -1249,11 +1257,12 @@ func (instance *Cluster) AddNode(ctx context.Context, def abstract.HostSizingReq
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return HostNullValue(), xerr
+			}
 		default:
+			return HostNullValue(), xerr
 		}
-	}
-	if xerr != nil {
-		return HostNullValue(), xerr
 	}
 
 	if task.Aborted() {
@@ -1289,11 +1298,12 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -1371,11 +1381,9 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	res, xerr := tg.WaitGroup()
-	if res != nil {
-		for _, v := range res {
-			if item, ok := v.(*propertiesv3.ClusterNode); ok {
-				nodes = append(nodes, item)
-			}
+	for _, v := range res {
+		if item, ok := v.(*propertiesv3.ClusterNode); ok {
+			nodes = append(nodes, item)
 		}
 	}
 
@@ -1502,11 +1510,12 @@ func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -1585,11 +1594,12 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -1665,11 +1675,12 @@ func (instance *Cluster) ListMasters(ctx context.Context) (list resources.Indexe
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptyList, xerr
+			}
 		default:
+			return emptyList, xerr
 		}
-	}
-	if xerr != nil {
-		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -1707,11 +1718,12 @@ func (instance *Cluster) ListMasterNames(ctx context.Context) (list data.Indexed
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptyList, xerr
+			}
 		default:
+			return emptyList, xerr
 		}
-	}
-	if xerr != nil {
-		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -1783,11 +1795,12 @@ func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.Ind
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptyList, xerr
+			}
 		default:
+			return emptyList, xerr
 		}
-	}
-	if xerr != nil {
-		return emptyList, xerr
 	}
 
 	xerr = instance.beingRemoved()
@@ -1842,11 +1855,12 @@ func (instance *Cluster) ListMasterIPs(ctx context.Context) (list data.IndexedLi
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptyList, xerr
+			}
 		default:
+			return emptyList, xerr
 		}
-	}
-	if xerr != nil {
-		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -1879,11 +1893,12 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -1925,11 +1940,12 @@ func (instance *Cluster) ListNodes(ctx context.Context) (list resources.IndexedL
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptyList, xerr
+			}
 		default:
+			return emptyList, xerr
 		}
-	}
-	if xerr != nil {
-		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -1982,11 +1998,12 @@ func (instance *Cluster) ListNodeNames(ctx context.Context) (list data.IndexedLi
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptyList, xerr
+			}
 		default:
+			return emptyList, xerr
 		}
-	}
-	if xerr != nil {
-		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -2049,11 +2066,12 @@ func (instance *Cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptyList, xerr
+			}
 		default:
+			return emptyList, xerr
 		}
-	}
-	if xerr != nil {
-		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -2085,11 +2103,12 @@ func (instance *Cluster) ListNodeIPs(ctx context.Context) (list data.IndexedList
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptyList, xerr
+			}
 		default:
+			return emptyList, xerr
 		}
-	}
-	if xerr != nil {
-		return emptyList, xerr
 	}
 
 	if task.Aborted() {
@@ -2126,11 +2145,12 @@ func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -2167,11 +2187,12 @@ func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return false, xerr
+			}
 		default:
+			return false, xerr
 		}
-	}
-	if xerr != nil {
-		return false, xerr
 	}
 
 	if task.Aborted() {
@@ -2227,11 +2248,12 @@ func (instance *Cluster) CountNodes(ctx context.Context) (count uint, xerr fail.
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return 0, xerr
+			}
 		default:
+			return 0, xerr
 		}
-	}
-	if xerr != nil {
-		return 0, xerr
 	}
 
 	if task.Aborted() {
@@ -2287,11 +2309,12 @@ func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostIn
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -2342,11 +2365,12 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2439,11 +2463,12 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2594,11 +2619,12 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -2812,16 +2838,17 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
-			case *fail.ErrTimeout, *fail.ErrAborted:
-				xerr = fail.ConvertError(fail.Cause(xerr))
-			default:
-			}
-		}
-		if xerr != nil {
-			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				// Subnet not found, considered as a successful deletion and continue
 				debug.IgnoreError(xerr)
+			case *fail.ErrTimeout, *fail.ErrAborted:
+				nerr := fail.ConvertError(fail.Cause(xerr))
+				switch nerr.(type) {
+				case *fail.ErrNotFound:
+					// Subnet not found, considered as a successful deletion and continue
+					debug.IgnoreError(nerr)
+				default:
+					return fail.Wrap(nerr, "failed to delete Subnet '%s'", subnetName)
+				}
 			default:
 				return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 			}
@@ -2948,11 +2975,12 @@ func (instance *Cluster) configureCluster(ctx context.Context) (xerr fail.Error)
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
@@ -3083,11 +3111,12 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -3347,11 +3376,12 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return emptySlice, xerr
+			}
 		default:
+			return emptySlice, xerr
 		}
-	}
-	if xerr != nil {
-		return emptySlice, xerr
 	}
 
 	if task.Aborted() {
@@ -3477,11 +3507,12 @@ func (instance *Cluster) IsFeatureInstalled(ctx context.Context, name string) (f
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return false, xerr
+			}
 		default:
+			return false, xerr
 		}
-	}
-	if xerr != nil {
-		return false, xerr
 	}
 
 	if task.Aborted() {

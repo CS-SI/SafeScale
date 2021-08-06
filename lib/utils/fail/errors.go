@@ -136,7 +136,11 @@ func defaultCauseFormatter(e Error) string {
 
 	msgFinal := ""
 
-	errCore := e.(*errorCore)
+	errCore, ok := e.(*errorCore)
+	if !ok {
+		return e.UnformattedError() // FIXME: cast
+	}
+
 	if errCore.cause != nil {
 		switch cerr := errCore.cause.(type) {
 		case Error:

@@ -97,16 +97,16 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 
 	if in != nil {
 		switch realErr := in.(type) {
-		case net.Error:
-			if realErr.Temporary() {
-				return realErr
-			}
-			return retry.StopRetryError(realErr)
 		case *url.Error:
 			if realErr.Temporary() {
 				return realErr
 			}
 			return normalizeURLError(realErr)
+		case net.Error:
+			if realErr.Temporary() {
+				return realErr
+			}
+			return retry.StopRetryError(realErr)
 		case fail.Error, fail.ErrNotAvailable, fail.ErrOverflow, fail.ErrOverload: // a fail.Error may contain a cause of type net.Error, being *url.Error a special subcase.
 			// net.Error, and by extension url.Error have methods to check if the error is temporary -Temporary()-, or it's a timeout -Timeout()-, we should use the information to make decisions
 			// In this case, handle those net.Error accordingly
@@ -242,8 +242,7 @@ func normalizeURLError(err *url.Error) fail.Error {
 				return fail.InvalidRequestError("failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), commErr)
 			}
 			return fail.InvalidRequestError("failed to communicate: %v", commErr)
-		} else {
-			return retry.StopRetryError(commErr, "failed to communicate")
 		}
+		return retry.StopRetryError(commErr, "failed to communicate")
 	}
 }

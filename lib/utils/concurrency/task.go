@@ -270,7 +270,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	generateID := true
 	if len(options) > 0 {
 		for _, v := range options {
-			switch v.Key() {
+			switch v.Key() { // nolint
 			case keywordInheritParentIDOption:
 				value, ok := v.Value().(bool)
 				if ok && value && parentTask != nil {

@@ -166,11 +166,13 @@ func assembleListenString(c *cli.Context) string {
 				listen = defaultDaemonHost + ":" + port
 			}
 		}
+
+		// At last, if listen is empty, build it from defaults
+		if listen == "" {
+			listen = defaultDaemonHost + ":" + defaultDaemonPort
+		}
 	}
-	// At last, if listen is empty, build it from defaults
-	if listen == "" {
-		listen = defaultDaemonHost + ":" + defaultDaemonPort
-	}
+
 	return listen
 }
 

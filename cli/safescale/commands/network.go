@@ -240,7 +240,7 @@ var networkCreate = &cli.Command{
 			Usage:   "If used, the resource(s) is(are) not deleted on failure (default: not set)",
 		},
 		&cli.StringFlag{
-			Name:  "os",
+			Name: "os",
 			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the gateway",
 		},
@@ -995,7 +995,7 @@ var subnetCreate = &cli.Command{
 			Usage:   "cidr of the network",
 		},
 		&cli.StringFlag{
-			Name:  "os",
+			Name: "os",
 			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the gateway",
 		},

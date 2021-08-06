@@ -56,7 +56,7 @@ func (rc *ResourceCache) isNull() bool {
 
 // Get returns the content associated with key
 func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) {
-	if rc.isNull() {
+	if rc == nil || rc.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -113,7 +113,7 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 
 // ReserveEntry sets a cache entry to reserve the key and returns the Entry associated
 func (rc *ResourceCache) ReserveEntry(key string) fail.Error {
-	if rc.isNull() {
+	if rc == nil || rc.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -133,7 +133,7 @@ func (rc *ResourceCache) unsafeReserveEntry(key string) fail.Error {
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter
 func (rc *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if rc.isNull() {
+	if rc == nil || rc.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -158,7 +158,7 @@ func (rc *ResourceCache) unsafeCommitEntry(key string, content cache.Cacheable) 
 
 // FreeEntry removes the reservation in cache
 func (rc *ResourceCache) FreeEntry(key string) fail.Error {
-	if rc.isNull() {
+	if rc == nil || rc.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -178,7 +178,7 @@ func (rc *ResourceCache) unsafeFreeEntry(key string) fail.Error {
 
 // AddEntry ...
 func (rc *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if rc.isNull() {
+	if rc == nil || rc.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 

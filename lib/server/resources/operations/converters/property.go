@@ -142,10 +142,10 @@ func ClusterFeaturesFromPropertyToProtocol(in propertiesv1.ClusterFeatures) (*pr
 		}
 
 		item := &protocol.FeatureResponse{
-			Name: k,
-			FileName: v.FileName,
+			Name:       k,
+			FileName:   v.FileName,
 			RequiredBy: requiredBy,
-			Requires: requires,
+			Requires:   requires,
 		}
 		installed.Features = append(installed.Features, item)
 	}

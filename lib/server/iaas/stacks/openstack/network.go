@@ -515,11 +515,14 @@ func (s Stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 			switch xerr.(type) { //nolint
 			case *fail.ErrNotFound:
 				an, xerr = s.InspectNetworkByName(networkRef)
+				if xerr != nil {
+					return nullAS, xerr
+				}
+			default:
+				return nullAS, xerr
 			}
 		}
-		if xerr != nil {
-			return nullAS, xerr
-		}
+
 		listOpts.NetworkID = an.ID
 	}
 
@@ -646,10 +649,9 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
-				case *fail.ErrInvalidRequest:
+				case *fail.ErrInvalidRequest, *fail.ErrDuplicate:
 					msg := "hosts or services are still attached"
-					logrus.Warnf(strprocess.Capitalize(msg))
-					return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
+					return retry.StopRetryError(fail.Wrap(innerXErr, msg))
 				case *fail.ErrNotFound:
 					// consider a missing Subnet as a successful deletion
 					debug.IgnoreError(innerXErr)
@@ -665,9 +667,9 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrTimeout:
-			return abstract.ResourceTimeoutError("subnet", id, temporal.GetContextTimeout())
+			return fail.Wrap(retryErr.Cause(), "timeout")
 		case *retry.ErrStopRetry:
-			return fail.Wrap(fail.Cause(retryErr), "failed to delete subnet after %v", temporal.GetContextTimeout())
+			return fail.Wrap(retryErr.Cause(), "stopping retries")
 		default:
 			return retryErr
 		}

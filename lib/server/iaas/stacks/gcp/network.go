@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -129,7 +130,9 @@ func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 	if xerr != nil {
 		return nullAN, xerr
 	}
-	return toAbstractNetwork(*resp), nil
+
+	anet := toAbstractNetwork(*resp)
+	return anet, nil
 }
 
 func toAbstractNetwork(in compute.Network) *abstract.Network {
@@ -448,11 +451,14 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.E
 			switch xerr.(type) { //nolint
 			case *fail.ErrNotFound:
 				an, xerr = s.InspectNetworkByName(networkRef)
+				if xerr != nil {
+					return emptySlice, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
+				}
+			default:
+				return emptySlice, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
 			}
 		}
-		if xerr != nil {
-			return emptySlice, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
-		}
+
 		filter = `selfLink eq "` + s.selfLinkPrefix + `/global/networks/` + an.Name + `"`
 	}
 
@@ -515,8 +521,10 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 	// Delete Subnet
 	if xerr = s.rpcDeleteSubnetByName(subn.Name); xerr != nil {
 		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return fail.Wrap(xerr.Cause(), "error deleting Subnet '%s', stopping retries", subn.Name)
 		case *fail.ErrTimeout:
-			return fail.Wrap(fail.Cause(xerr), "timeout waiting for Subnet '%s' deletion", subn.Name)
+			return fail.Wrap(xerr.Cause(), "timeout waiting for Subnet '%s' deletion", subn.Name)
 		default:
 			return xerr
 		}

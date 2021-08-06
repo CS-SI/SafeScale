@@ -39,7 +39,7 @@ func newOutscaleError(httpResponse *http.Response, operationError error) *outsca
 	return &outscaleError{httpResponse: httpResponse, operationError: operationError}
 }
 
-func normalizeFromHttpReturnCode(resp *http.Response) (fail.Error, fail.Error) {
+func normalizeFromHTTPReturnCode(resp *http.Response) (fail.Error, fail.Error) {
 	if resp == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("resp")
 	}
@@ -84,7 +84,7 @@ func normalizeFromHttpReturnCode(resp *http.Response) (fail.Error, fail.Error) {
 	}
 }
 
-func normalizeOpenApiError(realErr osc.GenericOpenAPIError) fail.Error {
+func normalizeOpenAPIError(realErr osc.GenericOpenAPIError) fail.Error {
 	switch model := realErr.Model().(type) {
 	case osc.ErrorResponse:
 		if len(model.Errors) > 0 {
@@ -117,20 +117,20 @@ func normalizeError(err error) fail.Error {
 
 	switch realErr := err.(type) {
 	case outscaleError:
-		normalized := normalizeOpenApiError(realErr.operationError.(osc.GenericOpenAPIError))
+		normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
 		if normalized != nil {
 			if _, ok := normalized.(*fail.ErrUnknown); ok {
-				errFromHttp, xerr := normalizeFromHttpReturnCode(realErr.httpResponse)
+				errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
 				if xerr != nil { // we failed using the http return code, so send the normalized error
 					return normalized
 				}
-				return errFromHttp // we got something
+				return errFromHTTP // we got something
 			}
 			return normalized
 		}
 		return nil
 	case osc.GenericOpenAPIError:
-		return normalizeOpenApiError(realErr)
+		return normalizeOpenAPIError(realErr)
 	default:
 		return fail.ConvertError(err)
 	}
