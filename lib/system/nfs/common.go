@@ -81,7 +81,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.ConvertError(err)
 		return "", xerr
 	}
 	data["reserved_BashLibrary"] = bashLibrary
@@ -109,20 +108,16 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	// get file content as string
 	tmplContent, err := tmplBox.String(name)
 	if err != nil {
-		// return 255, "", "", fail.ConvertError(err)
 		xerr = fail.ExecutionError(err)
 		_ = xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.ConvertError(err)
 		return "", xerr
 	}
 
 	// Prepare the template for execution
 	tmplPrepared, err := template.Parse(name, tmplContent)
 	if err != nil {
-		// return 255, "", "", fail.ConvertError(err)
 		xerr = fail.ExecutionError(err)
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.ConvertError(err)
 		return "", xerr
 	}
 
@@ -130,7 +125,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	if err := tmplPrepared.Execute(&buffer, data); err != nil {
 		xerr = fail.ExecutionError(err, "failed to execute template")
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.Wrap(err, "failed to execute template")
 		return "", xerr
 	}
 	content := buffer.String()
@@ -144,7 +138,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	f, xerr := system.CreateTempFileFromString(content, 0600)
 	if xerr != nil {
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.Wrap(err, "failed to create temporary file")
 		return "", xerr
 	}
 

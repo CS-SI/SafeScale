@@ -142,6 +142,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 				switch innerXErr.(type) {
 				case *fail.ErrExecution:
 					// Adds stdout and stderr as annotations to innerXErr
+					_ = innerXErr.Annotate("retcode", retcode)
 					_ = innerXErr.Annotate("stdout", stdout)
 					_ = innerXErr.Annotate("stderr", stderr)
 				case *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidRequest, *fail.ErrInvalidParameter:
@@ -407,14 +408,15 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	if cmd != "" {
 		retryErr = retry.WhileUnsuccessful(
 			func() error {
-				retcode, stdout, _, innerXErr := instance.UnsafeRun(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+				retcode, stdout, stderr, innerXErr := instance.UnsafeRun(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrAborted:
 						return innerXErr
 					default:
-						// on error, innerXErr already has annotations "retcode" and "stderr", we need to add stdout
+						_ = innerXErr.Annotate("retcode", retcode)
 						_ = innerXErr.Annotate("stdout", stdout)
+						_ = innerXErr.Annotate("stderr", stderr)
 						return innerXErr
 					}
 				}

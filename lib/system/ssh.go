@@ -1164,6 +1164,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			}
 			if retcode != 0 {
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
+				_ = fe.Annotate("retcode", retcode)
 				_ = fe.Annotate("stdout", stdout)
 				_ = fe.Annotate("stderr", stderr)
 				return fe

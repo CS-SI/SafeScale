@@ -1511,6 +1511,7 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 
 		// build new error
 		problem := fail.NewError("failed to execute install phase '%s' on Host '%s'", phase, instance.GetName())
+		_ = problem.Annotate("retcode", retcode)
 		_ = problem.Annotate("stdout", stdout)
 		_ = problem.Annotate("stderr", stderr)
 
