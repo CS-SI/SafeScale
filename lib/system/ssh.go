@@ -337,7 +337,7 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
-		"timeout 1200s ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
+		"ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
 		f.Name(),
 		localPort,
 		scfg.IPAddress,
@@ -623,7 +623,15 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		return invalid, "", "", xerr
 	}
 
-	r, xerr := subtask.Wait()
+	if timeout == 0 {
+		timeout = 1200 * time.Second // upper bound of 20 min
+	} else {
+		if timeout > 1200*time.Second {
+			timeout = 1200 * time.Second // nothing should take more than 20 min
+		}
+	}
+
+	_, r, xerr := subtask.WaitFor(timeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
@@ -900,7 +908,7 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 	}
 
 	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", sconf.Hostname)
-	sshCmdString := fmt.Sprintf("timeout 1200s ssh -i %s %s -p %d %s@%s", f.Name(), options, sconf.Port, sconf.User, sconf.IPAddress)
+	sshCmdString := fmt.Sprintf("ssh -i %s %s -p %d %s@%s", f.Name(), options, sconf.Port, sconf.User, sconf.IPAddress)
 
 	if shell == "" {
 		shell = "bash"
