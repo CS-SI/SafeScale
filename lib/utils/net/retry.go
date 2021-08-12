@@ -66,12 +66,14 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 	if xerr != nil {
 		switch realErr := xerr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Cause(realErr))
+			return fail.Wrap(fail.Cause(realErr), "stopping retries")
 		case *retry.ErrTimeout:
-			xerr = fail.ConvertError(fail.Cause(realErr))
+			return fail.Wrap(fail.Cause(realErr), "timeout")
+		default:
+			return xerr
 		}
 	}
-	return xerr
+	return nil
 }
 
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),

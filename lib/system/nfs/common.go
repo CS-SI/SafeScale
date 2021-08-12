@@ -150,7 +150,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := sshconfig.Copy(ctx, filename, f.Name(), true)
+			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(ctx, filename, f.Name(), true, temporal.GetOperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
@@ -159,6 +159,9 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 				_ = innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 				return innerXErr
 			}
+
+			// FIXME: Add crc
+
 			return nil
 		},
 		temporal.GetDefaultDelay(),
@@ -167,9 +170,9 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return "", fail.Wrap(xerr.Cause(), "stopping retries")
+			return "", fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout:
-			return "", fail.Wrap(xerr.Cause(), "timeout")
+			return "", fail.Wrap(fail.Cause(xerr), "timeout")
 		case *fail.ErrExecution:
 			return "", xerr
 		default:
@@ -200,9 +203,9 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return "", fail.Wrap(xerr.Cause(), "stopping retries")
+			return "", fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout:
-			return "", fail.Wrap(xerr.Cause(), "timeout")
+			return "", fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return "", xerr
 		}

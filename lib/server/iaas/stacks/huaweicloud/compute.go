@@ -505,9 +505,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry: // here it should never happen
-			return nil, userData, fail.Wrap(retryErr.Cause(), "stopping retries")
+			return nil, userData, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return nil, userData, fail.Wrap(retryErr.Cause(), "timeout")
+			return nil, userData, fail.Wrap(fail.Cause(retryErr), "timeout")
 		default:
 			return nil, userData, retryErr
 		}
@@ -941,9 +941,9 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				if innerRetryErr != nil {
 					switch innerRetryErr.(type) {
 					case *retry.ErrStopRetry:
-						return fail.Wrap(innerRetryErr.Cause(), "stopping retries")
+						return fail.Wrap(fail.Cause(innerRetryErr), "stopping retries")
 					case *retry.ErrTimeout:
-						return fail.Wrap(innerRetryErr.Cause(), "timeout")
+						return fail.Wrap(fail.Cause(innerRetryErr), "timeout")
 					default:
 						return innerRetryErr
 					}
@@ -960,9 +960,9 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if outerRetryErr != nil {
 		switch outerRetryErr.(type) {
 		case *retry.ErrStopRetry: // here it should never happen
-			return fail.Wrap(outerRetryErr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(outerRetryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return fail.Wrap(outerRetryErr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(outerRetryErr), "timeout")
 		default:
 			return outerRetryErr
 		}
@@ -1053,9 +1053,9 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry: // here it should never happen
-			return fail.Wrap(retryErr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(retryErr), "timeout")
 		default:
 			return retryErr
 		}

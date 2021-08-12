@@ -359,7 +359,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
-		case *fail.ErrNotFound, *fail.ErrNotAvailable:
+		case *fail.ErrNotFound:
 			// continue
 			debug.IgnoreError(xerr)
 		default:

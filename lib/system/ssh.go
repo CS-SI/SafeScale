@@ -1132,13 +1132,15 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	}
 
 	var (
-		retcode        int
 		stdout, stderr string
 	)
 
+	retcode := -1
+	iterations := 0
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
+			iterations = iterations + 1
 			sshCmd, innerXErr := sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
 				return innerXErr
@@ -1167,6 +1169,8 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 				_ = fe.Annotate("retcode", retcode)
 				_ = fe.Annotate("stdout", stdout)
 				_ = fe.Annotate("stderr", stderr)
+				_ = fe.Annotate("operation", sshCmd.runCmdString)
+				_ = fe.Annotate("iterations", iterations)
 				return fe
 			}
 			return nil
@@ -1177,9 +1181,9 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return stdout, fail.Wrap(retryErr.Cause(), "stopping retries")
+			return stdout, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return stdout, fail.Wrap(retryErr.Cause(), "timeout")
+			return stdout, fail.Wrap(fail.Cause(retryErr), "timeout")
 		default:
 			return stdout, retryErr
 		}
@@ -1194,7 +1198,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 
 // Copy copies a file/directory from/to local to/from remote
 func (sconf *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, isUpload bool) (errc int, stdout string, stderr string, err fail.Error) {
-	return sconf.copy(ctx, remotePath, localPath, isUpload, 0)
+	return sconf.copy(ctx, remotePath, localPath, isUpload, 0) // FIXME: 0 is toxic
 }
 
 // CopyWithTimeout copies a file/directory from/to local to/from remote, and fails after 'timeout'

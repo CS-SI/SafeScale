@@ -125,9 +125,9 @@ func (s Stack) rpcGetMetadataOfInstance(id string) (map[string]string, fail.Erro
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return emptyMap, fail.Wrap(xerr.Cause(), "timeout")
+			return emptyMap, fail.Wrap(fail.Cause(xerr), "timeout")
 		case *retry.ErrStopRetry:
-			return emptyMap, fail.Wrap(xerr.Cause(), "stopping retries")
+			return emptyMap, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
 			return emptyMap, xerr
 		}

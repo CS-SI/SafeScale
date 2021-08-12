@@ -181,17 +181,25 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
-		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Cause(xerr))
-		default:
-		}
-	}
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a Security Group not found as a successful deletion
 			debug.IgnoreError(xerr)
+		case *fail.ErrTimeout:
+			// consider a Security Group not found as a successful deletion
+			cause := fail.Cause(xerr)
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(cause)
+			} else {
+				return fail.Wrap(cause, "timeout")
+			}
+		case *retry.ErrStopRetry:
+			// consider a Security Group not found as a successful deletion
+			cause := fail.Cause(xerr)
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(cause)
+			} else {
+				return fail.Wrap(cause, "stopping retries")
+			}
 		default:
 			return xerr
 		}
@@ -209,7 +217,6 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		case *fail.ErrNotFound:
 			logrus.Tracef("core not found, deletion considered as a success")
 			debug.IgnoreError(xerr)
-			// continue
 		default:
 			return xerr
 		}

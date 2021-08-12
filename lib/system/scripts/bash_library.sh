@@ -1133,7 +1133,7 @@ export -f sfRandomString
 # Workaround for associative array not exported in bash
 declare -x SERIALIZED_FACTS=$(mktemp)
 function factsCleanup() {
-	rm -f "$SERIALIZED_FACTS" &>/dev/null
+	rm -f "$SERIALIZED_FACTS" &>/dev/null || true
 }
 trap factsCleanup exit
 # --------

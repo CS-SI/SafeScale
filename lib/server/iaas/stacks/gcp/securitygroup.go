@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -77,8 +78,15 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 			for _, v := range asg.Rules {
 				for _, r := range v.IDs {
 					if derr := s.rpcDeleteFirewallRuleByID(r); derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							// rule not found, considered as a removal success
+							continue
+						default:
+							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
+						}
 					}
+					logrus.Warningf("Deleted rule: %s", r)
 				}
 			}
 		}
@@ -184,10 +192,12 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// rule not found, considered as a removal success
+						continue
 					default:
 						return fail.Wrap(xerr, "failed to delete rule %d", k)
 					}
 				}
+				logrus.Warningf("Deleted rule: %s", r)
 			}
 		}
 	}
@@ -225,12 +235,21 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	logrus.Warningf("TBR, are we fucking clearing ??")
+
 	if len(asg.Rules) > 0 {
 		for k, v := range asg.Rules {
 			for _, r := range v.IDs {
 				if xerr = s.rpcDeleteFirewallRuleByID(r); xerr != nil {
-					return asg, fail.Wrap(xerr, "failed to delete rule %d", k)
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						// rule not found, considered as a removal success
+						continue
+					default:
+						return asg, fail.Wrap(xerr, "failed to delete rule %d", k)
+					}
 				}
+				logrus.Warningf("Deleted rule: %s", r)
 			}
 			v.IDs = []string{}
 		}
@@ -268,11 +287,11 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		return asg, xerr
 	}
 	ruleName := fmt.Sprintf("%s-%d", asg.ID, len(asg.Rules))
-	// description := fmt.Sprintf("SafeScale SG '%s', rule #%d", asg.Name, len(asg.Rules))
 	resp, xerr := s.rpcCreateFirewallRule(ruleName, asg.Network, rule.Description, direction, sourcesUseGroups, sources, targetsUseGroups, destinations, allowed, nil)
 	if xerr != nil {
 		return asg, xerr
 	}
+	logrus.Warningf("Created rule: %d with name %s", resp.Id, resp.Name)
 	rule.IDs = append(rule.IDs, fmt.Sprintf("%d", resp.Id))
 	asg.Rules = append(asg.Rules, rule)
 	return asg, nil

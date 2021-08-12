@@ -17,12 +17,16 @@
 package operations
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -85,7 +89,7 @@ func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.En
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
 			xerr = fail.ConvertError(fail.Cause(xerr))
 		case *fail.ErrTimeout:
-			if cerr := xerr.Cause(); cerr != nil {
+			if cerr := fail.Cause(xerr); cerr != nil {
 				switch cerr.(type) {
 				case *fail.ErrTimeout:
 					xerr = fail.Wrap(cerr, "failed to execute command on Host '%s' in %s", hostName, temporal.FormatDuration(executionTimeout))
@@ -112,12 +116,14 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 		timeout = temporal.GetLongOperationTimeout()
 	}
 
+	iterations := 0
 	var (
 		retcode        int
 		stdout, stderr string
 	)
 	xerr := retry.WhileUnsuccessful(
 		func() error {
+			iterations = iterations + 1
 			// Create the command
 			sshCmd, innerXErr := ssh.NewCommand(ctx, cmd)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -138,19 +144,14 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 			}(sshCmd)
 
 			retcode = -1
-			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout); innerXErr != nil { // FIXME: What if this never returns ?
-				switch innerXErr.(type) {
-				case *fail.ErrExecution:
-					// Adds stdout and stderr as annotations to innerXErr
-					_ = innerXErr.Annotate("retcode", retcode)
-					_ = innerXErr.Annotate("stdout", stdout)
-					_ = innerXErr.Annotate("stderr", stderr)
-				case *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidRequest, *fail.ErrInvalidParameter:
-					return retry.StopRetryError(innerXErr, "invalid")
-				case *fail.ErrRuntimePanic:
-					return retry.StopRetryError(innerXErr, "panicked")
-				default:
-				}
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout)
+			if innerXErr != nil {
+				// Adds stdout and stderr as annotations to innerXErr
+				_ = innerXErr.Annotate("retcode", retcode)
+				_ = innerXErr.Annotate("stdout", stdout)
+				_ = innerXErr.Annotate("stderr", stderr)
+				_ = innerXErr.Annotate("operation", cmd)
+				_ = innerXErr.Annotate("iterations", iterations)
 				return innerXErr
 			}
 			// If retcode == 255, ssh connection failed
@@ -174,6 +175,12 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 		}
 	}
 	return retcode, stdout, stderr, nil
+}
+
+func getMD5Hash(text string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(text))
+	return hex.EncodeToString(hasher.Sum(nil))
 }
 
 // UnsafePush is the non goroutine-safe version of Push, with less parameter validation, that do the real work
@@ -211,21 +218,79 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		timeout = temporal.GetHostTimeout()
 	}
 
+	md5hash := ""
+	if source != "" {
+		if content, err := ioutil.ReadFile(source); err == nil {
+			md5hash = getMD5Hash(string(content))
+		}
+	}
+
 	var (
-		retcode        int
 		stdout, stderr string
 	)
+	retcode := -1
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			var innerXErr fail.Error
-			if retcode, stdout, stderr, innerXErr = instance.sshProfile.Copy(ctx, target, source, true); innerXErr != nil {
+			copyCtx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
+
+			iretcode, istdout, istderr, innerXErr := instance.sshProfile.CopyWithTimeout(copyCtx, target, source, true, timeout)
+			if innerXErr != nil {
 				return innerXErr
 			}
-			if retcode != 0 {
-				if retcode == 1 && strings.Contains(stdout, "lost connection") {
-					return fail.NewError("lost connection, retrying...")
-				}
+			if iretcode != 0 {
+				problem := fail.NewError("copy failed")
+				_ = problem.Annotate("stdout", istdout)
+				_ = problem.Annotate("stderr", istderr)
+				_ = problem.Annotate("retcode", iretcode)
+				return problem
 			}
+
+			crcCheck := func() fail.Error {
+				// logrus.Warnf("TBR: checking md5")
+				crcCtx, cancelCrc := context.WithTimeout(ctx, timeout)
+				defer cancelCrc()
+
+				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, instance.sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, timeout)
+				finnerXerr = debug.InjectPlannedFail(finnerXerr)
+				if finnerXerr != nil {
+					_ = finnerXerr.Annotate("retcode", fretcode)
+					_ = finnerXerr.Annotate("stdout", fstdout)
+					_ = finnerXerr.Annotate("stderr", fstderr)
+
+					switch finnerXerr.(type) {
+					case *fail.ErrTimeout:
+						return fail.Wrap(fail.Cause(finnerXerr), "failed to check md5 in %v delay", timeout)
+					case *retry.ErrStopRetry:
+						return fail.Wrap(fail.Cause(finnerXerr), "stopping retries")
+					default:
+						return finnerXerr
+					}
+				}
+				if fretcode != 0 {
+					finnerXerr = fail.NewError("failed to check md5")
+					_ = finnerXerr.Annotate("retcode", fretcode)
+					_ = finnerXerr.Annotate("stdout", fstdout)
+					_ = finnerXerr.Annotate("stderr", fstderr)
+				}
+				if finnerXerr != nil {
+					return finnerXerr
+				}
+				if !strings.Contains(fstdout, md5hash) {
+					logrus.Warnf("TBR: WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", target, fstdout, fstderr, md5hash)
+					return fail.NewError("wrong md5 of '%s'", target)
+				}
+				return nil
+			}
+
+			if innerXErr = crcCheck(); innerXErr != nil {
+				return innerXErr
+			}
+
+			retcode = iretcode
+			stdout = istdout
+			stderr = istderr
+
 			return nil
 		},
 		temporal.GetDefaultDelay(),
@@ -235,9 +300,9 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return retcode, stdout, stderr, fail.Wrap(xerr.Cause(), "stopping retries")
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout:
-			return retcode, stdout, stderr, fail.Wrap(xerr.Cause(), "timeout")
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return retcode, stdout, stderr, xerr
 		}
@@ -246,6 +311,7 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		return retcode, stdout, stderr, nil
 	}
 
+	// Changing rights
 	cmd := ""
 	if owner != "" {
 		cmd += "sudo chown " + owner + ` '` + target + `' ;`
@@ -254,16 +320,34 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		retcode, stdout, stderr, xerr = run(ctx, instance.sshProfile, cmd, outputs.DISPLAY, timeout)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			switch xerr.(type) {
+		logrus.Warnf("TBR: extra changing rights")
+		iretcode, istdout, istderr, innerXerr := run(ctx, instance.sshProfile, cmd, outputs.COLLECT, timeout)
+		innerXerr = debug.InjectPlannedFail(innerXerr)
+		if innerXerr != nil {
+			_ = innerXerr.Annotate("retcode", iretcode)
+			_ = innerXerr.Annotate("stdout", istdout)
+			_ = innerXerr.Annotate("stderr", istderr)
+
+			switch innerXerr.(type) {
 			case *fail.ErrTimeout:
-				xerr = fail.Wrap(fail.Cause(xerr), "failed to update access rights in %v delay", timeout)
+				return iretcode, istdout, istderr, fail.Wrap(fail.Cause(innerXerr), "failed to update access rights in %v delay", timeout)
+			case *retry.ErrStopRetry:
+				return iretcode, istdout, istderr, fail.Wrap(fail.Cause(innerXerr), "stopping retries")
 			default:
+				return iretcode, istdout, istderr, innerXerr
 			}
 		}
+		if retcode != 0 {
+			innerXerr = fail.NewError("failed to update access rights")
+			_ = innerXerr.Annotate("retcode", iretcode)
+			_ = innerXerr.Annotate("stdout", istdout)
+			_ = innerXerr.Annotate("stderr", istderr)
+		}
+		if innerXerr != nil {
+			return iretcode, istdout, istderr, innerXerr
+		}
 	}
+
 	return retcode, stdout, stderr, xerr
 }
 
@@ -352,30 +436,22 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	}
 
 	to := fmt.Sprintf("%s:%s", hostName, filename)
-	deleted := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, _, _, innerXErr := instance.UnsafePush(ctx, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
+			retcode, stdout, stderr, innerXErr := instance.UnsafePush(ctx, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}
+			if retcode != 0 && (stdout != "" || stderr != "") {
+				logrus.Debugf("Ignoring '%s' and '%s'", stdout, stderr)
+			}
+			if retcode == 1 && (strings.Contains(stderr, "lost connection") || strings.Contains(stdout, "lost connection")) {
+				problem := fail.NewError(stderr)
+				_ = problem.Annotate("retcode", retcode)
+				return problem
+			}
 			if retcode != 0 {
-				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
-				if retcode == 1 && !deleted {
-					// File may exist on target, try to remove it
-					if _, _, _, innerXErr = instance.UnsafeRun(ctx, "sudo rm -f "+filename, outputs.COLLECT, temporal.GetConnectSSHTimeout(), temporal.GetExecutionTimeout()); innerXErr == nil {
-						deleted = true
-					}
-					switch innerXErr.(type) {
-					case *fail.ErrAborted:
-						return innerXErr
-					default:
-						return fail.NewError("file may exist on remote with inappropriate access rights, deleted it and now retrying")
-					}
-				}
-				if system.IsSCPRetryable(retcode) {
-					xerr = fail.NewError("failed to copy temporary file to '%s' (retcode: %d=%s)", to, retcode, system.SCPErrorString(retcode))
-				}
+				return fail.NewError("failed to copy temporary file to '%s' (retcode: %d=%s)", to, retcode, system.SCPErrorString(retcode))
 			}
 			return nil
 		},
@@ -421,7 +497,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 					}
 				}
 				if retcode != 0 {
-					xerr = fail.NewError("failed to change rights of file '%s' (retcode=%d)", to, retcode)
+					return fail.NewError("failed to change rights of file '%s' (retcode=%d)", to, retcode)
 				}
 				return nil
 			},
@@ -431,9 +507,9 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 		if retryErr != nil {
 			switch retryErr.(type) {
 			case *retry.ErrStopRetry:
-				return fail.Wrap(retryErr.Cause(), "stopping retries")
+				return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 			case *retry.ErrTimeout:
-				return fail.Wrap(retryErr.Cause(), "timeout")
+				return fail.Wrap(fail.Cause(retryErr), "timeout")
 			default:
 				return retryErr
 			}

@@ -492,7 +492,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 // WaitHostState wait for host to be in the specified state
 // On exit, xerr may be of type:
 // - *retry.ErrTimeout: when the timeout is reached
-// - *retry.ErrStopRetry: when a breaking error arises; xerr.Cause() contains the real error encountered
+// - *retry.ErrStopRetry: when a breaking error arises; fail.Cause(xerr) contains the real error encountered
 // - fail.Error: any other errors
 func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAHC := abstract.NewHostCore()
@@ -541,9 +541,9 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return nullAHC, fail.Wrap(xerr.Cause(), "timeout")
+			return nullAHC, fail.Wrap(fail.Cause(xerr), "timeout")
 		case *retry.ErrStopRetry:
-			return nullAHC, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nullAHC, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
 			return nullAHC, xerr
 		}
@@ -927,9 +927,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout:
-			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "timeout")
+			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return nullAHF, nullUDC, xerr
 		}

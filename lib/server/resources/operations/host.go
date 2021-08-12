@@ -2365,9 +2365,9 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		if innerXErr != nil {
 			switch innerXErr.(type) {
 			case *retry.ErrStopRetry:
-				return fail.Wrap(innerXErr.Cause(), "stopping retries")
+				return fail.Wrap(fail.Cause(innerXErr), "stopping retries")
 			case *retry.ErrTimeout:
-				return fail.Wrap(innerXErr.Cause(), "timeout")
+				return fail.Wrap(fail.Cause(innerXErr), "timeout")
 			default:
 				return innerXErr
 			}
@@ -2577,9 +2577,9 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return retcode, stdout, stderr, fail.Wrap(xerr.Cause(), "stopping retries")
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout:
-			return retcode, stdout, stderr, fail.Wrap(xerr.Cause(), "timeout")
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return retcode, stdout, stderr, xerr
 		}

@@ -28,6 +28,7 @@ import (
 )
 
 var clientRPCUUID uuid.UUID
+var uuidSet bool
 var mutexContextManager sync.Mutex
 
 // --------------------- CLIENT ---------------------------------
@@ -75,7 +76,7 @@ func generateUUID(store bool) (string, fail.Error) {
 		return "", fail.ConvertError(err)
 	}
 	if store {
-		_ = true
+		uuidSet = true
 		clientRPCUUID = newUUID
 	}
 	return newUUID.String(), nil

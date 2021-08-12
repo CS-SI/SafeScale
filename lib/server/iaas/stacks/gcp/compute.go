@@ -336,9 +336,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHF, nullUD, fail.Wrap(retryErr.Cause(), "stopping retries")
+			return nullAHF, nullUD, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return nullAHF, nullUD, fail.Wrap(retryErr.Cause(), "timeout")
+			return nullAHF, nullUD, fail.Wrap(fail.Cause(retryErr), "timeout")
 		default:
 			return nullAHF, nullUD, retryErr
 		}
@@ -390,9 +390,9 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHC, fail.Wrap(retryErr.Cause(), "stopping retries")
+			return nullAHC, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return nullAHC, fail.Wrap(retryErr.Cause(), "timeout")
+			return nullAHC, fail.Wrap(fail.Cause(retryErr), "timeout")
 		default:
 			return nullAHC, retryErr
 		}
@@ -628,9 +628,9 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout:
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}

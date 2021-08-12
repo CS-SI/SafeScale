@@ -736,9 +736,9 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return fail.Wrap(retryErr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(retryErr), "timeout")
 		default:
 			return retryErr
 		}
@@ -942,10 +942,16 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 				return xerr
 			}
 			if retcode != 0 {
+				problem := fail.NewError(stderr)
 				if retcode == 255 {
-					return fail.NotAvailableError("failed to reach SSH service of host '%s', retrying", hostName)
+					problem = fail.NewError("failed to reach SSH service of host '%s', retrying", hostName)
 				}
-				return fail.NewError(stderr)
+
+				_ = problem.Annotate("stdout", stdout)
+				_ = problem.Annotate("stderr", stderr)
+				_ = problem.Annotate("retcode", retcode)
+
+				return problem
 			}
 			return nil
 		},
@@ -955,9 +961,9 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return nil, fail.Wrap(retryErr.Cause(), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return nil, fail.Wrap(retryErr.Cause(), "timeout")
+			return nil, fail.Wrap(fail.Cause(retryErr), "timeout")
 		default:
 			return nil, retryErr
 		}

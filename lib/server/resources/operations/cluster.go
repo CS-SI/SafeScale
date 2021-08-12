@@ -872,9 +872,9 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry:
-				return fail.Wrap(xerr.Cause(), "stopping retries")
+				return fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout:
-				return fail.Wrap(xerr.Cause(), "timeout")
+				return fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return xerr
 			}

@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -520,16 +521,17 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 						case *fail.ErrNotFound:
 							// Subnet is already deleted, considered as a success and continue
 							debug.IgnoreError(xerr)
+							continue
 						default:
 							return xerr
 						}
-					} else {
-						subnetName := rs.GetName()
-						xerr = rs.Delete(ctx)
-						xerr = debug.InjectPlannedFail(xerr)
-						if xerr != nil {
-							return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
-						}
+					}
+
+					subnetName := rs.GetName()
+					xerr = rs.Delete(ctx)
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
 					}
 				}
 			}
@@ -542,23 +544,24 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 		// delete Network if not imported, with tolerance
 		if !abstractNetwork.Imported {
+			maybeDeleted := false
 			innerXErr = svc.DeleteNetwork(abstractNetwork.ID)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotFound:
 					// If Network does not exist anymore on the provider side, do not fail to cleanup the metadata: log and continue
 					logrus.Debugf("failed to find Network on provider side, cleaning up metadata.")
+					maybeDeleted = true
 				case *fail.ErrTimeout:
 					logrus.Error("cannot delete Network due to a timeout")
 					errWaitMore := retry.WhileUnsuccessful(
 						func() error {
 							recNet, recErr := svc.InspectNetwork(abstractNetwork.ID)
-							if recNet != nil {
-								return fmt.Errorf("still there")
-							}
-
 							if _, ok := recErr.(*fail.ErrNotFound); ok {
 								return nil
+							}
+							if recNet != nil {
+								return fmt.Errorf("still there")
 							}
 
 							return fail.Wrap(recErr, "another kind of error")
@@ -574,6 +577,25 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					logrus.Errorf(innerXErr.Error())
 					return innerXErr
 				}
+			}
+			maybeDeleted = true
+
+			if maybeDeleted {
+				logrus.Warnf("TBR: In theory the network %s is already deleted", abstractNetwork.ID)
+			}
+			iterations := 6
+			for {
+				if _, ierr := svc.InspectNetwork(abstractNetwork.ID); ierr != nil {
+					if _, ok := ierr.(*fail.ErrNotFound); ok {
+						break
+					}
+				}
+				iterations = iterations - 1
+				if iterations < 0 {
+					logrus.Warnf("TBR: A zombie network '%s' is still there", abstractNetwork.ID)
+					break
+				}
+				time.Sleep(5 * time.Second)
 			}
 		}
 		return nil

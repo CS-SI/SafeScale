@@ -1866,28 +1866,34 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 	)
 	svc := instance.GetService()
 	for _, v := range sgs {
+		if v == "" {
+			return fail.NewError("Something has to change")
+		}
 		if v != "" {
 			if rsg, xerr = LoadSecurityGroup(svc, v); xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
 					// Security Group not found, consider this as a success
 					debug.IgnoreError(xerr)
+					continue
 				default:
 					return xerr
 				}
-			} else {
-				sgName = rsg.GetName()
-				logrus.Debugf("Deleting Security Group '%s'...", sgName)
-				if xerr = rsg.Delete(ctx, true); xerr != nil {
-					switch xerr.(type) {
-					case *fail.ErrNotFound:
-						// Security Group not found, consider this as a success
-						debug.IgnoreError(xerr)
-					default:
-						return xerr
-					}
+			}
+
+			sgName = rsg.GetName()
+			logrus.Debugf("Deleting Security Group '%s'...", sgName)
+			if xerr = rsg.Delete(ctx, true); xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// Security Group not found, consider this as a success
+					debug.IgnoreError(xerr)
+					continue
+				default:
+					return xerr
 				}
 			}
+			logrus.Debugf("Deleted Security Group '%s'...", sgName)
 		}
 	}
 	return nil

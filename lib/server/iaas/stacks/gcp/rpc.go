@@ -152,9 +152,9 @@ func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry: // here it should never happen
-			return fail.Wrap(retryErr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(retryErr), "timeout")
 		default:
 			return retryErr
 		}
@@ -187,9 +187,9 @@ func (s stack) rpcGetSubnetByID(id string) (*compute.Subnetwork, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return nil, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return nil, fail.Wrap(xerr.Cause(), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return nil, xerr
 		}
@@ -247,9 +247,9 @@ func (s stack) rpcDeleteSubnetByName(name string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -294,9 +294,9 @@ func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.S
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return &compute.Subnetwork{}, fail.Wrap(xerr.Cause(), "stopping retries")
+			return &compute.Subnetwork{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return &compute.Subnetwork{}, fail.Wrap(xerr.Cause(), "timeout")
+			return &compute.Subnetwork{}, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return &compute.Subnetwork{}, xerr
 		}
@@ -333,9 +333,9 @@ func (s stack) rpcListSubnets(filter string) ([]*compute.Subnetwork, fail.Error)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return nil, fail.Wrap(xerr.Cause(), "stopping retries")
+				return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return nil, fail.Wrap(xerr.Cause(), "timeout")
+				return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return nil, xerr
 			}
@@ -373,9 +373,9 @@ func (s stack) rpcGetFirewallRuleByName(name string) (*compute.Firewall, fail.Er
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return nil, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return nil, fail.Wrap(xerr.Cause(), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return nil, xerr
 		}
@@ -408,9 +408,9 @@ func (s stack) rpcGetFirewallRuleByID(id string) (*compute.Firewall, fail.Error)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return nil, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return nil, fail.Wrap(xerr.Cause(), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return nil, xerr
 		}
@@ -484,9 +484,9 @@ func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, directi
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return nil, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return nil, fail.Wrap(xerr.Cause(), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return nil, xerr
 		}
@@ -542,9 +542,9 @@ func (s stack) rpcListFirewallRules(networkRef string, ids []string) ([]*compute
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return []*compute.Firewall{}, fail.Wrap(xerr.Cause(), "stopping retries")
+				return []*compute.Firewall{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return []*compute.Firewall{}, fail.Wrap(xerr.Cause(), "timeout")
+				return []*compute.Firewall{}, fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return []*compute.Firewall{}, xerr
 			}
@@ -583,9 +583,9 @@ func (s stack) rpcDeleteFirewallRuleByID(id string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -621,9 +621,9 @@ func (s stack) rpcEnableFirewallRuleByName(name string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -659,9 +659,9 @@ func (s stack) rpcDisableFirewallRuleByName(name string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -722,9 +722,9 @@ func (s stack) rpcGetNetworkByName(name string) (*compute.Network, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return &compute.Network{}, fail.Wrap(xerr.Cause(), "stopping retries")
+			return &compute.Network{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return &compute.Network{}, fail.Wrap(xerr.Cause(), "timeout")
+			return &compute.Network{}, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return &compute.Network{}, xerr
 		}
@@ -757,9 +757,9 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return nil, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return nil, fail.Wrap(xerr.Cause(), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return nil, xerr
 		}
@@ -788,9 +788,9 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return nil, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return nil, fail.Wrap(xerr.Cause(), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return nil, xerr
 		}
@@ -822,9 +822,9 @@ func (s stack) rpcGetRouteByName(name string) (*compute.Route, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return nil, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return nil, fail.Wrap(xerr.Cause(), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return nil, xerr
 		}
@@ -872,9 +872,9 @@ func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*comput
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return nil, fail.Wrap(xerr.Cause(), "stopping retries")
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return nil, fail.Wrap(xerr.Cause(), "timeout")
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return nil, xerr
 		}
@@ -911,9 +911,9 @@ func (s stack) rpcDeleteRoute(name string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -950,9 +950,9 @@ func (s stack) rpcListImages() ([]*compute.Image, fail.Error) {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-					return []*compute.Image{}, fail.Wrap(xerr.Cause(), "stopping retries")
+					return []*compute.Image{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
 				case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-					return []*compute.Image{}, fail.Wrap(xerr.Cause(), "timeout")
+					return []*compute.Image{}, fail.Wrap(fail.Cause(xerr), "timeout")
 				default:
 					return []*compute.Image{}, xerr
 				}
@@ -996,9 +996,9 @@ func (s stack) rpcGetImageByID(id string) (*compute.Image, fail.Error) {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-					return &compute.Image{}, fail.Wrap(xerr.Cause(), "stopping retries")
+					return &compute.Image{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
 				case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-					return &compute.Image{}, fail.Wrap(xerr.Cause(), "timeout")
+					return &compute.Image{}, fail.Wrap(fail.Cause(xerr), "timeout")
 				default:
 					return &compute.Image{}, xerr
 				}
@@ -1043,9 +1043,9 @@ func (s stack) rpcListMachineTypes() ([]*compute.MachineType, fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+				return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return zero, fail.Wrap(xerr.Cause(), "timeout")
+				return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return zero, xerr
 			}
@@ -1083,9 +1083,9 @@ func (s stack) rpcGetMachineType(id string) (*compute.MachineType, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -1118,9 +1118,9 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+				return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return zero, fail.Wrap(xerr.Cause(), "timeout")
+				return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return zero, xerr
 			}
@@ -1230,9 +1230,9 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -1270,9 +1270,9 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -1301,9 +1301,9 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -1337,9 +1337,9 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return fail.Wrap(xerr.Cause(), "stopping retries")
+				return fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return fail.Wrap(xerr.Cause(), "timeout")
+				return fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return xerr
 			}
@@ -1389,9 +1389,9 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -1438,9 +1438,9 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -1474,9 +1474,9 @@ func (s stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -1510,9 +1510,9 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -1574,9 +1574,9 @@ func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Addre
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -1601,9 +1601,9 @@ func (s stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return fail.Wrap(xerr.Cause(), "stopping retries")
+				return fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return fail.Wrap(xerr.Cause(), "timeout")
+				return fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return xerr
 			}
@@ -1626,9 +1626,9 @@ func (s stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -1660,9 +1660,9 @@ func (s stack) rpcStopInstance(ref string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -1695,9 +1695,9 @@ func (s stack) rpcStartInstance(ref string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -1730,9 +1730,9 @@ func (s stack) rpcListZones() ([]*compute.Zone, fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return emptySlice, fail.Wrap(xerr.Cause(), "stopping retries")
+				return emptySlice, fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return emptySlice, fail.Wrap(xerr.Cause(), "timeout")
+				return emptySlice, fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return emptySlice, xerr
 			}
@@ -1770,9 +1770,9 @@ func (s stack) rpcListRegions() ([]*compute.Region, fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+				return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return zero, fail.Wrap(xerr.Cause(), "timeout")
+				return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return zero, xerr
 			}
@@ -1812,9 +1812,9 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -1853,9 +1853,9 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -1891,9 +1891,9 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -1932,9 +1932,9 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -1968,9 +1968,9 @@ func (s stack) rpcListNetworks() (_ []*compute.Network, xerr fail.Error) {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-				return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+				return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-				return zero, fail.Wrap(xerr.Cause(), "timeout")
+				return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 			default:
 				return zero, xerr
 			}
@@ -2009,9 +2009,9 @@ func (s stack) rpcDeleteNetworkByID(id string) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -2048,9 +2048,9 @@ func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -2088,9 +2088,9 @@ func (s stack) rpcGetDisk(ref string) (*compute.Disk, fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -2124,9 +2124,9 @@ func (s stack) rpcDeleteDisk(ref string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}
@@ -2177,9 +2177,9 @@ func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Er
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return zero, fail.Wrap(xerr.Cause(), "stopping retries")
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return zero, fail.Wrap(xerr.Cause(), "timeout")
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return zero, xerr
 		}
@@ -2219,9 +2219,9 @@ func (s stack) rpcDeleteDiskAttachment(vaID string) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}

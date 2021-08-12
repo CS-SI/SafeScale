@@ -601,9 +601,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "failed to create Host, stopping retries")
+			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "failed to create Host, stopping retries")
 		case *fail.ErrTimeout:
-			return nullAHF, nullUDC, fail.Wrap(xerr.Cause(), "failed to create Host because of timeout")
+			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "failed to create Host because of timeout")
 		default:
 			return nullAHF, nullUDC, xerr
 		}
@@ -1040,9 +1040,9 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return fail.Wrap(retryErr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", hostRef, temporal.GetHostCleanupTimeout())
+			return fail.Wrap(fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef, temporal.GetHostCleanupTimeout())
 		default:
 			return retryErr
 		}
@@ -1087,9 +1087,9 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return fail.Wrap(retryErr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout waiting to get information of host '%s' after %v", hostRef, temporal.GetHostCleanupTimeout())
+			return fail.Wrap(fail.Cause(retryErr), "timeout waiting to get information of host '%s' after %v", hostRef, temporal.GetHostCleanupTimeout())
 		default:
 			return retryErr
 		}
@@ -1133,9 +1133,9 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrStopRetry:
-			return fail.Wrap(retryErr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout waiting to get host '%s' information after %v", hostRef, temporal.GetHostCleanupTimeout())
+			return fail.Wrap(fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef, temporal.GetHostCleanupTimeout())
 		default:
 			return retryErr
 		}

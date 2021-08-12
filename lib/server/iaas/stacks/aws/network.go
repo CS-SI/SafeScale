@@ -105,9 +105,9 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 		if retryErr != nil {
 			switch retryErr.(type) {
 			case *retry.ErrStopRetry:
-				return nullAN, fail.Wrap(retryErr.Cause(), "stopping retries")
+				return nullAN, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 			case *fail.ErrTimeout:
-				return nullAN, fail.Wrap(retryErr.Cause(), "timeout")
+				return nullAN, fail.Wrap(fail.Cause(retryErr), "timeout")
 			default:
 				return nullAN, retryErr
 			}
@@ -424,9 +424,9 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, x
 		if retryErr != nil {
 			switch retryErr.(type) {
 			case *retry.ErrStopRetry:
-				return nullAS, fail.Wrap(retryErr.Cause(), "stopping retries")
+				return nullAS, fail.Wrap(fail.Cause(retryErr), "stopping retries")
 			case *fail.ErrTimeout:
-				return nullAS, fail.Wrap(retryErr.Cause(), "timeout")
+				return nullAS, fail.Wrap(fail.Cause(retryErr), "timeout")
 			default:
 				return nullAS, retryErr
 			}

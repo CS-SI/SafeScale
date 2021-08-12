@@ -667,9 +667,9 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrTimeout:
-			return fail.Wrap(retryErr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(retryErr), "timeout")
 		case *retry.ErrStopRetry:
-			return fail.Wrap(retryErr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		default:
 			return retryErr
 		}

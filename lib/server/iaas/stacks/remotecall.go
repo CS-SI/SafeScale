@@ -60,9 +60,9 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			return fail.Wrap(xerr.Cause(), "stopping retries")
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
-			return fail.Wrap(xerr.Cause(), "timeout")
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}

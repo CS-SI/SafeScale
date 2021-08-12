@@ -30,6 +30,8 @@ type Arbiter func(Try) (verdict.Enum, fail.Error)
 // DefaultArbiter allows 10 retries, with a maximum duration of 30 seconds
 var DefaultArbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
 
+var CommonArbiter = PrevailDone(Min(5), Max(10))
+
 // PrevailRetry aggregates verdicts from Arbiters for a try:
 // - Returns Abort and the error as soon as an arbiter decides for an Abort.
 // - If at least one arbiter returns Retry without any Abort from others, returns Retry with nil error.
@@ -166,8 +168,8 @@ func Min(limit uint) Arbiter {
 			case *fail.ErrRuntimePanic:
 				return verdict.Abort, cerr
 			default:
-				if t.Count <= limit {
-					return verdict.Retry, LimitError(t.Err, limit)
+				if t.Count < limit { // last try is also good
+					return verdict.Retry, fail.ConvertError(t.Err)
 				}
 
 				return verdict.Undecided, fail.ConvertError(t.Err)
