@@ -1867,7 +1867,7 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 	svc := instance.GetService()
 	for _, v := range sgs {
 		if v == "" {
-			return fail.NewError("Something has to change")
+			return fail.NewError("unexpected empty security group")
 		}
 		if v != "" {
 			if rsg, xerr = LoadSecurityGroup(svc, v); xerr != nil {

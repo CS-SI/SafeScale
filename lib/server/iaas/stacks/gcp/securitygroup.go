@@ -81,6 +81,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 						switch xerr.(type) {
 						case *fail.ErrNotFound:
 							// rule not found, considered as a removal success
+							debug.IgnoreError(xerr)
 							continue
 						default:
 							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
@@ -192,6 +193,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// rule not found, considered as a removal success
+						debug.IgnoreError(xerr)
 						continue
 					default:
 						return fail.Wrap(xerr, "failed to delete rule %d", k)
@@ -205,7 +207,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 }
 
 // InspectSecurityGroup returns information about a security group
-// Actually there is no Security Group resource in GCP, so this function always returns a *fail.ErrNotAvailable error
+// Actually there is no Security Group resource in GCP, so this function always returns a *fail.NotImplementedError error
 func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	if s.IsNull() {
 		return &abstract.SecurityGroup{}, fail.InvalidInstanceError()
@@ -215,7 +217,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		return asg, fail.InvalidParameterError("sgParam", "must be consistent")
 	}
 
-	return asg, fail.NotAvailableError("no real Security Group resource proposed by gcp")
+	return asg, fail.NotImplementedError("no real Security Group resource proposed by gcp")
 }
 
 // ClearSecurityGroup removes all rules but keep group
@@ -235,8 +237,6 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	logrus.Warningf("TBR, are we fucking clearing ??")
-
 	if len(asg.Rules) > 0 {
 		for k, v := range asg.Rules {
 			for _, r := range v.IDs {
@@ -244,6 +244,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// rule not found, considered as a removal success
+						debug.IgnoreError(xerr)
 						continue
 					default:
 						return asg, fail.Wrap(xerr, "failed to delete rule %d", k)

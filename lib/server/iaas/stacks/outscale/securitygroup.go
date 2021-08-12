@@ -86,7 +86,7 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules ab
 		return nullASG, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nullASG, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "('%s')", name).WithStopwatch().Entering()
@@ -121,7 +121,7 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules ab
 	for k, v := range rules {
 		asg, xerr = s.AddRuleToSecurityGroup(asg, v)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to add rule #%d", k)
+			return nullASG, fail.Wrap(xerr, "failed to add rule #%d", k)
 		}
 	}
 
@@ -334,7 +334,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	}
 	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nil, xerr
+		return nullASG, xerr
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -353,11 +353,11 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 
 	flow, oscRule, xerr := fromAbstractSecurityGroupRule(rule)
 	if xerr != nil {
-		return nil, xerr
+		return nullASG, xerr
 	}
 
 	if xerr := s.rpcDeleteSecurityGroupRules(asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
-		return nil, xerr
+		return nullASG, xerr
 	}
 
 	return s.InspectSecurityGroup(asg.ID)

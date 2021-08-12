@@ -143,6 +143,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			return instance.unbindFromSubnets(ctx, sgnV1)
 		})
 		if innerXErr != nil {

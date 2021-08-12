@@ -359,6 +359,9 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
+		case *fail.ErrNotImplemented:
+			// not all providers implement security groups
+			debug.IgnoreError(xerr)
 		case *fail.ErrNotFound:
 			// continue
 			debug.IgnoreError(xerr)
