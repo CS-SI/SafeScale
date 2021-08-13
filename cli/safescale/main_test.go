@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/dlespiau/covertool/pkg/cover"
-	"github.com/dlespiau/covertool/pkg/exit"
+	"github.com/makholm/covertool/pkg/cover"
+	"github.com/makholm/covertool/pkg/exit"
 )
 
 func TestMain(m *testing.M) {

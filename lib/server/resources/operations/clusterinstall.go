@@ -29,6 +29,7 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -119,6 +120,7 @@ func (instance *Cluster) InstalledFeatures() []string {
 			return nil
 		})
 	})
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Error(xerr.Error())
 		return []string{}
@@ -259,8 +261,8 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, _ bool) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -299,8 +301,8 @@ func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
 // satisfies interface resources.Targetable
-func (instance *Cluster) UnregisterFeature(feat string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) UnregisterFeature(feat string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -326,7 +328,10 @@ func (instance *Cluster) UnregisterFeature(feat string) (xerr fail.Error) {
 }
 
 // ListInstalledFeatures returns a slice of installed features
-func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, xerr fail.Error) {
+func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
+
 	var emptySlice []resources.Feature
 	if instance == nil || instance.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -429,8 +434,8 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 }
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
 	if instance == nil || instance.IsNull() {
@@ -510,7 +515,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return invalid, "", "", xerr
+		return invalid, "", "", fail.Wrap(xerr, "failed to upload %s to %s", tmplName, host.GetName())
 	}
 
 	// executes remote file
@@ -552,7 +557,10 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 }
 
 // installNodeRequirements ...
-func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
+
 	netCfg, xerr := instance.GetNetworkConfig()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -584,7 +592,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 		_, _ = binaryDir, path
 		/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote),
-				               probaly a feature safescale-binaries to build SafeScale from source...
+				               probably a feature safescale-binaries to build SafeScale from source...
 				// Uploads safescale binary
 				if binaryDir != "" {
 					path = binaryDir + "/safescale"
@@ -640,7 +648,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 		if suffix := os.Getenv("SAFESCALE_METADATA_SUFFIX"); suffix != "" {
 			cmdTmpl := "sudo sed -i '/^SAFESCALE_METADATA_SUFFIX=/{h;s/=.*/=%s/};${x;/^$/{s//SAFESCALE_METADATA_SUFFIX=%s/;H};x}' /etc/environment"
 			cmd := fmt.Sprintf(cmdTmpl, suffix, suffix)
-			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetLongOperationTimeout())
+			retcode, stdout, stderr, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return fail.Wrap(xerr, "failed to submit content of SAFESCALE_METADATA_SUFFIX to Host '%s'", host.GetName())
@@ -702,8 +710,8 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 }
 
 // Installs reverseproxy
-func (instance *Cluster) installReverseProxy(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) installReverseProxy(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	identity, xerr := instance.unsafeGetIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -755,8 +763,8 @@ func (instance *Cluster) installReverseProxy(ctx context.Context) (xerr fail.Err
 }
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the Cluster
-func (instance *Cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) installRemoteDesktop(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	identity, xerr := instance.unsafeGetIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -811,8 +819,9 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 }
 
 // install proxycache-client feature if not disabled
-func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
@@ -844,6 +853,7 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 		}
 
 		r, xerr := feat.Add(ctx, host, data.Map{}, resources.FeatureSettings{})
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -857,8 +867,9 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 }
 
 // install proxycache-server feature if not disabled
-func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
@@ -905,7 +916,9 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 }
 
 // installDocker installs docker and docker-compose
-func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	// uses NewFeature() to let a chance to the user to use its own docker feature
 	feat, xerr := NewFeature(instance.GetService(), "docker")
 	xerr = debug.InjectPlannedFail(xerr)
@@ -919,10 +932,23 @@ func (instance *Cluster) installDocker(ctx context.Context, host resources.Host,
 		return xerr
 	}
 
+	reason := false
 	if !r.Successful() {
-		msg := r.AllErrorMessages()
-		logrus.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, msg)
-		return fail.NewError("failed to add feature 'docker': %s", host.GetName(), msg)
+		for _, k := range r.Keys() {
+			rk := r.ResultsOfKey(k)
+			if !rk.Successful() {
+				if len(rk.ErrorMessages()) == 0 {
+					logrus.Warnf("TBR: This is a false warning for %s !!: %s", k, rk.ErrorMessages())
+				} else {
+					reason = true
+					logrus.Warnf("TBR: This failed: %s with %s", k, spew.Sdump(rk))
+				}
+			}
+		}
+
+		if reason {
+			return fail.NewError("[%s] failed to add feature 'docker' on host '%s': %s", hostLabel, host.GetName(), r.AllErrorMessages())
+		}
 	}
 	logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 	return nil

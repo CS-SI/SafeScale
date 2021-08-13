@@ -567,7 +567,7 @@ func (scmd *SSHCommand) Run(ctx context.Context, outs outputs.Enum) (int, string
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s)", outs.String()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return scmd.RunWithTimeout(ctx, outs, 0)
+	return scmd.RunWithTimeout(ctx, outs, 0) // FIXME: Toxic timeout
 }
 
 // RunWithTimeout ...
@@ -619,10 +619,6 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		return invalid, "", "", xerr
 	}
 
-	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
-		return invalid, "", "", xerr
-	}
-
 	if timeout == 0 {
 		timeout = 1200 * time.Second // upper bound of 20 min
 	} else {
@@ -631,12 +627,18 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		}
 	}
 
+	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
+		return invalid, "", "", xerr
+	}
+
+	// logrus.Warningf("TBR: waiting for '%s' a time of '%s'", spew.Sdump(scmd), timeout)
 	_, r, xerr := subtask.WaitFor(timeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
 			xerr = fail.Wrap(fail.Cause(xerr), "reached timeout of %s", temporal.FormatDuration(timeout)) // FIXME: Change error message
 		default:
+			debug.IgnoreError(xerr)
 		}
 
 		// FIXME: This kind of resource exhaustion deserves its own handling and its own kind of error
@@ -761,7 +763,6 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 			result["stderr"] = string(msgErr)
 		} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
 			logrus.Error(pbcErr.Error())
-
 		}
 	} else {
 		xerr = fail.ExecutionError(runErr)
@@ -1196,16 +1197,10 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	return stdout, nil
 }
 
-// Copy copies a file/directory from/to local to/from remote
-func (sconf *SSHConfig) Copy(ctx context.Context, remotePath, localPath string, isUpload bool) (errc int, stdout string, stderr string, err fail.Error) {
-	return sconf.copy(ctx, remotePath, localPath, isUpload, 0) // FIXME: 0 is toxic
-}
-
 // CopyWithTimeout copies a file/directory from/to local to/from remote, and fails after 'timeout'
 func (sconf *SSHConfig) CopyWithTimeout(
 	ctx context.Context, remotePath, localPath string, isUpload bool, timeout time.Duration,
 ) (int, string, string, fail.Error) {
-
 	return sconf.copy(ctx, remotePath, localPath, isUpload, timeout)
 }
 
@@ -1255,7 +1250,7 @@ func (sconf *SSHConfig) copy(
 	return sshCommand.RunWithTimeout(ctx, outputs.COLLECT, timeout)
 }
 
-// Enter Enter to interactive shell
+// Enter to interactive shell
 func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 	tunnels, sshConfig, xerr := sconf.CreateTunneling()
 	if xerr != nil {

@@ -655,7 +655,9 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
-			case *retry.ErrTimeout, *retry.ErrStopRetry: // FIXME: Split
+			case *retry.ErrTimeout:
+				return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, id)
+			case *retry.ErrStopRetry:
 				return fail.Wrap(fail.RootCause(xerr), "failed to read %s by id %s", c.kind, id)
 			default:
 				return fail.Wrap(xerr, "failed to read %s by id %s", c.kind, c.id)
@@ -665,6 +667,9 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 		name, ok := c.name.Load().(string)
 		if !ok {
 			return fail.InconsistentError("field 'name' is not set with string")
+		}
+		if name == "" {
+			return fail.InconsistentError("field 'name' cannot be empty")
 		}
 
 		xerr = retry.WhileUnsuccessful(
@@ -763,6 +768,9 @@ func (c *MetadataCore) Delete() (xerr fail.Error) {
 		name, ok := c.name.Load().(string)
 		if !ok {
 			return fail.InconsistentError("field 'name' is not set with string")
+		}
+		if name == "" {
+			return fail.InconsistentError("field 'name' cannot be empty")
 		}
 
 		xerr = c.folder.Lookup(byNameFolderName, name)
@@ -971,7 +979,8 @@ func (c *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 // satisfies interface data.Cacheable
 func (c *MetadataCore) Released() {
 	if c == nil || c.IsNull() {
-		return // FIXME: Missing log?
+		logrus.Warningf("Released called on an invalid instance")
+		return
 	}
 
 	c.lock.RLock()
@@ -1000,7 +1009,8 @@ func (c *MetadataCore) released() {
 // satisfies interface data.Cacheable
 func (c *MetadataCore) Destroyed() {
 	if c == nil || c.IsNull() {
-		return // FIXME: Missing log ?
+		logrus.Warningf("Destroyed called on an invalid instance")
+		return
 	}
 
 	c.lock.RLock()

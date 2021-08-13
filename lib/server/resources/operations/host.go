@@ -712,7 +712,7 @@ func (instance *Host) GetState() (state hoststate.Enum) {
 
 // Create creates a new Host and its metadata
 // If the metadata is already carrying a Host, returns fail.ErrNotAvailable
-// In case of error occuring after Host resource creation, 'instance' still contains ID of the Host created. This can be used to
+// In case of error occurring after Host resource creation, 'instance' still contains ID of the Host created. This can be used to
 // defer Host deletion in case of error
 func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (_ *userdata.Content, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -727,6 +727,9 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			return nil, fail.NotAvailableError("already carrying Host '%s'", hostname)
 		}
 		return nil, fail.InvalidInstanceContentError("instance", "is not null value")
+	}
+	if ctx == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -1751,7 +1754,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	}
 
 	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure networking and security
-	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, 6*time.Minute)
+	xerr = instance.runInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, temporal.GetHostTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1787,7 +1790,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
-	time.Sleep(5 * time.Second)
+	time.Sleep(temporal.GetDefaultDelay())
 
 	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 0)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1820,7 +1823,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		if xerr != nil {
 			logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(temporal.GetDefaultDelay())
 
 		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, 0)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2560,7 +2563,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
-			if retcode, stdout, stderr, innerXErr = instance.sshProfile.Copy(ctx, target, source, false); innerXErr != nil {
+			if retcode, stdout, stderr, innerXErr = instance.sshProfile.CopyWithTimeout(ctx, target, source, false, timeout); innerXErr != nil {
 				return innerXErr
 			}
 			switch retcode { //nolint
@@ -2572,7 +2575,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 			return nil
 		},
 		temporal.GetDefaultDelay(),
-		2*timeout, // FIXME: Harcoded
+		2*timeout,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2735,7 +2738,7 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 			return svc.WaitHostState(hostID, hoststate.Started, temporal.GetHostTimeout())
 		},
 		temporal.GetDefaultDelay(),
-		5*time.Minute,
+		temporal.GetExecutionTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2808,7 +2811,7 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 			return svc.WaitHostState(hostID, hoststate.Stopped, temporal.GetHostTimeout())
 		},
 		temporal.GetDefaultDelay(),
-		5*time.Minute, // FIXME: harcoded
+		temporal.GetExecutionTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3658,6 +3661,7 @@ func ReserveCIDRForSingleHost(networkInstance resources.Network) (string, uint, 
 			derr := FreeCIDRForSingleHost(networkInstance, index)
 			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, networkInstance.GetName()))
 			if derr != nil {
+				_ = xerr.AddConsequence(derr)
 			}
 		}
 	}()

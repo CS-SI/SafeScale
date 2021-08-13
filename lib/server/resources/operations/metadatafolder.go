@@ -190,7 +190,14 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "timeout")
+		case *retry.ErrStopRetry:
+			return fail.Wrap(xerr.Cause(), "stopping retries")
+		default:
+			return fail.Wrap(xerr, "failed to read '%s/%s' in Metadata Storage", path, name)
+		}
 	}
 
 	doCrypt := f.crypt
@@ -297,7 +304,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 					return nil
 				},
 				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
-				retry.Fibonacci(1*time.Second),
+				retry.Fibonacci(temporal.GetMinDelay()),
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
@@ -308,15 +315,19 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 				},
 			)
 			if innerXErr != nil {
-				switch innerXErr.(type) { //nolint
+				switch innerXErr.(type) {
+				case *retry.ErrStopRetry:
+					return fail.Wrap(innerXErr.Cause(), "stopping retries")
 				case *retry.ErrTimeout:
-					innerXErr = fail.Wrap(fail.Cause(innerXErr), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
+					return fail.Wrap(innerXErr.Cause(), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
+				default:
+					return innerXErr
 				}
 			}
-			return innerXErr
+			return nil
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
-		retry.Constant(1*time.Second),
+		retry.Constant(temporal.GetMinDelay()),
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
@@ -328,12 +339,16 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "timeout")
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Wrap(fail.Cause(xerr), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
+			return fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath)
+		default:
+			return xerr
 		}
 	}
-	return xerr
+	return nil
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'callback' on each entry

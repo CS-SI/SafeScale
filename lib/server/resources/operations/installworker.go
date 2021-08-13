@@ -640,13 +640,16 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	if task.Aborted() {
+		if lerr, err := task.LastError(); err == nil {
+			return nil, fail.AbortedError(lerr, "aborted")
+		}
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	defer fail.OnExitLogError(&xerr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), p.stepName),
-		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), p.stepName),
+		fmt.Sprintf("Ending execution of step '%s::%s' with error '%s'", w.action.String(), p.stepName, xerr),
 		logrus.DebugLevel,
 	)
 
@@ -1077,11 +1080,12 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 
 			defer func() {
 				if xerr != nil {
+					logrus.Warnf("aborting because of %s", xerr.Error())
 					derr := tg.Abort()
 					if derr != nil {
 						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort TaskGroup"))
 					} else {
-						_, derr = tg.Wait()
+						_, derr = tg.WaitGroup()
 						if derr != nil {
 							_ = xerr.AddConsequence(derr)
 						}
@@ -1129,7 +1133,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 				}
 			}
 
-			_, xerr = tg.Wait()
+			_, xerr = tg.WaitGroup()
 			if xerr != nil {
 				return xerr
 			}
@@ -1158,6 +1162,9 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 	}
 
 	if task.Aborted() {
+		if lerr, err := task.LastError(); err == nil {
+			return nil, fail.AbortedError(lerr, "aborted")
+		}
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
@@ -1357,6 +1364,9 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 
 	for k, rule := range rules {
 		if task.Aborted() {
+			if lerr, err := task.LastError(); err == nil {
+				return fail.AbortedError(lerr, "aborted")
+			}
 			return fail.AbortedError(nil, "aborted")
 		}
 

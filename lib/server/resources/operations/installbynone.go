@@ -88,10 +88,10 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 	r, xerr = w.Proceed(ctx, v, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+		return r, fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 
-	return r, xerr
+	return r, nil
 }
 
 // Remove uninstalls the Feature
@@ -122,10 +122,10 @@ func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 	r, xerr = w.Proceed(ctx, v, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+		return r, fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 
-	return r, xerr
+	return r, nil
 }
 
 // newNoneInstaller creates a new instance

@@ -262,7 +262,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	}
 
 	// Write subnet object metadata
-	// logrus.Debugf("Saving subnet metadata '%s' ...", subnet.GetName)
+	logrus.Debugf("Saving subnet metadata '%s' ...", abstractNetwork.Name)
 	abstractNetwork.Imported = false
 	return instance.carry(abstractNetwork)
 }
@@ -581,7 +581,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 			maybeDeleted = true
 
 			if maybeDeleted {
-				logrus.Warnf("TBR: In theory the network %s is already deleted", abstractNetwork.ID)
+				logrus.Warningf("TBR: The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
 			}
 			iterations := 6
 			for {
@@ -592,10 +592,10 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 				}
 				iterations = iterations - 1
 				if iterations < 0 {
-					logrus.Warnf("TBR: A zombie network '%s' is still there", abstractNetwork.ID)
+					logrus.Warningf("TBR: A zombie network '%s' is still there", abstractNetwork.ID)
 					break
 				}
-				time.Sleep(5 * time.Second)
+				time.Sleep(temporal.GetDefaultDelay())
 			}
 		}
 		return nil

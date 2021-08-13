@@ -17,13 +17,18 @@
 package client
 
 import (
+	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -175,6 +180,12 @@ func extractPath(in string) (string, fail.Error) {
 	return strings.TrimSpace(parts[1]), nil
 }
 
+func getMD5Hash(text string) string {
+	hasher := md5.New()
+	hasher.Write([]byte(text))
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
 // Copy ...
 func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
 	const invalid = -1
@@ -249,26 +260,123 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 	ctx := task.Context()
 
 	var (
-		retcode        int
 		stdout, stderr string
 	)
+
+	retcode := -1
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, xerr = sshCfg.CopyWithTimeout(ctx, remotePath, localPath, upload, executionTimeout)
-			// If an error occurred, stop the loop and propagates this error
+			iretcode, istdout, istderr, xerr := sshCfg.CopyWithTimeout(ctx, remotePath, localPath, upload, executionTimeout)
+			xerr = debug.InjectPlannedFail(xerr)
+			// logrus.Warningf("'%d', '%s', '%s', '%s'", iretcode, istdout, istderr, spew.Sdump(xerr))
 			if xerr != nil {
-				retcode = -1
-				return nil
-			}
-			// If retcode == 255, ssh connection failed, retry
-			if retcode == 255 {
-				xerr = fail.NewError("failure copying '%s' to '%s': failed to connect to '%s'", toPath, hostTo, hostTo)
 				return xerr
 			}
+
+			if iretcode == 1 {
+				deleteThere := func() fail.Error {
+					crcCtx, cancelCrc := context.WithTimeout(ctx, executionTimeout)
+					defer cancelCrc()
+
+					crcCmd, finnerXerr := sshCfg.NewCommand(crcCtx, fmt.Sprintf("sudo rm %s", remotePath))
+					if finnerXerr != nil {
+						return finnerXerr
+					}
+
+					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
+					finnerXerr = debug.InjectPlannedFail(finnerXerr)
+					if finnerXerr != nil {
+						_ = finnerXerr.Annotate("retcode", fretcode)
+						_ = finnerXerr.Annotate("stdout", fstdout)
+						_ = finnerXerr.Annotate("stderr", fstderr)
+						return finnerXerr
+					}
+					if fretcode != 0 {
+						finnerXerr = fail.NewError("failed to remove file")
+						_ = finnerXerr.Annotate("retcode", fretcode)
+						_ = finnerXerr.Annotate("stdout", fstdout)
+						_ = finnerXerr.Annotate("stderr", fstderr)
+						return finnerXerr
+					}
+
+					return nil
+				}
+
+				if strings.Contains(istdout, "Permission denied") || strings.Contains(istderr, "Permission denied") {
+					derr := deleteThere()
+					if derr != nil {
+						logrus.Debugf("there was an error trying to delete the file: %s", derr)
+					}
+					return fmt.Errorf("Permission denied")
+				}
+			}
+
+			if iretcode != 0 {
+				xerr = fail.NewError("failure copying '%s' to '%s': scp error code %d", toPath, hostTo, iretcode)
+				if iretcode == 255 {
+					xerr = fail.NewError("failure copying '%s' to '%s': failed to connect to '%s'", toPath, hostTo, hostTo)
+				}
+
+				_ = xerr.Annotate("stdout", istdout)
+				_ = xerr.Annotate("stderr", istderr)
+				_ = xerr.Annotate("retcode", iretcode)
+
+				return xerr
+			}
+
+			// FIXME: Test md5
+			if upload {
+				md5hash := ""
+				if localPath != "" {
+					if content, err := ioutil.ReadFile(localPath); err == nil {
+						md5hash = getMD5Hash(string(content))
+					}
+				}
+
+				crcCheck := func() fail.Error {
+					crcCtx, cancelCrc := context.WithTimeout(ctx, executionTimeout)
+					defer cancelCrc()
+
+					crcCmd, finnerXerr := sshCfg.NewCommand(crcCtx, fmt.Sprintf("/usr/bin/md5sum %s", remotePath))
+					if finnerXerr != nil {
+						return finnerXerr
+					}
+
+					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
+					finnerXerr = debug.InjectPlannedFail(finnerXerr)
+					if finnerXerr != nil {
+						_ = finnerXerr.Annotate("retcode", fretcode)
+						_ = finnerXerr.Annotate("stdout", fstdout)
+						_ = finnerXerr.Annotate("stderr", fstderr)
+						return finnerXerr
+					}
+					if fretcode != 0 {
+						finnerXerr = fail.NewError("failed to check md5")
+						_ = finnerXerr.Annotate("retcode", fretcode)
+						_ = finnerXerr.Annotate("stdout", fstdout)
+						_ = finnerXerr.Annotate("stderr", fstderr)
+						return finnerXerr
+					}
+					if !strings.Contains(fstdout, md5hash) {
+						logrus.Warnf("TBR: WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath, fstdout, fstderr, md5hash)
+						return fail.NewError("wrong md5 of '%s'", remotePath)
+					}
+					return nil
+				}
+
+				if xerr = crcCheck(); xerr != nil {
+					return xerr
+				}
+			}
+
+			retcode = iretcode
+			stdout = istdout
+			stderr = istderr
+
 			return nil
 		},
 		temporal.GetMinDelay(),
-		connectionTimeout,
+		connectionTimeout+2*executionTimeout,
 	)
 	if retryErr != nil {
 		switch cErr := retryErr.(type) { // nolint

@@ -390,7 +390,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 				return innerXErr
 			},
 			temporal.GetDefaultDelay(),
-			10*time.Minute, // FIXME: Hardcoded
+			temporal.GetHostCreationTimeout(),
 		)
 		if retryErr != nil {
 			return nullAhf, userData, fail.Wrap(retryErr, "error creating vapp")

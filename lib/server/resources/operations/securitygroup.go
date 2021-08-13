@@ -40,6 +40,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 )
 
@@ -501,15 +502,11 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", hostInstance.GetName())))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				abErr := tg.Abort()
+				if abErr != nil {
+					logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				}
 				break
-			}
-		}
-
-		if count, xerr := tg.Started(); xerr == nil && count > 0 {
-			_, xerr = tg.WaitGroup()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
 			}
 		}
 
@@ -566,6 +563,10 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 			_, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, v, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/subnet/%s/unbind", k)))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				abErr := tg.Abort()
+				if abErr != nil {
+					logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				}
 				break
 			}
 		}
@@ -1314,6 +1315,10 @@ func (instance *SecurityGroup) enableOnHostsAttachedToSubnet(task concurrency.Ta
 
 				for _, v := range shV1.ByID {
 					if _, innerXErr := tg.Start(instance.taskEnableOnHost, v); innerXErr != nil {
+						abErr := tg.Abort()
+						if abErr != nil {
+							logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+						}
 						break
 					}
 				}
@@ -1343,6 +1348,10 @@ func (instance *SecurityGroup) disableOnHostsAttachedToSubnet(task concurrency.T
 
 				for _, v := range shV1.ByID {
 					if _, innerXErr := tg.Start(instance.taskDisableOnHost, v); innerXErr != nil {
+						abErr := tg.Abort()
+						if abErr != nil {
+							logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+						}
 						break
 					}
 				}

@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	"time"
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
@@ -53,7 +52,6 @@ import (
 const (
 	volumeKind        = "volume"
 	volumesFolderName = "volumes" // is the name of the Object Storage MetadataFolder used to store volume info
-
 )
 
 // Volume links Object Storage MetadataFolder and unsafeGetVolumes
@@ -731,7 +729,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			return nil
 		},
 		temporal.GetMinDelay(),
-		2*time.Minute,
+		temporal.GetCommunicationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -956,7 +954,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 			return nil
 		},
 		temporal.GetMinDelay(),
-		2*time.Minute,
+		temporal.GetExecutionTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

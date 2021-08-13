@@ -184,16 +184,7 @@ func (instance *cache) Commit(key string, content Cacheable) (ce *Entry, xerr fa
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	en, err := instance.unsafeCommitEntry(key, content)
-	if err != nil {
-		switch err.(type) {
-		case *fail.ErrInvalidParameter:
-			return nil, fail.NotFoundError("invalid keys cannot be committed")
-		default:
-			return en, err
-		}
-	}
-	return en, nil
+	return instance.unsafeCommitEntry(key, content)
 }
 
 // unsafeCommitEntry is the workforce of CommitEntry, without locking

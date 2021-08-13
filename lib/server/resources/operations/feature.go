@@ -425,8 +425,8 @@ func checkParameters(f Feature, v data.Map) fail.Error {
 
 // Add installs the Feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if f.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -687,8 +687,11 @@ func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targe
 		for _, k := range results.Keys() {
 			r := results.ResultsOfKey(k)
 			for _, l := range r.Keys() {
-				if s := r.ResultOfKey(l); s.Successful() {
-					successfulHosts[l] = struct{}{}
+				s := r.ResultOfKey(l)
+				if s != nil {
+					if s.Successful() {
+						successfulHosts[l] = struct{}{}
+					}
 				}
 			}
 		}
@@ -713,8 +716,11 @@ func unregisterOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Tar
 		for _, k := range results.Keys() {
 			r := results.ResultsOfKey(k)
 			for _, l := range r.Keys() {
-				if s := r.ResultOfKey(l); s.Successful() {
-					successfulHosts[l] = struct{}{}
+				s := r.ResultOfKey(l)
+				if s != nil {
+					if s.Successful() {
+						successfulHosts[l] = struct{}{}
+					}
 				}
 			}
 		}

@@ -474,6 +474,37 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 		return invalid, "", "", xerr
 	}
 
-	cRc, cStcOut, cStdErr, cErr := ssh.Copy(handler.job.Task().Context(), remotePath, localPath, upload)
-	return cRc, cStcOut, cStdErr, cErr
+	var (
+		stdout, stderr string
+	)
+	retcode := -1
+	xerr = retry.WhileUnsuccessful(
+		func() error {
+			iretcode, istdout, istderr, innerXErr := ssh.CopyWithTimeout(handler.job.Task().Context(), remotePath, localPath, upload, temporal.GetLongOperationTimeout())
+			if innerXErr != nil {
+				return innerXErr
+			}
+			if iretcode != 0 {
+				problem := fail.NewError("copy failed")
+				_ = problem.Annotate("stdout", istdout)
+				_ = problem.Annotate("stderr", istderr)
+				_ = problem.Annotate("retcode", iretcode)
+				return problem
+			}
+
+			// FIXME: Add md5
+			if upload {
+
+			}
+
+			retcode = iretcode
+			stdout = istdout
+			stderr = istderr
+
+			return nil
+		},
+		temporal.GetDefaultDelay(),
+		2*temporal.GetLongOperationTimeout(),
+	)
+	return retcode, stdout, stderr, xerr
 }

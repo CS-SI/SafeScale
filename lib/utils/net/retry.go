@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -79,7 +80,7 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),
 // waiting 1 second between each try, with a limit of 'timeout'
 func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessfulButRetryable(callback, retry.Constant(1*time.Second), timeout)
+	return WhileUnsuccessfulButRetryable(callback, retry.Constant(temporal.GetMinDelay()), timeout)
 }
 
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit

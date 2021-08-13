@@ -860,6 +860,7 @@ func (tv toV21_05_0) upgradeClusterDefaultsPropertyIfNeeded(instance *operations
 		case *fail.ErrAlteredNothing:
 			xerr = nil
 		default:
+			debug.IgnoreError(xerr)
 		}
 	}
 	return xerr

@@ -17,7 +17,7 @@
 package remotefile
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -79,44 +79,43 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	iterations := 0
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
+			iterations = iterations + 1
 			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, temporal.GetExecutionTimeout())
-			if iout != "" || ierr != "" {
-				logrus.Debugf("Ignoring '%s' and '%s'", iout, ierr)
-			}
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				_ = xerr.Annotate("iterations", iterations)
 				return xerr
 			}
+
+			if retcode != 0 && (iout != "" || ierr != "") {
+				logrus.Debugf("Ignoring '%s' and '%s'", iout, ierr)
+			}
+			if retcode == 1 && (strings.Contains(ierr, "lost connection") || strings.Contains(iout, "lost connection")) {
+				problem := fail.NewError(ierr)
+				_ = problem.Annotate("retcode", retcode)
+				_ = problem.Annotate("iterations", iterations)
+				return problem
+			}
+
 			if retcode != 0 {
-				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
-				if retcode == 1 {
-					// File may exist on target, try to remote it
-					_, _, _, xerr = host.Run(ctx, fmt.Sprintf("sudo rm -f %s", rfc.Remote), outputs.COLLECT, temporal.GetLongOperationTimeout(), temporal.GetExecutionTimeout())
-					if xerr == nil {
-						return fail.NewError("file may exist on remote with inappropriate access rights, deleted it and retrying")
-					}
-					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
-					return retry.StopRetryError(xerr, "an unrecoverable network error has occurred")
-				}
-				if system.IsSCPRetryable(retcode) {
-					xerr = fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.GetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
-					return xerr
-				}
-				return nil
+				problem := fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.GetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
+				_ = problem.Annotate("iterations", iterations)
+				return problem
 			}
 			return nil
 		},
 		temporal.GetDefaultDelay(),
-		temporal.GetLongOperationTimeout(),
+		temporal.GetConnectionTimeout()+2*temporal.GetExecutionTimeout(),
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
 		case *retry.ErrStopRetry:
 			return fail.Wrap(fail.Cause(realErr), "failed to copy file to remote host '%s'", host.GetName())
 		case *retry.ErrTimeout:
-			return fail.Wrap(realErr, "timeout trying to copy file to '%s:%s'", host.GetName(), rfc.Remote)
+			return fail.Wrap(fail.Cause(realErr), "timeout trying to copy file to '%s:%s'", host.GetName(), rfc.Remote)
 		}
 		return retryErr
 	}
@@ -135,6 +134,7 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 	}
 
 	f, xerr := system.CreateTempFileFromString(content, 0600)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")
 	}
@@ -146,6 +146,7 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 func (rfc Item) RemoveRemote(ctx context.Context, host resources.Host) fail.Error {
 	cmd := "rm -rf " + rfc.Remote
 	retcode, _, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil || retcode != 0 {
 		return fail.NewError("failed to remove file '%s:%s'", host.GetName(), rfc.Remote)
 	}
@@ -173,6 +174,7 @@ func (rfh *RemoteFilesHandler) Count() uint {
 func (rfh *RemoteFilesHandler) Upload(ctx context.Context, host resources.Host) fail.Error {
 	for _, v := range rfh.items {
 		xerr := v.Upload(ctx, host)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -186,6 +188,7 @@ func (rfh *RemoteFilesHandler) Upload(ctx context.Context, host resources.Host) 
 func (rfh *RemoteFilesHandler) Cleanup(ctx context.Context, host resources.Host) fail.Error {
 	for _, v := range rfh.items {
 		xerr := v.RemoveRemote(ctx, host)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Warnf(xerr.Error())
 		}
