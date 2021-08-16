@@ -102,7 +102,7 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 					if xerr != nil {
 						return nil, xerr
 					}
-					return nil, fail.TimeoutError(nil, reservation.duration, "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName())
+					return nil, fail.Wrap(fail.TimeoutError(nil, reservation.duration, "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName()), "failed to find entry '%s' in %s cache", key, instance.GetName())
 				}
 			}
 			waitFor := reservation.duration - time.Since(reservation.created)
@@ -118,7 +118,7 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 					if xerr != nil {
 						return nil, xerr
 					}
-					return nil, fail.TimeoutError(nil, reservation.duration, "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName())
+					return nil, fail.Wrap(fail.TimeoutError(nil, reservation.duration, "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName()), "failed to find entry '%s' in %s cache", key, instance.GetName())
 				}
 			} else {
 				select {

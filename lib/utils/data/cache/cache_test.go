@@ -88,11 +88,11 @@ func TestParallelLockContent(t *testing.T) {
 	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
 }
 
-func makeDeadlockHappy(mdh Cache) error {
+func makeDeadlockHappy(mdh Cache) fail.Error {
 	// doing some stuff that ends up calling....
-	anotherRead, err := mdh.Entry("What")
-	if err != nil {
-		return err
+	anotherRead, xerr := mdh.Entry("What")
+	if xerr != nil {
+		return xerr
 	}
 
 	theReadCt := anotherRead.Content() // Deadlock
@@ -125,22 +125,28 @@ func TestDeadlock(t *testing.T) {
 		content := newReservation("content", reservationInfiniteDuration)
 
 		nukaCola, _ := NewCache("nuka")
-		err := nukaCola.Reserve("What")
-		if err != nil {
-			t.Error(err)
+		xerr := nukaCola.Reserve("What", ReserveDurationOption(100*time.Millisecond))
+		if xerr != nil {
+			t.Error(xerr)
 			t.Fail()
 			return
 		}
 
 		// between reserve and commit, someone with a reference to our cache just checks its content
-		_ = makeDeadlockHappy(nukaCola)
+		xerr = makeDeadlockHappy(nukaCola)
+		t.Log(xerr)
 
 		time.Sleep(1 * time.Second)
-		_, _ = nukaCola.Commit("What", content)
+		_, xerr = nukaCola.Commit("What", content)
+		if xerr != nil {
+			t.Log(xerr)
+		}
 
-		theX, err := nukaCola.Entry("What")
-		if err == nil {
+		theX, xerr := nukaCola.Entry("What")
+		if xerr == nil {
 			fmt.Println(theX)
+		} else {
+			t.Log(xerr)
 		}
 	}()
 
