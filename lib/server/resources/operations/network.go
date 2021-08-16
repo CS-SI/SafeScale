@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -24,7 +25,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -95,32 +95,7 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 	}
 
 	options := []data.ImmutableKeyValue{
-		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-			rn, innerXErr := NewNetwork(svc)
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = rn.Read(ref); innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
-			// // Deal with legacy
-			// xerr = rn.(*network).upgradeNetworkMetadataIfNeeded()
-			// xerr = debug.InjectPlannedFail(xerr)
-			// if xerr != nil {
-			// 	switch xerr.(type) {
-			// 	case *fail.ErrAlteredNothing:
-			// 		// ignore
-			// 	default:
-			// 		return nil, fail.Wrap(xerr, "failed to upgrade Network properties")
-			// 	}
-			// }
-
-			return rn, nil
-		}),
+		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onNetworkCacheMiss(svc, ref) }),
 	}
 	cacheEntry, xerr := networkCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -146,6 +121,21 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 	}()
 
 	return rn, nil
+}
+
+// onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'
+func onNetworkCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+	networkInstance, innerXErr := NewNetwork(svc)
+	if innerXErr != nil {
+			return nil, innerXErr
+		}
+
+	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if innerXErr = networkInstance.Read(ref); innerXErr != nil {
+			return nil, innerXErr
+		}
+
+	return networkInstance, nil
 }
 
 // IsNull tells if the instance corresponds to subnet Null Value

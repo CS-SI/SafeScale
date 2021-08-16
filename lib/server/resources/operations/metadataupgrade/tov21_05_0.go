@@ -181,7 +181,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.SecondaryGatewayID)
 			}
 
-			innerXErr = subnetInstance.(*operations.Subnet).Carry(abstractSubnet)
+			innerXErr = subnetInstance.Carry(abstractSubnet)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				return innerXErr
@@ -190,7 +190,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			defer subnetInstance.Released()
 
 			// -- create Security groups --
-			gwSG, internalSG, publicSG, innerXErr := subnetInstance.(*operations.Subnet).UnsafeCreateSecurityGroups(context.Background(), owningInstance, false)
+			gwSG, internalSG, publicSG, innerXErr := subnetInstance.UnsafeCreateSecurityGroups(context.Background(), owningInstance, false)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				return innerXErr

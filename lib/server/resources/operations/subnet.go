@@ -142,7 +142,7 @@ func ListSubnets(ctx context.Context, svc iaas.Service, networkID string, all bo
 }
 
 // NewSubnet creates an instance of Subnet used as resources.Subnet
-func NewSubnet(svc iaas.Service) (_ resources.Subnet, xerr fail.Error) {
+func NewSubnet(svc iaas.Service) (_ *Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
@@ -261,19 +261,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Su
 		}
 
 		options := []data.ImmutableKeyValue{
-			data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-				rs, innerXErr := NewSubnet(svc)
-				if innerXErr != nil {
-					return nil, innerXErr
-				}
-
-				// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-				if innerXErr = rs.ReadByID(subnetID); innerXErr != nil {
-					return nil, innerXErr
-				}
-
-				return rs, rs.(*Subnet).updateCachedInformation()
-			}),
+			iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onSubnetCacheMiss(svc, subnetID) }),
 		}
 		cacheEntry, xerr := subnetCache.Get(subnetID, options...)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -301,6 +289,21 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (rs resources.Su
 		return nil, fail.NotFoundError("failed to find a Subnet referenced by '%s'", subnetRef)
 	}
 	return rs, nil
+}
+
+// onSubnetCacheMiss is called when there is no instance in cache of Subnet 'subnetID'
+func onSubnetCacheMiss(svc iaas.Service, subnetID string) (cache.Cacheable, fail.Error) {
+	subnetInstance, innerXErr := NewSubnet(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if innerXErr = subnetInstance.ReadByID(subnetID); innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	return subnetInstance, subnetInstance.updateCachedInformation()
 }
 
 // updateCachedInformation updates the information cached in instance because will be frequently used and will not changed over time

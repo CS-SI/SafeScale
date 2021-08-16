@@ -110,7 +110,7 @@ func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(svc iaas.Service, ref string) (rsg resources.SecurityGroup, xerr fail.Error) {
+func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance resources.SecurityGroup, xerr fail.Error) {
 	// Note: do not log error from here; caller has the responsibility to log if needed
 	defer fail.OnPanic(&xerr)
 
@@ -128,20 +128,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (rsg resources.SecurityGrou
 	}
 
 	options := []data.ImmutableKeyValue{
-		// defines action to perform if key is not found in cache
-		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-			rsg, innerXErr := NewSecurityGroup(svc)
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = rsg.Read(ref); innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			return rsg, nil
-		}),
+		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onSGCacheMiss(svc, ref) }),
 	}
 	cacheEntry, xerr := sgCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -155,7 +142,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (rsg resources.SecurityGrou
 		}
 	}
 
-	if rsg = cacheEntry.Content().(resources.SecurityGroup); rsg == nil {
+	if sgInstance = cacheEntry.Content().(resources.SecurityGroup); sgInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
 	}
 	_ = cacheEntry.LockContent()
@@ -166,7 +153,22 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (rsg resources.SecurityGrou
 		}
 	}()
 
-	return rsg, nil
+	return sgInstance, nil
+}
+
+// onSGCacheMiss is called when there is no instance in cache of Security Group 'ref'
+func onSGCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+	sgInstance, innerXErr := NewSecurityGroup(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if innerXErr = sgInstance.Read(ref); innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	return sgInstance, nil
 }
 
 // IsNull tests if instance is nil or empty

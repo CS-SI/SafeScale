@@ -66,11 +66,13 @@ const (
 	hostKind = "host"
 	// hostsFolderName is the technical name of the container used to store networks info
 	hostsFolderName = "hosts"
+
+	hostOptionLightKeyword = "light"
 )
 
 var (
 	// HostLightOption is used as option to LoadHost() to disable external information caching (that may lead to deadlock sometimes)
-	HostLightOption = data.NewImmutableKeyValue("light", "true")
+	HostLightOption = data.NewImmutableKeyValue(hostOptionLightKeyword, "true")
 )
 
 // Host ...
@@ -100,7 +102,6 @@ func NewHost(svc iaas.Service) (_ *Host, xerr fail.Error) {
 
 	instance := &Host{
 		MetadataCore: coreInstance,
-		// lock: concurrency.NewTaskedLock(),
 	}
 	return instance, nil
 }
@@ -131,7 +132,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 	if len(options) > 0 {
 		for _, v := range options {
 			switch v.Key() {
-			case "light":
+			case hostOptionLightKeyword:
 				updateCachedInformation = false
 			default:
 				logrus.Warningf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
@@ -140,28 +141,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 	}
 
 	cacheOptions := []data.ImmutableKeyValue{
-		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-			hostInstance, innerXErr := NewHost(svc)
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// TODO: MetadataCore.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = hostInstance.Read(ref); innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			if updateCachedInformation {
-				hostInstance.lock.Lock()
-				xerr = hostInstance.updateCachedInformation()
-				hostInstance.lock.Unlock()
-				if xerr != nil {
-					return hostInstance, xerr
-				}
-			}
-
-			return hostInstance, nil
-		}),
+		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onHostCacheMiss(svc, ref, updateCachedInformation) }),
 	}
 
 	ce, xerr := hostCache.Get(ref, cacheOptions...)
@@ -207,51 +187,29 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 	return hostInstance, nil
 }
 
-// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
-// // upgradeIfNeeded upgrades Host properties if needed
-// func (instance *host) upgradeIfNeeded() fail.Error {
-// 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-// 		if !props.Lookup(hostproperty.NetworkV2) {
-// 			// upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2
-// 			var hnV1 *propertiesv1.HostNetwork
-// 			innerXErr := props.Alter(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-// 				var ok bool
-// 				hnV1, ok = clonable.(*propertiesv1.HostNetwork)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv1.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-// 				return nil
-// 			})
-// 			if innerXErr != nil {
-// 				return innerXErr
-// 			}
-//
-// 			innerXErr = props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-// 				hnV2, ok := clonable.(*propertiesv2.HostNetworking)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-//
-// 				hnV2.DefaultSubnetID = hnV1.DefaultNetworkID
-// 				hnV2.IPv4Addresses = hnV1.IPv4Addresses
-// 				hnV2.IPv6Addresses = hnV1.IPv6Addresses
-// 				hnV2.IsGateway = hnV1.IsGateway
-// 				hnV2.PublicIPv4 = hnV1.PublicIPv4
-// 				hnV2.PublicIPv6 = hnV1.PublicIPv6
-// 				hnV2.SubnetsByID = hnV1.NetworksByID
-// 				hnV2.SubnetsByName = hnV1.NetworksByName
-// 				return nil
-// 			})
-// 			if innerXErr != nil {
-// 				return innerXErr
-// 			}
-//
-// 			// FIXME: clean old property or leave it ? will differ from v2 through time if Subnets are added for example
-// 		}
-//
-// 		return fail.AlteredNothingError()
-// 	})
-// }
+// onHostCacheMiss is called when host 'ref' is not found in cache
+func onHostCacheMiss(svc iaas.Service, ref string, updateCachedInformation bool) (cache.Cacheable, fail.Error) {
+	hostInstance, innerXErr := NewHost(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	// TODO: MetadataCore.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if innerXErr = hostInstance.Read(ref); innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	if updateCachedInformation {
+		hostInstance.lock.Lock()
+		xerr := hostInstance.updateCachedInformation()
+		hostInstance.lock.Unlock()
+		if xerr != nil {
+			return hostInstance, xerr
+		}
+	}
+
+	return hostInstance, nil
+}
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
 func (instance *Host) updateCachedInformation() fail.Error {

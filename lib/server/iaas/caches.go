@@ -24,6 +24,18 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
+const (
+	cacheOptionMissKeyword = "onMiss"
+)
+
+// CacheMissOption returns the data.ImmutableKeyValue option to use on cache miss
+func CacheMissOption(fn func() (cache.Cacheable, fail.Error)) data.ImmutableKeyValue {
+	if fn != nil {
+		return data.NewImmutableKeyValue(cacheOptionMissKeyword, fn)
+	}
+	return data.NewImmutableKeyValue(cacheOptionMissKeyword, func() (cache.Cacheable, fail.Error) { return nil, fail.InvalidRequestError("invalid function provided to react on cache miss event") })
+}
+
 // ResourceCache contains the caches for all kinds of resources
 type ResourceCache struct {
 	byID   cache.Cache
@@ -83,7 +95,7 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 		var onMissFunc func() (cache.Cacheable, fail.Error)
 		for _, v := range options {
 			switch v.Key() { //nolint
-			case "onMiss":
+			case cacheOptionMissKeyword:
 				onMissFunc = v.Value().(func() (cache.Cacheable, fail.Error))
 			default:
 			}

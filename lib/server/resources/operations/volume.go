@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -24,7 +25,6 @@ import (
 
 	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -103,19 +103,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 	}
 
 	options := []data.ImmutableKeyValue{
-		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-			rv, innerXErr := NewVolume(svc)
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = rv.Read(ref); innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			return rv, nil
-		}),
+		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onVolumeCacheMiss(svc, ref) }),
 	}
 	cacheEntry, xerr := volumeCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -141,6 +129,21 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 	}()
 
 	return rv, nil
+}
+
+// onVolumeCacheMiss is called when there is no instance in cache of Volume 'ref'
+func onVolumeCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+	volumeInstance, innerXErr := NewVolume(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if innerXErr = volumeInstance.Read(ref); innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	return volumeInstance, nil
 }
 
 // IsNull tells if the instance is a null value

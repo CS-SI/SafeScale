@@ -17,6 +17,7 @@
 package operations
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"path"
@@ -26,9 +27,6 @@ import (
 
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
-
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -39,6 +37,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
@@ -155,19 +154,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 	}
 
 	options := []data.ImmutableKeyValue{
-		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-			rs, innerXErr := NewShare(svc)
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = rs.Read(ref); innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			return rs, nil
-		}),
+		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) }),
 	}
 	cacheEntry, xerr := shareCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -193,6 +180,21 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 	}()
 
 	return rs, nil
+}
+
+// onShareCacheMiss is called when there is no instance in cache of Share 'ref'
+func onShareCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+	shareInstance, innerXErr := NewShare(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if innerXErr = shareInstance.Read(ref); innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	return shareInstance, nil
 }
 
 // IsNull tells if the instance should be considered as a null value

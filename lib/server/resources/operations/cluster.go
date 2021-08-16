@@ -27,9 +27,6 @@ import (
 	"sync"
 	"time"
 
-	clusterflavors2 "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
-	boh2 "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors/boh"
-	k8s2 "github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors/k8s"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
@@ -44,6 +41,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors/boh"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors/k8s"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
@@ -63,9 +63,9 @@ import (
 )
 
 const (
-	clusterKind = "cluster"
-	// Path is the path to use to reach Cluster Definitions/Metadata
-	clustersFolderName = "clusters"
+	clusterKind        = "cluster"
+	clustersFolderName = "clusters" // path to use to reach Cluster Definitions/Metadata
+
 )
 
 // Cluster is the implementation of resources.Cluster interface
@@ -73,19 +73,13 @@ type Cluster struct {
 	*MetadataCore
 
 	lock                sync.RWMutex
-	installMethods      sync.Map // map[uint8]installmethod.Enum
+	installMethods      sync.Map
 	lastStateCollection time.Time
-	makers              clusterflavors2.Makers
+	makers              clusterflavors.Makers
 }
 
-// VPL: not used
-// // ClusterNullValue returns a *Cluster representing a null value
-// func ClusterNullValue() *Cluster {
-// 	return &Cluster{MetadataCore: NullCore()}
-// }
-
 // NewCluster ...
-func NewCluster(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
+func NewCluster(svc iaas.Service) (_ *Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
@@ -105,7 +99,7 @@ func NewCluster(svc iaas.Service) (_ resources.Cluster, xerr fail.Error) {
 }
 
 // LoadCluster ...
-func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail.Error) {
+func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
@@ -122,49 +116,7 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 	}
 
 	options := []data.ImmutableKeyValue{
-		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-			rc, innerXErr := NewCluster(svc)
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement)
-			if innerXErr = rc.Read(name); innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
-			// // deal with legacy
-			// xerr = rc.(*cluster).updateClusterNodesPropertyIfNeeded()
-			// xerr = debug.InjectPlannedFail(xerr)
-			// if xerr != nil {
-			// 	return nullCluster(), xerr
-			// }
-			//
-			// xerr = rc.(*cluster).updateClusterNetworkPropertyIfNeeded()
-			// xerr = debug.InjectPlannedFail(xerr)
-			// if xerr != nil {
-			// 	return nullCluster(), xerr
-			// }
-			//
-			// xerr = rc.(*cluster).updateClusterDefaultsPropertyIfNeeded()
-			// xerr = debug.InjectPlannedFail(xerr)
-			// if xerr != nil {
-			// 	return nullCluster(), xerr
-			// }
-
-			flavor, innerXErr := rc.GetFlavor()
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-			innerXErr = rc.(*Cluster).bootstrap(flavor)
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-			rc.(*Cluster).updateCachedInformation()
-
-			return rc, nil
-		}),
+		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(svc, name) }),
 	}
 	cacheEntry, xerr := clusterCache.Get(name, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -187,262 +139,34 @@ func LoadCluster(svc iaas.Service, name string) (rc resources.Cluster, xerr fail
 	}
 	_ = cacheEntry.LockContent()
 
-	return rc, nil
+	return clusterInstance, nil
 }
 
-// VPL: disabled silent metadata upgrade; will be implemented in a global one-pass migration
-// // updateClusterNodesPropertyIfNeeded upgrades current Nodes property to last Nodes property (currently NodesV2)
-// func (instance *cluster) updateClusterNodesPropertyIfNeeded() fail.Error {
-// 	if instance.isNull() {
-// 		return fail.InvalidInstanceError()
-// 	}
-// 	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-// 		if props.Lookup(clusterproperty.NodesV3) {
-// 			return nil
-// 		}
-//
-// 		if props.Lookup(clusterproperty.NodesV2) {
-// 			var (
-// 				nodesV2 *propertiesv2.ClusterNodes
-// 				ok      bool
-// 			)
-// 			innerXErr := props.Inspect(clusterproperty.NodesV2, func(clonable data.Clonable) fail.Error {
-// 				nodesV2, ok = clonable.(*propertiesv2.ClusterNodes)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv2.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-// 				return nil
-// 			})
-// 			if innerXErr != nil {
-// 				return innerXErr
-// 			}
-//
-// 			return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-// 				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv3.Nodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-//
-// 				for _, i := range nodesV2.Masters {
-// 					nodesV3.GlobalLastIndex++
-//
-// 					node := &propertiesv3.ClusterNode{
-// 						ID:          i.ID,
-// 						NumericalID: nodesV3.GlobalLastIndex,
-// 						Name:        i.Name,
-// 						PrivateIP:   i.PrivateIP,
-// 						PublicIP:    i.PublicIP,
-// 					}
-// 					nodesV3.Masters = append(nodesV3.Masters, nodesV3.GlobalLastIndex)
-// 					nodesV3.ByNumericalID[nodesV3.GlobalLastIndex] = node
-// 				}
-// 				for _, i := range nodesV2.PrivateNodes {
-// 					nodesV3.GlobalLastIndex++
-//
-// 					node := &propertiesv3.ClusterNode{
-// 						ID:          i.ID,
-// 						NumericalID: nodesV3.GlobalLastIndex,
-// 						Name:        i.Name,
-// 						PrivateIP:   i.PrivateIP,
-// 						PublicIP:    i.PublicIP,
-// 					}
-// 					nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, nodesV3.GlobalLastIndex)
-// 					nodesV3.ByNumericalID[nodesV3.GlobalLastIndex] = node
-// 				}
-// 				nodesV3.MasterLastIndex = nodesV2.MasterLastIndex
-// 				nodesV3.PrivateLastIndex = nodesV2.PrivateLastIndex
-// 				return nil
-// 			})
-// 		}
-//
-// 		if props.Lookup(clusterproperty.NodesV1) {
-// 			var (
-// 				nodesV1 *propertiesv1.ClusterNodes
-// 				ok      bool
-// 			)
-//
-// 			innerXErr := props.Inspect(clusterproperty.NodesV1, func(clonable data.Clonable) fail.Error {
-// 				nodesV1, ok = clonable.(*propertiesv1.ClusterNodes)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv1.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-// 				return nil
-// 			})
-// 			if innerXErr != nil {
-// 				return innerXErr
-// 			}
-//
-// 			return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-// 				nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-//
-// 				for _, i := range nodesV1.Masters {
-// 					nodesV3.GlobalLastIndex++
-//
-// 					node := &propertiesv3.ClusterNode{
-// 						ID:          i.ID,
-// 						NumericalID: nodesV3.GlobalLastIndex,
-// 						Name:        i.Name,
-// 						PrivateIP:   i.PrivateIP,
-// 						PublicIP:    i.PublicIP,
-// 					}
-// 					nodesV3.Masters = append(nodesV3.Masters, node.NumericalID)
-// 					nodesV3.ByNumericalID[node.NumericalID] = node
-// 				}
-// 				for _, i := range nodesV1.PrivateNodes {
-// 					nodesV3.GlobalLastIndex++
-//
-// 					node := &propertiesv3.ClusterNode{
-// 						ID:          i.ID,
-// 						NumericalID: nodesV3.GlobalLastIndex,
-// 						Name:        i.Name,
-// 						PrivateIP:   i.PrivateIP,
-// 						PublicIP:    i.PublicIP,
-// 					}
-// 					nodesV3.PrivateNodes = append(nodesV3.PrivateNodes, node.NumericalID)
-// 					nodesV3.ByNumericalID[node.NumericalID] = node
-// 				}
-// 				nodesV3.MasterLastIndex = nodesV1.MasterLastIndex
-// 				nodesV3.PrivateLastIndex = nodesV1.PrivateLastIndex
-// 				return nil
-// 			})
-// 		}
-//
-// 		// Returning explicitly this error tells Alter not to try to commit changes, there are none
-// 		return fail.AlteredNothingError()
-// 	})
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	return xerr
-// }
-//
-// // updateClusterNetworkPropertyIfNeeded creates a clusterproperty.NetworkV3 property if previous versions are found
-// func (instance *cluster) updateClusterNetworkPropertyIfNeeded() fail.Error {
-// 	if instance.isNull() {
-// 		return fail.InvalidInstanceError()
-// 	}
-// 	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
-// 		if props.Lookup(clusterproperty.NetworkV3) {
-// 			return fail.AlteredNothingError()
-// 		}
-//
-// 		var (
-// 			config *propertiesv3.ClusterNetwork
-// 			update bool
-// 		)
-//
-// 		if props.Lookup(clusterproperty.NetworkV2) {
-// 			// Having a clusterproperty.NetworkV2, need to update instance with clusterproperty.NetworkV3
-// 			innerXErr = props.Inspect(clusterproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-// 				networkV2, ok := clonable.(*propertiesv2.ClusterNetwork)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-//
-// 				// In v2, NetworkID actually contains the subnet ID; we do not need ID of the Network owning the Subnet in
-// 				// the property, meaning that Network would have to be deleted also on cluster deletion because Network
-// 				// AND Subnet were created forcibly at cluster creation.
-// 				config = &propertiesv3.ClusterNetwork{
-// 					NetworkID:          "",
-// 					SubnetID:           networkV2.NetworkID,
-// 					CIDR:               networkV2.CIDR,
-// 					GatewayID:          networkV2.GatewayID,
-// 					GatewayIP:          networkV2.GatewayIP,
-// 					SecondaryGatewayID: networkV2.SecondaryGatewayID,
-// 					SecondaryGatewayIP: networkV2.SecondaryGatewayIP,
-// 					PrimaryPublicIP:    networkV2.PrimaryPublicIP,
-// 					SecondaryPublicIP:  networkV2.SecondaryPublicIP,
-// 					DefaultRouteIP:     networkV2.DefaultRouteIP,
-// 					EndpointIP:         networkV2.EndpointIP,
-// 					Domain:             networkV2.Domain,
-// 				}
-// 				update = true
-// 				return nil
-// 			})
-// 		} else {
-// 			// Having a clusterproperty.NetworkV1, need to update instance with clusterproperty.NetworkV3
-// 			innerXErr = props.Inspect(clusterproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
-// 				networkV1, ok := clonable.(*propertiesv1.ClusterNetwork)
-// 				if !ok {
-// 					return fail.InconsistentError()
-// 				}
-//
-// 				config = &propertiesv3.ClusterNetwork{
-// 					SubnetID:       networkV1.NetworkID,
-// 					CIDR:           networkV1.CIDR,
-// 					GatewayID:      networkV1.GatewayID,
-// 					GatewayIP:      networkV1.GatewayIP,
-// 					DefaultRouteIP: networkV1.GatewayIP,
-// 					EndpointIP:     networkV1.PublicIP,
-// 				}
-// 				update = true
-// 				return nil
-// 			})
-// 		}
-// 		if innerXErr != nil {
-// 			return innerXErr
-// 		}
-//
-// 		if update {
-// 			return props.Alter(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
-// 				networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-// 				networkV3.Replace(config)
-// 				return nil
-// 			})
-// 		}
-// 		return nil
-// 	})
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	if xerr != nil {
-// 		switch xerr.(type) { //nolint
-// 		case *fail.ErrAlteredNothing:
-// 			xerr = nil
-// 		}
-// 	}
-// 	return xerr
-// }
-//
-// // updateClusterDefaultsPropertyIfNeeded ...
-// func (instance *cluster) updateClusterDefaultsPropertyIfNeeded() fail.Error {
-// 	if instance.isNull() {
-// 		return fail.InvalidInstanceError()
-// 	}
-// 	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-// 		if props.Lookup(clusterproperty.DefaultsV2) {
-// 			return fail.AlteredNothingError()
-// 		}
-//
-// 		// If property.DefaultsV2 is not found but there is a property.DefaultsV1, converts it to DefaultsV2
-// 		return props.Inspect(clusterproperty.DefaultsV1, func(clonable data.Clonable) fail.Error {
-// 			defaultsV1, ok := clonable.(*propertiesv1.ClusterDefaults)
-// 			if !ok {
-// 				return fail.InconsistentError("'*propertiesv1.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 			}
-// 			return props.Alter(clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
-// 				defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
-// 				if !ok {
-// 					return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
-// 				}
-//
-// 				convertDefaultsV1ToDefaultsV2(defaultsV1, defaultsV2)
-// 				return nil
-// 			})
-// 		})
-// 	})
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	if xerr != nil {
-// 		switch xerr.(type) {
-// 		case *fail.ErrAlteredNothing:
-// 			xerr = nil
-// 		default:
-// 		}
-// 	}
-// 	return xerr
-// }
+// onClusterCacheMiss is called when cluster cache does not contain an instance of cluster 'name'
+func onClusterCacheMiss(svc iaas.Service, name string) (cache.Cacheable, fail.Error) {
+	clusterInstance, innerXErr := NewCluster(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement)
+	if innerXErr = clusterInstance.Read(name); innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	flavor, innerXErr := clusterInstance.GetFlavor()
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	innerXErr = clusterInstance.bootstrap(flavor)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+	clusterInstance.updateCachedInformation()
+
+	return clusterInstance, nil
+}
 
 // updateCachedInformation updates information cached in the instance
 func (instance *Cluster) updateCachedInformation() {
@@ -638,9 +362,9 @@ func (instance *Cluster) Deserialize(buf []byte) (xerr fail.Error) {
 func (instance *Cluster) bootstrap(flavor clusterflavor.Enum) (xerr fail.Error) {
 	switch flavor {
 	case clusterflavor.BOH:
-		instance.makers = boh2.Makers
+		instance.makers = boh.Makers
 	case clusterflavor.K8S:
-		instance.makers = k8s2.Makers
+		instance.makers = k8s.Makers
 	default:
 		return fail.NotImplementedError("unknown Cluster Flavor '%d'", flavor)
 	}
