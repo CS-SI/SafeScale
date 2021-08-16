@@ -130,13 +130,14 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 		}
 	}
 
-	if _, ok := cacheEntry.Content().(resources.Cluster); !ok {
+	var ok bool
+	if clusterInstance, ok = cacheEntry.Content().(resources.Cluster); !ok {
 		return nil, fail.InconsistentError("value found in Cluster cache for key '%s' is not a Cluster", name)
 	}
-
-	if rc = cacheEntry.Content().(resources.Cluster); rc == nil {
+	if clusterInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)
 	}
+
 	_ = cacheEntry.LockContent()
 
 	return clusterInstance, nil
