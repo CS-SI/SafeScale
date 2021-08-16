@@ -27,7 +27,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -155,8 +154,18 @@ func validateServerString(server string) (string, fail.Error) {
 // Connect establishes connection with safescaled
 func (s *Session) Connect() {
 	if s.connection == nil {
-		s.connection = utils.GetConnection(s.server)
+		s.connection = dial(s.server)
 	}
+}
+
+// dial returns a connection to GRPC server
+func dial(server string) *grpc.ClientConn {
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(server, grpc.WithInsecure())
+	if err != nil {
+		logrus.Fatalf("failed to connect to safescaled (%s): %v", server, err)
+	}
+	return conn
 }
 
 // Disconnect cuts the connection with safescaled
