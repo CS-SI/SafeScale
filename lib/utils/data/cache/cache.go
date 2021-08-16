@@ -26,6 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
@@ -126,6 +127,13 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 					return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
 				case <-reservation.committed():
 					// acknowledge commit, and continue
+				case <-time.After(2 * temporal.GetDefaultDelay()): // more than enough
+					// reservation expired, clean up
+					xerr := instance.reservationExpired(key)
+					if xerr != nil {
+						return nil, xerr
+					}
+					return nil, fail.TimeoutError(nil, 2*temporal.GetDefaultDelay(), "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName())
 				}
 			}
 		}

@@ -33,7 +33,9 @@ func CacheMissOption(fn func() (cache.Cacheable, fail.Error)) data.ImmutableKeyV
 	if fn != nil {
 		return data.NewImmutableKeyValue(cacheOptionMissKeyword, fn)
 	}
-	return data.NewImmutableKeyValue(cacheOptionMissKeyword, func() (cache.Cacheable, fail.Error) { return nil, fail.InvalidRequestError("invalid function provided to react on cache miss event") })
+	return data.NewImmutableKeyValue(cacheOptionMissKeyword, func() (cache.Cacheable, fail.Error) {
+		return nil, fail.InvalidRequestError("invalid function provided to react on cache miss event")
+	})
 }
 
 // ResourceCache contains the caches for all kinds of resources
@@ -103,6 +105,22 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 
 		if onMissFunc != nil {
 			if xerr := rc.unsafeReserveEntry(key); xerr != nil {
+				if _, ok := xerr.(*fail.ErrDuplicate); ok {
+					// Search in the cache by ID
+					if ce, xerr = rc.byID.Entry(key); xerr == nil {
+						return ce, nil
+					}
+
+					// Not found, search an entry in the cache by name to get id and search again by id
+					rc.lock.Lock()
+					if id, ok := rc.byName[key]; ok {
+						if ce, xerr = rc.byID.Entry(id); xerr == nil {
+							rc.lock.Unlock()
+							return ce, nil
+						}
+					}
+					rc.lock.Unlock()
+				}
 				return nil, xerr
 			}
 
