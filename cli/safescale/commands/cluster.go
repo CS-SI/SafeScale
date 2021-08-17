@@ -880,7 +880,7 @@ var clusterHelmCommand = &cli.Command{
 		}
 
 		clientID := GenerateClientIdentity()
-		useTLS := " --tls"
+		// useTLS := " --tls"
 		var filteredArgs []string
 		args := c.Args().Tail()
 		ignoreNext := false
@@ -893,16 +893,16 @@ var clusterHelmCommand = &cli.Command{
 			}
 			ignore := false
 			switch arg {
-			case "--help":
-				useTLS = ""
+			//case "--help":
+			//	useTLS = ""
 			case "init":
 				if idx == 0 {
 					return cli.NewExitError("helm init is forbidden", int(exitcode.InvalidArgument))
 				}
-			case "search", "repo", "help", "install", "uninstall":
-				if idx == 0 {
-					useTLS = ""
-				}
+			//case "search", "repo", "help", "install", "uninstall":
+			//	if idx == 0 {
+			//		useTLS = ""
+			//	}
 			case "--":
 				ignore = true
 			case "-f", "--values":
@@ -956,7 +956,7 @@ var clusterHelmCommand = &cli.Command{
 				filteredArgs = append(filteredArgs, arg)
 			}
 		}
-		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") + useTLS
+		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") // + useTLS
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
