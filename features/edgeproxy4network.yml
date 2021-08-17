@@ -161,7 +161,6 @@ feature:
                                     volumes:
                                         - ${SF_ETCDIR}/edgeproxy4network/kong.conf:/etc/kong/kong.conf:ro
                                         - ${SF_ETCDIR}/edgeproxy4network/includes:/etc/kong/includes:ro
-                                    network_mode: "host"
                                     ports:
                                         - "0.0.0.0:443:443"
                                         - "{{ .HostIP }}:6443:6443"
@@ -171,50 +170,7 @@ feature:
                                         test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || sfFail 1"]
                                         interval: 5s
                                         retries: 10
-                            #         secrets:
-                            #             - safescale.postgresxl.password
-                            #             - safescale.edgeproxy.db_password
-
-                            # secrets:
-                            #     safescale.postgresxl.password:
-                            #         external: true
-                            #     safescale.edgeproxy.db_password:
-                            #         external: true
-
-                            # networks:
-                            #     safescale-gw:
-                            #         external: true
                             EOF
-
-                                # gui:
-                                #     image: pantsel/konga
-                                #     volumes:
-                                #         - ${SF_ETCDIR}/edgeproxy4network/konga.userdb.data:/usr/local/etc/userdb.data:ro
-                                #     environment:
-                                #         - TOKEN_SECRET="$(sfRandomString 32 [:alnum:])"
-                                #         - DB_ADAPTER=postgres
-                                #         - DB_DATABASE=edgeproxy4network-gui
-                                #         - DB_USER=edgeproxy4network
-                                #         - DB_PASSWORD="${DB_PASSWORD}"
-                                #         - NODE_ENV=production
-                                #         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
-                                #     network:
-                                #         - safescale-gw
-                                #     ports:
-                                #         - target: 1337
-                                #           published: 1337
-                                #           protocol: tcp
-                                #           mode: "host"
-                                #     deploy:
-                                #         mode: global
-                                #         placement:
-                                #             constraints:
-                                #                 - node.role == manager
-                                #         restart_policy:
-                                #             condition: on-failure
-                                #             delay: 5s
-                                #             max_attempts: 3
-                                #             window: 120s
 
                             chmod go-rwx ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml
 
@@ -227,17 +183,6 @@ feature:
                             anonymous_reports = off
                             EOF
                             sfExit
-
-                    # secret:
-                    #     targets:
-                    #         hosts: no
-                    #         gateways: any
-                    #         masters: no
-                    #         nodes: no
-                    #     run: |
-                    #         docker secret rm safescale.edgeproxy.db_password &>/dev/null || true
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.edgeproxy.db_password - &>/dev/null || sfFail 192
-                    #         sfExit
 
                     networks:
                         targets:
