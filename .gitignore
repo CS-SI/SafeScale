@@ -123,3 +123,5 @@ lib/security/gateway/client/safe-security
 .DS_Store
 
 cli/safescaled/safescaled__d__v
+
+.run/
