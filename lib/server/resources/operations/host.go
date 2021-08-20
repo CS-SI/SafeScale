@@ -140,10 +140,10 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		}
 	}
 
-	cacheOptions := []data.ImmutableKeyValue{
-		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onHostCacheMiss(svc, ref, updateCachedInformation) }),
-	}
-
+	cacheOptions := iaas.CacheMissOption(
+		func() (cache.Cacheable, fail.Error) { return onHostCacheMiss(svc, ref, updateCachedInformation) },
+		temporal.GetMetadataTimeout(),
+	)
 	ce, xerr := hostCache.Get(ref, cacheOptions...)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -418,7 +418,7 @@ func (instance *Host) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2274,14 +2274,14 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 			// Unbind Security Groups from Host
 			var errors []error
 			for _, v := range hsgV1.ByID {
-				rsg, derr := LoadSecurityGroup(svc, v.ID)
+				sgInstance, derr := LoadSecurityGroup(svc, v.ID)
 				if derr == nil {
 					//goland:noinspection ALL
 					defer func(sgInstance resources.SecurityGroup) {
 						sgInstance.Released()
-					}(rsg)
+					}(sgInstance)
 
-					derr = rsg.UnbindFromHost(ctx, instance)
+					derr = sgInstance.UnbindFromHost(ctx, instance)
 				}
 				if derr != nil {
 					switch derr.(type) {
@@ -3202,7 +3202,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 }
 
 // BindSecurityGroup binds a security group to the Host; if enabled is true, apply it immediately
-func (instance *Host) BindSecurityGroup(ctx context.Context, rsg resources.SecurityGroup, enable resources.SecurityGroupActivation) (xerr fail.Error) {
+func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup, enable resources.SecurityGroupActivation) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -3211,8 +3211,8 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if rsg == nil {
-		return fail.InvalidParameterCannotBeNilError("rsg")
+	if sgInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("sgInstance")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -3233,7 +3233,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s', enable=%v", rsg.GetName(), enable).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s', enable=%v", sgInstance.GetName(), enable).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -3246,7 +3246,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := rsg.GetID()
+			sgID := sgInstance.GetID()
 			// If the Security Group is already bound to the Host with the exact same state, considered as a success
 			if v, ok := hsgV1.ByID[sgID]; ok && v.Disabled == !bool(enable) {
 				return nil
@@ -3255,14 +3255,14 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, rsg resources.Secur
 			// Not found, add it
 			item := &propertiesv1.SecurityGroupBond{
 				ID:       sgID,
-				Name:     rsg.GetName(),
+				Name:     sgInstance.GetName(),
 				Disabled: bool(!enable),
 			}
 			hsgV1.ByID[sgID] = item
 			hsgV1.ByName[item.Name] = item.ID
 
 			// If enabled, apply it
-			if innerXErr := rsg.BindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+			if innerXErr := sgInstance.BindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate:
 					// already bound, success
@@ -3492,7 +3492,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 }
 
 // DisableSecurityGroup disables a bound security group to Host
-func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.SecurityGroup) (xerr fail.Error) {
+func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -3501,8 +3501,8 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 	if ctx == nil {
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if rsg == nil {
-		return fail.InvalidParameterError("rsg", "cannot be nil")
+	if sgInstance == nil {
+		return fail.InvalidParameterError("sgInstance", "cannot be nil")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -3523,8 +3523,8 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	sgName := rsg.GetName()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(rsg='%s')", sgName).WithStopwatch().Entering()
+	sgName := sgInstance.GetName()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -3539,7 +3539,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 			}
 
 			var asg *abstract.SecurityGroup
-			xerr := rsg.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			xerr := sgInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				if asg, ok = clonable.(*abstract.SecurityGroup); !ok {
 					return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -3565,7 +3565,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, rsg resources.Se
 				}
 			}
 			if !found {
-				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, rsg.GetID())
+				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgInstance.GetID())
 			}
 
 			if svc.GetCapabilities().CanDisableSecurityGroup {

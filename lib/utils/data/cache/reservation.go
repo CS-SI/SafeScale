@@ -24,27 +24,23 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-const (
-	reservationInfiniteDuration = time.Duration(0)
-)
-
 // reservation is a struct to simulate a content of an Entry to "reserve" a key
 type reservation struct {
 	key         string
 	observers   map[string]observer.Observer
 	freedCh     chan struct{}
 	committedCh chan struct{}
-	duration    time.Duration
+	timeout     time.Duration
 	created     time.Time
 }
 
 // newReservation creates an instance of reservation
-func newReservation(key string, duration time.Duration) *reservation {
+func newReservation(key string/*, duration time.Duration*/) *reservation {
 	return &reservation{
 		key:         key,
 		freedCh:     make(chan struct{}, 1),
 		committedCh: make(chan struct{}, 1),
-		duration:    duration,
+		//timeout:     duration,
 		created:     time.Now(),
 	}
 }

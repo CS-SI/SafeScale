@@ -25,6 +25,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
@@ -153,9 +154,10 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 		return nil, xerr
 	}
 
-	options := []data.ImmutableKeyValue{
-		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) }),
-	}
+	options := iaas.CacheMissOption(
+		func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) },
+		temporal.GetMetadataTimeout(),
+	)
 	cacheEntry, xerr := shareCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -224,7 +226,7 @@ func (instance *Share) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

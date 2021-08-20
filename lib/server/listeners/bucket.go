@@ -56,10 +56,8 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, xerr := PrepareJob(ctx, "", "/buckets/list")
@@ -98,10 +96,8 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	bucketName := in.GetName()
@@ -115,8 +111,8 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewBucketHandler(job)
-	if xerr = handler.Create(bucketName); xerr != nil {
+	xerr = handlers.NewBucketHandler(job).Create(bucketName)
+	if xerr != nil {
 		return empty, xerr
 	}
 
@@ -140,10 +136,8 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	bucketName := in.GetName()
@@ -157,12 +151,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewBucketHandler(job)
-	if err = handler.Delete(bucketName); err != nil {
-		return empty, err
-	}
-
-	return empty, nil
+	return empty, handlers.NewBucketHandler(job).Delete(bucketName)
 }
 
 // Inspect a bucket
@@ -181,10 +170,8 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err != nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	bucketName := in.GetName()
@@ -194,8 +181,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	}
 	defer job.Close()
 
-	task := job.Task()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.bucket"), "('%s')", bucketName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -204,11 +190,13 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
 	if resp == nil {
 		return nil, fail.NotFoundError("bucket '%s' not found", bucketName)
 	}
-	return converters.BucketMountPointFromResourceToProtocol(task.Context(), resp)
+
+	return converters.BucketMountPointFromResourceToProtocol(job.Context(), resp)
 }
 
 // Mount a bucket on the filesystem of the host
@@ -228,10 +216,8 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	bucketName := in.GetBucket()
@@ -246,11 +232,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewBucketHandler(job)
-	if xerr = handler.Mount(bucketName, hostRef, in.GetPath()); xerr != nil {
-		return empty, xerr
-	}
-	return empty, nil
+	return empty, handlers.NewBucketHandler(job).Mount(bucketName, hostRef, in.GetPath())
 }
 
 // Unmount a bucket from the filesystem of the host
@@ -270,10 +252,8 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	bucketName := in.GetBucket()
@@ -288,9 +268,5 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	handler := handlers.NewBucketHandler(job)
-	if xerr = handler.Unmount(bucketName, hostRef); xerr != nil {
-		return empty, xerr
-	}
-	return empty, nil
+	return empty, handlers.NewBucketHandler(job).Unmount(bucketName, hostRef)
 }

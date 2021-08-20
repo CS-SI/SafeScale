@@ -115,9 +115,10 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 		return nil, xerr
 	}
 
-	options := []data.ImmutableKeyValue{
-		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(svc, name) }),
-	}
+	options := iaas.CacheMissOption(
+		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(svc, name) },
+		temporal.GetMetadataTimeout(),
+	)
 	cacheEntry, xerr := clusterCache.Get(name, options...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -238,7 +239,7 @@ func (instance *Cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -248,7 +249,6 @@ func (instance *Cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
-
 		}
 	}()
 

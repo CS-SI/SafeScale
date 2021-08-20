@@ -29,7 +29,7 @@ import (
 )
 
 func TestLockContent(t *testing.T) {
-	content := newReservation("content", reservationInfiniteDuration)
+	content := newReservation("content"/*, time.Minute*/)
 	cacheEntry := newEntry(content)
 
 	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
@@ -48,7 +48,7 @@ func TestLockContent(t *testing.T) {
 }
 
 func TestParallelLockContent(t *testing.T) {
-	content := newReservation("content", reservationInfiniteDuration)
+	content := newReservation("content"/*, time.Minute*/)
 	cacheEntry := newEntry(content)
 
 	task1, _ := concurrency.NewUnbreakableTask()
@@ -122,10 +122,10 @@ func TestDeadlock(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		content := newReservation("content", reservationInfiniteDuration)
+		content := newReservation("content"/*, time.Minute*/)
 
 		nukaCola, _ := NewCache("nuka")
-		xerr := nukaCola.Reserve("What", ReserveDurationOption(100*time.Millisecond))
+		xerr := nukaCola.Reserve("What", 2*time.Second)
 		if xerr != nil {
 			t.Error(xerr)
 			t.Fail()
@@ -162,7 +162,7 @@ func TestReserveCommitGet(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		content := newReservation("content", reservationInfiniteDuration)
+		content := newReservation("content"/*, time.Minute*/)
 
 		nukaCola, err := NewCache("nuka")
 		if err != nil {
@@ -171,7 +171,7 @@ func TestReserveCommitGet(t *testing.T) {
 			return
 		}
 
-		err = nukaCola.Reserve(content.GetID())
+		err = nukaCola.Reserve(content.GetID(), 100*time.Millisecond)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
@@ -210,7 +210,7 @@ func TestReserveCommitGet(t *testing.T) {
 
 func TestMultipleReserveCommitGet(t *testing.T) {
 	wg := sync.WaitGroup{}
-	content := newReservation("content", reservationInfiniteDuration)
+	content := newReservation("content"/*, time.Minute*/)
 	nukaCola, err := NewCache("nuka")
 	require.Nil(t, err)
 
@@ -219,7 +219,7 @@ func TestMultipleReserveCommitGet(t *testing.T) {
 
 		go func() {
 			defer wg.Done()
-			xerr := nukaCola.Reserve(content.GetID())
+			xerr := nukaCola.Reserve(content.GetID(), 200*time.Millisecond)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotAvailable, *fail.ErrDuplicate:
@@ -268,7 +268,7 @@ func TestSurprisingBehaviour(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		content := newReservation("content", reservationInfiniteDuration)
+		content := newReservation("content"/*, time.Minute*/)
 
 		nukaCola, err := NewCache("nuka")
 		if err != nil {
@@ -277,7 +277,7 @@ func TestSurprisingBehaviour(t *testing.T) {
 			return
 		}
 
-		err = nukaCola.Reserve("What")
+		err = nukaCola.Reserve("What", 200*time.Millisecond)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
@@ -324,7 +324,7 @@ func TestSurprisingBehaviour(t *testing.T) {
 }
 
 func TestDeadlockAddingEntry(t *testing.T) {
-	content := newReservation("content", reservationInfiniteDuration)
+	content := newReservation("content"/*, time.Minute*/)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -354,7 +354,7 @@ func TestDeadlockAddingEntry(t *testing.T) {
 }
 
 func TestSignalChangeEntry(t *testing.T) {
-	content := newReservation("content", reservationInfiniteDuration)
+	content := newReservation("content"/*, time.Minute*/)
 	_ = content
 
 	wg := sync.WaitGroup{}
@@ -369,7 +369,7 @@ func TestSignalChangeEntry(t *testing.T) {
 			return
 		}
 
-		err = nukaCola.Reserve(content.GetName())
+		err = nukaCola.Reserve(content.GetName(), 100*time.Millisecond)
 		if err != nil {
 			t.Error(err)
 			t.Fail()
@@ -400,9 +400,9 @@ func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
 		t.FailNow()
 	}
 
-	previous := newReservation("previous", reservationInfiniteDuration)
+	previous := newReservation("previous"/*, time.Minute*/)
 	_ = previous
-	content := newReservation("cola", reservationInfiniteDuration)
+	content := newReservation("cola"/*, time.Minute*/)
 	_ = content
 
 	wg := sync.WaitGroup{}
@@ -411,11 +411,11 @@ func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
 	go func() {
 		defer wg.Done()
 
-		_ = rc.Reserve("previous")
+		_ = rc.Reserve("previous", 100*time.Millisecond)
 		// _ , _ = rc.Commit("previous", previous)
 
 		key := "cola"
-		if xerr := rc.Reserve(key); xerr != nil {
+		if xerr := rc.Reserve(key, 100*time.Millisecond); xerr != nil {
 			t.Error(xerr)
 			t.Fail()
 			return

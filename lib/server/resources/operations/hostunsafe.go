@@ -116,14 +116,13 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 		timeout = temporal.GetLongOperationTimeout()
 	}
 
-	iterations := 0
 	var (
-		retcode        int
+		iterations, retcode        int
 		stdout, stderr string
 	)
 	xerr := retry.WhileUnsuccessful(
 		func() error {
-			iterations = iterations + 1
+			iterations++
 			// Create the command
 			sshCmd, innerXErr := ssh.NewCommand(ctx, cmd)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -143,7 +142,6 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 				}
 			}(sshCmd)
 
-			retcode = -1
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout)
 			if innerXErr != nil {
 				// Adds stdout and stderr as annotations to innerXErr
@@ -167,7 +165,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command '%s' after '%s'", cmd, temporal.FormatDuration(timeout))
+			return retcode, stdout, stderr, fail.Wrap(fail.Cause(xerr), "failed to execute command on Host '%s' after %s", ssh.Hostname, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
 			return retcode, stdout, stderr, fail.ConvertError(fail.Cause(xerr))
 		default:

@@ -40,6 +40,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 )
@@ -90,13 +91,13 @@ func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 		return false, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
 
-	rsg, xerr := NewSecurityGroup(svc)
+	sgInstance, xerr := NewSecurityGroup(svc)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return false, xerr
 	}
 
-	xerr = rsg.Read(ref)
+	xerr = sgInstance.Read(ref)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -127,9 +128,10 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance resources.Secur
 		return nil, fail.Wrap(xerr, "failed to get cache for Security Groups")
 	}
 
-	options := []data.ImmutableKeyValue{
-		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onSGCacheMiss(svc, ref) }),
-	}
+	options := iaas.CacheMissOption(
+		func() (cache.Cacheable, fail.Error) { return onSGCacheMiss(svc, ref) },
+		temporal.GetMetadataTimeout(),
+	)
 	cacheEntry, xerr := sgCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -202,7 +204,7 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -213,7 +215,6 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
-
 		}
 	}()
 
@@ -363,8 +364,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotImplemented:
-			// not all providers implement security groups
-			debug.IgnoreError(xerr)
+			// not all providers implement security groups, and I do not want to see it even in !release mode, so no debug.IgnoreError()
 		case *fail.ErrNotFound:
 			// continue
 			debug.IgnoreError(xerr)
@@ -372,7 +372,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 			return fail.Wrap(xerr, "failed to check if Security Group name '%s' is already used", name)
 		}
 	} else {
-		return fail.DuplicateError("a Security Group named '%s' already exists (but not managed by SafeScale)", name)
+		return fail.DuplicateError("a Security Group named '%s' already exists (not managed by SafeScale)", name)
 	}
 
 	asg, xerr = svc.CreateSecurityGroup(networkID, name, description, rules)

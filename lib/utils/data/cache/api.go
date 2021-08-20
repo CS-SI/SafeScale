@@ -21,7 +21,6 @@ package cache
 import (
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -32,22 +31,8 @@ type Cache interface {
 	observer.Observer
 
 	Entry(key string) (*Entry, fail.Error)                            // returns a cache entry from its key
-	Reserve(key string, options ...data.ImmutableKeyValue) fail.Error // reserve an entry in the cache
+	Reserve(key string, timeout time.Duration) fail.Error             // reserve an entry in the cache
 	Commit(key string, content Cacheable) (*Entry, fail.Error)        // Commit fills a previously reserved entry by 'key' with 'content'
 	Free(key string) fail.Error                                       // frees a cache entry (removing the reservation from cache)
 	Add(content Cacheable) (*Entry, fail.Error)                       // adds a content in cache (doing Reserve+Commit in a whole with content ID as key)
-}
-
-const (
-	cacheReserveDurationOption = `reserve_duration`
-)
-
-// ReserveDurationOption returns a data.ImmutableKeyValue with proper key and value
-func ReserveDurationOption(duration time.Duration) data.ImmutableKeyValue {
-	return data.NewImmutableKeyValue(cacheReserveDurationOption, duration)
-}
-
-// ReserveInfiniteDurationOption returns a data.ImmutableKeyValue with proper key and infinite duration as value
-func ReserveInfiniteDurationOption() data.ImmutableKeyValue {
-	return ReserveDurationOption(0)
 }

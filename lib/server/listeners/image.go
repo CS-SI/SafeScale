@@ -50,10 +50,8 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, err := PrepareJob(ctx, in.GetTenantId(), "/images/list")
@@ -73,10 +71,10 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	}
 
 	// Build response mapping abstract.Image to protocol.Image
-	var pbImages []*protocol.Image
-	for _, image := range images {
-		pbImages = append(pbImages, converters.ImageFromAbstractToProtocol(&image))
+	pbImages := make([]*protocol.Image, len(images))
+	for k, image := range images {
+		pbImages[k] = converters.ImageFromAbstractToProtocol(&image)
 	}
-	rv := &protocol.ImageList{Images: pbImages}
-	return rv, nil
+	out := &protocol.ImageList{Images: pbImages}
+	return out, nil
 }

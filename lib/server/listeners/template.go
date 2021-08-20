@@ -155,16 +155,13 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/template/match")
-
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	task := job.Task()
-
 	sizing := in.GetSizing()
-	tracer := debug.NewTracer(task, true, "%s", sizing).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true, "%s", sizing).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

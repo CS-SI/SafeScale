@@ -94,9 +94,10 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 		return nil, xerr
 	}
 
-	options := []data.ImmutableKeyValue{
-		iaas.CacheMissOption(func() (cache.Cacheable, fail.Error) { return onNetworkCacheMiss(svc, ref) }),
-	}
+	options := iaas.CacheMissOption(
+		func() (cache.Cacheable, fail.Error) { return onNetworkCacheMiss(svc, ref) },
+		temporal.GetMetadataTimeout(),
+	)
 	cacheEntry, xerr := networkCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -276,7 +277,7 @@ func (instance *Network) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -534,6 +535,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 		// delete Network if not imported, with tolerance
 		if !abstractNetwork.Imported {
+			// FIXME: before deleting Network, it may still exist Security Groups that have to be deleted first...
 			maybeDeleted := false
 			innerXErr = svc.DeleteNetwork(abstractNetwork.ID)
 			if innerXErr != nil {

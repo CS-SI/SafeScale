@@ -18,6 +18,7 @@ package iaas
 
 import (
 	"sync"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
@@ -25,17 +26,30 @@ import (
 )
 
 const (
-	cacheOptionMissKeyword = "onMiss"
+	cacheOptionOnMissKeyword        = "on_miss"
+	cacheOptionOnMissTimeoutKeyword = "on_miss_timeout"
 )
 
-// CacheMissOption returns the data.ImmutableKeyValue option to use on cache miss
-func CacheMissOption(fn func() (cache.Cacheable, fail.Error)) data.ImmutableKeyValue {
-	if fn != nil {
-		return data.NewImmutableKeyValue(cacheOptionMissKeyword, fn)
+// CacheMissOption returns []data.ImmutableKeyValue options to use on cache miss with timeout
+func CacheMissOption(fn func() (cache.Cacheable, fail.Error), timeout time.Duration) []data.ImmutableKeyValue {
+	if timeout <= 0 {
+		return []data.ImmutableKeyValue{
+			data.NewImmutableKeyValue(cacheOptionOnMissKeyword, func() (cache.Cacheable, fail.Error) { return nil, fail.InvalidRequestError("invalid timeout for function provided to react on cache miss event: cannot be less or equal to 0") }),
+			data.NewImmutableKeyValue(cacheOptionOnMissTimeoutKeyword, timeout),
+		}
 	}
-	return data.NewImmutableKeyValue(cacheOptionMissKeyword, func() (cache.Cacheable, fail.Error) {
-		return nil, fail.InvalidRequestError("invalid function provided to react on cache miss event")
-	})
+
+	if fn != nil {
+		return []data.ImmutableKeyValue{
+			data.NewImmutableKeyValue(cacheOptionOnMissKeyword, fn),
+			data.NewImmutableKeyValue(cacheOptionOnMissTimeoutKeyword, timeout),
+		}
+	}
+
+	return []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue(cacheOptionOnMissKeyword, func() (cache.Cacheable, fail.Error) { return nil, fail.InvalidRequestError("invalid function provided to react on cache miss event: cannot be nil") }),
+		data.NewImmutableKeyValue(cacheOptionOnMissTimeoutKeyword, timeout),
+	}
 }
 
 // ResourceCache contains the caches for all kinds of resources
@@ -94,17 +108,26 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 
 	// We have a cache miss, check if we have a function to get the missing content
 	if len(options) > 0 {
-		var onMissFunc func() (cache.Cacheable, fail.Error)
+		var (
+			onMissFunc func() (cache.Cacheable, fail.Error)
+			onMissTimeout time.Duration
+		)
 		for _, v := range options {
 			switch v.Key() { //nolint
-			case cacheOptionMissKeyword:
+			case cacheOptionOnMissKeyword:
 				onMissFunc = v.Value().(func() (cache.Cacheable, fail.Error))
+			case cacheOptionOnMissTimeoutKeyword:
+				onMissTimeout = v.Value().(time.Duration)
 			default:
 			}
 		}
 
 		if onMissFunc != nil {
-			if xerr := rc.unsafeReserveEntry(key); xerr != nil {
+			if onMissTimeout <= 0 {
+				_, xerr = onMissFunc()  // onMissFunc() knows what the error is
+                return nil, xerr
+            }
+			if xerr := rc.unsafeReserveEntry(key, onMissTimeout); xerr != nil {
 				if _, ok := xerr.(*fail.ErrDuplicate); ok {
 					// Search in the cache by ID
 					if ce, xerr = rc.byID.Entry(key); xerr == nil {
@@ -121,6 +144,10 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 					}
 					rc.lock.Unlock()
 				}
+				return nil, xerr
+			}
+
+			if xerr := rc.unsafeReserveEntry(key, onMissTimeout); xerr != nil {
 				return nil, xerr
 			}
 
@@ -142,23 +169,26 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 }
 
 // ReserveEntry sets a cache entry to reserve the key and returns the Entry associated
-func (rc *ResourceCache) ReserveEntry(key string) fail.Error {
+func (rc *ResourceCache) ReserveEntry(key string, timeout time.Duration) fail.Error {
 	if rc == nil || rc.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
+	if timeout <= 0 {
+		return fail.InvalidParameterError("timeout", "cannot be less or equal to 0")
+	}
 
 	rc.lock.Lock()
 	defer rc.lock.Unlock()
 
-	return rc.unsafeReserveEntry(key)
+	return rc.unsafeReserveEntry(key, timeout)
 }
 
 // unsafeReserveEntry sets a cache entry to reserve the key and returns the Entry associated
-func (rc *ResourceCache) unsafeReserveEntry(key string) fail.Error {
-	return rc.byID.Reserve(key)
+func (rc *ResourceCache) unsafeReserveEntry(key string, timeout time.Duration) fail.Error {
+	return rc.byID.Reserve(key, timeout)
 }
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter

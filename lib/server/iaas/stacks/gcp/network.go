@@ -495,8 +495,8 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 	defer tracer.Exiting()
 
 	// Delete NAT route
-	natRuleName := fmt.Sprintf(natRouteNameFormat, id)
-	if xerr = s.rpcDeleteRoute(natRuleName); xerr != nil {
+	natRouteName := fmt.Sprintf(natRouteNameFormat, id)
+	if xerr = s.rpcDeleteRoute(natRouteName); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider missing route as a successful removal

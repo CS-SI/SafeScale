@@ -79,7 +79,7 @@ func NewTracer(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
 	t.callerParams = strings.TrimSpace(message)
 
 	// Build the message to trace
-	// VPL: ma version
+	// VPL: my version
 	// if pc, file, line, ok := runtime.Caller(1); ok {
 	//	if f := runtime.FuncForPC(pc); f != nil {
 	//		t.funcName = f.Name()

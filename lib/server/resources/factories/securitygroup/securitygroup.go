@@ -39,16 +39,17 @@ func List(ctx context.Context, svc iaas.Service, all bool) ([]*abstract.Security
 		return svc.ListSecurityGroups("")
 	}
 
-	rsg, err := New(svc)
-	if err != nil {
-		return nil, err
+	sgInstance, xerr := New(svc)
+	if xerr != nil {
+		return nil, xerr
 	}
+
 	var list []*abstract.SecurityGroup
-	err = rsg.Browse(ctx, func(asg *abstract.SecurityGroup) fail.Error {
+	xerr = sgInstance.Browse(ctx, func(asg *abstract.SecurityGroup) fail.Error {
 		list = append(list, asg)
 		return nil
 	})
-	return list, err
+	return list, xerr
 }
 
 // New creates an instance of resources.SecurityGroup
@@ -57,11 +58,12 @@ func New(svc iaas.Service) (_ resources.SecurityGroup, xerr fail.Error) {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
 
-	rsg, xerr := operations.NewSecurityGroup(svc)
+	sgInstance, xerr := operations.NewSecurityGroup(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
-	return rsg, nil
+
+	return sgInstance, nil
 }
 
 // Load loads the metadata of Security Group a,d returns an instance of resources.SecurityGroup
