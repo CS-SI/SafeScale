@@ -113,7 +113,7 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 			onMissTimeout time.Duration
 		)
 		for _, v := range options {
-			switch v.Key() { //nolint
+			switch v.Key() {
 			case cacheOptionOnMissKeyword:
 				onMissFunc = v.Value().(func() (cache.Cacheable, fail.Error))
 			case cacheOptionOnMissTimeoutKeyword:
@@ -127,28 +127,29 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 				_, xerr = onMissFunc()  // onMissFunc() knows what the error is
                 return nil, xerr
             }
-			if xerr := rc.unsafeReserveEntry(key, onMissTimeout); xerr != nil {
-				if _, ok := xerr.(*fail.ErrDuplicate); ok {
+			xerr := rc.unsafeReserveEntry(key, onMissTimeout)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrDuplicate:
 					// Search in the cache by ID
 					if ce, xerr = rc.byID.Entry(key); xerr == nil {
-						return ce, nil
-					}
+							return ce, nil
+						}
 
 					// Not found, search an entry in the cache by name to get id and search again by id
 					rc.lock.Lock()
 					if id, ok := rc.byName[key]; ok {
-						if ce, xerr = rc.byID.Entry(id); xerr == nil {
+						ce, xerr = rc.byID.Entry(id)
+						if xerr == nil {
 							rc.lock.Unlock()
 							return ce, nil
 						}
 					}
 					rc.lock.Unlock()
+					return nil, xerr
+				default:
+					return nil, xerr
 				}
-				return nil, xerr
-			}
-
-			if xerr := rc.unsafeReserveEntry(key, onMissTimeout); xerr != nil {
-				return nil, xerr
 			}
 
 			var content cache.Cacheable

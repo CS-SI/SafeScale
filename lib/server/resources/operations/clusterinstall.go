@@ -592,7 +592,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 		_, _ = binaryDir, path
 		/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote),
-				               probably a feature safescale-binaries to build SafeScale from source...
+		               probably a feature safescale-binaries to build SafeScale from source...
 				// Uploads safescale binary
 				if binaryDir != "" {
 					path = binaryDir + "/safescale"
