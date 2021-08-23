@@ -2630,7 +2630,8 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		logrus.Debugf("Cluster Deleting Subnet '%s'", subnetName)
 		xerr = retry.WhileUnsuccessfulWithHardTimeout(
 			func() error {
-				if innerXErr := subnetInstance.Delete(ctx); innerXErr != nil {
+				innerXErr := subnetInstance.Delete(ctx)
+				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotAvailable, *fail.ErrNotFound:
 						return retry.StopRetryError(innerXErr)
@@ -2672,7 +2673,8 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		logrus.Debugf("Deleting Network '%s'...", networkName)
 		xerr = retry.WhileUnsuccessfulWithHardTimeout(
 			func() error {
-				if innerXErr := networkInstance.Delete(ctx); innerXErr != nil {
+				innerXErr := networkInstance.Delete(ctx)
+				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrNotFound:
 						return retry.StopRetryError(innerXErr)

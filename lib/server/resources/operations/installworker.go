@@ -517,6 +517,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		if len(steps) == 0 {
 			return nil, fail.InvalidRequestError("nothing to do")
 		}
+
 		order = strings.Split(pace, ",")
 	}
 

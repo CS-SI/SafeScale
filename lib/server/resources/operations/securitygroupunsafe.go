@@ -241,7 +241,7 @@ func (instance *SecurityGroup) unsafeClear(task concurrency.Task) fail.Error {
 }
 
 // unsafeAddRule adds a rule to a security group
-func (instance *SecurityGroup) unsafeAddRule(task concurrency.Task, rule *abstract.SecurityGroupRule) (xerr fail.Error) {
+func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if rule.IsNull() {
@@ -254,12 +254,12 @@ func (instance *SecurityGroup) unsafeAddRule(task concurrency.Task, rule *abstra
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		newAsg, innerXErr := instance.GetService().AddRuleToSecurityGroup(asg, rule)
+		_, innerXErr := instance.GetService().AddRuleToSecurityGroup(asg, rule)
 		if innerXErr != nil {
 			return innerXErr
 		}
 
-		asg.Replace(newAsg)
+		// asg.Replace(newAsg)
 		return nil
 	})
 }

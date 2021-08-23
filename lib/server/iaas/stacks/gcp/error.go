@@ -36,25 +36,48 @@ func normalizeOperationError(oe *compute.OperationError) fail.Error {
 		return nil
 	}
 
-	if len(oe.Errors) == 0 {
+	switch len(oe.Errors) {
+	case 0:
 		return nil
-	}
-
-	var errors []error
-	for _, operr := range oe.Errors {
-		if operr != nil {
-			ne := fail.NewError(operr.Message)
-			ne.Annotate("code", operr.Code)
-
-			errors = append(errors, ne)
+	case 1:
+		return normalizeOperationErrorFromCode(oe.Errors[0])
+	default:
+		var errors []error
+		for _, operr := range oe.Errors {
+			ne := normalizeOperationErrorFromCode(operr)
+			if ne != nil {
+				errors = append(errors, ne)
+			}
+		}
+		if len(errors) > 0 {
+			return fail.NewErrorList(errors)
 		}
 	}
 
-	if len(errors) == 0 {
+	return nil
+}
+
+func normalizeOperationErrorFromCode(err *compute.OperationErrorErrors) fail.Error {
+	if err == nil {
 		return nil
 	}
 
-	return fail.NewErrorList(errors)
+	switch err.Code {
+	case "RESOURCE_IN_USE_BY_ANOTHER_RESOURCE":     // This kind of error is not retryable
+		ne := fail.NotAvailableError(err.Message)
+		_ = ne.Annotate("code", err.Code)
+		if err.Location != "" {
+			_ = ne.Annotate("location", err.Location)
+		}
+		return fail.AbortedError(ne)
+	default:
+		ne := fail.NewError(err.Message)
+		_ = ne.Annotate("code", err.Code)
+		if err.Location != "" {
+			_ = ne.Annotate("location", err.Location)
+		}
+		return ne
+	}
 }
 
 // normalizeError translates GCP error to SafeScale one

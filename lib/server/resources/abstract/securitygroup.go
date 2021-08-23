@@ -372,9 +372,9 @@ func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 
 	src := p.(*SecurityGroup)
 	*sg = *src
-	sg.Rules = make(SecurityGroupRules, 0, len(src.Rules))
-	for _, v := range src.Rules {
-		sg.Rules = append(sg.Rules, v.Clone().(*SecurityGroupRule))
+	sg.Rules = make(SecurityGroupRules, len(src.Rules))
+	for k, v := range src.Rules {
+		sg.Rules[k] = v.Clone().(*SecurityGroupRule)
 	}
 	return sg
 }

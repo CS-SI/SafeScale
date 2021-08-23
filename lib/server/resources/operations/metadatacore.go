@@ -23,6 +23,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -979,7 +980,7 @@ func (c *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 // satisfies interface data.Cacheable
 func (c *MetadataCore) Released() {
 	if c == nil || c.IsNull() {
-		logrus.Warningf("Released called on an invalid instance")
+		logrus.Errorf(callstack.DecorateWith("", "Released called on an invalid instance", "cannot be nil or null value", 0))
 		return
 	}
 

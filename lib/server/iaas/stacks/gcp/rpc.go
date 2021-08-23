@@ -57,6 +57,7 @@ func refreshResult(oco opContext) (res result, xerr fail.Error) {
 			if ierr != nil {
 				return res, fail.ConvertError(ierr)
 			}
+
 			zone := getResourceNameFromSelfLink(*zoneURL)
 			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
 			if err != nil {
@@ -67,6 +68,7 @@ func refreshResult(oco opContext) (res result, xerr fail.Error) {
 			if ierr != nil {
 				return res, fail.ConvertError(ierr)
 			}
+
 			region := getResourceNameFromSelfLink(*regionURL)
 			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
 			if err != nil {
@@ -141,6 +143,7 @@ func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation
 			if anerr != nil {
 				return anerr
 			}
+
 			if !r.Done {
 				return fmt.Errorf("not finished yet")
 			}

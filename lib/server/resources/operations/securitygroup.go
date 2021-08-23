@@ -687,7 +687,7 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 
 	// ... then re-adds rules from metadata
 	for _, v := range rules {
-		xerr = instance.unsafeAddRule(task, v)
+		xerr = instance.unsafeAddRule(v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -725,7 +725,7 @@ func (instance *SecurityGroup) AddRule(ctx context.Context, rule *abstract.Secur
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	return instance.unsafeAddRule(task, rule)
+	return instance.unsafeAddRule(rule)
 }
 
 // AddRules adds rules to a Security Group

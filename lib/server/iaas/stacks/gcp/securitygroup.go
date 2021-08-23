@@ -87,7 +87,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
 						}
 					}
-					logrus.Warningf("Deleted rule: %s", r)
+					logrus.Debug("Deleted rule: %s", r)
 				}
 			}
 		}
@@ -199,7 +199,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 						return fail.Wrap(xerr, "failed to delete rule %d", k)
 					}
 				}
-				logrus.Warningf("Deleted rule: %s", r)
+				logrus.Debugf("Deleted rule: %s", r)
 			}
 		}
 	}
@@ -250,7 +250,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 						return asg, fail.Wrap(xerr, "failed to delete rule %d", k)
 					}
 				}
-				logrus.Warningf("Deleted rule: %s", r)
+				logrus.Debugf("Deleted rule: %s", r)
 			}
 			v.IDs = []string{}
 		}
@@ -287,12 +287,14 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	if xerr != nil {
 		return asg, xerr
 	}
+
 	ruleName := fmt.Sprintf("%s-%d", asg.ID, len(asg.Rules))
 	resp, xerr := s.rpcCreateFirewallRule(ruleName, asg.Network, rule.Description, direction, sourcesUseGroups, sources, targetsUseGroups, destinations, allowed, nil)
 	if xerr != nil {
 		return asg, xerr
 	}
-	logrus.Warningf("Created rule: %d with name %s", resp.Id, resp.Name)
+
+	logrus.Debugf("Created rule: %d with name %s", resp.Id, resp.Name)
 	rule.IDs = append(rule.IDs, fmt.Sprintf("%d", resp.Id))
 	asg.Rules = append(asg.Rules, rule)
 	return asg, nil

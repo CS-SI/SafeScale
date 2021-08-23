@@ -274,7 +274,6 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 						newChild.normalizeError = casted
 					}
 				default:
-					logrus.Tracef("Ignored subtask option: %s", v.Key())
 				}
 			}
 		}
@@ -282,7 +281,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 		if timeout > 0 {
 			_, xerr = subtask.StartWithTimeout(action, params, timeout, options...)
 		} else {
-			_, xerr = subtask.Start(action, params)
+			_, xerr = subtask.Start(action, params, options...)
 		}
 		if xerr != nil {
 			return nil, err
