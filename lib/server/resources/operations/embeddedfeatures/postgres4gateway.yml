@@ -72,7 +72,7 @@ feature:
                                         - ${SF_VARDIR}/postgres4gateway:/var/lib/postgresql/data
                                     # networks:
                                     #     - safescale-gw
-                                    network_mode: "host"
+                                    # network_mode: "host"
                                     ports:
                                         - "{{ .HostIP }}:5432:5432"
                                     restart: always

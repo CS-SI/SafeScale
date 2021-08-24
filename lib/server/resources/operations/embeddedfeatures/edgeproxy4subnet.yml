@@ -153,7 +153,7 @@ feature:
                                     volumes:
                                         - ${SF_ETCDIR}/edgeproxy4subnet/kong.conf:/etc/kong/kong.conf:ro
                                         - ${SF_ETCDIR}/edgeproxy4subnet/includes:/etc/kong/includes:ro
-                                    network_mode: "host"
+                                    # network_mode: "host"
                                     ports:
                                         - "0.0.0.0:443:443"
                                         - "{{ .HostIP }}:6443:6443"

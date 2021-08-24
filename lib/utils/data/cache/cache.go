@@ -29,7 +29,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 type cache struct {
@@ -94,45 +93,25 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 				return nil, fail.InconsistentError("'*cache.reservation' expected, '%s' provided", reflect.TypeOf(ce.Content()).String())
 			}
 		} else {
-			if reservation.timeout > 0 {
-				if reservation.timeout < time.Since(reservation.created) {
-					// reservation expired, clean up
-					xerr := instance.reservationExpired(key)
-					if xerr != nil {
-						return nil, xerr
-					}
-					return nil, fail.Wrap(fail.TimeoutError(nil, reservation.timeout, "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName()), "failed to find entry '%s' in %s cache", key, instance.GetName())
-				}
-			}
 			waitFor := reservation.timeout - time.Since(reservation.created)
-			if waitFor > 0 {
-				select {
-				case <-reservation.freed():
-					return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
-				case <-reservation.committed():
-					// acknowledge commit, and continue
-				case <-time.After(waitFor):
-					// reservation expired, clean up
-					xerr := instance.reservationExpired(key)
-					if xerr != nil {
+			if waitFor < 0 {
+				waitFor = 0
+			}
+			select {
+			case <-reservation.freed():
+				return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
+
+			case <-reservation.committed():
+				// acknowledge commit, and continue
+
+			case <-time.After(waitFor):
+				// reservation expired, clean up
+				xerr := instance.reservationExpired(key)
+				if xerr != nil {
 						return nil, xerr
 					}
-					return nil, fail.Wrap(fail.TimeoutError(nil, reservation.timeout, "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName()), "failed to find entry '%s' in %s cache", key, instance.GetName())
-				}
-			} else {
-				select {
-				case <-reservation.freed():
-					return nil, fail.NotFoundError("failed to find entry with key '%s' in %s cache", key, instance.GetName())
-				case <-reservation.committed():
-					// acknowledge commit, and continue
-				case <-time.After(2 * temporal.GetDefaultDelay()): // more than enough
-					// reservation expired, clean up
-					xerr := instance.reservationExpired(key)
-					if xerr != nil {
-						return nil, xerr
-					}
-					return nil, fail.TimeoutError(nil, 2*temporal.GetDefaultDelay(), "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName())
-				}
+
+				return nil, fail.Wrap(fail.TimeoutError(nil, reservation.timeout, "reservation for entry with key '%s' in %s cache has expired", key, instance.GetName()), "failed to find entry '%s' in %s cache", key, instance.GetName())
 			}
 		}
 	}
@@ -148,6 +127,7 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 func (instance *cache) reservationExpired(key string) fail.Error {
 	instance.lock.RUnlock()
 	defer instance.lock.RLock()
+
 	return instance.Free(key)
 }
 

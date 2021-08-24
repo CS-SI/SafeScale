@@ -87,7 +87,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
 						}
 					}
-					logrus.Debug("Deleted rule: %s", r)
+					logrus.Debugf("Deleted rule: %s", r)
 				}
 			}
 		}

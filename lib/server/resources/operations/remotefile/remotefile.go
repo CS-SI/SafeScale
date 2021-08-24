@@ -138,6 +138,7 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")
 	}
+
 	rfc.Local = f.Name()
 	return rfc.Upload(ctx, host)
 }
