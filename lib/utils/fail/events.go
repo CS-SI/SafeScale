@@ -119,7 +119,7 @@ func OnExitWrapError(err interface{}, msg ...interface{}) {
 				newErr = Wrap(*v, msg...)
 			}
 		default:
-			logrus.Errorf("fail.OnExitWrapError(): invalid parameter 'err': unexpected type '%s'", reflect.TypeOf(err).String())
+			logrus.Errorf(callstack.DecorateWith("fail.OnExitWrapError()", "invalid parameter 'err'", fmt.Sprintf("unexpected type '%s'", reflect.TypeOf(err).String()), 0))
 			return
 		}
 		if newErr != nil {
