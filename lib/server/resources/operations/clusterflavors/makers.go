@@ -17,9 +17,6 @@
 package clusterflavors
 
 import (
-	"sync/atomic"
-
-	rice "github.com/GeertJohan/go.rice"
 	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -28,9 +25,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-var (
-	templateBox atomic.Value
-)
+// VPL: not used
+// var (
+// 	templateBox atomic.Value
+// )
 
 // Makers ...
 type Makers struct {
@@ -54,20 +52,21 @@ type Makers struct {
 	JoinMasterToCluster    func(c resources.Cluster, host resources.Host) fail.Error
 	JoinNodeToCluster      func(c resources.Cluster, host resources.Host) fail.Error
 	LeaveMasterFromCluster func(c resources.Cluster, host resources.Host) fail.Error
-	LeaveNodeFromCluster   func(c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
+	LeaveNodeFromCluster   func(ctx context.Context, c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
 	GetState               func(c resources.Cluster) (clusterstate.Enum, fail.Error)
 }
 
-func getTemplateBox() (*rice.Box, fail.Error) { //nolint
-	anon := templateBox.Load()
-	if anon == nil {
-		// Note: path MUST be literal for rice to work
-		b, err := rice.FindBox("../flavors/scripts")
-		if err != nil {
-			return nil, fail.ConvertError(err)
-		}
-		templateBox.Store(b)
-		anon = templateBox.Load()
-	}
-	return anon.(*rice.Box), nil
-}
+// VPL: not used
+// func getTemplateBox() (*rice.Box, fail.Error) { //nolint
+// 	anon := templateBox.Load()
+// 	if anon == nil {
+// 		// Note: path MUST be literal for rice to work
+// 		b, err := rice.FindBox("../flavors/scripts")
+// 		if err != nil {
+// 			return nil, fail.ConvertError(err)
+// 		}
+// 		templateBox.Store(b)
+// 		anon = templateBox.Load()
+// 	}
+// 	return anon.(*rice.Box), nil
+// }

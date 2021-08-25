@@ -2353,7 +2353,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	} else {
 		// host still exists, leave it from Cluster, if master is not null
 		if master != nil && !master.IsNull() {
-			xerr = instance.leaveNodesFromList([]resources.Host{hostInstance}, master)
+			xerr = instance.leaveNodesFromList(ctx, []resources.Host{hostInstance}, master)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -2963,14 +2963,14 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 }
 
 // leaveNodesFromList makes nodes from a list leave the Cluster
-func (instance *Cluster) leaveNodesFromList(hosts []resources.Host, master resources.Host) (xerr fail.Error) {
+func (instance *Cluster) leaveNodesFromList(ctx context.Context, hosts []resources.Host, selectedMaster resources.Host) (xerr fail.Error) {
 	logrus.Debugf("Instructing nodes to leave Cluster...")
 
 	// Unjoins from Cluster are done sequentially, experience shows too many join at the same time
 	// may fail (depending of the Cluster Flavor)
-	for _, rh := range hosts {
+	for _, node := range hosts {
 		if instance.makers.LeaveNodeFromCluster != nil {
-			xerr = instance.makers.LeaveNodeFromCluster(instance, rh, master)
+			xerr = instance.makers.LeaveNodeFromCluster(ctx, instance, node, selectedMaster)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
