@@ -179,9 +179,9 @@ feature:
                             ansible_python_interpreter=/usr/bin/python3
                             EOF
 
-                            chown -R {{ .ClusterAdminUsername }} ${SF_ETCDIR}/ansible
-                            chmod -R ug+rw,o-rw ${SF_ETCDIR}/ansible
-                            find ${SF_ETCDIR}/ansible -type d -exec chmod ug+x,o-x {} \;
+                            chown -R {{ .ClusterAdminUsername }}:root ${SF_ETCDIR}/ansible
+                            chmod -R ug+rw-x,o+r-wx ${SF_ETCDIR}/ansible
+                            find ${SF_ETCDIR}/ansible -type d -exec chmod a+x {} \;
                             sfExit
 
             remove:
