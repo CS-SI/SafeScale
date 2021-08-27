@@ -67,8 +67,8 @@ function reset_fw() {
 	ubuntu)
 		echo "Reset firewall"
 		sfApt update &>/dev/null || failure 206 "failure running apt update"
-		sfApt install -q -y iptables 2>&1 || failure 206 "failure updating iptables"
-		sfApt install -q -y firewalld 2>&1 || failure 206 "failure updating firewalld"
+		#sfApt install -q -y iptables 2>&1 || failure 206 "failure installing iptables"
+		sfApt install -q -y firewalld 2>&1 || failure 206 "failure installing firewalld"
 
 		echo "Stopping ufw"
 		# systemctl stop ufw || failure 206 "failure stopping ufw"
@@ -82,8 +82,8 @@ function reset_fw() {
 	debian)
 		echo "Reset firewall"
 		sfApt update &>/dev/null || failure 206 "failure running apt update"
-		sfApt install -q -y iptables 2>&1 || failure 206 "failure updating iptables"
-		sfApt install -q -y firewalld 2>&1 || failure 206 "failure updating firewalld"
+		#sfApt install -q -y iptables 2>&1 || failure 206 "failure installing iptables"
+		sfApt install -q -y firewalld 2>&1 || failure 206 "failure installing firewalld"
 
 		echo "Stopping ufw"
 		systemctl stop ufw || true    # set to true to fix issues
@@ -95,7 +95,7 @@ function reset_fw() {
 		# firewalld may not be installed
 		if ! systemctl is-active firewalld &>/dev/null; then
 			if ! systemctl status firewalld &>/dev/null; then
-				yum install -q -y firewalld || failure 206 "failure updating firewalld"
+				yum install -q -y firewalld || failure 206 "failure installing firewalld"
 			fi
 		fi
 		;;
@@ -121,13 +121,13 @@ function reset_fw() {
 	{{- end }}
 
 	# Sets the default target of packets coming from public interface to DROP
-	firewall-offline-cmd --zone=public --set-target=DROP || failure 206 "firewall-offline-cmd failed with $? dropping public"
+	firewall-offline-cmd --zone=public --set-target=DROP || failure 206 "firewall-offline-cmd failed with $? dropping public zone"
 
 	# Attach LAN interfaces to zone trusted
 	[[ ! -z ${PR_IFs} ]] && {
 		for i in $PR_IFs; do
 			# sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
-			firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || failure 206 "firewall-offline-cmd failed with $? attaching lan to trusted"
+			firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || failure 206 "firewall-offline-cmd failed with $? adding $PR_IFs to trusted"
 		done
 	}
 	# Attach lo interface to zone trusted
