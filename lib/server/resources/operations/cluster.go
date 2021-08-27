@@ -3280,8 +3280,13 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 			return emptySlice, xerr
 		}
 
+		selectedMaster, xerr := instance.UnsafeFindAvailableMaster(ctx)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+
 		for _, v := range removedNodes {
-			_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, master: nil}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)))
+			_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, master: selectedMaster.(*Host)}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				errors = append(errors, xerr)
