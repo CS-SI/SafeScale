@@ -18,6 +18,7 @@ package k8s
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -143,12 +144,20 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 	}
 
 	// Drain pods from node
-	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-local-data", node.GetName())
+	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
 	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(),temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute pod drain from node '%s'", node.GetName())
 	}
-	if retcode != 0 {
+	switch retcode {
+	case 0:
+		break
+	case 1:
+		if strings.Contains(stderr, "(NotFound)") {
+			break
+		}
+		fallthrough
+	default:
 		xerr := fail.ExecutionError(nil, "failed to drain pods from node '%s'", node.GetName())
 		_ = xerr.Annotate("retcode", retcode)
 		_ = xerr.Annotate("stdout", stdout)
@@ -162,7 +171,15 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute node deletion '%s' from cluster '%s'", node.GetName(), clusterInstance.GetName())
 	}
-	if retcode != 0 {
+	switch retcode {
+	case 0:
+		break
+	case 1:
+		if strings.Contains(stderr, "(NotFound)") {
+			break
+		}
+		fallthrough
+	default:
 		xerr := fail.ExecutionError(nil, "failed to delete node '%s' from cluster '%s'", node.GetName(), clusterInstance.GetName())
 		_ = xerr.Annotate("retcode", retcode)
 		_ = xerr.Annotate("stdout", stdout)
@@ -171,13 +188,12 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 	}
 
 	// Finally, reset kubernetes configuration of node
-	cmd = fmt.Sprintf("sudo -u cladm -i kubeadm -f reset")
-	retcode, stdout, stderr, xerr = selectedMaster.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr = node.Run(ctx, "sudo kubeadm reset -f", outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute reset of kubernetes configuration on Host '%s'", node.GetName())
 	}
 	if retcode != 0 {
-		xerr := fail.ExecutionError(nil, "failed to reset kubernetes configuration on Host '%s'", node.GetName(), clusterInstance.GetName())
+		xerr := fail.ExecutionError(nil, "failed to reset kubernetes configuration on Host '%s'", node.GetName())
 		_ = xerr.Annotate("retcode", retcode)
 		_ = xerr.Annotate("stdout", stdout)
 		_ = xerr.Annotate("stderr", stderr)
