@@ -37,15 +37,47 @@ It allows to:
 
 SafeScale Infra provides a complete abstraction overlay over underlying IaaS APIs to mask their heterogeneity.
 
-### SafeScale Platform - REVIEW_ME
+### SafeScale Platform
 
-The concept of SafeScale Perform revolves around the offer of an API to create on-demand computing platforms. These platforms are built to be highly versatile providing all necessary building blocks to create a cutting-edge, production grade, scalable and highly available services: Micro service orchestration, Big Data and HPC computing frameworks, large scale data management, AI training and inference frameworks.
-![SafeScale Perform](doc/img/SafeScale_Perform.png "SafeScale Perform")
+Safescale Platform provides PaaS (Platform as a Service) capabilities:
+- deploy a standard cluster
+- deploy a specific cluster, deployment commands are executed in parallel to improve the speed
 
-The innovative aspect of SafeScale Perform platforms lies in their capacity to offer a combined usage of a large variety of frameworks and technologies without having to manage resources allocation (Node, RAM, CPU, and GPU).
-SafeScale Perform platforms resource management is centralized by Apache Mesos which guarantees a fair and efficient distribution of resources for all components hosted by the platform. This particularity enables SafeScale users to run concurrently services and compute loads of data without worrying about their partitioning over the nodes of the cluster and thus significantly accelerate the implementation of complex distributed services.
-A corollary of the centralized resource management system is that it allows the combined usage of various computing and service management frameworks which greatly simplifies the porting of in-house applications to the Cloud.
-It is also important to precise that SafeScale Perform platforms are not static, they can be up-scaled and downscaled on-demand or automatically to adapt to load fluctuations and thus to optimize IT costs.
+Platform can deploy a standard cluster with minimal features:
+- cluster management environment: BOH (Bunch Of Hosts, ie cluster without workload orchestrator like Kubernetes), K8S (with Kubernetes)
+- one or two gateways, including :
+  - a reverse proxy (Kong) with only SSH and HTTPS access allowed by default
+  - an internal load balancer over the cluster
+- the remote desktop
+
+For example the following command creates a Kubernetes cluster named `k8s-cluster`using `Normal`complexity (3 masters and 3 nodes):
+
+```
+$ safescale platform create --flavor k8s --complexity nomal k8s-cluster
+```
+
+Supplemental software and/or configurations can be installed in 2 ways on SafeScale Hosts or Clusters:
+- using ssh command (the old and manual way):
+  ```
+  $ safescale ssh run -c "apt install nginx" my-host
+  ```
+- using "SafeScale `Feature`", that can be seen as the "ansible" for SafeScale:
+
+  ```
+  $ safescale cluster feature add mycluster keycloak
+  ```
+
+A "SafeScale `Feature`" is a file in YAML format that describes the operations to check/add/remove software and/or configuration on a target (Host or Cluster).
+
+A `Feature` can describe operations using different methods:
+- `package`: just define the package(s) concerned
+- `bash`: uses bash snippets
+- `helm` (coming soon): uses helm chart, the "package" engine for Kubernetes
+- `ansible` (coming soon): defines playbook to run, SafeScale provising inventory
+
+Additionnaly, a `Feature` is able to apply:
+- reverse proxy rules
+- Security Group rules
 
 ### SafeScale Security
 
@@ -57,8 +89,8 @@ SafeScale Security relies on Kong, an open source generic proxy to be put in bet
 The design of a SafeScale Security gateway can be depicted as below:
 ![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
 
-## Currently available features
-SafeScale is currently under active development and does not yet offer all the features planned. However, we are already publishing it with the following features:
+## Currently available abilities
+SafeScale is currently under active development and does not yet offer all the abilities planned. However, we are already publishing it with the following ones:
 
   - SafeScale Infra:
     - Create / Destroy private networks
@@ -66,7 +98,7 @@ SafeScale is currently under active development and does not yet offer all the f
     - Create / Destroy block and object storage,
     - Mount object storage on file system,
     - Create Shares, Connect/disconnect host to share,
-
+    - Create / Update/Destroy Security Groups,
       
   - SafeScale Platform:
     - Create / Destroy clusters composed of a network, servers and services
