@@ -261,10 +261,14 @@ clean:
 mrproper: clean
 	@(git clean -xdf -e .idea -e vendor -e .vscode || true)
 
-install:
-	@(for i in $(EXECS); do echo $$i; $(RM) -f "$(GOPATH)/bin/$$i"; done)
-	@($(CP) -f $(EXECS) $(GOPATH)/bin || true)
-	@($(CP) -f $(COVEREXECS) $(GOPATH)/bin > /dev/null 2>&1 || true)
+install: removebins
+	@($(CP) -f $(EXECS) $(GOPATH)/bin)
+	@($(CP) -f $(COVEREXECS) $(GOPATH)/bin > /dev/null 2>&1 || :)
+
+removebins:
+	@# Big Sur on ARM M1 processor requires all code to be validly signed; so removal of existing files is necessary
+	@(for i in $(foreach v,$(EXECS),$(notdir $v)); do rm -f "$(GOPATH)/bin/$$i" || : ; done)
+	@(for i in $(foreach v,$(COVEREXECS),$(notdir $v)); do rm -f "$(GOPATH)/bin/$$i" || : ; done)
 
 installci:
 	@(mkdir -p $(CIBIN) || true)
