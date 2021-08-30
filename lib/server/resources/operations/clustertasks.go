@@ -2458,8 +2458,9 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 }
 
 type taskDeleteNodeParameters struct {
-	node   *propertiesv3.ClusterNode
-	master *Host
+	node           *propertiesv3.ClusterNode
+	nodeLoadMethod data.ImmutableKeyValue
+	master         *Host
 }
 
 // taskDeleteNode deletes one node
@@ -2474,7 +2475,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	// Convert and validate paramsx
+	// Convert and validate params
 	p, ok := params.(taskDeleteNodeParameters)
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteNodeParameters'")
@@ -2488,7 +2489,9 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	if p.node.ID == "" && p.node.Name == "" {
 		return nil, fail.InvalidParameterError("params.node.ID|params.node.Name", "ID or Name must be set")
 	}
-
+	if p.nodeLoadMethod != HostLightOption && p.nodeLoadMethod != HostFullOption {
+		return nil, fail.InvalidParameterError("params.nodeLoadMethod", "must be 'HostLightOption' or 'HostFullOption'")
+	}
 	nodeName := p.node.Name
 	if nodeName == "" {
 		nodeName = p.node.ID
@@ -2509,7 +2512,7 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}()
 
 	logrus.Debugf("Deleting Node '%s'", nodeName)
-	xerr = instance.deleteNode(task.Context(), p.node, p.master)
+	xerr = instance.deleteNode(task.Context(), p.node, p.master, p.nodeLoadMethod)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {

@@ -1183,8 +1183,8 @@ var clusterNodeDeleteCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:    "assume-yes",
-			Aliases: []string{"yes", "y"},
+			Name:    "yes",
+			Aliases: []string{"y"},
 			Usage:   "If set, respond automatically yes to all questions",
 		},
 		&cli.BoolFlag{
@@ -1206,16 +1206,26 @@ var clusterNodeDeleteCommand = &cli.Command{
 		yes := c.Bool("yes")
 		force := c.Bool("force")
 
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		_, err = clientSession.Cluster.Inspect(clusterName, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
+		}
+
+		if len(nodeList) == 0 {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, "missing nodes"))
+		}
+
 		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node%s '%s' of the cluster '%s'", strprocess.Plural(uint(len(nodeList))), strings.Join(nodeList, ","), clusterName)) {
 			return clitools.SuccessResponse("Aborted")
 		}
 		if force {
 			logrus.Println("'-f,--force' does nothing yet")
-		}
-
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
 		err = clientSession.Cluster.DeleteNode(clusterName, nodeList, 0)

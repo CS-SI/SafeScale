@@ -72,7 +72,9 @@ const (
 
 var (
 	// HostLightOption is used as option to LoadHost() to disable external information caching (that may lead to deadlock sometimes)
-	HostLightOption = data.NewImmutableKeyValue(hostOptionLightKeyword, "true")
+	HostLightOption = data.NewImmutableKeyValue(hostOptionLightKeyword, true)
+	// HostFullOption is used as option to LoadHost() to enable external information caching (that may lead to deadlock sometimes) (default if neither "light" nor "full" is used)
+	HostFullOption = data.NewImmutableKeyValue(hostOptionLightKeyword, false)
 )
 
 // Host ...
@@ -133,7 +135,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		for _, v := range options {
 			switch v.Key() {
 			case hostOptionLightKeyword:
-				updateCachedInformation = false
+				updateCachedInformation = !v.Value().(bool)
 			default:
 				logrus.Warningf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
 			}

@@ -1365,7 +1365,7 @@ func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 		return nil, xerr
 	}
 
-	xerr = instance.deleteNode(ctx, node, selectedMaster.(*Host))
+	xerr = instance.deleteNode(ctx, node, selectedMaster.(*Host), HostFullOption)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1456,7 +1456,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		return xerr
 	}
 
-	return instance.deleteNode(ctx, node, selectedMaster.(*Host))
+	return instance.deleteNode(ctx, node, selectedMaster.(*Host), HostFullOption)
 }
 
 // ListMasters lists the node instances corresponding to masters (if there is such masters in the flavor...)
@@ -2256,7 +2256,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 }
 
 // deleteNode deletes a node
-func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.ClusterNode, master *Host) (xerr fail.Error) {
+func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.ClusterNode, master *Host, loadHostMethod data.ImmutableKeyValue) (xerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2341,7 +2341,7 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 	}()
 
 	// Deletes node
-	hostInstance, xerr := LoadHost(instance.GetService(), nodeRef, HostLightOption)
+	hostInstance, xerr := LoadHost(instance.GetService(), nodeRef, loadHostMethod)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2522,7 +2522,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			if n, ok := all[v]; ok {
 				foundSomething = true
 				completedOptions := append(options, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", n.Name)))
-				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n}, completedOptions...)
+				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n, nodeLoadMethod: HostLightOption }, completedOptions...)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
@@ -2535,7 +2535,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			if n, ok := all[v]; ok {
 				foundSomething = true
 				completedOptions := append(options, concurrency.AmendID(fmt.Sprintf("/master/%s/delete", n.Name)))
-				_, xerr := tg.Start(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n}, completedOptions...)
+				_, xerr := tg.Start(instance.taskDeleteMaster, taskDeleteNodeParameters{node: n, nodeLoadMethod: HostLightOption}, completedOptions...)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
@@ -2586,7 +2586,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 		}
 
 		for _, v := range all {
-			_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)))
+			_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: HostLightOption}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", v.Name))
@@ -3286,7 +3286,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 		}
 
 		for _, v := range removedNodes {
-			_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, master: selectedMaster.(*Host)}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)))
+			_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: HostFullOption, master: selectedMaster.(*Host)}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", v.Name)))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				errors = append(errors, xerr)
