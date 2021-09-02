@@ -47,11 +47,11 @@ type gpuCfg struct {
 var gpuMap = map[string]gpuCfg{
 	"g1.xlarge": gpuCfg{
 		GPUNumber: 1,
-		GPUType:   "UNKNOW",
+		GPUType:   "UNKNOWN",
 	},
 	"g1.2xlarge": gpuCfg{
 		GPUNumber: 1,
-		GPUType:   "UNKNOW",
+		GPUType:   "UNKNOWN",
 	},
 	"g1.2xlarge.8": gpuCfg{
 		GPUNumber: 1,
@@ -292,6 +292,14 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 
 	var tpls []abstract.HostTemplate
 	for _, tpl := range allTemplates {
+		// Ignore templates containing ".mcs."
+		if strings.Contains(tpl.Name, ".mcs.") {
+			continue
+		}
+		// Ignore template stating with "physical."
+		if strings.HasPrefix(tpl.Name, "physical.") {
+			continue
+		}
 		addGPUCfg(&tpl)
 		tpls = append(tpls, tpl)
 	}
