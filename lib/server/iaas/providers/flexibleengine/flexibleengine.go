@@ -209,6 +209,15 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 
 	var tpls []abstract.HostTemplate
 	for _, tpl := range allTemplates {
+		// Ignore templates containing ".mcs."
+		if strings.Contains(tpl.Name, ".mcs.") {
+			continue
+		}
+		// Ignore template starting with "physical."
+		if strings.HasPrefix(tpl.Name, "physical.") {
+			continue
+		}
+
 		addGPUCfg(&tpl)
 		tpls = append(tpls, tpl)
 	}
