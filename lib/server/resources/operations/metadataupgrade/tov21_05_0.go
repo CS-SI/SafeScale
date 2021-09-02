@@ -130,7 +130,7 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
 	})
 }
 
-// upgradeNetworkMetadatasIfNeeded upgrades properties to most recent version
+// upgradeNetworkMetadataIfNeeded upgrades properties to most recent version
 func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInstance resources.Network) fail.Error {
 	var (
 		networkName, subnetName string
@@ -159,17 +159,21 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				return innerXErr
 			}
 
-			abstractSubnet, innerXErr := svc.InspectSubnetByName(networkName, subnetName)
-			innerXErr = debug.InjectPlannedFail(innerXErr)
-			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrNotFound:
-					return fail.NotFoundError("cannot create Subnet '%s' metadata: Subnet resource does not exist", subnetName)
-				default:
-					return fail.Wrap(innerXErr, "cannot create Subnet '%s' metadata", subnetName)
-				}
-			}
+			// VPL: is it really necessary to check if resource exist to migrate metadata? Not sure it's the right place for this...
+			// abstractSubnet, innerXErr := svc.InspectSubnetByName(networkName, subnetName)
+			// innerXErr = debug.InjectPlannedFail(innerXErr)
+			// if innerXErr != nil {
+			// 	switch innerXErr.(type) {
+			// 	case *fail.ErrNotFound:
+			// 		return fail.NotFoundError("cannot create Subnet '%s' metadata: Subnet resource does not exist", subnetName)
+			// 	default:
+			// 		return fail.Wrap(innerXErr, "cannot create Subnet '%s' metadata", subnetName)
+			// 	}
+			// }
 
+			abstractSubnet := abstract.NewSubnet()
+			abstractSubnet.ID = currentInstance.GetID()
+			abstractSubnet.Name = subnetName
 			abstractSubnet.Network = owningInstance.GetID()
 			abstractSubnet.IPVersion = ipversion.IPv4
 			abstractSubnet.DNSServers = abstractNetwork.DNSServers
@@ -532,13 +536,13 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 }
 
 func (tv toV21_05_0) upgradeClusters(svc iaas.Service) fail.Error {
-	instance, xerr := operations.NewCluster(svc)
+	browseInstance, xerr := operations.NewCluster(svc)
 	if xerr != nil {
 		return xerr
 	}
 
 	logrus.Infof("Upgrading metadata of Clusters...")
-	return instance.Browse(context.Background(), func(aci *abstract.ClusterIdentity) fail.Error {
+	return browseInstance.Browse(context.Background(), func(aci *abstract.ClusterIdentity) fail.Error {
 		clusterInstance, xerr := operations.LoadCluster(svc, aci.Name)
 		if xerr != nil {
 			return xerr
@@ -730,27 +734,17 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				networkInstance, innerXErr := operations.LoadNetwork(instance.GetService(), networkV2.NetworkID)
+				networkInstance, subnetInstance, clusterCreatedNetwork, innerXErr := inspectNetworkAndSubnet(instance, networkV2.NetworkID)
 				innerXErr = debug.InjectPlannedFail(innerXErr)
 				if innerXErr != nil {
 					return innerXErr
 				}
-
 				defer networkInstance.Released()
-				subnetInstance, innerXErr := operations.LoadSubnet(instance.GetService(), networkInstance.GetName(), networkInstance.GetName())
-				innerXErr = debug.InjectPlannedFail(innerXErr)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
 				defer subnetInstance.Released()
 
-				// In v2, NetworkID actually contains the subnet ID; we do not need ID of the Network owning the Subnet in
-				// the property, meaning that Network would have to be deleted also on Cluster deletion because Network
-				// AND Subnet were created forcibly at Cluster creation.
 				config = &propertiesv3.ClusterNetwork{
-					NetworkID:          networkV2.NetworkID,
-					CreatedNetwork:     true,
+					NetworkID:          networkInstance.GetID(),
+					CreatedNetwork:     clusterCreatedNetwork,
 					SubnetID:           subnetInstance.GetID(),
 					CIDR:               networkV2.CIDR,
 					GatewayID:          networkV2.GatewayID,
@@ -774,24 +768,17 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 					return fail.InconsistentError()
 				}
 
-				networkInstance, innerXErr := operations.LoadNetwork(instance.GetService(), networkV1.NetworkID)
+				networkInstance, subnetInstance, clusterCreatedNetwork, innerXErr := inspectNetworkAndSubnet(instance, networkV1.NetworkID)
 				innerXErr = debug.InjectPlannedFail(innerXErr)
 				if innerXErr != nil {
 					return innerXErr
 				}
-
 				defer networkInstance.Released()
-				subnetInstance, innerXErr := operations.LoadSubnet(instance.GetService(), networkInstance.GetName(), networkInstance.GetName())
-				innerXErr = debug.InjectPlannedFail(innerXErr)
-				if innerXErr != nil {
-					return innerXErr
-				}
-
 				defer subnetInstance.Released()
 
 				config = &propertiesv3.ClusterNetwork{
-					NetworkID:      networkV1.NetworkID,
-					CreatedNetwork: true,
+					NetworkID:      networkInstance.GetID(),
+					CreatedNetwork: clusterCreatedNetwork,
 					SubnetID:       subnetInstance.GetID(),
 					CIDR:           networkV1.CIDR,
 					GatewayID:      networkV1.GatewayID,
@@ -822,12 +809,41 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
 			xerr = nil
+		default:
+			return xerr
 		}
 	}
-	return xerr
+	return nil
+}
+
+func inspectNetworkAndSubnet(instance *operations.Cluster, networkID string) (resources.Network, resources.Subnet, bool, fail.Error) {
+	subnetInstance, xerr := operations.LoadSubnet(instance.GetService(), "", networkID)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, nil, false, xerr
+	}
+
+	networkInstance, xerr := subnetInstance.InspectNetwork()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, nil, false, xerr
+	}
+
+	// determine if the Network of the Subnet has been created by cluster creation
+	var clusterCreatedNetwork bool
+	if instance.GetService().HasDefaultNetwork() {
+		defaultNetwork, xerr := instance.GetService().GetDefaultNetwork()
+		if xerr != nil {
+			return nil, nil, false, xerr
+		}
+		if defaultNetwork.GetName() != instance.GetName() {
+			clusterCreatedNetwork = true
+		}
+	}
+	return networkInstance, subnetInstance, clusterCreatedNetwork, nil
 }
 
 // upgradeClusterDefaultsPropertyIfNeeded ...

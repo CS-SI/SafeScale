@@ -109,22 +109,26 @@ func (f MetadataFolder) Path() string {
 	return f.path
 }
 
-// absolutePath returns the fullpath to reach the 'path'+'name' starting from the MetadataFolder path
+// absolutePath returns the full path to reach the 'path'+'name' starting from the MetadataFolder path
 func (f MetadataFolder) absolutePath(path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
 	}
 	var relativePath string
 	for _, item := range path {
-		if item != "" {
+		if item != "" && item != "/" {
 			relativePath += "/" + item
 		}
 	}
-	relativePath = strings.Trim(relativePath, "/")
-	if f.path != "" {
-		return strings.Join([]string{f.path, relativePath}, "/")
+	if relativePath != "" {
+		absolutePath := strings.Replace(relativePath, "//", "/", -1)
+		if f.path != "" {
+			absolutePath = f.path + "/" + relativePath
+			absolutePath = strings.Replace(absolutePath, "//", "/", -1)
+		}
+		return absolutePath
 	}
-	return relativePath
+	return f.path
 }
 
 // Lookup tells if the object named 'name' is inside the ObjectStorage MetadataFolder
@@ -367,12 +371,16 @@ func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail
 	}
 
 	// If there is a single entry equals to absolute path, then there is nothing, it's an empty MetadataFolder
-	if len(list) == 1 && list[0] == absPath {
+	if len(list) == 1 && strings.Trim(list[0], "/") == absPath {
 		return nil
 	}
 
 	var err error
 	for _, i := range list {
+		i = strings.Trim(i, "/")
+		if i == absPath {
+			continue
+		}
 		var buffer bytes.Buffer
 		xerr = f.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
 		xerr = debug.InjectPlannedFail(xerr)
