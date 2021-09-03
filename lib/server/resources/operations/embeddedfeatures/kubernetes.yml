@@ -95,7 +95,7 @@ feature:
                             masters: one
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
-                                [ $(sfKubectl get nodes -A | grep -v VERSION | grep -v Ready | wc -l) -eq 0 ] || sfFail 196 "not all nodes ready"
+                                [ $(sfKubectl get nodes -A | grep -v VERSION | grep -v Ready | wc -l) -gt 0 ] || sfFail 196 "not all nodes ready"
                                 sfExit
                             fi
                             sfFail 197 "master didn't join (no .joined file)"
