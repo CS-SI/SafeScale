@@ -139,7 +139,7 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 		return nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)
 	}
 
-	_ = cacheEntry.LockContent()
+	cacheEntry.LockContent()
 
 	return clusterInstance, nil
 }
@@ -2522,9 +2522,10 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 			if n, ok := all[v]; ok {
 				foundSomething = true
 				completedOptions := append(options, concurrency.AmendID(fmt.Sprintf("/node/%s/delete", n.Name)))
-				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n, nodeLoadMethod: HostLightOption }, completedOptions...)
+				_, xerr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: n, nodeLoadMethod: HostLightOption}, completedOptions...)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
+					_ = tg.Abort()
 					cleaningErrors = append(cleaningErrors, fail.Wrap(xerr, "failed to start deletion of Host '%s'", n.Name))
 					break
 				}

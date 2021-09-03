@@ -128,13 +128,13 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 func onNetworkCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
 	networkInstance, innerXErr := NewNetwork(svc)
 	if innerXErr != nil {
-			return nil, innerXErr
-		}
+		return nil, innerXErr
+	}
 
 	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
 	if innerXErr = networkInstance.Read(ref); innerXErr != nil {
-			return nil, innerXErr
-		}
+		return nil, innerXErr
+	}
 
 	return networkInstance, nil
 }

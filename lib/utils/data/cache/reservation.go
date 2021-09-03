@@ -35,13 +35,13 @@ type reservation struct {
 }
 
 // newReservation creates an instance of reservation
-func newReservation(key string/*, duration time.Duration*/) *reservation {
+func newReservation(key string /*, duration time.Duration*/) *reservation {
 	return &reservation{
 		key:         key,
 		freedCh:     make(chan struct{}, 1),
 		committedCh: make(chan struct{}, 1),
 		//timeout:     duration,
-		created:     time.Now(),
+		created: time.Now(),
 	}
 }
 

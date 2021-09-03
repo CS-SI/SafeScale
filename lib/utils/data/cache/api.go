@@ -25,14 +25,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-
 // Cache interface describing what a struct must implement to be considered as a cache
 type Cache interface {
 	observer.Observer
 
-	Entry(key string) (*Entry, fail.Error)                            // returns a cache entry from its key
-	Reserve(key string, timeout time.Duration) fail.Error             // reserve an entry in the cache
-	Commit(key string, content Cacheable) (*Entry, fail.Error)        // Commit fills a previously reserved entry by 'key' with 'content'
-	Free(key string) fail.Error                                       // frees a cache entry (removing the reservation from cache)
-	Add(content Cacheable) (*Entry, fail.Error)                       // adds a content in cache (doing Reserve+Commit in a whole with content ID as key)
+	Entry(key string) (*Entry, fail.Error)                     // returns a cache entry from its key
+	Reserve(key string, timeout time.Duration) fail.Error      // reserve an entry in the cache
+	Commit(key string, content Cacheable) (*Entry, fail.Error) // Commit fills a previously reserved entry by 'key' with 'content'
+	Free(key string) fail.Error                                // frees a cache entry (removing the reservation from cache)
+	Add(content Cacheable) (*Entry, fail.Error)                // adds a content in cache (doing Reserve+Commit in a whole with content ID as key)
 }

@@ -110,7 +110,6 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 
 	defer networkInstance.Released()
 
-
 	subnetInstance, xerr := subnetfactory.New(job.Service())
 	if xerr != nil {
 		return nil, xerr
