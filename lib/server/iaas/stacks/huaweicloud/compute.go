@@ -535,6 +535,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	if xerr != nil {
 		return nil, nil, xerr
 	}
+
 	host.Networking.DefaultSubnetID = defaultSubnetID
 	// host.Networking.DefaultGatewayID = defaultGatewayID
 	// host.Networking.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
@@ -544,7 +545,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	if request.PublicIP {
 		var fip *FloatingIP
-		if fip, xerr = s.attachFloatingIP(ahc); xerr != nil {
+		if fip, xerr = s.attachFloatingIP(host); xerr != nil {
 			return nil, userData, fail.Wrap(xerr, "error attaching public IP for host '%s'", request.ResourceName)
 		}
 		if fip == nil {
@@ -1010,13 +1011,13 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 }
 
 // attachFloatingIP creates a Floating IP and attaches it to an host
-func (s stack) attachFloatingIP(host *abstract.HostCore) (*FloatingIP, fail.Error) {
-	fip, xerr := s.CreateFloatingIP()
+func (s stack) attachFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
+	fip, xerr := s.CreateFloatingIP(host)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = s.AssociateFloatingIP(host, fip.ID)
+	xerr = s.AssociateFloatingIP(host.Core, fip.ID)
 	if xerr != nil {
 		derr := s.DeleteFloatingIP(fip.ID)
 		if derr != nil {
@@ -1025,6 +1026,7 @@ func (s stack) attachFloatingIP(host *abstract.HostCore) (*FloatingIP, fail.Erro
 		_ = xerr.AddConsequence(derr)
 		return nil, xerr
 	}
+
 	return fip, nil
 }
 

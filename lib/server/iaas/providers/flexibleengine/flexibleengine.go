@@ -195,6 +195,7 @@ func (p *provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error
 	if xerr != nil {
 		return nullAHT, xerr
 	}
+
 	addGPUCfg(&tpl)
 	return tpl, nil
 }

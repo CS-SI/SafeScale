@@ -208,9 +208,12 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 }
 
 // CreateFloatingIP creates a floating IP
-func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
+func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
 	if s.IsNull() {
 		return &FloatingIP{}, fail.InvalidInstanceError()
+	}
+	if host == nil {
+		return &FloatingIP{}, fail.InvalidParameterCannotBeNilError("host")
 	}
 
 	ipOpts := ipCreateOpts{
@@ -220,8 +223,9 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
 	bandwidthOpts := bandwidthCreateOpts{
-		Name:      "bandwidth-" + s.vpc.Name,
+		Name:      "bandwidth-" + host.Networking.SubnetsByID[host.Networking.DefaultSubnetID],
 		Size:      1000,
 		ShareType: "PER",
 	}
@@ -229,6 +233,7 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
 	// Merger bi in bb
 	for k, v := range bi {
 		bb[k] = v
@@ -255,6 +260,7 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
 	return fip, nil
 }
 
