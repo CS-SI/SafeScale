@@ -294,6 +294,7 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 	}
 
 	result["last_state"] = c.State
+	result["last_state_label"] = c.State.String()
 	result["admin_login"] = "cladm"
 
 	return result, nil
