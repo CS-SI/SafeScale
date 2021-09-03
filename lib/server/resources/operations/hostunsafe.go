@@ -117,8 +117,8 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 	}
 
 	var (
-		iterations, retcode        int
-		stdout, stderr string
+		iterations, retcode int
+		stdout, stderr      string
 	)
 	xerr := retry.WhileUnsuccessful(
 		func() error {

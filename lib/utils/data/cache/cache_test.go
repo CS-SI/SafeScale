@@ -29,7 +29,7 @@ import (
 )
 
 func TestLockContent(t *testing.T) {
-	content := newReservation("content"/*, time.Minute*/)
+	content := newReservation("content" /*, time.Minute*/)
 	cacheEntry := newEntry(content)
 
 	assert.EqualValues(t, uint(0), cacheEntry.LockCount())
@@ -48,7 +48,7 @@ func TestLockContent(t *testing.T) {
 }
 
 func TestParallelLockContent(t *testing.T) {
-	content := newReservation("content"/*, time.Minute*/)
+	content := newReservation("content" /*, time.Minute*/)
 	cacheEntry := newEntry(content)
 
 	task1, _ := concurrency.NewUnbreakableTask()
@@ -122,7 +122,7 @@ func TestDeadlock(t *testing.T) {
 
 	go func() {
 		defer wg.Done()
-		content := newReservation("content"/*, time.Minute*/)
+		content := newReservation("content" /*, time.Minute*/)
 
 		nukaCola, _ := NewCache("nuka")
 		xerr := nukaCola.Reserve("What", 2*time.Second)
@@ -162,7 +162,7 @@ func TestReserveCommitGet(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		content := newReservation("content"/*, time.Minute*/)
+		content := newReservation("content" /*, time.Minute*/)
 
 		nukaCola, err := NewCache("nuka")
 		if err != nil {
@@ -210,7 +210,7 @@ func TestReserveCommitGet(t *testing.T) {
 
 func TestMultipleReserveCommitGet(t *testing.T) {
 	wg := sync.WaitGroup{}
-	content := newReservation("content"/*, time.Minute*/)
+	content := newReservation("content" /*, time.Minute*/)
 	nukaCola, err := NewCache("nuka")
 	require.Nil(t, err)
 
@@ -268,7 +268,7 @@ func TestSurprisingBehaviour(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		content := newReservation("content"/*, time.Minute*/)
+		content := newReservation("content" /*, time.Minute*/)
 
 		nukaCola, err := NewCache("nuka")
 		if err != nil {
@@ -324,7 +324,7 @@ func TestSurprisingBehaviour(t *testing.T) {
 }
 
 func TestDeadlockAddingEntry(t *testing.T) {
-	content := newReservation("content"/*, time.Minute*/)
+	content := newReservation("content" /*, time.Minute*/)
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -354,7 +354,7 @@ func TestDeadlockAddingEntry(t *testing.T) {
 }
 
 func TestSignalChangeEntry(t *testing.T) {
-	content := newReservation("content"/*, time.Minute*/)
+	content := newReservation("content" /*, time.Minute*/)
 	_ = content
 
 	wg := sync.WaitGroup{}
@@ -400,9 +400,9 @@ func TestFreeWhenConflictingReservationAlreadyThere(t *testing.T) {
 		t.FailNow()
 	}
 
-	previous := newReservation("previous"/*, time.Minute*/)
+	previous := newReservation("previous" /*, time.Minute*/)
 	_ = previous
-	content := newReservation("cola"/*, time.Minute*/)
+	content := newReservation("cola" /*, time.Minute*/)
 	_ = content
 
 	wg := sync.WaitGroup{}
