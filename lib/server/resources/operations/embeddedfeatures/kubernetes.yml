@@ -68,7 +68,7 @@ feature:
     install:
         bash:
             check:
-                pace: nodes,kube
+                pace: nodes,kube,ready
                 steps:
                     nodes:
                         targets:
@@ -90,6 +90,15 @@ feature:
                                 sfExit
                             fi
                             sfFail 195 "master didn't join (no .joined file)"
+                    ready:
+                        targets:
+                            masters: one
+                        run: |
+                            if [ -f /etc/kubernetes/.joined ]; then
+                                [ $(sfKubectl get nodes -A | grep -v VERSION | grep -v Ready | wc -l) -gt 0 ] || sfFail 196 "not all nodes ready"
+                                sfExit
+                            fi
+                            sfFail 197 "master didn't join (no .joined file)"
 
             add:
                 pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
