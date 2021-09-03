@@ -27,6 +27,7 @@ import (
 	txttmpl "text/template"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -566,12 +567,13 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
 		}
 
+		var problem error
 		subtask, xerr := concurrency.NewTaskWithParent(task)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return outcomes, xerr
 		}
-		_, xerr = subtask.Start(w.taskLaunchStep, taskLaunchStepParameters{
+		subtask, xerr = subtask.Start(w.taskLaunchStep, taskLaunchStepParameters{
 			stepName:  k,
 			stepKey:   stepKey,
 			stepMap:   stepMap,
@@ -579,18 +581,32 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action.String()), strings.ToLower(w.target.TargetType().String()), k)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return outcomes, xerr
+			problem = xerr
+			abErr := subtask.Abort()
+			if abErr != nil {
+				logrus.Warn("problem aborting task")
+			}
 		}
 
-		tr, xerr := subtask.Wait()
+		var tr concurrency.TaskResult
+		tr, xerr = subtask.Wait()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			if problem != nil {
+				_ = xerr.AddConsequence(problem)
+			}
+			if tr != nil {
+				if outcome, ok := tr.(*resources.UnitResults); ok {
+					_ = outcomes.Add(k, *outcome)
+				}
+			}
 			return outcomes, xerr
 		}
 
 		if tr != nil {
-			outcome := tr.(*resources.UnitResults)
-			_ = outcomes.Add(k, *outcome)
+			if outcome, ok := tr.(*resources.UnitResults); ok {
+				_ = outcomes.Add(k, *outcome)
+			}
 		}
 	}
 
@@ -817,19 +833,45 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if !r.Successful() {
 		// If there are some not completed steps, reports them and break
 		if !r.Completed() {
-			msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), p.stepName, r.Uncompleted())
-			logrus.Errorf(strprocess.Capitalize(msg))
-			return &r, fail.NewError(msg)
+			var errpack []error
+			for _, key := range r.Keys() {
+				cuk := r.ResultOfKey(key)
+				if cuk != nil {
+					if !cuk.Successful() && !cuk.Completed() {
+						// TBR: It's one of those
+						msg := fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v with [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
+						logrus.Warnf(msg.Error())
+						errpack = append(errpack, msg)
+					}
+				}
+			}
+
+			if len(errpack) > 0 {
+				return &r, fail.NewErrorList(errpack)
+			}
 		}
+
 		// not successful but completed, if action is check means the Feature is not installed, it's an information not a failure
 		if w.action == installaction.Check {
 			return &r, nil
 		}
 
-		// For any other situations, raise error and break
-		msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), p.stepName, r.ErrorMessages())
-		logrus.Errorf(strprocess.Capitalize(msg))
-		return &r, fail.NewError(msg)
+		var newerrpack []error
+		for _, key := range r.Keys() {
+			cuk := r.ResultOfKey(key)
+			if cuk != nil {
+				if !cuk.Successful() && cuk.Completed() {
+					// TBR: It's one of those
+					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %v with [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
+					logrus.Warnf(msg.Error())
+					newerrpack = append(newerrpack, msg)
+				}
+			}
+		}
+
+		if len(newerrpack) > 0 {
+			return &r, fail.NewErrorList(newerrpack)
+		}
 	}
 
 	return &r, nil

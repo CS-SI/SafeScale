@@ -86,6 +86,7 @@ function sfFail() {
 		echo 3 >/proc/sys/vm/drop_caches
 		sleep 2
 	) || true
+	echo "exiting with errorcode $1"
 	exit $1
 }
 export -f sfFail
@@ -96,6 +97,7 @@ function sfExit() {
 		echo 3 >/proc/sys/vm/drop_caches
 		sleep 2
 	) || true
+	echo "exiting with errorcode 0"
 	exit 0
 }
 export -f sfExit

@@ -63,7 +63,7 @@ func normalizeOperationErrorFromCode(err *compute.OperationErrorErrors) fail.Err
 	}
 
 	switch err.Code {
-	case "RESOURCE_IN_USE_BY_ANOTHER_RESOURCE":     // This kind of error is not retryable
+	case "RESOURCE_IN_USE_BY_ANOTHER_RESOURCE": // This kind of error is not retryable
 		ne := fail.NotAvailableError(err.Message)
 		_ = ne.Annotate("code", err.Code)
 		if err.Location != "" {
