@@ -175,11 +175,6 @@ func UseService(tenantName string) (newService Service, err error) {
 				return nil, err
 			}
 
-			err = validateRegionName(providerInstance, objectStorageConfig.Region)
-			if err != nil {
-				return nil, err
-			}
-
 			objectStorageLocation, err = objectstorage.NewLocation(objectStorageConfig)
 			if err != nil {
 				return nil, fail.Errorf(
@@ -202,11 +197,6 @@ func UseService(tenantName string) (newService Service, err error) {
 				return nil, err
 			}
 
-			err = validateRegionName(providerInstance, objectStorageConfig.Region)
-			if err != nil {
-				return nil, err
-			}
-			
 			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
 			if err != nil {
 				return nil, fail.Errorf(
@@ -477,9 +467,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 	if config.Region, ok = ostorage["Region"].(string); !ok {
 		config.Region, _ = compute["Region"].(string)
-		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-			return config, err
-		}
+		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+		// 	return config, err
+		// }
 	}
 
 	if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
@@ -523,23 +513,18 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	return config, nil
 }
 
-func validateOVHObjectStorageRegionNaming(context, region, authURL string) error {
-	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
-	// Object Storage regions don't contain anymore an index like compute regions
-	if strings.Contains(authURL, "ovh.") {
-		rLen := len(region)
-		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
-			region = region[:rLen-1]
-			return fail.InvalidRequestError(
-				fmt.Sprintf(
-					`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`,
-					context, region,
-				),
-			)
-		}
-	}
-	return nil
-}
+// func validateOVHObjectStorageRegionNaming(context, region, authURL string) fail.Error {
+// 	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
+// 	// Object Storage regions don't contain anymore an index like compute regions
+// 	if strings.Contains(authURL, "ovh.") {
+// 		rLen := len(region)
+// 		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
+// 			region = region[:rLen-1]
+// 			return fail.InvalidRequestError(fmt.Sprintf(`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`, context, region))
+// 		}
+// 	}
+// 	return nil
+// }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
 func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (_ objectstorage.Config, err error) {
@@ -665,9 +650,9 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		if config.Region, ok = ostorage["Region"].(string); !ok {
 			config.Region, _ = compute["Region"].(string)
 		}
-		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-			return config, err
-		}
+		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+		// 	return config, err
+		// }
 	}
 
 	if config.AvailabilityZone, ok = metadata["AvailabilityZone"].(string); !ok {
