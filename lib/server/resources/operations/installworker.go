@@ -79,11 +79,12 @@ print_error() {
 trap print_error ERR
 
 set +x
-rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+sudo rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 1<&-
 exec 2<&-
 exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 2>&1
+sudo chown {{.User}}:{{.User}} %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 set -x
 
 {{ .reserved_BashLibrary }}
@@ -1328,7 +1329,7 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 		}
 
 		// parse then execute the template
-		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder)
+		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder, utils.LogFolder)
 		r, xerr := template.Parse("normalize_script", tmpl)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
