@@ -172,11 +172,6 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 				return NullService(), xerr
 			}
 
-			allRegions, xerr = newS.ListRegions()
-			if xerr != nil {
-				return NullService(), xerr
-			}
-
 			xerr = validateRegionName(objectStorageConfig.Region, allRegions)
 			if xerr != nil {
 				return nil, xerr
