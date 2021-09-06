@@ -267,12 +267,56 @@ func UseService(tenantName string) (newService Service, err error) {
 	return nil, abstract.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
+// validateRegionName validates the availability of the region passed as parameter
+func validateRegionName(provider Service, name string) fail.Error {
+	validRegions, xerr := provider.ListRegions()
+	if xerr != nil && len(validRegions) > 0 {
+		return xerr
+	}
+
+	if len(validRegions) > 0 {
+		regionIsValidInput := false
+		for _, vr := range validRegions {
+			if name == vr {
+				regionIsValidInput = true
+			}
+		}
+		if !regionIsValidInput {
+			return fail.NotFoundError("invalid Region in objectstorage section: '%s': not found", name)
+		}
+	}
+
+	return nil
+}
+
 //checkMetadataVersion checks metadata version, if it's not our version, we stop
 func checkMetadataVersion(s *service) error {
 	var buffer bytes.Buffer
 	_, err := s.GetMetadataBucket().ReadObject("version", &buffer, 0, 0)
 	if err != nil {
 		return nil
+        }
+	data := string(buffer.Bytes())
+
+	ourVersion := fmt.Sprintf("v%s", Version)
+	if strings.HasPrefix(data, ourVersion) {
+		return nil
+	}
+
+	if strings.Contains(ourVersion, ".") {
+		if strings.HasPrefix(data, ourVersion[0:strings.LastIndex(ourVersion, ".")]) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("cannot continue: the minimum version of Safescale binaries needed to work correctly with this bucket is '%s'. (current binary '%s')", data, ourVersion)
+}
+
+// validateRegexps validates regexp values from tenants file
+func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
+	compute, ok := tenant["compute"].(map[string]interface{})
+	if !ok {
+		return fail.InvalidParameterError("tenant['compute']", "is not a map")
 	}
 	data := string(buffer.Bytes())
 
