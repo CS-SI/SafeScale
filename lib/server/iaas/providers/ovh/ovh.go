@@ -172,7 +172,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		ProviderName:     providerName,
 	}
 
-	serviceVersions := map[string]string{"volume": "v1"}
+	serviceVersions := map[string]string{"volume": "v2"}
 
 	stack, err := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
 	if err != nil {
