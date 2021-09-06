@@ -194,6 +194,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Stack:            stack,
 		tenantParameters: params,
 	}
+
 	return newP, nil
 }
 
