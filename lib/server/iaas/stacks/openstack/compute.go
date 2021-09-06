@@ -320,7 +320,7 @@ func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
+	kp, err := keypairs.Get(s.ComputeClient, id, nil).Extract() // FIXME: Maybe needed
 	if err != nil {
 		return nil, fail.Wrap(err, "error getting keypair")
 	}
@@ -345,7 +345,7 @@ func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	var kpList []abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			return keypairs.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
+			return keypairs.List(s.ComputeClient, nil).EachPage(func(page pagination.Page) (bool, error) { // FIXME: Maybe needed
 				list, err := keypairs.ExtractKeyPairs(page)
 				if err != nil {
 					return false, err
@@ -384,7 +384,7 @@ func (s Stack) DeleteKeyPair(id string) fail.Error {
 
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			return keypairs.Delete(s.ComputeClient, id).ExtractErr()
+			return keypairs.Delete(s.ComputeClient, id, nil).ExtractErr() // FIXME: Maybe needed
 		},
 		NormalizeError,
 	)
