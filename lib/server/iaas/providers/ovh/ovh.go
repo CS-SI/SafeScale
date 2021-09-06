@@ -183,7 +183,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		DefaultImage:             defaultImage,
 	}
 
-	serviceVersions := map[string]string{"volume": "v1"}
+	serviceVersions := map[string]string{"volume": "v2"}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
 	if xerr != nil {
