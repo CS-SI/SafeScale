@@ -125,3 +125,7 @@ lib/security/gateway/client/safe-security
 cli/safescaled/safescaled__d__v
 
 .run/
+
+go.sum
+
+lib/server/iaas/userdata/version.go
