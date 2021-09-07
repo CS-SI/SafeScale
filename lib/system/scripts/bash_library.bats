@@ -3,7 +3,7 @@
 cp ./bash_library.sh ./bash_library.bash
 load ./bash_library
 
-function fuckup() {
+function wrong() {
     export SF_BASEDIR=/tmp
     export SF_VARDIR=${SF_BASEDIR}/var
     export SF_LOGDIR=${SF_VARDIR}/log
@@ -29,7 +29,7 @@ function down_ok() {
 }
 
 @test "download the wrong file" {
-  run fuckup
+  run wrong
   [ "$status" -eq 22 ]
 }
 
