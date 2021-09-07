@@ -142,15 +142,15 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 			tenantName: tenantName,
 		}
 
-		allRegions, xerr := newS.ListRegions()
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				break
-			default:
-				return NullService(), xerr
-			}
-		}
+		// allRegions, xerr := newS.ListRegions()
+		// if xerr != nil {
+		// 	switch xerr.(type) {
+		// 	case *fail.ErrNotFound:
+		// 		break
+		// 	default:
+		// 		return NullService(), xerr
+		// 	}
+		// }
 
 		authOpts, xerr := providerInstance.GetAuthenticationOptions()
 		if xerr != nil {
@@ -158,11 +158,12 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		}
 
 		// Validate region parameter in compute section
-		computeRegion := authOpts.GetString("Region")
-		xerr = validateRegionName(computeRegion, allRegions)
-		if xerr != nil {
-			return NullService(), fail.Wrap(xerr, "invalid region in section 'compute'")
-		}
+		// VPL: does not work with Outscale "cloudgouv"...
+		// computeRegion := authOpts.GetString("Region")
+		// xerr = validateRegionName(computeRegion, allRegions)
+		// if xerr != nil {
+		// 	return NullService(), fail.Wrap(xerr, "invalid region in section 'compute'")
+		// }
 
 		// Initializes Object Storage
 		var objectStorageLocation objectstorage.Location
