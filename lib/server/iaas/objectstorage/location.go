@@ -476,6 +476,7 @@ func (l location) ReadObject(bucketName, objectName string, writer io.Writer, fr
 		return err
 	}
 
+	objectName = strings.Trim(objectName, "/")
 	o, err := newObject(&b, objectName)
 	if err != nil {
 		return err
