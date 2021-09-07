@@ -161,7 +161,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		computeRegion := authOpts.GetString("Region")
 		xerr = validateRegionName(computeRegion, allRegions)
 		if xerr != nil {
-			return NullService(), xerr
+			return NullService(), fail.Wrap(xerr, "invalid region in section 'compute'")
 		}
 
 		// Initializes Object Storage
@@ -172,10 +172,11 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 				return NullService(), xerr
 			}
 
-			xerr = validateRegionName(objectStorageConfig.Region, allRegions)
-			if xerr != nil {
-				return nil, xerr
-			}
+			// VPL: disable region validation, may need to update allRegions for objectstorage/metadata)
+			// xerr = validateRegionName(objectStorageConfig.Region, allRegions)
+			// if xerr != nil {
+			// 	return nil, fail.Wrap(xerr, "invalid region in section 'objectstorage")
+			// }
 
 			objectStorageLocation, xerr = objectstorage.NewLocation(objectStorageConfig)
 			if xerr != nil {
@@ -197,10 +198,11 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 				return NullService(), err
 			}
 
-			xerr = validateRegionName(metadataLocationConfig.Region, allRegions)
-			if xerr != nil {
-				return nil, xerr
-			}
+			// VPL: disable region validation, may need to update allRegions for objectstorage/metadata)
+			// xerr = validateRegionName(metadataLocationConfig.Region, allRegions)
+			// if xerr != nil {
+			// 	return nil, fail.Wrap(xerr, "invalid region in section 'metadata'")
+			// }
 
 			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
 			if err != nil {
@@ -287,7 +289,7 @@ func validateRegionName(name string, allRegions []string) fail.Error {
 			}
 		}
 		if !regionIsValidInput {
-			return fail.NotFoundError("invalid Region in objectstorage section: '%s': not found", name)
+			return fail.NotFoundError("region '%s' not found", name)
 		}
 	}
 
