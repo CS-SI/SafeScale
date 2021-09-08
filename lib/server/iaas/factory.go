@@ -174,7 +174,6 @@ func UseService(tenantName string) (newService Service, err error) {
 			if err != nil {
 				return nil, err
 			}
-
 			objectStorageLocation, err = objectstorage.NewLocation(objectStorageConfig)
 			if err != nil {
 				return nil, fail.Errorf(
@@ -196,7 +195,6 @@ func UseService(tenantName string) (newService Service, err error) {
 			if err != nil {
 				return nil, err
 			}
-
 			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
 			if err != nil {
 				return nil, fail.Errorf(
@@ -269,56 +267,12 @@ func UseService(tenantName string) (newService Service, err error) {
 	return nil, abstract.ResourceNotFoundError("provider builder for", svcProvider)
 }
 
-// validateRegionName validates the availability of the region passed as parameter
-func validateRegionName(provider Service, name string) error {
-	validRegions, err := provider.ListRegions()
-	if err != nil && len(validRegions) > 0 {
-		return err
-	}
-
-	if len(validRegions) > 0 {
-		regionIsValidInput := false
-		for _, vr := range validRegions {
-			if name == vr {
-				regionIsValidInput = true
-			}
-		}
-		if !regionIsValidInput {
-			return fail.Errorf(fmt.Sprintf("invalid Region in objectstorage section: '%s': not found", name), nil)
-		}
-	}
-
-	return nil
-}
-
-// checkMetadataVersion checks metadata version, if it's not our version, we stop
+//checkMetadataVersion checks metadata version, if it's not our version, we stop
 func checkMetadataVersion(s *service) error {
 	var buffer bytes.Buffer
 	_, err := s.GetMetadataBucket().ReadObject("version", &buffer, 0, 0)
 	if err != nil {
 		return nil
-        }
-	data := string(buffer.Bytes())
-
-	ourVersion := fmt.Sprintf("v%s", Version)
-	if strings.HasPrefix(data, ourVersion) {
-		return nil
-	}
-
-	if strings.Contains(ourVersion, ".") {
-		if strings.HasPrefix(data, ourVersion[0:strings.LastIndex(ourVersion, ".")]) {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("cannot continue: the minimum version of Safescale binaries needed to work correctly with this bucket is '%s'. (current binary '%s')", data, ourVersion)
-}
-
-// validateRegexps validates regexp values from tenants file
-func validateRegexps(svc *service, tenant map[string]interface{}) fail.Error {
-	compute, ok := tenant["compute"].(map[string]interface{})
-	if !ok {
-		return fail.InvalidParameterError("tenant['compute']", "is not a map")
 	}
 	data := string(buffer.Bytes())
 
@@ -467,9 +421,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 	if config.Region, ok = ostorage["Region"].(string); !ok {
 		config.Region, _ = compute["Region"].(string)
-		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-		// 	return config, err
-		// }
+		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+			return config, err
+		}
 	}
 
 	if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
@@ -513,18 +467,23 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	return config, nil
 }
 
-// func validateOVHObjectStorageRegionNaming(context, region, authURL string) fail.Error {
-// 	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
-// 	// Object Storage regions don't contain anymore an index like compute regions
-// 	if strings.Contains(authURL, "ovh.") {
-// 		rLen := len(region)
-// 		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
-// 			region = region[:rLen-1]
-// 			return fail.InvalidRequestError(fmt.Sprintf(`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`, context, region))
-// 		}
-// 	}
-// 	return nil
-// }
+func validateOVHObjectStorageRegionNaming(context, region, authURL string) error {
+	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
+	// Object Storage regions don't contain anymore an index like compute regions
+	if strings.Contains(authURL, "ovh.") {
+		rLen := len(region)
+		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
+			region = region[:rLen-1]
+			return fail.InvalidRequestError(
+				fmt.Sprintf(
+					`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`,
+					context, region,
+				),
+			)
+		}
+	}
+	return nil
+}
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
 func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (_ objectstorage.Config, err error) {
@@ -650,9 +609,9 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		if config.Region, ok = ostorage["Region"].(string); !ok {
 			config.Region, _ = compute["Region"].(string)
 		}
-		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-		// 	return config, err
-		// }
+		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+			return config, err
+		}
 	}
 
 	if config.AvailabilityZone, ok = metadata["AvailabilityZone"].(string); !ok {
