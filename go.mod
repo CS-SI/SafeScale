@@ -26,6 +26,7 @@ require (
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/itchyny/gojq v0.12.4
 	github.com/jcelliott/lumber v0.0.0-20160324203708-dd349441af25 // indirect
+	github.com/kisielk/errcheck v1.6.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/libvirt/libvirt-go v4.8.0+incompatible
 	github.com/libvirt/libvirt-go-xml v4.8.0+incompatible

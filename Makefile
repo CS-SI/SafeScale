@@ -76,7 +76,7 @@ fastall: begin
 common: begin ground getdevdeps mod sdk generate
 
 versioncut:
-	@(($(GO) version | grep go1.16) || ($(GO) version | grep go1.15)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.15 ! $(NO_COLOR)\n" && false);
+	@(($(GO) version | grep go1.17) || ($(GO) version | grep go1.16) || ($(GO) version | grep go1.15)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.15 ! $(NO_COLOR)\n" && false);
 
 begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
