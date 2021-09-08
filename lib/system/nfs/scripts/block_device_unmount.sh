@@ -26,5 +26,8 @@ function print_error() {
 }
 trap print_error ERR
 
-umount -l -f "/dev/disk/by-uuid/{{.UUID}}" && \
+eval "$(lsblk -P -o MOUNTPOINT /dev/disk/by-uuid/{{.UUID}})"
+[ -z "$MOUNTPOINT" ] && echo "device /dev/disk/by-uuid/{{.UUID}} not mounted" && exit 1
+
+umount -l -f "$MOUNTPOINT" && \
 sed -i '\:{{.UUID}}:d' /etc/fstab
