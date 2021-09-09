@@ -1182,6 +1182,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/GeertJohan/go.rice",
+    "github.com/GeertJohan/go.rice/embedded",
     "github.com/GeertJohan/go.rice/rice",
     "github.com/Masterminds/sprig",
     "github.com/antihax/optional",
@@ -1205,7 +1206,6 @@
     "github.com/gobwas/glob",
     "github.com/golang/mock/gomock",
     "github.com/golang/mock/mockgen",
-    "github.com/golang/mock/mockgen/model",
     "github.com/golang/protobuf/protoc-gen-go",
     "github.com/golang/protobuf/ptypes/empty",
     "github.com/gophercloud/gophercloud",
@@ -1281,6 +1281,8 @@
     "google.golang.org/grpc/metadata",
     "google.golang.org/grpc/reflection",
     "google.golang.org/grpc/status",
+    "google.golang.org/protobuf/reflect/protoreflect",
+    "google.golang.org/protobuf/runtime/protoimpl",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1
