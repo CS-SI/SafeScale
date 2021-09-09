@@ -59,14 +59,16 @@ require (
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	golang.org/x/lint v0.0.0-20201208152925-83fdc39ff7b5 // indirect
 	golang.org/x/net v0.0.0-20210908191846-a5e095526f91
 	golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84
 	golang.org/x/sys v0.0.0-20210908233432-aa78b53d3365
+	golang.org/x/tools v0.1.5 // indirect
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20210805201207-89edb61ffb67 // indirect
 	google.golang.org/grpc v1.39.1
+	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

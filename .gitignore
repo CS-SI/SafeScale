@@ -99,7 +99,6 @@ Test Results - client_test_go\.html
 lib/system/version.go
 cli/safescaled/__debug_bin
 lib/security/gateway/client/safe-security
-go.sum
 
 .atom/
 
