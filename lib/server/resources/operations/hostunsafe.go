@@ -117,8 +117,8 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 	}
 
 	var (
-		iterations, retcode        int
-		stdout, stderr string
+		iterations, retcode int
+		stdout, stderr      string
 	)
 	xerr := retry.WhileUnsuccessful(
 		func() error {
@@ -376,7 +376,7 @@ func (instance *Host) UnsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error)
 // Intended to be used when objh is notoriously not nil (because previously checked)
 func (instance *Host) UnsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Error) {
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())

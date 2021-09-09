@@ -10,6 +10,7 @@
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
@@ -18,6 +19,7 @@ package commands
 
 import (
 	"fmt"
+	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -25,7 +27,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/client"
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -279,17 +280,22 @@ type volumeDisplayable struct {
 }
 
 func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInspectResponse) *volumeInfoDisplayable {
-	ref, _ := srvutils.GetReference(volumeInfo.GetHost())
-	return &volumeInfoDisplayable{
-		volumeInfo.GetId(),
-		volumeInfo.GetName(),
-		protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
-		volumeInfo.GetSize(),
-		ref,
-		volumeInfo.GetMountPath(),
-		volumeInfo.GetFormat(),
-		volumeInfo.GetDevice(),
+	out := &volumeInfoDisplayable{
+		ID:    volumeInfo.GetId(),
+		Name:  volumeInfo.GetName(),
+		Speed: protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
+		Size:  volumeInfo.GetSize(),
 	}
+	attachments := volumeInfo.GetAttachments()
+	if len(attachments) > 0 {
+		out.MountPath = attachments[0].MountPath
+		out.Format = attachments[0].Format
+		out.Device = attachments[0].Device
+		ref, _ := srvutils.GetReference(attachments[0].GetHost())
+		out.Host = ref
+	}
+
+	return out
 }
 
 func toDisplayableVolume(volumeInfo *protocol.VolumeInspectResponse) *volumeDisplayable {

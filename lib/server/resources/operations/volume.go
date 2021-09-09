@@ -1252,23 +1252,24 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 
 	svc := instance.GetService()
 	for k := range attachments.Hosts {
-		rh, xerr := LoadHost(svc, k)
+		hostInstance, xerr := LoadHost(svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
-		//goland:noinspection ALL
-		defer func(hostInstance resources.Host) {
-			hostInstance.Released()
-		}(rh)
 
-		vols, _ := rh.(*Host).UnsafeGetVolumes()
+		//goland:noinspection ALL
+		defer func(item resources.Host) {
+			item.Released()
+		}(hostInstance)
+
+		vols, _ := hostInstance.(*Host).UnsafeGetVolumes()
 		device, ok := vols.DevicesByID[volumeID]
 		if !ok {
 			return nil, fail.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", volumeName, k)
 		}
 
-		mnts, _ := rh.(*Host).UnsafeGetMounts()
+		mnts, _ := hostInstance.(*Host).UnsafeGetMounts()
 		if mnts != nil {
 			path, ok := mnts.LocalMountsByDevice[device]
 			if !ok {
@@ -1282,8 +1283,7 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 
 			a := &protocol.VolumeAttachmentResponse{
 				Host: &protocol.Reference{
-					Name: k,
-					Id:   rh.GetID(),
+					Name: hostInstance.GetName(),
 				},
 				MountPath: path,
 				Format:    m.FileSystem,
