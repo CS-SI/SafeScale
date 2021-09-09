@@ -170,7 +170,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 				ir:  "Ahhhh",
 				err: fail.ConvertError(iErr),
 			}
-			return
+			return // nolint
 		}()
 
 		select {

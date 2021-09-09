@@ -45,7 +45,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
-			break
+			break // nolint
 		default:
 			return nullAV, xerr
 		}

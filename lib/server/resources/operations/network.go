@@ -582,7 +582,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 						break
 					}
 				}
-				iterations = iterations - 1
+				iterations--
 				if iterations < 0 {
 					logrus.Warningf("TBR: A zombie network '%s' is still there", abstractNetwork.ID)
 					break

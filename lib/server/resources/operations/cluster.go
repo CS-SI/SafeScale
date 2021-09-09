@@ -1209,11 +1209,9 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	if xerr != nil {
 		return nil, fail.NewErrorWithCause(xerr, "errors occurred on node%s addition", strprocess.Plural(uint(len(errors))))
 	}
-	if res != nil {
-		for _, v := range res {
-			if item, ok := v.(*propertiesv3.ClusterNode); ok {
-				nodes = append(nodes, item)
-			}
+	for _, v := range res {
+		if item, ok := v.(*propertiesv3.ClusterNode); ok {
+			nodes = append(nodes, item)
 		}
 	}
 

@@ -82,7 +82,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 	iterations := 0
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			iterations = iterations + 1
+			iterations++
 			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, temporal.GetExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {

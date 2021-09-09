@@ -75,7 +75,7 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	}
 
 	out := &protocol.SecurityGroupListResponse{}
-	out.SecurityGroups = make([]*protocol.SecurityGroupResponse, len(list), len(list))
+	out.SecurityGroups = make([]*protocol.SecurityGroupResponse, len(list))
 	for k, v := range list {
 		out.SecurityGroups[k] = converters.SecurityGroupFromAbstractToProtocol(*v)
 	}

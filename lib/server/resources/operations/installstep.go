@@ -410,11 +410,11 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 					oko := outcome.(stepResult)
 					logrus.Warnf("TBR: output '%s' and err '%v'", oko.output, oko.err)
 					if oko.err != nil {
-						wrongs = wrongs + 1
+						wrongs++
 						continue
 					}
 					if !strings.Contains(oko.output, "exit 0") {
-						wrongs = wrongs + 1
+						wrongs++
 						continue
 					}
 				}
@@ -580,9 +580,8 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 					_ = xerr.Annotate("stdout", outrun)
 					_ = xerr.Annotate("stderr", outerr)
 					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
-				} else {
-					break
 				}
+				break
 			}
 		}
 

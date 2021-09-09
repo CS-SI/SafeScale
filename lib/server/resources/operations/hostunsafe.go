@@ -177,7 +177,10 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 
 func getMD5Hash(text string) string {
 	hasher := md5.New()
-	hasher.Write([]byte(text))
+	_, err := hasher.Write([]byte(text))
+	if err != nil {
+		return ""
+	}
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 

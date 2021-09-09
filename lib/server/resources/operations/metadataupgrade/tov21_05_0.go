@@ -325,9 +325,8 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			abstractNetwork.GatewayID, abstractNetwork.SecondaryGatewayID = "", ""
 			abstractNetwork.Domain = ""
 			return nil
-		} else {
-			logrus.Tracef("metadata of Network '%s' is up to date", currentInstance.GetName())
 		}
+		logrus.Tracef("metadata of Network '%s' is up to date", currentInstance.GetName())
 
 		// called when nothing has been changed, to prevent useless metadata update
 		return fail.AlteredNothingError()
@@ -811,7 +810,7 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
-			xerr = nil
+			return nil
 		default:
 			return xerr
 		}
