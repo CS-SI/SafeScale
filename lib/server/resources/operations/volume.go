@@ -1100,7 +1100,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 				if i.Device == device {
 					continue
 				}
-				if strings.Index(p, mount.Path) == 0 {
+				if strings.Index(p+"/", mount.Path+"/") == 0 {
 					return fail.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'", volumeName, targetName, mount.Path, targetName, p)
 				}
 			}
@@ -1109,7 +1109,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 					return fail.AbortedError(nil, "aborted")
 				}
 
-				if strings.Index(p, mount.Path) == 0 {
+				if strings.Index(p+"/", mount.Path+"/") == 0 {
 					return fail.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'", volumeName, targetName, mount.Path, targetName, p)
 				}
 			}
