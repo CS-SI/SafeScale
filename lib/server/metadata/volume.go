@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package metadata
 import (
 	"fmt"
 
+	"github.com/graymeta/stow"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -32,8 +33,8 @@ import (
 )
 
 const (
-	// VolumesFolderName is the technical name of the container used to store volume info
-	VolumesFolderName = "volumes"
+	// volumesFolderName is the technical name of the container used to store volume info
+	volumesFolderName = "volumes"
 )
 
 // Volume links Object Storage folder and Volumes
@@ -51,7 +52,7 @@ func NewVolume(svc iaas.Service) (_ *Volume, err error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	aVol, err := metadata.NewItem(svc, VolumesFolderName)
+	aVol, err := metadata.NewItem(svc, volumesFolderName)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,7 @@ func NewVolume(svc iaas.Service) (_ *Volume, err error) {
 	}, nil
 }
 
-// Carry links a Volume instance to the metadata instance
+// Carry links a Volume instance to the Metadata instance
 func (mv *Volume) Carry(volume *abstract.Volume) (_ *Volume, err error) {
 	defer fail.OnPanic(&err)()
 
@@ -168,7 +169,7 @@ func (mv *Volume) ReadByReference(ref string) (err error) {
 	}
 
 	if len(errors) == 2 {
-		if isErrorNotFound(err1) && isErrorNotFound(err2) { // FIXME: Remove stow dependency
+		if err1 == stow.ErrNotFound && err2 == stow.ErrNotFound { // FIXME: Remove stow dependency
 			return fail.NotFoundErrorWithCause(fmt.Sprintf("reference %s not found", ref), fail.ErrListError(errors))
 		}
 
@@ -419,7 +420,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
-				if isErrorNotFound(innerErr) {
+				if innerErr == stow.ErrNotFound { // FIXME: Remove stow dependency
 					return retry.AbortedError("no metadata found", innerErr)
 				}
 
@@ -427,7 +428,7 @@ func LoadVolume(svc iaas.Service, ref string) (mv *Volume, err error) {
 			}
 			return nil
 		},
-		2*temporal.GetContextTimeout(),
+		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
 		switch err := retryErr.(type) {

@@ -1,7 +1,7 @@
 // +build libvirt
 
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -407,10 +407,6 @@ func (s *Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest)
 		diskNames = append(diskNames, disk.Target.Dev)
 	}
 	sort.Strings(diskNames)
-	if len(diskNames) == 0 {
-		return "", fmt.Errorf("no disk names")
-	}
-
 	lastDiskName := diskNames[len(diskNames)-1]
 	tmpInt, err := strconv.ParseInt(lastDiskName, 36, 64)
 	newDiskName := strconv.FormatInt(tmpInt+1, 36)

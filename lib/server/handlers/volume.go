@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -265,18 +265,13 @@ func (handler *VolumeHandler) Create(ctx context.Context, name string, size int,
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
+	// FIXME: validate parameters
 
 	tracer := debug.NewTracer(
 		nil, fmt.Sprintf("('%s', %d, %s)", name, size, speed.String()), true,
 	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	defer func() {
-		if volume == nil && err == nil {
-			logrus.Errorf("volume is nil, should not without an error")
-		}
-	}()
 
 	_, err = metadata.LoadVolume(handler.service, name)
 	if err != nil {
@@ -1477,7 +1472,7 @@ func (handler *VolumeHandler) Shrink(ctx context.Context, volumeName, hostName s
 
 	if incrementType == "uv" {
 		numberOfVolumeUnitsAffected = increment
-		logrus.Debugf("We have to add %d volumes of %d Gb each", numberOfVolumeUnitsAffected, vuSize)
+		logrus.Debugf("We have to add %d volumes of %d Gb each", increment, vuSize)
 		wantedSizeInGb = wantedSizeInGb - (int(increment) * int(vuSize))
 	}
 

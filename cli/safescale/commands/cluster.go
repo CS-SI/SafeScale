@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -141,7 +141,7 @@ var clusterListCommand = cli.Command{
 
 		var formatted []interface{}
 		for _, value := range list {
-			c, _ := value.(api.Cluster)
+			c := value.(api.Cluster)
 			converted, err := convertToMap(c)
 			if err != nil {
 				return clitools.FailureResponse(
@@ -811,11 +811,11 @@ var clusterExpandCommand = cli.Command{
 	<operator> can be =,<,> (except for disk where valid operators are only = or >)
 	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
 		},
-		cli.BoolFlag{
-			Name:  "keep-on-failure, k",
-			Usage: "If used, the resources are not deleted on failure (default: not set)",
-		},
-	},
+        cli.BoolFlag{
+            Name:  "keep-on-failure, k",
+            Usage: "If used, the resources are not deleted on failure (default: not set)",
+        },
+    },
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -859,8 +859,8 @@ var clusterExpandCommand = cli.Command{
 				}
 			}
 		}
-		nodesDef.KeepOnFailure = c.Bool("keep-on-failure")
-
+        nodesDef.KeepOnFailure = c.Bool("keep-on-failure")
+        
 		hosts, err := clusterInstance.AddNodes(concurrency.RootTask(), count, nodesDef)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1591,6 +1591,7 @@ var clusterNodeListCommand = cli.Command{
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				msg := fmt.Sprintf("failed to get data for node '%s': %s. Ignoring.", i, err.Error())
+				// fmt.Println(msg)
 				logrus.Warnln(msg)
 				continue
 			}
@@ -1664,13 +1665,9 @@ var clusterNodeDeleteCommand = cli.Command{
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
-		// err = extractHostArgument(c, 1)
-		// if err != nil {
-		//      return clitools.FailureResponse(err)
-		// }
-		hostID := c.Args().Get(1)
-		if hostID == "" {
-			return clitools.ExitOnInvalidArgument("argument HOSTID invalid")
+		err = extractHostArgument(c, 1)
+		if err != nil {
+			return clitools.FailureResponse(err)
 		}
 
 		yes := c.Bool("yes")
@@ -1687,16 +1684,9 @@ var clusterNodeDeleteCommand = cli.Command{
 			logrus.Println("'-f,--force' does nothing yet")
 		}
 
-		// fmt.Printf("Deleting %d node%s from Cluster '%s' (this may take a while)...\n", count, countS, clusterName)
-		var msgs []string
-		err = clusterInstance.DeleteSpecificNode(concurrency.RootTask(), hostID, "")
-		if err != nil {
-			msgs = append(msgs, fmt.Sprintf("failed to delete node %s: %s", hostID, err.Error()))
-		}
-		if len(msgs) > 0 {
-			return clitools.FailureResponse(clitools.ExitOnRPC(strings.Join(msgs, "\n")))
-		}
-		return clitools.SuccessResponse(nil)
+		// FIXME: No more does nothing yet
+
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
 	},
 }
 
@@ -1824,6 +1814,7 @@ var clusterMasterListCommand = cli.Command{
 			host, err := hostClt.Inspect(i, temporal.GetExecutionTimeout())
 			if err != nil {
 				msg := fmt.Sprintf("failed to get data for master '%s': %s. Ignoring.", i, err.Error())
+				fmt.Println(msg)
 				logrus.Warnln(msg)
 				continue
 			}

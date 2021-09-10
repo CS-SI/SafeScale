@@ -165,6 +165,8 @@ feature:
                             EOF
                             sfExit
 
+                            sfExit
+
                     rbac-apply:
                         targets:
                             masters: one
@@ -183,7 +185,6 @@ feature:
                                 --tiller-tls-hostname {{ .Hostname }} \
                                 --tiller-tls-cert ${SF_ETCDIR}/helm/pki/tiller.cert.pem \
                                 --tiller-tls-key ${SF_ETCDIR}/helm/pki/tiller.key.pem \
-                                --stable-repo-url=https://charts.helm.sh/stable \
                                 --tiller-tls-verify \
                                 --tls-ca-cert /etc/kubernetes/pki/ca.crt \
                                 --service-account tiller \

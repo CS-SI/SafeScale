@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -121,9 +122,31 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 		return 255, "", "", fmt.Errorf("failed to copy script to remote host: %s", retryErr.Error())
 	}
 
+	k, uperr := sshconfig.Command("which scp")
+	if uperr != nil && k != nil {
+		_, uptext, _, kerr := k.RunWithTimeout(nil, outputs.COLLECT, temporal.GetBigDelay())
+		if kerr == nil {
+			connected := strings.Contains(uptext, "/scp")
+			if !connected {
+				logrus.Warn("SSH problem ?")
+			}
+		}
+	}
+
+	k, uperr = sshconfig.SudoCommand("which scp", false)
+	if uperr != nil && k != nil {
+		_, uptext, _, kerr := k.RunWithTimeout(nil, outputs.COLLECT, temporal.GetBigDelay())
+		if kerr == nil {
+			connected := strings.Contains(uptext, "/scp")
+			if !connected {
+				logrus.Warn("SUDO problem ?")
+			}
+		}
+	}
+
 	nerr := utils.LazyRemove(f.Name())
 	if nerr != nil {
-		logrus.Warnf("error deleting file: %v", nerr)
+		logrus.Warnf("Error deleting file: %v", nerr)
 	}
 
 	// Execute script on remote host with retries if needed
@@ -133,7 +156,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 	)
 
 	// cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; if [[ rc -eq 0 ]]; then rm -f %s; fi; exit $rc", filename, filename, filename)
-	cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s", filename, filename)
+	cmd = fmt.Sprintf("chmod u+rwx %s; bash -c %s; rc=$?; exit $rc", filename, filename)
 
 	retryErr = retry.Action(
 		func() error {
@@ -141,7 +164,7 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			stderr = ""
 			retcode = 0
 
-			sshCmd, err := sshconfig.SudoCommand(cmd)
+			sshCmd, err := sshconfig.SudoCommand(cmd, false)
 			if err != nil {
 				return err
 			}
@@ -171,6 +194,18 @@ func executeScript(sshconfig system.SSHConfig, name string, data map[string]inte
 			return 255, stdout, stderr, retryErr
 		}
 	}
+
+	/*
+		k, uperr = sshconfig.SudoCommand("ping -c4 google.com")
+		if uperr != nil {
+			logrus.Warn("Network problem...")
+		} else {
+			_, uptext, _, kerr := k.Run()
+			if kerr == nil {
+				logrus.Warnf("Network working !!: %s", uptext)
+			}
+		}
+	*/
 
 	return retcode, stdout, stderr, err
 }

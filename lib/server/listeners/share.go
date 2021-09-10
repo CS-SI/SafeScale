@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -87,9 +87,6 @@ func (s *ShareListener) Create(ctx context.Context, in *pb.ShareDefinition) (sd 
 	)
 	if err != nil {
 		tbr := fail.Wrap(err, fmt.Sprintf("cannot create share '%s'", shareName)+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 	if share == nil {
@@ -142,10 +139,10 @@ func (s *ShareListener) Delete(ctx context.Context, in *pb.Reference) (empty *go
 
 	err = handler.Delete(ctx, shareName)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
-		return empty, status.Errorf(codes.Internal, fail.Wrap(err, fmt.Sprintf("cannot delete share '%s'", shareName)+adaptedUserMessage(err)).Message())
+		return empty, status.Errorf(
+			codes.Internal,
+			fail.Wrap(err, fmt.Sprintf("cannot delete share '%s'", shareName)+adaptedUserMessage(err)).Message(),
+		)
 	}
 	return empty, nil
 }
@@ -175,9 +172,6 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (sl 
 	shares, err := handler.List(ctx)
 	if err != nil {
 		tbr := fail.Wrap(err, "cannot list Shares"+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -186,7 +180,7 @@ func (s *ShareListener) List(ctx context.Context, in *googleprotobuf.Empty) (sl 
 		for _, share := range item {
 			pbs, err := srvutils.ToPBShare(k, share)
 			if err != nil {
-				log.Warnf("ignoring error listing share: %v", err)
+				log.Warn(err)
 				continue
 			}
 			pbshares = append(pbshares, pbs)
@@ -233,9 +227,6 @@ func (s *ShareListener) Mount(ctx context.Context, in *pb.ShareMountDefinition) 
 	mount, err := handler.Mount(ctx, shareRef, hostRef, hostPath, in.GetWithCache())
 	if err != nil {
 		tbr := fail.Wrap(err, fmt.Sprintf("cannot mount share '%s'", shareRef)+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 	return srvutils.ToPBShareMount(in.GetShare().GetName(), in.GetHost().GetName(), mount)
@@ -277,10 +268,10 @@ func (s *ShareListener) Unmount(ctx context.Context, in *pb.ShareMountDefinition
 	handler := ShareHandler(tenant.Service)
 	err = handler.Unmount(ctx, shareRef, hostRef)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
-		return empty, status.Errorf(codes.Internal, fail.Wrap(err, fmt.Sprintf("cannot unmount share '%s'", shareRef)+adaptedUserMessage(err)).Message())
+		return empty, status.Errorf(
+			codes.Internal,
+			fail.Wrap(err, fmt.Sprintf("cannot unmount share '%s'", shareRef)+adaptedUserMessage(err)).Message(),
+		)
 	}
 	return empty, nil
 }
@@ -315,11 +306,8 @@ func (s *ShareListener) Inspect(ctx context.Context, in *pb.Reference) (sml *pb.
 	handler := ShareHandler(tenant.Service)
 	host, share, mounts, err := handler.Inspect(ctx, shareRef)
 	if err != nil {
-		tbr := fail.Wrap(err, fmt.Sprintf("cannot inspect share '%s'", shareRef)+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
-		return nil, status.Errorf(codes.Internal, tbr.Message())
+		err := fail.Wrap(err, fmt.Sprintf("cannot inspect share '%s'", shareRef)+adaptedUserMessage(err))
+		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if host == nil {
 		return nil, abstract.ResourceNotFoundError("share", shareRef)

@@ -127,7 +127,6 @@ feature:
                             EOF
                             chown safescale:safescale ${SF_ETCDIR}/elasticsearch/docker-compose.yml
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/elasticsearch/docker-compose.yml
-                            sfExit
 
                     start:
                         targets:
@@ -155,7 +154,6 @@ feature:
                             PREFIX="elasticsearch"
                             {{ end }}
                             sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} ${PREFIX}_server_1"
-                            sfExit
 
                     ready:
                         targets:

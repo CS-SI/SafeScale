@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,9 +40,6 @@ func (s *Stack) checkDHCPOptionsName(onet *osc.Net) (bool, fail.Error) {
 func (s *Stack) deleteDhcpOptions(onet *osc.Net, checkName bool) error {
 	// Delete DHCP options
 	namedDHCPOptions, err := s.checkDHCPOptionsName(onet)
-	if err != nil {
-		return err
-	}
 	// prevent deleting default dhcp options
 	if checkName && !namedDHCPOptions {
 		return nil

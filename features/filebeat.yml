@@ -102,7 +102,6 @@ feature:
                             xpack.monitoring:
                                 enabled: true
                             EOF
-                            sfExit
 
                     compose:
                         targets:

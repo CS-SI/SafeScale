@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -130,12 +130,12 @@ func (rfh *RemoteFilesHandler) Upload(hostname string) error {
 }
 
 // Cleanup executes the removal of remote files.
-// Note: Removal of local files is the responsibility of the caller, not the RemoteFilesHandler.
+// Note: Removal of local files is the responsability of the caller, not the RemoteFilesHandler.
 func (rfh *RemoteFilesHandler) Cleanup(hostname string) {
 	for _, v := range rfh.items {
 		err := v.RemoveRemote(hostname)
 		if err != nil {
-			logrus.Warnf("error cleaning remote files: %v", err)
+			logrus.Warnf(err.Error())
 		}
 	}
 }

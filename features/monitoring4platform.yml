@@ -796,7 +796,6 @@ feature:
                                 #         - source: safescale.portainer-ui.admin_password
                                 #           target: admin_password
                             EOF
-                            sfExit
 
                     # secrets:
                     #     targets:

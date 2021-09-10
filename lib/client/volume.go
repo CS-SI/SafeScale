@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // volume is the part of safescale client handing volumes
@@ -74,7 +73,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
-		errs  []error
+		errs  []string
 	)
 
 	volumeDeleter := func(aname string) {
@@ -83,8 +82,8 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 
 		if err != nil {
 			mutex.Lock()
-			defer mutex.Unlock()
-			errs = append(errs, err)
+			errs = append(errs, err.Error())
+			mutex.Unlock()
 		}
 	}
 
@@ -95,11 +94,7 @@ func (v *volume) Delete(names []string, timeout time.Duration) error {
 	wg.Wait()
 
 	if len(errs) > 0 {
-		var errstrs []string
-		for _, aerr := range errs {
-			errstrs = append(errstrs, aerr.Error())
-		}
-		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ package aws
 import (
 	"fmt"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -31,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract/enums/volumestate"
 )
 
-func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, fail.Error) {
 	v, err := s.EC2Service.CreateVolume(
 		&ec2.CreateVolumeInput{
 			Size:             aws.Int64(int64(request.Size)),
@@ -43,16 +41,7 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 		return nil, err
 	}
 
-	defer func() {
-		if xerr != nil {
-			_, derr := s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{
-				VolumeId: v.VolumeId,
-			})
-			if derr != nil {
-				logrus.Warnf("problem deleting volume %s on cleanup after error %s", aws.StringValue(v.VolumeId), derr.Error())
-			}
-		}
-	}()
+	// FIXME: Defer volume destruction
 
 	_, err = s.EC2Service.CreateTags(
 		&ec2.CreateTagsInput{
@@ -62,32 +51,22 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 					Key:   aws.String("Name"),
 					Value: aws.String(request.Name),
 				},
-				{
-					Key:   aws.String("ManagedBy"),
-					Value: aws.String("safescale"),
-				},
-				{
-					Key:   aws.String("DeclaredInBucket"),
-					Value: aws.String(s.Config.MetadataBucket),
-				},
 			},
 		},
 	)
 	if err != nil {
+		// FIXME: Should we delete the volume if we cannot name it ?
 		return nil, err
 	}
 
-	volume := abstract.NewVolume()
-	volume.ID = aws.StringValue(v.VolumeId)
-	volume.Name = request.Name
-	volume.Size = int(aws.Int64Value(v.Size))
-	volume.Speed = toVolumeSpeed(v.VolumeType)
-	volume.State = toVolumeState(v.State)
-	volume.Tags["Name"] = request.Name
-	volume.Tags["ManagedBy"] = "safescale"
-	volume.Tags["DeclaredInBucket"] = s.Config.MetadataBucket
-
-	return volume, nil
+	volume := abstract.Volume{
+		ID:    aws.StringValue(v.VolumeId),
+		Name:  request.Name,
+		Size:  int(aws.Int64Value(v.Size)),
+		Speed: toVolumeSpeed(v.VolumeType),
+		State: toVolumeState(v.State),
+	}
+	return &volume, nil
 }
 
 func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
@@ -105,13 +84,14 @@ func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
 	}
 
 	v := out.Volumes[0]
-	volume := abstract.NewVolume()
-	volume.ID = aws.StringValue(v.VolumeId)
-	volume.Name = aws.StringValue(v.VolumeId) // FIXME: Append name as Tags
-	volume.Size = int(aws.Int64Value(v.Size))
-	volume.Speed = toVolumeSpeed(v.VolumeType)
-	volume.State = toVolumeState(v.State)
-	return volume, nil
+	volume := abstract.Volume{
+		ID:    aws.StringValue(v.VolumeId),
+		Name:  aws.StringValue(v.VolumeId), // FIXME: Append name as Tags
+		Size:  int(aws.Int64Value(v.Size)),
+		Speed: toVolumeSpeed(v.VolumeType),
+		State: toVolumeState(v.State),
+	}
+	return &volume, nil
 }
 
 func toVolumeType(speed volumespeed.Enum) string {
@@ -191,14 +171,14 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 			}
 		}
 
-		volume := abstract.NewVolume()
-		volume.ID = aws.StringValue(v.VolumeId)
-		volume.Name = volumeName
-		volume.Size = int(aws.Int64Value(v.Size))
-		volume.Speed = toVolumeSpeed(v.VolumeType)
-		volume.State = toVolumeState(v.State)
-
-		volumes = append(volumes, *volume)
+		volume := abstract.Volume{
+			ID:    aws.StringValue(v.VolumeId),
+			Name:  volumeName,
+			Size:  int(aws.Int64Value(v.Size)),
+			Speed: toVolumeSpeed(v.VolumeType),
+			State: toVolumeState(v.State),
+		}
+		volumes = append(volumes, volume)
 	}
 
 	return volumes, nil
@@ -255,7 +235,7 @@ func (s *Stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachm
 	out, err := s.EC2Service.DescribeVolumes(
 		&ec2.DescribeVolumesInput{
 			Filters: []*ec2.Filter{
-				{
+				&ec2.Filter{
 					Name:   aws.String("attachment.instance-id"),
 					Values: []*string{aws.String(serverID)},
 				},

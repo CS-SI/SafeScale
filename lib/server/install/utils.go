@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,9 +26,6 @@ import (
 	"sync/atomic"
 	"text/template"
 	"time"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
@@ -57,18 +54,13 @@ trap print_error ERR
 
 set +x
 rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
-
-# Redirects outputs to /opt/safescale/var/log/user_data.final.log
-LOGFILE=%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
-
-### All output to one file and all output to the screen
-exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+exec 1<&-
+exec 2<&-
+exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+exec 2>&1
 set -x
 
 {{ .reserved_BashLibrary }}
-
-waitForUserdata
-sfDetectFacts
 
 {{ .reserved_Content }}
 `
@@ -77,17 +69,97 @@ sfDetectFacts
 // var featureScriptTemplate *template.Template
 var featureScriptTemplate atomic.Value
 
+// // parseTargets validates targets on the cluster from the feature specification
+// // Without error, returns 'master target', 'private node target' and 'public node target'
+// func parseTargets(specs *viper.Viper) (string, string, string, error) {
+// 	if !specs.IsSet("feature.target.cluster") {
+// 		return "", "", "", fmt.Errorf("feature isn't suitable for a cluster")
+// 	}
+
+// 	master := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.master")))
+// 	switch master {
+// 	case "":
+// 		fallthrough
+// 	case "false":
+// 		fallthrough
+// 	case "no":
+// 		fallthrough
+// 	case "none":
+// 		fallthrough
+// 	case "0":
+// 		master = "0"
+// 	case "any":
+// 		fallthrough
+// 	case "one":
+// 		fallthrough
+// 	case "1":
+// 		master = "1"
+// 	case "all":
+// 		fallthrough
+// 	case "*":
+// 		master = "*"
+// 	default:
+// 		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.master'", master)
+// 	}
+
+// 	privnode := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.node.private")))
+// 	switch privnode {
+// 	case "false":
+// 		fallthrough
+// 	case "no":
+// 		fallthrough
+// 	case "none":
+// 		privnode = "0"
+// 	case "any":
+// 		fallthrough
+// 	case "one":
+// 		fallthrough
+// 	case "1":
+// 		privnode = "1"
+// 	case "":
+// 		fallthrough
+// 	case "all":
+// 		fallthrough
+// 	case "*":
+// 		privnode = "*"
+// 	default:
+// 		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.node.private'", privnode)
+// 	}
+
+// 	pubnode := strings.ToLower(strings.TrimSpace(specs.GetString("feature.target.cluster.node.public")))
+// 	switch pubnode {
+// 	case "":
+// 		fallthrough
+// 	case "false":
+// 		fallthrough
+// 	case "no":
+// 		fallthrough
+// 	case "none":
+// 		fallthrough
+// 	case "0":
+// 		pubnode = "0"
+// 	case "any":
+// 		fallthrough
+// 	case "one":
+// 		fallthrough
+// 	case "1":
+// 		pubnode = "1"
+// 	case "all":
+// 		fallthrough
+// 	case "*":
+// 		pubnode = "*"
+// 	default:
+// 		return "", "", "", fmt.Errorf("invalid value '%s' for field 'feature.target.cluster.node.public'", pubnode)
+// 	}
+
+// 	if master == "0" && privnode == "0" && pubnode == "0" {
+// 		return "", "", "", fmt.Errorf("invalid 'feature.target.cluster': no target designated")
+// 	}
+// 	return master, privnode, pubnode, nil
+// }
+
 // UploadFile uploads a file to remote host
 func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, rights string) (err error) {
-	logrus.Debugf("UploadFile %s to %s starting...", remotepath, host.Name)
-	defer func() {
-		if err != nil {
-			logrus.Debugf("UploadFile %s to %s failed with: %v", remotepath, host.Name, err)
-		} else {
-			logrus.Debugf("UploadFile %s to %s OK", remotepath, host.Name)
-		}
-	}()
-
 	if localpath == "" {
 		return fail.InvalidParameterError("localpath", "cannot be empty string")
 	}
@@ -106,33 +178,51 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
+	sshClt := client.New().SSH
+	networkError := false
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			logrus.Debug("Getting the SSH Client")
-			sshClt := client.New().SSH
-			logrus.Debug("Running the SSH copy client")
-			retcode, _, _, err := sshClt.Copy(localpath, to, temporal.GetDefaultDelay(), 90*time.Second)
-			logrus.Debug("Returning from SSH copy client")
+			retcode, _, _, err := sshClt.Copy(localpath, to, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout())
 			if err != nil {
-				logrus.Warnf("Upload problem: %v", err)
 				return err
 			}
-			if retcode == 0 {
-				// it seems copy was ok, but make sure of it
-				retcode, _, _, err = sshClt.Run(host.Name, fmt.Sprintf("test -s %s", remotepath), outputs.COLLECT, temporal.GetDefaultDelay(), 90 * time.Second)
-				if err != nil {
-					return err
+			if retcode != 0 {
+				// If retcode == 1 (general copy error), retry. It may be a temporary network incident
+				if retcode == 1 {
+					// File may exist on target, try to remote it
+					_, _, _, err = sshClt.Run(
+						host.Name, fmt.Sprintf("sudo rm -f %s", remotepath), outputs.COLLECT, temporal.GetBigDelay(),
+						temporal.GetExecutionTimeout(),
+					)
+					if err == nil {
+						return fmt.Errorf("file may exist on remote with inappropriate access rights, deleted it and retrying")
+					}
+					// If submission of removal of remote file fails, stop the retry and consider this as an unrecoverable network error
+					logrus.Tracef(
+						fmt.Sprintf(
+							"this error occured, considered as an unrecoverable network error: %v", err,
+						),
+					)
+					networkError = true
+					return nil
 				}
-				if retcode != 0 {
-					return fmt.Errorf("problem checking file %s on host %s: %d", remotepath, host.Name, retcode)
+				if system.IsSCPRetryable(retcode) {
+					err = fmt.Errorf(
+						"failed to copy file '%s' to '%s' (retcode: %d=%s)", localpath, to, retcode,
+						system.SCPErrorString(retcode),
+					)
+					return err
 				}
 				return nil
 			}
-			return fmt.Errorf("problem copying file %s on host %s: %d", remotepath, host.Name, retcode)
+			return nil
 		},
 		temporal.GetDefaultDelay(),
 		temporal.GetLongOperationTimeout(),
 	)
+	if networkError {
+		return fmt.Errorf("an unrecoverable network error has occurred")
+	}
 	if retryErr != nil {
 		switch retryErr.(type) { // nolint
 		case retry.ErrTimeout:
@@ -158,46 +248,36 @@ func UploadFile(localpath string, host *pb.Host, remotepath, owner, group, right
 		cmd += "sudo chmod " + rights + " " + remotepath
 	}
 
-	if len(cmd) > 0 {
-		retryErr = retry.WhileUnsuccessful(
-			func() error {
-				var retcode int
-				sshClt := client.New().SSH
-				retcode, _, _, err = sshClt.Run(
-					host.Name, cmd, outputs.COLLECT, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout(),
-				)
-				if err != nil {
-					if sta, ok := status.FromError(err); ok {
-						if sta.Code() == codes.NotFound {
-							return fail.AbortedError("not found", err)
-						}
-					}
-					return err
-				}
-				if retcode != 0 {
-					err = fmt.Errorf("failed to change rights of file '%s' (retcode=%d)", to, retcode)
-					logrus.Warnf("hidden failure: %v", err)
-					return nil
-				}
-				return nil
-			},
-			temporal.GetMinDelay(),
-			temporal.GetLongOperationTimeout(),
-		)
-		if retryErr != nil {
-			switch retryErr.(type) {
-			case retry.ErrTimeout:
-				return fmt.Errorf(
-					"timeout trying to change rights of file '%s' on host '%s': %s", remotepath, host.Name, err.Error(),
-				)
-			default:
-				return fmt.Errorf(
-					"failed to change rights of file '%s' on host '%s': %s", remotepath, host.Name, retryErr.Error(),
-				)
+	retryErr = retry.WhileUnsuccessful(
+		func() error {
+			var retcode int
+			retcode, _, _, err = sshClt.Run(
+				host.Name, cmd, outputs.COLLECT, temporal.GetDefaultDelay(), temporal.GetExecutionTimeout(),
+			)
+			if err != nil {
+				return err
 			}
+			if retcode != 0 {
+				err = fmt.Errorf("failed to change rights of file '%s' (retcode=%d)", to, retcode)
+				return nil
+			}
+			return nil
+		},
+		temporal.GetMinDelay(),
+		temporal.GetLongOperationTimeout(),
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case retry.ErrTimeout:
+			return fmt.Errorf(
+				"timeout trying to change rights of file '%s' on host '%s': %s", remotepath, host.Name, err.Error(),
+			)
+		default:
+			return fmt.Errorf(
+				"failed to change rights of file '%s' on host '%s': %s", remotepath, host.Name, retryErr.Error(),
+			)
 		}
 	}
-
 	return nil
 }
 

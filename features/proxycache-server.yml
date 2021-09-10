@@ -33,7 +33,6 @@ feature:
                             hosts: yes
                         run: |
                             docker image ls {{ "--format '{{.Repository}}:{{.Tag}}'" }} | grep 'proxycache:latest' &>/dev/null
-                            sfExit
 
             add:
                 pace: squid
@@ -165,7 +164,6 @@ feature:
                             cd ${SF_TMPDIR} && rm -rf proxycache.image || sfFail 192
 
                             docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml -p proxycache up -d || sfFail 514
-                            sfExit
 
             remove:
                 pace: container
@@ -176,27 +174,21 @@ feature:
                         run: |
                             docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml rm -f
                             docker image rm -f proxycache:latest
-                            sfExit
 
     service:
         start: |
             docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml up -d
-            sfExit
 
         stop: |
             docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml down
-            sfExit
 
         pause: |
             docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml pause
-            sfExit
 
         unpause: |
             docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml unpause
-            sfExit
 
         state: |
             docker ps | grep proxycache &>/dev/null
-            sfExit
 
 ...

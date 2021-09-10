@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package openstack
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
@@ -64,28 +63,18 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	identityEndpoint, _ := identity["IdentityEndpoint"].(string)
 	username, _ := identity["Username"].(string)
 	password, _ := identity["Password"].(string)
-	tenantID, _ := identity["ApplicationKey"].(string)
+	tenantName, _ := compute["TenantName"].(string)
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
-	if zone == "" {
-		zone = "nova"
-	}
+	floatingIPPool, _ := network["FloatingIPPool"].(string)
 	providerNetwork, _ := network["ExternalNetwork"].(string)
 	if providerNetwork == "" {
 		providerNetwork = "public"
-	}
-	floatingIPPool, _ := network["FloatingIPPool"].(string)
-	if floatingIPPool == "" {
-		floatingIPPool = providerNetwork
 	}
 	defaultImage, _ := compute["DefaultImage"].(string)
 	dnsServers, _ := network["DNSServers"].([]string)
 	if len(dnsServers) == 0 {
 		dnsServers = []string{"8.8.8.8", "1.1.1.1"}
-	}
-	maxLifeTime := 0
-	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
@@ -100,7 +89,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
 		Password:         password,
-		TenantID:         tenantID,
+		TenantName:       tenantName,
 		Region:           region,
 		AvailabilityZone: zone,
 		FloatingIPPool:   floatingIPPool,
@@ -114,7 +103,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		ok                 bool
 	)
 	if metadataBucketName, ok = metadata["Bucket"].(string); !ok || metadataBucketName == "" {
-		metadataBucketName, err = objectstorage.BuildMetadataBucketName(providerName, region, tenantID, "0")
+		metadataBucketName, err = objectstorage.BuildMetadataBucketName(providerName, region, tenantName, "0")
 		if err != nil {
 			return nil, err
 		}
@@ -129,12 +118,11 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			"standard":   volumespeed.COLD,
 			"performant": volumespeed.HDD,
 		},
-		DNSList:            dnsServers,
-		DefaultImage:       defaultImage,
-		MetadataBucket:     metadataBucketName,
-		OperatorUsername:   operatorUsername,
-		ProviderName:       providerName,
-		MaxLifetimeInHours: maxLifeTime,
+		DNSList:          dnsServers,
+		DefaultImage:     defaultImage,
+		MetadataBucket:   metadataBucketName,
+		OperatorUsername: operatorUsername,
+		ProviderName:     providerName,
 	}
 
 	stack, err := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -228,7 +216,6 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
-	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
 
 	return cfg, nil
 }

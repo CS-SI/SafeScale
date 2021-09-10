@@ -7,7 +7,7 @@ ARG LANG=C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 ENV BUILD_ENV docker
 ARG BRANCH_NAME
-ARG GOVERSION=1.15.9
+ARG GOVERSION=1.15.2
 ARG PROTOVERSION=3.6.1
 
 # -----------------
@@ -26,8 +26,6 @@ unzip \
 vim \
 git \
 jq \
-iproute2 \
-iputils-ping \
 openssh-server \
 python3.6 \
 python3-pip \

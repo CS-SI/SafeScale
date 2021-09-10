@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -102,26 +102,22 @@ func ListFeatures(suitableFor string) ([]interface{}, error) {
 
 	for _, path := range paths {
 		files, err := ioutil.ReadDir(path)
-		if err != nil {
-			logrus.Error(err)
-			continue
-		}
-
-		for _, f := range files {
-			if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
-				feature, err := NewFeature(
-					concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1),
-				)
-				if err != nil {
-					logrus.Error(err)
-					continue
-				}
-				if _, ok := allEmbeddedMap[feature.displayName]; !ok {
-					allEmbeddedMap[feature.displayName] = feature
+		if err == nil {
+			for _, f := range files {
+				if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
+					feature, err := NewFeature(
+						concurrency.RootTask(), strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1),
+					)
+					if err != nil {
+						logrus.Error(err) // FIXME: Don't hide errors
+						continue
+					}
+					if _, ok := allEmbeddedMap[feature.displayName]; !ok {
+						allEmbeddedMap[feature.displayName] = feature
+					}
 				}
 			}
 		}
-
 	}
 
 	for _, feature := range features {

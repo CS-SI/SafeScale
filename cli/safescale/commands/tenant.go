@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ var TenantCmd = cli.Command{
 		tenantList,
 		tenantGet,
 		tenantSet,
-		tenantInspect,
 		// tenantStorageList,
 		// tenantStorageGet,
 		// tenantStorageSet,
@@ -62,35 +61,6 @@ var tenantList = cli.Command{
 			)
 		}
 		return clitools.SuccessResponse(tenants.GetTenants())
-	},
-}
-
-var tenantInspect = cli.Command{
-	Name:    "inspect",
-	Aliases: []string{"inspect"},
-	Usage:   "inspect current tenant",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "all",
-			Usage: "Inspect all resources on tenant (not only those created by SafeScale)",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", tenantCmdName, c.Command.Name, c.Args())
-		resources, err := client.New().Tenant.Inspect(c.Bool("all"), temporal.GetExecutionTimeout())
-		if err != nil {
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					utils.Capitalize(
-						client.DecorateError(
-							err, "tenant inspection", false,
-						).Error(),
-					),
-				),
-			)
-		}
-
-		return clitools.SuccessResponse(resources)
 	},
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -158,7 +158,7 @@ var shareDelete = cli.Command{
 			defer wg.Done()
 			err := client.New().Share.Delete(aname, temporal.GetExecutionTimeout())
 			if err != nil {
-				msgs, _ := errMessage.Load().(string)
+				msgs := errMessage.Load().(string)
 				msgs += fmt.Sprintf("error while deleting share %s: %s", aname, utils.Capitalize(err.Error()))
 				errMessage.Store(msgs)
 				atomic.AddInt32(&errs, 1)

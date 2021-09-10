@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -227,20 +227,6 @@ func logstashFeature() *Feature {
 // k8shelm2Feature ...
 func k8shelm2Feature() *Feature {
 	name := "k8s.helm2"
-	filename, specs, err := loadSpecFile(name)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
-func k8shelm3Feature() *Feature {
-	name := "k8s.helm3"
 	filename, specs, err := loadSpecFile(name)
 	if err != nil {
 		panic(err.Error())

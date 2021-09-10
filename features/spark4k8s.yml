@@ -50,13 +50,11 @@ feature:
                             masters: one
                         run: |
                             sfDcos package install --yes spark
-                            sfExit
                     cli:
                         targets:
                             masters: all
                         run: |
                             sfDcos package install --yes --cli spark
-                            sfExit
 
             remove: |
                 pace: package
@@ -66,7 +64,6 @@ feature:
                             masters: one
                         run: |
                             sfDcos package remove --yes spark
-                            sfExit
 
         bash:
             check:
@@ -100,7 +97,6 @@ feature:
                             rm -f spark-{{.SparkVersion}}-bin-hadoop2.7.tgz
                             ln -s /usr/local/spark-{{.SparkVersion}}-bin-hadoop2.7 /usr/local/spark
                             ln -s /usr/local/spark/bin/spark-submit /usr/local/bin
-                            sfExit
 
             remove:
                 pace: distrib
@@ -113,5 +109,4 @@ feature:
                         run: |
                             rm -rf /usr/local/spark-{{.SparkVersion}}-bin-hadoop*
                             rm -f /usr/local/spark
-                            sfExit
 ...

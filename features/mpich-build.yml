@@ -33,7 +33,6 @@ feature:
                                 nodes: all
                         run: |
                             which /usr/local/bin/mpiexec &>/dev/null
-                            sfExit
 
             add:
                 pace: fromsrc
@@ -86,4 +85,3 @@ feature:
                                 nodes: all
                         run: |
                             rm -rf /usr/local/bin/mpiexec &>/dev/null
-                            sfExit

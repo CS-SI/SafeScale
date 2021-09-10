@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,10 +68,6 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	buckets, err := handler.List(ctx)
 	if err != nil {
 		tbr := fail.Wrap(err, "Can't list buckets"+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
-
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -102,89 +98,10 @@ func (s *BucketListener) Create(ctx context.Context, in *pb.Bucket) (empty *goog
 	err = handler.Create(ctx, bucketName)
 	if err != nil {
 		tbr := fail.Wrap(err, "cannot create bucket"+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
 	return &googleprotobuf.Empty{}, nil
-}
-
-// Prune
-func (s *BucketListener) Prune(ctx context.Context, in *pb.Bucket) (empty *googleprotobuf.Empty, err error) {
-	bucketName := in.GetName()
-	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Inspect : "+in.GetName()); err != nil {
-		return nil, status.Errorf(
-			codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error(),
-		)
-	}
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		logrus.Info("Cannot verify bucket: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot verify bucket: no tenant set")
-	}
-
-	handler := BucketHandler(tenant.Service)
-	err = handler.Prune(ctx, bucketName)
-	if err != nil {
-		tbr := fail.Wrap(err, "cannot prune bucket"+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
-		return nil, status.Errorf(codes.Internal, tbr.Message())
-	}
-
-	return &googleprotobuf.Empty{}, nil
-}
-
-// Verify
-func (s *BucketListener) Verify(ctx context.Context, in *pb.Bucket) (bl *pb.BucketErrorList, err error) {
-	bucketName := in.GetName()
-	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", bucketName), true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	ctx, cancelFunc := context.WithCancel(ctx)
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Bucket Inspect : "+in.GetName()); err != nil {
-		return nil, status.Errorf(
-			codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error(),
-		)
-	}
-
-	tenant := GetCurrentTenant()
-	if tenant == nil {
-		logrus.Info("Cannot verify bucket: no tenant set")
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot verify bucket: no tenant set")
-	}
-
-	handler := BucketHandler(tenant.Service)
-	resp, err := handler.Verify(ctx, bucketName)
-	if err != nil {
-		tbr := fail.Wrap(err, "cannot verify bucket"+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
-		return nil, status.Errorf(codes.Internal, tbr.Message())
-	}
-	if resp == nil {
-		return &pb.BucketErrorList{}, nil
-	}
-
-	var prErrs []*pb.Error
-	for _, er := range resp {
-		prErrs = append(prErrs, &pb.Error{
-			Error: er.Error(),
-		})
-	}
-
-	return &pb.BucketErrorList{Errors: prErrs}, nil
 }
 
 // Destroy a bucket
@@ -212,9 +129,6 @@ func (s *BucketListener) Destroy(ctx context.Context, in *pb.Bucket) (empty *goo
 	err = handler.Destroy(ctx, bucketName)
 	if err != nil {
 		tbr := fail.Wrap(err, "cannot destroy bucket"+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -246,9 +160,6 @@ func (s *BucketListener) Delete(ctx context.Context, in *pb.Bucket) (empty *goog
 	err = handler.Delete(ctx, bucketName)
 	if err != nil {
 		tbr := fail.Wrap(err, "cannot delete bucket"+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 
@@ -279,9 +190,6 @@ func (s *BucketListener) Inspect(ctx context.Context, in *pb.Bucket) (bmp *pb.Bu
 	resp, err := handler.Inspect(ctx, bucketName)
 	if err != nil {
 		tbr := fail.Wrap(err, "cannot inspect bucket"+adaptedUserMessage(err))
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, tbr.Message())
-		}
 		return nil, status.Errorf(codes.Internal, tbr.Message())
 	}
 	if resp == nil {

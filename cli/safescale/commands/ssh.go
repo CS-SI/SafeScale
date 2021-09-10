@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"github.com/urfave/cli"
 
 	"github.com/CS-SI/SafeScale/lib/client"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -149,7 +150,7 @@ var sshCopy = cli.Command{
 		if retcode != 0 {
 			return clitools.FailureResponse(
 				clitools.ExitOnErrorWithMessage(
-					exitcode.Run, fmt.Sprintf("copy failed: retcode=%d", retcode),
+					exitcode.Run, fmt.Sprintf("copy failed: retcode=%d (%s)", retcode, system.SSHErrorString(retcode)),
 				),
 			)
 		}

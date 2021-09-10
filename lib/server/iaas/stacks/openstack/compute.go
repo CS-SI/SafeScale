@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package openstack
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -167,7 +166,7 @@ func (s *Stack) GetImage(id string) (image *abstract.Image, xerr fail.Error) {
 		2*temporal.GetDefaultDelay(),
 	)
 	if retryErr != nil {
-		return nil, fail.Wrap(retryErr, fmt.Sprintf("error getting image: %s", ProviderErrorToString(retryErr)))
+		return nil, fail.Wrap(xerr, fmt.Sprintf("error getting image: %s", ProviderErrorToString(xerr)))
 	}
 
 	return &abstract.Image{ID: img.ID, Name: img.Name, DiskSize: int64(img.MinDiskGigabytes)}, nil
@@ -331,14 +330,6 @@ func (s *Stack) DeleteKeyPair(id string) error {
 
 	err := keypairs.Delete(s.ComputeClient, id).ExtractErr()
 	if err != nil {
-		if errc, nerr := GetUnexpectedGophercloudErrorCode(err); nerr == nil {
-			if errc != 404 {
-				return fail.Wrap(err, fmt.Sprintf("error deleting key pair: %s", ProviderErrorToString(err)))
-			}
-
-			return nil
-		}
-
 		return fail.Wrap(err, fmt.Sprintf("error deleting key pair: %s", ProviderErrorToString(err)))
 	}
 	return nil
@@ -417,21 +408,13 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 			return nil, err
 		}
 
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			// FIXME: Get creation time and/or metadata
-			logrus.Warn(spew.Sdump(server))
-			logrus.Warn(spew.Sdump(server.Created))
-		}
-
 		err = s.complementHost(host, server)
 		if err != nil {
 			return nil, err
 		}
 
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			if !host.OK() {
-				logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
-			}
+		if !host.OK() {
+			logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 		}
 	default:
 		host.LastState = serverState
@@ -463,14 +446,14 @@ func (s *Stack) interpretAddresses(
 			version := address["version"].(float64)
 			fixedIP := address["addr"].(string)
 			if n == s.cfgOpts.ProviderNetwork {
-				switch int(version) {
+				switch version {
 				case 4:
 					AcccessIPv4 = fixedIP
 				case 6:
 					AcccessIPv6 = fixedIP
 				}
 			} else {
-				switch int(version) {
+				switch version {
 				case 4:
 					addrs[ipversion.IPv4][n] = fixedIP
 				case 6:
@@ -496,20 +479,6 @@ func (s *Stack) complementHost(host *abstract.Host, server *servers.Server) erro
 	}
 
 	host.LastState = toHostState(server.Status)
-
-	// retrieve host metadata
-	var ferr fail.Error
-	host.Tags, ferr = s.getMetadata(host, temporal.GetDefaultDelay())
-	if ferr != nil {
-		return ferr
-	}
-
-	// Add CreationDate to MetaData
-	host.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
-
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		logrus.Warnf("Tags content: %s", spew.Sdump(host.Tags))
-	}
 
 	// Updates Host Property propsv1.HostDescription
 	err := host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(
@@ -615,13 +584,13 @@ func (s *Stack) complementHost(host *abstract.Host, server *servers.Server) erro
 					if err != nil {
 						switch err.(type) {
 						case fail.ErrNotFound:
-							logrus.Errorf(err.Error())
+							logrus.Errorf(err.Error()) // FIXME: complementHost should be a failure
 						default:
 							logrus.Errorf(
 								"failed to get network '%s': %v", netid, err,
-							)
+							) // FIXME: complementHost should be a failure
 						}
-						return err
+						continue
 					}
 					if net.Name == config.ProviderNetwork {
 						continue
@@ -658,35 +627,6 @@ func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
 				host := abstract.NewHost()
 				host.ID = entry["id"].(string)
 				host.Name = name
-				return s.InspectHost(host)
-			}
-		}
-	}
-	return nil, abstract.ResourceNotFoundError("host", name)
-}
-
-// GetHostByID returns the host using the name passed as parameter
-func (s *Stack) GetHostByID(name string) (*abstract.Host, fail.Error) {
-	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", name), true).WithStopwatch().GoingIn().OnExitTrace()()
-
-	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
-	r := servers.GetResult{}
-	_, r.Err = s.ComputeClient.Get(
-		s.ComputeClient.ServiceURL("servers?id="+name), &r.Body, &gc.RequestOpts{
-			OkCodes: []int{200, 203},
-		},
-	)
-	if r.Err != nil {
-		return nil, fail.Errorf(fmt.Sprintf("failed to get data of host '%s': %v", name, r.Err), r.Err)
-	}
-	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
-	if found && len(serverList) > 0 {
-		for _, anon := range serverList {
-			entry := anon.(map[string]interface{})
-			if entry["id"].(string) == name {
-				host := abstract.NewHost()
-				host.ID = name
-				host.Name = entry["name"].(string)
 				return s.InspectHost(host)
 			}
 		}
@@ -779,9 +719,6 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 	}
 
 	// FIXME: Change volume size
-	metadata := make(map[string]string)
-	metadata["ManagedBy"] = "safescale"
-	metadata["DeclaredInBucket"] = s.cfgOpts.MetadataBucket
 
 	srvOpts := servers.CreateOpts{
 		Name:             request.ResourceName,
@@ -791,7 +728,6 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		ImageRef:         request.ImageID,
 		UserData:         userDataPhase1,
 		AvailabilityZone: azone,
-		Metadata:         metadata,
 	}
 
 	// --- Initializes abstract.Host ---
@@ -862,13 +798,12 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		func() error {
 
 			bd := []bootfromvolume.BlockDevice{
-				{
+				bootfromvolume.BlockDevice{
 					UUID:       srvOpts.ImageRef,
 					SourceType: bootfromvolume.SourceImage,
 					VolumeSize: template.DiskSize,
 				},
 			}
-
 			server, ierr := bootfromvolume.Create(s.ComputeClient, bootfromvolume.CreateOptsExt{
 				CreateOptsBuilder: srvOpts,
 				BlockDevice:       bd,
@@ -961,7 +896,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		if s.cfgOpts.UseLegacyFloatingIP {
 			_, errFip := s.CreateFloatingIP()
 			if errFip != nil {
-				logrus.Warnf("failure creating floating ip with legacy method: %v", errFip)
+				logrus.Warn("failure creating floating ip with legacy method")
 			}
 		}
 
@@ -1114,7 +1049,7 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 			for _, state := range states {
 				if lastState == state {
 					if previousIterationState != hoststate.UNKNOWN {
-						logrus.Debugf("Target state of '%s': %s, current state: %s", host.ID, states, lastState)
+						logrus.Warnf("Target state of '%s': %s, current state: %s", host.ID, states, lastState)
 					}
 					return nil
 				}
@@ -1164,74 +1099,7 @@ func (s *Stack) waitHostState(hostParam interface{}, states []hoststate.Enum, ti
 	return server, nil
 }
 
-// getMetadata retrieves host metadata
-// hostParam can be an ID of host, or an instance of *abstract.Host; any other type will return an utils.ErrInvalidParameter
-func (s *Stack) getMetadata(hostParam interface{}, timeout time.Duration) (_ map[string]string, xerr fail.Error) {
-	var host *abstract.Host
-
-	switch hostParam := hostParam.(type) {
-	case string:
-		host = abstract.NewHost()
-		host.ID = hostParam
-	case *abstract.Host:
-		host = hostParam
-	}
-	if host == nil {
-		return nil, fail.InvalidParameterError(
-			"hostParam", "must be a not-empty string or a *abstract.Host!",
-		)
-	}
-
-	hostRef := host.Name
-	if hostRef == "" {
-		hostRef = host.ID
-	}
-
-	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", hostRef), true).WithStopwatch().GoingIn().OnExitTrace()()
-	var metadata map[string]string
-
-	retryErr := retry.WhileUnsuccessful(
-		func() error {
-			server, err := servers.Get(s.ComputeClient, host.ID).Extract()
-			if err != nil {
-				return ReinterpretGophercloudErrorCode(
-					err, nil, []int64{408, 429, 500, 503}, []int64{404, 409}, func(ferr error) error {
-						return fail.AbortedError("", ferr)
-					},
-				)
-			}
-
-			if server == nil {
-				return fail.Errorf("error getting host, nil response from gophercloud", nil)
-			}
-
-			metadata = server.Metadata
-
-			return nil
-		},
-		temporal.GetMinDelay(),
-		timeout,
-	)
-	if retryErr != nil {
-		if _, ok := retryErr.(retry.ErrTimeout); ok {
-			return nil, abstract.TimeoutError(
-				fmt.Sprintf(
-					"timeout waiting to get host '%s' information after %v", hostRef, timeout,
-				), timeout,
-			)
-		}
-
-		if aborted, ok := retryErr.(retry.ErrAborted); ok {
-			return nil, aborted.Cause()
-		}
-
-		return nil, retryErr
-	}
-
-	return metadata, nil
-}
-
-// getHostState retrieves host State
+// waitHostState waits an host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.Host; any other type will return an utils.ErrInvalidParameter
 func (s *Stack) getHostState(hostParam interface{}, timeout time.Duration) (_ hoststate.Enum, xerr fail.Error) {
 	var host *abstract.Host
@@ -1322,9 +1190,8 @@ func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 			}
 
 			for _, srv := range list {
-				theSrv := srv
 				h := abstract.NewHost()
-				err := s.complementHost(h, &theSrv)
+				err := s.complementHost(h, &srv)
 				if err != nil {
 					return false, err
 				}

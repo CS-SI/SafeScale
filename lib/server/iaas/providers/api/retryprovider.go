@@ -790,35 +790,6 @@ func (w RetryProvider) GetHostByName(name string) (res *abstract.Host, xerr fail
 	return res, xerr
 }
 
-// GetHostByID ...
-func (w RetryProvider) GetHostByID(name string) (res *abstract.Host, xerr fail.Error) {
-	retryErr := retry.WhileUnsuccessful(
-		func() error {
-			res, xerr = w.InnerProvider.GetHostByID(name)
-			if xerr != nil {
-				switch xerr.(type) {
-				case fail.ErrTimeout:
-					return xerr
-				case *net.DNSError:
-					return xerr
-				case fail.ErrInvalidRequest:
-					return xerr
-				default:
-					return nil
-				}
-			}
-			return nil
-		},
-		0,
-		temporal.GetContextTimeout(),
-	)
-	if retryErr != nil {
-		return res, retryErr
-	}
-
-	return res, xerr
-}
-
 // GetHostState ...
 func (w RetryProvider) GetHostState(something interface{}) (res hoststate.Enum, xerr fail.Error) {
 	retryErr := retry.WhileUnsuccessful(

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -451,25 +451,13 @@ func (w *worker) Proceed(v Variables, s Settings) (results Results, err error) {
 		}
 
 		var result *StepResults
-		_, tr, err := subtask.WaitFor(10*time.Minute)
-		if err != nil {
-			if tr != nil {
-				result, ok = tr.(*StepResults)
-				if ok {
-					results[k] = *result
-				} else {
-					logrus.Error("problem casting to StepResults")
-				}
-			}
-			return results, err
-		}
+		tr, err := subtask.Wait()
 		if tr != nil {
-			result, ok = tr.(*StepResults)
-			if ok {
-				results[k] = *result
-			} else {
-				logrus.Error("problem casting to StepResults")
-			}
+			result = tr.(*StepResults)
+			results[k] = *result
+		}
+		if err != nil {
+			return results, err
 		}
 	}
 	return results, nil

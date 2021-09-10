@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -247,8 +247,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	}
 	var nets []*abstract.Network
 	for _, onet := range res.Subnets {
-		theSubnet := onet
-		nets = append(nets, toNetwork(&theSubnet))
+		nets = append(nets, toNetwork(&onet))
 	}
 
 	return nets, nil

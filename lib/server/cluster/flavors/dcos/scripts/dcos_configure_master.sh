@@ -26,8 +26,6 @@ exec 2>&1
 
 # shellcheck disable=SC1073
 {{ .reserved_BashLibrary }}
-waitForUserdata
-sfDetectFacts
 
 ###############################################
 ### Defining functions used asynchronously ###

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -167,10 +167,6 @@ func (svc *service) WaitHostState(hostID string, state hoststate.Enum, timeout t
 		for {
 			host, err = svc.InspectHost(host)
 			if err != nil {
-				if _, ok := err.(fail.ErrInvalidParameter); ok {
-					c <- err
-					break
-				}
 				continue
 			}
 			if host.LastState == state {

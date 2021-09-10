@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package aws
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/sirupsen/logrus"
 
@@ -61,6 +60,11 @@ func (p *provider) GetTenantParameters() map[string]interface{} {
 	return p.tenantParameters
 }
 
+// New creates a new instance of aws provider
+func New() apiprovider.Provider {
+	return &provider{}
+}
+
 // Build build a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
 	// tenantName, _ := params["name"].(string)
@@ -76,12 +80,6 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	}
 
 	metadataCfg, ok := params["metadata"].(map[string]interface{})
-	if !ok {
-		_, ok = params["objectstorage"].(map[string]interface{})
-		if !ok {
-			logrus.Warnf("metadata section not found in tenants.toml !!")
-		}
-	}
 
 	networkName := "safescale"
 
@@ -150,10 +148,6 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	projectName, _ := computeCfg["ProjectName"].(string)
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
-	maxLifeTime := 0
-	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
-	}
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
@@ -188,18 +182,17 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	cfgOptions := stacks.ConfigurationOptions{
 		DNSList:                   []string{},
 		UseFloatingIP:             true,
-		UseNATService:             false,
-		ProviderName:              providerName,
-		BuildSubnetworks:          false, // FIXME: AWS by default don't build subnetworks
 		AutoHostNetworkInterfaces: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{
 			"standard":   volumespeed.COLD,
 			"performant": volumespeed.HDD,
 		},
-		DefaultImage:       defaultImage,
-		MetadataBucket:     metadataBucketName,
-		OperatorUsername:   operatorUsername,
-		MaxLifetimeInHours: maxLifeTime,
+		MetadataBucket:   metadataBucketName,
+		DefaultImage:     defaultImage,
+		OperatorUsername: operatorUsername,
+		UseNATService:    false,
+		ProviderName:     providerName,
+		BuildSubnetworks: false, // FIXME: AWS by default don't build subnetworks
 	}
 
 	stack, err := aws.New(authOptions, awsConf, cfgOptions)
@@ -240,8 +233,6 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("BuildSubnetworks", opts.BuildSubnetworks)
-	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
-
 	return cfg, nil
 }
 

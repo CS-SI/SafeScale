@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package aws
 import (
 	"fmt"
 	"net"
-	"os"
 	"reflect"
 	"strings"
 
@@ -63,7 +62,7 @@ func (s *Stack) DeleteVIP(*abstract.VirtualIP) error {
 }
 
 func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, xerr fail.Error) {
-	logrus.Debugf("CreateNetwork invocation")
+	logrus.Warnf("CreateNetwork invocation")
 
 	var theVpc *ec2.Vpc
 
@@ -145,7 +144,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Networ
 		},
 	)
 	if err != nil {
-		logrus.Warnf("Error creating tags: %v", err)
+		logrus.Warn("Error creating tags")
 	}
 
 	defer func() {
@@ -169,7 +168,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Networ
 	var subnetsResult []*ec2.CreateSubnetOutput
 
 	if s.Config.BuildSubnetworks {
-		logrus.Debugf("We should build subnetworks")
+		logrus.Warn("We should build subnetworks")
 		publicSubnetCidr, err := cidr.Subnet(parentNet, 1, 0)
 		if err != nil {
 			return nil, fail.Wrap(err, "error preparing a public subnet")
@@ -182,7 +181,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Networ
 		}
 		subnets = append(subnets, privateSubnetCidr)
 	} else {
-		logrus.Debugf("We should NOT build subnetworks")
+		logrus.Warn("We should NOT build subnetworks") // FIXME: AWS Remove message later
 		subnets = append(subnets, parentNet)
 	}
 
@@ -237,7 +236,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Networ
 		},
 	)
 	if err != nil {
-		logrus.Warnf("Error creating tags: %v", err)
+		logrus.Warn("Error creating tags")
 	}
 
 	for _, sn := range subnetsResult {
@@ -313,7 +312,7 @@ func (s *Stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Networ
 	table, err := s.EC2Service.DescribeRouteTables(
 		&ec2.DescribeRouteTablesInput{
 			Filters: []*ec2.Filter{
-				{
+				&ec2.Filter{
 					Name: aws.String("vpc-id"),
 					Values: []*string{
 						theVpc.VpcId,
@@ -486,7 +485,7 @@ func (s *Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 }
 
 func (s *Stack) DeleteNetwork(id string) error {
-	logrus.Debugf("beginning deletion of network: %s", id)
+	logrus.Warnf("Beginning deletion of network: %s", id)
 
 	vpcnet, err := s.GetNetwork(id)
 	if err != nil {
@@ -536,17 +535,15 @@ func (s *Stack) DeleteNetwork(id string) error {
 		return err
 	}
 
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		logrus.Warn(spew.Sdump(vpcnet))
-	}
+	logrus.Warn(spew.Sdump(vpcnet))
 
 	var vpcId *string
 
 	for _, asnTmp := range snTmp.Subnets {
-		logrus.Debugf("Comparing %s to %s", aws.StringValue(asnTmp.VpcId), vpcnet.Parent)
+		logrus.Warnf("Comparing %s to %s", aws.StringValue(asnTmp.VpcId), vpcnet.Parent)
 		if aws.StringValue(asnTmp.VpcId) == vpcnet.Parent {
 			vpcId = asnTmp.VpcId
-			logrus.Debugf("Deleting subnetwork %s", aws.StringValue(asnTmp.SubnetId))
+			logrus.Warnf("Actually trying to delete subnetwork %s", aws.StringValue(asnTmp.SubnetId))
 			_, err = s.EC2Service.DeleteSubnet(
 				&ec2.DeleteSubnetInput{
 					SubnetId: asnTmp.SubnetId,
@@ -558,7 +555,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 		}
 	}
 
-	logrus.Debugf("Reached gateway delete call")
+	logrus.Warnf("Reached gateway delete call")
 
 	gwTmp, err := s.EC2Service.DescribeInternetGateways(&ec2.DescribeInternetGatewaysInput{})
 	if err != nil {
@@ -590,7 +587,7 @@ func (s *Stack) DeleteNetwork(id string) error {
 		}
 	}
 
-	logrus.Debugf("Reached Route delete call")
+	logrus.Warnf("Reached Route delete call")
 
 	rtTmp, err := s.EC2Service.DescribeRouteTables(&ec2.DescribeRouteTablesInput{})
 	if err != nil {
@@ -631,12 +628,12 @@ func (s *Stack) DeleteNetwork(id string) error {
 		}
 	}
 
-	logrus.Debugf("Reached Route Table delete call")
+	logrus.Warnf("Reached Route Table delete call")
 
 	table, err := s.EC2Service.DescribeRouteTables(
 		&ec2.DescribeRouteTablesInput{
 			Filters: []*ec2.Filter{
-				{
+				&ec2.Filter{
 					Name: aws.String("vpc-id"),
 					Values: []*string{
 						vpcId,
@@ -663,15 +660,18 @@ func (s *Stack) DeleteNetwork(id string) error {
 		}
 	}
 
-	logrus.Debugf("Reached DeleteVpc call")
+	logrus.Warnf("Reached DeleteVpc call")
 
 	_, err = s.EC2Service.DeleteVpc(
 		&ec2.DeleteVpcInput{
 			VpcId: aws.String(vpcnet.Parent),
 		},
 	)
+	if err != nil {
+		return err
+	}
 
-	return err
+	return nil
 }
 
 func getAwsInstanceState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) {

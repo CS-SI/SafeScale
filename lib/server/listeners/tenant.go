@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ package listeners
 import (
 	"context"
 	"fmt"
-	"math"
-	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
@@ -89,9 +87,6 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (li
 
 	tenants, err := iaas.GetTenantNames()
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -108,111 +103,10 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (li
 	return &pb.TenantList{Tenants: tl}, nil
 }
 
-// List registered tenants
-func (s *TenantListener) Inspect(ctx context.Context, in *pb.TenantInspectRequest) (list *pb.ResourceList, err error) {
-	if s == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
-	}
-
-	all := in.All
-
-	tracer := debug.NewTracer(nil, "", true).WithStopwatch().GoingIn()
-	defer tracer.OnExitTrace()()
-	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	ctx, cancelFunc := context.WithCancel(ctx)
-	// FIXME: handle error
-	if err := srvutils.JobRegister(ctx, cancelFunc, "Tenants Inspect"); err == nil {
-		defer srvutils.JobDeregister(ctx)
-	}
-
-	// FIXME: Do something with tenant
-	tenant := getCurrentTenant()
-	if tenant == nil {
-		return nil, status.Errorf(codes.FailedPrecondition, "cannot inspect tenant: no tenant set")
-	}
-
-	cfg, err := tenant.Service.GetConfigurationOptions()
-	if err != nil {
-		return nil, status.Error(codes.Unknown, fmt.Sprintf("cannot inspect tenant : cannot read configuration : %s", err.Error()))
-	}
-
-	if _, ok := cfg.Get("MaxLifetimeInHours"); !ok { // No problem, flag not defined, nothing to do here
-		return &pb.ResourceList{}, nil
-	}
-
-	limit := math.MaxInt32
-	if mlt, ok := cfg.Get("MaxLifetimeInHours"); ok {
-		if cmlt, ok := mlt.(int); ok {
-			limit = cmlt
-		}
-	}
-	if limit == math.MaxInt32 || limit == 0 {
-		return &pb.ResourceList{}, nil
-	}
-
-	var ress []*pb.Resource
-
-	hosts, err := tenant.Service.ListHosts()
-	if err != nil {
-		return nil, status.Errorf(codes.Unknown, fmt.Sprintf("cannot inspect tenant : cannot list hosts : %s", err.Error()))
-	}
-
-	for _, aho := range hosts {
-		if val, ok := aho.Tags["CreationDate"]; ok {
-			pat, err := time.Parse(time.RFC3339, val)
-			if err != nil {
-				continue
-			}
-			duration := time.Since(pat)
-			if duration.Hours() > float64(limit) {
-				if all {
-					ress = append(ress, &pb.Resource{ResourceId: aho.ID, ResourceType: "Host", ResourceName: aho.Name})
-				} else {
-					if manager, ok := aho.Tags["ManagedBy"]; ok {
-						if manager == "safescale" {
-							ress = append(ress, &pb.Resource{ResourceId: aho.ID, ResourceType: "Host", ResourceName: aho.Name})
-						}
-					}
-				}
-			}
-		}
-	}
-
-	volumes, err := tenant.Service.ListVolumes()
-	if err != nil {
-		return nil, status.Errorf(codes.Unknown, fmt.Sprintf("cannot inspect tenant : cannot list hosts : %s", err.Error()))
-	}
-
-	for _, vol := range volumes {
-		if val, ok := vol.Tags["CreationDate"]; ok {
-			pat, err := time.Parse(time.RFC3339, val)
-			if err != nil {
-				continue
-			}
-			duration := time.Since(pat)
-			if duration.Hours() > float64(limit) {
-				if all {
-					ress = append(ress, &pb.Resource{ResourceId: vol.ID, ResourceType: "Volume", ResourceName: vol.Name})
-				} else {
-					if manager, ok := vol.Tags["ManagedBy"]; ok {
-						if manager == "safescale" {
-							ress = append(ress, &pb.Resource{ResourceId: vol.ID, ResourceType: "Volume", ResourceName: vol.Name})
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return &pb.ResourceList{
-		Resources: ress,
-	}, nil
-}
-
 // Get returns the name of the current tenant used
 func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (tn *pb.TenantName, err error) {
 	if s == nil {
+		// FIXME: return a status.Errorf
 		return nil, status.Errorf(codes.FailedPrecondition, fail.InvalidInstanceError().Message())
 	}
 

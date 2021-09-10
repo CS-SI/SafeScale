@@ -18,14 +18,14 @@
 
 {{.Header}}
 
-function print_error() {
+print_error() {
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file:" "{"$(sed "${line}q;d" "$file")"}" >&2
     echo -n "2,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 }
 trap print_error ERR
 
-function fail() {
+fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
     set +x
@@ -42,7 +42,7 @@ exec 1<>/opt/safescale/var/log/user_data.phase1.log
 exec 2>&1
 set -x
 
-function sfApt() {
+sfApt() {
     rc=-1
     DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
     [ $rc -eq -1 ] && return 1
@@ -51,7 +51,7 @@ function sfApt() {
 export -f sfApt
 
 # try using dnf instead of yum if available
-function sfYum() {
+sfYum() {
     rc=-1
     if [[ -n $(which dnf) ]]; then
         dnf "$@" && rc=$?
@@ -65,7 +65,7 @@ export -f sfYum
 
 # sfRetry <timeout> <delay> command
 # retries command until success, with sleep of <delay> seconds
-function sfRetry() {
+sfRetry() {
     local timeout=$1
     local delay=$2
     shift 2
@@ -100,7 +100,7 @@ VERSION_ID=
 FULL_VERSION_ID=
 FULL_HOSTNAME=
 
-function sfAvail() {
+sfAvail() {
     rc=-1
     case $LINUX_KIND in
     redhat | rhel | centos | fedora)
@@ -119,7 +119,7 @@ function sfAvail() {
 }
 export -f sfAvail
 
-function sfDetectFacts() {
+sfDetectFacts() {
     [[ -f /etc/os-release ]] && {
         . /etc/os-release
         LINUX_KIND=$ID
@@ -149,12 +149,9 @@ function sfDetectFacts() {
         }
     }
 }
-export -f sfDetectFacts
-
-# Detect facts
 sfDetectFacts
 
-function create_user() {
+create_user() {
     echo "Creating user {{.User}}..."
     useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home || true
     echo "{{.User}}:{{.Password}}" | chpasswd
@@ -198,21 +195,6 @@ pathappend() {
 }
 pathprepend $HOME/.local/bin
 pathappend /opt/safescale/bin
-
-if [[ ! -v SAFESCALESSHUSER ]]; then
-    :
-elif [[ -z "$SAFESCALESSHUSER" ]]; then
-    :
-else
-    if [[ ! -v SAFESCALESSHPASS ]]; then
-        :
-    elif [[ -z "$SAFESCALESSHPASS" ]]; then
-        :
-    else
-        echo "$SAFESCALESSHPASS" | sudo -S -u $SAFESCALESSHUSER sudo -S -l 2>&1 | grep "incorrect" && exit
-        sudo -u $SAFESCALESSHUSER -i;exit
-    fi
-fi
 EOF
 
     chown -R {{.User}}:{{.User}} /opt/safescale
@@ -228,12 +210,12 @@ EOF
         chmod ug+r-wx,o-rwx $i
     done
 
-    echo "done"
+    echo done
 }
 
 # Follows the CentOS rules:
 # - /etc/hostname contains short hostname
-function put_hostname_in_hosts() {
+put_hostname_in_hosts() {
     FULL_HOSTNAME="{{ .HostName }}"
     SHORT_HOSTNAME="${FULL_HOSTNAME%%.*}"
 
@@ -244,13 +226,13 @@ function put_hostname_in_hosts() {
 }
 
 # Disable cloud-init automatic network configuration to be sure our configuration won't be replaced
-function disable_cloudinit_network_autoconf() {
+disable_cloudinit_network_autoconf() {
     fname=/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
     mkdir -p $(dirname $fname)
     echo "network: {config: disabled}" >$fname
 }
 
-function disable_services() {
+disable_services() {
     case $LINUX_KIND in
     debian | ubuntu)
         if [[ -n $(which systemctl) ]]; then
@@ -295,7 +277,7 @@ function check_dns_configuration() {
 }
 
 function is_network_reachable() {
-    NETROUNDS=2
+    NETROUNDS=4
     REACHED=0
     TRIED=0
 
@@ -306,7 +288,7 @@ function is_network_reachable() {
         fi
 
         if [[ ${TRIED} -eq 1 ]]; then
-            continue
+            break
         fi
 
         if which wget; then
@@ -315,7 +297,7 @@ function is_network_reachable() {
         fi
 
         if [[ ${TRIED} -eq 1 ]]; then
-            continue
+            break
         fi
 
         ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
@@ -330,7 +312,7 @@ function is_network_reachable() {
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-function ensure_network_connectivity() {
+ensure_network_connectivity() {
     op=-1
     is_network_reachable && op=$? || true
     if [[ ${op} -eq 0 ]]; then
@@ -340,11 +322,9 @@ function ensure_network_connectivity() {
     fi
 
     {{- if .AddGateway }}
-    echo "This is NOT a gateway"
     route del -net default &>/dev/null
     route add -net default gw {{ .DefaultRouteIP }}
     {{- else }}
-    echo "This IS a gateway"
     :
     {{- end}}
 
@@ -454,32 +434,11 @@ function silent_compatible_network() {
     fi
 }
 
-function track_time() {
-    uptime
-    last
-}
-
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
 
-PHASE_DONE=/opt/safescale/var/state/user_data.phase1.done
-if [[ -f "$PHASE_DONE" ]]; then
-    echo "$PHASE_DONE already there."
-    set +x
-    exit 0
-fi
-
-PHASE_DONE=/opt/safescale/var/state/user_data.phase2.done
-if [[ -f "$PHASE_DONE" ]]; then
-    echo "$PHASE_DONE already there."
-    set +x
-    exit 0
-fi
-
 put_hostname_in_hosts
-
-track_time
 
 check_dns_configuration || true
 
@@ -497,8 +456,6 @@ touch /etc/cloud/cloud-init.disabled
 
 fail_fast_unsupported_distros
 
-track_time
-
-echo -n "0,linux,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.phase1.done
+echo -n "0,linux,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase1.done
 set +x
 exit 0

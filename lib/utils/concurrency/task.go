@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,9 +23,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -70,7 +67,6 @@ type TaskGuard interface {
 type TaskCore interface {
 	Abort() error
 	Aborted() bool
-	Finished() bool
 	ForceID(string) (Task, error)
 	GetID() (string, error)
 	GetSignature() string
@@ -81,7 +77,8 @@ type TaskCore interface {
 	Unlock(TaskedLock)
 	RUnlock(TaskedLock)
 	New() (Task, error)
-	NewWithContext(ctx context.Context) (Task, error)
+	// Reset() (Task, error) // VPL: disabled, may lead to DATARACE; need to either fix or definitively remove Reset()
+	// GetResult() TaskResult
 	Run(TaskAction, TaskParameters) (TaskResult, error)
 	Start(TaskAction, TaskParameters) (Task, error)
 	StartWithTimeout(TaskAction, TaskParameters, time.Duration) (Task, error)
@@ -110,7 +107,6 @@ type task struct {
 	result TaskResult
 
 	generation uint // For tracing/debug purpose
-	lifetime   time.Time
 }
 
 var globalTask atomic.Value
@@ -119,7 +115,7 @@ var globalTask atomic.Value
 func RootTask() Task {
 	anon := globalTask.Load()
 	if anon == nil {
-		newT, _ := newTask(context.Background(), nil)
+		newT, _ := newTask(context.TODO(), nil)
 		newT.id = "0"
 		newT.generation = 0
 		globalTask.Store(newT)
@@ -135,7 +131,7 @@ func VoidTask() (Task, error) {
 
 // NewTask ...
 func NewTask(parentTask Task) (Task, error) {
-	return newTask(context.Background(), parentTask)
+	return newTask(context.TODO(), parentTask)
 }
 
 // NewTaskWithContext ...
@@ -204,6 +200,8 @@ func (t *task) GetSignature() string {
 
 // Status returns the current task status
 func (t *task) GetStatus() TaskStatus {
+	t.lock.Lock()
+	defer t.lock.Unlock()
 	return t.status
 }
 
@@ -246,8 +244,6 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	t.lifetime = time.Now()
-
 	if action == nil {
 		t.status = DONE
 	} else {
@@ -260,14 +256,8 @@ func (t *task) StartWithTimeout(action TaskAction, params TaskParameters, timeou
 	return t, nil
 }
 
-// controller controls the start, termination and possibly abortion of the action
+// controller controls the start, termination and possibly aboprtion of the action
 func (t *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) {
-	defer func() {
-		if err := recover(); err != nil {
-			logrus.Warnf("panic in controller !!")
-		}
-	}()
-
 	go t.run(action, params)
 
 	// tracer := NewTracer(t, "", true)
@@ -279,33 +269,21 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				// logrus.Debugf("receiving signal from context, aborting task %s", t.id)
+				// tracer.Trace("receiving signal from context, aborting task...")
 				t.lock.Lock()
 				if t.status == RUNNING && t.abortCh != nil {
-					if t.ctx != nil {
-						if t.ctx.Err() == context.Canceled {
-							t.status = DONE
-						}
-						if t.ctx.Err() == context.DeadlineExceeded {
-							t.status = TIMEOUT
-						}
-					}
 					t.abortCh <- struct{}{}
-				} else {
-					t.status = DONE
 				}
 				t.lock.Unlock()
-				finish = true
 			case <-t.doneCh:
 				// When action is done, "rearms" the done channel to allow Wait()/TryWait() to read from it
-				// logrus.Debugf("receiving done signal from go routine %s", t.id)
+				// tracer.Trace("receiving done signal from go routine")
 				t.lock.Lock()
 				t.status = DONE
 				t.lock.Unlock()
 				finish = true
 			case <-t.abortCh:
 				// Abort signal received
-				// logrus.Debugf("receiving from abortch channel %s", t.id)
 				t.lock.Lock()
 				close(t.abortCh)
 				t.abortCh = nil
@@ -316,7 +294,6 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 				t.lock.Unlock()
 				finish = true
 			case <-time.After(timeout):
-				// logrus.Debugf("catching a timeout %s", t.id)
 				t.lock.Lock()
 				st := t.status
 				t.status = TIMEOUT
@@ -337,32 +314,20 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 			select {
 			case <-t.ctx.Done():
 				// Context cancel signal received, propagating using abort signal
-				// logrus.Debugf("receiving signal from context, aborting task %s", t.id)
+				// tracer.Trace("receiving signal from context, aborting task...")
 				t.lock.Lock()
 				if t.status == RUNNING && t.abortCh != nil {
-					if t.ctx != nil {
-						if t.ctx.Err() == context.Canceled {
-							t.status = DONE
-						}
-						if t.ctx.Err() == context.DeadlineExceeded {
-							t.status = TIMEOUT
-						}
-					}
 					t.abortCh <- struct{}{}
-				} else {
-					t.status = DONE
 				}
 				t.lock.Unlock()
-				finish = true
 			case <-t.doneCh:
-				// logrus.Debugf("receiving done signal from go routine %s", t.id)
 				t.lock.Lock()
 				t.status = DONE
 				t.lock.Unlock()
 				finish = true
 			case <-t.abortCh:
 				// Abort signal received
-				// logrus.Debugf("receiving from abortch channel %s", t.id)
+				// tracer.Trace("receiving abort signal")
 				t.lock.Lock()
 				close(t.abortCh)
 				t.abortCh = nil
@@ -376,30 +341,15 @@ func (t *task) controller(action TaskAction, params TaskParameters, timeout time
 		}
 	}
 
-	logrus.Debugf("sending to finish channel of %s", t.id)
+	t.lock.Lock()
 	t.finishCh <- struct{}{}
 	close(t.finishCh)
+	t.lock.Unlock()
 }
 
 // run executes the function 'action'
 func (t *task) run(action TaskAction, params TaskParameters) {
-	var err error
-	var result TaskResult
-
-	defer func() {
-		if err := recover(); err != nil {
-			logrus.Warnf("panic in task !!")
-			t.lock.Lock()
-			defer t.lock.Unlock()
-
-			t.err = fail.RuntimePanicError(fmt.Sprintf("panic happened: %v", err))
-			t.result = nil
-			t.doneCh <- false
-			defer close(t.doneCh)
-		}
-	}()
-
-	result, err = action(t, params)
+	result, err := action(t, params)
 
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -411,41 +361,17 @@ func (t *task) run(action TaskAction, params TaskParameters) {
 }
 
 // Run starts task, waits its completion then return the error code
-func (t *task) Run(action TaskAction, params TaskParameters) (_ TaskResult, err error) {
-	rt := time.Now()
-	defer func() {
-		if params != nil {
-			if p, ok := params.(data.Map); ok {
-				if anon, ok := p["variables"]; ok {
-					if vars, ok := anon.(map[string]interface{}); ok {
-						if what, ok := vars["StepID"]; ok {
-							if err != nil {
-								logrus.Debugf("action %s FAILED and took %s", what, time.Since(rt))
-							} else {
-								logrus.Debugf("action %s took %s", what, time.Since(rt))
-							}
-						}
-					}
-				}
-			}
-		}
-	}()
-
-	_, err = t.Start(action, params)
+func (t *task) Run(action TaskAction, params TaskParameters) (TaskResult, error) {
+	_, err := t.Start(action, params)
 	if err != nil {
 		return nil, err
 	}
-	result, err := t.Wait() // FIXME: Use waitFor instead
-	return result, err
+	return t.Wait()
 }
 
 // Wait waits for the task to end, and returns the error (or nil) of the execution
 func (t *task) Wait() (TaskResult, error) {
 	tid, _ := t.GetID() // FIXME: Later
-
-	defer func() {
-		logrus.Tracef("wait of %s finished after %s", t.id, time.Since(t.lifetime))
-	}()
 
 	status := t.GetStatus()
 	if status == DONE {
@@ -457,25 +383,11 @@ func (t *task) Wait() (TaskResult, error) {
 	if status != RUNNING {
 		return nil, fmt.Errorf("cannot wait task '%s': not running (%d)", tid, status)
 	}
+	<-t.finishCh
 
-	for {
-		select {
-		case <-t.finishCh:
-			return t.result, t.err
-		default:
-			status = t.GetStatus()
-			if status == DONE {
-				return t.result, t.err
-			}
-			if status == ABORTED {
-				return nil, t.err
-			}
-			if status != RUNNING {
-				return nil, fmt.Errorf("cannot wait task '%s': not running (%d)", tid, status)
-			}
-			time.Sleep(250 * time.Millisecond)
-		}
-	}
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	return t.result, t.err
 }
 
 // TryWait tries to wait on a task
@@ -510,70 +422,64 @@ func (t *task) TryWait() (bool, TaskResult, error) {
 func (t *task) WaitFor(duration time.Duration) (bool, TaskResult, error) {
 	tid, _ := t.GetID() // FIXME: Later
 
-	defer func() {
-		logrus.Tracef("waitfor of %s finished after %s", t.id, time.Since(t.lifetime))
-	}()
-
-	type result struct {
-		resBool bool
-		res TaskResult
-		resErr error
+	status := t.GetStatus()
+	if status == DONE {
+		return true, t.result, t.err
+	}
+	if status == ABORTED {
+		return true, nil, t.err
+	}
+	if status != RUNNING {
+		return false, nil, fmt.Errorf("cannot wait task '%s': not running", tid)
 	}
 
-	resChan := make(chan result)
-	go func() {
-		for {
-			select {
-			case <-t.finishCh:
-				defer close(resChan)
-				resChan <- result{
-					resBool: true,
-					res:     t.result,
-					resErr:  t.err,
-				}
-				return
-			default:
-				status := t.GetStatus()
-				if status == DONE {
-					defer close(resChan)
-					resChan <- result{
-						resBool: true,
-						res:     t.result,
-						resErr:  t.err,
-					}
-					return
-				}
-				if status == ABORTED {
-					defer close(resChan)
-					resChan <- result{
-						resBool: true,
-						res:     nil,
-						resErr:  t.err,
-					}
-					return
-				}
-				if status != RUNNING {
-					defer close(resChan)
-					resChan <- result{
-						resBool: false,
-						res:     nil,
-						resErr:  fmt.Errorf("cannot wait task '%s': not running", tid),
-					}
-					return
-				}
-				// Waits 250 ms between checks...
-				time.Sleep(250 * time.Millisecond)
+	for {
+		select {
+		case <-time.After(duration):
+			return false, nil, fail.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
+		default:
+			ok, result, err := t.TryWait()
+			if ok {
+				return ok, result, err
 			}
+			// Waits 1 ms between checks...
+			time.Sleep(time.Millisecond)
 		}
-	}()
-
-	select {
-	case res := <-resChan:
-		return res.resBool, res.res, res.resErr
-	case <-time.After(duration):
-		return false, nil, fail.TimeoutError(fmt.Sprintf("timeout waiting for task '%s'", tid), duration, nil)
 	}
 }
+
+// Reset resets the task for reuse
+// VPL: DISABLED; need fix or definitive removal
+// func (t *task) Reset() (Task, error) {
+// 	tid, _ := t.GetID() // FIXME: Later
+
+// 	status := t.GetStatus()
+// 	if status == RUNNING {
+// 		return nil, fmt.Errorf("cannot reset task '%s': task running", tid)
+// 	}
+
+// 	t.lock.Lock()
+// 	defer t.lock.Unlock()
+
+// 	t.status = READY
+// 	t.err = nil
+// 	t.result = nil
+// 	return t, nil
+// }
+
+// // GetResult returns the result of the task action
+// func (t *task) GetResult() TaskResult {
+// 	status := t.GetStatus()
+// 	if status == READY {
+// 		panic("Can't get result of task '%s': task not started!")
+// 	}
+// 	if status != DONE {
+// 		panic("Can't get result of task '%s': task not done!")
+// 	}
+// 	t.lock.Lock()
+// 	defer t.lock.Unlock()
+// 	return t.result
+// }
 
 // Abort aborts the task execution
 func (t *task) Abort() error {
@@ -582,32 +488,22 @@ func (t *task) Abort() error {
 	}
 
 	status := t.GetStatus()
-
-	t.lock.Lock()
-	defer t.lock.Unlock()
 	if status == RUNNING {
-		// Tell context to cancel
-		t.status = ABORTED
-	}
-	if status == READY {
-		t.status = ABORTED
-	}
-	t.cancel()
+		t.lock.Lock()
+		defer t.lock.Unlock()
 
+		// Tell context to cancel
+		t.cancel()
+
+		t.status = ABORTED
+	}
 	return nil
 }
 
 // Aborted tells if task has been aborted
 func (t *task) Aborted() bool {
 	st := t.GetStatus()
-	ctxErr := t.GetContext().Err()
-	return st == ABORTED || st == TIMEOUT || ctxErr != nil
-}
-
-func (t *task) Finished() bool {
-	st := t.GetStatus()
-	ctxErr := t.GetContext().Err()
-	return st == ABORTED || st == TIMEOUT || st == DONE || ctxErr != nil
+	return st == ABORTED || st == TIMEOUT
 }
 
 // StoreResult stores the result of the run
@@ -619,11 +515,7 @@ func (t *task) StoreResult(result TaskParameters) {
 
 // New creates a subtask from current task
 func (t *task) New() (Task, error) {
-	return newTask(context.Background(), t)
-}
-
-func (t *task) NewWithContext(ctx context.Context) (Task, error) {
-	return newTask(ctx, t)
+	return newTask(context.TODO(), t)
 }
 
 // Lock locks the TaskedLock

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package fail
 
 import (
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -131,61 +130,6 @@ func sender() error {
 
 func specialSender() error {
 	return InvalidInstanceError()
-}
-
-func newKindGenerator() error {
-	return Wrapf("this is a problem: %w", fmt.Errorf("this failed"))
-}
-
-func newKindRawGenerator() error {
-	return Wrapf("This was an issue: %v", fmt.Errorf("it failed"))
-}
-
-func TestUnwrap2(t *testing.T) {
-	var err error
-	err = newKindRawGenerator()
-
-	if _, ok := err.(causer); !ok {
-		t.FailNow()
-	}
-
-	if withCause, ok := err.(causer); ok {
-		cause := withCause.Cause()
-		cerr := cause.Error()
-		require.Equal(t, "This was an issue: it failed", cerr)
-	}
-
-	// This time, unwrap should do nothing...
-	rawCause := errors.Unwrap(err)
-	require.NotNil(t, rawCause)
-
-	ct := rawCause.Error()
-	require.Equal(t, "This was an issue: it failed", ct)
-
-	fmt.Println(err.Error())
-}
-
-func TestUnwrap(t *testing.T) {
-	var err error
-	err = newKindGenerator()
-
-	if _, ok := err.(causer); !ok {
-		t.FailNow()
-	}
-
-	if withCause, ok := err.(causer); ok {
-		cause := withCause.Cause()
-		cerr := cause.Error()
-		require.Equal(t, "this is a problem: this failed", cerr)
-	}
-
-	rawCause := errors.Unwrap(err)
-	require.NotNil(t, rawCause)
-
-	ct := rawCause.Error()
-	require.Equal(t, "this is a problem: this failed", ct)
-
-	fmt.Println(err.Error())
 }
 
 func TestRecognizeErrCore(t *testing.T) {

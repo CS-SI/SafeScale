@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -125,9 +125,6 @@ type ConfigurationOptions struct {
 
 	// OperatorUsername contain the name of the safescale created user
 	OperatorUsername string
-
-	// Specify limited life for some resources
-	MaxLifetimeInHours int
 
 	// Customizations map[string]string
 

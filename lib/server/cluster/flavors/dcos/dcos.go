@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -367,7 +367,7 @@ func getState(task concurrency.Task, foreman control.Foreman) (clusterstate.Enum
 		return clusterstate.Error, err
 
 	}
-	_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetContextTimeout())
+	_, err = sshCfg.WaitServerReady("ready", temporal.GetContextTimeout())
 	if err != nil {
 		return clusterstate.Error, err
 	}

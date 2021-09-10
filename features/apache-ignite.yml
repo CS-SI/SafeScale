@@ -33,7 +33,6 @@ feature:
                         sfFail 1
                         ;;
                 esac
-                sfExit
 
             add: |
                 case $LINUX_KIND in
@@ -64,7 +63,6 @@ feature:
                         sfFail 1
                         ;;
                 esac
-                sfExit
 
             remove: |
                 systemctl stop pache-ignite
@@ -78,7 +76,5 @@ feature:
                         sfApt remove -y apache-ignite
                         rm -f /etc/apt/sources.list.d/ignite.list
                         ;;
-                esac
-                sfExit
 
 ...

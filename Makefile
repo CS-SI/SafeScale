@@ -5,6 +5,9 @@ ndef = $(if $(value $(1)),,$(error $(1) not set))
 .PHONY: default
 default: help ;
 
+#ROOTDIR:=$(shell ROOTDIR='$(ROOTDIR)' bash -c "dirname $(realpath $(lastword $(MAKEFILE_LIST)))")
+#export ROOTDIR
+
 include ./common.mk
 
 # Binaries generated
@@ -36,20 +39,19 @@ ERRCHECK := github.com/kisielk/errcheck
 XUNIT := github.com/tebeka/go2xunit
 COVERTOOL := github.com/dlespiau/covertool
 GOVENDOR := github.com/kardianos/govendor
-RULES := github.com/quasilyte/go-ruleguard/...
 
 DEVDEPSLIST := $(RICE) $(PROTOBUF) $(DEP) $(COVER) $(XUNIT) $(COVERTOOL) $(GOVENDOR)
 
 BUILD_TAGS :=
 export BUILD_TAGS
 
-all: begin ground getdevdeps ensure patch generate lib cli err-light vet-light
+all: begin ground getdevdeps ensure generate lib cli err vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
-common: begin ground getdevdeps ensure patch generate
+common: begin ground getdevdeps ensure generate
 
 versioncut:
-	@(($(GO) version | grep go1.13) || ($(GO) version | grep go1.14) || ($(GO) version | grep go1.15)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.13 ! $(NO_COLOR)\n" && /bin/false);
+	@(($(GO) version | grep go1.12) || ($(GO) version | grep go1.13) || ($(GO) version | grep go1.14) || ($(GO) version | grep go1.15)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.12 ! $(NO_COLOR)\n" && /bin/false);
 
 begin: versioncut
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins ...$(NO_COLOR)\n";
@@ -68,7 +70,7 @@ libvirt:
 		printf "%b" "$(WARN_COLOR)$(WARN_STRING) Hardware acceleration is NOT available!\n"; \
 	fi
 	@$(eval BUILD_TAGS = "--tags=libvirt")
-	@export BUILD_TAGS = "--tags=libvirt"
+	@export BUILD_TAGS="--tags=libvirt"
 
 with_git:
 	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
@@ -79,16 +81,13 @@ ground:
 	@command -v $(GO) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) go is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v protoc >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) protoc is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 
-getdevdeps: begin ground
+getdevdeps: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@which dep > /dev/null; if [ $$? -ne 0 ]; then \
     	printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading dep...\n" && $(GO) get -u $(DEP); \
     fi
 	@which rice > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...\n" && $(GO) get -u $(RICE); \
-	fi
-	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u $(STRINGER); \
 	fi
 	@which govendor > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading govendor...\n" && $(GO) get -u $(GOVENDOR); \
@@ -105,20 +104,18 @@ getdevdeps: begin ground
 	@which errcheck > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get -u $(ERRCHECK); \
 	fi
+	@which goconvey > /dev/null; if [ $$? -ne 0 ]; then \
+  		mkdir ./vendor >/dev/null 2>&1 || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && govendor fetch $(CONVEY)@v1.6.3 && GOBIN=$(GOPATH)/bin $(GO) install vendor/github.com/smartystreets/goconvey/goconvey.go; \
+	fi
 	@which golint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get -u $(LINTER); \
 	fi
-	@which goconvey > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading goconvey...\n" && $(GO) get -u $(CONVEY); \
-	fi
-	@which ruleguard > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ruleguard...\n" && $(GO) get -v -u $(RULES); \
+	@which stringer > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get -u $(STRINGER); \
 	fi
 	@which golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
   		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.26.0; \
-	fi
-	@which gosec > /dev/null; if [ $$? -ne 0 ]; then \
-    	curl -sfL https://raw.githubusercontent.com/securego/gosec/master/install.sh | sh -s -- -b $$(go env GOPATH)/bin latest; \
 	fi
 
 ensure:
@@ -129,10 +126,6 @@ ensure:
 	done
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing protobuf... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(govendor get github.com/golang/protobuf/protoc-gen-go@1.2.0 && GOBIN=$(GOPATH)/bin $(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
-
-patch:
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Patching dependencies, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(patch ./vendor/github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes/results.go ./patches/results.patch -f)
 
 sdk:
 	@(cd lib && $(MAKE) $(@))
@@ -153,8 +146,14 @@ clean:
 mrproper: clean
 	@(git clean -xdf -e .idea -e vendor -e .vscode || true)
 
-install:
-	@($(CP) -f $(EXECS) $(GOPATH)/bin || true)
+install: removebins
+	@($(CP) -f $(EXECS) $(GOPATH)/bin)
+	@($(CP) -f $(COVEREXECS) $(GOPATH)/bin > /dev/null 2>&1 || :)
+
+removebins:
+	@# Big Sur on ARM M1 processor requires all code to be validly signed; so removal of existing files is necessary
+	@(for i in $(foreach v,$(EXECS),$(notdir $v)); do rm -f "$(GOPATH)/bin/$$i" || : ; done)
+	@(for i in $(foreach v,$(COVEREXECS),$(notdir $v)); do rm -f "$(GOPATH)/bin/$$i" || : ; done)
 
 installci:
 	@(mkdir -p $(CIBIN) || true)
@@ -174,8 +173,8 @@ conveystop:
 
 depclean: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning vendor and redownloading deps, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@if [ -f ./Gopkg.lock ]; then $(RM) ./Gopkg.lock; fi;
-	@$(RM) -rf ./vendor
+	@if [ -f ./Gopkg.lock ]; then rm ./Gopkg.lock; fi;
+	@rm -rf ./vendor
 	@if [ ! -d ./vendor ]; then printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading all dependencies from zero, this is gonna take a while..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; else printf "%b" "$(OK_COLOR)$(INFO_STRING) Updating vendor dir..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; fi;
 	@while [ 1 -ne 0 ] ; do \
 		$$(dep ensure) && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
@@ -193,8 +192,6 @@ depclean: begin
 
 generate: begin # Run generation
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(RM) *.log;
-	@if [ -s ./generation_results.log ]; then $(RM) ./generation_results.log;fi;
 	@cd lib && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@cd cli && $(MAKE) generate 2>&1 | tee -a generation_results.log
 	@if [ -z "$(GOOS)" ]; then $(GO) generate -run mockgen ./...  2>&1 | tee -a generation_results.log;fi;
@@ -227,12 +224,12 @@ vet-light: begin
 
 err: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@errcheck -asserts -ignoretests -ignoregenerated ${TESTABLE_PKG_LIST} 2>&1 | grep -v _test | grep -v test_ | tee err_results.log
+	@errcheck ${TESTABLE_PKG_LIST} 2>&1 | grep -v _test | grep -v test_ | tee err_results.log
 	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck (with restrictions) FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
 
 err-light: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck (with restrictions), $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@errcheck -ignoretests -ignoregenerated ${TESTABLE_PKG_LIST} 2>&1 | grep -v _test | grep -v test_ | tee err_results.log
+	@errcheck ${TESTABLE_PKG_LIST} 2>&1 | grep -v defer | grep -v _test | grep -v test_ | tee err_results.log
 	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck (with restrictions) FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
 
 vet: begin
@@ -240,29 +237,17 @@ vet: begin
 	@$(GO) vet ${PKG_LIST} 2>&1 | tee vet_results.log
 	@if [ -s ./vet_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) vet FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
-linters: begin generate lint metalint security ruleguard style
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running all linters, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@cat lint.log metalint.log ruleguard.log style.log security.log | grep -v _test > issues.log
-
 lint: begin
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running lint checks, storing into lint.log $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@golint ./... | grep -v vendor | grep -v test | grep -v Test | grep -v enum\. | grep -v version\.go > lint.log 2>&1  || true
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running lint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@golint ./... | grep -v vendor | grep -v test | grep -v Test | grep -v enum\. | grep -v version\.go || true
 
 metalint: begin
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, storing into metalint.log $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(which golangci-lint >/dev/null 2>&1 && golangci-lint --color never --disable-all --enable=deadcode --enable=gocyclo --enable=varcheck --enable=structcheck --enable=maligned --enable=errcheck --enable=unused -enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard run --enable=dogsled --enable=funlen --enable=gochecknoglobals --deadline=8m ./... > metalint.log 2>&1 || true) || echo "golangci-lint not installed in your system"
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(which golangci-lint && golangci-lint --color never --disable-all --enable=deadcode --enable=gocyclo --enable=varcheck --enable=structcheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard run --enable=dogsled --enable=funlen --enable=gochecknoglobals --deadline=8m ./... || true) || echo "golangci-lint not installed in your system"
 
-style: begin
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, storing output into style.log $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(which golangci-lint >/dev/null 2>&1 && golangci-lint --color never --disable-all --enable=errcheck --enable=stylecheck --enable=deadcode --enable=golint --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck --deadline=8m run ./... > style.log 2>&1 || true) || echo "golangci-lint not installed in your system"
-
-security: begin
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running security checks, storing output into security.log $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(which gosec >/dev/null 2>&1 && gosec -out security.log ./... > security.log 2>&1 || true) || echo "gosec not installed in your system"
-
-ruleguard: begin
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running ruleguard checks, storing output into ruleguard.log, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(which ruleguard >/dev/null 2>&1 && ruleguard -c=0 -rules ./build/ruleguard.rules ./... > ruleguard.log 2>&1 || true) || echo "ruleguard not installed in your system"
+style: begin generate gofmt
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(which golangci-lint > /dev/null && golangci-lint --color never --disable-all --enable=errcheck --enable=stylecheck --enable=deadcode --enable=golint --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck --deadline=8m run ./... || true) || echo "golangci-lint not installed in your system"
 
 coverage: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

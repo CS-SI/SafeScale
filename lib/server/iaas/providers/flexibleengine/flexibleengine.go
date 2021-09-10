@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package flexibleengine
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -46,15 +45,15 @@ type gpuCfg struct {
 }
 
 var gpuMap = map[string]gpuCfg{
-	"g1.xlarge": {
+	"g1.xlarge": gpuCfg{
 		GPUNumber: 1,
-		GPUType:   "UNKNOW",
+		GPUType:   "UNKNOWN",
 	},
-	"g1.2xlarge": {
+	"g1.2xlarge": gpuCfg{
 		GPUNumber: 1,
-		GPUType:   "UNKNOW",
+		GPUType:   "UNKNOWN",
 	},
-	"g1.2xlarge.8": {
+	"g1.2xlarge.8": gpuCfg{
 		GPUNumber: 1,
 		GPUType:   "NVIDIA 1080 TI",
 	},
@@ -93,10 +92,6 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	vpcCIDR, _ := network["VPCCIDR"].(string)
 	region, _ := compute["Region"].(string)
 	zone, _ := compute["AvailabilityZone"].(string)
-	maxLifeTime := 0
-	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
-	}
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
@@ -152,10 +147,9 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			"SATA": volumespeed.COLD,
 			"SSD":  volumespeed.SSD,
 		},
-		MetadataBucket:     metadataBucketName,
-		OperatorUsername:   operatorUsername,
-		ProviderName:       providerName,
-		MaxLifetimeInHours: maxLifeTime,
+		MetadataBucket:   metadataBucketName,
+		OperatorUsername: operatorUsername,
+		ProviderName:     providerName,
 		// WhitelistTemplateRegexp: whitelistTemplatePattern,
 		// BlacklistTemplateRegexp: blacklistTemplatePattern,
 		// WhitelistImageRegexp:    whitelistImagePattern,
@@ -298,9 +292,16 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 
 	var tpls []abstract.HostTemplate
 	for _, tpl := range allTemplates {
-		theTemplate := tpl
-		addGPUCfg(&theTemplate)
-		tpls = append(tpls, theTemplate)
+		// Ignore templates containing ".mcs."
+		if strings.Contains(tpl.Name, ".mcs.") {
+			continue
+		}
+		// Ignore template stating with "physical."
+		if strings.HasPrefix(tpl.Name, "physical.") {
+			continue
+		}
+		addGPUCfg(&tpl)
+		tpls = append(tpls, tpl)
 	}
 
 	return tpls, nil
@@ -357,8 +358,6 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
-	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
-
 	// cfg.Set("Customizations", opts.Customizations)
 
 	return cfg, nil

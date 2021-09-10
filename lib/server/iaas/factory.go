@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,9 +17,12 @@
 package iaas
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -181,7 +184,7 @@ func UseService(tenantName string) (newService Service, err error) {
 			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
 		}
 
-		// Initializes metadata Object Storage (may be different than the Object Storage)
+		// Initializes Metadata Object Storage (may be different from the Object Storage)
 		var (
 			metadataBucket   objectstorage.Bucket
 			metadataCryptKey *crypt.Key
@@ -248,6 +251,13 @@ func UseService(tenantName string) (newService Service, err error) {
 			metadataBucket: metadataBucket,
 			metadataKey:    metadataCryptKey,
 		}
+
+		// validate metadata version
+		err = checkMetadataVersion(newS)
+		if err != nil {
+			return nil, err
+		}
+
 		return newS, validateRegexps(newS /*tenantClient*/, tenant)
 	}
 
@@ -255,6 +265,29 @@ func UseService(tenantName string) (newService Service, err error) {
 		return nil, fail.Errorf(fmt.Sprintf("tenant '%s' not found in configuration", tenantName), nil)
 	}
 	return nil, abstract.ResourceNotFoundError("provider builder for", svcProvider)
+}
+
+//checkMetadataVersion checks metadata version, if it's not our version, we stop
+func checkMetadataVersion(s *service) error {
+	var buffer bytes.Buffer
+	_, err := s.GetMetadataBucket().ReadObject("version", &buffer, 0, 0)
+	if err != nil {
+		return nil
+	}
+	data := string(buffer.Bytes())
+
+	ourVersion := fmt.Sprintf("v%s", Version)
+	if strings.HasPrefix(data, ourVersion) {
+		return nil
+	}
+
+	if strings.Contains(ourVersion, ".") {
+		if strings.HasPrefix(data, ourVersion[0:strings.LastIndex(ourVersion, ".")]) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("cannot continue: the minimum version of Safescale binaries needed to work correctly with this bucket is '%s'. (current binary '%s')", data, ourVersion)
 }
 
 // validateRegexps validates regexp values from tenants file
@@ -361,7 +394,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	config.Endpoint, _ = ostorage["Endpoint"].(string)
 
 	if config.User, ok = ostorage["AccessKey"].(string); !ok {
-		if config.User, ok = ostorage["OpenstackID"].(string); !ok {
+		if config.User, ok = ostorage["OpenStackID"].(string); !ok {
 			if config.User, ok = ostorage["Username"].(string); !ok {
 				if config.User, ok = identity["OpenstackID"].(string); !ok {
 					config.User, _ = identity["Username"].(string)
@@ -388,6 +421,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 	if config.Region, ok = ostorage["Region"].(string); !ok {
 		config.Region, _ = compute["Region"].(string)
+		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+			return config, err
+		}
 	}
 
 	if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
@@ -429,6 +465,24 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		config.Credentials = string(d1)
 	}
 	return config, nil
+}
+
+func validateOVHObjectStorageRegionNaming(context, region, authURL string) error {
+	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
+	// Object Storage regions don't contain anymore an index like compute regions
+	if strings.Contains(authURL, "ovh.") {
+		rLen := len(region)
+		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
+			region = region[:rLen-1]
+			return fail.InvalidRequestError(
+				fmt.Sprintf(
+					`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`,
+					context, region,
+				),
+			)
+		}
+	}
+	return nil
 }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
@@ -554,6 +608,9 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	if config.Region, ok = metadata["Region"].(string); !ok {
 		if config.Region, ok = ostorage["Region"].(string); !ok {
 			config.Region, _ = compute["Region"].(string)
+		}
+		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+			return config, err
 		}
 	}
 

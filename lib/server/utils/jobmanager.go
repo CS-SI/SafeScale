@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,14 +51,11 @@ func JobRegister(ctx context.Context, cancelFunc func(), command string) error {
 	mutexJobManager.Lock()
 	defer mutexJobManager.Unlock()
 
-	resp := md.Get("uuid")
-	if len(resp) > 0 {
-		jobMap[resp[0]] = jobInfo{
-			commandName: command,
-			launchTime:  time.Now(),
-			context:     ctx,
-			cancelFunc:  cancelFunc,
-		}
+	jobMap[md.Get("uuid")[0]] = jobInfo{
+		commandName: command,
+		launchTime:  time.Now(),
+		context:     ctx,
+		cancelFunc:  cancelFunc,
 	}
 
 	return nil
@@ -87,10 +84,7 @@ func JobDeregister(ctx context.Context) {
 	if !ok {
 		logrus.Errorf("Trying to deregister a job without uuid!")
 	} else {
-		resp := md.Get("uuid")
-		if len(resp) > 0 {
-			JobDeregisterUUID(resp[0])
-		}
+		JobDeregisterUUID(md.Get("uuid")[0])
 	}
 }
 

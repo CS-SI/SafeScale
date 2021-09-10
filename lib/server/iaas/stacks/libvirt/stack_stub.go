@@ -1,7 +1,7 @@
 // +build !libvirt
 
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -163,11 +163,6 @@ func (s *Stack) InspectHost(interface{}) (*abstract.Host, fail.Error) {
 
 // GetHostByName stub
 func (s *Stack) GetHostByName(string) (*abstract.Host, fail.Error) {
-	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
-}
-
-// GetHostByID stub
-func (s *Stack) GetHostByID(string) (*abstract.Host, fail.Error) {
 	return nil, fail.Errorf(fmt.Sprintf(errorStr), nil)
 }
 

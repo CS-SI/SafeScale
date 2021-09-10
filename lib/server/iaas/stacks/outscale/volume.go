@@ -2,7 +2,6 @@ package outscale
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/antihax/optional"
 	"github.com/sirupsen/logrus"
@@ -50,28 +49,22 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 	ov := res.Volume
 
 	defer func() {
-		if xerr != nil {
+		if err != nil {
 			if !fail.ImplementsCauser(err) {
-				xerr = fail.Wrap(xerr, "")
+				err = fail.Wrap(err, "")
 			}
 
 			derr := s.DeleteVolume(ov.VolumeId)
 			if derr != nil {
-				err = fail.AddConsequence(xerr, derr)
+				err = fail.AddConsequence(err, derr)
 			}
 		}
 	}()
 
-	// FIXME: Add resource tags here
-	tags := make(map[string]string)
-	tags["name"] = request.Name
-
-	tags["ManagedBy"] = "safescale"
-	tags["DeclaredInBucket"] = s.configurationOptions.MetadataBucket
-	tags["CreationDate"] = time.Now().Format(time.RFC3339)
-
 	err = s.setResourceTags(
-		res.Volume.VolumeId, tags,
+		res.Volume.VolumeId, map[string]string{
+			"name": request.Name,
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -86,11 +79,6 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume
 	volume.Size = int(ov.Size)
 	volume.State = volumestate.AVAILABLE
 	volume.Name = request.Name
-
-	tagged, _ := s.getResourceTags(res.Volume.VolumeId)
-	volume.Tags["CreationDate"] = tagged["CreationDate"]
-	volume.Tags["ManagedBy"] = tagged["ManagedBy"]
-	volume.Tags["DeclaredInBucket"] = tagged["DeclaredInBucket"]
 	return volume, nil
 }
 
@@ -175,12 +163,6 @@ func (s *Stack) GetVolume(id string) (*abstract.Volume, fail.Error) {
 	volume.Size = int(ov.Size)
 	volume.State = volumeState(ov.State)
 	volume.Name = getResourceTag(ov.Tags, "name", "")
-
-	tagged, _ := s.getResourceTags(ov.VolumeId)
-	volume.Tags["CreationDate"] = tagged["CreationDate"]
-	volume.Tags["ManagedBy"] = tagged["ManagedBy"]
-	volume.Tags["DeclaredInBucket"] = tagged["DeclaredInBucket"]
-
 	return volume, nil
 }
 
@@ -218,11 +200,6 @@ func (s *Stack) GetVolumeByName(name string) (*abstract.Volume, fail.Error) {
 	volume.Size = int(ov.Size)
 	volume.State = volumeState(ov.State)
 	volume.Name = name
-
-	tagged, _ := s.getResourceTags(ov.VolumeId)
-	volume.Tags["CreationDate"] = tagged["CreationDate"]
-	volume.Tags["ManagedBy"] = tagged["ManagedBy"]
-	volume.Tags["DeclaredInBucket"] = tagged["DeclaredInBucket"]
 	return volume, nil
 }
 
@@ -251,10 +228,6 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 		volume.Size = int(ov.Size)
 		volume.State = volumeState(ov.State)
 		volume.Name = getResourceTag(ov.Tags, "name", "")
-		tagged, _ := s.getResourceTags(ov.VolumeId)
-		volume.Tags["CreationDate"] = tagged["CreationDate"]
-		volume.Tags["ManagedBy"] = tagged["ManagedBy"]
-		volume.Tags["DeclaredInBucket"] = tagged["DeclaredInBucket"]
 		volumes = append(volumes, *volume)
 	}
 	return volumes, nil

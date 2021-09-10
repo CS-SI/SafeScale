@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,10 +53,29 @@ func (s *Stack) CreateVIP(subnetID string, name string) (_ *abstract.VirtualIP, 
 		return nil, normalizeError(err)
 	}
 
+	/*
+		defer func() {
+			if err != nil {
+				dnr := osc.DeleteNicRequest{
+					NicId:  res.Nic.NicId,
+				}
+				_, _, cerr := s.client.NicApi.DeleteNic(s.auth, &osc.DeleteNicOpts{DeleteNicRequest: optional.NewInterface(dnr)})
+				if cerr != nil {
+					err = fail.AddConsequence(err, cerr)
+				}
+			}
+		}()
+	*/
+
 	if len(res.Nic.PrivateIps) < 1 {
 		return nil, fail.InconsistentError("Inconsistent provider response")
 	}
 	nic := res.Nic
+	// ip, err := s.addPublicIP(&nic)
+	// VPL: twice ?
+	// if len(res.Nic.PrivateIps) < 1 {
+	//	return nil, fail.InconsistentError("Inconsistent provider response")
+	// }
 
 	err = s.setResourceTags(
 		nic.NicId, map[string]string{
@@ -204,5 +223,5 @@ func (s *Stack) DeleteVIP(vip *abstract.VirtualIP) (err error) {
 		return normalizeErrorWithReason("failure removing nic", err)
 	}
 
-	return nil
+	return err
 }

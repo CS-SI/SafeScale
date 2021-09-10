@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,15 +27,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/cmdstatus"
 )
-
-type exitErrorWithCause struct {
-	error
-	cause error
-}
-
-func (e *exitErrorWithCause) Cause() error {
-	return e.cause
-}
 
 // response define a standard response for most safescale commands
 type response struct {
@@ -143,19 +134,6 @@ func (r *response) getDisplayResponse() responseDisplay {
 		}
 	}
 	return output
-}
-
-// FailureResponse ...
-func FailureResponseWithCause(cause error, err error) error {
-	r := newResponse()
-	_ = r.Failure(err)
-	if r.Error != nil {
-		return &exitErrorWithCause{
-			cause: cause,
-			error: urfcli.NewExitError("", r.Error.ExitCode()),
-		}
-	}
-	return nil
 }
 
 // FailureResponse ...

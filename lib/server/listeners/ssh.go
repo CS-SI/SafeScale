@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ import (
 	pb "github.com/CS-SI/SafeScale/lib"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -78,9 +79,6 @@ func (s *SSHListener) Run(ctx context.Context, in *pb.SshCommand) (sr *pb.SshRes
 	handler := SSHHandler(tenant.Service)
 	retcode, stdout, stderr, err := handler.Run(ctx, host, command, outputs.DISPLAY)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		err = status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	return &pb.SshResponse{
@@ -121,14 +119,11 @@ func (s *SSHListener) Copy(ctx context.Context, in *pb.SshCopyCommand) (sr *pb.S
 	handler := SSHHandler(tenant.Service)
 	retcode, stdout, stderr, err := handler.Copy(ctx, source, dest)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if retcode != 0 {
 		return nil, fmt.Errorf(
-			"cannot copy by ssh: copy failed: retcode=%d: %s", retcode, stderr,
+			"cannot copy by ssh: copy failed: retcode=%d (=%s): %s", retcode, system.SCPErrorString(retcode), stderr,
 		)
 	}
 

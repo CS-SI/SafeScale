@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -219,45 +219,41 @@ func ToPBHost(in *abstract.Host) (*pb.Host, error) {
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	if in.Properties != nil {
-		err := in.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(
-			func(clonable data.Clonable) error {
-				hostNetworkV1 = clonable.(*propsv1.HostNetwork)
-				return in.Properties.LockForRead(hostproperty.SizingV1).ThenUse(
-					func(clonable data.Clonable) error {
-						hostSizingV1 = clonable.(*propsv1.HostSizing)
-						return in.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(
-							func(clonable data.Clonable) error {
-								hostVolumesV1 = clonable.(*propsv1.HostVolumes)
-								for k := range hostVolumesV1.VolumesByName {
-									volumes = append(volumes, k)
-								}
-								return nil
-							},
-						)
-					},
-				)
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
+	err := in.Properties.LockForRead(hostproperty.NetworkV1).ThenUse(
+		func(clonable data.Clonable) error {
+			hostNetworkV1 = clonable.(*propsv1.HostNetwork)
+			return in.Properties.LockForRead(hostproperty.SizingV1).ThenUse(
+				func(clonable data.Clonable) error {
+					hostSizingV1 = clonable.(*propsv1.HostSizing)
+					return in.Properties.LockForRead(hostproperty.VolumesV1).ThenUse(
+						func(clonable data.Clonable) error {
+							hostVolumesV1 = clonable.(*propsv1.HostVolumes)
+							for k := range hostVolumesV1.VolumesByName {
+								volumes = append(volumes, k)
+							}
+							return nil
+						},
+					)
+				},
+			)
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
-
 	return &pb.Host{
-		Id:                  in.ID,
-		Name:                in.Name,
 		Cpu:                 int32(hostSizingV1.AllocatedSize.Cores),
-		Ram:                 hostSizingV1.AllocatedSize.RAMSize,
 		Disk:                int32(hostSizingV1.AllocatedSize.DiskSize),
+		GatewayId:           hostNetworkV1.DefaultGatewayID,
+		Id:                  in.ID,
 		PublicIp:            in.GetPublicIP(),
 		PrivateIp:           in.GetPrivateIP(),
-		State:               pb.HostState(in.LastState),
+		Name:                in.Name,
 		PrivateKey:          in.PrivateKey,
-		GatewayId:           hostNetworkV1.DefaultGatewayID,
-		AttachedVolumeNames: volumes,
 		Password:            in.Password,
-		Tags:                in.Tags,
+		Ram:                 hostSizingV1.AllocatedSize.RAMSize,
+		State:               pb.HostState(in.LastState),
+		AttachedVolumeNames: volumes,
 	}, nil
 }
 

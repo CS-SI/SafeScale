@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,10 +18,6 @@ package openstack
 
 import (
 	"fmt"
-	"os"
-
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 
@@ -65,9 +61,6 @@ func (s *Stack) GetSecurityGroup(name string) (*secgroups.SecGroup, fail.Error) 
 func (s *Stack) getDefaultSecurityGroup() (*secgroups.SecGroup, fail.Error) {
 	sg, err := s.GetSecurityGroup(s.DefaultSecurityGroupName)
 	if err != nil {
-		if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-			logrus.Warnf("error retrieving security group: %s", spew.Sdump(err))
-		}
 		return nil, fail.Errorf(fmt.Sprintf("error listing routers: %s", ProviderErrorToString(err)), err)
 	}
 

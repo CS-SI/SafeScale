@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package cloudferro
 import (
 	"fmt"
 	"regexp"
-	"strconv"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -58,22 +57,16 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
-	network, _ := params["network"].(map[string]interface{})
+	// network, _ := params["network"].(map[string]interface{})
 	metadata, _ := params["metadata"].(map[string]interface{})
 
 	username, _ := identity["Username"].(string)
 	password, _ := identity["Password"].(string)
 	domainName, _ := identity["DomainName"].(string)
 
-	// region, _ := compute["Region"].(string)
-	region := "RegionOne"
-	// zone, _ := compute["AvailabilityZone"].(string)
-	zone := "nova"
+	region, _ := compute["Region"].(string)
+	zone, _ := compute["AvailabilityZone"].(string)
 	projectName, _ := compute["ProjectName"].(string)
-	maxLifeTime := 0
-	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
-	}
 	// projectID, _ := compute["ProjectID"].(string)
 	defaultImage, _ := compute["DefaultImage"].(string)
 	if defaultImage == "" {
@@ -88,15 +81,6 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		}
 	}
 
-	providerNetwork, _ := network["ProviderNetwork"].(string)
-	if providerNetwork == "" {
-		providerNetwork = "external"
-	}
-	floatingIPPool, _ := network["FloatingIPPool"].(string)
-	if floatingIPPool == "" {
-		floatingIPPool = providerNetwork
-	}
-
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: cloudferroIdentityEndpoint,
 		Username:         username,
@@ -105,7 +89,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 		TenantName:       projectName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   floatingIPPool,
+		FloatingIPPool:   "external",
 		AllowReauth:      true,
 	}
 
@@ -135,7 +119,7 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
-		ProviderNetwork:           providerNetwork,
+		ProviderNetwork:           "external",
 		UseFloatingIP:             true,
 		UseLayer3Networking:       true,
 		AutoHostNetworkInterfaces: true,
@@ -144,12 +128,11 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			"HDD": volumespeed.HDD,
 			"SSD": volumespeed.SSD,
 		},
-		MetadataBucket:     metadataBucketName,
-		DNSList:            cloudferroDNSServers,
-		DefaultImage:       defaultImage,
-		OperatorUsername:   operatorUsername,
-		ProviderName:       providerName,
-		MaxLifetimeInHours: maxLifeTime,
+		MetadataBucket:   metadataBucketName,
+		DNSList:          cloudferroDNSServers,
+		DefaultImage:     defaultImage,
+		OperatorUsername: operatorUsername,
+		ProviderName:     providerName,
 	}
 
 	stack, err := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -239,8 +222,6 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
-	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
-
 	return cfg, nil
 }
 

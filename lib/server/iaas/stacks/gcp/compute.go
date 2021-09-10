@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package gcp
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"time"
 
@@ -331,7 +330,7 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
 			server, err := buildGcpMachine(
-				s.Config.MetadataBucket, s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Region,
+				s.ComputeService, s.GcpConfig.ProjectID, request.ResourceName, rim.URL, s.GcpConfig.Region,
 				s.GcpConfig.Zone, s.GcpConfig.NetworkName, defaultNetwork.Name, string(userDataPhase1), isGateway,
 				template,
 			)
@@ -430,10 +429,8 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (host *abstract.Host, u
 		return nil, nil, fail.Errorf(fmt.Sprintf("unexpected nil host"), nil)
 	}
 
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		if !host.OK() {
-			logrus.Warnf("Missing data in host: %s", spew.Sdump(host))
-		}
+	if !host.OK() {
+		logrus.Warnf("Missing data in host: %s", spew.Sdump(host))
 	}
 
 	return host, userData, nil
@@ -501,7 +498,7 @@ func publicAccess(isPublic bool) []*compute.AccessConfig {
 }
 
 // buildGcpMachine ...
-func buildGcpMachine(bucketName string, service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *abstract.HostTemplate) (*abstract.Host, fail.Error) {
+func buildGcpMachine(service *compute.Service, projectID string, instanceName string, imageID string, region string, zone string, network string, subnetwork string, userdata string, isPublic bool, template *abstract.HostTemplate) (*abstract.Host, fail.Error) {
 	prefix := "https://www.googleapis.com/compute/v1/projects/" + projectID
 
 	imageURL := imageID
@@ -512,7 +509,6 @@ func buildGcpMachine(bucketName string, service *compute.Service, projectID stri
 	}
 
 	// logrus.Warnf("Receiving a disk request of %d", template.DiskSize)
-	managedTag := "safescale"
 
 	instance := &compute.Instance{
 		Name:         instanceName,
@@ -556,14 +552,6 @@ func buildGcpMachine(bucketName string, service *compute.Service, projectID stri
 					Key:   "startup-script",
 					Value: &userdata,
 				},
-				{
-					Key:   "ManagedBy",
-					Value: &managedTag,
-				},
-				{
-					Key:   "DeclaredInBucket",
-					Value: &bucketName,
-				},
 			},
 		},
 	}
@@ -591,25 +579,7 @@ func buildGcpMachine(bucketName string, service *compute.Service, projectID stri
 		return nil, err
 	}
 
-	if isPublic {
-		if inst != nil {
-			if len(inst.NetworkInterfaces) > 0 && len(inst.NetworkInterfaces[0].AccessConfigs) > 0 {
-				_, err = service.Addresses.Insert(projectID, region, &compute.Address{
-					Name:        "staticip-" + instanceName,
-					NetworkTier: "PREMIUM",
-					Address:     inst.NetworkInterfaces[0].AccessConfigs[0].NatIP,
-					Region:      fmt.Sprintf("projects/%s/regions/%s", projectID, region),
-				}).Do()
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
-	}
-
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		logrus.Tracef("Got compute.Instance, err: %#v, %v", inst, err)
-	}
+	logrus.Tracef("Got compute.Instance, err: %#v, %v", inst, err)
 
 	if googleapi.IsNotModified(err) {
 		logrus.Warnf("Instance not modified since insert.")
@@ -755,10 +725,8 @@ func (s *Stack) InspectHost(hostParam interface{}) (host *abstract.Host, xerr fa
 		return nil, fail.Errorf(fmt.Sprintf("failed to update hostproperty.SizingV1 : %s", err.Error()), err)
 	}
 
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		if !host.OK() {
-			logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
-		}
+	if !host.OK() {
+		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 
 	return host, nil
@@ -813,39 +781,19 @@ func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	return nil, abstract.ResourceNotFoundError("host", name)
 }
 
-// GetHostByID returns the host identified by ref (name or id)
-func (s *Stack) GetHostByID(name string) (*abstract.Host, fail.Error) {
-	hosts, err := s.ListHosts()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, host := range hosts {
-		if host.ID == name {
-			return host, nil
-		}
-	}
-
-	return nil, abstract.ResourceNotFoundError("host", name)
-}
-
 // DeleteHost deletes the host identified by id
 func (s *Stack) DeleteHost(id string) (err error) {
 	service := s.ComputeService
 	projectID := s.GcpConfig.ProjectID
 	zone := s.GcpConfig.Zone
-	region := s.GcpConfig.Region
-	instanceId := id
+	instanceName := id
 
-	var host *compute.Instance
-	host, err = service.Instances.Get(projectID, zone, instanceId).Do()
+	_, err = service.Instances.Get(projectID, zone, instanceName).Do()
 	if err != nil {
 		return err
 	}
 
-	hostName := host.Name
-
-	op, err := service.Instances.Delete(projectID, zone, instanceId).Do()
+	op, err := service.Instances.Delete(projectID, zone, instanceName).Do()
 	if err != nil {
 		return err
 	}
@@ -858,47 +806,23 @@ func (s *Stack) DeleteHost(id string) (err error) {
 	}
 
 	err = waitUntilOperationIsSuccessfulOrTimeout(oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
-	if err != nil {
-		return err
-	}
 
 	waitErr := retry.WhileUnsuccessfulDelay5Seconds(
 		func() error {
-			_, recErr := service.Instances.Get(projectID, zone, instanceId).Do()
+			_, recErr := service.Instances.Get(projectID, zone, instanceName).Do()
 			if gerr, ok := recErr.(*googleapi.Error); ok {
 				if gerr.Code == 404 {
 					return nil
 				}
 			}
 			return fail.Errorf(
-				fmt.Sprintf("error waiting for instance [%s] to disappear: [%v]", instanceId, recErr), recErr,
+				fmt.Sprintf("error waiting for instance [%s] to disappear: [%v]", instanceName, recErr), recErr,
 			)
 		}, temporal.GetContextTimeout(),
 	)
+
 	if waitErr != nil {
-		return fail.Cause(waitErr)
-	}
-
-	cleanStaticIP := false
-	_, err = service.Addresses.Get(projectID, region, "staticip-"+hostName).Do()
-	if err != nil {
-		if gerr, ok := err.(*googleapi.Error); ok {
-			logrus.Warnf("Detected a googleapi error: %s", spew.Sdump(err))
-			if gerr.Code == 404 {
-				cleanStaticIP = false
-			}
-		}
-
-		err = nil // ignore error
-	} else {
-		cleanStaticIP = true
-	}
-
-	if cleanStaticIP {
-		_, err = service.Addresses.Delete(projectID, region, "staticip-"+hostName).Do()
-		if err != nil {
-			return err
-		}
+		logrus.Error(fail.Cause(waitErr))
 	}
 
 	return err
@@ -927,14 +851,6 @@ func (s *Stack) ListHosts() ([]*abstract.Host, fail.Error) {
 			nhost.Name = instance.Name
 			nhost.LastState, _ = stateConvert(instance.Status)
 
-			iTags := make(map[string]string)
-			for _, item := range instance.Metadata.Items {
-				iTags[item.Key] = *item.Value
-			}
-
-			iTags["CreationDate"] = instance.CreationTimestamp
-
-			nhost.Tags = iTags
 			hostList = append(hostList, nhost)
 		}
 		token := resp.NextPageToken

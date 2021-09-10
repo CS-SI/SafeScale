@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -296,42 +296,21 @@ func (s *Stack) DeleteNetwork(id string) error {
 
 	sns, err := s.listSubnets(id)
 	if err != nil {
-		msg := fmt.Sprintf("failed to delete subnetwork '%s': %s", network.Name, ProviderErrorToString(err))
+		msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
 		return fail.Errorf(fmt.Sprintf(msg), err)
 	}
 	for _, sn := range sns {
-		remainingPorts, err := s.listPorts(
-			ports.ListOpts{
-				NetworkID: id,
-			},
-		)
-		if err != nil {
-			return err
-		}
-
-		var errs []error
-		for _, port := range remainingPorts {
-			err = ports.Delete(s.NetworkClient, port.ID).ExtractErr()
-			if err != nil {
-				errs = append(errs, err)
-			}
-		}
-		if len(errs) > 0 {
-			return fail.ErrListError(errs)
-		}
-
-		err = s.deleteSubnet(sn.ID)
+		err := s.deleteSubnet(sn.ID)
 		if err != nil {
 			switch err.(type) {
 			case fail.ErrNotAvailable:
 				return err
 			default:
-				msg := fmt.Sprintf("failed to delete subnetwork '%s': %s", network.Name, ProviderErrorToString(err))
+				msg := fmt.Sprintf("failed to delete network '%s': %s", network.Name, ProviderErrorToString(err))
 				return fail.Errorf(fmt.Sprintf(msg), err)
 			}
 		}
 	}
-
 	err = networks.Delete(s.NetworkClient, id).ExtractErr()
 	if err != nil {
 		switch err.(type) {
@@ -622,9 +601,8 @@ func (s *Stack) deleteSubnet(id string) error {
 	routerList, _ := s.ListRouters()
 	var router *Router
 	for _, r := range routerList {
-		theR := r
-		if theR.Name == id {
-			router = &theR
+		if r.Name == id {
+			router = &r
 			break
 		}
 	}

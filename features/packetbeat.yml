@@ -93,7 +93,6 @@ feature:
                             EOF
                             chown -R {{ .Username }}:{{ .Username }} ${SF_ETCDIR}/packetbeat4safescale
                             chmod u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/packetbeat4safescale/config.yml
-                            sfExit
 
                     compose:
                         targets:
@@ -124,7 +123,6 @@ feature:
                             EOF
                             chown -R safescale:safescale ${SF_ETCDIR}/packetbeat4safescale
                             chmod -R u+rw-x,g+r-wx,o-rwx ${SF_ETCDIR}/packetbeat4safescale
-                            sfExit
 
                     start:
                         targets:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,6 @@ const (
 	ByIDFolderName = "byID"
 	// ByNameFolderName tells in what folder to store 'byName' information
 	ByNameFolderName = "byName"
-	// BucketNamePrefix is the beginning of the name of the bucket for Tags
+	// BucketNamePrefix is the beginning of the name of the bucket for Metadata
 	BucketNamePrefix = "0.safescale"
 )

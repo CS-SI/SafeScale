@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -94,12 +94,6 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 		return nil, fail.Errorf(fmt.Sprintf("volume '%s' already exists", request.Name), err)
 	}
 
-	// Add tags to volume
-	tags := make(map[string]string)
-	tags["Name"] = request.Name
-	tags["ManagedBy"] = "safescale"
-	tags["DeclaredInBucket"] = s.cfgOpts.MetadataBucket
-
 	az, err := s.SelectedAvailabilityZone()
 	if err != nil {
 		return nil, err
@@ -109,7 +103,6 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 		Name:             request.Name,
 		Size:             request.Size,
 		VolumeType:       s.getVolumeType(request.Speed),
-		Metadata:         tags,
 	}
 	vol, err := volumes.Create(s.Stack.VolumeClient, opts).Extract()
 	if err != nil {
@@ -121,7 +114,6 @@ func (s *Stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, 
 		Size:  vol.Size,
 		Speed: s.getVolumeSpeed(vol.VolumeType),
 		State: toVolumeState(vol.Status),
-		Tags:  vol.Metadata,
 	}
 	return &v, nil
 }
@@ -169,7 +161,6 @@ func (s *Stack) GetVolume(id string) (_ *abstract.Volume, xerr fail.Error) {
 		Size:  volume.Size,
 		Speed: s.getVolumeSpeed(volume.VolumeType),
 		State: toVolumeState(volume.Status),
-		Tags:  volume.Metadata,
 	}
 	return &av, nil
 }
@@ -191,7 +182,6 @@ func (s *Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 					Size:  vol.Size,
 					Speed: s.getVolumeSpeed(vol.VolumeType),
 					State: toVolumeState(vol.Status),
-					Tags:  vol.Metadata,
 				}
 				vs = append(vs, av)
 			}

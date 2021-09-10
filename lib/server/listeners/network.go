@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -113,15 +113,9 @@ func (s *NetworkListener) Create(ctx context.Context, in *pb.NetworkDefinition) 
 		in.KeepOnFailure,
 	)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if network == nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, "network operation failure with nil result and nil error")
-		}
 		return nil, status.Errorf(codes.Internal, "network operation failure with nil result and nil error")
 	}
 
@@ -158,9 +152,6 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	handler := NetworkHandler(tenant.Service)
 	networks, err := handler.List(ctx, in.GetAll())
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -169,7 +160,7 @@ func (s *NetworkListener) List(ctx context.Context, in *pb.NetworkListRequest) (
 	for _, network := range networks {
 		pbn, err := srvutils.ToPBNetwork(network)
 		if err != nil {
-			log.Warnf("ignoring error listing network: %v", err)
+			log.Warn(err)
 			continue
 		}
 
@@ -212,9 +203,6 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *pb.Reference) (net *p
 	handler := NetworkHandler(currentTenant.Service)
 	network, err := handler.Inspect(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if network == nil {
@@ -257,9 +245,6 @@ func (s *NetworkListener) Delete(ctx context.Context, in *pb.Reference) (buf *go
 	handler := NetworkHandler(currentTenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -300,9 +285,6 @@ func (s *NetworkListener) Destroy(ctx context.Context, in *pb.Reference) (buf *g
 	handler := NetworkHandler(currentTenant.Service)
 	err = handler.Destroy(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 

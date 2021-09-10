@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/sirupsen/logrus"
@@ -90,10 +89,6 @@ func (handler *HostHandler) Start(ctx context.Context, ref string) (err error) {
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if ctx != nil && ctx.Err() != nil {
-		return fail.AbortedError("aborted by parent", ctx.Err())
-	}
-
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
 		return err
@@ -131,10 +126,6 @@ func (handler *HostHandler) Stop(ctx context.Context, ref string) (err error) {
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	if ctx != nil && ctx.Err() != nil {
-		return fail.AbortedError("aborted by parent", ctx.Err())
-	}
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -178,20 +169,18 @@ func (handler *HostHandler) Reboot(ctx context.Context, ref string) (err error) 
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if ctx != nil && ctx.Err() != nil {
-		return fail.AbortedError("aborted by parent", ctx.Err())
-	}
-
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
-		return fmt.Errorf("error loading host metadata: %w", err)
+		logrus.Warnf("Problem loading host...")
+		return err
 	}
 	if mh == nil {
 		return fail.Errorf(fmt.Sprintf("host '%s' not found", ref), nil)
 	}
 	mhm, err := mh.Get()
 	if err != nil {
-		return fmt.Errorf("error retrieving host metadata: %w", err)
+		logrus.Warnf("Problem loading metadata itself")
+		return err
 	}
 
 	id := mhm.ID
@@ -231,10 +220,6 @@ func (handler *HostHandler) Resize(ctx context.Context, ref string, cpu int, ram
 	).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	if ctx != nil && ctx.Err() != nil {
-		return nil, fail.AbortedError("aborted by parent", ctx.Err())
-	}
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -329,711 +314,590 @@ func (handler *HostHandler) Create(
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	type result struct {
-		rhost *abstract.Host
-		rerr  error
-	}
-
-	hostID := ""
-	comm := make(chan result)
-
 	defer func() {
 		if newHost == nil && err == nil {
-			logrus.Errorf("host is nil, should not without an error")
+			logrus.Debugf("host is nil, should not without an error")
 		}
 	}()
 
-	go func() {
-		tracer := debug.NewTracer(
-			nil, fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)", name, net, los, public, force), true,
-		).WithStopwatch().GoingIn()
-		defer tracer.OnExitTrace()()
-		defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
+	tracer := debug.NewTracer(
+		nil, fmt.Sprintf("('%s', '%s', '%s', %v, <sizingParam>, %v)", name, net, los, public, force), true,
+	).WithStopwatch().GoingIn()
+	defer tracer.OnExitTrace()()
+	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-		var (
-			sizing       *abstract.SizingRequirements
-			templateName string
-		)
-		switch sizingParam := sizingParam.(type) {
-		case *abstract.SizingRequirements:
-			sizing = sizingParam
-		case string:
-			templateName = sizingParam
+	var (
+		sizing       *abstract.SizingRequirements
+		templateName string
+	)
+	switch sizingParam := sizingParam.(type) {
+	case *abstract.SizingRequirements:
+		sizing = sizingParam
+	case string:
+		templateName = sizingParam
+	default:
+		return nil, fail.InvalidParameterError("sizing", "must be *abstract.SizingRequirements or string")
+	}
+
+	// Check if host already exist in SafeScale scope
+	_, err = metadata.LoadHost(handler.service, name)
+	if err != nil {
+		switch err.(type) {
+		case fail.ErrNotFound:
+			// continue
 		default:
-			comm <- result{
-				nil, fail.InvalidParameterError("sizing", "must be *abstract.SizingRequirements or string"),
-			}
-			return
+			return nil, err
 		}
+	} else {
+		return nil, fail.DuplicateError(fmt.Sprintf("host '%s' already exists", name))
+	}
 
-		// Check if host already exist in SafeScale scope
-		_, err = metadata.LoadHost(handler.service, name)
+	// Check if host exist outside SafeScale scope
+	host, err := handler.service.GetHostByName(name)
+	if err != nil {
+		switch err.(type) {
+		case fail.ErrNotFound:
+			// continue
+		case fail.ErrTimeout:
+			return nil, err
+		default:
+			return nil, err
+		}
+	} else {
+		hostThere, hsErr := handler.service.GetHostState(name)
+		if hsErr == nil {
+			logrus.Warnf("we have a host %s with status: %s", name, hostThere.String())
+			if hostThere != hoststate.TERMINATED {
+				return nil, abstract.ResourceDuplicateError("host", name)
+			}
+		}
+		return nil, abstract.ResourceDuplicateError("host", name)
+	}
+
+	var (
+		networks       []*abstract.Network
+		defaultNetwork *abstract.Network
+		primaryGateway *abstract.Host
+		// secondaryGateway *abstract.Host
+		defaultRouteIP string
+	)
+	if net != "" && net != "net-safescale" {
+		networkHandler := NewNetworkHandler(handler.service)
+		defaultNetwork, err = networkHandler.Inspect(ctx, net)
+		if err != nil {
+			if _, ok := err.(fail.ErrNotFound); ok {
+				return nil, err
+			}
+			return nil, err
+		}
+		if defaultNetwork == nil {
+			return nil, fail.Errorf(fmt.Sprintf("failed to find network '%s'", net), nil)
+		}
+		networks = append(networks, defaultNetwork)
+
+		mgw, err := metadata.LoadHost(handler.service, defaultNetwork.GatewayID)
+		if err != nil {
+			return nil, err
+		}
+		if mgw == nil {
+			return nil, fail.Errorf(fmt.Sprintf("failed to find gateway of network '%s'", net), nil)
+		}
+		primaryGateway, err = mgw.Get()
+		if err != nil {
+			return nil, err
+		}
+		if defaultNetwork.VIP != nil {
+			defaultRouteIP = defaultNetwork.VIP.PrivateIP
+		} else {
+			defaultRouteIP = primaryGateway.GetPrivateIP()
+		}
+	} else {
+		net, err := handler.getOrCreateDefaultNetwork()
+		if err != nil {
+			return nil, err
+		}
+		networks = append(networks, net)
+	}
+
+	var template *abstract.HostTemplate
+	if sizing != nil {
+		templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
 		if err != nil {
 			switch err.(type) {
-			case fail.ErrNotFound:
-				// continue
+			case fail.ErrNotFound, fail.ErrTimeout:
+				return nil, err
 			default:
-				comm <- result{nil, err}
-				return
+				return nil, err
 			}
-		} else {
-			comm <- result{
-				nil, fail.DuplicateError(fmt.Sprintf("host '%s' already exists", name)),
-			}
-			return
 		}
-
-		// Check if host exist outside SafeScale scope
-		host, err := handler.service.GetHostByName(name)
+		if len(templates) > 0 {
+			template = templates[0]
+			msg := fmt.Sprintf(
+				"Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores),
+			)
+			if template.CPUFreq > 0 {
+				msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
+			}
+			msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
+			if template.GPUNumber > 0 {
+				msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
+				if template.GPUType != "" {
+					msg += fmt.Sprintf(" %s", template.GPUType)
+				}
+			}
+			msg += ")"
+			logrus.Infof(msg)
+		} else {
+			return nil, fail.Errorf(fmt.Sprintf("failed to find template corresponding to requested abstract"), nil)
+		}
+	} else {
+		template, err = handler.service.SelectTemplateByName(templateName)
 		if err != nil {
 			switch err.(type) {
-			case fail.ErrNotFound:
-				// continue
-			case fail.ErrTimeout:
-				comm <- result{nil, err}
-				return
-			default:
-				comm <- result{nil, err}
-				return
-			}
-		} else {
-			hostThere, hsErr := handler.service.GetHostState(name)
-			if hsErr == nil {
-				logrus.Warnf("we have a host %s with status: %s", name, hostThere.String())
-				if hostThere != hoststate.TERMINATED {
-					comm <- result{nil, abstract.ResourceDuplicateError("host", name)}
-					return
-				}
-			}
-			comm <- result{nil, abstract.ResourceDuplicateError("host", name)}
-			return
-		}
-
-		var (
-			networks       []*abstract.Network
-			defaultNetwork *abstract.Network
-			primaryGateway *abstract.Host
-			// secondaryGateway *abstract.Host
-			defaultRouteIP string
-		)
-		if net != "" && net != "net-safescale" {
-			networkHandler := NewNetworkHandler(handler.service)
-			defaultNetwork, err = networkHandler.Inspect(ctx, net)
-			if err != nil {
-				if _, ok := err.(fail.ErrNotFound); ok {
-					comm <- result{nil, err}
-					return
-				}
-				comm <- result{nil, err}
-				return
-			}
-			if defaultNetwork == nil {
-				comm <- result{nil, fail.Errorf(fmt.Sprintf("failed to find network '%s'", net), nil)}
-				return
-			}
-			networks = append(networks, defaultNetwork)
-
-			mgw, err := metadata.LoadHost(handler.service, defaultNetwork.GatewayID)
-			if err != nil {
-				comm <- result{nil, err}
-				return
-			}
-			if mgw == nil {
-				comm <- result{nil, fail.Errorf(fmt.Sprintf("failed to find gateway of network '%s'", net), nil)}
-				return
-			}
-			primaryGateway, err = mgw.Get()
-			if err != nil {
-				comm <- result{nil, err}
-				return
-			}
-			if defaultNetwork.VIP != nil {
-				defaultRouteIP = defaultNetwork.VIP.PrivateIP
-			} else {
-				defaultRouteIP = primaryGateway.GetPrivateIP()
-			}
-		} else {
-			defaultNetwork, err = handler.getOrCreateDefaultNetwork()
-			if err != nil {
-				comm <- result{nil, err}
-				return
-			}
-			networks = append(networks, defaultNetwork)
-		}
-
-		var template *abstract.HostTemplate
-		if sizing != nil {
-			templates, err := handler.service.SelectTemplatesBySize(*sizing, force)
-			if err != nil {
-				switch err.(type) {
-				case fail.ErrNotFound, fail.ErrTimeout:
-					comm <- result{nil, err}
-					return
-				default:
-					comm <- result{nil, err}
-					return
-				}
-			}
-			if len(templates) > 0 {
-				template = templates[0]
-				msg := fmt.Sprintf(
-					"Selected host template: '%s' (%d core%s", template.Name, template.Cores, utils.Plural(template.Cores),
-				)
-				if template.CPUFreq > 0 {
-					msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
-				}
-				msg += fmt.Sprintf(", %.01f GB RAM, %d GB disk", template.RAMSize, template.DiskSize)
-				if template.GPUNumber > 0 {
-					msg += fmt.Sprintf(", %d GPU%s", template.GPUNumber, utils.Plural(template.GPUNumber))
-					if template.GPUType != "" {
-						msg += fmt.Sprintf(" %s", template.GPUType)
-					}
-				}
-				msg += ")"
-				logrus.Infof(msg)
-			} else {
-				comm <- result{nil, fail.Errorf(fmt.Sprintf("failed to find template corresponding to requested abstract"), nil)}
-				return
-			}
-		} else {
-			template, err = handler.service.SelectTemplateByName(templateName)
-			if err != nil {
-				switch err.(type) {
-				case fail.ErrNotFound, fail.ErrTimeout:
-					comm <- result{nil, err}
-					return
-				default:
-					comm <- result{nil, err}
-					return
-				}
-			}
-		}
-
-		var img *abstract.Image
-		retryErr := retryOnCommunicationFailure(
-			func() error {
-				var innerErr error
-				img, innerErr = handler.service.SearchImage(los)
-				return innerErr
-			},
-			2*temporal.GetDefaultDelay(),
-		)
-		if retryErr != nil {
-			switch retryErr.(type) {
 			case fail.ErrNotFound, fail.ErrTimeout:
-				comm <- result{nil, retryErr}
-				return
+				return nil, err
 			default:
-				comm <- result{nil, retryErr}
-				return
+				return nil, err
 			}
 		}
+	}
 
-		if domain == "" {
-			domain = defaultNetwork.Domain
+	var img *abstract.Image
+	retryErr := retryOnCommunicationFailure(
+		func() error {
+			var innerErr error
+			img, innerErr = handler.service.SearchImage(los)
+			return innerErr
+		},
+		2*temporal.GetDefaultDelay(),
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case fail.ErrNotFound, fail.ErrTimeout:
+			return nil, retryErr
+		default:
+			return nil, retryErr
 		}
-		domain = strings.Trim(domain, ".")
-		if domain != "" {
-			domain = "." + domain
-		}
+	}
 
-		keypair, err := abstract.NewKeyPair(name)
+	if domain == "" {
+		domain = defaultNetwork.Domain
+	}
+	domain = strings.Trim(domain, ".")
+	if domain != "" {
+		domain = "." + domain
+	}
+
+	keypair, err := abstract.NewKeyPair(name)
+	if err != nil {
+		return nil, err
+	}
+	hostRequest := abstract.HostRequest{
+		ImageID:        img.ID,
+		ResourceName:   name,
+		HostName:       name + domain,
+		TemplateID:     template.ID,
+		PublicIP:       public,
+		Networks:       networks,
+		DefaultRouteIP: defaultRouteIP,
+		DefaultGateway: primaryGateway,
+		KeyPair:        keypair,
+	}
+
+	host = nil
+	var userData *userdata.Content
+	retryErr = retryOnCommunicationFailure(
+		func() error {
+			var innerErr error
+			host, userData, innerErr = handler.service.CreateHost(hostRequest)
+			return innerErr
+		},
+		0,
+	)
+	if retryErr != nil {
+		logrus.Error(fail.Errorf("failure creating host", retryErr))
+		switch retryErr.(type) {
+		case fail.ErrInvalidRequest:
+			return nil, retryErr
+		case fail.ErrNotFound, fail.ErrTimeout:
+			return nil, retryErr
+		default:
+			return nil, retryErr
+		}
+	}
+
+	defer func() {
 		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-		hostRequest := abstract.HostRequest{
-			ImageID:        img.ID,
-			ResourceName:   name,
-			HostName:       name + domain,
-			TemplateID:     template.ID,
-			PublicIP:       public,
-			Networks:       networks,
-			DefaultRouteIP: defaultRouteIP,
-			DefaultGateway: primaryGateway,
-			KeyPair:        keypair,
-		}
-
-		host = nil
-		var userData *userdata.Content
-		retryErr = retryOnCommunicationFailure(
-			func() error {
-				var innerErr error
-				host, userData, innerErr = handler.service.CreateHost(hostRequest)
-				return innerErr
-			},
-			0,
-		)
-		if retryErr != nil {
-			logrus.Error(fail.Errorf("failure creating host", retryErr))
-			switch retryErr.(type) {
-			case fail.ErrInvalidRequest:
-				comm <- result{nil, retryErr}
-				return
-			case fail.ErrNotFound, fail.ErrTimeout:
-				comm <- result{nil, retryErr}
-				return
-			default:
-				comm <- result{nil, retryErr}
-				return
-			}
-		}
-		hostID = host.ID
-
-		defer func() {
-			if err != nil {
-				if keeponfailure {
-					if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-						return
-					}
-				}
-				retryErr := retryOnCommunicationFailure(
-					func() error {
-						if host != nil {
-							return handler.service.DeleteHost(host.ID)
-						}
-						return nil
-					},
-					0,
-				)
-				if retryErr != nil {
-					switch retryErr.(type) {
-					case fail.ErrNotFound:
-						logrus.Errorf("failed to delete host '%s', resource not found: %v", host.Name, retryErr)
-					case fail.ErrTimeout:
-						logrus.Errorf("failed to delete host '%s', timeout: %v", host.Name, retryErr)
-					default:
-						logrus.Errorf("failed to delete host '%s', other reason: %v", host.Name, retryErr)
-					}
-				}
-				err = fail.AddConsequence(err, retryErr)
-			}
-		}()
-
-		if host == nil {
-			comm <- result{nil, fail.Errorf(fmt.Sprintf("unexpected error creating host instance: host is nil"), nil)}
-			return
-		}
-		if host.Properties == nil {
-			comm <- result{nil, fail.Errorf(fmt.Sprintf("error populating host properties: host.Properties is nil"), nil)}
-			return
-		}
-
-		// Updates host metadata
-		mh, err := metadata.NewHost(handler.service)
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-
-		ch, err := mh.Carry(host)
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-
-		err = ch.Write()
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-		logrus.Infof("Compute resource created: '%s'", host.Name)
-
-		// Starting from here, remove metadata if exiting with error
-		defer func() {
-			if err != nil {
-				if keeponfailure {
-					if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-						return
-					}
-				}
-				derr := mh.Delete()
-				if derr != nil {
-					logrus.Errorf("failed to remove host metadata after host creation failure")
-					err = fail.AddConsequence(err, derr)
+			if keeponfailure {
+				if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+					return
 				}
 			}
-		}()
-
-		// Updates property propsv1.HostSizing
-		if sizing != nil {
-			err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
-				func(clonable data.Clonable) error {
-					hostSizingV1 := clonable.(*propsv1.HostSizing)
-					hostSizingV1.Template = hostRequest.TemplateID
-					hostSizingV1.RequestedSize = &propsv1.HostSize{
-						Cores:     sizing.MinCores,
-						RAMSize:   sizing.MinRAMSize,
-						DiskSize:  sizing.MinDiskSize,
-						GPUNumber: sizing.MinGPU,
-						CPUFreq:   sizing.MinFreq,
+			retryErr := retryOnCommunicationFailure(
+				func() error {
+					if host != nil {
+						return handler.service.DeleteHost(host.ID)
 					}
 					return nil
 				},
+				0,
 			)
-		} else {
-			err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
-				func(clonable data.Clonable) error {
-					hostSizingV1 := clonable.(*propsv1.HostSizing)
-					hostSizingV1.Template = hostRequest.TemplateID
-					hostSizingV1.RequestedSize = &propsv1.HostSize{
-						Cores:     template.Cores,
-						RAMSize:   template.RAMSize,
-						DiskSize:  template.DiskSize,
-						GPUNumber: template.GPUNumber,
-						CPUFreq:   template.CPUFreq,
-					}
-					return nil
-				},
-			)
+			if retryErr != nil {
+				switch retryErr.(type) {
+				case fail.ErrNotFound:
+					logrus.Errorf("failed to delete host '%s', resource not found: %v", host.Name, retryErr)
+				case fail.ErrTimeout:
+					logrus.Errorf("failed to delete host '%s', timeout: %v", host.Name, retryErr)
+				default:
+					logrus.Errorf("failed to delete host '%s', other reason: %v", host.Name, retryErr)
+				}
+			}
+			err = fail.AddConsequence(err, retryErr)
 		}
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
+	}()
 
-		// Sets host extension DescriptionV1
-		creator := ""
-		hostname, _ := os.Hostname()
-		if curUser, err := user.Current(); err == nil {
-			creator = curUser.Username
-			if hostname != "" {
-				creator += "@" + hostname
+	if host == nil {
+		return nil, fail.Errorf(fmt.Sprintf("unexpected error creating host instance: host is nil"), nil)
+	}
+	if host.Properties == nil {
+		return nil, fail.Errorf(fmt.Sprintf("error populating host properties: host.Properties is nil"), nil)
+	}
+
+	// Updates host metadata
+	mh, err := metadata.NewHost(handler.service)
+	if err != nil {
+		return nil, err
+	}
+
+	ch, err := mh.Carry(host)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ch.Write()
+	if err != nil {
+		return nil, err
+	}
+	logrus.Infof("Compute resource created: '%s'", host.Name)
+
+	// Starting from here, remove metadata if exiting with error
+	defer func() {
+		if err != nil {
+			if keeponfailure {
+				if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
+					return
+				}
 			}
-			if curUser.Name != "" {
-				creator += " (" + curUser.Name + ")"
+			derr := mh.Delete()
+			if derr != nil {
+				logrus.Errorf("failed to remove host metadata after host creation failure")
+				err = fail.AddConsequence(err, derr)
 			}
-		} else {
-			creator = "unknown@" + hostname
 		}
-		err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(
+	}()
+
+	// Updates property propsv1.HostSizing
+	if sizing != nil {
+		err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
 			func(clonable data.Clonable) error {
-				hostDescriptionV1 := clonable.(*propsv1.HostDescription)
-				hostDescriptionV1.Created = time.Now()
-				hostDescriptionV1.Creator = creator
-				hostDescriptionV1.Domain = domain
+				hostSizingV1 := clonable.(*propsv1.HostSizing)
+				hostSizingV1.Template = hostRequest.TemplateID
+				hostSizingV1.RequestedSize = &propsv1.HostSize{
+					Cores:     sizing.MinCores,
+					RAMSize:   sizing.MinRAMSize,
+					DiskSize:  sizing.MinDiskSize,
+					GPUNumber: sizing.MinGPU,
+					CPUFreq:   sizing.MinFreq,
+				}
 				return nil
 			},
 		)
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-
-		// Updates host property propsv1.HostNetwork
-		var (
-			defaultNetworkID string
-			gatewayID        string
-		)
-		err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(
+	} else {
+		err = host.Properties.LockForWrite(hostproperty.SizingV1).ThenUse(
 			func(clonable data.Clonable) error {
-				hostNetworkV1 := clonable.(*propsv1.HostNetwork)
-				defaultNetworkID = hostNetworkV1.DefaultNetworkID // set earlier by handler.service.CreateHost()
-				if !public {
-					if len(networks) > 0 {
-						mgw, err := metadata.LoadGateway(handler.service, defaultNetworkID)
-						if err == nil {
-							mgwm, merr := mgw.Get()
-							if merr != nil {
-								return merr
-							}
-
-							gatewayID = mgwm.ID
-						}
-					}
+				hostSizingV1 := clonable.(*propsv1.HostSizing)
+				hostSizingV1.Template = hostRequest.TemplateID
+				hostSizingV1.RequestedSize = &propsv1.HostSize{
+					Cores:     template.Cores,
+					RAMSize:   template.RAMSize,
+					DiskSize:  template.DiskSize,
+					GPUNumber: template.GPUNumber,
+					CPUFreq:   template.CPUFreq,
 				}
-				hostNetworkV1.DefaultGatewayID = gatewayID
-
-				if net != "" {
-					mn, err := metadata.LoadNetwork(handler.service, net)
-					if err != nil {
-						return err
-					}
-					network, err := mn.Get()
-					if err != nil {
-						return err
-					}
-					hostNetworkV1.NetworksByID[network.ID] = network.Name
-					hostNetworkV1.NetworksByName[network.Name] = network.ID
-				}
-
 				return nil
 			},
 		)
-		if err != nil {
-			comm <- result{nil, err}
-			return
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// Sets host extension DescriptionV1
+	creator := ""
+	hostname, _ := os.Hostname()
+	if curUser, err := user.Current(); err == nil {
+		creator = curUser.Username
+		if hostname != "" {
+			creator += "@" + hostname
 		}
-
-		// Updates host metadata
-		err = mh.Write()
-		if err != nil {
-			comm <- result{nil, err}
-			return
+		if curUser.Name != "" {
+			creator += " (" + curUser.Name + ")"
 		}
+	} else {
+		creator = "unknown@" + hostname
+	}
+	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(
+		func(clonable data.Clonable) error {
+			hostDescriptionV1 := clonable.(*propsv1.HostDescription)
+			hostDescriptionV1.Created = time.Now()
+			hostDescriptionV1.Creator = creator
+			hostDescriptionV1.Domain = domain
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
 
-		if host == nil {
-			comm <- result{nil, fail.InconsistentError("host is nil after mh.Write()")}
-			return
-		}
+	// Updates host property propsv1.HostNetwork
+	var (
+		defaultNetworkID string
+		gatewayID        string
+	)
+	err = host.Properties.LockForWrite(hostproperty.NetworkV1).ThenUse(
+		func(clonable data.Clonable) error {
+			hostNetworkV1 := clonable.(*propsv1.HostNetwork)
+			defaultNetworkID = hostNetworkV1.DefaultNetworkID // set earlier by handler.service.CreateHost()
+			if !public {
+				if len(networks) > 0 {
+					mgw, err := metadata.LoadGateway(handler.service, defaultNetworkID)
+					if err == nil {
+						mgwm, merr := mgw.Get()
+						if merr != nil {
+							return merr
+						}
 
-		// A host claimed ready by a Cloud provider is not necessarily ready
-		// to be used until ssh service is up and running. So we wait for it before
-		// claiming host is created
-		logrus.Infof("Waiting start of SSH service on remote host '%s' ...", host.Name)
-		sshHandler := NewSSHHandler(handler.service)
-		sshCfg, err := sshHandler.GetConfig(ctx, host.ID)
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-
-		task, _ := concurrency.NewTaskWithContext(ctx)
-		_, err = sshCfg.WaitServerReady(task, "phase1", temporal.GetHostCreationTimeout())
-		if err != nil {
-			derr := err
-			if client.IsTimeoutError(derr) {
-				comm <- result{nil, fail.Wrap(derr, fmt.Sprintf("timeout waiting host '%s' to become ready", host.Name))}
-				return
-			}
-
-			if client.IsProvisioningError(derr) {
-				logrus.Errorf("%+v", derr)
-				retrieveForensicsData(ctx, sshHandler, host)
-				comm <- result{nil, fail.Wrap(derr, fmt.Sprintf("failed to provision host '%s', please check safescaled logs", host.Name))}
-				return
-			}
-
-			comm <- result{nil, fail.Wrap(derr, fmt.Sprintf("failed to wait host '%s' to become ready", host.Name))}
-			return
-		}
-
-		if host == nil {
-			comm <- result{nil, fail.InconsistentError("host is nil after WaitServerReady('phase1')")}
-			return
-		}
-
-		// Updates host link with networks
-		for _, i := range networks {
-			merr := i.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(
-				func(clonable data.Clonable) error {
-					networkHostsV1 := clonable.(*propsv1.NetworkHosts)
-					networkHostsV1.ByName[host.Name] = host.ID
-					networkHostsV1.ByID[host.ID] = host.Name
-					return nil
-				},
-			)
-			if merr != nil {
-				logrus.Errorf(merr.Error())
-				continue
-			}
-			_, merr = metadata.SaveNetwork(handler.service, i)
-			if merr != nil {
-				logrus.Errorf(merr.Error())
-			}
-		}
-
-		// Executes userdata phase2 script to finalize host installation
-		userDataPhase2, err := userData.Generate("phase2")
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-
-		filepath := utils.TempFolder + "/user_data.phase2.sh"
-		pbHost, err := srvutils.ToPBHost(host)
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-		err = install.UploadStringToRemoteFile(string(userDataPhase2), pbHost, filepath, "", "", "")
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-
-		if host == nil {
-			comm <- result{nil, fail.InconsistentError("host is nil after UploadStringToRemoteFile(phase2)")}
-			return
-		}
-
-		sshConfig, err := sshHandler.GetConfig(ctx, host)
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-
-		command := fmt.Sprintf("sudo nohup bash %s &", filepath)
-		sshCmd, err := sshConfig.Command(command)
-		if err != nil {
-			comm <- result{nil, err}
-			return
-		}
-
-		logrus.Debug("Running phase 2")
-
-		// Executes the script on the remote host
-		// retcode, stdout, stderr, err := sshHandler.Run(ctx, host.Name, command)
-		var (
-			retcode        int
-			stdout, stderr string
-		)
-		retryErr = retry.WhileUnsuccessfulDelay1SecondWithNotify(
-			func() error {
-				var inErr error
-				retcode, stdout, stderr, inErr = sshCmd.RunWithTimeout(task, outputs.COLLECT, 0)
-				if stdout != "" || stderr != "" {
-					logrus.Warnf("Remote SSH service response: errorcode %d, '%s', '%s'", retcode, stdout, stderr)
-				}
-
-				if inErr != nil {
-					return inErr
-				}
-
-				if retcode != 0 {
-					logrus.Warnf("Remote SSH service response: errorcode %d, '%s', '%s'", retcode, stdout, stderr)
-					if retcode != 255 {
-						return fail.AbortedError(fmt.Sprintf("Remote SSH service response: errorcode %d", retcode), nil)
+						gatewayID = mgwm.ID
 					}
-					return fail.Errorf(fmt.Sprintf("Remote SSH service response: errorcode %d", retcode), nil)
-				} else {
-					return nil
 				}
-			},
-			temporal.GetHostTimeout(),
-			func(t retry.Try, v verdict.Enum) {
-				if v == verdict.Retry {
-					logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.Name)
+			}
+			hostNetworkV1.DefaultGatewayID = gatewayID
+
+			if net != "" {
+				mn, err := metadata.LoadNetwork(handler.service, net)
+				if err != nil {
+					return err
 				}
+				network, err := mn.Get()
+				if err != nil {
+					return err
+				}
+				hostNetworkV1.NetworksByID[network.ID] = network.Name
+				hostNetworkV1.NetworksByName[network.Name] = network.ID
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// Updates host metadata
+	err = mh.Write()
+	if err != nil {
+		return nil, err
+	}
+
+	// VPL:
+	if host == nil {
+		return nil, fail.InconsistentError("host is nil after mh.Write()")
+	}
+
+	// A host claimed ready by a Cloud provider is not necessarily ready
+	// to be used until ssh service is up and running. So we wait for it before
+	// claiming host is created
+	logrus.Infof("Waiting start of SSH service on remote host '%s' ...", host.Name)
+	sshHandler := NewSSHHandler(handler.service)
+	sshCfg, err := sshHandler.GetConfig(ctx, host.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = sshCfg.WaitServerReady("phase1", temporal.GetHostCreationTimeout())
+	if err != nil {
+		derr := err
+		if client.IsTimeoutError(derr) {
+			return nil, fail.Wrap(derr, fmt.Sprintf("timeout waiting host '%s' to become ready", host.Name))
+		}
+
+		if client.IsProvisioningError(derr) {
+			logrus.Errorf("%+v", derr)
+			retrieveForensicsData(ctx, sshHandler, host)
+			return nil, fail.Wrap(
+				derr, fmt.Sprintf("failed to provision host '%s', please check safescaled logs", host.Name),
+			)
+		}
+
+		return nil, fail.Wrap(derr, fmt.Sprintf("failed to wait host '%s' to become ready", host.Name))
+	}
+
+	// VPL:
+	if host == nil {
+		return nil, fail.InconsistentError("host is nil after WaitServerReady('phase1')")
+	}
+
+	// Updates host link with networks
+	for _, i := range networks {
+		merr := i.Properties.LockForWrite(networkproperty.HostsV1).ThenUse(
+			func(clonable data.Clonable) error {
+				networkHostsV1 := clonable.(*propsv1.NetworkHosts)
+				networkHostsV1.ByName[host.Name] = host.ID
+				networkHostsV1.ByID[host.ID] = host.Name
+				return nil
 			},
 		)
-		if retryErr != nil {
-			logrus.Error(fail.Errorf("failure running phase 2", retryErr))
-			retrieveForensicsData(ctx, sshHandler, host)
-			comm <- result{nil, retryErr}
-			return
+		if merr != nil {
+			logrus.Errorf(merr.Error())
+			continue
 		}
-
-		if host == nil {
-			comm <- result{nil, fail.InconsistentError("host is nil after Run(phase2)")}
-			return
+		_, merr = metadata.SaveNetwork(handler.service, i)
+		if merr != nil {
+			logrus.Errorf(merr.Error())
 		}
+	}
 
-		if retcode != 0 {
-			retrieveForensicsData(ctx, sshHandler, host)
+	// Executes userdata phase2 script to finalize host installation
+	userDataPhase2, err := userData.Generate("phase2")
+	if err != nil {
+		return nil, err
+	}
 
-			comm <- result{nil, fail.Errorf(fmt.Sprintf("failed to finalize host '%s' installation: retcode=%d, stdout[%s], stderr[%s]", host.Name, retcode,
-				stdout, stderr), nil)}
-			return
-		}
+	filepath := utils.TempFolder + "/user_data.phase2.sh"
+	pbHost, err := srvutils.ToPBHost(host)
+	if err != nil {
+		return nil, err
+	}
+	err = install.UploadStringToRemoteFile(string(userDataPhase2), pbHost, filepath, "", "", "")
+	if err != nil {
+		return nil, err
+	}
 
-		// FIXME: AWS Retrieve data anyway
+	// VPL:
+	if host == nil {
+		return nil, fail.InconsistentError("host is nil after UploadStringToRemoteFile(phase2)")
+	}
+
+	sshConfig, err := sshHandler.GetConfig(ctx, host)
+	if err != nil {
+		return nil, err
+	}
+
+	command := fmt.Sprintf("sudo bash %s; exit $?", filepath)
+	sshCmd, err := sshConfig.Command(command)
+	if err != nil {
+		return nil, err
+	}
+
+	// Executes the script on the remote host
+	// retcode, stdout, stderr, err := sshHandler.Run(ctx, host.Name, command)
+	var (
+		retcode        int
+		stdout, stderr string
+	)
+	retryErr = retry.WhileUnsuccessfulDelay1SecondWithNotify(
+		func() error {
+			var inErr error
+			retcode, stdout, stderr, inErr = sshCmd.RunWithTimeout(nil, outputs.COLLECT, 0)
+			if stdout != "" || stderr != "" {
+				logrus.Warnf("Remote SSH service response: errorcode %d, '%s', '%s'", retcode, stdout, stderr)
+			}
+
+			if inErr != nil {
+				return inErr
+			}
+
+			if retcode != 0 {
+				logrus.Warnf("Remote SSH service response: errorcode %d, '%s', '%s'", retcode, stdout, stderr)
+				if retcode != 255 {
+					return fail.AbortedError(fmt.Sprintf("Remote SSH service response: errorcode %d", retcode), nil)
+				}
+				return fail.Errorf(fmt.Sprintf("Remote SSH service response: errorcode %d", retcode), nil)
+			} else {
+				return nil
+			}
+		},
+		temporal.GetHostTimeout(),
+		func(t retry.Try, v verdict.Enum) {
+			if v == verdict.Retry {
+				logrus.Debugf("Remote SSH service on host '%s' isn't ready, retrying...", host.Name)
+			}
+		},
+	)
+	if retryErr != nil {
+		logrus.Error(fail.Errorf("failure running phase 2", retryErr))
+		retrieveForensicsData(ctx, sshHandler, host)
+		return nil, err
+	}
+
+	// VPL:
+	if host == nil {
+		return nil, fail.InconsistentError("host is nil after Run(phase2)")
+	}
+
+	if retcode != 0 {
 		retrieveForensicsData(ctx, sshHandler, host)
 
-		err = handler.Reboot(ctx, host.ID)
-		if err != nil {
-			comm <- result{nil, fail.Errorf("reboot command failed", err)}
-			return
+		return nil, fail.Errorf(
+			fmt.Sprintf(
+				"failed to finalize host '%s' installation: retcode=%d, stdout[%s], stderr[%s]", host.Name, retcode,
+				stdout, stderr,
+			), nil,
+		)
+	}
+
+	// FIXME: AWS Retrieve data anyway
+	retrieveForensicsData(ctx, sshHandler, host)
+
+	// Reboot host
+	command = "sudo systemctl reboot"
+	retcode, _, _, err = sshHandler.Run(ctx, host.Name, command, outputs.COLLECT)
+	if err != nil {
+		return nil, err
+	}
+	if retcode != 0 && retcode != 255 {
+		return nil, fail.Errorf(fmt.Sprintf("reboot command failed: retcode=%d", retcode), nil)
+	}
+
+	// Wait like 2 min for the machine to reboot
+	_, err = sshCfg.WaitServerReady("ready", temporal.GetConnectSSHTimeout())
+	if err != nil {
+		if client.IsTimeoutError(err) {
+			return nil, err
 		}
 
-		// Wait like 2 min for the machine to reboot
-		_, err = sshCfg.WaitServerReady(task, "ready", temporal.GetConnectSSHTimeout())
-		if err != nil {
-			if client.IsTimeoutError(err) {
-				comm <- result{nil, err}
-				return
-			}
-
-			if client.IsProvisioningError(err) {
-				retrieveForensicsData(ctx, sshHandler, host)
-				comm <- result{nil, fail.Wrap(err, fmt.Sprintf("error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name))}
-				return
-			}
-
-			comm <- result{nil, err}
-			return
+		if client.IsProvisioningError(err) {
+			retrieveForensicsData(ctx, sshHandler, host)
+			return nil, fail.Wrap(
+				err, fmt.Sprintf(
+					"error creating host '%s', error provisioning the new host, please check safescaled logs", host.Name,
+				),
+			)
 		}
-		logrus.Infof("SSH service started on host '%s'.", host.Name)
-		comm <- result{host, nil}
-		return
-	}()
+
+		return nil, err
+	}
+	logrus.Infof("SSH service started on host '%s'.", host.Name)
 
 	select {
 	case <-ctx.Done():
-		err = fail.Errorf("host creation cancelled by safescale", ctx.Err())
-		// remove metadata first
-		if hostID != "" {
-			if keeponfailure {
-				if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-					return
-				}
-			}
-
-			retryErr := retryOnCommunicationFailure(
-				func() error {
-					if hostID != "" {
-						nh, mhErr := metadata.LoadHost(handler.service, hostID)
-						if mhErr != nil {
-							if _, ok := mhErr.(fail.ErrNotFound); ok {
-								return fail.AbortedError("not there", mhErr)
-							}
-							return mhErr
-						}
-
-						mhErr = nh.Delete()
-						if mhErr != nil {
-							if _, ok := mhErr.(fail.ErrNotFound); ok {
-								return fail.AbortedError("not there", mhErr)
-							}
-							return mhErr
-						}
-					}
-					return nil
-				},
-				0,
-			)
-			if retryErr != nil {
-				switch retryErr.(type) {
-				case fail.ErrNotFound:
-					logrus.Errorf("failed to delete host '%s', resource not found: %v", hostID, retryErr)
-				case fail.ErrTimeout:
-					logrus.Errorf("failed to delete host '%s', timeout: %v", hostID, retryErr)
-				default:
-					logrus.Errorf("failed to delete host '%s', other reason: %v", hostID, retryErr)
-				}
-			}
-		}
-		if hostID != "" {
-			if keeponfailure {
-				if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-					return
-				}
-			}
-
-			retryErr := retryOnCommunicationFailure(
-				func() error {
-					if hostID != "" {
-						return handler.service.DeleteHost(hostID)
-					}
-					return nil
-				},
-				0,
-			)
-			if retryErr != nil {
-				switch retryErr.(type) {
-				case fail.ErrNotFound:
-					logrus.Errorf("failed to delete host '%s', resource not found: %v", hostID, retryErr)
-				case fail.ErrTimeout:
-					logrus.Errorf("failed to delete host '%s', timeout: %v", hostID, retryErr)
-				default:
-					logrus.Errorf("failed to delete host '%s', other reason: %v", hostID, retryErr)
-				}
-			}
-		}
+		err = fail.Errorf("host creation cancelled by safescale", nil)
+		logrus.Warn(err)
 		return nil, err
-	case res := <-comm:
-		return res.rhost, res.rerr
+	default:
 	}
+
+	return host, nil
 }
 
 func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host *abstract.Host) ([]string, []string) {
@@ -1062,7 +926,6 @@ func getPhaseWarningsAndErrors(ctx context.Context, sshHandler *SSHHandler, host
 	return warnings, errs
 }
 
-// FIXME: Why we accept ctx if it's not used ?
 func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *abstract.Host) {
 	if sshHandler == nil || host == nil {
 		return
@@ -1071,12 +934,23 @@ func retrieveForensicsData(ctx context.Context, sshHandler *SSHHandler, host *ab
 		_ = os.MkdirAll(utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s", host.Name)), 0777)
 		dumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/userdata-%s.", host.Name, "phase1"))
 		etcDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/etcdata.tar.gz", host.Name))
+		textDumpName := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/textdata.tar.gz", host.Name))
+		fwDumpName1 := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/firewall-trusted.cfg", host.Name))
+		fwDumpName2 := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/forensics/%s/firewall-public.cfg", host.Name))
 
 		_, _, _, err := sshHandler.RunWithTimeout(ctx, host.Name, "whoami", outputs.COLLECT, 60*time.Second)
 		if err == nil { // If there's no ssh connection, no need to wait
 			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
 			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf etcdir.tar.gz /etc", outputs.COLLECT)
+			_, _, _, _ = sshHandler.Run(
+				ctx, host.Name, "systemd-resolve --status > /tmp/systemd-resolve.txt", outputs.COLLECT,
+			)
+			_, _, _, _ = sshHandler.Run(ctx, host.Name, "netplan ip leases eth0 > /tmp/netplan.txt", outputs.COLLECT)
+			_, _, _, _ = sshHandler.Run(ctx, host.Name, "sudo tar -czvf textdumps.tar.gz /tmp/*.txt", outputs.COLLECT)
 			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/etcdir.tar.gz", etcDumpName)
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/home/safescale/textdumps.tar.gz", textDumpName)
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/tmp/firewall-trusted.cfg", fwDumpName1)
+			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":/tmp/firewall-public.cfg", fwDumpName2)
 
 			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.TempFolder+"/user_data.phase1.sh", dumpName+"sh")
 			_, _, _, _ = sshHandler.Copy(ctx, host.Name+":"+utils.LogFolder+"/user_data.phase1.log", dumpName+"log")
@@ -1115,10 +989,8 @@ func (handler *HostHandler) getOrCreateDefaultNetwork() (network *abstract.Netwo
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
-		case fail.ErrInvalidRequest, fail.ErrTimeout:
+		case fail.ErrInvalidRequest, fail.ErrNotFound, fail.ErrTimeout:
 			return nil, retryErr
-		case fail.ErrNotFound:
-			// We have to create the network...
 		default:
 			return nil, retryErr
 		}
@@ -1163,10 +1035,6 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*abstra
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if ctx != nil && ctx.Err() != nil {
-		return nil, fail.AbortedError("aborted by parent", ctx.Err())
-	}
-
 	if all {
 		return handler.service.ListHosts()
 	}
@@ -1181,8 +1049,10 @@ func (handler *HostHandler) List(ctx context.Context, all bool) (hosts []*abstra
 			return nil
 		},
 	)
-
-	return hosts, err
+	if err != nil {
+		return hosts, err
+	}
+	return hosts, nil
 }
 
 // Force 	 ...
@@ -1191,10 +1061,6 @@ func (handler *HostHandler) ForceInspect(ctx context.Context, ref string) (host 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	if ctx != nil && ctx.Err() != nil {
-		return nil, fail.AbortedError("aborted by parent", ctx.Err())
-	}
 
 	host, err = handler.Inspect(ctx, ref)
 	if err != nil {
@@ -1211,10 +1077,6 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *abst
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	if ctx != nil && ctx.Err() != nil {
-		return nil, fail.AbortedError("aborted by parent", ctx.Err())
-	}
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -1260,11 +1122,10 @@ func retryOnCommunicationFailure(fn func() error, duration time.Duration) error 
 		},
 		duration,
 	)
-
-	if realErr, ok := err.(retry.ErrAborted); ok {
-		return realErr.Cause()
+	switch realErr := err.(type) {
+	case retry.ErrAborted:
+		err = realErr.Cause()
 	}
-
 	return err
 }
 
@@ -1275,8 +1136,9 @@ func normalizeError(in error) (err error) {
 	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
 	defer func() {
 		if err != nil {
-			if realErr, ok := err.(fail.ErrInvalidRequest); ok {
-				logrus.Warning(realErr.Error())
+			switch err.(type) {
+			case fail.ErrInvalidRequest:
+				logrus.Warning(err.Error())
 			}
 		}
 	}()
@@ -1307,10 +1169,6 @@ func (handler *HostHandler) Delete(ctx context.Context, ref string) (err error) 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	if ctx != nil && ctx.Err() != nil {
-		return fail.AbortedError("aborted by parent", ctx.Err())
-	}
 
 	mh, err := metadata.LoadHost(handler.service, ref)
 	if err != nil {
@@ -1568,10 +1426,6 @@ func (handler *HostHandler) SSH(ctx context.Context, ref string) (sshConfig *sys
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
-
-	if ctx != nil && ctx.Err() != nil {
-		return nil, fail.AbortedError("aborted by parent", ctx.Err())
-	}
 
 	sshHandler := NewSSHHandler(handler.service)
 	sshConfig, err = sshHandler.GetConfig(ctx, ref)

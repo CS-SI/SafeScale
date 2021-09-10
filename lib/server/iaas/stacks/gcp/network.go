@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -332,10 +331,8 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 		)
 	}
 
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		if !theNetwork.OK() {
-			logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
-		}
+	if !theNetwork.OK() {
+		logrus.Warnf("Missing data in network: %s", spew.Sdump(theNetwork))
 	}
 
 	compuService := s.ComputeService
@@ -360,7 +357,7 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 	if err != nil {
 		switch err.(type) {
 		case fail.ErrTimeout:
-			logrus.Warnf("timeout waiting for subnetwork deletion")
+			logrus.Warnf("Timeout waiting for subnetwork deletion")
 			return err
 		default:
 			return err
@@ -384,12 +381,12 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout(),
 			)
 			if operr != nil {
-				logrus.Warnf("error waiting for firewall rule deletion: %v", operr)
+				logrus.Warn(operr)
 			}
 		}
 	}
 	if err != nil {
-		logrus.Warnf("error getting firewall rules: %v", err)
+		logrus.Warn(err)
 	}
 
 	natRuleName := fmt.Sprintf("%s-%s-nat-allowed", s.GcpConfig.NetworkName, subnetwork.Name)
@@ -408,12 +405,12 @@ func (s *Stack) DeleteNetwork(ref string) (err error) {
 				oco, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout(),
 			)
 			if operr != nil {
-				logrus.Warnf("error deleting routes: %v", operr)
+				logrus.Warn(operr)
 			}
 		}
 	}
 	if err != nil {
-		logrus.Warnf("error getting routes: %v", err)
+		logrus.Warn(err)
 	}
 
 	return nil

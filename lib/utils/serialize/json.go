@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -147,7 +147,7 @@ func (x *JSONProperties) LockForRead(key string) *SyncedJSONProperty {
 		panic("key is empty!")
 	}
 
-	// FIXME: Zero can panic, look at deferred code
+	// FIXME Zero can panic, look at deferred code
 
 	x.Lock()
 	defer x.Unlock()
@@ -190,7 +190,7 @@ func (x *JSONProperties) LockForWrite(key string) *SyncedJSONProperty {
 	x.Lock()
 	defer x.Unlock()
 
-	// FIXME: Zero can panic, look at deferred code
+	// FIXME Zero can panic, look at deferred code
 
 	var (
 		item  *jsonProperty

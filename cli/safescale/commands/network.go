@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -194,7 +194,7 @@ var networkCreate = cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "create a network",
-	ArgsUsage: "NETWORKNAME",
+	ArgsUsage: "<network_name>",
 	Flags: []cli.Flag{
 		cli.StringFlag{
 			Name:  "cidr",

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,19 +64,15 @@ func (s *TemplateListener) List(ctx context.Context, in *pb.TemplateListRequest)
 	handler := TemplateHandler(tenant.Service)
 	templates, err := handler.List(ctx, all)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	// Map abstract.Host to pb.Host
 	var pbTemplates []*pb.HostTemplate
 	for _, template := range templates {
-		theTemplate := template
-		pbt, err := srvutils.ToPBHostTemplate(&theTemplate)
+		pbt, err := srvutils.ToPBHostTemplate(&template)
 		if err != nil {
-			log.Warnf("ignoring error listing template: %v", err)
+			log.Warn(err)
 			continue
 		}
 		pbTemplates = append(pbTemplates, pbt)

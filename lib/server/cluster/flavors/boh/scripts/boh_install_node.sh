@@ -25,8 +25,6 @@ exec 1<>/opt/safescale/var/log/boh_install_node.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}
-waitForUserdata
-sfDetectFacts
 
 # Installs and configures everything needed on any node
 {{ .reserved_CommonRequirements }}

@@ -44,25 +44,20 @@ feature:
                 systemctl start gmond
                 systemctl start gmetad
                 systemctl try-restart httpd
-                sfExit
 
             remove: |
                 sfYum remove -y ohpc-base ohpc-slurm-server ohpc-ganglia gangli-gmond-ohpc nhc-ohpc \
                               ohpc-autotools EasyBuild-ohpc hwloc-ohpc spack-ohpc valgrind-ohpc \
                               openmpi3-gnu7-ohpc mpich-gnu7-ohpc ohpc-gnu7-perf-tools slurm-torque
-                sfExit
 
     service:
         start: |
             systemctl start slurmctld
-            sfExit
 
         stop: |
             systemctl stop slurmctld
-            sfExit
 
         state: |
             systemctl status slurm-server
-            sfExit
 
 ...

@@ -27,8 +27,6 @@ exec 1<>/opt/safescale/var/log/dcos_prepare_bootstrap.log
 exec 2>&1
 
 {{ .reserved_BashLibrary }}
-waitForUserdata
-sfDetectFacts
 
 # Download if needed the file dcos_generate_config.sh and executes it
 download_dcos_config_generator() {

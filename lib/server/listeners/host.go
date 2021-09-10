@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,9 +19,6 @@ package listeners
 import (
 	"context"
 	"fmt"
-	"os"
-
-	"github.com/davecgh/go-spew/spew"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
@@ -101,9 +98,6 @@ func (s *HostListener) Start(ctx context.Context, in *pb.Reference) (empty *goog
 	handler := HostHandler(tenant.Service)
 	err = handler.Start(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -181,9 +175,6 @@ func (s *HostListener) Reboot(ctx context.Context, in *pb.Reference) (empty *goo
 	handler := HostHandler(tenant.Service)
 	err = handler.Reboot(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -217,9 +208,6 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 	handler := HostHandler(tenant.Service)
 	hosts, err := handler.List(ctx, all)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -228,7 +216,7 @@ func (s *HostListener) List(ctx context.Context, in *pb.HostListRequest) (hl *pb
 	for _, host := range hosts {
 		pbHost, err := srvutils.ToPBHost(host)
 		if err != nil {
-			log.Warnf("ignoring error listing host: %v", err)
+			log.Warn(err)
 			continue
 		}
 		pbhost = append(pbhost, pbHost)
@@ -296,15 +284,9 @@ func (s *HostListener) Create(ctx context.Context, in *pb.HostDefinition) (h *pb
 		in.KeepOnFailure,
 	)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if host == nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, "host operation failure with nil result and nil error")
-		}
 		return nil, status.Errorf(codes.Internal, "host operation failure with nil result and nil error")
 	}
 
@@ -350,9 +332,6 @@ func (s *HostListener) Resize(ctx context.Context, in *pb.HostDefinition) (h *pb
 		float32(in.GetCpuFreq()),
 	)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	log.Infof("Host '%s' resized", name)
@@ -392,9 +371,6 @@ func (s *HostListener) Status(ctx context.Context, in *pb.Reference) (ht *pb.Hos
 	handler := HostHandler(tenant.Service)
 	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	return srvutils.ToHostStatus(host)
@@ -433,16 +409,8 @@ func (s *HostListener) Inspect(ctx context.Context, in *pb.Reference) (h *pb.Hos
 	handler := HostHandler(tenant.Service)
 	host, err := handler.ForceInspect(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, fmt.Sprintf("cannot inspect host: %s", getUserMessage(err)))
 	}
-
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		log.Warn(spew.Sdump(host))
-	}
-
 	return srvutils.ToPBHost(host)
 }
 
@@ -480,9 +448,6 @@ func (s *HostListener) Delete(ctx context.Context, in *pb.Reference) (empty *goo
 	handler := HostHandler(tenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	log.Infof("Host '%s' successfully deleted.", ref)
@@ -523,7 +488,7 @@ func (s *HostListener) SSH(ctx context.Context, in *pb.Reference) (sc *pb.SshCon
 	sshConfig, err := handler.SSH(ctx, ref)
 	if err != nil {
 		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, fmt.Sprintf("host '%s' not found", ref))
+			return nil, status.Errorf(codes.Internal, fmt.Sprintf("host '%s' not found", ref))
 		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}

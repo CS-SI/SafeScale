@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,19 +79,15 @@ func (s *VolumeListener) List(ctx context.Context, in *pb.VolumeListRequest) (_ 
 	handler := VolumeHandler(tenant.Service)
 	volumes, err := handler.List(ctx, in.GetAll())
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	// Map abstract.Volume to pb.Volume
 	var pbvolumes []*pb.Volume
 	for _, volume := range volumes {
-		theVolume := volume
-		pbv, err := srvutils.ToPBVolume(&theVolume)
+		pbv, err := srvutils.ToPBVolume(&volume)
 		if err != nil {
-			log.Warnf("protobuf error reading volumes: %v", err)
+			log.Warn(err)
 			continue
 		}
 		pbvolumes = append(pbvolumes, pbv)
@@ -121,7 +117,9 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 
 	ctx, cancelFunc := context.WithCancel(ctx)
 	if err := srvutils.JobRegister(ctx, cancelFunc, "Volumes Create "+in.GetName()); err != nil {
-		return nil, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
+		return nil, status.Errorf(
+			codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error(),
+		)
 	}
 	defer srvutils.JobDeregister(ctx)
 
@@ -134,9 +132,6 @@ func (s *VolumeListener) Create(ctx context.Context, in *pb.VolumeDefinition) (_
 	handler := VolumeHandler(tenant.Service)
 	vol, err := handler.Create(ctx, name, int(size), volumespeed.Enum(speed))
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if vol == nil {
@@ -164,9 +159,6 @@ func (s *VolumeListener) Expand(ctx context.Context, in *pb.VolumeSizeChange) (*
 
 	err := handler.Expand(ctx, volumeName, hostName, in.ChangeSize, in.ChangeSizeType)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -191,9 +183,6 @@ func (s *VolumeListener) Shrink(ctx context.Context, in *pb.VolumeSizeChange) (*
 
 	err := handler.Shrink(ctx, volumeName, hostName, in.ChangeSize, in.ChangeSizeType)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -212,11 +201,15 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 	}
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
-		return empty, status.Errorf(codes.InvalidArgument, "cannot attach volume: neither name nor id given as reference for volume")
+		return empty, status.Errorf(
+			codes.InvalidArgument, "cannot attach volume: neither name nor id given as reference for volume",
+		)
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
-		return empty, status.Errorf(codes.InvalidArgument, "cannot attach volume: neither name nor id given as reference for host")
+		return empty, status.Errorf(
+			codes.InvalidArgument, "cannot attach volume: neither name nor id given as reference for host",
+		)
 	}
 	mountPath := in.GetMountPath()
 	// FIXME: change Format to Filesystem in protobuf
@@ -239,7 +232,9 @@ func (s *VolumeListener) Attach(ctx context.Context, in *pb.VolumeAttachment) (_
 	ctx, cancelFunc := context.WithCancel(ctx)
 	err = srvutils.JobRegister(ctx, cancelFunc, "Volumes Attach "+volumeRef+" to host "+hostRef)
 	if err != nil {
-		return empty, status.Errorf(codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error())
+		return empty, status.Errorf(
+			codes.FailedPrecondition, fmt.Errorf("failed to register the process : %s", getUserMessage(err)).Error(),
+		)
 	}
 	defer srvutils.JobDeregister(ctx)
 
@@ -269,11 +264,15 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_
 	}
 	volumeRef := srvutils.GetReference(in.GetVolume())
 	if volumeRef == "" {
-		return empty, status.Errorf(codes.InvalidArgument, "cannot detach volume: neither name nor id given as reference for volume")
+		return empty, status.Errorf(
+			codes.InvalidArgument, "cannot detach volume: neither name nor id given as reference for volume",
+		)
 	}
 	hostRef := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
-		return empty, status.Errorf(codes.InvalidArgument, "cannot detach volume: neither name nor id given as reference for host")
+		return empty, status.Errorf(
+			codes.InvalidArgument, "cannot detach volume: neither name nor id given as reference for host",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s', '%s')", volumeRef, hostRef), true).WithStopwatch().GoingIn()
@@ -295,9 +294,6 @@ func (s *VolumeListener) Detach(ctx context.Context, in *pb.VolumeDetachment) (_
 	handler := VolumeHandler(tenant.Service)
 	err = handler.Detach(ctx, volumeRef, hostRef)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return empty, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
@@ -316,7 +312,9 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googl
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return empty, status.Errorf(codes.InvalidArgument, "cannot delete volume: neither name nor id given as reference")
+		return empty, status.Errorf(
+			codes.InvalidArgument, "cannot delete volume: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -338,10 +336,9 @@ func (s *VolumeListener) Delete(ctx context.Context, in *pb.Reference) (_ *googl
 	handler := VolumeHandler(tenant.Service)
 	err = handler.Delete(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
-		return empty, status.Errorf(codes.Internal, fmt.Sprintf("cannot delete volume '%s': %s", ref, getUserMessage(err)))
+		return empty, status.Errorf(
+			codes.Internal, fmt.Sprintf("cannot delete volume '%s': %s", ref, getUserMessage(err)),
+		)
 	}
 	log.Infof("Volume '%s' successfully deleted.", ref)
 	return empty, nil
@@ -357,7 +354,9 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 	}
 	ref := srvutils.GetReference(in)
 	if ref == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "cannot inspect volume: neither name nor id given as reference")
+		return nil, status.Errorf(
+			codes.InvalidArgument, "cannot inspect volume: neither name nor id given as reference",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, fmt.Sprintf("('%s')", ref), true).WithStopwatch().GoingIn()
@@ -379,9 +378,6 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *pb.Reference) (_ *pb.V
 	handler := VolumeHandler(tenant.Service)
 	volume, mounts, err := handler.Inspect(ctx, ref)
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 	if volume == nil {

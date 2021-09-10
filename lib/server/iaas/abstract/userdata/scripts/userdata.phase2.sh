@@ -18,16 +18,16 @@
 
 {{.Header}}
 
-function print_error() {
+print_error() {
     read line file <<<$(caller)
     echo "An error occurred in line $line of file $file:" "{"$(sed "${line}q;d" "$file")"}" >&2
     {{.ExitOnError}}
 }
 trap print_error ERR
 
-function fail() {
+fail() {
     echo "PROVISIONING_ERROR: $1"
-    echo -n "$1,${LINUX_KIND},${FULL_VERSION_ID},$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.phase2.done
+    echo -n "$1,${LINUX_KIND},${FULL_VERSION_ID},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 
     collect_installed_packages
 
@@ -45,9 +45,10 @@ exec 1<>/opt/safescale/var/log/user_data.phase2.log
 exec 2>&1
 set -x
 
+# Tricks BashLibrary's waitUserData to believe the current phase (2) is already done
+>/opt/safescale/var/state/user_data.phase2.done
 # Includes the BashLibrary
 {{ .BashLibrary }}
-sfDetectFacts
 
 function lkw_reset_fw() {
     case $LINUX_KIND in
@@ -302,7 +303,7 @@ OUT=
 
 # Don't request dns name servers from DHCP server
 # Don't update default route
-function configure_dhclient() {
+configure_dhclient() {
     # kill any dhclient process already running
     pkill dhclient || true
 
@@ -323,7 +324,7 @@ EOF
     fi
 }
 
-function is_ip_private() {
+is_ip_private() {
     ip=$1
     ipv=$(sfIP2long $ip)
 
@@ -341,7 +342,7 @@ function is_ip_private() {
     return 1
 }
 
-function identify_nics() {
+identify_nics() {
     NICS=$(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
     NICS=${NICS/[[:cntrl:]]/ }
 
@@ -413,13 +414,13 @@ function identify_nics() {
     echo
 }
 
-function substring_diff() {
+substring_diff() {
     read -a l1 <<<$1
     read -a l2 <<<$2
     echo "${l1[@]}" "${l2[@]}" | tr ' ' '\n' | sort | uniq -u
 }
 
-function collect_original_packages() {
+collect_original_packages() {
     case $LINUX_KIND in
     debian | ubuntu)
         dpkg-query -l >${SF_VARDIR}/log/packages_installed_before.phase2.list
@@ -431,7 +432,7 @@ function collect_original_packages() {
     esac
 }
 
-function ensure_curl_is_installed() {
+ensure_curl_is_installed() {
     case $LINUX_KIND in
     ubuntu | debian)
         if [[ -n $(which curl) ]]; then
@@ -455,7 +456,7 @@ function ensure_curl_is_installed() {
     return 0
 }
 
-function collect_installed_packages() {
+collect_installed_packages() {
     case $LINUX_KIND in
     debian | ubuntu)
         dpkg-query -l >${SF_VARDIR}/log/packages_installed_after.phase2.list
@@ -469,7 +470,7 @@ function collect_installed_packages() {
 }
 
 # If host isn't a gateway, we need to configure temporarily and manually gateway on private hosts to be able to update packages
-function ensure_network_connectivity() {
+ensure_network_connectivity() {
     op=1
     is_network_reachable && op=$? || true
     if [[ $op -ne 0 ]]; then
@@ -505,7 +506,7 @@ function ensure_network_connectivity() {
     return 0
 }
 
-function configure_dns() {
+configure_dns() {
     if systemctl status systemd-resolved &>/dev/null; then
         echo "Configuring dns with resolved"
         configure_dns_systemd_resolved
@@ -522,7 +523,7 @@ function configure_dns() {
 # Follows CentOS rules :
 # - if there is a domain suffix in hostname, /etc/hosts contains FQDN as first entry and short hostname as second, after the IP
 # - if there is no domain suffix in hostname, /etc/hosts contains short hostname as first entry, after the IP
-function update_fqdn() {
+update_fqdn() {
     cat /etc/hosts
 
     FULL_HOSTNAME="{{ .HostName }}"
@@ -577,15 +578,7 @@ function install_route_if_needed() {
     return 0
 }
 
-function allow_custom_env_ssh_vars() {
-    cat >>/etc/ssh/sshd_config <<-EOF
-AcceptEnv SAFESCALESSHUSER
-AcceptEnv SAFESCALESSHPASS
-EOF
-    systemctl reload sshd
-}
-
-function configure_network() {
+configure_network() {
     case $LINUX_KIND in
     debian | ubuntu)
         if systemctl status systemd-networkd &>/dev/null; then
@@ -628,7 +621,6 @@ function configure_network() {
     {{- end }}
 
     update_fqdn
-    allow_custom_env_ssh_vars
 
     check_for_network || {
         echo "PROVISIONING_ERROR: missing or incomplete network connectivity"
@@ -637,7 +629,7 @@ function configure_network() {
 }
 
 # Configure network for Debian distribution
-function configure_network_debian() {
+configure_network_debian() {
     echo "Configuring network (debian-like)..."
 
     local path=/etc/network/interfaces.d
@@ -691,11 +683,11 @@ EOF
         fail 200
     }
 
-    echo "done"
+    echo done
 }
 
 # Configure network using systemd-networkd
-function configure_network_systemd_networkd() {
+configure_network_systemd_networkd() {
     echo "Configuring network (using netplan and systemd-networkd)..."
 
     {{- if .IsGateway }}
@@ -872,11 +864,11 @@ EOF
         reset_fw || (echo "PROVISIONING_ERROR: failure setting firewall" && fail 199)
     fi
 
-    echo "done"
+    echo done
 }
 
 # Configure network for redhat alike distributions (rhel, centos, ...)
-function configure_network_redhat() {
+configure_network_redhat() {
     echo "Configuring network (redhat-like)..."
 
     if [[ -z $VERSION_ID || $VERSION_ID -lt 7 ]]; then
@@ -955,11 +947,11 @@ function configure_network_redhat() {
         }
     fi
 
-    echo "done"
+    echo done
 }
 
 # Configure network for redhat 6- alike distributions (rhel, centos, ...)
-function configure_network_redhat_without_nmcli() {
+configure_network_redhat_without_nmcli() {
     echo "Configuring network (RedHat 6- alike)..."
 
     # We don't want NetworkManager if RedHat/CentOS < 7
@@ -1017,7 +1009,7 @@ EOF
 }
 
 # Configure network for redhat7+ alike distributions (rhel, centos, ...)
-function configure_network_redhat_with_nmcli() {
+configure_network_redhat_with_nmcli() {
     echo "Configuring network (RedHat 7+ alike with Network Manager)..."
 
     # Do some cleanup inside /etc/sysconfig/network-scripts
@@ -1071,7 +1063,7 @@ function configure_network_redhat_with_nmcli() {
     return 0
 }
 
-function check_for_ip() {
+check_for_ip() {
     case $LINUX_KIND in
     debian)
         lsb_release -rs | grep "8." && return 0
@@ -1109,7 +1101,7 @@ function check_for_ip() {
 # Checks network is set correctly
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
-function check_for_network() {
+check_for_network() {
     is_network_reachable || return 1
 
     [[ ! -z "$PU_IF" ]] && {
@@ -1122,7 +1114,7 @@ function check_for_network() {
     return 0
 }
 
-function configure_as_gateway() {
+configure_as_gateway() {
     echo "Configuring host as gateway..."
 
     if [[ ! -z $PR_IFs ]]; then
@@ -1161,10 +1153,10 @@ EOF
     sed -i '/^.*PasswordAuthentication / s/^.*$/PasswordAuthentication no/' /etc/ssh/sshd_config || sfFail 197
     systemctl restart sshd || sfFail 197
 
-    echo "done"
+    echo done
 }
 
-function install_keepalived() {
+install_keepalived() {
     # Try installing network-scripts if available
     case $LINUX_KIND in
     redhat | rhel | centos | fedora)
@@ -1282,7 +1274,7 @@ EOF
     return 0
 }
 
-function configure_dns_legacy() {
+configure_dns_legacy() {
     echo "Configuring /etc/resolv.conf..."
     cp /etc/resolv.conf /etc/resolv.conf.bak
 
@@ -1331,10 +1323,10 @@ EOF
 
     [[ ${op} -ne 0 ]] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf && touch /etc/resolv.conf && sleep 2 || echo "dns change OK..."
 
-    echo "done"
+    echo done
 }
 
-function configure_dns_resolvconf() {
+configure_dns_resolvconf() {
     echo "Configuring resolvconf..."
 
     EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
@@ -1359,10 +1351,10 @@ EOF
     #    fi
 
     resolvconf -u
-    echo "done"
+    echo done
 }
 
-function configure_dns_systemd_resolved() {
+configure_dns_systemd_resolved() {
     echo "Configuring systemd-resolved..."
 
     {{- if not .DefaultRouteIP }}
@@ -1391,10 +1383,10 @@ EOF
     #    fi
 
     systemctl restart systemd-resolved
-    echo "done"
+    echo done
 }
 
-function install_drivers_nvidia() {
+install_drivers_nvidia() {
     case $LINUX_KIND in
     ubuntu)
         sfFinishPreviousInstall
@@ -1440,7 +1432,7 @@ function install_drivers_nvidia() {
     esac
 }
 
-function early_packages_update() {
+early_packages_update() {
     is_network_reachable || return 1
 
     # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
@@ -1536,16 +1528,16 @@ EOF
     sfProbeGPU
 }
 
-function install_packages() {
+install_packages() {
     case $LINUX_KIND in
     ubuntu | debian)
-        sfRetry 4m 5 "sfApt install -y -qq jq zip time &>/dev/null" || fail 214
+        sfRetry 3m 5 "sfApt install -y -qq jq zip time &>/dev/null" || fail 214
         ;;
     redhat | rhel | centos)
-        sfRetry 4m 5 "sfYum install --enablerepo=epel -y -q wget jq time zip &>/dev/null" || fail 215
+        sfRetry 3m 5 "sfYum install --enablerepo=epel -y -q wget jq time zip &>/dev/null" || fail 215
         ;;
     fedora)
-        sfRetry 4m 5 "sfYum install -y -q wget jq time zip &>/dev/null" || fail 215
+        sfRetry 3m 5 "sfYum install -y -q wget jq time zip &>/dev/null" || fail 215
         ;;
     *)
         echo "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
@@ -1554,7 +1546,7 @@ function install_packages() {
     esac
 }
 
-function add_backport_repos() {
+add_backport_repos() {
     case $LINUX_KIND in
     debian)
         sfFinishPreviousInstall
@@ -1564,7 +1556,7 @@ function add_backport_repos() {
     esac
 }
 
-function add_common_repos() {
+add_common_repos() {
     case $LINUX_KIND in
     ubuntu)
         sfFinishPreviousInstall
@@ -1593,7 +1585,7 @@ function add_common_repos() {
     esac
 }
 
-function configure_locale() {
+configure_locale() {
     case $LINUX_KIND in
     ubuntu | debian)
         locale-gen en_US.UTF-8
@@ -1602,7 +1594,7 @@ function configure_locale() {
     export LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 }
 
-function force_dbus_restart() {
+force_dbus_restart() {
     case $LINUX_KIND in
     ubuntu)
         sudo sed -i 's/^RefuseManualStart=.*$/RefuseManualStart=no/g' /lib/systemd/system/dbus.service
@@ -1616,7 +1608,7 @@ function force_dbus_restart() {
 # to be able to connect root on console when emergency shell arises.
 # Root account not being usable remotely (and OperatorUsername being able to become root with sudo), this is not
 # considered a security risk. Especially when set after SSH and Firewall configuration applied.
-function configure_root_password_if_needed() {
+configure_root_password_if_needed() {
     case ${LINUX_KIND} in
     redhat | rhel | centos | fedora)
         echo "root:{{.Password}}" | chpasswd
@@ -1624,7 +1616,7 @@ function configure_root_password_if_needed() {
     esac
 }
 
-function update_kernel_settings() {
+update_kernel_settings() {
     cat >/etc/sysctl.d/20-safescale.conf <<-EOF
 vm.max_map_count=262144
 EOF
@@ -1634,7 +1626,7 @@ EOF
     esac
 }
 
-function use_cgroups_v1_if_needed() {
+use_cgroups_v1_if_needed() {
     case $LINUX_KIND in
     fedora)
         if [[ -n $(which lsb_release) ]]; then
@@ -1703,8 +1695,8 @@ function fail_fast_unsupported_distros() {
     esac
 }
 
-function check_network_reachable() {
-    NETROUNDS=2
+check_network_reachable() {
+    NETROUNDS=4
     REACHED=0
     TRIED=0
 
@@ -1738,7 +1730,7 @@ function check_network_reachable() {
     return 0
 }
 
-function check_dns_configuration() {
+check_dns_configuration() {
     if [[ -r /etc/resolv.conf ]]; then
         echo "Getting DNS using resolv.conf..."
         THE_DNS=$(cat /etc/resolv.conf | grep -i '^nameserver' | head -n1 | cut -d ' ' -f2) || true
@@ -1768,8 +1760,8 @@ function check_dns_configuration() {
     return 1
 }
 
-function is_network_reachable() {
-    NETROUNDS=2
+is_network_reachable() {
+    NETROUNDS=4
     REACHED=0
     TRIED=0
 
@@ -1780,7 +1772,7 @@ function is_network_reachable() {
         fi
 
         if [[ ${TRIED} -eq 1 ]]; then
-            continue
+            break
         fi
 
         if which wget; then
@@ -1789,7 +1781,7 @@ function is_network_reachable() {
         fi
 
         if [[ ${TRIED} -eq 1 ]]; then
-            continue
+            break
         fi
 
         ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
@@ -1826,21 +1818,7 @@ function make_ready_for_ansible() {
     esac
 }
 
-function track_time() {
-    uptime
-    last
-}
-
 # ---- Main
-
-PHASE_DONE=/opt/safescale/var/state/user_data.phase2.done
-if [[ -f "$PHASE_DONE" ]]; then
-    echo "$PHASE_DONE already there."
-    set +x
-    exit 0
-fi
-
-track_time
 
 collect_original_packages
 
@@ -1912,7 +1890,7 @@ is_network_reachable || fail 238
 
 collect_installed_packages
 
-echo -n "0,linux,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.phase2.done
+echo -n "0,linux,${LINUX_KIND},${FULL_VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 
 # For compatibility with previous user_data implementation (until v19.03.x)...
 mkdir -p /var/tmp || true
@@ -1923,8 +1901,6 @@ ln -s ${SF_VARDIR}/state/user_data.phase2.done /var/tmp/user_data.done || true
 #insert_tag
 
 force_dbus_restart
-
-track_time
 
 set +x
 exit 0

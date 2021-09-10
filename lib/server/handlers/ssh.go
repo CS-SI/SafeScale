@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/sirupsen/logrus"
@@ -105,20 +104,13 @@ func (handler *SSHHandler) GetConfig(ctx context.Context, hostParam interface{})
 	defer tracer.OnExitTrace()()
 	defer fail.OnExitLogError(tracer.TraceMessage(""), &err)()
 
-	if ctx.Err() != nil {
-		return nil, fail.AbortedError("operation aborted by parent", ctx.Err())
-	}
-
 	cfg, err := handler.service.GetConfigurationOptions()
 	if err != nil {
 		return nil, err
 	}
 	user := abstract.DefaultUser
 	if userIf, ok := cfg.Get("OperatorUsername"); ok {
-		user, ok = userIf.(string)
-		if !ok {
-			return nil, fmt.Errorf("OperatorUsername is not a string")
-		}
+		user = userIf.(string)
 		if user == "" {
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
 			user = abstract.DefaultUser
@@ -175,18 +167,12 @@ func (handler *SSHHandler) WaitServerReady(ctx context.Context, hostParam interf
 		return fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	if ctx.Err() != nil {
-		return fail.AbortedError("operation aborted by parent", ctx.Err())
-	}
-
 	sshSvc := NewSSHHandler(handler.service)
 	ssh, err := sshSvc.GetConfig(ctx, hostParam)
 	if err != nil {
 		return err
 	}
-
-	task, _ := concurrency.NewTaskWithContext(ctx)
-	_, waitErr := ssh.WaitServerReady(task, "ready", timeout)
+	_, waitErr := ssh.WaitServerReady("ready", timeout)
 	return waitErr
 }
 
@@ -204,10 +190,6 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs o
 	if ctx == nil {
 		return 1, "", "", fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if ctx.Err() != nil {
-		return 1, "", "", fail.AbortedError("operation aborted by parent", ctx.Err())
-	}
-
 	if hostName == "" {
 		return 1, "", "", fail.InvalidParameterError("hostName", "cannot be empty")
 	}
@@ -229,9 +211,6 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs o
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			if ctx.Err() != nil {
-				return fail.AbortedError("operation cancelled by caller", ctx.Err())
-			}
 			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, outs, temporal.GetHostTimeout())
 			return err
 		},
@@ -246,7 +225,7 @@ func (handler *SSHHandler) Run(ctx context.Context, hostName, cmd string, outs o
 		return retCode, stdOut, stdErr, retryErr
 	}
 
-	return retCode, stdOut, stdErr, nil
+	return retCode, stdOut, stdErr, err
 }
 
 // Run tries to execute command 'cmd' on the host
@@ -270,10 +249,6 @@ func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd str
 		return 1, "", "", fail.InvalidParameterError("cmd", "cannot be empty")
 	}
 
-	if ctx.Err() != nil {
-		return 1, "", "", fail.AbortedError("operation aborted by parent", ctx.Err())
-	}
-
 	hostSvc := NewHostHandler(handler.service)
 	host, err := hostSvc.ForceInspect(ctx, hostName)
 	if err != nil {
@@ -288,9 +263,6 @@ func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd str
 
 	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
 		func() error {
-			if ctx.Err() != nil {
-				return fail.AbortedError("operation cancelled by caller", ctx.Err())
-			}
 			retCode, stdOut, stdErr, err = handler.runWithTimeout(ssh, cmd, outs, timeout)
 			return err
 		},
@@ -305,7 +277,7 @@ func (handler *SSHHandler) RunWithTimeout(ctx context.Context, hostName, cmd str
 		return retCode, stdOut, stdErr, retryErr
 	}
 
-	return retCode, stdOut, stdErr, nil
+	return retCode, stdOut, stdErr, err
 }
 
 // run executes command on the host
@@ -370,10 +342,6 @@ func (handler *SSHHandler) Copy(ctx context.Context, from, to string) (retCode i
 	}
 	if to == "" {
 		return 1, "", "", fail.InvalidParameterError("to", "cannot be empty")
-	}
-
-	if ctx.Err() != nil {
-		return 1, "", "", fail.AbortedError("operation aborted by parent", ctx.Err())
 	}
 
 	hostName := ""

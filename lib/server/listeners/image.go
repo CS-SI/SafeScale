@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -63,19 +63,15 @@ func (s *ImageListener) List(ctx context.Context, in *pb.ImageListRequest) (il *
 	handler := ImageHandler(currentTenant.Service)
 	images, err := handler.List(ctx, in.GetAll())
 	if err != nil {
-		if _, ok := err.(fail.ErrNotFound); ok {
-			return nil, status.Errorf(codes.NotFound, getUserMessage(err))
-		}
 		return nil, status.Errorf(codes.Internal, getUserMessage(err))
 	}
 
 	// Map abstract.Image to pb.Image
 	var pbImages []*pb.Image
 	for _, image := range images {
-		theImage := image
-		pbi, err := srvutils.ToPBImage(&theImage)
+		pbi, err := srvutils.ToPBImage(&image)
 		if err != nil {
-			logrus.Warnf("ignoring error listing images: %v", err)
+			logrus.Warn(err)
 			continue
 		}
 		pbImages = append(pbImages, pbi)

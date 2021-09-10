@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package client
 
 import (
-	"context"
 	"strings"
 	"sync"
 	"time"
@@ -64,7 +63,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
-		errs  []error
+		errs  []string
 	)
 
 	networkDeleter := func(aname string) {
@@ -74,7 +73,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
-			errs = append(errs, err)
+			errs = append(errs, err.Error())
 		}
 	}
 
@@ -85,11 +84,7 @@ func (n *network) Delete(names []string, timeout time.Duration) error {
 	wg.Wait()
 
 	if len(errs) > 0 {
-		var errstrs []string
-		for _, aerr := range errs {
-			errstrs = append(errstrs, aerr.Error())
-		}
-		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 }
@@ -107,7 +102,7 @@ func (n *network) Destroy(names []string, timeout time.Duration) error {
 	var (
 		mutex sync.Mutex
 		wg    sync.WaitGroup
-		errs  []error
+		errs  []string
 	)
 
 	networkDeleter := func(aname string) {
@@ -117,7 +112,7 @@ func (n *network) Destroy(names []string, timeout time.Duration) error {
 		if err != nil {
 			mutex.Lock()
 			defer mutex.Unlock()
-			errs = append(errs, err)
+			errs = append(errs, err.Error())
 		}
 	}
 
@@ -128,11 +123,7 @@ func (n *network) Destroy(names []string, timeout time.Duration) error {
 	wg.Wait()
 
 	if len(errs) > 0 {
-		var errstrs []string
-		for _, aerr := range errs {
-			errstrs = append(errstrs, aerr.Error())
-		}
-		return clitools.FailureResponseWithCause(fail.ErrListError(errs), clitools.ExitOnRPC(strings.Join(errstrs, ", ")))
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
 	}
 	return nil
 }
@@ -149,18 +140,6 @@ func (n *network) Inspect(name string, timeout time.Duration) (*pb.Network, erro
 
 	return service.Inspect(ctx, &pb.Reference{Name: name})
 
-}
-
-func (n *network) CreateWithCancel(ctx context.Context, def *pb.NetworkDefinition, timeout time.Duration) (*pb.Network, error) {
-	if def == nil {
-		return nil, fail.InvalidParameterError("def", "cannot be nil")
-	}
-
-	n.session.Connect()
-	defer n.session.Disconnect()
-	service := pb.NewNetworkServiceClient(n.session.connection)
-
-	return service.Create(ctx, def)
 }
 
 // Create ...

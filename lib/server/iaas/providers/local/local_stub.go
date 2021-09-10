@@ -1,7 +1,7 @@
 // +build !libvirt
 
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -138,9 +138,6 @@ func (provider *provider) InspectHost(interface{}) (*abstract.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) GetHostByName(string) (*abstract.Host, error) {
-	return nil, fmt.Errorf(errorStr)
-}
-func (provider *provider) GetHostByID(string) (*abstract.Host, error) {
 	return nil, fmt.Errorf(errorStr)
 }
 func (provider *provider) GetHostState(interface{}) (hoststate.Enum, error) {

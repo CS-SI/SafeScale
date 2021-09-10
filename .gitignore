@@ -52,7 +52,6 @@ cli/safescaled/version.go
 cli/scanner/version.go
 
 vendor
-Gopkg.lock
 
 # coverage info
 cover.out
@@ -123,3 +122,5 @@ lib/security/gateway/client/safe-security
 .DS_Store
 
 cli/safescaled/safescaled__d__v
+
+.run/

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package gcp
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/abstract"
@@ -35,6 +34,11 @@ type provider struct {
 	*gcp.Stack
 
 	tenantParameters map[string]interface{}
+}
+
+// New creates a new instance of gcp provider
+func New() apiprovider.Provider {
+	return &provider{}
 }
 
 // Build build a new Client from configuration parameter
@@ -98,10 +102,6 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 	projectName, _ := computeCfg["ProjectName"].(string)
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
-	maxLifeTime := 0
-	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
-		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
-	}
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
@@ -139,12 +139,11 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 			"standard":   volumespeed.COLD,
 			"performant": volumespeed.HDD,
 		},
-		MetadataBucket:     metadataBucketName,
-		DefaultImage:       defaultImage,
-		OperatorUsername:   operatorUsername,
-		UseNATService:      true,
-		ProviderName:       providerName,
-		MaxLifetimeInHours: maxLifeTime,
+		MetadataBucket:   metadataBucketName,
+		DefaultImage:     defaultImage,
+		OperatorUsername: operatorUsername,
+		UseNATService:    true,
+		ProviderName:     providerName,
 	}
 
 	stack, err := gcp.New(authOptions, gcpConf, cfgOptions)
@@ -187,8 +186,6 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
-	cfg.Set("MaxLifetimeInHours", opts.MaxLifetimeInHours)
-
 	return cfg, nil
 }
 

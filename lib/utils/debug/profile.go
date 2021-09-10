@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -126,11 +126,7 @@ func Profile(what string) func() {
 
 func constructProfileFilename(path, complement string) string {
 	if path == "" {
-		prefix := "./"
-		if strings.HasPrefix(os.Args[0], "/") {
-			prefix = ""
-		}
-		path = prefix + os.Args[0] + complement
+		path = "./" + os.Args[0] + complement
 	}
 	path = strings.TrimSpace(path)
 	st, err := os.Stat(path)
@@ -139,11 +135,7 @@ func constructProfileFilename(path, complement string) string {
 			logrus.Fatalf("failed to check if profile file '%s' exists: %s", path, err.Error())
 		}
 	} else if st.IsDir() {
-		prefix := "/"
-		if strings.HasPrefix(os.Args[0], prefix) {
-			prefix = ""
-		}
-		path += prefix + os.Args[0] + complement
+		path += "/" + os.Args[0] + complement
 	}
 	return path
 }

@@ -813,20 +813,6 @@ func (s *Stack) complementHost(host *abstract.Host, server *servers.Server) erro
 
 	host.LastState = toHostState(server.Status)
 
-	// retrieve host metadata
-	var ferr fail.Error
-	host.Tags, ferr = s.getMetadata(host, temporal.GetDefaultDelay())
-	if ferr != nil {
-		return ferr
-	}
-
-	// Add CreationDate to MetaData
-	host.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
-
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		logrus.Warnf("Tags content: %s", spew.Sdump(host.Tags))
-	}
-
 	// Updates Host Property propsv1.HostDescription
 	err = host.Properties.LockForWrite(hostproperty.DescriptionV1).ThenUse(
 		func(clonable data.Clonable) error {

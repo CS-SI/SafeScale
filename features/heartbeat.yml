@@ -125,7 +125,6 @@ feature:
                                         - ${SF_ETCDIR}/heartbeat4safescale/config.yml:/usr/share/heartbeat/heartbeat.yml:ro
                                     restart: always
                             EOF
-                            sfExit
 
                     start:
                         targets:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,8 +40,6 @@ var BucketCmd = cli.Command{
 		bucketInspect,
 		bucketMount,
 		bucketUnmount,
-		bucketVerify,
-		bucketPrune,
 	},
 }
 
@@ -151,45 +149,6 @@ var bucketDelete = cli.Command{
 	},
 }
 
-var bucketPrune = cli.Command{
-	Name:      "prune",
-	Aliases:   []string{"prune"},
-	Usage:     "Prune a bucket",
-	ArgsUsage: "<Bucket_name> [<Bucket_name>...]",
-	Flags: []cli.Flag{
-		cli.BoolFlag{
-			Name:  "force, f",
-			Usage: "If used, deletes the bucket and its contents",
-		},
-	},
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", bucketCmdName, c.Command.Name, c.Args())
-		if c.NArg() < 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
-		}
-
-		var bucketList []string
-		bucketList = append(bucketList, c.Args().First())
-		bucketList = append(bucketList, c.Args().Tail()...)
-
-		err := client.New().Bucket.Prune(bucketList, temporal.GetExecutionTimeout())
-		if err != nil {
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					utils.Capitalize(
-						client.DecorateError(
-							err, "destruction of bucket", true,
-						).Error(),
-					),
-				),
-			)
-		}
-
-		return clitools.SuccessResponse(nil)
-	},
-}
-
 var bucketInspect = cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show", "detail"},
@@ -209,34 +168,6 @@ var bucketInspect = cli.Command{
 					utils.Capitalize(
 						client.DecorateError(
 							err, "inspection of bucket", false,
-						).Error(),
-					),
-				),
-			)
-		}
-		return clitools.SuccessResponse(resp)
-	},
-}
-
-var bucketVerify = cli.Command{
-	Name:      "verify",
-	Aliases:   []string{"verify"},
-	Usage:     "Verifies a bucket",
-	ArgsUsage: "<Bucket_name>",
-	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", bucketCmdName, c.Command.Name, c.Args())
-		if c.NArg() != 1 {
-			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
-		}
-
-		resp, err := client.New().Bucket.Verify(c.Args().Get(0), temporal.GetExecutionTimeout())
-		if err != nil {
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					utils.Capitalize(
-						client.DecorateError(
-							err, "verification of a bucket", false,
 						).Error(),
 					),
 				),

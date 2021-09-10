@@ -1,4 +1,4 @@
-VERSION=20.06.3
+VERSION=20.06.2
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
@@ -16,7 +16,7 @@ endif
 
 MAKEFLAGS += -s
 
-BRANCH_NAME?="release/v20.06"
+BRANCH_NAME?="develop"
 FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
 BUILD := $(shell git rev-parse HEAD)
 UPSTREAM := $(shell git rev-parse origin/$(BRANCH_NAME))
@@ -92,12 +92,6 @@ ifneq ($(OS),Windows_NT)
 ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
 $(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
 endif
-endif
-
-ifeq (, $(GOOS))
-RACE_CHECK=-race
-else
-RACE_CHECK=
 endif
 
 # Life is better with colors

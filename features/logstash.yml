@@ -51,7 +51,6 @@ feature:
                             nodes: no
                         run: |
                             docker pull logstash:7.1.1
-                            sfExit
 
                     config:
                         targets:
@@ -145,7 +144,6 @@ feature:
                             OPTIONS=
                             {{ end }}
                             docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d
-                            sfExit
 
                     ready:
                         targets:

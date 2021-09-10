@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -59,7 +59,7 @@ func getBoxContent(script string, data interface{}) (tplcmd string, err error) {
 	return tplcmd, nil
 }
 
-// Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
+// Execute the given script (embeded in a rice-box) with the given data on the host identified by hostid
 func exec(ctx context.Context, script string, data interface{}, hostid string, svc iaas.Service) error {
 	scriptCmd, err := getBoxContent(script, data)
 	if err != nil {
@@ -72,7 +72,7 @@ func exec(ctx context.Context, script string, data interface{}, hostid string, s
 		return err
 	}
 
-	cmd, err := ssh.SudoCommand(scriptCmd)
+	cmd, err := ssh.SudoCommand(scriptCmd, false)
 	if err != nil {
 		return err
 	}

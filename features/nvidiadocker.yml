@@ -46,7 +46,6 @@ feature:
                                     sfFail 192
                                     ;;
                             esac
-                            sfExit
 
             add:
                 pace: fromdist
@@ -171,6 +170,5 @@ feature:
                                     sfFail 1
                                     ;;
                             esac
-                            sfExit
 
 ...

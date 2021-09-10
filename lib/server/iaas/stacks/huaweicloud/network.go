@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -161,10 +161,9 @@ func (s *Stack) findVPCBindedNetwork(vpcName string) (*networks.Network, fail.Er
 		return nil, fail.Errorf(fmt.Sprintf("failed to list routers: %s", openstack.ProviderErrorToString(err)), err)
 	}
 	for _, r := range routerList {
-		theR := r
-		if theR.Name == vpcName {
+		if r.Name == vpcName {
 			found = true
-			router = &theR
+			router = &r
 			break
 		}
 	}
@@ -461,6 +460,12 @@ func convertNumberToIPv4(n uint32) net.IP {
 	IP := net.IPv4(a, b, c, d)
 	return IP
 }
+
+// VPL: replaced by utils.DoCIDRsIntersect
+// // cidrIntersects tells if the 2 CIDR passed as parameter intersect
+// func cidrIntersects(n1, n2 *net.IPNet) bool {
+//	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
+// }
 
 // createSubnet creates a subnet using native FlexibleEngine API
 func (s *Stack) createSubnet(name string, cidr string) (*subnets.Subnet, fail.Error) {

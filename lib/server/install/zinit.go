@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -53,7 +53,6 @@ func init() {
 		packetbeatFeature(),
 		kibanaFeature(),
 		k8shelm2Feature(),
-		k8shelm3Feature(),
 		sparkmaster4platformFeature(),
 		elassandraFeature(),
 		consul4platformFeature(),

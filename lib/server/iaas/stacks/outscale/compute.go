@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
+ * Copyright 2018-2020, CS Systemes d'Information, http://csgroup.eu
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,14 +20,12 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/antihax/optional"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/outscale-dev/osc-sdk-go/osc"
@@ -413,10 +411,9 @@ func (s *Stack) createNICS(request *abstract.HostRequest) ([]osc.Nic, fail.Error
 	nics, err = s.tryCreateNICS(request, nics)
 	if err != nil { // if error delete created NICS
 		for _, ni := range nics {
-			theNic := ni
-			err := s.deleteNic(&theNic)
+			err := s.deleteNic(&ni)
 			if err != nil {
-				logrus.Errorf("impossible to delete NIC %v", theNic.NicId)
+				logrus.Errorf("impossible to delete NIC %v", ni.NicId)
 			}
 		}
 	}
@@ -436,8 +433,7 @@ func (s *Stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]
 
 func (s *Stack) deleteNics(nics []osc.Nic) error {
 	for _, nic := range nics {
-		theNic := nic
-		err := s.deleteNic(&theNic)
+		err := s.deleteNic(&nic)
 		if err != nil {
 			return err
 		}
@@ -652,7 +648,10 @@ func (s *Stack) addVolume(request *abstract.HostRequest, vmID string) (err error
 			VolumeID: v.ID,
 		},
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Stack) getNICS(vmID string) ([]osc.Nic, fail.Error) {
@@ -846,8 +845,7 @@ func (s *Stack) addPublicIPs(primaryNIC *osc.Nic, otherNICs []osc.Nic) (*osc.Pub
 	}
 
 	for _, nic := range otherNICs {
-		theNic := nic
-		_, err = s.addPublicIP(&theNic)
+		_, err = s.addPublicIP(&nic)
 		if err != nil {
 			return nil, err
 		}
@@ -1022,17 +1020,10 @@ func (s *Stack) CreateHost(request abstract.HostRequest) (_ *abstract.Host, _ *u
 	if err != nil {
 		return nil, userData, err
 	}
-
-	// FIXME: Add resource tags here
-	tags := make(map[string]string)
-	tags["name"] = request.ResourceName
-
-	tags["ManagedBy"] = "safescale"
-	tags["DeclaredInBucket"] = s.configurationOptions.MetadataBucket
-	tags["CreationDate"] = time.Now().Format(time.RFC3339)
-
 	err = s.setResourceTags(
-		vm.VmId, tags,
+		vm.VmId, map[string]string{
+			"name": request.ResourceName,
+		},
 	)
 	if err != nil {
 		return nil, userData, err
@@ -1079,7 +1070,6 @@ func (s *Stack) getVM(vmID string) (*osc.Vm, fail.Error) {
 			ReadVmsRequest: optional.NewInterface(readVmsRequest),
 		},
 	)
-
 	if err != nil {
 		return nil, normalizeError(err)
 	}
@@ -1193,12 +1183,6 @@ func (s *Stack) InspectHost(hostParam interface{}) (*abstract.Host, fail.Error) 
 	if err != nil {
 		return nil, err
 	}
-
-	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics != "" {
-		// FIXME: Get creation time and/or metadata
-		logrus.Warn(spew.Sdump(vm))
-	}
-
 	if hostName == "" {
 		tags, err := s.getResourceTags(vm.VmId)
 		if err != nil {
@@ -1208,7 +1192,6 @@ func (s *Stack) InspectHost(hostParam interface{}) (*abstract.Host, fail.Error) 
 			hostName = tag
 		}
 	}
-
 	nets, nics, err := s.listNetworksByHost(vm.VmId)
 	if err != nil {
 		return nil, err
@@ -1240,29 +1223,6 @@ func (s *Stack) GetHostByName(name string) (*abstract.Host, fail.Error) {
 	}
 	if len(res.Vms) == 0 {
 		return nil, fail.NotFoundError(fmt.Sprintf("No host named %s", name))
-	}
-	return s.InspectHost(res.Vms[0].VmId)
-}
-
-// GetHostByID returns the host identified by name
-func (s *Stack) GetHostByID(name string) (*abstract.Host, fail.Error) {
-	res, _, err := s.client.VmApi.ReadVms(
-		s.auth, &osc.ReadVmsOpts{
-			ReadVmsRequest: optional.NewInterface(
-				osc.ReadVmsRequest{
-					DryRun: false,
-					Filters: osc.FiltersVm{
-						Tags: []string{fmt.Sprintf("id=%s", name)},
-					},
-				},
-			),
-		},
-	)
-	if err != nil {
-		return nil, normalizeError(err)
-	}
-	if len(res.Vms) == 0 {
-		return nil, fail.NotFoundError(fmt.Sprintf("No host with id %s", name))
 	}
 	return s.InspectHost(res.Vms[0].VmId)
 }

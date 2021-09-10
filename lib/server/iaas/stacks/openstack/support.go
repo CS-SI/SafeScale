@@ -48,7 +48,7 @@ func GetUnexpectedGophercloudErrorCode(err error) (int64, fail.Error) {
 
 func ReinterpretGophercloudErrorCode(gopherErr error, success []int64, transparent []int64, abort []int64, defaultHandler func(error) error) error {
 	if gopherErr == nil {
-		return nil
+		return gopherErr
 	}
 
 	if code, err := GetUnexpectedGophercloudErrorCode(gopherErr); code != 0 && err == nil {
