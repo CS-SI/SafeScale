@@ -1064,7 +1064,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 			cafu()
 		}()
 
-		_, xerr = single.Wait()
+		_, xerr = single.Wait() // FIXME: Wait ignores ctx.Err
 		end := time.Since(begin)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -1072,17 +1072,25 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 			case *fail.ErrTimeout:
 				// expected error types
 			default:
-				t.Errorf("Unexpected error occurred in test #%d: %s (%s)", ind, xerr.Error(), reflect.TypeOf(xerr).String())
+				t.Errorf(
+					"Unexpected error occurred in test #%d: %s (%s)", ind, xerr.Error(), reflect.TypeOf(xerr).String(),
+				)
+			}
+		} else {
+			ok := (xerr != nil) == errorExpected
+			if !ok {
+				t.Fail()
 			}
 		}
 
 		if !((xerr != nil) == errorExpected) {
-			t.Errorf("Failure in test %d: %d, %d, %d, %t, wrong error", ind, timeout, sleep, trigger, errorExpected)
-		}
-
-		ok := (xerr != nil) == errorExpected
-		if !ok {
-			t.Fail()
+			if ctx.Err() != nil {
+				t.Errorf("context is reported as Cancelled: %v, yet the Wait returns nil", ctx.Err())
+			}
+			t.Errorf(
+				"Failure in test %d: %d, %d, %d, %t, wrong error: %v", ind, timeout, sleep, trigger, errorExpected,
+				xerr,
+			)
 		}
 
 		tolerance := func(in float64, percent uint) float32 {
