@@ -384,7 +384,7 @@ message Host {
 	repeated string attached_volume_names = 12;
 	string password = 13;
 	int32 ssh_port = 14;
-	string host_state_label = 15;
+	string state_label = 15;
 }
 
 message HostStatus {

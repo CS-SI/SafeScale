@@ -3210,7 +3210,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 		Password:            ahc.Password,
 		Ram:                 hostSizingV1.AllocatedSize.RAMSize,
 		State:               protocol.HostState(ahc.LastState),
-		HostStateLabel:      ahc.LastState.String(),
+		StateLabel:      ahc.LastState.String(),
 		AttachedVolumeNames: volumes,
 	}
 	return ph, nil
