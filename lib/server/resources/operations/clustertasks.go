@@ -2045,7 +2045,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	hostLabel := fmt.Sprintf("node #%d", p.index)
 	logrus.Debugf(tracer.TraceMessage("[%s] starting Host creation...", hostLabel))
 
-	// First creates node in metadata, to keep track of its tried creation, in case of failure
+	// -- First creates node in metadata, to keep track of its tried creation, in case of failure --
 	var nodeIdx uint
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -2069,7 +2069,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
 
-	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
+	// Starting from here, if exiting with error, remove entry from node of the metadata
 	defer func() {
 		if xerr != nil && !p.keepOnFailure {
 			// Disable abort signal during the clean up
@@ -2104,7 +2104,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, xerr
 	}
 
-	// Create the hostInstance
+	// -- Create the Host instance corresponding to the new node --
 	xerr = subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -2161,6 +2161,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		}
 	}()
 
+	// -- update cluster metadata --
 	var node *propertiesv3.ClusterNode
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
@@ -2196,6 +2197,37 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "[%s] creation failed", hostLabel)
 	}
+
+	// Starting from here, rollback on cluster metadata in case of failure
+	defer func() {
+		if xerr != nil && !p.keepOnFailure {
+			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					if found, indexInSlice := containsClusterNode(nodesV3.PrivateNodes, nodeIdx); found {
+						length := len(nodesV3.PrivateNodes)
+						if indexInSlice < length-1 {
+							nodesV3.PrivateNodes = append(nodesV3.PrivateNodes[:indexInSlice], nodesV3.PrivateNodes[indexInSlice+1:]...)
+						} else {
+							nodesV3.PrivateNodes = nodesV3.PrivateNodes[:indexInSlice]
+						}
+					}
+
+					delete(nodesV3.PrivateNodeByName, hostInstance.GetName())
+					delete(nodesV3.PrivateNodeByID, hostInstance.GetID())
+
+					return nil
+				})
+			})
+			if derr != nil {
+				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove node '%s' from metadata of cluster '%s'", hostInstance.GetName(), instance.GetName()))
+			}
+		}
+	}()
 
 	hostLabel = fmt.Sprintf("node #%d (%s)", p.index, hostInstance.GetName())
 
@@ -2241,7 +2273,8 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 		if lerr, err := task.LastError(); err == nil {
 			return nil, fail.AbortedError(lerr, "parent task killed")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+
+		return nil, fail.AbortedError(nil, "parent task aborted")
 	}
 
 	clusterName := instance.GetName()
@@ -2424,10 +2457,6 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 		return nil, fail.AbortedError(nil, "parent task killed")
 	}
 
-	// prefix := "Cleaning up on failure, "
-	// hostName := node.Name
-	// logrus.Debugf(prefix + fmt.Sprintf("deleting Host '%s'", hostName))
-
 	hostInstance, xerr := LoadHost(instance.GetService(), node.ID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2441,20 +2470,6 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 	}
 
 	return nil, deleteHostOnFailure(hostInstance)
-	// xerr = hostInstance.Delete(context.Background())
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	switch xerr.(type) {
-	// 	case *fail.ErrNotFound:
-	// 		logrus.Tracef("Node %s not found, deletion considered successful", hostName)
-	// 		return nil, nil
-	// 	default:
-	// 		return nil, xerr
-	// 	}
-	// }
-	//
-	// logrus.Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
-	// return nil, nil
 }
 
 type taskDeleteNodeParameters struct {
@@ -2612,9 +2627,8 @@ func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params c
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be a 'taskDeleteHostOnFailureParameters'")
 	}
-	hostInstance := casted.host
 
-	return nil, deleteHostOnFailure(hostInstance)
+	return nil, deleteHostOnFailure(casted.host)
 }
 
 // deleteHostOnFailure deletes a Host with appropriate logs
