@@ -945,12 +945,13 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			}
 		}
 
-		if content, ok := results[id]; !ok {
+		var content concurrency.TaskResult
+		var ok bool
+		if content, ok = results[id]; !ok {
 			return fail.InconsistentError("task results does not contain %s", id)
-		} else {
-			if content == nil {
-				return fail.InconsistentError("task result with %s should not be nil", id)
-			}
+		}
+		if content == nil {
+			return fail.InconsistentError("task result with %s should not be nil", id)
 		}
 
 		result, ok := results[id].(data.Map)

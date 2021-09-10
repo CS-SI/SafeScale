@@ -296,7 +296,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 
 	if len(options) > 0 {
 		for _, v := range options {
-			switch v.Key() {
+			switch v.Key() { // nolint
 			case keywordAmendID:
 				value, ok := v.Value().(string)
 				if ok {
@@ -848,7 +848,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 
 	default:
 		if instance.err != nil {
-			switch cerr := instance.err.(type) {
+			switch cerr := instance.err.(type) { // nolint
 			case fail.Error:
 				_ = cerr.AddConsequence(xerr)
 			}

@@ -1534,6 +1534,8 @@ func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return status, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *fail.ErrTimeout:
 			return status, fail.Wrap(fail.Cause(xerr), "failed to wait for SSH on Host '%s' to be ready after %s (phase %s): %s", instance.GetName(), temporal.FormatDuration(duration), phase, status)
 		default:
@@ -1802,6 +1804,8 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) { //nolint
+			case *retry.ErrStopRetry:
+				return fail.Wrap(xerr, "stopping retries")
 			case *fail.ErrTimeout:
 				return fail.Wrap(xerr, "timeout creating a Host")
 			}
@@ -2517,21 +2521,29 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 	// 	timeout = temporal.GetHostTimeout()
 	// }
 	var (
-		retcode        int
 		stdout, stderr string
 	)
+	retcode := -1
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			var innerXErr fail.Error
-			if retcode, stdout, stderr, innerXErr = instance.sshProfile.CopyWithTimeout(ctx, target, source, false, timeout); innerXErr != nil {
+			iretcode, istdout, istderr, innerXErr := instance.sshProfile.CopyWithTimeout(ctx, target, source, false, timeout)
+			if innerXErr != nil {
 				return innerXErr
 			}
-			switch retcode { //nolint
-			case 1: // FIXME: Check errorcodes
-				if strings.Contains(stdout, "lost connection") {
-					return fail.NewError("lost connection, retrying...")
-				}
+			if iretcode != 0 {
+				problem := fail.NewError("copy failed")
+				_ = problem.Annotate("stdout", istdout)
+				_ = problem.Annotate("stderr", istderr)
+				_ = problem.Annotate("retcode", iretcode)
+				return problem
 			}
+
+			// FIXME: Add md5 (download)
+
+			retcode = iretcode
+			stdout = istdout
+			stderr = istderr
+
 			return nil
 		},
 		temporal.GetDefaultDelay(),
@@ -3198,6 +3210,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 		Password:            ahc.Password,
 		Ram:                 hostSizingV1.AllocatedSize.RAMSize,
 		State:               protocol.HostState(ahc.LastState),
+		HostStateLabel:      ahc.LastState.String(),
 		AttachedVolumeNames: volumes,
 	}
 	return ph, nil

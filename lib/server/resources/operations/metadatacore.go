@@ -540,16 +540,16 @@ func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrTimeout:
-			xerr = fail.Wrap(fail.RootCause(xerr), "failed to read metadata of %s '%s' after %s", c.kind, ref, temporal.FormatDuration(timeout))
+			return fail.Wrap(fail.RootCause(xerr), "failed to read metadata of %s '%s' after %s", c.kind, ref, temporal.FormatDuration(timeout))
 		case *retry.ErrStopRetry:
-			xerr = fail.Wrap(fail.RootCause(xerr), "failed to read metadata of %s '%s'", c.kind, ref)
+			return fail.Wrap(fail.RootCause(xerr), "failed to read metadata of %s '%s'", c.kind, ref)
 		case *fail.ErrNotFound:
-			xerr = fail.Wrap(xerr, "failed to find metadata of %s '%s'", c.kind, ref)
+			return fail.Wrap(xerr, "failed to find metadata of %s '%s'", c.kind, ref)
 		default:
-			xerr = fail.Wrap(xerr, "failed to read metadata of %s '%s'", c.kind, ref)
+			return fail.Wrap(xerr, "something failed reading metadata of %s '%s'", c.kind, ref)
 		}
 	}
-	return xerr
+	return nil
 }
 
 // readByName reads a metadata identified by name

@@ -45,7 +45,10 @@ var (
 
 func getSHA256Hash(text string) string {
 	hasher := sha256.New()
-	hasher.Write([]byte(text))
+	_, err := hasher.Write([]byte(text))
+	if err != nil {
+		return ""
+	}
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 

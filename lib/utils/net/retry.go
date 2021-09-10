@@ -233,19 +233,23 @@ func normalizeURLError(err *url.Error) fail.Error {
 
 	isTemporary := err.Temporary()
 
-	switch commErr := err.Err.(type) {
-	case *net.DNSError:
-		if isTemporary {
-			return fail.InvalidRequestError("failed to resolve by DNS: %v", commErr)
-		}
-		return retry.StopRetryError(commErr, "failed to resolve by DNS")
-	default:
-		if isTemporary {
-			if commErr != nil {
-				return fail.InvalidRequestError("failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), commErr)
+	if err.Err != nil {
+		switch commErr := err.Err.(type) { // FIXME: What if err.Err is nil
+		case *net.DNSError:
+			if isTemporary {
+				return fail.InvalidRequestError("failed to resolve by DNS: %v", commErr)
 			}
-			return fail.InvalidRequestError("failed to communicate: %v", commErr)
+			return retry.StopRetryError(commErr, "failed to resolve by DNS")
+		default:
+			if isTemporary {
+				if commErr != nil {
+					return fail.InvalidRequestError("failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), commErr)
+				}
+				return fail.InvalidRequestError("failed to communicate: %v", commErr)
+			}
+			return retry.StopRetryError(err)
 		}
-		return retry.StopRetryError(commErr, "failed to communicate")
 	}
+
+	return retry.StopRetryError(err)
 }

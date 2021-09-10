@@ -24,6 +24,16 @@ sed -i "s#\(.*\)develop#\1${BRANCH_NAME}#" common.mk
 echo "mod"
 make mod
 
+sleep 15
+
+make sdk
+
+sleep 15
+
+make generate
+
+sleep 15
+
 echo "Make All"
 make all
 [ $? -ne 0 ] && echo "Build failure" && exit 1

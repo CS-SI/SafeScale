@@ -38,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 )
 
@@ -246,6 +247,9 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 	outcomes = &unitResults{}
 
 	if task.Aborted() {
+		if lerr, err := task.LastError(); err == nil {
+			return outcomes, fail.AbortedError(lerr, "aborted")
+		}
 		return outcomes, fail.AbortedError(nil, "aborted")
 	}
 
@@ -254,7 +258,7 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
 	if is.Serial || s.Serialize {
-
+		// logrus.Warnf("TBR: Installing %s feature serialized", is.Worker.feature.GetName())
 		for _, h := range hosts {
 			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
 			is.Worker.startTime = time.Now()
@@ -306,7 +310,9 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 				return nil, xerr
 			}
 
-			outcomes.AddOne(h.GetName(), outcome.(resources.UnitResult))
+			if outcome != nil {
+				outcomes.AddOne(h.GetName(), outcome.(resources.UnitResult))
+			}
 
 			if !outcomes.Successful() {
 				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
@@ -325,16 +331,24 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 			}
 		}
 	} else {
+		// logrus.Warnf("TBR: Installing %s feature in parallel", is.Worker.feature.GetName())
+		tg, xerr := concurrency.NewTaskGroupWithParent(task)
+		if xerr != nil {
+			return nil, xerr
+		}
+
 		subtasks := map[string]concurrency.Task{}
-		for _, h := range hosts {
-			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
+		for _, th := range hosts {
+			h := th
 			is.Worker.startTime = time.Now()
 
 			cloneV := v.Clone()
 			cloneV["HostIP"], xerr = h.GetPrivateIP()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return nil, xerr
+				logrus.Warnf("aborting because of %s", xerr.Error())
+				_ = tg.Abort()
+				break
 			}
 
 			cloneV["ShortHostname"] = h.GetName()
@@ -355,56 +369,69 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 			})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return nil, xerr
+				logrus.Warnf("aborting because of %s", xerr.Error())
+				_ = tg.Abort()
+				break
 			}
 
 			cloneV["Hostname"] = h.GetName() + domain
 			cloneV, xerr = realizeVariables(cloneV)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return nil, xerr
+				logrus.Warnf("aborting because of %s", xerr.Error())
+				_ = tg.Abort()
+				break
 			}
 
-			subtask, xerr := concurrency.NewTaskWithParent(task)
+			subtask, xerr := tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return nil, xerr
-			}
-
-			subtask, xerr = subtask.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
+				logrus.Warnf("aborting because of %s", xerr.Error())
+				_ = tg.Abort()
+				break
 			}
 
 			subtasks[h.GetName()] = subtask
 		}
-		for k, s := range subtasks {
-			outcome, xerr := s.Wait()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				logrus.Warn(tracer.TraceMessage(": %s(%s):step(%s)@%s finished after %s, but failed to recover result",
-					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
-				continue
-			}
-			if outcome != nil {
-				outcomes.AddOne(k, outcome.(resources.UnitResult))
-			}
 
-			if !outcomes.Successful() {
-				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
-					tracer.Trace(": %s(%s):step(%s)@%s finished in %s: not present",
-						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
-						temporal.FormatDuration(time.Since(is.Worker.startTime)))
-				} else { // other steps are expected to succeed
-					tracer.Trace(": %s(%s):step(%s)@%s failed in %s: %s",
-						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
-						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
+		tgr, xerr := tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			if len(subtasks) != len(hosts) {
+				logrus.Errorf("TBR: no matter what, this should faile because something happened starting tasks")
+			}
+			logrus.Warnf("TBR: at this point, we failed because we have [%s]", spew.Sdump(xerr))
+			logrus.Warnf("TBR: when it happened, the outcomes were:")
+			wrongs := 0
+			for _, s := range subtasks {
+				sid, _ := s.ID()
+				outcome := tgr[sid]
+				if outcome != nil {
+					oko := outcome.(stepResult)
+					logrus.Warnf("TBR: output '%s' and err '%v'", oko.output, oko.err)
+					if oko.err != nil {
+						wrongs++
+						continue
+					}
+					if !strings.Contains(oko.output, "exit 0") {
+						wrongs++
+						continue
+					}
 				}
+			}
+			if wrongs == 0 && (len(subtasks) == len(hosts)) {
+				logrus.Warnf("TBR: this is BAD")
 			} else {
-				tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
-					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
-					temporal.FormatDuration(time.Since(is.Worker.startTime)))
+				return outcomes, xerr
+			}
+		}
+
+		for k, s := range subtasks {
+			sid, _ := s.ID()
+			outcome := tgr[sid]
+			if outcome != nil {
+				oko := outcome.(resources.UnitResult)
+				outcomes.AddOne(k, oko)
 			}
 		}
 	}
@@ -422,6 +449,22 @@ type runOnHostParameters struct {
 func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
+	defer func() {
+		if result != nil {
+			if sres, ok := result.(stepResult); ok {
+				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
+					dur := spew.Sdump(result)
+					if !strings.Contains(dur, "check_") {
+						logrus.Warnf("TBR: task result: %s", spew.Sdump(result)) // TBR, remove this later
+					}
+				}
+			}
+		}
+		if xerr != nil {
+			logrus.Warnf("TBR: task error: %v", xerr) // TBR, remove this later
+		}
+	}()
+
 	var ok bool
 	if params == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("params")
@@ -434,29 +477,30 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
 	// Updates variables in step script
 	command, xerr := replaceVariablesInString(is.Script, p.Variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return stepResult{err: fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)}, xerr
+		problem := fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)
+		return stepResult{err: problem}, problem
 	}
 
 	// If options file is defined, upload it to the remote rh
 	if is.OptionsFileContent != "" {
-		rfcItem := remotefile.Item{
+		opItem := remotefile.Item{
 			Remote:       utils.TempFolder + "/options.json",
 			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
 			RemoteRights: "ug+rw-x,o-rwx",
 		}
-		xerr = rfcItem.UploadString(task.Context(), is.OptionsFileContent, p.Host)
+		defer func() {
+			_ = os.Remove(opItem.Local)
+		}()
+		xerr = opItem.UploadString(task.Context(), is.OptionsFileContent, p.Host)
 		xerr = debug.InjectPlannedFail(xerr)
-		_ = os.Remove(rfcItem.Local)
 		if xerr != nil {
-			return stepResult{err: xerr}, xerr
+			logrus.Warnf("TBR: failure uploading script: %v", xerr)
+			problem := fail.Wrap(xerr, "failure uploading script")
+			return stepResult{err: problem}, problem
 		}
 	}
 
@@ -473,11 +517,16 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	rfcItem := remotefile.Item{
 		Remote: filename,
 	}
+
+	defer func() {
+		_ = os.Remove(rfcItem.Local)
+	}()
 	xerr = rfcItem.UploadString(task.Context(), command, p.Host)
-	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return stepResult{err: xerr}, xerr
+		logrus.Warnf("TBR: failure uploading script: %v", xerr)
+		problem := fail.Wrap(xerr, "failure uploading script")
+		return stepResult{err: problem}, problem
 	}
 
 	if !hidesOutput {
@@ -531,9 +580,8 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 					_ = xerr.Annotate("stdout", outrun)
 					_ = xerr.Annotate("stderr", outerr)
 					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
-				} else {
-					break
 				}
+				break
 			}
 		}
 

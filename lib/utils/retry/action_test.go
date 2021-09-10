@@ -502,8 +502,30 @@ func TestErrCheckStdError(t *testing.T) {
 
 	if xerr != nil {
 		t.Logf(xerr.Error())
-		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(xerr.Error(), "failed 7") || strings.Contains(xerr.Error(), "failed 8")) {
+		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(xerr.Error(), "failed 7") || strings.Contains(xerr.Error(), "failed 8") || strings.Contains(xerr.Error(), "failed 9")) {
 			t.FailNow()
+		}
+	}
+}
+
+func TestErrCheckStdErrorHard(t *testing.T) {
+	iteration := 0
+	xerr := WhileUnsuccessfulWithHardTimeout(
+		func() error {
+			iteration = iteration + 1
+			return fail.NewError("It failed %d", iteration)
+		},
+		10*time.Millisecond, 80*time.Millisecond)
+	if xerr != nil {
+		xerr = fail.Wrap(xerr, "the checking failed")
+	}
+
+	if xerr != nil {
+		t.Logf(xerr.Error())
+		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(xerr.Error(), "failed 7") || strings.Contains(xerr.Error(), "failed 8") || strings.Contains(xerr.Error(), "failed 9")) {
+			if !strings.Contains(xerr.Error(), "desist") {
+				t.FailNow()
+			}
 		}
 	}
 }

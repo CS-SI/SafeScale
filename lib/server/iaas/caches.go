@@ -34,7 +34,9 @@ const (
 func CacheMissOption(fn func() (cache.Cacheable, fail.Error), timeout time.Duration) []data.ImmutableKeyValue {
 	if timeout <= 0 {
 		return []data.ImmutableKeyValue{
-			data.NewImmutableKeyValue(cacheOptionOnMissKeyword, func() (cache.Cacheable, fail.Error) { return nil, fail.InvalidRequestError("invalid timeout for function provided to react on cache miss event: cannot be less or equal to 0") }),
+			data.NewImmutableKeyValue(cacheOptionOnMissKeyword, func() (cache.Cacheable, fail.Error) {
+				return nil, fail.InvalidRequestError("invalid timeout for function provided to react on cache miss event: cannot be less or equal to 0")
+			}),
 			data.NewImmutableKeyValue(cacheOptionOnMissTimeoutKeyword, timeout),
 		}
 	}
@@ -47,7 +49,9 @@ func CacheMissOption(fn func() (cache.Cacheable, fail.Error), timeout time.Durat
 	}
 
 	return []data.ImmutableKeyValue{
-		data.NewImmutableKeyValue(cacheOptionOnMissKeyword, func() (cache.Cacheable, fail.Error) { return nil, fail.InvalidRequestError("invalid function provided to react on cache miss event: cannot be nil") }),
+		data.NewImmutableKeyValue(cacheOptionOnMissKeyword, func() (cache.Cacheable, fail.Error) {
+			return nil, fail.InvalidRequestError("invalid function provided to react on cache miss event: cannot be nil")
+		}),
 		data.NewImmutableKeyValue(cacheOptionOnMissTimeoutKeyword, timeout),
 	}
 }
@@ -109,7 +113,7 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 	// We have a cache miss, check if we have a function to get the missing content
 	if len(options) > 0 {
 		var (
-			onMissFunc func() (cache.Cacheable, fail.Error)
+			onMissFunc    func() (cache.Cacheable, fail.Error)
 			onMissTimeout time.Duration
 		)
 		for _, v := range options {
@@ -124,17 +128,17 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 
 		if onMissFunc != nil {
 			if onMissTimeout <= 0 {
-				_, xerr = onMissFunc()  // onMissFunc() knows what the error is
-                return nil, xerr
-            }
+				_, xerr = onMissFunc() // onMissFunc() knows what the error is
+				return nil, xerr
+			}
 			xerr := instance.unsafeReserveEntry(key, onMissTimeout)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrDuplicate:
 					// Search in the cache by ID
 					if ce, xerr = instance.byID.Entry(key); xerr == nil {
-							return ce, nil
-						}
+						return ce, nil
+					}
 
 					// Not found, search an entry in the cache by name to get id and search again by id
 					instance.lock.Lock()

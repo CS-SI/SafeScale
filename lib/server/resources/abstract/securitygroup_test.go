@@ -71,7 +71,6 @@ func TestSecurityGroup_Replace(t *testing.T) {
 	sg := NewSecurityGroup()
 	sg.Name = "securitygroup"
 
-
 	sg.Rules = append(sg.Rules, &SecurityGroupRule{
 		Description: "run for cover",
 	})

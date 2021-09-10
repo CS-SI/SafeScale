@@ -44,7 +44,7 @@ var (
 		DefaultImage:           defaultImage,
 		// GetGlobalSystemRequirements: flavors.GetGlobalSystemRequirements,
 		// GetNodeInstallationScript: getNodeInstallationScript,
-		ConfigureCluster: configureCluster,
+		ConfigureCluster:     configureCluster,
 		LeaveNodeFromCluster: leaveNodeFromCluster,
 	}
 )
@@ -145,7 +145,7 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 
 	// Drain pods from node
 	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
-	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(),temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute pod drain from node '%s'", node.GetName())
 	}

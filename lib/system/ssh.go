@@ -621,10 +621,8 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 
 	if timeout == 0 {
 		timeout = 1200 * time.Second // upper bound of 20 min
-	} else {
-		if timeout > 1200*time.Second {
-			timeout = 1200 * time.Second // nothing should take more than 20 min
-		}
+	} else if timeout > 1200*time.Second {
+		timeout = 1200 * time.Second // nothing should take more than 20 min
 	}
 
 	if _, xerr = subtask.StartWithTimeout(scmd.taskExecute, taskExecuteParameters{collectOutputs: outs != outputs.DISPLAY}, timeout); xerr != nil {
@@ -1141,7 +1139,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
-			iterations = iterations + 1
+			iterations++
 			sshCmd, innerXErr := sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
 				return innerXErr

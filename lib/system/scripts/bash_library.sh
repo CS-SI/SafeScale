@@ -86,6 +86,7 @@ function sfFail() {
 		echo 3 >/proc/sys/vm/drop_caches
 		sleep 2
 	) || true
+	echo "exiting with errorcode $1"
 	exit $1
 }
 export -f sfFail
@@ -96,6 +97,7 @@ function sfExit() {
 		echo 3 >/proc/sys/vm/drop_caches
 		sleep 2
 	) || true
+	echo "exiting with errorcode 0"
 	exit 0
 }
 export -f sfExit
@@ -472,6 +474,8 @@ export -f sfInstall
 
 # sfDownload url filename timeout delay
 function sfDownload() {
+    mkdir -p $SF_LOGDIR || true
+
 	local url="$1"
 	local encoded
 	encoded=$(echo "$url" | md5sum | cut -d' ' -f1)
@@ -512,6 +516,8 @@ function sfDownload() {
 export -f sfDownload
 
 __create_dropzone() {
+    mkdir -p $SF_LOGDIR || true
+
 	[[ ! -d ~cladm/.dropzone ]] && {
 		mkdir -p ~cladm/.dropzone
 		[ $? -ne 0 ] && return $?
@@ -530,6 +536,7 @@ function sfDownloadInDropzone() {
 		sfDownload "$@"
 		[ $? -ne 0 ] && return $?
 	}
+	cd ~cladm/.dropzone || return 1
 	return 0
 }
 export -f sfDownloadInDropzone
@@ -538,12 +545,21 @@ export -f sfDownloadInDropzone
 function sfDropzonePush() {
 	local file
 	file="$1"
-	__create_dropzone || echo "failed to create dropzone (exit code $?)"
-	[ $? -ne 0 ] && return $?
-	cp -rf "$file" ~cladm/.dropzone/ || echo "failed to copy '$file' in dropzone (exit code $?)"
-	[ $? -ne 0 ] && return $?
-	chown -R cladm:cladm ~cladm/.dropzone || echo "failed to set ownership of dropzone (exit code $?)"
-	[ $? -ne 0 ] && return $?
+	__create_dropzone || {
+	    rco=$?
+	    echo "failed to create dropzone (exit code $rco)"
+	    return $rco
+	}
+	cp -rf "$file" ~cladm/.dropzone/ || {
+	    rco=$?
+	    echo "failed to copy '$file' in dropzone (exit code $rco)"
+	    return $rco
+	}
+	chown -R cladm:cladm ~cladm/.dropzone || {
+	    rco=$?
+	    echo "failed to set ownership of dropzone (exit code $rco)"
+	    return $rco
+	}
 	return 0
 }
 export -f sfDropzonePush
@@ -566,15 +582,30 @@ function sfDropzonePop() {
 	local dest="$1"
 	local file=
 	[ $# -eq 2 ] && file="$2"
-	__create_dropzone || echo "failed to create dropzone (exit code $?)"
-	[ $? -ne 0 ] && return $?
-	mkdir -p "$dest" >/dev/null || echo "failed to create '$dest' folder (exit code $?)"
+	__create_dropzone || {
+	    rco=$?
+	    echo "failed to create dropzone (exit code $rco)"
+	    return $rco
+	}
+	if [ ! -d "$dest" ]; then
+        mkdir -p "$dest" >/dev/null || {
+            rco=$?
+            echo "failed to create '$dest' folder (exit code $rco)"
+            return $rco
+        }
+	fi
 	if [ $# -eq 1 ]; then
-		mv -f ~cladm/.dropzone/* "$dest" || echo "failed to move all files in dropzone to '$dest' (exit code $?)"
-		[ $? -ne 0 ] && return $?
+		mv -f ~cladm/.dropzone/* "$dest" || {
+		    rco=$?
+		    echo "failed to move all files in dropzone to '$dest' (exit code $rco)"
+		    return $rco
+		}
 	else
-		mv -f ~cladm/.dropzone/"$file" "$dest" || echo "failed to move file '$file' in dropzone to '$dest' (exit code $?)"
-		[ $? -ne 0 ] && return $?
+		mv -f ~cladm/.dropzone/"$file" "$dest" || {
+		    rco=$?
+		    echo "failed to move file '$file' in dropzone to '$dest' (exit code $rco)"
+		    return $rco
+		}
 	fi
 	return 0
 }
@@ -1252,6 +1283,8 @@ function waitForUserdata() {
 }
 export -f waitForUserdata
 
-waitForUserdata
-sfDetectFacts
-set -x
+if [ ! -f ./bash_library.bats ]; then
+    set -x
+    waitForUserdata
+    sfDetectFacts
+fi
