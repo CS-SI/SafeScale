@@ -523,7 +523,9 @@ func TestErrCheckStdErrorHard(t *testing.T) {
 	if xerr != nil {
 		t.Logf(xerr.Error())
 		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(xerr.Error(), "failed 7") || strings.Contains(xerr.Error(), "failed 8") || strings.Contains(xerr.Error(), "failed 9")) {
-			t.FailNow()
+			if !strings.Contains(xerr.Error(), "desist") {
+				t.FailNow()
+			}
 		}
 	}
 }
