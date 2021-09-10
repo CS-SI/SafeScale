@@ -38,16 +38,20 @@ JSONTOML := github.com/pelletier/go-toml
 BUILD_TAGS = 
 export BUILD_TAGS
 
-#all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
-all: logclean ground getdevdeps mod sdk generate lib cli minimock err vet
+all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
+
+alluntested: logclean ground getdevdeps mod sdk generate lib cli minimock err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
 allcover: all
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 
-#release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet releasearchive
-release: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
+release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet releasearchive
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
+
+releaseuntested: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
 
 releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
@@ -319,7 +323,7 @@ safemintest: begin
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
-test: begin # Run unit tests
+test: begin coverdeps # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache

@@ -394,12 +394,14 @@ func TestAwfulSimpleTaskActionCitizen(t *testing.T) {
 
 	stCh := make(chan string, 100)
 	_, xerr = single.StartWithTimeout(horribleTaskActionCitizen, stCh, 4*time.Second)
-	if xerr == nil { // It should fail because it's an aborted task...
+	if xerr != nil {
+		t.Logf("The task is just starting.., it shouldn't fail")
 		t.Fail()
 	}
 
 	_, _, xerr = single.WaitFor(4 * time.Second)
 	if xerr == nil { // It should fail with a timeout
+		t.Logf("This should have failed with a timeout")
 		t.Fail()
 	}
 
