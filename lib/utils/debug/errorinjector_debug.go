@@ -33,38 +33,17 @@ import (
 )
 
 // this is the function pointer to the function that will panic
-var originalCrash func(...int)
+// var originalCrash func(...int)
 var crash func(...int) error
 
-func CrasherWithDescription(in error, description string, calldepth ...int) (err error) {
-	defer func() {
-		rerr := recover()
-		if _, ok := rerr.(error); ok {
-			err = rerr.(error)
-		} else {
-			if rerr != nil {
-				err = fmt.Errorf("error %s: %v", description, rerr)
-			}
-		}
-	}()
-	if in != nil {
-		return in
-	}
-	if originalCrash != nil {
-		originalCrash(calldepth...)
-	}
-	return nil
-}
-
-// // InjectPlannedError generates an error if planned, 'in' being an error of not
-// func InjectPlannedError(in error, calldepth ...int) (err error) {
+// func CrasherWithDescription(in error, description string, calldepth ...int) (err error) {
 // 	defer func() {
 // 		rerr := recover()
 // 		if _, ok := rerr.(error); ok {
 // 			err = rerr.(error)
 // 		} else {
 // 			if rerr != nil {
-// 				err = fmt.Errorf("error: %v", rerr)
+// 				err = fmt.Errorf("error %s: %v", description, rerr)
 // 			}
 // 		}
 // 	}()
@@ -90,28 +69,6 @@ func InjectPlannedError(in error, calldepth ...int) error {
 	return nil
 }
 
-// // FailIfPlanned returns 'in' if it's not nil (an error occurred), or generates one if 'in' is nil
-// func FailIfPlanned(in fail.Error, calldepth ...int) (err fail.Error) {
-// 	defer func() {
-// 		rerr := recover()
-// 		if _, ok := rerr.(error); ok {
-// 			err = fail.ConvertError(rerr.(error))
-// 		} else {
-// 			if rerr != nil {
-// 				err = fail.ConvertError(fmt.Errorf("error: %v", rerr))
-// 			}
-// 		}
-// 	}()
-// 	if in != nil {
-// 		return in
-// 	}
-// 	if originalCrash != nil {
-// 		return originalCrash(calldepth...)
-// 	}
-//
-// 	return nil
-// }
-
 // InjectPlannedFail returns 'in' if it's not nil (an error occurred), or generates one if 'in' is nil
 func InjectPlannedFail(in fail.Error, calldepth ...int) (err fail.Error) {
 	if in != nil {
@@ -127,11 +84,42 @@ func InjectPlannedFail(in fail.Error, calldepth ...int) (err fail.Error) {
 	return nil
 }
 
-// setup is called by InitializeErrorInjector() to configure originalCrash sites in your code. It parses
+type crashTrigger interface {
+	DoCrash() bool
+	Why() string
+}
+
+type probabilityTrigger struct {
+	p float64
+}
+
+func (t probabilityTrigger) DoCrash() bool {
+	return t.p > 0 && rand.Float64() <= t.p
+}
+
+func (t probabilityTrigger) Why() string {
+	return fmt.Sprintf("probability %f", t.p)
+}
+
+type iterationTrigger struct {
+	count int64
+	max   int64
+}
+
+func (t *iterationTrigger) DoCrash() bool {
+	t.count++
+	return t.max > 0 && t.count >= t.max
+}
+
+func (t iterationTrigger) Why() string {
+	return fmt.Sprintf("iteration %d", t.max)
+}
+
+// setup is called by InitializeErrorInjector() to configure crash sites in your code. It parses
 // and saves a list of originalCrash sites and their probabilities of crashing, and then
-// makes the originalCrash() function originalCrash probabilistically when called from one of
-// the specified originalCrash sites. An example spec:
-//   client.go:53:.003,server.go:18:.02
+// makes the crash() function crash with appropriate trigger when called from one of
+// the specified crash sites. An example spec:
+//   client.go:53:p:.003,server.go:18:p:.02,validate.go:25:i:3
 // That will cause a originalCrash .003 of the time at client.go line 53, and .02 of the time
 // at server.go line 18.
 func setup(spec string) error {
@@ -146,31 +134,17 @@ func setup(spec string) error {
 		line int64
 	}
 
-	sites := make(map[site]float64)
+	// sites := make(map[site]float64)
+	sites := make(map[site]crashTrigger)
 	for _, s := range strings.Split(spec, ",") {
-		file, line, probability, err := newSite(s)
+		//file, line, probability, err := newSite(s)
+		file, line, trigger, err := newSite(s)
 		if err != nil {
 			return err
 		}
-		sites[site{file: file, line: line}] = probability
-	}
 
-	// Generate the function that causes crashes.
-	// originalCrash = func(calldepth ...int) {
-	// 	file, line, err := getCallSite(calldepth...)
-	// 	if err != nil {
-	// 		return
-	// 	}
-	//
-	// 	chance := sites[site{
-	// 		file: file,
-	// 		line: int64(line),
-	// 	}]
-	//
-	// 	if chance > 0 && rand.Float64() <= chance {
-	// 		panic(fmt.Sprintf("originalCrash injected at %s:%d, probability %f", file, line, chance))
-	// 	}
-	// }
+		sites[site{file: file, line: line}] = trigger
+	}
 
 	crash = func(calldepth ...int) error {
 		file, line, err := getCallSite(calldepth...)
@@ -178,13 +152,17 @@ func setup(spec string) error {
 			return fmt.Errorf("failed to inject error at %s:%d: %v", file, line, err)
 		}
 
-		chance := sites[site{
+		// chance := sites[site{
+		// 	file: file,
+		// 	line: int64(line),
+		// }]
+		trigger := sites[site{
 			file: file,
 			line: int64(line),
 		}]
 
-		if chance > 0 && rand.Float64() <= chance {
-			err := fmt.Errorf("error injected at %s:%d, probability %f", file, line, chance)
+		if trigger != nil && trigger.DoCrash() {
+			err := fmt.Errorf("error injected at %s:%d, %s", file, line, trigger.Why())
 			logrus.Debug(err.Error())
 			return err
 		}
@@ -210,20 +188,29 @@ func getCallSite(calldepth ...int) (string, int, error) {
 	return file, line, nil
 }
 
-// Parse a originalCrash site spec; return values: line, file, probability, error
-func newSite(s string) (string, int64, float64, error) {
+// Parse a crash site spec; return values: line, file, crashTrigger, error
+// func newSite(s string) (string, int64, float64, error) {
+func newSite(s string) (string, int64, crashTrigger, error) {
 	parts := strings.Split(s, ":")
-	if len(parts) == 3 {
+	if len(parts) == 4 {
 		file := parts[0]
 		line, intParseErr := strconv.ParseInt(parts[1], 10, 64)
 		if intParseErr == nil {
-			prob, floatParseErr := strconv.ParseFloat(parts[2], 64)
-			if floatParseErr == nil {
-				return file, line, prob, nil
+			switch parts[2] {
+			case "p":
+				prob, err := strconv.ParseFloat(parts[3], 64)
+				if err == nil {
+					return file, line, &probabilityTrigger{prob}, nil
+				}
+			case "i":
+				iter, err := strconv.ParseInt(parts[3], 10, 64)
+				if err == nil {
+					return file, line, &iterationTrigger{max: iter}, nil
+				}
 			}
 		}
 	}
-	return "", 0, 0, fmt.Errorf("invalid originalCrash site spec '%s'", s)
+	return "", 0, nil, fmt.Errorf("invalid crash site spec '%s'", s)
 }
 
 // InitializeErrorInjector loads error plans from environment and setup the error injector
