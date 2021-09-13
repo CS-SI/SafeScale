@@ -1187,7 +1187,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			}
 
 			for _, v := range nodes {
-				_, derr = tg.Start(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: v})
+				_, derr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: HostLightOption})
 				if derr != nil {
 					_ = xerr.AddConsequence(derr)
 					abErr := tg.Abort()
@@ -1203,16 +1203,17 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			}
 		}
 	}()
-
+	
 	res, xerr := tg.WaitGroup()
-	xerr = debug.InjectPlannedFail(xerr)
+	if res != nil && len(res) > 0 {
+		for _, v := range res {
+			if item, ok := v.(*propertiesv3.ClusterNode); ok {
+				nodes = append(nodes, item)
+			}
+		}
+	}
 	if xerr != nil {
 		return nil, fail.NewErrorWithCause(xerr, "errors occurred on node%s addition", strprocess.Plural(uint(len(errors))))
-	}
-	for _, v := range res {
-		if item, ok := v.(*propertiesv3.ClusterNode); ok {
-			nodes = append(nodes, item)
-		}
 	}
 
 	// configure what has to be done Cluster-wide
