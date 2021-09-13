@@ -58,7 +58,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaitingFor
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 3 {
 				break
 			}
 			if enough {
@@ -199,7 +199,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 20 {
+			if iter > 10 {
 				break
 			}
 			if enough || caught {
@@ -363,7 +363,7 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 20 {
+			if iter > 10 {
 				break
 			}
 			if enough || caught {
@@ -501,7 +501,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 3 {
 				break
 			}
 			if enough {
@@ -710,7 +710,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitForLater(t *testin
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 12 {
+			if iter > 6 {
 				break
 			}
 			if enough {
@@ -844,7 +844,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 		defer wg.Done()
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 3 {
 				break
 			}
 
@@ -939,9 +939,13 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWaitFor(t *testing.T) {
 				if xerr != previousErr {
 					if xerr != nil && previousErr != nil {
 						if strings.Compare(xerr.Error(), previousErr.Error()) != 0 {
-							t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
-							t.Fail()
-							return
+							if !strings.Contains(xerr.Error(), "aborted") || !strings.Contains(
+								previousErr.Error(), "aborted",
+							) {
+								t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)
+								t.Fail()
+								return
+							}
 						}
 					} else {
 						t.Errorf("Not consistent, before: %v, now: %v", previousErr, xerr)

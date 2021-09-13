@@ -55,9 +55,6 @@ func TestStartAfterDone(t *testing.T) {
 			_, err = overlord.Wait()
 			require.Nil(t, err)
 
-			ok, _ := overlord.IsSuccessful()
-			require.True(t, ok)
-
 			// already DONE taskgroup, now it should fail
 			_, err = overlord.Start(taskgenWithCustomFunc(20, 80, 5, 3, 0, 0, false, nil), nil)
 			require.NotNil(t, err)
@@ -104,16 +101,9 @@ func TestIntrospection(t *testing.T) {
 		sign := overlord.Signature()
 		require.NotEmpty(t, sign)
 
-		ok, err := overlord.IsSuccessful()
-		require.NotNil(t, err)
-
 		res, err := overlord.Wait()
 		require.Nil(t, err)
 		require.NotEmpty(t, res)
-
-		ok, err = overlord.IsSuccessful()
-		require.Nil(t, err)
-		require.True(t, ok)
 	}
 }
 
@@ -169,16 +159,9 @@ func TestIntrospectionWithErrors(t *testing.T) {
 		sign := overlord.Signature()
 		require.NotEmpty(t, sign)
 
-		ok, err := overlord.IsSuccessful()
-		require.NotNil(t, err)
-
 		res, err := overlord.Wait()
 		require.NotNil(t, err)
 		require.NotEmpty(t, res)
-
-		ok, err = overlord.IsSuccessful()
-		require.Nil(t, err)
-		require.False(t, ok)
 	}()
 
 	failed := waitTimeout(&wg, 3*time.Second)
@@ -292,10 +275,10 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 	}
 
 	// Look at the pressure supported by GC
-	funk(1, 20, 200, 250, 50, 50, 10)
-	funk(2, 20, 200, 250, 50, 50, 10)
-	funk(3, 20, 200, 250, 50, 50, 10)
-	funk(4, 20, 200, 250, 50, 50, 10)
+	funk(1, 10, 100, 125, 25, 25, 10)
+	funk(2, 10, 100, 125, 25, 25, 10)
+	funk(3, 10, 100, 125, 25, 25, 10)
+	funk(4, 10, 100, 125, 25, 25, 10)
 }
 
 func TestTimingOnlyOne(t *testing.T) {
@@ -1169,7 +1152,9 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 				el, _ := xerr.(*fail.ErrorList)
 				for _, ae := range el.ToErrorSlice() {
 					if _, ok := ae.(*fail.ErrAborted); !ok {
-						t.Errorf("everything should be aborts in this test")
+						t.Errorf(
+							"everything should be aborts in this test: %v", ae,
+						) // FIXME: This happened: 3d90f4a9-1e13-446b-881e-002041f02f92: context canceled: context canceled
 						failure = true
 						return
 					}

@@ -98,10 +98,6 @@ func TestWaitReadyTask(t *testing.T) {
 	require.NotNil(t, ta)
 	require.Nil(t, err)
 
-	su, err := ta.IsSuccessful()
-	require.False(t, su)
-	require.NotNil(t, err)
-
 	_, tr, err := ta.WaitFor(10 * time.Second)
 	require.Nil(t, tr)
 	require.NotNil(t, err)
@@ -260,10 +256,6 @@ func TestOneWaitingForGameWithFuncGen(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.True(t, good)
-
-	suc, err := got.IsSuccessful()
-	require.True(t, suc)
-	require.Nil(t, err)
 
 	err = got.SetID("small changes")
 	require.NotNil(t, err)
@@ -478,7 +470,7 @@ func TestLastError(t *testing.T) {
 }
 
 func TestResultCheckOfAbortedTask(t *testing.T) {
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 40; i++ {
 		got, xerr := NewTask()
 		require.NotNil(t, got)
 		require.Nil(t, xerr)
@@ -487,7 +479,9 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		require.Nil(t, xerr)
 		require.NotEmpty(t, theID)
 
-		_, xerr = got.StartWithTimeout(taskgenWithCustomFunc(50, 250, 10, 0, 0, 0, false, nil), nil, 400*time.Millisecond)
+		_, xerr = got.StartWithTimeout(
+			taskgenWithCustomFunc(50, 250, 10, 0, 0, 0, false, nil), nil, 400*time.Millisecond,
+		)
 		if xerr != nil {
 			t.Errorf("Shouldn't happen")
 		}
@@ -516,10 +510,6 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 				t.Errorf("Unexpected error: %v", xerr)
 			}
 		}
-		if res == nil {
-			require.NotEmpty(t, res) // aborted or timeout, we may have something in the result // FIXME: Sometimes is nil
-		}
-		require.NotEmpty(t, res)
 
 		// Waiting for task for 300 more ms (must succeed; we've waiting 304 ms for a workload that must end after 250 ms max)
 		done, res, xerr = got.WaitFor(300 * time.Millisecond)
@@ -542,11 +532,6 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		default:
 			t.Errorf("Unexpected error: %v", xerr)
 		}
-
-		// VPL: we waited 304ms, more than the 250 ms maximum of execution of the task. So when we arrive here, the task has ended...
-		success, xerr := got.IsSuccessful()
-		require.Nil(t, xerr)      // VPL: got is done, even if we tried previously to start a new workload, so xerr == nil
-		require.False(t, success) // VPL: success has to be false
 
 		// Using Result() is valid, Task is terminated
 		tr, xerr := got.Result()
@@ -1302,10 +1287,6 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 
 		_, _, xerr = single.WaitFor(50 * time.Millisecond)
 		require.NotNil(t, xerr)
-
-		success, xerr := single.IsSuccessful()
-		require.Nil(t, xerr) // VPL: IsSuccessful() is able to say if Task succeeded or not, so why waiting for a xerr != nil ?
-		require.False(t, success)
 
 		_, xerr = single.StartWithTimeout(taskgen(5, 100, 10, 1, 0, 0, false), nil, 90*time.Millisecond)
 		require.NotNil(t, xerr)

@@ -86,7 +86,6 @@ type TaskCore interface {
 	Context() context.Context
 	LastError() (error, fail.Error)
 	Result() (TaskResult, fail.Error)
-	IsSuccessful() (bool, fail.Error)
 	SetID(string) fail.Error
 
 	Run(fn TaskAction, params TaskParameters, options ...data.ImmutableKeyValue) (TaskResult, fail.Error)
@@ -873,39 +872,6 @@ func (instance *task) Run(action TaskAction, params TaskParameters, options ...d
 	return instance.Wait()
 }
 
-// IsSuccessful tells if the Task has been executed without error
-func (instance *task) IsSuccessful() (bool, fail.Error) {
-	if instance.IsNull() {
-		return false, fail.InvalidInstanceError()
-	}
-
-	instance.lock.RLock()
-	status := instance.status
-	instance.lock.RUnlock()
-
-	switch status {
-	case DONE:
-		instance.lock.RLock()
-		defer instance.lock.RUnlock()
-		return instance.err == nil, nil
-
-	case READY:
-		return false, fail.InconsistentError("cannot test the success of a Task (status %s) that has not started", status)
-
-	case ABORTED:
-		fallthrough
-	case TIMEOUT:
-		fallthrough
-	case RUNNING:
-		return false, fail.InvalidRequestError("cannot test the success of a Task (status %s) that has not been waited", status)
-
-	case UNKNOWN:
-		fallthrough
-	default:
-		return false, fail.InvalidRequestError("failed to tell if Task is successful: invalid status")
-	}
-}
-
 // Wait awaits for the task to end, and returns the error (or nil) of the execution
 // Returns:
 // - TaskResult, nil: the Task ended normally and provide a Result
@@ -1003,7 +969,13 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			//goland:noinspection GoDeferInLoop
 			defer instance.lock.RUnlock()
 
-			traceR.trace("run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration)
+			traceR.trace(
+				"run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration,
+			)
+			if instance.ctx.Err() != nil && instance.err == nil {
+				return instance.result, fail.AbortedError(instance.ctx.Err())
+			}
+
 			return instance.result, instance.err
 
 		case UNKNOWN:
@@ -1044,6 +1016,9 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 	case DONE:
 		instance.lock.RLock()
 		defer instance.lock.RUnlock()
+		if instance.ctx.Err() != nil && instance.err == nil {
+			return true, instance.result, fail.AbortedError(instance.ctx.Err())
+		}
 		return true, instance.result, instance.err
 
 	case ABORTED:
@@ -1089,6 +1064,9 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 	case DONE:
 		instance.lock.RLock()
 		defer instance.lock.RUnlock()
+		if instance.ctx.Err() != nil && instance.err == nil {
+			return true, instance.result, fail.AbortedError(instance.ctx.Err())
+		}
 		return true, instance.result, instance.err
 
 	case ABORTED:
