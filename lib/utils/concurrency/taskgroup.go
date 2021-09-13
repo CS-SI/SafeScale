@@ -327,18 +327,6 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	}
 }
 
-// IsSuccessful tells if the TaskGroup has been executed without error
-func (instance *taskGroup) IsSuccessful() (bool, fail.Error) {
-	if instance.isNull() {
-		return false, fail.InvalidInstanceError()
-	}
-
-	instance.task.lock.RLock()
-	defer instance.task.lock.RUnlock()
-
-	return instance.task.IsSuccessful()
-}
-
 // Wait is a synonym to WaitGroup (exists to satisfy interface Task)
 func (instance *taskGroup) Wait() (TaskResult, fail.Error) {
 	if instance.isNull() {
@@ -385,6 +373,10 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			instance.task.lock.RLock()
 			//goland:noinspection GoDeferInLoop
 			defer instance.task.lock.RUnlock()
+
+			if fail.Cause(instance.task.err) == context.Canceled {
+				return instance.result, fail.AbortedError(instance.task.err)
+			}
 
 			return instance.result, instance.task.err
 
@@ -506,10 +498,18 @@ func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
 			if err != nil {
 				if s.normalizeError != nil {
 					if normalizedError := s.normalizeError(err); normalizedError != nil {
-						errorList[sid] = normalizedError
+						if fail.Cause(normalizedError) == context.Canceled {
+							errorList[sid] = fail.AbortedError(normalizedError)
+						} else {
+							errorList[sid] = normalizedError
+						}
 					}
 				} else {
-					errorList[sid] = err
+					if fail.Cause(err) == context.Canceled {
+						errorList[sid] = fail.AbortedError(err)
+					} else {
+						errorList[sid] = err
+					}
 				}
 			}
 
@@ -647,6 +647,8 @@ func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupR
 		return false, nil, fail.InconsistentError("cannot wait TaskGroup '%s': not started", tid)
 
 	case DONE:
+		instance.task.lock.RLock()
+		defer instance.task.lock.RUnlock()
 		return true, instance.result, instance.task.err
 
 	case TIMEOUT:

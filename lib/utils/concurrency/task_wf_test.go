@@ -371,7 +371,9 @@ func TestChildrenWaitingGameWithContextCancelfuncsWF(t *testing.T) {
 		if !((xerr != nil) == errorExpected) {
 			if xerr != nil {
 				if !strings.Contains(xerr.Error(), "inconsistent") {
-					t.Errorf("Failure in test %d: %v, %v, %t: wrong error!", ind, sleep, trigger, errorExpected)
+					t.Errorf(
+						"Failure in test %d: %v, %v, %t: wrong error: %v!", ind, sleep, trigger, errorExpected, xerr,
+					)
 				}
 			} else {
 				t.Errorf("Failure in test %d: %v, %v, %t: wrong error!", ind, sleep, trigger, errorExpected)
@@ -405,9 +407,9 @@ func TestChildrenWaitingGameWithContextCancelfuncsWF(t *testing.T) {
 	funk(10, 50, 10, 46, true) // latency matters, this sometimes fails
 	funk(11, 50, 10, 47, true) // latency matters, this sometimes fails
 	// VPL: on macM1, cancel signal hits at 51.80ms, task detects abort at 57.11ms -> Aborted
-	funk(12, 60, 20, 62, false) // latency matters, this sometimes fails
+	funk(12, 60, 20, 63, false) // latency matters, this sometimes fails
 	// VPL: on macM1, cancel signals hits at 52.13ms, task detects abort at 57.36ms -> Aborted
-	funk(13, 60, 20, 63, false) // latency matters, this sometimes fails
+	funk(13, 60, 20, 64, false) // latency matters, this sometimes fails
 	funk(14, 60, 20, 70, false) // latency matters, this sometimes fails
 	// VPL: on macM1, task ended its work after 62.71ms, before cancel hits -> no error
 	funk(15, 60, 20, 73, false) // if we go far enough, no errors

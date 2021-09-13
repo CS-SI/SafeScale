@@ -675,20 +675,6 @@ function sfHelm() {
 }
 export -f sfHelm
 
-function sfDcos() {
-	sudo -u cladm -i dcos "$@"
-	[ $? -ne 0 ] && return $?
-    return 0
-}
-export -f sfDcos
-
-function sfMarathon() {
-	sudo -u cladm -i marathon "$@"
-	[ $? -ne 0 ] && return $?
-    return 0
-}
-export -f sfMarathon
-
 function sfProbeGPU() {
 	if command -v lspci &>/dev/null; then
 		val=$(lspci | grep nvidia 2>/dev/null) || true
@@ -1283,6 +1269,7 @@ function waitForUserdata() {
 }
 export -f waitForUserdata
 
+# .bats files are only on dev environments
 if [ ! -f ./bash_library.bats ]; then
     set -x
     waitForUserdata

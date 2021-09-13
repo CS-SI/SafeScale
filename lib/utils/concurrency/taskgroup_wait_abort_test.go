@@ -58,7 +58,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 		chansize := 10
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 3 {
 				break
 			}
 			if enough {
@@ -226,7 +226,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 
 		for {
 			iter++
-			if iter > 10 {
+			if iter > 5 {
 				break
 			}
 			if enough || caught {
@@ -401,7 +401,7 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 		chansize := 20
 		for {
 			iter++
-			if iter > 10 {
+			if iter > 5 {
 				break
 			}
 			if enough || caught {
@@ -550,7 +550,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		chansize := 10
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 3 {
 				break
 			}
 			if enough {
@@ -759,7 +759,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		chansize := 10
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 3 {
 				break
 			}
 			if enough {
@@ -896,7 +896,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 	iter := 0
 	for {
 		iter++
-		if iter > 10 {
+		if iter > 5 {
 			break
 		}
 

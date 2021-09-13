@@ -30,6 +30,7 @@ RULES_DSL := github.com/quasilyte/go-ruleguard/dsl
 GOGREP := mvdan.cc/gogrep
 
 # CI tools
+BATS := github.com/sstephenson/bats
 GOJQ := github.com/itchyny/gojq/cmd/gojq
 GRON := github.com/tomnomnom/gron
 JSONTOML := github.com/pelletier/go-toml
@@ -41,17 +42,11 @@ export BUILD_TAGS
 all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
-alluntested: logclean ground getdevdeps mod sdk generate lib cli minimock err vet
-	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
-
 allcover: all
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 
 release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet releasearchive
-	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
-
-releaseuntested: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
 
 releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
@@ -125,6 +120,7 @@ ground:
 	@command -v git >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) git is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v $(GO) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) go is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v protoc >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) protoc is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
+	@cp ./hooks/pre-commit ./.git/hooks/pre-commit > /dev/null || true
 
 cideps: begin ground
 	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
@@ -139,6 +135,10 @@ cideps: begin ground
 	@$(WHICH) tomljson > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...\n" && $(GO) get $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
 	fi
+
+installbats: begin ground
+	@mkdir -p ./helpers/tmp || true
+	@if [ ! -s ./helpers/bin/bats ]; then git clone https://github.com/sstephenson/bats.git ./helpers/tmp;./helpers/tmp/install.sh ./helpers;rm -rf ./helpers/tmp; fi
 
 coverdeps: begin ground
 	@$(WHICH) cover > /dev/null; if [ $$? -ne 0 ]; then \
@@ -307,19 +307,19 @@ mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/concurrency/... 2>&1 > test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/retry/... 2>&1 >> test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/data/... 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
-safemintest: begin
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+precommittest: begin
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running precommit unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/concurrency/... -p 1 2>&1 > test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/retry/... -p 1 2>&1 >> test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/data/... -p 1 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
@@ -360,16 +360,16 @@ minimock: begin generate
 metalint: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --color never --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard --enable=dogsled --enable=funlen --enable=gochecknoglobals run || true
+	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --color never --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard --enable=dogsled --enable=funlen --enable=gochecknoglobals run ./... | grep -v _test || true
 
 metalint-mini: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --color never --enable=errcheck --enable=ineffassign --enable=interfacer --enable=depguard --enable=dogsled run || true
+	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --color never --enable=errcheck --enable=ineffassign --enable=interfacer --enable=depguard --enable=dogsled --disable=unused --disable=varcheck run ./... | grep -v _test || true
 
 metalint-full: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(WHICH) golangci-lint > /dev/null && golangci-lint --color never --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard run --enable=dogsled --enable=funlen --enable=gochecknoglobals ./... || true) || echo "golangci-lint not installed in your system"
+	@($(WHICH) golangci-lint > /dev/null && golangci-lint --color never --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard run --enable=dogsled --enable=funlen --enable=gochecknoglobals ./... | grep -v _test || true) || echo "golangci-lint not installed in your system"
 
 style: begin generate gofmt
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

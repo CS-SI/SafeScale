@@ -70,10 +70,7 @@ func TestATaskIsAGroup2(t *testing.T) {
 func TestInvalidTask(t *testing.T) {
 	got := generator()
 
-	_, err := got.IsSuccessful()
-	require.NotNil(t, err)
-
-	_, err = got.Result()
+	_, err := got.Result()
 	require.NotNil(t, err)
 
 	_, _, err = got.WaitFor(0)
