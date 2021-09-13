@@ -140,6 +140,12 @@ installbats: begin ground
 	@mkdir -p ./helpers/tmp || true
 	@if [ ! -s ./helpers/bin/bats ]; then git clone https://github.com/sstephenson/bats.git ./helpers/tmp;./helpers/tmp/install.sh ./helpers;rm -rf ./helpers/tmp; fi
 
+bashtest:
+	@if [ ! -s ./helpers/bin/bats ]; then \
+		printf "%b" "$(ERROR_COLOR)$(INFO_STRING) Cannot run bash tests: bats is not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; \
+	fi
+	@(cd lib && $(MAKE) $(@))
+
 coverdeps: begin ground
 	@$(WHICH) cover > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading cover...\n" && $(GO) install $(COVER)@v0.1.0 &>/dev/null || true; \
