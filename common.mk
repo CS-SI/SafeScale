@@ -162,12 +162,6 @@ ifneq ($(OS),Windows_NT)
 PATH = $(HOME)/.local/bin:/go/bin:$(shell printenv PATH)
 endif
 
-ifneq ($(OS),Windows_NT)
-ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
-$(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
-endif
-endif
-
 # Life is better with colors
 COM_COLOR   = \033[0;34m
 OBJ_COLOR   = \033[0;36m
