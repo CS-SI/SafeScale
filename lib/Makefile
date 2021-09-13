@@ -26,6 +26,10 @@ vet:
 
 test:
 	@$(GO) test $(RACE_CHECK_TEST) -v ./...
+	@(cd system && $(MAKE) $(@))
+
+bashtest:
+	@(cd system && $(MAKE) $(@))
 
 gensrc:
 	@(mkdir -p mocks) || true

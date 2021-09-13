@@ -10,6 +10,12 @@ all: nfs generate
 vet:
 	@$(GO) vet ./...
 
+test:
+	@(cd scripts && $(MAKE) $(@))
+
+bashtest:
+	@(cd scripts && $(MAKE) $(@))
+
 nfs:
 	@(cd nfs && $(MAKE) all)
 
