@@ -1004,7 +1004,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 		return nil
 	}
 
-	// FIXME: there are valid scenarii for reverse proxy settings when Feature applied to Host...
+	// FIXME: there are valid scenarios for reverse proxy settings when Feature applied to Host...
 	if w.cluster == nil {
 		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
@@ -1444,6 +1444,9 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			var commaSplitted []string
 			if ports, ok := r["ports"].(int); ok {
 				sgRule.Description = description + fmt.Sprintf(" (port %d)", ports) + forFeature
+				if ports > 65535 {
+					return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
+				}
 				sgRule.PortFrom = int32(ports)
 
 				xerr = gwSG.AddRule(ctx, sgRule)
@@ -1482,6 +1485,12 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 							}
 							sgRule.Description += fmt.Sprintf(" (port%s %s)", strprocess.Plural(uint(dashCount)), dashSplitted)
 
+							if portFrom > 65535 {
+								return fail.SyntaxError("invalid value '%d' for field 'portFrom'", portFrom)
+							}
+							if portTo > 65535 {
+								return fail.SyntaxError("invalid value '%d' for field 'portTo'", portTo)
+							}
 							sgRule.PortFrom = int32(portFrom)
 							sgRule.PortTo = int32(portTo)
 						}
