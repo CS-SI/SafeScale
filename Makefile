@@ -121,6 +121,7 @@ ground:
 	@command -v $(GO) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) go is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@command -v protoc >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) protoc is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@cp ./hooks/pre-commit ./.git/hooks/pre-commit > /dev/null || true
+	@chmod u+x ./.git/hooks/pre-commit > /dev/null || true
 
 cideps: begin ground
 	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
