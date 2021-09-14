@@ -123,6 +123,7 @@ ground:
 	@cp ./hooks/pre-commit ./.git/hooks/pre-commit > /dev/null || true
 	@chmod u+x ./.git/hooks/pre-commit > /dev/null || true
 
+#CI dependencies
 cideps: begin ground
 	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...$(NO_COLOR)\n" && $(GO) get $(GOJQ)@v0.12.3 &>/dev/null || true; \
