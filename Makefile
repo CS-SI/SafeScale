@@ -124,21 +124,31 @@ ground:
 
 cideps: begin ground
 	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...\n" && $(GO) get $(GOJQ)@v0.12.3 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...$(NO_COLOR)\n" && $(GO) get $(GOJQ)@v0.12.3 &>/dev/null || true; \
 	fi
 	@$(WHICH) gron > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...\n" && $(GO) get $(GRON)@v0.6.1 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...$(NO_COLOR)\n" && $(GO) get $(GRON)@v0.6.1 &>/dev/null || true; \
 	fi
 	@$(WHICH) jsontoml > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...\n" && $(GO) get $(JSONTOML)/cmd/jsontoml@v1.9.0 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...$(NO_COLOR)\n" && $(GO) get $(JSONTOML)/cmd/jsontoml@v1.9.0 &>/dev/null || true; \
 	fi
 	@$(WHICH) tomljson > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...\n" && $(GO) get $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...$(NO_COLOR)\n" && $(GO) get $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
 	fi
 
 installbats: begin ground
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing bats...$(NO_COLOR)\n"
 	@mkdir -p ./helpers/tmp || true
 	@if [ ! -s ./helpers/bin/bats ]; then git clone https://github.com/sstephenson/bats.git ./helpers/tmp;./helpers/tmp/install.sh ./helpers;rm -rf ./helpers/tmp; fi
+
+installtrivy: begin ground
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing trivy...$(NO_COLOR)\n"
+	@mkdir -p ./helpers/tmp || true
+	@if [ ! -s ./helpers/bin/trivy ]; then curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | bash -s -- -b `pwd`/helpers/bin v0.19.2;rm -rf ./helpers/tmp; fi
+
+trivyreport: begin ground
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Generating trivy report in background...$(NO_COLOR)\n"
+	@find . | grep yml | xargs grep FROM | awk {'print $$3'} | sort | uniq | grep : | xargs -I _ ./helpers/bin/trivy image -s CRITICAL _ > trivy-report.log &
 
 coverdeps: begin ground
 	@$(WHICH) cover > /dev/null; if [ $$? -ne 0 ]; then \
@@ -289,7 +299,7 @@ convey:
 
 conveystop:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Stopping goconvey in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(ps -ef | grep goconvey | grep -v grep | grep 8082 | awk {'print $2'} | xargs kill -9 || true)
+	@(ps -ef | grep goconvey | grep -v grep | grep 8082 | awk {'print $$2'} | xargs kill -9 || true)
 
 generate: sdk
 	@sleep 5
