@@ -18,6 +18,7 @@ package k8s
 
 import (
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -91,7 +92,7 @@ func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
 }
 
 func defaultImage(_ resources.Cluster) string {
-	return "Ubuntu 20.04"
+	return consts.DEFAULTOS
 }
 
 func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
