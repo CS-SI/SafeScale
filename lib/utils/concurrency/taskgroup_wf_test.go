@@ -435,55 +435,57 @@ func TestChildrenWaitingGameEnoughTimeAfter(t *testing.T) {
 	// funk(4, 10, 50, 250, 20, 40, 20)
 }
 
-func TestStates(t *testing.T) {
-	overlord, xerr := NewTaskGroup()
-	require.NotNil(t, overlord)
-	require.Nil(t, xerr)
+func TestStates(t *testing.T) { // FIXME: CI failed
+	for j := 0; j < 60; j++ {
+		overlord, xerr := NewTaskGroup()
+		require.NotNil(t, overlord)
+		require.Nil(t, xerr)
 
-	theID, xerr := overlord.GetID()
-	require.Nil(t, xerr)
-	require.NotEmpty(t, theID)
+		theID, xerr := overlord.GetID()
+		require.Nil(t, xerr)
+		require.NotEmpty(t, theID)
 
-	for ind := 0; ind < 4; ind++ {
-		_, xerr := overlord.StartWithTimeout(taskgen(200, 250, 50, 0, 0, 0, false), nil, 60*time.Millisecond)
-		if xerr != nil {
-			t.Errorf("Unexpected: %s", xerr)
+		for ind := 0; ind < 4; ind++ {
+			_, xerr := overlord.StartWithTimeout(taskgen(200, 250, 50, 0, 0, 0, false), nil, 60*time.Millisecond)
+			if xerr != nil {
+				t.Errorf("Unexpected: %s", xerr)
+			}
 		}
+
+		aborted := overlord.Aborted()
+		require.False(t, aborted)
+
+		res, xerr := overlord.WaitGroup()
+		require.NotNil(t, xerr)
+		require.NotEmpty(t, res)
+
+		// We have waited, and no problem, so are we DONE ?
+		st, xerr := overlord.Status()
+		require.Nil(t, xerr)
+		if st != DONE {
+			t.Errorf("We should be DONE but we are: %s", st)
+		}
+
+		// VPL: (status == DONE) + (xerr is ErrorList) = TaskGroup finished normally with TaskAction(s) in TIMEOUT error(s)
+		aborted = overlord.Aborted()
+		if aborted {
+			t.Errorf("We should be DONE here, so aborted should be true (according to taskgroup.go:776)")
+		}
+		require.False(t, aborted)
+
+		st, xerr = overlord.Status()
+		require.Nil(t, xerr)
+		require.NotNil(t, st)
+
+		gst, xerr := overlord.GroupStatus()
+		require.Nil(t, xerr)
+		require.NotNil(t, gst)
+
+		// VPL: tg.Status() returns the status of the TaskGroup (ie the parent Task launching the children)
+		//      tg.GroupStatus() returns the current status of each child of the TaskGroup
+		//      maybe we should rename it to GetChildrenStatus()?
+		require.NotEqual(t, st, gst) // this is unclear, why both a Status and a GroupStatus ?
 	}
-
-	aborted := overlord.Aborted()
-	require.False(t, aborted)
-
-	res, xerr := overlord.WaitGroup()
-	require.NotNil(t, xerr)
-	require.NotEmpty(t, res)
-
-	// We have waited, and no problem, so are we DONE ?
-	st, xerr := overlord.Status()
-	require.Nil(t, xerr)
-	if st != DONE {
-		t.Errorf("We should be DONE but we are: %s", st)
-	}
-
-	// VPL: (status == DONE) + (xerr is ErrorList) = TaskGroup finished normally with TaskAction(s) in TIMEOUT error(s)
-	aborted = overlord.Aborted()
-	if aborted {
-		t.Errorf("We should be DONE here, so aborted should be true (according to taskgroup.go:776)")
-	}
-	require.False(t, aborted)
-
-	st, xerr = overlord.Status()
-	require.Nil(t, xerr)
-	require.NotNil(t, st)
-
-	gst, xerr := overlord.GroupStatus()
-	require.Nil(t, xerr)
-	require.NotNil(t, gst)
-
-	// VPL: tg.Status() returns the status of the TaskGroup (ie the parent Task launching the children)
-	//      tg.GroupStatus() returns the current status of each child of the TaskGroup
-	//      maybe we should rename it to GetChildrenStatus()?
-	require.NotEqual(t, st, gst) // this is unclear, why both a Status and a GroupStatus ?
 }
 
 func TestTimeoutState(t *testing.T) {

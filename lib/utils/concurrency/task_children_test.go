@@ -26,59 +26,61 @@ import (
 )
 
 // make sure children cannot wait after father is aborted
-func TestTaskGroupFatherAbortion(t *testing.T) {
-	overlord, xerr := NewTaskGroup()
-	_ = overlord.SetID("/overlord")
-	require.NotNil(t, overlord)
-	require.Nil(t, xerr)
+func TestTaskGroupFatherAbortion(t *testing.T) { // FIXME: CI Failed
+	for j := 0; j < 30; j++ {
+		overlord, xerr := NewTaskGroup()
+		_ = overlord.SetID("/overlord")
+		require.NotNil(t, overlord)
+		require.Nil(t, xerr)
 
-	count := 0
+		count := 0
 
-	child, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		fmt.Println("child started.")
-		time.Sleep(time.Duration(400) * time.Millisecond)
-		fmt.Println("Evaluating...")
-		if t.Aborted() {
-			fmt.Println("child aborts.")
-			return "A", fail.AbortedError(nil)
-		}
-		count++
-		fmt.Println("child done.")
-		return "B", nil
-	}, nil, InheritParentIDOption, AmendID("/child"))
-	require.Nil(t, xerr)
+		child, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			fmt.Println("child started.")
+			time.Sleep(time.Duration(400) * time.Millisecond)
+			fmt.Println("Evaluating...")
+			if t.Aborted() {
+				fmt.Println("child aborts.")
+				return "A", fail.AbortedError(nil)
+			}
+			count++
+			fmt.Println("child done.")
+			return "B", nil
+		}, nil, InheritParentIDOption, AmendID("/child"))
+		require.Nil(t, xerr)
 
-	sibling, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		fmt.Println("sibling started.")
-		time.Sleep(time.Duration(500) * time.Millisecond)
-		fmt.Println("Evaluating...")
-		if t.Aborted() {
-			fmt.Println("sibling aborts.")
-			return "A", fail.AbortedError(nil)
-		}
-		count++
-		fmt.Println("sibling done.")
-		return "B", nil
-	}, nil, InheritParentIDOption, AmendID("/sibling"))
-	require.Nil(t, xerr)
+		sibling, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			fmt.Println("sibling started.")
+			time.Sleep(time.Duration(500) * time.Millisecond)
+			fmt.Println("Evaluating...")
+			if t.Aborted() {
+				fmt.Println("sibling aborts.")
+				return "A", fail.AbortedError(nil)
+			}
+			count++
+			fmt.Println("sibling done.")
+			return "B", nil
+		}, nil, InheritParentIDOption, AmendID("/sibling"))
+		require.Nil(t, xerr)
 
-	time.Sleep(time.Duration(50) * time.Millisecond) // definitively weird: with 40ms of sleep, everything is working as expected...
-	// something occurs after 40ms that delay channel read with select...
-	xerr = overlord.Abort()
-	require.Nil(t, xerr)
+		time.Sleep(time.Duration(50) * time.Millisecond) // definitively weird: with 40ms of sleep, everything is working as expected...
+		// something occurs after 40ms that delay channel read with select...
+		xerr = overlord.Abort()
+		require.Nil(t, xerr)
 
-	res, xerr := child.Wait()
-	require.NotNil(t, xerr)
-	require.NotNil(t, res)
+		res, xerr := child.Wait()
+		require.NotNil(t, xerr)
+		require.NotNil(t, res)
 
-	res, xerr = sibling.Wait()
-	require.NotNil(t, xerr)
-	require.NotNil(t, res)
+		res, xerr = sibling.Wait()
+		require.NotNil(t, xerr)
+		require.NotNil(t, res)
 
-	require.Equal(t, 0, count)
+		require.Equal(t, 0, count)
 
-	_, xerr = overlord.Wait()
-	require.NotNil(t, xerr)
+		_, xerr = overlord.Wait()
+		require.NotNil(t, xerr)
+	}
 }
 
 // if a children doesn't listen to abort, it keeps running

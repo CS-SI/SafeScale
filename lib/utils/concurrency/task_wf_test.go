@@ -151,30 +151,32 @@ func TestResultCheckWF(t *testing.T) {
 	require.NotNil(t, tr)
 }
 
-func TestResultCheckWithoutWF(t *testing.T) {
-	got, err := NewUnbreakableTask()
-	require.NotNil(t, got)
-	require.Nil(t, err)
+func TestResultCheckWithoutWF(t *testing.T) { // FIXME: CI Failed
+	for j := 0; j < 60; j++ {
+		got, err := NewUnbreakableTask()
+		require.NotNil(t, got)
+		require.Nil(t, err)
 
-	theID, err := got.ID()
-	require.Nil(t, err)
-	require.NotEmpty(t, theID)
+		theID, err := got.ID()
+		require.Nil(t, err)
+		require.NotEmpty(t, theID)
 
-	_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-		return "waiting game", nil
-	}, nil, 10*time.Millisecond)
-	if err != nil {
-		t.Errorf("Shouldn't happen")
+		_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil, 10*time.Millisecond)
+		if err != nil {
+			t.Errorf("Shouldn't happen")
+		}
+
+		res, err := got.Wait()
+		require.NotNil(t, err)
+		require.NotNil(t, res)
+
+		tr, xerr := got.Result()
+		require.Nil(t, xerr)
+		require.NotNil(t, tr)
 	}
-
-	res, err := got.Wait()
-	require.NotNil(t, err)
-	require.NotNil(t, res)
-
-	tr, xerr := got.Result()
-	require.Nil(t, xerr)
-	require.NotNil(t, tr)
 }
 
 func TestSingleTaskWF(t *testing.T) {

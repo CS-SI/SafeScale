@@ -932,26 +932,28 @@ func TestSingleTaskTryWaitKO(t *testing.T) {
 	}
 }
 
-func TestSingleTaskWait(t *testing.T) {
-	single, err := NewUnbreakableTask()
-	require.NotNil(t, single)
-	require.Nil(t, err)
+func TestSingleTaskWait(t *testing.T) { // FIXME: CI Failed
+	for j := 0; j < 60; j++ {
+		single, err := NewUnbreakableTask()
+		require.NotNil(t, single)
+		require.Nil(t, err)
 
-	single, err = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(30) * time.Millisecond)
-		return "Ahhhh", nil
-	}, nil)
-	require.Nil(t, err)
+		single, err = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(30) * time.Millisecond)
+			return "Ahhhh", nil
+		}, nil)
+		require.Nil(t, err)
 
-	begin := time.Now()
-	res, err := single.Wait()
-	end := time.Since(begin)
+		begin := time.Now()
+		res, err := single.Wait()
+		end := time.Since(begin)
 
-	require.NotNil(t, res)
-	require.Nil(t, err)
+		require.NotNil(t, res)
+		require.Nil(t, err)
 
-	if end >= (time.Millisecond*50) || end < (time.Millisecond*20) {
-		t.Errorf("It should have finished near 30 ms but it didn't !!")
+		if end >= (time.Millisecond*50) || end < (time.Millisecond*20) {
+			t.Errorf("It should have finished near 30 ms but it didn't !!")
+		}
 	}
 }
 
