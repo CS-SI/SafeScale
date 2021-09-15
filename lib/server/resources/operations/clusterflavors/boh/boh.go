@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -84,5 +85,5 @@ func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
 }
 
 func defaultImage(_ resources.Cluster) string {
-	return "Ubuntu 20.04"
+	return consts.DEFAULTOS
 }

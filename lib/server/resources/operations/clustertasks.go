@@ -19,6 +19,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"net"
 	"reflect"
 	"strings"
@@ -400,7 +401,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 		imageQuery = instance.makers.DefaultImage(instance)
 	}
 	if imageQuery == "" {
-		imageQuery = "Ubuntu 20.04"
+		imageQuery = consts.DEFAULTOS
 	}
 	svc := instance.GetService()
 	_, imageID, xerr = determineImageID(svc, imageQuery)

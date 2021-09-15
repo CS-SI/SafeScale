@@ -19,6 +19,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"net"
 	"reflect"
 	"strings"
@@ -709,7 +710,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 			imageQuery = cfg.GetString("DefaultImage")
 
 			if imageQuery == "" {
-				imageQuery = "Ubuntu 20.04"
+				imageQuery = consts.DEFAULTOS
 			}
 		}
 		img, xerr := svc.SearchImage(imageQuery)

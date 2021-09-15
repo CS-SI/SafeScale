@@ -19,6 +19,7 @@ package operations
 import (
 	"context"
 	"fmt"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"net"
 	"os"
 	"os/user"
@@ -774,6 +775,10 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	imageQuery := hostDef.Image
 	if imageQuery == "" {
 		imageQuery = hostReq.ImageRef
+		if imageQuery == "" { // if ImageRef also empty, use defaults
+			imageQuery = consts.DEFAULTOS
+		}
+
 		hostReq.ImageRef, hostReq.ImageID, xerr = determineImageID(svc, imageQuery)
 		if xerr != nil {
 			return nil, xerr
@@ -3210,7 +3215,7 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 		Password:            ahc.Password,
 		Ram:                 hostSizingV1.AllocatedSize.RAMSize,
 		State:               protocol.HostState(ahc.LastState),
-		StateLabel:      ahc.LastState.String(),
+		StateLabel:          ahc.LastState.String(),
 		AttachedVolumeNames: volumes,
 	}
 	return ph, nil
