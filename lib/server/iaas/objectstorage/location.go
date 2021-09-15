@@ -34,6 +34,8 @@ import (
 	_ "github.com/graymeta/stow/swift"
 )
 
+const STOWWINDOWSSIZE = 75
+
 // location ...
 type location struct {
 	stowLocation stow.Location
@@ -107,6 +109,39 @@ func (l location) GetType() string {
 	return l.config.Type
 }
 
+func (l location) estimateSize(prefix string) (int, error) {
+	containerSet := make(map[string]bool) // New empty set
+	currentPageSize := 10
+
+	for {
+		err := stow.WalkContainers(
+			l.stowLocation, prefix, currentPageSize,
+			func(c stow.Container, err error) error {
+				if err != nil {
+					return err
+				}
+
+				if containerSet[c.Name()] {
+					return fail.DuplicateError(fmt.Sprintf("we found a duplicate: %s, we had %d items by then", c.Name(), len(containerSet)))
+				}
+				containerSet[c.Name()] = true
+
+				return nil
+			},
+		)
+		if err != nil {
+			if _, ok := err.(fail.ErrDuplicate); ok { // begin again with twice the capacity
+				currentPageSize = 2 * currentPageSize
+				containerSet = make(map[string]bool)
+				continue
+			}
+			return -1, err
+		}
+		break
+	}
+	return currentPageSize, nil
+}
+
 // ListBuckets ...
 func (l *location) ListBuckets(prefix string) ([]string, error) {
 	if l == nil {
@@ -115,9 +150,14 @@ func (l *location) ListBuckets(prefix string) ([]string, error) {
 
 	defer debug.NewTracer(nil, fmt.Sprintf("('%s')", prefix), false /*Trace.Location*/).GoingIn().OnExitTrace()()
 
+	estimatedPageSize, err := l.estimateSize(stow.NoPrefix)
+	if err != nil {
+		return nil, err
+	}
+
 	var list []string
-	err := stow.WalkContainers(
-		l.stowLocation, stow.NoPrefix, 100,
+	err = stow.WalkContainers(
+		l.stowLocation, stow.NoPrefix, estimatedPageSize,
 		func(c stow.Container, err error) error {
 			if err != nil {
 				return err
@@ -145,9 +185,14 @@ func (l *location) FindBucket(bucketName string) (bool, error) {
 
 	defer debug.NewTracer(nil, fmt.Sprintf("(%s)", bucketName), false /*Trace.Location*/).GoingIn().OnExitTrace()()
 
+	estimatedPageSize, err := l.estimateSize(stow.NoPrefix)
+	if err != nil {
+		return false, err
+	}
+
 	found := false
-	err := stow.WalkContainers(
-		l.stowLocation, stow.NoPrefix, 100,
+	err = stow.WalkContainers(
+		l.stowLocation, stow.NoPrefix, estimatedPageSize,
 		func(c stow.Container, err error) error {
 			if err != nil {
 				log.Debugf("%v", err)

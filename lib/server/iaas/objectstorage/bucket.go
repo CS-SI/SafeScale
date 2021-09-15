@@ -81,9 +81,14 @@ func (b *bucket) List(path, prefix string) ([]string, error) {
 
 	fullPath := buildFullPath(path, prefix)
 
+	estimatedPageSize, err := b.estimateSize(path, prefix)
+	if err != nil {
+		return list, err
+	}
+
 	// log.Println("Location.Container => : ", c.Name())
-	err := stow.Walk(
-		b.container, path, 100,
+	err = stow.Walk(
+		b.container, path, estimatedPageSize,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
@@ -112,20 +117,65 @@ func (b *bucket) Browse(path, prefix string, callback func(Object) error) error 
 
 	fullPath := buildFullPath(path, prefix)
 
-	err := stow.Walk(
-		b.container, path, 100,
+	estimatedPageSize, err := b.estimateSize(path, prefix)
+	if err != nil {
+		return err
+	}
+
+	err = stow.Walk(
+		b.container, path, estimatedPageSize,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
 			}
 			if strings.Index(item.Name(), fullPath) == 0 {
-
 				return callback(newObjectFromStow(b, item))
 			}
 			return nil
 		},
 	)
 	return err
+}
+
+func (b *bucket) estimateSize(path, prefix string) (int, error) {
+	if b == nil {
+		return -1, fail.InvalidInstanceError()
+	}
+
+	defer debug.NewTracer(
+		nil, fmt.Sprintf("('%s', '%s')", path, prefix), false, /*Trace.Controller*/
+	).GoingIn().OnExitTrace()()
+
+	itemSet := make(map[string]bool) // New empty set
+	currentPageSize := STOWWINDOWSSIZE
+
+	for {
+		err := stow.Walk(
+			b.container, path, currentPageSize,
+			func(item stow.Item, err error) error {
+				if err != nil {
+					return err
+				}
+
+				if itemSet[item.Name()] {
+					return fail.DuplicateError(fmt.Sprintf("we found a duplicate: %s, we had %d items by then", item.Name(), len(itemSet)))
+				}
+				itemSet[item.Name()] = true
+
+				return nil
+			},
+		)
+		if err != nil {
+			if _, ok := err.(fail.ErrDuplicate); ok { // begin again with twice the capacity
+				currentPageSize = 2 * currentPageSize
+				itemSet = make(map[string]bool)
+				continue
+			}
+			return -1, err
+		}
+		break
+	}
+	return currentPageSize, nil
 }
 
 // Clear empties a bucket
@@ -144,8 +194,13 @@ func (b *bucket) Clear(path, prefix string) error {
 
 	fullPath := buildFullPath(path, prefix)
 
+	estimatedPageSize, err := b.estimateSize(path, prefix)
+	if err != nil {
+		return err
+	}
+
 	walkErr := stow.Walk(
-		b.container, fullPath, 100,
+		b.container, fullPath, estimatedPageSize,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
@@ -284,8 +339,13 @@ func (b *bucket) GetCount(path, prefix string) (int64, error) {
 	var count int64
 	fullPath := buildFullPath(path, prefix)
 
-	err := stow.Walk(
-		b.container, path, 100,
+	estimatedPageSize, err := b.estimateSize(path, prefix)
+	if err != nil {
+		return -1, err
+	}
+
+	err = stow.Walk(
+		b.container, path, estimatedPageSize,
 		func(c stow.Item, err error) error {
 			if err != nil {
 				return err
@@ -317,8 +377,13 @@ func (b *bucket) GetSize(path, prefix string) (int64, string, error) {
 
 	fullPath := buildFullPath(path, prefix)
 
+	estimatedPageSize, err := b.estimateSize(path, prefix)
+	if err != nil {
+		return -1, "", err
+	}
+
 	err = stow.Walk(
-		b.container, path, 100,
+		b.container, path, estimatedPageSize,
 		func(item stow.Item, err error) error {
 			if err != nil {
 				return err
