@@ -603,7 +603,7 @@ func TestTryWaitOfAbortedTask(t *testing.T) {
 
 	res, xerr = got.Wait()
 	require.NotNil(t, xerr)
-	require.NotNil(t, res)
+	require.NotNil(t, res) // FIXME: CI Failed here too
 
 	res, xerr = got.Wait()
 	require.NotNil(t, xerr)

@@ -40,17 +40,17 @@ BUILD_TAGS =
 export BUILD_TAGS
 
 all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
-	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 allcover: all
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 
 release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet releasearchive
-	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release SUCCESSFUL $(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet releasearchive
-	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc SUCCESSFUL $(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 releasetags:
 	@echo "settings go build tags for release"
@@ -70,7 +70,7 @@ fastall: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(GO) list ./... | grep -v mock | grep -v cli | xargs errcheck | $(TEE) err_results.log
 	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
-	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build SUCCESSFUL $(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 common: begin ground getdevdeps mod sdk generate
 
@@ -78,7 +78,7 @@ versioncut:
 	@(($(GO) version | grep go1.17) || ($(GO) version | grep go1.16)|| ($(GO) version | grep go1.15)) || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) Minimum go version is 1.15 ! $(NO_COLOR)\n" && false);
 
 begin: versioncut
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins...$(NO_COLOR)\n";
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Build begins, branch $$(git rev-parse --abbrev-ref HEAD)...$(NO_COLOR)\n";
 
 mod:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
