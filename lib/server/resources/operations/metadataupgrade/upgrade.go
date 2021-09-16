@@ -79,6 +79,7 @@ func Upgrade(svc iaas.Service, from, to string, dryRun, doNotBackup bool) fail.E
 		from = next
 	}
 
+	// Executes steps to reach the target version...
 	for k, fn := range mutatorList {
 		xerr := fn.Upgrade(svc, fromVersionList[k], dryRun)
 		xerr = debug.InjectPlannedFail(xerr)

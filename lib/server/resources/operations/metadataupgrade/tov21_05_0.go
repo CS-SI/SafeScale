@@ -112,7 +112,11 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
 		return xerr
 	}
 
-	return owningInstance.Browse(context.Background(), func(abstractCurrentNetwork *abstract.Network) fail.Error {
+	browsingInstance, xerr := operations.NewNetwork(svc)
+	if xerr != nil {
+		return xerr
+	}
+	return browsingInstance.Browse(context.Background(), func(abstractCurrentNetwork *abstract.Network) fail.Error {
 		if abstractOwningNetwork != nil && (abstractCurrentNetwork.Name == abstractOwningNetwork.Name || abstractCurrentNetwork.ID == abstractOwningNetwork.ID) {
 			return nil
 		}
@@ -133,12 +137,12 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
 // upgradeNetworkMetadataIfNeeded upgrades properties to most recent version
 func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInstance resources.Network) fail.Error {
 	var (
-		networkName, subnetName string
+		networkName, subnetName, subnetID string
 	)
-	if owningInstance == nil || owningInstance.IsNull() {
-		owningInstance = currentInstance
+
+	if owningInstance != nil && !owningInstance.IsNull() {
+		networkName = owningInstance.GetName()
 	}
-	networkName = owningInstance.GetName()
 	subnetName = currentInstance.GetName()
 
 	xerr := currentInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -148,7 +152,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 		}
 
 		if !props.Lookup(networkproperty.SubnetsV1) {
-			logrus.Tracef("Upgrading metadata of Network '%s'", networkName)
+			logrus.Tracef("Upgrading metadata of Network '%s'", subnetName)
 
 			svc := currentInstance.GetService()
 
@@ -159,20 +163,48 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				return innerXErr
 			}
 
-			// VPL: is it really necessary to check if resource exist to migrate metadata? Not sure it's the right place for this...
-			// abstractSubnet, innerXErr := svc.InspectSubnetByName(networkName, subnetName)
-			// innerXErr = debug.InjectPlannedFail(innerXErr)
-			// if innerXErr != nil {
-			// 	switch innerXErr.(type) {
-			// 	case *fail.ErrNotFound:
-			// 		return fail.NotFoundError("cannot create Subnet '%s' metadata: Subnet resource does not exist", subnetName)
-			// 	default:
-			// 		return fail.Wrap(innerXErr, "cannot create Subnet '%s' metadata", subnetName)
-			// 	}
-			// }
+			abstractSubnet, innerXErr := svc.InspectSubnetByName(networkName, subnetName)
+			innerXErr = debug.InjectPlannedFail(innerXErr)
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					return fail.NotFoundError("cannot create Subnet '%s' metadata: Subnet resource does not exist", subnetName)
+				default:
+					return fail.Wrap(innerXErr, "cannot create Subnet '%s' metadata", subnetName)
+				}
+			}
 
-			abstractSubnet := abstract.NewSubnet()
-			abstractSubnet.ID = currentInstance.GetID()
+			// If Subnet is not "owned" yet, do the necessary to create Network metadata
+			if (owningInstance == nil || owningInstance.IsNull()) && abstractSubnet.Network != "" {
+				abstractOwningNetwork, innerXErr := svc.InspectNetwork(abstractSubnet.Network)
+				innerXErr = debug.InjectPlannedFail(innerXErr)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				owningInstance, innerXErr = operations.LoadNetwork(svc, abstractSubnet.Network)
+				if innerXErr != nil {
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						owningInstance, innerXErr = operations.NewNetwork(svc)
+						if innerXErr != nil {
+							return innerXErr
+						}
+
+						innerXErr = owningInstance.Import(context.Background(), abstractSubnet.Network)
+						if innerXErr != nil {
+							return innerXErr
+						}
+					default:
+						return innerXErr
+					}
+				}
+
+				networkName = abstractOwningNetwork.Name
+			}
+
+			subnetID = currentInstance.GetID()
+			abstractSubnet.ID = subnetID
 			abstractSubnet.Name = subnetName
 			abstractSubnet.Network = owningInstance.GetID()
 			abstractSubnet.IPVersion = ipversion.IPv4
@@ -261,20 +293,6 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				return innerXErr
 			}
 
-			// -- add reference to subnet in network properties --
-			innerXErr = props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
-				}
-				subnetsV1.ByName[abstractSubnet.Name] = abstractSubnet.ID
-				subnetsV1.ByID[abstractSubnet.ID] = abstractSubnet.Name
-				return nil
-			})
-			innerXErr = debug.InjectPlannedFail(innerXErr)
-			if innerXErr != nil {
-				return innerXErr
-			}
 
 			// -- transfer Hosts attached to Network to Subnet --
 			innerXErr = props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
@@ -335,7 +353,24 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 		return xerr
 	}
 
-	// delete network in metadata of owningInstance is different than currentInstance
+	// -- add reference to subnet in Network properties --
+	xerr = owningInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+			subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
+			}
+			subnetsV1.ByName[subnetName] = subnetID
+			subnetsV1.ByID[subnetID] = subnetName
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	// delete currentInstance in metadata if owningInstance is different than currentInstance
 	if owningInstance != currentInstance {
 		xerr = currentInstance.(*operations.Network).MetadataCore.Delete()
 		if xerr != nil {

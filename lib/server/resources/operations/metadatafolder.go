@@ -120,6 +120,7 @@ func (f MetadataFolder) absolutePath(path ...string) string {
 			relativePath += "/" + item
 		}
 	}
+	relativePath = strings.Trim(relativePath, "/")
 	if relativePath != "" {
 		absolutePath := strings.Replace(relativePath, "//", "/", -1)
 		if f.path != "" {

@@ -479,6 +479,8 @@ func toAbstractSubnet(in compute.Subnetwork) *abstract.Subnet {
 	item.Name = in.Name
 	item.ID = strconv.FormatUint(in.Id, 10)
 	item.CIDR = in.IpCidrRange
+	parts := strings.Split(in.Network, "/")
+	item.Network = parts[len(parts)-1]
 	return item
 }
 
