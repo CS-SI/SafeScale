@@ -92,6 +92,7 @@ func NewErrorWithCause(cause error, msg ...interface{}) Error {
 }
 
 // NewErrorWithCauseAndConsequences creates a new failure report with a cause and a list of teardown problems 'consequences'
+// FIXME: unused
 func NewErrorWithCauseAndConsequences(cause error, consequences []error, msg ...interface{}) Error {
 	return &ErrUnqualified{
 		errorCore: newError(cause, consequences, msg...),
@@ -337,6 +338,7 @@ type ErrWarning struct {
 }
 
 // WarningError returns an ErrWarning instance
+// FIXME: unused
 func WarningError(cause error, msg ...interface{}) *ErrWarning {
 	r := newError(cause, nil, msg...)
 	r.grpcCode = codes.DeadlineExceeded

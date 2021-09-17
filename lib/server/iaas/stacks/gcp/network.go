@@ -41,6 +41,7 @@ const (
 // ------ network methods ------
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+// No default network settings supported by GCP
 func (s stack) HasDefaultNetwork() bool {
 	return false
 }
