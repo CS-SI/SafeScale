@@ -373,6 +373,7 @@ func (instance *task) Signature() string {
 	return instance.signature()
 }
 
+// Signature returns a string as signature
 func (instance *task) signature() string {
 	if instance.id != "" {
 		return `{task ` + instance.id + `}`
@@ -477,14 +478,9 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 			instance.lock.Unlock()
 
 			go func() {
-				instance.lock.Lock()
-				instance.stats.controllerBegin = time.Now()
-				instance.lock.Unlock()
-
 				ctrlErr := instance.controller(action, params, timeout)
 
 				instance.lock.Lock()
-				instance.stats.controllerDuration = time.Since(instance.stats.controllerBegin)
 				if ctrlErr != nil {
 					if instance.err != nil {
 						_ = instance.err.AddConsequence(fail.Wrap(ctrlErr, "unexpected error running the Task controller"))
@@ -521,11 +517,9 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 
 	traceR := newTracer(instance, tracing.ShouldTrace("concurrency.task"))
 
-	defer func() {
-		instance.lock.Lock()
-		instance.controllerTerminated = true
-		instance.lock.Unlock()
-	}()
+	instance.lock.Lock()
+	instance.stats.controllerBegin = time.Now()
+	instance.lock.Unlock()
 
 	go func() {
 		instance.lock.Lock()
@@ -816,6 +810,7 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 			fallthrough
 		case DONE:
 			// do nothing
+			break
 
 		case READY: // abnormal status if controller is running
 			fallthrough
@@ -831,6 +826,7 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 // processTerminated operates when go routine terminates
 func (instance *task) processTerminated(traceR *tracer) {
 	instance.lock.Lock()
+	instance.stats.controllerDuration = time.Since(instance.stats.controllerBegin)
 	instance.controllerTerminated = true
 	instance.lock.Unlock()
 	instance.controllerTerminatedCh <- struct{}{}
@@ -923,6 +919,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 			switch cerr := instance.err.(type) {
 			case *fail.ErrAborted:
 				// leave instance.err as it is
+				break
 			default:
 				_ = cerr.AddConsequence(xerr)
 			}
@@ -1058,9 +1055,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			//goland:noinspection GoDeferInLoop
 			defer instance.lock.RUnlock()
 
-			traceR.trace(
-				"run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration,
-			)
+			traceR.trace("run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration)
 			if instance.ctx.Err() != nil && instance.err == nil {
 				return instance.result, fail.AbortedError(instance.ctx.Err())
 			}

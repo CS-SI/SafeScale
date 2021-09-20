@@ -111,3 +111,5 @@ lib/server/iaas/userdata/version.go
 *.pprof
 
 *.tar.gz
+
+helpers/
