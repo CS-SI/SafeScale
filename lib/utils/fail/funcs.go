@@ -127,6 +127,7 @@ func ToGRPCStatus(err error) error {
 	if casted, ok := err.(Error); ok {
 		return casted.ToGRPCStatus()
 	}
+
 	return grpcstatus.Errorf(codes.Unknown, err.Error())
 }
 
@@ -140,9 +141,11 @@ func Wrap(cause error, msg ...interface{}) Error {
 	case *ErrorList:
 		rerr.prependToMessage(strprocess.FormatStrings(msg...))
 		return rerr
+
 	case Error:
 		rerr.prependToMessage(strprocess.FormatStrings(msg...))
 		return rerr
+
 	default:
 		return newError(cause, nil, msg...)
 	}
@@ -206,6 +209,7 @@ func Cause(err error) (resp error) {
 		if cau != nil {
 			return cau
 		}
+
 		return err
 	}
 	return err

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"sync"
 	"syscall"
 	"time"
 
@@ -53,7 +54,7 @@ type Error interface {
 
 	UnformattedError() string
 
-	AnnotationFormatter(func(data.Annotations) string)
+	SetAnnotationFormatter(func(data.Annotations) string)
 
 	GRPCCode() codes.Code
 	ToGRPCStatus() error
@@ -70,6 +71,7 @@ type errorCore struct {
 	annotationFormatter func(data.Annotations) string
 	consequences        []error
 	grpcCode            codes.Code
+	lock                *sync.RWMutex
 }
 
 // ErrUnqualified is a generic Error type that has no particulaur signification
@@ -111,6 +113,7 @@ func newError(cause error, consequences []error, msg ...interface{}) *errorCore 
 		grpcCode:            codes.Unknown,
 		causeFormatter:      defaultCauseFormatter,
 		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
 	}
 	return &r
 }
@@ -120,6 +123,14 @@ func (e *errorCore) IsNull() bool {
 	if e == nil {
 		return true
 	}
+
+	if e.lock == nil {
+		return true
+	}
+
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	// if there is no message, no cause and causeFormatter is nil, this is not a correctly initialized 'errorCore', so called a null value of 'errorCore'
 	if e.message == "" && e.cause == nil && e.causeFormatter == nil && e.annotationFormatter == nil {
 		return true
@@ -138,13 +149,16 @@ func defaultCauseFormatter(e Error) string {
 
 	errCore, ok := e.(*errorCore)
 	if !ok {
-		return e.UnformattedError() // FIXME: cast
+		return e.UnformattedError()
 	}
 
+	errCore.lock.RLock()
 	if errCore.cause != nil {
 		switch cerr := errCore.cause.(type) {
 		case Error:
+			errCore.lock.RUnlock()
 			raw := cerr.UnformattedError()
+			errCore.lock.RLock()
 			if raw != "" {
 				msgFinal += ": " + raw
 			}
@@ -173,7 +187,7 @@ func defaultCauseFormatter(e Error) string {
 			}
 		}
 	}
-
+	errCore.lock.RUnlock()
 	return msgFinal
 }
 
@@ -187,16 +201,26 @@ func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 		logrus.Errorf("invalid nil pointer for parameter 'formatter'")
 		return
 	}
+
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	e.causeFormatter = formatter
 }
 
 // Unwrap implements the Wrapper interface
 func (e errorCore) Unwrap() error {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return e.cause
 }
 
 // Cause is just an accessor for internal e.cause
 func (e errorCore) Cause() error {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return e.cause
 }
 
@@ -222,11 +246,17 @@ func defaultAnnotationFormatter(a data.Annotations) string {
 
 // Annotations ...
 func (e errorCore) Annotations() data.Annotations {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return e.annotations
 }
 
 // Annotation ...
 func (e errorCore) Annotation(key string) (data.Annotation, bool) {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	r, ok := e.annotations[key]
 	return r, ok
 }
@@ -239,6 +269,9 @@ func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable
 		return e
 	}
 
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	if e.annotations == nil {
 		e.annotations = make(data.Annotations)
 	}
@@ -247,16 +280,20 @@ func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable
 	return e
 }
 
-// AnnotationFormatter defines the func to use to format annotations
-func (e *errorCore) AnnotationFormatter(formatter func(data.Annotations) string) {
+// SetAnnotationFormatter defines the func to use to format annotations
+func (e *errorCore) SetAnnotationFormatter(formatter func(data.Annotations) string) {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AnnotationFormatter()", "from null value", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.SetAnnotationFormatter()", "from null value", 0))
 		return
 	}
 	if formatter == nil {
 		logrus.Errorf("invalid nil value for parameter 'formatter'")
 		return
 	}
+
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	e.annotationFormatter = formatter
 }
 
@@ -270,6 +307,9 @@ func (e *errorCore) AddConsequence(err error) Error {
 		return e
 	}
 	if err != nil {
+		e.lock.Lock()
+		defer e.lock.Unlock()
+
 		if e.consequences == nil {
 			e.consequences = []error{}
 		}
@@ -280,12 +320,18 @@ func (e *errorCore) AddConsequence(err error) Error {
 
 // Consequences returns the consequences of current error (detected teardown problems)
 func (e errorCore) Consequences() []error {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return e.consequences
 }
 
 // Error returns a human-friendly error explanation
 // satisfies interface error
 func (e *errorCore) Error() string {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	msgFinal := e.message
 
 	if e.causeFormatter != nil {
@@ -303,6 +349,15 @@ func (e *errorCore) Error() string {
 // UnformattedError returns a human-friendly error explanation
 // satisfies interface error
 func (e *errorCore) UnformattedError() string {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
+	return e.unsafeUnformattedError()
+}
+
+// unsafeUnformattedError returns a human-friendly error explanation
+// must be applying wisely, no errCore locking inside
+func (e *errorCore) unsafeUnformattedError() string {
 	msgFinal := e.message
 
 	if len(e.annotations) > 0 {
@@ -315,19 +370,30 @@ func (e *errorCore) UnformattedError() string {
 
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e errorCore) GRPCCode() codes.Code {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 	return e.grpcCode
 }
 
 // ToGRPCStatus returns a grpcstatus struct from error
 func (e errorCore) ToGRPCStatus() error {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return grpcstatus.Errorf(e.GRPCCode(), e.Error())
 }
 
+// prependToMessage adds 'msg' as prefix to current message of 'e'
+// Note: do not call prependTomessage with an already set lock, it will deadlock
 func (e *errorCore) prependToMessage(msg string) {
 	if e.IsNull() {
 		logrus.Errorf("invalid call of errorCore.prependToMessage() from null instance")
 		return
 	}
+
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	e.message = msg + ": " + e.message
 }
 
@@ -337,6 +403,7 @@ type ErrWarning struct {
 }
 
 // WarningError returns an ErrWarning instance
+// FIXME: not used
 func WarningError(cause error, msg ...interface{}) *ErrWarning {
 	r := newError(cause, nil, msg...)
 	r.grpcCode = codes.DeadlineExceeded
