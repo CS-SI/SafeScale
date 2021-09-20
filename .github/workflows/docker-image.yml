@@ -2,9 +2,9 @@ name: Docker Image CI
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ review/ut ]
   pull_request:
-    branches: [ develop ]
+    branches: [ review/ut ]
 
 jobs:
 
@@ -15,4 +15,4 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build the Docker image
-        run: docker build . --file Dockerfile.current --tag safescale-develop:$(date +%s)
+        run: docker build . --file Dockerfile.current --tag safescale-ut:$(date +%s)
