@@ -1156,7 +1156,8 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallel(t *testing.T) {
 					if _, ok := ae.(*fail.ErrAborted); !ok {
 						t.Errorf(
 							"everything should be aborts in this test: %v", ae,
-						) // FIXME: This happened: 3d90f4a9-1e13-446b-881e-002041f02f92: context canceled: context canceled
+						) // FIXME: CI Failed
+						// This happened on previous CI failure : 3d90f4a9-1e13-446b-881e-002041f02f92: context canceled: context canceled
 						failure = true
 						return
 					}

@@ -603,7 +603,7 @@ func TestTryWaitOfAbortedTask(t *testing.T) {
 
 	res, xerr = got.Wait()
 	require.NotNil(t, xerr)
-	require.NotNil(t, res) // FIXME: CI Failed here too
+	require.NotNil(t, res)
 
 	res, xerr = got.Wait()
 	require.NotNil(t, xerr)
@@ -730,7 +730,7 @@ func TestWaitingForGame(t *testing.T) {
 	}
 }
 
-func TestWaitingForGameZero(t *testing.T) {
+func TestWaitingForGameZero(t *testing.T) { // FIXME: CI Failed after merge
 	got, err := NewUnbreakableTask()
 	require.NotNil(t, got)
 	require.Nil(t, err)
@@ -1334,7 +1334,7 @@ func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
 		// VPL: No. At the time we do WaitFor(), the Task is timed out. So WaitFor will make it transition to DONE state, rv is true, and xerr is *fail.ErrTimeout
 		rv, _, xerr := single.WaitFor(4 * time.Millisecond)
 		require.True(t, rv)
-		require.NotNil(t, xerr) // FIXME: It failed
+		require.NotNil(t, xerr) // FIXME: CI Failed
 
 		_, xerr = single.Wait()
 		require.NotNil(t, xerr)
