@@ -483,7 +483,7 @@ func TestStates(t *testing.T) { // FIXME: CI failed
 
 		// VPL: tg.Status() returns the status of the TaskGroup (ie the parent Task launching the children)
 		//      tg.GroupStatus() returns the current status of each child of the TaskGroup
-		//      maybe we should rename it to GetChildrenStatus()?
+		//      maybe we should rename it to ChildrenStatus()?
 		require.NotEqual(t, st, gst) // this is unclear, why both a Status and a GroupStatus ?
 	}
 }
