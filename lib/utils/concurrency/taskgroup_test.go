@@ -105,7 +105,7 @@ iteration:
 
 			runOutOfTime := waitTimeout(&wg, 60*time.Second)
 			if runOutOfTime {
-				t.Errorf("Failure: there is a deadlock in TestStartAfterDoneWF !") // FIXME: It happened
+				t.Errorf("Failure: there is a deadlock in TestStartAfterDoneWF !") // FIXME: CI Failed
 				t.FailNow()
 			}
 		}
