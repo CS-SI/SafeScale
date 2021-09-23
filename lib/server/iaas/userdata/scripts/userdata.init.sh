@@ -83,37 +83,37 @@ function sfDetectFacts() {
 sfDetectFacts
 
 function create_user() {
-	echo "Creating user {{.User}}..."
-	if getent passwd {{.User}}; then
-		echo "User {{.User}} already exists !"
-		useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home || true
+	echo "Creating user {{.Username}}..."
+	if getent passwd {{.Username}}; then
+		echo "User {{.Username}} already exists !"
+		useradd {{.Username}} --home-dir /home/{{.Username}} --shell /bin/bash --comment "" --create-home || true
 	else
-		useradd {{.User}} --home-dir /home/{{.User}} --shell /bin/bash --comment "" --create-home
+		useradd {{.Username}} --home-dir /home/{{.Username}} --shell /bin/bash --comment "" --create-home
 	fi
 	# This password will be changed at phase 2 and can be used only from console (not remotely)
-	echo "{{.User}}:safescale" | chpasswd
+	echo "{{.Username}}:safescale" | chpasswd
 
 	if getent group docker; then
 		echo "Group docker already exists !"
 	else
 		groupadd -r docker
 	fi
-	usermod -aG docker {{.User}}
-	SUDOERS_FILE=/etc/sudoers.d/{{.User}}
+	usermod -aG docker {{.Username}}
+	SUDOERS_FILE=/etc/sudoers.d/{{.Username}}
 	[ ! -d "$(dirname $SUDOERS_FILE)" ] && SUDOERS_FILE=/etc/sudoers
 	cat >>$SUDOERS_FILE <<-'EOF'
-		Defaults:{{.User}} !requiretty
-		{{.User}} ALL=(ALL) NOPASSWD:ALL
+		Defaults:{{.Username}} !requiretty
+		{{.Username}} ALL=(ALL) NOPASSWD:ALL
 	EOF
 
-	mkdir /home/{{.User}}/.ssh
-	echo "{{.FirstPublicKey}}" >/home/{{.User}}/.ssh/authorized_keys
-	echo "{{.FirstPrivateKey}}" >/home/{{.User}}/.ssh/id_rsa
-	chmod 0700 /home/{{.User}}/.ssh
-	chmod -R 0600 /home/{{.User}}/.ssh/*
-	cat /home/{{.User}}/.ssh/id_rsa
+	mkdir /home/{{.Username}}/.ssh
+	echo "{{.FirstPublicKey}}" >/home/{{.Username}}/.ssh/authorized_keys
+	echo "{{.FirstPrivateKey}}" >/home/{{.Username}}/.ssh/id_rsa
+	chmod 0700 /home/{{.Username}}/.ssh
+	chmod -R 0600 /home/{{.Username}}/.ssh/*
+	cat /home/{{.Username}}/.ssh/id_rsa
 
-	cat >>/home/{{.User}}/.bashrc <<-'EOF'
+	cat >>/home/{{.Username}}/.bashrc <<-'EOF'
 		pathremove() {
 		        local IFS=':'
 		        local NEWPATH
@@ -140,16 +140,16 @@ function create_user() {
 		pathappend /opt/safescale/bin
 	EOF
 
-	chown -R {{.User}}:{{.User}} /opt/safescale
+	chown -R {{.Username}}:{{.Username}} /opt/safescale
 	chmod -R 0640 /opt/safescale
 	find /opt/safescale -type d -exec chmod a+rx {} \;
 	chmod 1777 /opt/safescale/var/tmp
 
-	chown -R {{.User}}:{{.User}} /home/{{.User}}
+	chown -R {{.Username}}:{{.Username}} /home/{{.Username}}
 
-	for i in /home/{{.User}}/.hushlogin /home/{{.User}}/.cloud-warnings.skip; do
+	for i in /home/{{.Username}}/.hushlogin /home/{{.Username}}/.cloud-warnings.skip; do
 		touch $i
-		chown root:{{.User}} $i
+		chown root:{{.Username}} $i
 		chmod ug+r-wx,o-rwx $i
 	done
 

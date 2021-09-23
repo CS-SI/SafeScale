@@ -117,7 +117,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	username, ok := identityCfg["Username"].(string)
 	if !ok || username == "" {
-		username, _ = identityCfg["User"].(string)
+		username, _ = identityCfg["Username"].(string)
 	}
 	password, _ := identityCfg["Password"].(string)
 

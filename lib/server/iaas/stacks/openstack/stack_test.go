@@ -64,7 +64,7 @@ func Test_Template(t *testing.T) {
 	client := getClient()
 	//Data structure to apply to userdata.sh template
 	type userData struct {
-		User       string
+		Username       string
 		Key        string
 		ConfIF     bool
 		IsGateway  bool
@@ -74,7 +74,7 @@ func Test_Template(t *testing.T) {
 	}
 	dataBuffer := bytes.NewBufferString("")
 	data := userData{
-		User:       api.DefaultUser,
+		Username:       api.DefaultUser,
 		Key:        "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
 		ConfIF:     true,
 		IsGateway:  true,

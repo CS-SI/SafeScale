@@ -77,15 +77,21 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
-	bashLibrary, xerr := system.GetBashLibrary()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		xerr.Annotate("retcode", 255)
 		return "", xerr
 	}
-	data["reserved_BashLibrary"] = bashLibrary
-	data["Revision"] = system.REV
 
+	mapped, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return "", xerr
+	}
+	for k, v := range mapped {
+		data[k] = v
+	}
+	data["Revision"] = system.REV
 	scriptHeader := "set -u -o pipefail"
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
 		if strings.EqualFold("True", strings.TrimSpace(suffixCandidate)) {
@@ -122,7 +128,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	}
 
 	var buffer bytes.Buffer
-	if err := tmplPrepared.Execute(&buffer, data); err != nil {
+	if err := tmplPrepared.Option("missingkey=error").Execute(&buffer, data); err != nil {
 		xerr = fail.ExecutionError(err, "failed to execute template")
 		xerr.Annotate("retcode", 255)
 		return "", xerr

@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -473,29 +472,25 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	}
 
 	// Configures reserved_BashLibrary template var
-	bashLibrary, xerr := system.GetBashLibrary()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
-	data["reserved_BashLibrary"] = bashLibrary
 
-	// Sets delays and timeouts for script
-	data["reserved_DefaultDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
-	data["reserved_DefaultTimeout"] = strings.Replace(
-		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_LongTimeout"] = strings.Replace(
-		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_ClusterJoinTimeout"] = strings.Replace(
-		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_DockerImagePullTimeout"] = strings.Replace(
-		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
-	)
+	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
 
-	script, path, xerr := realizeTemplate(box, tmplName, data, tmplName)
+	finalData := make(map[string]interface{}, len(data)+len(bashLibraryVariables))
+	for k, v := range data {
+		finalData[k] = v
+	}
+	for k, v := range bashLibraryVariables {
+		finalData[k] = v
+	}
+	script, path, xerr := realizeTemplate(box, tmplName, finalData, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)

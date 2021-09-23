@@ -316,7 +316,7 @@ func (k *KongController) realizeRuleData(content string, v data.Map) (string, fa
 		return "", fail.Wrap(xerr, "error preparing rule")
 	}
 	dataBuffer := bytes.NewBufferString("")
-	err := contentTmpl.Execute(dataBuffer, v)
+	err := contentTmpl.Option("missingkey=error").Execute(dataBuffer, v)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
