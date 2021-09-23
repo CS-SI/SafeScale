@@ -18,6 +18,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gojuno/minimock/v3 v3.0.8
+	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.5.2
 	github.com/gophercloud/gophercloud v0.20.0
 	github.com/gopherjs/gopherjs v0.0.0-20210202160940-bed99a852dfe // indirect

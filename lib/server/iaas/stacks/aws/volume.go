@@ -17,6 +17,7 @@
 package aws
 
 import (
+	"github.com/sirupsen/logrus"
 	"sort"
 	"strings"
 
@@ -42,7 +43,13 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-	resp, xerr := s.rpcCreateVolume(aws.String(request.Name), int64(request.Size), fromAbstractVolumeSpeed(request.Speed))
+	volumeType, minSize := fromAbstractVolumeSpeed(request.Speed)
+	if request.Size < minSize {
+		logrus.Infof("AWS minimum size for requested volume type is %d (%d requested); using minimum size", minSize, request.Size)
+		request.Size = 125
+	}
+
+	resp, xerr := s.rpcCreateVolume(aws.String(request.Name), int64(request.Size), volumeType)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -120,14 +127,14 @@ func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
 	return &volume, nil
 }
 
-func fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
+func fromAbstractVolumeSpeed(speed volumespeed.Enum) (string, int) {
 	switch speed {
 	case volumespeed.Cold:
-		return "sc1"
+		return "sc1", 125
 	case volumespeed.Ssd:
-		return "gp2"
+		return "gp2", 1
 	}
-	return "st1"
+	return "st1", 125
 }
 
 func toAbstractVolumeSpeed(t *string) volumespeed.Enum {
