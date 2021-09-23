@@ -605,7 +605,7 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 			}
 
 			buffer := bytes.NewBufferString("")
-			err := varTemplate.Execute(buffer, variables)
+			err := varTemplate.Option("missingkey=error").Execute(buffer, variables)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return nil, fail.ConvertError(err)
@@ -627,7 +627,7 @@ func replaceVariablesInString(text string, v data.Map) (string, fail.Error) {
 	}
 
 	dataBuffer := bytes.NewBufferString("")
-	err := tmpl.Execute(dataBuffer, v)
+	err := tmpl.Option("missingkey=error").Execute(dataBuffer, v)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.Wrap(err, "failed to replace variables")

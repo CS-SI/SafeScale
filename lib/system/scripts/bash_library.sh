@@ -230,6 +230,35 @@ function sfInterfaceWithIP() {
 }
 export -f sfInterfaceWithIP
 
+#------ delays and timeouts ------
+
+function sfDefaultDelay() {
+	echo {{ default 10 .BashLibrary.DefaultDelay }}
+}
+export -f sfDefaultDelay
+
+function sfDefaultTimeout() {
+	echo {{ default "3m" .BashLibrary.DefaultTimeout }}
+}
+export -f sfDefaultTimeout
+
+function sfLongTimeout() {
+	echo {{ default "6m" .BashLibrary.LongTimeout }}
+}
+export -f sfLongTimeout
+
+function sfClusterJoinTimeout() {
+	echo {{ default "14m" .BashLibrary.ClusterJoinTimeout }}
+}
+export -f sfClusterJoinTimeout
+
+function sfDockerImagePullTimeout() {
+	echo {{ default "10m" .BashLibrary.DockerImagePullTimeout }}
+}
+export -f sfDockerImagePullTimeout
+
+#------
+
 # sfAsyncStart <what> <duration> <command>...
 function sfAsyncStart() {
 	local pid=${1}_PID

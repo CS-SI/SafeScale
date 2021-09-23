@@ -561,7 +561,7 @@ func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Er
 	}
 
 	var buffer bytes.Buffer
-	err = tpl.Execute(&buffer, data)
+	err = tpl.Option("missingkey=error").Execute(&buffer, data)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)

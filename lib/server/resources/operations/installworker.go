@@ -84,7 +84,7 @@ exec 1<&-
 exec 2<&-
 exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 2>&1
-sudo chown {{.User}}:{{.User}} %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+sudo chown {{.Username}}:{{.Username}} %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 set -x
 
 {{ .reserved_BashLibrary }}
@@ -791,7 +791,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, xerr := normalizeScript(data.Map{
+	templateCommand, xerr := normalizeScript(p.variables, data.Map{
 		"reserved_Name":    w.feature.GetName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
@@ -1314,7 +1314,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
-func normalizeScript(params map[string]interface{}) (string, fail.Error) {
+func normalizeScript(params, reserved map[string]interface{}) (string, fail.Error) {
 	var (
 		err         error
 		tmplContent string
@@ -1335,20 +1335,37 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 		if xerr != nil {
 			return "", fail.SyntaxError("error parsing bash template: %s", xerr.Error())
 		}
+
+		// Set template to generate error if there is missing key in params during Execute
+		_ = r.Option("missingkey=error")
 		featureScriptTemplate.Store(r)
 		anon = featureScriptTemplate.Load()
 	}
 
 	// Configures BashLibrary template var
-	bashLibrary, xerr := system.GetBashLibrary()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
-	params["reserved_BashLibrary"] = bashLibrary
 
+	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return "", xerr
+	}
+	
+	finalParams := make(map[string]interface{}, len(params)+len(reserved)+len(bashLibraryVariables))
+	for k, v := range params {
+		finalParams[k] = v
+	}
+	for k, v := range reserved {
+		finalParams[k] = v
+	}
+	for k, v := range bashLibraryVariables {
+		finalParams[k] = v
+	}
 	dataBuffer := bytes.NewBufferString("")
-	err = anon.(*txttmpl.Template).Execute(dataBuffer, params)
+	err = anon.(*txttmpl.Template).Option("missingkey=error").Execute(dataBuffer, finalParams)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)

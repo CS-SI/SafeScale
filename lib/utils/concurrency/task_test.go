@@ -718,8 +718,8 @@ func TestWaitingForGame(t *testing.T) {
 	for _, itta := range tarray {
 		good, res, err := itta.WaitFor(4 * time.Second)
 		require.Nil(t, err)
-		require.NotNil(t, res)
 		require.True(t, good)
+		require.NotNil(t, res)
 		waited++
 	}
 
@@ -728,7 +728,7 @@ func TestWaitingForGame(t *testing.T) {
 	}
 }
 
-func TestWaitingForGameZero(t *testing.T) { // FIXME: CI Failed after merge
+func TestWaitingForGameZero(t *testing.T) {
 	got, err := NewUnbreakableTask()
 	require.NotNil(t, got)
 	require.Nil(t, err)
@@ -737,36 +737,48 @@ func TestWaitingForGameZero(t *testing.T) { // FIXME: CI Failed after merge
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	var tarray []Task
+	const LOOPCOUNT = 200
 
-	for ind := 0; ind < 200; ind++ {
-		got, err := NewUnbreakableTask()
-		require.Nil(t, err)
-		require.NotNil(t, got)
+	type run struct {
+		t Task
+		d time.Duration
+	}
+	var j int
+	// for ; j < 20000; j++ {
+		var tarray []run
+		for ind := 0; ind < LOOPCOUNT; ind++ {
+			got, err := NewUnbreakableTask()
+			require.Nil(t, err)
+			require.NotNil(t, got)
 
-		theTask, err := got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil)
-		if err == nil {
-			tarray = append(tarray, theTask)
-		} else {
-			t.Errorf("Shouldn't happen")
+			duration := time.Duration(randomInt(50, 250)) * time.Millisecond
+			theTask, err := got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(duration)
+				return "waiting game", nil
+			}, nil)
+			if err == nil {
+				tarray = append(tarray, run{theTask, duration})
+			} else {
+				t.Errorf("Shouldn't happen")
+			}
 		}
-	}
 
-	waited := 0
-	for _, itta := range tarray {
-		good, res, err := itta.WaitFor(0)
-		require.Nil(t, err)
-		require.NotNil(t, res)
-		require.True(t, good)
-		waited++
-	}
+		waited := 0
+		for _, itta := range tarray {
+			good, res, err := itta.t.WaitFor(0)
+			require.Nil(t, err)
+			require.True(t, good)
+			// require.NotNil(t, res)
+			if res == nil {
+				t.Errorf("[#%d] res == nil, shouldn't happen (task #%d, duration=%v)", j, waited, itta.d)
+			}
+			waited++
+		}
 
-	if waited != 200 {
-		t.Errorf("Not enough waiting...: %d", waited)
-	}
+		if waited != LOOPCOUNT {
+			t.Errorf("Not enough waiting...: %d", waited)
+		}
+	// }
 }
 
 func TestSingleTaskTryWait(t *testing.T) {
@@ -1332,7 +1344,7 @@ func TestLikeBeforeChangingWaitForTimingWithoutAbort(t *testing.T) {
 		// VPL: No. At the time we do WaitFor(), the Task is timed out. So WaitFor will make it transition to DONE state, rv is true, and xerr is *fail.ErrTimeout
 		rv, _, xerr := single.WaitFor(4 * time.Millisecond)
 		require.True(t, rv)
-		require.NotNil(t, xerr) // FIXME: CI Failed
+		require.NotNil(t, xerr) // FIXME: It failed
 
 		_, xerr = single.Wait()
 		require.NotNil(t, xerr)

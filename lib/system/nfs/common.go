@@ -79,30 +79,21 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
-	bashLibrary, xerr := system.GetBashLibrary()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		xerr.Annotate("retcode", 255)
 		return "", xerr
 	}
-	data["reserved_BashLibrary"] = bashLibrary
+
+	mapped, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return "", xerr
+	}
+	for k, v := range mapped {
+		data[k] = v
+	}
 	data["Revision"] = system.REV
-
-	// Sets delays and timeouts for script
-	data["reserved_DefaultDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
-	data["reserved_DefaultTimeout"] = strings.Replace(
-		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_LongTimeout"] = strings.Replace(
-		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_ClusterJoinTimeout"] = strings.Replace(
-		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_DockerImagePullTimeout"] = strings.Replace(
-		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
-	)
-
 	scriptHeader := "set -u -o pipefail"
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
 		if strings.EqualFold("True", strings.TrimSpace(suffixCandidate)) {
@@ -139,7 +130,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	}
 
 	var buffer bytes.Buffer
-	if err := tmplPrepared.Execute(&buffer, data); err != nil {
+	if err := tmplPrepared.Option("missingkey=error").Execute(&buffer, data); err != nil {
 		xerr = fail.ExecutionError(err, "failed to execute template")
 		xerr.Annotate("retcode", 255)
 		return "", xerr
