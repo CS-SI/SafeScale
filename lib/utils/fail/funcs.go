@@ -17,11 +17,10 @@
 package fail
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
-
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 // AddConsequence adds an error 'err' to the list of consequences
@@ -90,7 +89,8 @@ func FromGRPCStatus(err error) Error {
 
 	message := grpcstatus.Convert(err).Message()
 	code := grpcstatus.Code(err)
-	common := &errorCore{message: message, grpcCode: code}
+	common := newError(nil, nil, message)
+	common.grpcCode = code
 	switch code {
 	case codes.DeadlineExceeded:
 		return &ErrTimeout{errorCore: common, dur: 0}
