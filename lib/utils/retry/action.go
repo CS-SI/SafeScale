@@ -346,6 +346,8 @@ func DefaultMetadataNotifier(metaID string) func(t Try, v verdict.Enum) {
 	}
 }
 
+// FIXME: not used...
+// DefaultNotifierWithContext ...
 func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum) {
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics == "" {
 		return func(t Try, v verdict.Enum) {
@@ -354,19 +356,22 @@ func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum)
 
 	ctxID := ""
 
-	// FIXME: OPP Too specific, this should go into a function that gets the id from the interface{}
-	if ctx != nil {
-		if ctx != context.TODO() {
-			res := ctx.Value(concurrency.KeyForTaskInContext)
-			if res != nil {
-				switch rt := res.(type) {
-				case string:
-					ctxID = rt
-				case concurrency.TaskCore:
-					ctxID, _ = rt.ID()
-				}
-			}
-		}
+	//if ctx != nil && {
+	//	if ctx != context.TODO() {
+	//		res := ctx.Value(concurrency.KeyForTaskInContext)
+	//		if res != nil {
+	//			switch rt := res.(type) {
+	//			case string:
+	//				ctxID = rt
+	//			case concurrency.TaskCore:
+	//				ctxID, _ = rt.ID()
+	//			}
+	//		}
+	//	}
+	//}
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr == nil {
+		ctxID, _ = task.ID()
 	}
 
 	if ctxID == "" {
