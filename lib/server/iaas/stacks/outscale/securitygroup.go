@@ -356,8 +356,15 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		return nullASG, xerr
 	}
 
-	if xerr := s.rpcDeleteSecurityGroupRules(asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
-		return nullASG, xerr
+	xerr = s.rpcDeleteSecurityGroupRules(asg.ID, flow, []osc.SecurityGroupRule{oscRule})
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// consider a missing rule as a successful deletion and continue
+			break
+		default:
+			return nullASG, xerr
+		}
 	}
 
 	return s.InspectSecurityGroup(asg.ID)

@@ -497,8 +497,15 @@ func (s stack) deleteRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.I
 	}
 
 	if len(egress) > 0 {
-		if xerr := s.rpcRevokeSecurityGroupEgress(aws.String(asg.ID), egress); xerr != nil {
-			return fail.Wrap(xerr, "failed to delete egress rules from Security Group '%s'", asg.Name)
+		xerr := s.rpcRevokeSecurityGroupEgress(aws.String(asg.ID), egress)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// consider a missing rule(s) as a successful deletion
+				break
+			default:
+				return fail.Wrap(xerr, "failed to delete egress rules from Security Group '%s'", asg.Name)
+			}
 		}
 	}
 
