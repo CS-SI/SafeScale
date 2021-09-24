@@ -59,7 +59,7 @@ set -x
 # Tricks BashLibrary's waitUserData to believe the current phase 'netsec' is already done (otherwise will deadlock)
 >/opt/safescale/var/state/user_data.netsec.done
 # Includes the BashLibrary
-{{ .BashLibrary }}
+{{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.netsec.done
 
 function reset_fw() {

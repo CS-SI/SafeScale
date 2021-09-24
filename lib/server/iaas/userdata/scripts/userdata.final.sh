@@ -63,7 +63,7 @@ set -x
 # Tricks BashLibrary's waitUserData to believe the current phase 'user_data.final' is already done (otherwise will deadlock)
 >/opt/safescale/var/state/user_data.final.done
 # Includes the BashLibrary
-{{ .BashLibrary }}
+{{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.final.done
 
 function install_drivers_nvidia() {

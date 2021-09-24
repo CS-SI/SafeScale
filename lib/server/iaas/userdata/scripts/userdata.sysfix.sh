@@ -59,7 +59,7 @@ set -x
 # Tricks BashLibrary's waitUserData to believe the current phase 'sysfix' is already done (otherwise will deadlock)
 >/opt/safescale/var/state/user_data.sysfix.done
 # Includes the BashLibrary
-{{ .BashLibrary }}
+{{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.sysfix.done
 
 # ---- Main

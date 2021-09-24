@@ -57,7 +57,7 @@ exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
 # Includes the BashLibrary
-{{ .BashLibrary }}
+{{ .reserved_BashLibrary }}
 
 function install_keepalived() {
 	case $LINUX_KIND in
