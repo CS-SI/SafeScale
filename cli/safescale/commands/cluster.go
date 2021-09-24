@@ -322,7 +322,7 @@ var clusterCreateCommand = &cli.Command{
 			Name:    "flavor",
 			Aliases: []string{"F"},
 			Value:   "K8S",
-			Usage: `Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S
+			Usage: `Defines the type of the cluster; can be BOH, K8S
 	Default sizing for each cluster type is:
 		BOH: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
 		K8S: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[15-32], disk=[80])

@@ -114,22 +114,6 @@ func (sgr *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 		return false
 	}
 
-	if len(sgr.IDs) != len(in.IDs) {
-		return false
-	}
-	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for _, v := range sgr.IDs {
-		found := false
-		for _, w := range in.IDs {
-			if w == v {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
 
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range sgr.Sources {
@@ -158,6 +142,7 @@ func (sgr *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -195,6 +180,44 @@ func concernsGroups(in []string) (bool, fail.Error) {
 		return false, fail.InvalidRequestError("missing valid sources/targets in rule")
 	}
 	return idFound > 0, nil
+}
+
+// Validate returns an error if the content of the rule is incomplete
+func (sgr *SecurityGroupRule) Validate() fail.Error {
+	// Note: DO NOT USE SecurityGroupRule.IsNull() here
+	if sgr == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	switch sgr.EtherType {
+	case ipversion.IPv4, ipversion.IPv6:
+		break
+	default:
+		return fail.InvalidRequestError("rule --type must be 'ipv4' or 'ipv6'")
+	}
+
+	switch sgr.Direction {
+	case securitygroupruledirection.Egress, securitygroupruledirection.Ingress:
+		break
+	default:
+		return fail.InvalidRequestError("rule --direction must be 'egress' or 'ingress'")
+	}
+
+	switch sgr.Protocol {
+	case "icmp":
+		break
+	case "tcp", "udp":
+		if sgr.PortFrom <= 0 {
+				return fail.InvalidRequestError("rule --port-from must contain a positive integer")
+			}
+		if len(sgr.Sources) == 0 && len(sgr.Targets) == 0 {
+				return fail.InvalidRequestError("rule --cidr must be defined")
+			}
+	default:
+		return fail.InvalidRequestError("rule --protocol must be 'tcp', 'udp' or 'icmp'")
+	}
+
+	return nil
 }
 
 // NewSecurityGroupRule creates an abstract.SecurityGroupRule
@@ -248,7 +271,7 @@ func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (i
 		}
 	}
 	if !found {
-		return -1, fail.NotFoundError("no comparable rule found")
+		return -1, fail.NotFoundError("no corresponding rule found")
 	}
 	return index, nil
 }
