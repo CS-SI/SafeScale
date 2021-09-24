@@ -525,7 +525,14 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 			for k, v := range ruleIDs {
 				innerErr := secrules.Delete(s.NetworkClient, v).ExtractErr()
 				if innerErr != nil {
-					return fail.Wrap(innerErr, "failed to delete provider rule #%d", k)
+					innerXErr := NormalizeError(innerErr)
+					switch innerXErr.(type) {
+					case *fail.ErrNotFound:
+						// If rule not found on provider side, consider the deletion as successful and continue the loop
+						break
+					default:
+						return fail.Wrap(innerErr, "failed to delete provider rule #%d", k)
+					}
 				}
 			}
 			var innerXErr fail.Error

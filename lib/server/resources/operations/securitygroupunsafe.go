@@ -228,7 +228,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 // unsafeClear is the non goroutine-safe implementation for Clear, that does the real work faster (no locking, less if no parameter validations)
 // Note: must be used wisely
-func (instance *SecurityGroup) unsafeClear(task concurrency.Task) fail.Error {
+func (instance *SecurityGroup) unsafeClear() fail.Error {
 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		asg, ok := clonable.(*abstract.SecurityGroup)
 		if !ok {
@@ -244,8 +244,9 @@ func (instance *SecurityGroup) unsafeClear(task concurrency.Task) fail.Error {
 func (instance *SecurityGroup) unsafeAddRule(rule *abstract.SecurityGroupRule) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if rule.IsNull() {
-		return fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
+	xerr = rule.Validate()
+	if xerr != nil {
+		return xerr
 	}
 
 	return instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {

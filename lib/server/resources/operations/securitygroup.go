@@ -413,7 +413,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	}()
 
 	if len(rules) == 0 {
-		xerr = instance.unsafeClear(task)
+		xerr = instance.unsafeClear()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -485,6 +485,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			if v.FromSubnet {
 				return fail.InvalidRequestError("cannot unbind from host a security group applied from subnet; use disable instead or remove from bound subnet")
 			}
+
 			hostInstance, xerr := LoadHost(svc, v.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -628,7 +629,7 @@ func (instance *SecurityGroup) Clear(ctx context.Context) (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.unsafeClear(task)
+	return instance.unsafeClear()
 }
 
 // Reset clears a security group and re-adds associated rules as stored in metadata
@@ -679,7 +680,7 @@ func (instance *SecurityGroup) Reset(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// Removes all rules...
-	xerr = instance.unsafeClear(task)
+	xerr = instance.unsafeClear()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -774,12 +775,16 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 			if v.IsNull() {
 				return fail.InvalidParameterError("rules", "entry #%d cannot be null value of 'abstract.SecurityGroupRule'", k)
 			}
-
+			innerXErr = v.Validate()
+			if innerXErr != nil {
+				return innerXErr
+			}
+		}
+		for _, v := range rules {
 			if _, innerXErr = instance.GetService().AddRuleToSecurityGroup(asg, v); innerXErr != nil {
 				return innerXErr
 			}
 		}
-		// _ = asg.Replace(newAsg)
 		return nil
 	})
 }
@@ -795,8 +800,12 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if rule.IsNull() {
-		return fail.InvalidParameterError("rule", "cannot be null value of 'abstract.SecurityGroupRule'")
+	if rule == nil {
+		return fail.InvalidParameterCannotBeNilError("rule")
+	}
+	xerr = rule.Validate()
+	if xerr != nil {
+		return xerr
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -826,12 +835,16 @@ func (instance *SecurityGroup) DeleteRule(ctx context.Context, rule *abstract.Se
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		newAsg, innerXErr := instance.GetService().DeleteRuleFromSecurityGroup(asg, rule)
+		_, innerXErr := instance.GetService().DeleteRuleFromSecurityGroup(asg, rule)
 		if innerXErr != nil {
+			switch innerXErr.(type) {
+			case *fail.ErrNotFound:
+				break
+			}
 			return innerXErr
 		}
 
-		asg.Replace(newAsg)
+		// asg.Replace(newAsg)
 		return nil
 	})
 }
