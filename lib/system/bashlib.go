@@ -93,9 +93,11 @@ func (bld *BashLibraryDefinition) ToMap() (map[string]interface{}, fail.Error) {
 	if err != nil {
 		return empty, fail.Wrap(err, "failed to convert BashLibraryDefinition to JSON")
 	}
+
 	err = json.Unmarshal(jsoned, &out)
 	if err != nil {
 		return empty, fail.Wrap(err, "failed to convert BashLibraryDefinition from JSON to map")
 	}
+
 	return out, nil
 }

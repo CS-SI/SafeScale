@@ -43,7 +43,7 @@ import (
 // Content is the structure to apply to userdata.sh template
 type Content struct {
 	// BashLibrary contains the bash library
-	BashLibrary system.BashLibraryDefinition
+	system.BashLibraryDefinition
 
 	Header                      string                        // is the bash header for scripts
 	Revision                    string                        // is the git revision used to build SafeScale
@@ -97,7 +97,7 @@ func NewContent() *Content {
 // OK ...
 func (ud Content) OK() bool { // FIXME: Complete function, mark struct fields as optional, then validate
 	result := true
-	result = result && ud.BashLibrary.Content != ""
+	result = result && ud.BashLibraryDefinition.Content != ""
 	result = result && ud.HostName != ""
 	return result
 }
@@ -154,7 +154,7 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		}
 	}
 
-	ud.BashLibrary = *bashLibraryDefinition
+	ud.BashLibraryDefinition = *bashLibraryDefinition
 	ud.Header = scriptHeader
 	ud.Revision = REV
 	ud.Username = operatorUsername

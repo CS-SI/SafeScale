@@ -65,7 +65,7 @@ set -x
 uptime >/opt/safescale/var/state/user_data.final.done
 
 # Includes the BashLibrary
-{{ .BashLibrary }}
+{{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.final.done
 
 function install_drivers_nvidia() {

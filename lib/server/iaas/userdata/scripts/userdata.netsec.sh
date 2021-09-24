@@ -61,7 +61,7 @@ set -x
 uptime >/opt/safescale/var/state/user_data.netsec.done
 
 # Includes the BashLibrary
-{{ .BashLibrary }}
+{{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.netsec.done
 
 function reset_fw() {

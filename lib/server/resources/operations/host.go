@@ -1423,35 +1423,6 @@ func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequiremen
 	return template.ID, nil
 }
 
-// VPL: deprecated, replaced by determineImageID()
-// func (instance *Host) findImageID(imageName string) (string, fail.Error) {
-// 	svc := instance.GetService()
-// 	if imageName == "" {
-// 		cfg, xerr := svc.GetConfigurationOptions()
-// 		xerr = debug.InjectPlannedFail(xerr)
-// 		if xerr != nil {
-// 			return "", xerr
-// 		}
-//
-// 		imageName = cfg.GetString("DefaultImage")
-// 	}
-//
-// 	var img *abstract.Image
-// 	xerr := retry.WhileUnsuccessfulDelay1Second(
-// 		func() error {
-// 			var innerXErr fail.Error
-// 			img, innerXErr = svc.SearchImage(imageName)
-// 			return innerXErr
-// 		},
-// 		temporal.GetOperationTimeout(),
-// 	)
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	if xerr != nil {
-// 		return "", xerr
-// 	}
-// 	return img.ID, nil
-// }
-
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
 func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration) fail.Error {
 	content, xerr := userdataContent.Generate(phase)
