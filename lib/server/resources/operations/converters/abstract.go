@@ -21,6 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
@@ -334,7 +335,12 @@ func SecurityGroupRuleFromAbstractToProtocol(in abstract.SecurityGroupRule) *pro
 		EtherType:   protocol.SecurityGroupRuleEtherType(in.EtherType),
 		PortFrom:    in.PortFrom,
 		PortTo:      in.PortTo,
-		Involved:    in.Targets,
+	}
+	switch in.Direction {
+	case securitygroupruledirection.Ingress:
+		out.Involved = in.Sources
+	case securitygroupruledirection.Egress:
+		out.Involved = in.Targets
 	}
 	return out
 }

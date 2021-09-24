@@ -418,7 +418,7 @@ var networkSecurityGroupInspect = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
-		formatted, err := reformatSecurityGroup(resp, false)
+		formatted, err := reformatSecurityGroup(resp, true)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
