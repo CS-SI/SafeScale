@@ -39,7 +39,7 @@ type ClusterNetwork struct {
 	SecondaryPublicIP  string           `json:"secondary_public_ip,omitempty"`  // contains the public IP of the secondary gateway
 	EndpointIP         string           `json:"endpoint_ip,omitempty"`          // contains the IP of the external Endpoint
 	SubnetState        subnetstate.Enum `json:"status,omitempty"`               // contains the network state
-	Domain             string           `json:"domain,omitempty"`               // contains the domain used to define the FQDN of hosts created (taken from network)
+	Domain             string           `json:"domain,omitempty"`               // contains the domain used to define the FQDN of hosts created (taken from network)X
 }
 
 func newClusterNetwork() *ClusterNetwork {
