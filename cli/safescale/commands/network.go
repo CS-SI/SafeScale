@@ -621,13 +621,13 @@ var networkSecurityGroupBonds = &cli.Command{
 			result["hosts"] = hosts
 		}
 		if len(list.Subnets) > 0 {
-			networks := make([]map[string]interface{}, len(list.Subnets))
+			subnets := make([]map[string]interface{}, len(list.Subnets))
 			jsoned, _ := json.Marshal(list.Subnets)
-			err = json.Unmarshal(jsoned, &networks)
+			err = json.Unmarshal(jsoned, &subnets)
 			if err != nil {
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
 			}
-			result["networks"] = networks
+			result["subnets"] = subnets
 		}
 		if len(result) > 0 {
 			return clitools.SuccessResponse(result)
@@ -1369,7 +1369,7 @@ var subnetSecurityGroupRemoveCommand = &cli.Command{
 
 var subnetSecurityGroupListCommand = &cli.Command{
 	Name:      "list",
-	Aliases:   []string{"show"},
+	Aliases:   []string{"show", "ls"},
 	Usage:     "lists security groups bound to subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF",
 	Flags: []cli.Flag{
