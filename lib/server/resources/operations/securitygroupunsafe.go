@@ -25,7 +25,6 @@ import (
 	
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
@@ -213,9 +212,6 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		}
 	}
 
-	// // Again, if we arrive here, we want the deletion of metadata not to be interrupted by abort, it's too late
-	// defer task.DisarmAbortSignal()()
-
 	// Deletes metadata from Object Storage
 	xerr = instance.MetadataCore.Delete()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -223,31 +219,14 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		// If entry not found, considered as a success
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			logrus.Tracef("core not found, deletion considered as a success")
+			logrus.Tracef("metadata not found, deletion considered successful")
 			debug.IgnoreError(xerr)
 		default:
 			return xerr
 		}
 	}
 
-	// -- update Security Groups in Network metadata
-	networkInstance, xerr := LoadNetwork(svc, abstractSG.Network)
-	if xerr != nil {
-		return xerr
-	}
-
-	return networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			delete(nsgV1.ByID, abstractSG.ID)
-			delete(nsgV1.ByName, abstractSG.Name)
-			return nil
-		})
-	})
+	return nil
 }
 
 // unsafeClear is the non goroutine-safe implementation for Clear, that does the real work faster (no locking, less if no parameter validations)

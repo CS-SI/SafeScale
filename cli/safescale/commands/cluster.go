@@ -256,12 +256,12 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 	var sgwpubip string
 	if c.Network != nil {
 		result["network_id"] = c.Network.NetworkId
+		result["subnet_id"] = c.Network.SubnetId
 		result["cidr"] = c.Network.Cidr
 		result["default_route_ip"] = c.Network.DefaultRouteIp
 		result["primary_gateway_ip"] = c.Network.GatewayIp
 		result["endpoint_ip"] = c.Network.EndpointIp
 		result["primary_public_ip"] = c.Network.EndpointIp
-		result["secondary_gateway_ip"] = sgwpubip
 		if sgwpubip = c.Network.SecondaryPublicIp; sgwpubip != "" {
 			result["secondary_public_ip"] = sgwpubip
 			result["secondary_gateway_ip"] = c.Network.SecondaryGatewayIp
