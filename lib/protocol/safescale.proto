@@ -827,8 +827,7 @@ message ClusterNetwork {
 	string primary_public_ip = 9;
 	string secondary_public_ip = 10;
 	string endpoint_ip = 11;
-	//ClusterNetworkState network_state = 12;      // ???
-	// repeated Host gateways = 13; // To allow less limited number of gateways in the future ?
+	string subnet_id = 12;
 }
 
 message ClusterResponse {

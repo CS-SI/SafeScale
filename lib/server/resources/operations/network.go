@@ -553,10 +553,19 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 							return propsXErr
 						}
 					}
-					propsXErr = sgInstance.Delete(ctx, true)
+
+					// -- delete Security Group
+					sgInstance.lock.Lock()
+					defer sgInstance.lock.Unlock()
+
+					propsXErr = sgInstance.unsafeDelete(ctx, true)
 					if propsXErr != nil {
 						return propsXErr
 					}
+
+					// -- delete reference to Security Group in Network
+					delete(nsgV1.ByID, sgInstance.GetID())
+					delete(nsgV1.ByName, sgInstance.GetName())
 				}
 				return nil
 			})

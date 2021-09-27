@@ -477,7 +477,46 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (xerr fai
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.unsafeDelete(ctx, force)
+	var networkID string
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		abstractSG, ok := clonable.(*abstract.SecurityGroup)
+		if !ok {
+			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		networkID = abstractSG.Network
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	sgID := instance.GetID()
+	sgName := instance.GetName()
+
+	// -- delete Security Group
+	xerr = instance.unsafeDelete(ctx, force)
+	if xerr != nil {
+		return xerr
+	}
+
+	// -- update Security Groups in Network metadata
+	networkInstance, xerr := LoadNetwork(instance.GetService(), networkID)
+	if xerr != nil {
+		return xerr
+	}
+
+	return networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+			nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			delete(nsgV1.ByID, sgID)
+			delete(nsgV1.ByName, sgName)
+			return nil
+		})
+	})
 }
 
 // unbindFromHosts unbinds security group from all the hosts bound to it and update the host metadata accordingly
