@@ -36,9 +36,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// UnsafeInspectGateway returns the gateway related to Subnet
+// unsafeInspectGateway returns the gateway related to Subnet
 // Note: a write lock of the instance (instance.lock.Lock() ) must have been called before calling this method
-func (instance *Subnet) UnsafeInspectGateway(primary bool) (_ resources.Host, xerr fail.Error) {
+func (instance *Subnet) unsafeInspectGateway(primary bool) (_ resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	gwIdx := 0
@@ -60,8 +60,8 @@ func (instance *Subnet) UnsafeInspectGateway(primary bool) (_ resources.Host, xe
 	return out, nil
 }
 
-// UnsafeGetDefaultRouteIP ...
-func (instance *Subnet) UnsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {
+// unsafeGetDefaultRouteIP ...
+func (instance *Subnet) unsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {
 	ip = ""
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
