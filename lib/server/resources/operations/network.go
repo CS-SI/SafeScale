@@ -535,7 +535,33 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 		// delete Network if not imported, with tolerance
 		if !abstractNetwork.Imported {
-			// FIXME: before deleting Network, it may still exist Security Groups that have to be deleted first...
+			innerXErr = props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+				nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SecurityGroupsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				for k := range nsgV1.ByID {
+					sgInstance, propsXErr := LoadSecurityGroup(svc, k)
+					if propsXErr != nil {
+						switch propsXErr.(type) {
+						case *fail.ErrNotFound:
+							continue
+						default:
+							return propsXErr
+						}
+					}
+					propsXErr = sgInstance.Delete(ctx, true)
+					if propsXErr != nil {
+						return propsXErr
+					}
+				}
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
 			maybeDeleted := false
 			innerXErr = svc.DeleteNetwork(abstractNetwork.ID)
 			if innerXErr != nil {

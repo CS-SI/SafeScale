@@ -19,7 +19,6 @@ package operations
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"net"
 	"os"
 	"os/user"
@@ -28,6 +27,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 
 	"github.com/sirupsen/logrus"
 
@@ -264,7 +266,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						return xerr
 					}
 
-					rgw, xerr := subnetInstance.(*Subnet).UnsafeInspectGateway(true)
+					rgw, xerr := subnetInstance.unsafeInspectGateway(true)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return xerr
@@ -291,7 +293,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 					}
 
 					// Secondary gateway may not exist...
-					rgw, xerr = subnetInstance.(*Subnet).UnsafeInspectGateway(false)
+					rgw, xerr = subnetInstance.unsafeInspectGateway(false)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
@@ -834,7 +836,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 
 		if hostReq.DefaultRouteIP == "" {
-			hostReq.DefaultRouteIP = func() string { out, _ := defaultSubnet.(*Subnet).UnsafeGetDefaultRouteIP(); return out }()
+			hostReq.DefaultRouteIP = func() string { out, _ := defaultSubnet.(*Subnet).unsafeGetDefaultRouteIP(); return out }()
 		}
 
 		// list IDs of Security Groups to apply to Host
@@ -1948,7 +1950,7 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			subnetRequest.DNSServers = dnsServers
 			subnetRequest.HA = false
 
-			xerr = subnetInstance.(*Subnet).CreateSubnetWithoutGateway(ctx, subnetRequest)
+			xerr = subnetInstance.CreateSubnetWithoutGateway(ctx, subnetRequest)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, nil, xerr
@@ -3268,24 +3270,26 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 
 			sgID := sgInstance.GetID()
 			// If the Security Group is already bound to the Host with the exact same state, considered as a success
-			if v, ok := hsgV1.ByID[sgID]; ok && v.Disabled == !bool(enable) {
+			item, ok := hsgV1.ByID[sgID]
+			if ok && item.Disabled == !bool(enable) {
 				return nil
 			}
-
-			// Not found, add it
-			item := &propertiesv1.SecurityGroupBond{
-				ID:       sgID,
-				Name:     sgInstance.GetName(),
-				Disabled: bool(!enable),
+			if !ok { // Not found, update bind metadata of Host
+				item = &propertiesv1.SecurityGroupBond{
+					ID:       sgID,
+					Name:     sgInstance.GetName(),
+				}
+				hsgV1.ByID[sgID] = item
+				hsgV1.ByName[item.Name] = item.ID
 			}
-			hsgV1.ByID[sgID] = item
-			hsgV1.ByName[item.Name] = item.ID
+			item.Disabled = bool(!enable)
 
 			// If enabled, apply it
-			if innerXErr := sgInstance.BindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+			if innerXErr := sgInstance.(*SecurityGroup).unsafeBindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate:
-					// already bound, success
+					// already bound, consider as a success
+					break
 				default:
 					return innerXErr
 				}
@@ -3296,7 +3300,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 }
 
 // UnbindSecurityGroup unbinds a security group from the Host
-func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (xerr fail.Error) {
+func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -3305,8 +3309,8 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if sg == nil {
-		return fail.InvalidParameterCannotBeNilError("sg")
+	if sgInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("sgInstance")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -3327,21 +3331,21 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	sgName := sg.GetName()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
+	sgName := sgInstance.GetName()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := sg.GetID()
+			sgID := sgInstance.GetID()
 			// Check if the security group is listed for the Host
 			found := false
 			for k, v := range hsgV1.ByID {
@@ -3363,13 +3367,30 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 			}
 
 			// unbind security group from Host on remote service side
-			if innerXErr := sg.UnbindFromHost(ctx, instance); innerXErr != nil {
+			if innerXErr := sgInstance.UnbindFromHost(ctx, instance); innerXErr != nil {
 				return innerXErr
 			}
 
 			// found, delete it from properties
 			delete(hsgV1.ByID, sgID)
-			delete(hsgV1.ByName, sg.GetName())
+			delete(hsgV1.ByName, sgInstance.GetName())
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	// -- Remove Host reference in Security Group
+	return sgInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			delete(sghV1.ByID, instance.GetID())
+			delete(sghV1.ByName, instance.GetName())
 			return nil
 		})
 	})
