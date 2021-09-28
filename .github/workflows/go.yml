@@ -15,4 +15,14 @@ jobs:
     - uses: actions/setup-go@v2
       with:
         go-version: '1.16.5' # The Go version to download (if necessary) and use.
+    - name: Install Protoc
+      run: |
+        cd /tmp
+        PROTOCVERSION=3.17.3
+        PROTOCZIP=$(echo "protoc-${PROTOCVERSION}-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).zip")
+        wget https://github.com/google/protobuf/releases/download/v${PROTOCVERSION}/$PROTOCZIP
+        sudo unzip -d /usr/local/include/protoc $PROTOCZIP
+        sudo chmod a+r -R /usr/local/include/protoc
+        sudo chmod a+xr -R /usr/local/include/protoc/bin/protoc
+        sudo ln -s /usr/local/include/protoc/bin/protoc /usr/local/bin/
     - run: make all
