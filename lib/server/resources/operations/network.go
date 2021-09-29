@@ -80,7 +80,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.Error) {
+func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be null value")
 	}
@@ -115,8 +115,8 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, xerr fail.
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
 	}()
@@ -145,8 +145,8 @@ func (instance *Network) IsNull() bool {
 }
 
 // Create creates a Network
-func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
@@ -235,15 +235,15 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 	abstractNetwork, xerr := svc.CreateNetwork(req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return xerr
+		return fail.Wrap(xerr, "failure creating provider network")
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			derr := svc.DeleteNetwork(abstractNetwork.ID)
 			derr = debug.InjectPlannedFail(derr)
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network"))
 			}
 		}
 	}()
@@ -259,7 +259,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 }
 
 // carry registers clonable as core value and deals with cache
-func (instance *Network) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *Network) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -283,10 +283,10 @@ func (instance *Network) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
 	}()
@@ -519,6 +519,8 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					}
 
 					subnetName := rs.GetName()
+					logrus.Warningf("Trying to delete subnet with name '%s'", subnetName)
+
 					xerr = rs.Delete(ctx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
@@ -619,7 +621,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 				}
 				iterations--
 				if iterations < 0 {
-					logrus.Warningf("TBR: A zombie network '%s' is still there", abstractNetwork.ID)
+					logrus.Warningf("TBR: The network '%s' is still there", abstractNetwork.ID)
 					break
 				}
 				time.Sleep(temporal.GetDefaultDelay())
@@ -629,11 +631,15 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return xerr
+		return fail.Wrap(xerr, "failure altering metadata")
 	}
 
 	// Remove metadata
-	return instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete()
+	if xerr != nil {
+		return fail.Wrap(xerr, "failure deleting metadata")
+	}
+	return nil
 }
 
 // GetCIDR returns the CIDR of the subnet

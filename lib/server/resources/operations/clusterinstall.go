@@ -479,6 +479,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 		return invalid, "", "", xerr
 	}
 	data["reserved_BashLibrary"] = bashLibrary
+	data["Revision"] = system.REV
 
 	// Sets delays and timeouts for script
 	data["reserved_DefaultDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))

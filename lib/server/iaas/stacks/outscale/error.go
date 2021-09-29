@@ -129,6 +129,19 @@ func normalizeError(err error) fail.Error {
 			return normalized
 		}
 		return nil
+	case *outscaleError:
+		normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
+		if normalized != nil {
+			if _, ok := normalized.(*fail.ErrUnknown); ok {
+				errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
+				if xerr != nil { // we failed using the http return code, so send the normalized error
+					return normalized
+				}
+				return errFromHTTP // we got something
+			}
+			return normalized
+		}
+		return nil
 	case osc.GenericOpenAPIError:
 		return normalizeOpenAPIError(realErr)
 	default:

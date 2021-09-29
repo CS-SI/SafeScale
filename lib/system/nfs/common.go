@@ -19,8 +19,10 @@ package nfs
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	rice "github.com/GeertJohan/go.rice"
@@ -85,6 +87,21 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	}
 	data["reserved_BashLibrary"] = bashLibrary
 	data["Revision"] = system.REV
+
+	// Sets delays and timeouts for script
+	data["reserved_DefaultDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
+	data["reserved_DefaultTimeout"] = strings.Replace(
+		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
+	)
+	data["reserved_LongTimeout"] = strings.Replace(
+		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
+	)
+	data["reserved_ClusterJoinTimeout"] = strings.Replace(
+		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
+	)
+	data["reserved_DockerImagePullTimeout"] = strings.Replace(
+		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
+	)
 
 	scriptHeader := "set -u -o pipefail"
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {

@@ -159,6 +159,11 @@ func (b bucket) estimateSize(path, prefix string) (int, error) {
 				itemSet = make(map[string]bool)
 				continue
 			}
+			if _, ok := err.(*fail.ErrDuplicate); ok { // begin again with twice the capacity
+				currentPageSize = 2 * currentPageSize
+				itemSet = make(map[string]bool)
+				continue
+			}
 			return -1, err // it was something else, just drop it
 		}
 		break
