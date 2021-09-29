@@ -119,7 +119,7 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(svc, name) },
 		temporal.GetMetadataTimeout(),
 	)
-	cacheEntry, xerr := clusterCache.Get(name, options...)
+	cacheEntry, xerr := clusterCache.Get(name, options...) // FIXME: It fails
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1203,7 +1203,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			}
 		}
 	}()
-	
+
 	res, xerr := tg.WaitGroup()
 	if res != nil && len(res) > 0 {
 		for _, v := range res {

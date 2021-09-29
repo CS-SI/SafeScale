@@ -125,10 +125,10 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
-                                    sfStandardRetry sfApt install -y ebtables socat || sfFail 194
+                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfApt install -y ebtables socat || sfFail 194
                                     ;;
                                 redhat|rhel|centos|fedora)
-                                    sfStandardRetry yum install -y ebtables socat || sfFail 195
+                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} yum install -y ebtables socat || sfFail 195
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
                             net.bridge.bridge-nf-call-ip6tables = 1
                             net.bridge.bridge-nf-call-iptables = 1
@@ -374,7 +374,7 @@ feature:
                             # EOF
                             # fi
 
-                            sfStandardRetry kubeadm config images pull || sfFail 198
+                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} kubeadm config images pull || sfFail 198
                             kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 199
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 200
                             cert_key=$(kubeadm init phase upload-certs --experimental-upload-certs | tail -n 1) || sfFail 201
@@ -400,29 +400,29 @@ feature:
                             echo "$cp_join_cmd --experimental-control-plane --certificate-key $cert_key" >${SF_TMPDIR}/cp_join_cmd.sh
                             cat ${SF_TMPDIR}/cp_join_cmd.sh
                             sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || fail 203
-                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 204
-                            for ip in {{range .ClusterMasterIPs}}{{.}} {{end}}; do
-                                [ "$ip" = "{{.HostIP}}" ] && continue
-                                sfDropzoneSync $ip || sfFail 205
-                            done
-                            rm ${SF_TMPDIR}/cp_join_cmd.sh ${SF_TMPDIR}/init_cluster_admin_kube.sh
-                            sfDropzoneClean
+                          sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || fail 204
+                          for ip in {{range .ClusterMasterIPs}}{{.}} {{end}}; do
+                              [ "$ip" = "{{.HostIP}}" ] && continue
+                              sfDropzoneSync $ip || sfFail 205
+                          done
+                          rm ${SF_TMPDIR}/cp_join_cmd.sh ${SF_TMPDIR}/init_cluster_admin_kube.sh
+                          sfDropzoneClean
 
-                            # waits availability of key pods
-                            set -u -o pipefail
-                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 206
-                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 207
-                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 208
+                          # waits availability of key pods
+                          set -u -o pipefail
+                          sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 206
+                          sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 207
+                          sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 208
 
-                            touch /etc/kubernetes/.joined
-                            echo "cp1 init done"
+                          touch /etc/kubernetes/.joined
+                          echo "cp1 init done"
 
-                            if [ "{{.Hardening}}" == "true" ]; then
-                                cat >/etc/kubernetes/kubeadm/psp-default.yaml <<-'EOF'
-                            ---
-                            apiVersion: extensions/v1beta1
-                            kind: PodSecurityPolicy
-                            metadata:
+                          if [ "{{.Hardening}}" == "true" ]; then
+                              cat >/etc/kubernetes/kubeadm/psp-default.yaml <<-'EOF'
+                          ---
+                          apiVersion: extensions/v1beta1
+                          kind: PodSecurityPolicy
+                          metadata:
                               name: default
                               annotations:
                                 seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'docker/default'
@@ -690,29 +690,29 @@ feature:
                             # Don't try to init a kubernetes cluster already running
                             [ -f /etc/kubernetes/.joined ] && sfExit
 
-                            sfDropzonePop ${SF_TMPDIR} || sfFail 212
-                            sfDropzoneClean
+                          sfDropzonePop ${SF_TMPDIR} || sfFail 212
+                          sfDropzoneClean
 
-                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 213
-                            bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 214
-                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 215
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 216
+                          [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 213
+                          bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 214
+                          [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 215
+                          bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 216
 
-                            # waits availability of key pods
-                            set -u -o pipefail
-                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 217
-                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 218
-                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 219
+                          # waits availability of key pods
+                          set -u -o pipefail
+                          sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 217
+                          sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 218
+                          sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 219
 
-                            touch /etc/kubernetes/.joined
-                            echo "cpx init done"
+                          touch /etc/kubernetes/.joined
+                          echo "cpx init done"
 
-                            # Configure firewall
-                            case {{.CNI}} in
-                                flannel)
-                                    sfFirewallAdd --zone=trusted --add-interface=flannel.1
-                                    sfFirewallAdd --zone=trusted --add-interface=cni0
-                                    sfFirewallReload || sfFail 204 "Firewall problem"
+                          # Configure firewall
+                          case {{.CNI}} in
+                              flannel)
+                                  sfFirewallAdd --zone=trusted --add-interface=flannel.1
+                                  sfFirewallAdd --zone=trusted --add-interface=cni0
+                                  sfFirewallReload || sfFail 204 "Firewall problem"
                                     ;;
                                 calico)
                                     sfFirewallAdd --zone=trusted --add-interface=cni0
@@ -753,10 +753,10 @@ feature:
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                    sfStandardRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
                                 else
                                     if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                        sfStandardRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 222 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
                                     fi
                                 fi
                             fi
