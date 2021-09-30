@@ -20,9 +20,9 @@
 {{.Header}}
 
 function print_error() {
-	read -r line file <<<"$(caller)"
-	echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
-	{{.ExitOnError}}
+  read -r line file <<<"$(caller)"
+  echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
+  {{.ExitOnError}}
 }
 trap print_error ERR
 
@@ -188,6 +188,7 @@ NETMASK=
 AWS=
 GCP=
 OUT=
+FEN=
 
 # Don't request dns name servers from DHCP server
 # Don't update default route
@@ -294,6 +295,14 @@ function identify_nics() {
   else
     echo "It is NOT Outscale"
     OUT=0
+  fi
+
+  if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
+    echo "It actually IS FlexibleEngine"
+    FEN=1
+  else
+    echo "It is NOT FlexibleEngine"
+    FEN=0
   fi
 
   echo "NICS identified: $NICS"
@@ -758,6 +767,10 @@ function configure_network_redhat() {
     configure_network_redhat_without_nmcli || {
       failure 208 "failed to set network without NetworkManager"
     }
+  elif [[ ${FEN} -eq 1 ]]; then
+    configure_network_redhat_without_nmcli || {
+      failure 208 "failed to set network without NetworkManager"
+    }
   else
     NMCLI=$(which nmcli 2>/dev/null) || true
     if [[ -z "${NMCLI}" ]]; then
@@ -785,25 +798,29 @@ function configure_network_redhat_without_nmcli() {
   # We don't want NetworkManager if RedHat/CentOS < 7
   stop_svc NetworkManager &>/dev/null
   disable_svc NetworkManager &>/dev/null
-  sfRetry 3m 5 "sfYum remove -y NetworkManager &>/dev/null"
-  echo "exclude=NetworkManager" >>/etc/yum.conf
+  if [[ ${FEN} -eq 0 ]]; then
+    sfRetry 3m 5 "sfYum remove -y NetworkManager &>/dev/null"
+    echo "exclude=NetworkManager" >>/etc/yum.conf
 
-  if which dnf; then
-    dnf install -q -y network-scripts || {
-      dnf install -q -y NetworkManager-config-routing-rules
-      echo net.ipv4.ip_forward=1 >> /etc/sysctl.d/90-override.conf
-      sysctl -w net.ipv4.ip_forward=1
-      sysctl -p
-      firewall-cmd --complete-reload
-    }
+    if which dnf; then
+      dnf install -q -y network-scripts || {
+        dnf install -q -y NetworkManager-config-routing-rules
+        echo net.ipv4.ip_forward=1 >> /etc/sysctl.d/90-override.conf
+        sysctl -w net.ipv4.ip_forward=1
+        sysctl -p
+        firewall-cmd --complete-reload
+      }
+    else
+      yum install -q -y network-scripts || {
+        yum install -q -y NetworkManager-config-routing-rules
+        echo net.ipv4.ip_forward=1 >> /etc/sysctl.d/90-override.conf
+        sysctl -w net.ipv4.ip_forward=1
+        sysctl -p
+        firewall-cmd --complete-reload
+      }
+    fi
   else
-    yum install -q -y network-scripts || {
-      yum install -q -y NetworkManager-config-routing-rules
-      echo net.ipv4.ip_forward=1 >> /etc/sysctl.d/90-override.conf
-      sysctl -w net.ipv4.ip_forward=1
-      sysctl -p
-      firewall-cmd --complete-reload
-    }
+    yum remove -y NetworkManager &>/dev/null
   fi
 
   # Configure all network interfaces in dhcp
@@ -1228,9 +1245,13 @@ function early_packages_update() {
 
     if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
       sfApt install -y --force-yes pciutils || failure 210 "problem installing pciutils"
-      which netplan || {
+      if [[ ${FEN} -eq 0 ]]; then
+        which netplan || {
+          sfApt install -y --force-yes netplan.io || failure 210 "problem installing netplan.io"
+        }
+      else
         sfApt install -y --force-yes netplan.io || failure 210 "problem installing netplan.io"
-      }
+      fi
       sfApt install -y --force-yes sudo || failure 210 "problem installing sudo"
     else
       sfApt install -y systemd pciutils sudo || failure 211
@@ -1329,7 +1350,7 @@ function add_common_repos() {
     ;;
   redhat | rhel | centos)
     if which dnf; then
-      # Install EPEL repo ...
+    # Install EPEL repo ...
       sfRetry 3m 5 "dnf install -y epel-release" || failure 217 "failure installing epel repo"
       sfRetry 3m 5 "dnf makecache fast -y || dnf makecache -y" || failure 218 "failure updating cache"
       # ... but don't enable it by default
