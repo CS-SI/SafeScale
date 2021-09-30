@@ -26,3 +26,7 @@ jobs:
         sudo chmod a+xr /opt/protoc/bin/protoc
         sudo ln -s /opt/protoc/bin/protoc /usr/local/bin/
     - run: make all
+    - uses: actions/upload-artifact@v2
+      if: failure()
+      with:
+        path: test_results.log
