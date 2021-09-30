@@ -38,7 +38,9 @@ import (
 )
 
 // FeatureListener feature service server grpc
-type FeatureListener struct{}
+type FeatureListener struct{
+	protocol.UnimplementedFeatureServiceServer
+}
 
 // List ...
 func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequest) (_ *protocol.FeatureListResponse, err error) {

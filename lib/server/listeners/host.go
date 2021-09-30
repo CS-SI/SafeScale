@@ -49,7 +49,9 @@ import (
 )
 
 // HostListener host service server grpc
-type HostListener struct{}
+type HostListener struct{
+	protocol.UnimplementedHostServiceServer
+}
 
 // StoredCPUInfo ...
 type StoredCPUInfo struct {
