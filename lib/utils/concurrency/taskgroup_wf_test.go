@@ -256,6 +256,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 			fastEnough, res, xerr := overlord.WaitFor(timeout)
 			waitForRealDuration := time.Since(begin)
 			if !fastEnough {
+				t.Logf("WaitFor failed: %s", xerr)
 				if childrenStartDuration > 5*time.Millisecond { // however, it grows with gcpressure
 					t.Logf("Launching children took %v", childrenStartDuration)
 				}
