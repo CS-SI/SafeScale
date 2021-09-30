@@ -39,7 +39,9 @@ import (
 // safescale ssh copy host1:/file/test.txt /tmp
 
 // SSHListener SSH service server grpc
-type SSHListener struct{}
+type SSHListener struct{
+	protocol.UnimplementedSshServiceServer
+}
 
 // Run executes an ssh command an an host
 func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {

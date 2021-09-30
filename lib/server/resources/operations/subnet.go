@@ -1749,6 +1749,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		hostList []string
 	)
 	svc := instance.GetService()
+	subnetName := instance.GetName()
 	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -1857,7 +1858,6 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			return innerXErr
 		}
 
-		logrus.Infof("Subnet '%s' successfully deleted.", as.Name)
 
 		// Delete Subnet's own Security Groups
 		return instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
@@ -1868,22 +1868,25 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// Remove metadata
-	return instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete()
+	if xerr != nil {
+		return xerr
+	}
+
+	logrus.Infof("Subnet '%s' successfully deleted.", subnetName)
+	return nil
 }
 
 // deleteSecurityGroups deletes the Security Groups created for the Subnet
 func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string) (xerr fail.Error) {
-	var (
-		sgInstance   resources.SecurityGroup
-		sgName, sgID string
-	)
 	svc := instance.GetService()
 	for _, v := range sgs {
 		if v == "" {
 			return fail.NewError("unexpected empty security group")
 		}
 
-		if sgInstance, xerr = LoadSecurityGroup(svc, v); xerr != nil {
+		sgInstance, xerr := LoadSecurityGroup(svc, v)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// Security Group not found, consider this as a success
@@ -1894,10 +1897,11 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 			}
 		}
 
-		sgName = sgInstance.GetName()
-		sgID = sgInstance.GetID()
+		sgName := sgInstance.GetName()
+		sgID := sgInstance.GetID()
 		logrus.Debugf("Deleting Security Group '%s' (%s)...", sgName, sgID)
-		if xerr = sgInstance.Delete(ctx, true); xerr != nil {
+		xerr = sgInstance.Delete(ctx, true)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// Security Group not found, consider this as a success
@@ -2015,8 +2019,25 @@ func (instance *Subnet) unbindSecurityGroups(ctx context.Context, sgs *propertie
 			}(sgInstance)
 		}
 
-		if sgInstance != nil {
-			xerr = sgInstance.UnbindFromSubnet(ctx, instance)
+		unbindParams = taskUnbindFromHostsAttachedToSubnetParams{
+			subnetID:    instance.GetID(),
+			subnetName:  instance.GetName(),
+			subnetHosts: subnetHosts,
+		}
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = props.Inspect(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+		sgs, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
+		if !ok {
+			return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		for k, v := range sgs.ByName {
+			sgInstance, xerr := LoadSecurityGroup(svc, v)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				switch xerr.(type) {

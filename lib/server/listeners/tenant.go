@@ -36,7 +36,11 @@ import (
 )
 
 // TenantListener server is used to implement SafeScale.safescale.
-type TenantListener struct{}
+type TenantListener struct{
+	protocol.UnimplementedTenantServiceServer
+}
+
+// VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
 
 // List lists registered tenants
 func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ *protocol.TenantList, err error) {

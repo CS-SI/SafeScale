@@ -127,7 +127,7 @@ type task struct {
 	abortCh                chan struct{} // Used to signal the routine it has to stop processing
 
 	err    fail.Error
-	result TaskResult
+	result chan TaskResult
 
 	abortDisengaged      bool // used to not react on abort signal
 	cancelDisengaged     bool // used to not react on cancel signal (internal use only, not exposed by API)
@@ -266,6 +266,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 		abortCh:                make(chan struct{}, 1),
 		runTerminatedCh:        make(chan struct{}, 1),
 		controllerTerminatedCh: make(chan struct{}, 1),
+		result:                 make(chan TaskResult),
 	}
 
 	generateID := true
@@ -347,7 +348,7 @@ func (instance *task) Result() (TaskResult, fail.Error) {
 		return nil, fail.InvalidRequestError("task is not done, there is no result yet")
 	}
 
-	return instance.result, nil
+	return <-instance.result, nil
 }
 
 // ID returns an unique id for the task
@@ -1233,7 +1234,7 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				tout := fail.TimeoutError(xerr, duration, "timeout of %s waiting for Task '%s'", duration, tid)
 				instance.lock.RLock()
 				defer instance.lock.RUnlock()
-				return false, instance.result, tout
+				return false, <-instance.result, tout
 			}
 		} else {
 			// No duration, do task.Wait()

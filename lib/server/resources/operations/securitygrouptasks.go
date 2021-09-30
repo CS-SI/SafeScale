@@ -110,28 +110,40 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 		return nil, fail.InvalidParameterError("params", "must be a 'taskUnbindFromHostsAttachedToSubnetParams'")
 	}
 
-	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
-	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", instance.GetName(), p.subnetName)
+	if len(p.subnetHosts.ByID) > 0 {
+		tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", instance.GetName(), p.subnetName)
+		}
+
+		svc := instance.GetService()
+		for k, v := range p.subnetHosts.ByID {
+			hostInstance, xerr := LoadHost(svc, k)
+			if xerr != nil {
+				return nil, xerr
+			}
+			defer func(in resources.Host) {
+				in.Released()
+			}(hostInstance)
+
+			_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", v)))
+			if xerr != nil {
+				break
+			}
+		}
+		_, werr := tg.WaitGroup()
+		if werr != nil {
+			if xerr != nil {
+				_ = xerr.AddConsequence(werr)
+			} else {
+				xerr = werr
+			}
+		}
+
+		return nil, xerr
 	}
 
-	svc := instance.GetService()
-	for k, v := range p.subnetHosts.ByID {
-		hostInstance, xerr := LoadHost(svc, k)
-		if xerr != nil {
-			return nil, xerr
-		}
-		defer func(in resources.Host) {
-			in.Released()
-		}(hostInstance)
-
-		_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", v)))
-		if xerr != nil {
-			break
-		}
-	}
-	_, xerr = tg.WaitGroup()
-	return nil, xerr
+	return nil, nil
 }
 
 // taskBindEnabledOnHost binds the SG if needed (applying rules) and enables it on Host

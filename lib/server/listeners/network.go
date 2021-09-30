@@ -40,7 +40,9 @@ const (
 )
 
 // NetworkListener network service server grpc
-type NetworkListener struct{}
+type NetworkListener struct{
+	protocol.UnimplementedNetworkServiceServer
+}
 
 // Create a new network
 func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, err error) {

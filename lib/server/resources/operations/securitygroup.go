@@ -477,46 +477,53 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (xerr fai
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	var networkID string
-	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-		abstractSG, ok := clonable.(*abstract.SecurityGroup)
-		if !ok {
-			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		networkID = abstractSG.Network
-		return nil
-	})
-	if xerr != nil {
-		return xerr
-	}
+	return instance.unsafeDelete(ctx, force)
+}
 
-	sgID := instance.GetID()
-	sgName := instance.GetName()
-
-	// -- delete Security Group
-	xerr = instance.unsafeDelete(ctx, force)
-	if xerr != nil {
-		return xerr
-	}
-
-	// -- update Security Groups in Network metadata
-	networkInstance, xerr := LoadNetwork(instance.GetService(), networkID)
-	if xerr != nil {
-		return xerr
-	}
-
-	return networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-			nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
+// deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
+func deleteProviderSecurityGroup(svc iaas.Service, abstractSG *abstract.SecurityGroup) fail.Error {
+	// FIXME: communication failure handled at service level, not necessary anymore to retry here
+	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			if innerXErr := svc.DeleteSecurityGroup(abstractSG); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					return retry.StopRetryError(innerXErr)
+				default:
+					return innerXErr
+				}
 			}
-
-			delete(nsgV1.ByID, sgID)
-			delete(nsgV1.ByName, sgName)
 			return nil
-		})
-	})
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// consider a Security Group not found as a successful deletion
+			debug.IgnoreError(xerr)
+		case *fail.ErrTimeout:
+			// consider a Security Group not found as a successful deletion
+			cause := fail.Cause(xerr)
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(cause)
+			} else {
+				return fail.Wrap(cause, "timeout")
+			}
+		case *retry.ErrStopRetry:
+			// consider a Security Group not found as a successful deletion
+			cause := fail.Cause(xerr)
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(cause)
+			} else {
+				return fail.Wrap(cause, "stopping retries")
+			}
+		default:
+			return xerr
+		}
+	}
+	return nil
 }
 
 // unbindFromHosts unbinds security group from all the hosts bound to it and update the host metadata accordingly
@@ -576,12 +583,10 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			}
 		}
 
-		if count, xerr := tg.Started(); xerr == nil && count > 0 {
-			_, xerr = tg.WaitGroup()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
+		_, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
 		}
 	}
 
