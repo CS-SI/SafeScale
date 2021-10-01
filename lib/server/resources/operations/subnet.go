@@ -1829,7 +1829,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.unbindSecurityGroups(ctx, ssgV1)
+			innerXErr := instance.onRemovalUnbindSecurityGroups(ctx, ssgV1)
 			return innerXErr
 		})
 		if innerXErr != nil {
@@ -1996,11 +1996,31 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 	return ids, nil
 }
 
-// unbindSecurityGroups makes sure the security groups bound to Subnet are unbound
-func (instance *Subnet) unbindSecurityGroups(ctx context.Context, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
+// onRemovalUnbindSecurityGroups makes sure the security groups bound to Subnet are unbound
+func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
+	var subnetHosts *propertiesv1.SubnetHosts
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			var ok bool
+			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	unbindParams := taskUnbindFromHostsAttachedToSubnetParams{
+		subnetID:    instance.GetID(),
+		subnetName:  instance.GetName(),
+		subnetHosts: subnetHosts,
+	}
 	svc := instance.GetService()
-	for k, v := range sgs.ByName {
-		sgInstance, xerr := LoadSecurityGroup(svc, v)
+	for k := range sgs.ByID {
+		sgInstance, xerr := LoadSecurityGroup(svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -2015,41 +2035,16 @@ func (instance *Subnet) unbindSecurityGroups(ctx context.Context, sgs *propertie
 			defer func(sgInstance resources.SecurityGroup) {
 				sgInstance.Released()
 			}(sgInstance)
-		}
 
-		unbindParams = taskUnbindFromHostsAttachedToSubnetParams{
-			subnetID:    instance.GetID(),
-			subnetName:  instance.GetName(),
-			subnetHosts: subnetHosts,
-		}
-		return nil
-	})
-	if xerr != nil {
-		return xerr
-	}
-
-	xerr = props.Inspect(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-		sgs, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
-		if !ok {
-			return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-
-		for k, v := range sgs.ByName {
-			sgInstance, xerr := LoadSecurityGroup(svc, v)
-			xerr = debug.InjectPlannedFail(xerr)
+			xerr = sgInstance.unbindFromSubnetHosts(ctx, unbindParams)
 			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					// consider a Security Group not found as a successful unbind
-					debug.IgnoreError(xerr)
-				default:
-					return xerr
-				}
+				return xerr
 			}
-		}
 
-		delete(sgs.ByID, v)
-		delete(sgs.ByName, k)
+			// VPL: no need to update SubnetSecurityGroups property, the Subnet is being removed
+			// delete(sgs.ByID, v)
+			// delete(sgs.ByName, k)
+		}
 	}
 	return nil
 }
