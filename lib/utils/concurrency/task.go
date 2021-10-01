@@ -1071,7 +1071,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			instance.lock.Lock()
 			if instance.resultObtained {
 				//goland:noinspection GoDeferInLoop
-				defer instance.lock.Unlock()    // Note: we can defer here, we will abort the loop
+				defer instance.lock.Unlock() // Note: we can defer here, we will abort the loop
 
 				if instance.ctx.Err() != nil && instance.err == nil {
 					instance.err = fail.AbortedError(instance.ctx.Err())
@@ -1088,9 +1088,6 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 		default:
 			return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%s)", tid, status)
 		}
-
-		// Leave space to the CPU
-		time.Sleep(time.Millisecond * 1) // FIXME: hardcoded value
 	}
 }
 

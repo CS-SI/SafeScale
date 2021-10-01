@@ -6,7 +6,7 @@ ifneq ($(OS),Windows_NT)
 PATH = $(HOME)/.local/bin:$(shell printenv PATH)
 endif
 
-all:	sdk
+all:	clean sdk
 
 vet:
 	@$(GO) vet ./...

@@ -268,7 +268,6 @@ else
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.26.0 || true; \
 	fi
-	@git checkout go.mod
 endif
 
 ensure: common
