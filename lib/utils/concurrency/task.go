@@ -1018,7 +1018,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				instance.status, status = DONE, DONE
 			}
 			instance.lock.Unlock() // Note: Do not defer this, the loop continue
-			continue
+			break
 
 		case ABORTED:
 			instance.lock.RLock()
@@ -1047,7 +1047,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				instance.status, status = DONE, DONE
 			}
 			instance.lock.Unlock() // Note: Do not defer this, the loop continue
-			continue
+			break
 
 		case RUNNING:
 			instance.lock.Lock()
@@ -1063,12 +1063,11 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				instance.status, status = DONE, DONE
 			}
 			instance.lock.Unlock()
-			continue
+			break
 
 		case DONE:
-			traceR.trace("run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration)
-
 			instance.lock.Lock()
+			traceR.trace("run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration)
 			if instance.resultObtained {
 				//goland:noinspection GoDeferInLoop
 				defer instance.lock.Unlock() // Note: we can defer here, we will abort the loop
@@ -1081,7 +1080,7 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 
 			instance.lock.Unlock()
 			// result not returned by TaskAction yet, continue
-			continue
+			break
 
 		case UNKNOWN:
 			fallthrough
