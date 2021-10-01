@@ -266,6 +266,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 		abortCh:                make(chan struct{}, 1),
 		runTerminatedCh:        make(chan struct{}, 1),
 		controllerTerminatedCh: make(chan struct{}, 1),
+		result:                 make(chan TaskResult),
 	}
 
 	generateID := true
