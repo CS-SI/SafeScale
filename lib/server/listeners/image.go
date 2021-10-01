@@ -32,7 +32,9 @@ import (
 // safescale image list --all=false
 
 // ImageListener image service server grpc
-type ImageListener struct{}
+type ImageListener struct{
+	protocol.UnimplementedImageServiceServer
+}
 
 // List available images
 func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest) (_ *protocol.ImageList, err error) {

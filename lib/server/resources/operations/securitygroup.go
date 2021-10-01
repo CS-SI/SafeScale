@@ -39,6 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -480,6 +481,52 @@ func (instance *SecurityGroup) Delete(ctx context.Context, force bool) (xerr fai
 	return instance.unsafeDelete(ctx, force)
 }
 
+// deleteProviderSecurityGroup encapsulates the code responsible to the real Security Group deletion on Provider side
+func deleteProviderSecurityGroup(svc iaas.Service, abstractSG *abstract.SecurityGroup) fail.Error {
+	// FIXME: communication failure handled at service level, not necessary anymore to retry here
+	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
+		func() error {
+			if innerXErr := svc.DeleteSecurityGroup(abstractSG); innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					return retry.StopRetryError(innerXErr)
+				default:
+					return innerXErr
+				}
+			}
+			return nil
+		},
+		temporal.GetCommunicationTimeout(),
+	)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// consider a Security Group not found as a successful deletion
+			debug.IgnoreError(xerr)
+		case *fail.ErrTimeout:
+			// consider a Security Group not found as a successful deletion
+			cause := fail.Cause(xerr)
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(cause)
+			} else {
+				return fail.Wrap(cause, "timeout")
+			}
+		case *retry.ErrStopRetry:
+			// consider a Security Group not found as a successful deletion
+			cause := fail.Cause(xerr)
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(cause)
+			} else {
+				return fail.Wrap(cause, "stopping retries")
+			}
+		default:
+			return xerr
+		}
+	}
+	return nil
+}
+
 // unbindFromHosts unbinds security group from all the hosts bound to it and update the host metadata accordingly
 func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *propertiesv1.SecurityGroupHosts) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -537,12 +584,10 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			}
 		}
 
-		if count, xerr := tg.Started(); xerr == nil && count > 0 {
-			_, xerr = tg.WaitGroup()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return xerr
-			}
+		_, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
 		}
 	}
 

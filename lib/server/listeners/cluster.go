@@ -39,7 +39,9 @@ import (
 )
 
 // ClusterListener host service server grpc
-type ClusterListener struct{}
+type ClusterListener struct{
+	protocol.UnimplementedClusterServiceServer
+}
 
 // List lists clusters
 func (s *ClusterListener) List(ctx context.Context, in *protocol.Reference) (hl *protocol.ClusterListResponse, err error) {
