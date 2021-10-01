@@ -49,17 +49,17 @@ WORKDIR /tmp
 # Install GO $GOVERSION
 # ----------------------
 RUN wget https://dl.google.com/go/go$GOVERSION.linux-amd64.tar.gz \
-&& tar -C /usr/local -xzf go$GOVERSION.linux-amd64.tar.gz
+&& tar -C /usr/local -xzf go$GOVERSION.linux-amd64.tar.gz \
+&& rm /tmp/go$GOVERSION.linux-amd64.tar.gz
 ENV PATH $PATH:/usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-RUN rm /tmp/go$GOVERSION.linux-amd64.tar.gz
 
 # ----------------------
 # Install Protoc $PROTOVERSION
 # ----------------------
 RUN wget https://github.com/google/protobuf/releases/download/v$PROTOVERSION/protoc-$PROTOVERSION-linux-x86_64.zip \
 && unzip -d /usr/local/protoc protoc-$PROTOVERSION-linux-x86_64.zip \
-&& ln -s /usr/local/protoc/bin/protoc /usr/local/bin
-RUN rm /tmp/protoc-$PROTOVERSION-linux-x86_64.zip
+&& ln -s /usr/local/protoc/bin/protoc /usr/local/bin \
+&& rm /tmp/protoc-$PROTOVERSION-linux-x86_64.zip
 
 ENV SHELL /bin/bash
 ENV GOPATH /go

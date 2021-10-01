@@ -73,5 +73,5 @@ func (nsg *NetworkSecurityGroups) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.subnet", networkproperty.SecurityGroupsV1, NewNetworkSecurityGroups())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.SecurityGroupsV1, NewNetworkSecurityGroups())
 }
