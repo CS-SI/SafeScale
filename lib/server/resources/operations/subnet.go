@@ -1706,6 +1706,11 @@ func (instance *Subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 	return gatewayIPs, nil
 }
 
+var (
+	removingSubnetAbstractContextKey = "removing_subnet_abstract"
+	removingSubnetPropertiesContextKey = "remocing_subnet_properties"
+)
+
 // Delete deletes a Subnet
 func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -1715,6 +1720,19 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		subnetAbstract, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		ctx = context.WithValue(ctx, removingSubnetAbstractContextKey, subnetAbstract)
+		ctx = context.WithValue(ctx, removingSubnetPropertiesContextKey, props)
+		return nil
+	})
+	if xerr != nil {
+		return xerr
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)

@@ -435,6 +435,11 @@ func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Net
 	})
 }
 
+var (
+	removingNetworkAbstractContextKey = "removing_network_abstract"
+	removingNetworkPropertiesContextKey = "removing_network_properties"
+)
+
 // Delete deletes subnet
 func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -444,6 +449,19 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		networkAbstract, ok := clonable.(*abstract.Network)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		ctx = context.WithValue(ctx, removingNetworkAbstractContextKey, networkAbstract)
+		ctx = context.WithValue(ctx, removingNetworkPropertiesContextKey, props)
+		return nil
+	})
+	if xerr != nil {
+		return xerr
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
