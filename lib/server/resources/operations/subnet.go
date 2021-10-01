@@ -24,8 +24,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 

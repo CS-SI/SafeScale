@@ -22,11 +22,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	uuid "github.com/satori/go.uuid"
-	"github.com/sirupsen/logrus"
 )
 
 //go:generate stringer -type=TaskStatus
@@ -132,6 +133,7 @@ type task struct {
 	cancelDisengaged     bool // used to not react on cancel signal (internal use only, not exposed by API)
 	runTerminated        bool // used to keep track of run terminated state
 	controllerTerminated bool // used to keep track of controller terminated state
+	resultObtained       bool // used to know that the result has been returned by the TaskAction
 
 	start    time.Time
 	duration time.Duration
@@ -481,6 +483,8 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 				ctrlErr := instance.controller(action, params, timeout)
 
 				instance.lock.Lock()
+				defer instance.lock.Unlock()
+
 				if ctrlErr != nil {
 					if instance.err != nil {
 						_ = instance.err.AddConsequence(fail.Wrap(ctrlErr, "unexpected error running the Task controller"))
@@ -488,7 +492,6 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 						instance.err = fail.Wrap(ctrlErr, "unexpected error running the Task controller")
 					}
 				}
-				instance.lock.Unlock()
 			}()
 		}
 		return instance, nil
@@ -869,14 +872,15 @@ func (instance *task) processTimeout(timeout time.Duration) {
 	instance.lock.RUnlock()
 
 	if status != ABORTED {
-		instance.abortCh <- struct{}{} // Note: DO NOT put this inside a lock
+		instance.abortCh <- struct{}{} // Note: DO NOT put this inside a lock (blocking write, unbuffered channel...)
 
 		instance.lock.Lock()
+		defer instance.lock.Unlock()
+
 		if !instance.runTerminated {
 			instance.err = fail.TimeoutError(instance.err, timeout)
 		}
 		instance.status = TIMEOUT
-		instance.lock.Unlock()
 	}
 }
 
@@ -884,10 +888,12 @@ func (instance *task) processTimeout(timeout time.Duration) {
 func (instance *task) run(action TaskAction, params TaskParameters) {
 	defer func() {
 		if err := recover(); err != nil {
-			instance.runTerminatedCh <- struct{}{} // Note: Do not put this inside a lock
+			instance.runTerminatedCh <- struct{}{} // Note: Do not put this inside a lock (blocking write, unbuffered channel...)
 			close(instance.runTerminatedCh)        // Note: This channel MUST BE CLOSED
 
 			instance.lock.Lock()
+			defer instance.lock.Unlock()
+
 			instance.runTerminated = true
 			instance.cancelDisengaged = true
 			if instance.err != nil {
@@ -895,16 +901,17 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 			} else {
 				instance.err = fail.RuntimePanicError("panic happened: %v", err)
 			}
+
 			instance.result = nil
+			instance.resultObtained = true
 			instance.status = DONE
-			instance.lock.Unlock()
 		}
 	}()
 
 	result, xerr := action(instance, params)
 
-	instance.runTerminatedCh <- struct{}{} // VPL: Do not put this inside a lock
-	close(instance.runTerminatedCh)        // VPL: this channel MUST BE CLOSED
+	instance.runTerminatedCh <- struct{}{} // Note: Do not put this inside a lock
+	close(instance.runTerminatedCh)        // Note: this channel MUST BE CLOSED
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
@@ -912,31 +919,36 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 	instance.cancelDisengaged = true
 	instance.runTerminated = true
 	instance.result = result
+	instance.resultObtained = true
 
-	switch xerr.(type) {
-	case *fail.ErrAborted:
-		if instance.err != nil {
-			switch cerr := instance.err.(type) {
-			case *fail.ErrAborted:
-				// leave instance.err as it is
-				break
-			default:
-				_ = cerr.AddConsequence(xerr)
+	currentError := instance.err
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrAborted:
+			if currentError != nil {
+				switch cerr := currentError.(type) {
+				case *fail.ErrAborted:
+					// leave instance.err as it is
+					break
+				default:
+					_ = cerr.AddConsequence(xerr)
+				}
+			} else {
+				currentError = xerr
 			}
-		} else {
-			instance.err = xerr
-		}
 
-	default:
-		if instance.err != nil {
-			switch cerr := instance.err.(type) { // nolint
-			case fail.Error:
-				_ = cerr.AddConsequence(xerr)
+		default:
+			if currentError != nil {
+				switch cerr := currentError.(type) { // nolint
+				case fail.Error:
+					_ = cerr.AddConsequence(xerr)
+				}
+			} else {
+				currentError = xerr
 			}
-		} else {
-			instance.err = xerr
 		}
 	}
+	instance.err = currentError
 }
 
 // Run starts task, waits its completion then return the error code
@@ -980,7 +992,8 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			instance.lock.RLock()
 			runTerminated := instance.runTerminated
 			instance.lock.RUnlock()
-			<-instance.controllerTerminatedCh
+
+			<-instance.controllerTerminatedCh // Note: DO NOT PUT this inside a lock (blocking channel write, unbuffered channel)
 
 			instance.lock.Lock()
 			var forgedError fail.Error
@@ -1004,14 +1017,15 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			if runTerminated {
 				instance.status, status = DONE, DONE
 			}
-			instance.lock.Unlock()
+			instance.lock.Unlock() // Note: Do not defer this, the loop continue
 			continue
 
 		case ABORTED:
 			instance.lock.RLock()
 			runTerminated := instance.runTerminated
 			instance.lock.RUnlock()
-			<-instance.controllerTerminatedCh
+
+			<-instance.controllerTerminatedCh // Note: DO NOT PUT this inside a lock (blocking channel write, unbuffered channel)
 
 			instance.lock.Lock()
 			// In case of ABORT, if an error is already there, the Task has ended, so just return this error with the result
@@ -1032,13 +1046,14 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			if runTerminated {
 				instance.status, status = DONE, DONE
 			}
-			instance.lock.Unlock()
+			instance.lock.Unlock() // Note: Do not defer this, the loop continue
 			continue
 
 		case RUNNING:
 			instance.lock.Lock()
 			runTerminated := instance.runTerminated
 			instance.lock.Unlock()
+
 			<-instance.controllerTerminatedCh
 
 			// Reload status, it may have changed since the controller terminated
@@ -1051,22 +1066,31 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 			continue
 
 		case DONE:
-			instance.lock.RLock()
-			//goland:noinspection GoDeferInLoop
-			defer instance.lock.RUnlock()
-
 			traceR.trace("run lasted %v, controller lasted %v\n", instance.stats.runDuration, instance.stats.controllerDuration)
-			if instance.ctx.Err() != nil && instance.err == nil {
-				return instance.result, fail.AbortedError(instance.ctx.Err())
+
+			instance.lock.Lock()
+			if instance.resultObtained {
+				//goland:noinspection GoDeferInLoop
+				defer instance.lock.Unlock()    // Note: we can defer here, we will abort the loop
+
+				if instance.ctx.Err() != nil && instance.err == nil {
+					instance.err = fail.AbortedError(instance.ctx.Err())
+				}
+				return instance.result, instance.err
 			}
 
-			return instance.result, instance.err
+			instance.lock.Unlock()
+			// result not returned by TaskAction yet, continue
+			continue
 
 		case UNKNOWN:
 			fallthrough
 		default:
 			return nil, fail.InconsistentError("cannot wait task '%s': unknown status (%s)", tid, status)
 		}
+
+		// Leave space to the CPU
+		time.Sleep(time.Millisecond * 1) // FIXME: hardcoded value
 	}
 }
 
@@ -1098,12 +1122,18 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 		return false, nil, fail.InconsistentError("cannot wait task '%s': has not been started", tid)
 
 	case DONE:
-		instance.lock.RLock()
-		defer instance.lock.RUnlock()
-		if instance.ctx.Err() != nil && instance.err == nil {
-			return true, instance.result, fail.AbortedError(instance.ctx.Err())
+		instance.lock.Lock()
+		defer instance.lock.Unlock()
+
+		if instance.resultObtained {
+			if instance.ctx.Err() != nil && instance.err == nil {
+				instance.err = fail.AbortedError(instance.ctx.Err())
+			}
+			return true, instance.result, instance.err
 		}
-		return true, instance.result, instance.err
+
+		// result has not been returned yet by TaskAction
+		return false, nil, nil
 
 	case ABORTED:
 		fallthrough
@@ -1111,10 +1141,8 @@ func (instance *task) TryWait() (bool, TaskResult, fail.Error) {
 		fallthrough
 	case RUNNING:
 		if len(instance.controllerTerminatedCh) == 1 {
-			_, err := instance.Wait()
-			instance.lock.RLock()
-			defer instance.lock.RUnlock()
-			return true, instance.result, err
+			result, err := instance.Wait()
+			return true, result, err
 		}
 		return false, nil, nil
 
@@ -1146,12 +1174,17 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 		return false, nil, fail.InconsistentError("cannot wait a Task that has not be started")
 
 	case DONE:
-		instance.lock.RLock()
-		defer instance.lock.RUnlock()
-		if instance.ctx.Err() != nil && instance.err == nil {
-			return true, instance.result, fail.AbortedError(instance.ctx.Err())
+		instance.lock.Lock()
+		defer instance.lock.Unlock()
+
+		if instance.resultObtained {
+			if instance.ctx.Err() != nil && instance.err == nil {
+				instance.err = fail.AbortedError(instance.ctx.Err())
+			}
+			return true, instance.result, instance.err
 		}
-		return true, instance.result, instance.err
+
+		return false, nil, fail.InconsistentError("done task has not returned the result")
 
 	case ABORTED:
 		fallthrough

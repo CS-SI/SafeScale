@@ -206,7 +206,7 @@ func TestCallingReadyTaskGroup(t *testing.T) {
 
 	res, err := overlord.Wait()
 	require.Empty(t, res)
-	require.NotNil(t, err)
+	require.Nil(t, err) // recent change: waiting on TaskGroup where nothing has been started is now a success
 
 	done, res, err := overlord.WaitFor(10 * time.Millisecond)
 	require.False(t, done)
