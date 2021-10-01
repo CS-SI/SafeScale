@@ -22,7 +22,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
-	
+
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-
 )
 
 // delete effectively remove a Security Group
@@ -62,7 +61,6 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 	var (
 		abstractSG *abstract.SecurityGroup
-		networkID string
 	)
 	svc := instance.GetService()
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -72,7 +70,6 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		networkID = abstractSG.Network
 		if !force {
 			// check bonds to hosts
 			innerXErr := props.Inspect(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
