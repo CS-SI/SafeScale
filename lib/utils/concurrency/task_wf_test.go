@@ -397,29 +397,31 @@ func TestChildrenWaitingGameWithContextCancelfuncsWF(t *testing.T) {
 		}
 	}
 
-	// tests are right, errorExpected it what it should be
-	// previous versions got the work done fast enough, now we don't, why ?
-	// if trigger >= (sleep + latency) and we have an error (we should NOT), this is failure
-	funk(1, 10, 5, 1, true)
-	funk(2, 10, 5, 5, true) // latency matters ?
-	funk(3, 10, 5, 6, true) // this test and the previous should be equivalent
-	// VPL: Task took 12.22ms to end, cancel hits at 12.16ms -> Aborted
-	funk(4, 10, 5, 12, false) // latency matters ?
-	funk(5, 10, 5, 13, false)
-	funk(6, 50, 10, 80, false)
-	funk(7, 50, 10, 300, false)
-	funk(8, 50, 10, 3000, false)
-	funk(9, 50, 10, 6000, false)
-	funk(10, 50, 10, 46, true) // latency matters, this sometimes fails
-	funk(11, 50, 10, 47, true) // latency matters, this sometimes fails
-	// VPL: on macM1, cancel signal hits at 51.80ms, task detects abort at 57.11ms -> Aborted
-	funk(12, 60, 20, 63, false) // latency matters, this sometimes fails
-	// VPL: on macM1, cancel signals hits at 52.13ms, task detects abort at 57.36ms -> Aborted
-	funk(13, 60, 20, 64, false) // latency matters, this sometimes fails
-	funk(14, 60, 20, 70, false) // latency matters, this sometimes fails
-	// VPL: on macM1, task ended its work after 62.71ms, before cancel hits -> no error
-	funk(15, 60, 20, 73, false) // if we go far enough, no errors
-	funk(16, 60, 20, 83, false) // if we go far enough, no errors
+	for i := 0; i < 5; i++ {
+		// tests are right, errorExpected it what it should be
+		// previous versions got the work done fast enough, now we don't, why ?
+		// if trigger >= (sleep + latency) and we have an error (we should NOT), this is failure
+		funk(1, 10, 5, 1, true)
+		funk(2, 10, 5, 5, true) // latency matters ?
+		funk(3, 10, 5, 6, true) // this test and the previous should be equivalent
+		// VPL: Task took 12.22ms to end, cancel hits at 12.16ms -> Aborted
+		funk(4, 10, 5, 12, false) // latency matters ?
+		funk(5, 10, 5, 13, false)
+		funk(6, 50, 10, 80, false)
+		funk(7, 50, 10, 300, false)
+		funk(8, 50, 10, 3000, false)
+		funk(9, 50, 10, 6000, false)
+		funk(10, 50, 10, 45, true) // latency matters, this sometimes fails
+		funk(11, 50, 10, 46, true) // latency matters, this sometimes fails
+		// VPL: on macM1, cancel signal hits at 51.80ms, task detects abort at 57.11ms -> Aborted
+		funk(12, 60, 20, 63, false) // latency matters, this sometimes fails
+		// VPL: on macM1, cancel signals hits at 52.13ms, task detects abort at 57.36ms -> Aborted
+		funk(13, 60, 20, 64, false) // latency matters, this sometimes fails
+		funk(14, 60, 20, 70, false) // latency matters, this sometimes fails
+		// VPL: on macM1, task ended its work after 62.71ms, before cancel hits -> no error
+		funk(15, 60, 20, 73, false) // if we go far enough, no errors
+		funk(16, 60, 20, 83, false) // if we go far enough, no errors
+	}
 }
 
 func TestDoesAbortReallyAbortOrIsJustFakeNewsWF(t *testing.T) {
