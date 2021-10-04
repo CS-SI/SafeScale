@@ -101,8 +101,30 @@ feature:
                             sfFail 197 "master didn't join (no .joined file)"
 
             add:
-                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
+                pace: ca-certs,sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
                 steps:
+                    ca-certs:
+                        targets:
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            # Fixes Let's Encrypt root certificate expiration error with wget occurring 09/30/21
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfWaitForApt
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y ca-certificates || sfFail 192
+                                    ;;
+                                redhat|rhel|fedora|centos)
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum install -y ca-certificates || sfFail 193
+                                    ;;
+                                *)
+                                    echo "Unmanaged Linux distribution '$LINUX_KIND'"
+                                    sfFail 194
+                                    ;;
+                            esac
+                            sfExit
+
                     sysconf:
                         targets:
                             gateways: all

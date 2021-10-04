@@ -729,6 +729,12 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 			PortTo:      int32(c.Int("port-to")),
 			Targets:     c.StringSlice("cidr"),
 		}
+		switch rule.Direction {
+		case securitygroupruledirection.Ingress:
+			rule.Sources = c.StringSlice("cidr")
+		case securitygroupruledirection.Egress:
+			rule.Targets = c.StringSlice("cidr")
+		}
 
 		if err := clientSession.SecurityGroup.AddRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout()); err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1320,7 +1326,7 @@ var subnetSecurityGroupAddCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.BindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), c.Bool("disabled"), temporal.GetExecutionTimeout())
+		err := clientSession.Subnet.BindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "adding security group to network", false).Error())))

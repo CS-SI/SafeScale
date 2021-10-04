@@ -45,7 +45,11 @@ import (
 // safescale network subnet inspect net1 subnet-1
 
 // SubnetListener subnet service server gRPC
-type SubnetListener struct{}
+type SubnetListener struct{
+	protocol.UnimplementedSubnetServiceServer
+}
+
+// VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
 
 // Create a new subnet
 func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRequest) (_ *protocol.Subnet, err error) {

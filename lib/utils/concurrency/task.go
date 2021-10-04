@@ -266,6 +266,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 		abortCh:                make(chan struct{}, 1),
 		runTerminatedCh:        make(chan struct{}, 1),
 		controllerTerminatedCh: make(chan struct{}, 1),
+		result:                 make(chan TaskResult),
 	}
 
 	generateID := true
@@ -1229,6 +1230,7 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 				tout := fail.TimeoutError(xerr, duration, "timeout of %s waiting for Task '%s'", duration, tid)
 				instance.lock.RLock()
 				defer instance.lock.RUnlock()
+
 				return false, instance.result, tout
 			}
 		} else {

@@ -17,11 +17,9 @@
 package operations
 
 import (
+	"context"
 	"reflect"
 	"strings"
-
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -32,11 +30,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // delete effectively remove a Security Group
@@ -63,7 +58,12 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		abstractSG *abstract.SecurityGroup
 		networkID  string
 	)
-	svc := instance.GetService()
+
+	value := ctx.Value(removingNetworkAbstractContextKey)
+	if value != nil {
+		networkID = value.(*abstract.Network).ID
+	}
+
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		var ok bool
 		abstractSG, ok = clonable.(*abstract.SecurityGroup)
@@ -71,8 +71,9 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		networkID = abstractSG.Network
-		logrus.Tracef("Trying to destory security group of network %s", networkID)
+		if networkID == "" {
+			networkID = abstractSG.Network
+		}
 
 		if !force {
 			// check bonds to hosts
@@ -145,7 +146,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		// FIXME: how to restore bindings in case of failure or abortion ? This would prevent the use of DisarmAbortSignal here...
 		// defer task.DisarmAbortSignal()()
 
-		// First unbind from subnets (which will unbind from hosts attached to these subnets...)
+		// unbind from Subnets (which will unbind from Hosts attached to these Subnets...)
 		innerXErr := props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgnV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
@@ -158,7 +159,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 			return innerXErr
 		}
 
-		// Second, unbind from the hosts if there are remaining ones
+		// unbind from the Hosts if there are remaining ones
 		innerXErr = props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
@@ -170,69 +171,31 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 			return innerXErr
 		}
 
-		// Conditions are met, delete SecurityGroup
-		// FIXME: communication failure handled at service level, not necessary anymore to retry here
-		return netretry.WhileCommunicationUnsuccessfulDelay1Second(
-			func() error {
-				if innerXErr := svc.DeleteSecurityGroup(abstractSG); innerXErr != nil {
-					switch innerXErr.(type) {
-					case *fail.ErrNotFound:
-						return retry.StopRetryError(innerXErr)
-					default:
-						return innerXErr
-					}
-				}
-				return nil
-			},
-			temporal.GetCommunicationTimeout(),
-		)
+		// delete SecurityGroup resource
+		return deleteProviderSecurityGroup(instance.GetService(), abstractSG)
 	})
-	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// consider a Security Group not found as a successful deletion
-			debug.IgnoreError(xerr)
-		case *fail.ErrTimeout:
-			// consider a Security Group not found as a successful deletion
-			cause := fail.Cause(xerr)
-			if _, ok := cause.(*fail.ErrNotFound); ok {
-				debug.IgnoreError(cause)
-			} else {
-				return fail.Wrap(cause, "timeout")
-			}
-		case *retry.ErrStopRetry:
-			// consider a Security Group not found as a successful deletion
-			cause := fail.Cause(xerr)
-			if _, ok := cause.(*fail.ErrNotFound); ok {
-				debug.IgnoreError(cause)
-			} else {
-				return fail.Wrap(cause, "stopping retries")
-			}
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
-	// // Again, if we arrive here, we want the deletion of metadata not to be interrupted by abort, it's too late
-	// defer task.DisarmAbortSignal()()
-
-	// Deletes metadata from Object Storage
+	// delete Security Group metadata
 	xerr = instance.MetadataCore.Delete()
-	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		// If entry not found, considered as a success
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			logrus.Tracef("core not found, deletion considered as a success")
-			debug.IgnoreError(xerr)
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
+	// delete Security Groups in Network metadata if the current operation is not to remove this Network (otherwise may deadlock)
+	removingNetworkAbstract := ctx.Value(removingNetworkAbstractContextKey)
+	if removingNetworkAbstract == nil {
+		return instance.updateNetworkMetadataOnRemoval(networkID)
+	}
+	return nil
+}
+
+// updateNetworkMetadataOnRemoval removes the reference to instance in Network metadata
+func (instance *SecurityGroup) updateNetworkMetadataOnRemoval(networkID string) fail.Error {
 	// -- update Security Groups in Network metadata
-	networkInstance, xerr := LoadNetwork(svc, abstractSG.Network)
+	networkInstance, xerr := LoadNetwork(instance.GetService(), networkID)
 	if xerr != nil {
 		return xerr
 	}
@@ -244,8 +207,8 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 				return fail.InconsistentError("'*propertiesv1.NetworkSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			delete(nsgV1.ByID, abstractSG.ID)
-			delete(nsgV1.ByName, abstractSG.Name)
+			delete(nsgV1.ByID, instance.GetID())
+			delete(nsgV1.ByName, instance.GetName())
 			return nil
 		})
 	})

@@ -44,7 +44,9 @@ import (
 // safescale share inspect share1
 
 // ShareListener Share service server grpc
-type ShareListener struct{}
+type ShareListener struct{
+	protocol.UnimplementedShareServiceServer
+}
 
 // Create calls share service creation
 func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition) (_ *protocol.ShareDefinition, err error) {

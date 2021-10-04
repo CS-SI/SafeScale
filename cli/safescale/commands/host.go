@@ -681,8 +681,26 @@ var hostSecurityGroupListCommand = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
-		return clitools.SuccessResponse(resp)
+
+		out, err := reformatHostGroups(resp.Hosts)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "formatting of result", false).Error())))
+		}
+		return clitools.SuccessResponse(out)
 	},
+}
+
+func reformatHostGroups(in []*protocol.SecurityGroupBond) ([]interface{}, fail.Error) {
+	out := make([]interface{}, 0, len(in))
+	jsoned, err := json.Marshal(in)
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+	err = json.Unmarshal(jsoned, &out)
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+	return out, nil
 }
 
 var hostSecurityGroupEnableCommand = &cli.Command{

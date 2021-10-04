@@ -24,6 +24,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -38,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
@@ -455,7 +456,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := instance.deleteSubnetAndConfirm(instance.GetID()); derr != nil {
+			if derr := instance.deleteSubnetThenWaitCompletion(instance.GetID()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 			} else {
 				logrus.Warningf("the subnet '%s' should be gone by now", instance.GetID())
@@ -518,7 +519,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
 		if ferr != nil && abstractSubnet != nil && !req.KeepOnFailure {
-			if derr := instance.deleteSubnetAndConfirm(abstractSubnet.ID); derr != nil {
+			if derr := instance.deleteSubnetThenWaitCompletion(abstractSubnet.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 			}
 		}
@@ -1164,8 +1165,8 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 	}
 }
 
-// deleteSubnetAndConfirm deletes the Subnet identified by 'id' and wait for deletion confirmation
-func (instance *Subnet) deleteSubnetAndConfirm(id string) fail.Error {
+// deleteSubnetThenWaitCompletion deletes the Subnet identified by 'id' and wait for deletion confirmation
+func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 	svc := instance.GetService()
 	xerr := svc.DeleteSubnet(id)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1706,6 +1707,11 @@ func (instance *Subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 	return gatewayIPs, nil
 }
 
+var (
+	removingSubnetAbstractContextKey   = "removing_subnet_abstract"
+	removingSubnetPropertiesContextKey = "removing_subnet_properties"
+)
+
 // Delete deletes a Subnet
 func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -1715,6 +1721,33 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	var (
+		subnetAbstract *abstract.Subnet
+		subnetHosts    *propertiesv1.SubnetHosts
+	)
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		var ok bool
+		subnetAbstract, ok = clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		ctx = context.WithValue(ctx, removingSubnetAbstractContextKey, subnetAbstract)
+		ctx = context.WithValue(ctx, removingSubnetPropertiesContextKey, props)
+
+		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			var ok bool
+			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -1747,6 +1780,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		hostList []string
 	)
 	svc := instance.GetService()
+	subnetName := instance.GetName()
 	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
@@ -1805,7 +1839,8 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			return innerXErr
 		}
 
-		// Unbind Host from current Subnet (not done by relaxedDeleteHost as Host is a gateway to avoid dead-lock as Subnet instance may already be locked)
+		// FIXME: see if we can adapt relaxedDeleteHost to use context values and prevent duplicated code...
+		// Unbind Host from current Subnet (not done by relaxedDeleteHost as Hosts are gateways, to avoid deadlock as Subnet instance may already be locked)
 		if len(gwIDs) > 0 {
 			for _, v := range gwIDs {
 				if innerXErr = instance.unsafeAbandonHost(props, v); innerXErr != nil {
@@ -1828,7 +1863,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.unbindSecurityGroups(ctx, ssgV1)
+			innerXErr := instance.onRemovalUnbindSecurityGroups(ctx, subnetHosts, ssgV1)
 			return innerXErr
 		})
 		if innerXErr != nil {
@@ -1851,11 +1886,9 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 		// finally delete Subnet
 		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
-		if innerXErr = instance.deleteSubnetAndConfirm(as.ID); innerXErr != nil {
+		if innerXErr = instance.deleteSubnetThenWaitCompletion(as.ID); innerXErr != nil {
 			return innerXErr
 		}
-
-		logrus.Infof("Subnet '%s' successfully deleted.", as.Name)
 
 		// Delete Subnet's own Security Groups
 		return instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
@@ -1866,22 +1899,25 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// Remove metadata
-	return instance.MetadataCore.Delete()
+	xerr = instance.MetadataCore.Delete()
+	if xerr != nil {
+		return xerr
+	}
+
+	logrus.Infof("Subnet '%s' successfully deleted.", subnetName)
+	return nil
 }
 
 // deleteSecurityGroups deletes the Security Groups created for the Subnet
 func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string) (xerr fail.Error) {
-	var (
-		sgInstance   resources.SecurityGroup
-		sgName, sgID string
-	)
 	svc := instance.GetService()
 	for _, v := range sgs {
 		if v == "" {
 			return fail.NewError("unexpected empty security group")
 		}
 
-		if sgInstance, xerr = LoadSecurityGroup(svc, v); xerr != nil {
+		sgInstance, xerr := LoadSecurityGroup(svc, v)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// Security Group not found, consider this as a success
@@ -1892,10 +1928,11 @@ func (instance *Subnet) deleteSecurityGroups(ctx context.Context, sgs [3]string)
 			}
 		}
 
-		sgName = sgInstance.GetName()
-		sgID = sgInstance.GetID()
+		sgName := sgInstance.GetName()
+		sgID := sgInstance.GetID()
 		logrus.Debugf("Deleting Security Group '%s' (%s)...", sgName, sgID)
-		if xerr = sgInstance.Delete(ctx, true); xerr != nil {
+		xerr = sgInstance.Delete(ctx, true)
+		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				// Security Group not found, consider this as a success
@@ -1992,11 +2029,16 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 	return ids, nil
 }
 
-// unbindSecurityGroups makes sure the security groups bound to Subnet are unbound
-func (instance *Subnet) unbindSecurityGroups(ctx context.Context, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
+// onRemovalUnbindSecurityGroups makes sure the security groups bound to Subnet are unbound
+func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
+	unbindParams := taskUnbindFromHostsAttachedToSubnetParams{
+		subnetID:    instance.GetID(),
+		subnetName:  instance.GetName(),
+		subnetHosts: subnetHosts,
+	}
 	svc := instance.GetService()
-	for k, v := range sgs.ByName {
-		sgInstance, xerr := LoadSecurityGroup(svc, v)
+	for k := range sgs.ByID {
+		sgInstance, xerr := LoadSecurityGroup(svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -2011,24 +2053,16 @@ func (instance *Subnet) unbindSecurityGroups(ctx context.Context, sgs *propertie
 			defer func(sgInstance resources.SecurityGroup) {
 				sgInstance.Released()
 			}(sgInstance)
-		}
 
-		if sgInstance != nil {
-			xerr = sgInstance.UnbindFromSubnet(ctx, instance)
-			xerr = debug.InjectPlannedFail(xerr)
+			xerr = sgInstance.unbindFromSubnetHosts(ctx, unbindParams)
 			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					// consider a Security Group not found as a successful unbind
-					debug.IgnoreError(xerr)
-				default:
-					return xerr
-				}
+				return xerr
 			}
-		}
 
-		delete(sgs.ByID, v)
-		delete(sgs.ByName, k)
+			// VPL: no need to update SubnetSecurityGroups property, the Subnet is being removed
+			// delete(sgs.ByID, v)
+			// delete(sgs.ByName, k)
+		}
 	}
 	return nil
 }

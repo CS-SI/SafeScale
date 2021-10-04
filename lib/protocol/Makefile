@@ -16,7 +16,7 @@ generate: sdk
 sdk:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building using $(GOMODPATH)/pkg/mod, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;
 	@ln -f -s $(GOMODPATH)/pkg/mod/github.com/golang/protobuf@v1.3.2 $(GOMODPATH)/pkg/mod/github.com/golang/protobuf 2> /dev/null || true
-	@protoc -I. -I$(GOMODPATH)/pkg/mod --go_out=plugins=grpc:. safescale.proto
+	@protoc -I. -I$(GOMODPATH)/pkg/mod --go_out=. --go-grpc_out=. safescale.proto
 
 has_python:
 	@which python3 > /dev/null; if [ $$? -ne 0 ]; then echo "No python installed !"; exit 1; fi
