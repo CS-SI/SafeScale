@@ -50,7 +50,7 @@ WORKDIR /tmp
 # ----------------------
 RUN wget https://dl.google.com/go/go1.16.2.linux-amd64.tar.gz \
 && tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz
-ENV PATH /home/oscar/.gvm/pkgsets/go1.16.7/global/bin:/home/oscar/.gvm/gos/go1.16.7/bin:/home/oscar/.gvm/pkgsets/go1.16.7/global/overlay/bin:/home/oscar/.gvm/bin:/home/oscar/.gvm/bin:/home/oscar/.nvm/versions/node/v10.16.3/bin:/home/oscar/.pyenv/plugins/pyenv-virtualenv/shims:/home/oscar/.pyenv/shims:/home/oscar/.pyenv/bin:/home/oscar/.cargo/bin:/home/oscar/.cargo/bin:/home/oscar/.local/alt/shims:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/oscar/.garden/bin:/home/oscar/Apps:/home/oscar/.fzf/bin:/usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV PATH /usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 RUN rm /tmp/go1.16.2.linux-amd64.tar.gz
 
 # ----------------------
