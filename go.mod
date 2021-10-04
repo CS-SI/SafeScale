@@ -63,6 +63,7 @@ require (
 	golang.org/x/net v0.0.0-20210908191846-a5e095526f91
 	golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84
 	golang.org/x/sys v0.0.0-20210908233432-aa78b53d3365
+	golang.org/x/tools v0.1.0 // indirect
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect

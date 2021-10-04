@@ -1725,7 +1725,6 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 	var (
 		subnetAbstract *abstract.Subnet
-		subnetProps    *serialize.JSONProperties
 		subnetHosts    *propertiesv1.SubnetHosts
 	)
 	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1736,7 +1735,6 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		}
 		ctx = context.WithValue(ctx, removingSubnetAbstractContextKey, subnetAbstract)
 		ctx = context.WithValue(ctx, removingSubnetPropertiesContextKey, props)
-		subnetProps = props
 
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
