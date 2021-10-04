@@ -21,9 +21,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
-
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
@@ -35,7 +32,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // delete effectively remove a Security Group
@@ -60,6 +56,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 	var (
 		abstractSG *abstract.SecurityGroup
+		networkID  string
 	)
 
 	value := ctx.Value(removingNetworkAbstractContextKey)
@@ -72,6 +69,10 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		abstractSG, ok = clonable.(*abstract.SecurityGroup)
 		if !ok {
 			return fail.InconsistentError("'*abstract.SecurityGroup' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		if networkID == "" {
+			networkID = abstractSG.Network
 		}
 
 		if !force {

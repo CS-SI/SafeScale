@@ -456,7 +456,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
 		if ferr != nil && !req.KeepOnFailure {
-			if derr := instance.deleteSubnetAndConfirm(instance.GetID()); derr != nil {
+			if derr := instance.deleteSubnetThenWaitCompletion(instance.GetID()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 			} else {
 				logrus.Warningf("the subnet '%s' should be gone by now", instance.GetID())
@@ -519,7 +519,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 	// Starting from here, delete Subnet if exiting with error
 	defer func() {
 		if ferr != nil && abstractSubnet != nil && !req.KeepOnFailure {
-			if derr := instance.deleteSubnetAndConfirm(abstractSubnet.ID); derr != nil {
+			if derr := instance.deleteSubnetThenWaitCompletion(abstractSubnet.ID); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 			}
 		}
@@ -1165,8 +1165,8 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Conte
 	}
 }
 
-// deleteSubnetAndConfirm deletes the Subnet identified by 'id' and wait for deletion confirmation
-func (instance *Subnet) deleteSubnetAndConfirm(id string) fail.Error {
+// deleteSubnetThenWaitCompletion deletes the Subnet identified by 'id' and wait for deletion confirmation
+func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 	svc := instance.GetService()
 	xerr := svc.DeleteSubnet(id)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1708,8 +1708,8 @@ func (instance *Subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 }
 
 var (
-	removingSubnetAbstractContextKey = "removing_subnet_abstract"
-	removingSubnetPropertiesContextKey = "remocing_subnet_properties"
+	removingSubnetAbstractContextKey   = "removing_subnet_abstract"
+	removingSubnetPropertiesContextKey = "removing_subnet_properties"
 )
 
 // Delete deletes a Subnet
@@ -1723,14 +1723,30 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	var (
+		subnetAbstract *abstract.Subnet
+		subnetProps    *serialize.JSONProperties
+		subnetHosts    *propertiesv1.SubnetHosts
+	)
 	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		subnetAbstract, ok := clonable.(*abstract.Subnet)
+		var ok bool
+		subnetAbstract, ok = clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 		ctx = context.WithValue(ctx, removingSubnetAbstractContextKey, subnetAbstract)
 		ctx = context.WithValue(ctx, removingSubnetPropertiesContextKey, props)
-		return nil
+		subnetProps = props
+
+		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			var ok bool
+			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			return nil
+		})
 	})
 	if xerr != nil {
 		return xerr
@@ -1825,7 +1841,8 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			return innerXErr
 		}
 
-		// Unbind Host from current Subnet (not done by relaxedDeleteHost as Host is a gateway to avoid dead-lock as Subnet instance may already be locked)
+		// FIXME: see if we can adapt relaxedDeleteHost to use context values and prevent duplicated code...
+		// Unbind Host from current Subnet (not done by relaxedDeleteHost as Hosts are gateways, to avoid deadlock as Subnet instance may already be locked)
 		if len(gwIDs) > 0 {
 			for _, v := range gwIDs {
 				if innerXErr = instance.unsafeAbandonHost(props, v); innerXErr != nil {
@@ -1848,7 +1865,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 				return fail.InconsistentError("'*propertiesv1.SubnetSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr := instance.onRemovalUnbindSecurityGroups(ctx, ssgV1)
+			innerXErr := instance.onRemovalUnbindSecurityGroups(ctx, subnetHosts, ssgV1)
 			return innerXErr
 		})
 		if innerXErr != nil {
@@ -1871,10 +1888,9 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 
 		// finally delete Subnet
 		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
-		if innerXErr = instance.deleteSubnetAndConfirm(as.ID); innerXErr != nil {
+		if innerXErr = instance.deleteSubnetThenWaitCompletion(as.ID); innerXErr != nil {
 			return innerXErr
 		}
-
 
 		// Delete Subnet's own Security Groups
 		return instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
@@ -2016,22 +2032,7 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 }
 
 // onRemovalUnbindSecurityGroups makes sure the security groups bound to Subnet are unbound
-func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
-	var subnetHosts *propertiesv1.SubnetHosts
-	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			var ok bool
-			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			return nil
-		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
+func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subnetHosts *propertiesv1.SubnetHosts, sgs *propertiesv1.SubnetSecurityGroups) (xerr fail.Error) {
 	unbindParams := taskUnbindFromHostsAttachedToSubnetParams{
 		subnetID:    instance.GetID(),
 		subnetName:  instance.GetName(),

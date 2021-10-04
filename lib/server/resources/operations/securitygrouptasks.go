@@ -120,7 +120,13 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 		for k, v := range p.subnetHosts.ByID {
 			hostInstance, xerr := LoadHost(svc, k)
 			if xerr != nil {
-				return nil, xerr
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					// if Host is not found, consider operation as a success and continue
+					continue
+				default:
+					return nil, xerr
+				}
 			}
 			defer func(in resources.Host) {
 				in.Released()

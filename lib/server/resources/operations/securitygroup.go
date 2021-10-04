@@ -386,6 +386,9 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		return fail.Wrap(xerr, "failed to create security group '%s'", name)
 	}
 
+	// make sure Network ID is stored in Security Group abstract
+	asg.Network = networkID
+
 	defer func() {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -1478,6 +1481,10 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 		default:
 			return xerr
 		}
+	}
+	task, xerr = concurrency.NewTaskWithParent(task)
+	if xerr != nil {
+		return xerr
 	}
 
 	if task.Aborted() {
