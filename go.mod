@@ -67,6 +67,7 @@ require (
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.41.0
+	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0 // indirect
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect

@@ -198,7 +198,7 @@ ifneq ($(STRICT),1)
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null && $(GO) install github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null; \
 	fi
 	@$(WHICH) protoc-gen-go-grpc > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go-grpc...\n" && $(GO) get google.golang.org/grpc/cmd/protoc-gen-go-grpcv1.1.0 &>/dev/null && $(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpcv1.1.0 &>/dev/null; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go-grpc...\n" && $(GO) get google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null && $(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null; \
 	fi
 	@$(WHICH) minimock > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) get $(MINIMOCK)@v3.0.9 &>/dev/null || true; \
