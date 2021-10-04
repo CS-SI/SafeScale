@@ -211,8 +211,8 @@ func (sgr *SecurityGroupRule) Validate() fail.Error {
 				return fail.InvalidRequestError("rule --port-from must contain a positive integer")
 			}
 		if len(sgr.Sources) == 0 && len(sgr.Targets) == 0 {
-				return fail.InvalidRequestError("rule --cidr must be defined")
-			}
+			return fail.InvalidRequestError("rule --cidr must be defined")
+		}
 	default:
 		// protocol may be empty, meaning allow everything, only if there are no ports defined
 		if sgr.PortFrom > 0 || sgr.PortTo > 0 {
