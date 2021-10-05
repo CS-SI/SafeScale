@@ -16,16 +16,20 @@
 
 package serialize
 
+
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data/shielded"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/shielded"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
@@ -261,7 +265,7 @@ func (x *JSONProperties) Deserialize( /*task concurrency.Task, */ buf []byte) (x
 	var unjsoned = map[string]string{}
 	if jserr := json.Unmarshal(buf, &unjsoned); jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			logrus.Tracef("*JSONProperties.Deserialize(): Unmarshalling buf to string failed: %s", jserr.Error())
