@@ -2,7 +2,9 @@ name: Go Build CI
 
 on:
   push:
+    branches: [ review/ut ]
   pull_request:
+    branches: [ review/ut ]
 
 env:
   GOVERSION: '1.16.8' # The Go version to download (if necessary) and use.
