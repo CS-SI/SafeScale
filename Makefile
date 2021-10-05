@@ -183,7 +183,7 @@ getdevdeps: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing without version tags. $(NO_COLOR)\n";
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(WHICH) rice > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) get $(RICE)@v1.0.2 &>/dev/null && $(GO) install $(RICE)/rice &>/dev/null; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) get $(RICE)/rice@v1.0.2 &>/dev/null && $(GO) install $(RICE)/rice &>/dev/null; \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing rice module...$(NO_COLOR)\n" && $(GO) mod download github.com/GeertJohan/go.rice &>/dev/null; \
 	fi
 	@sleep 2
