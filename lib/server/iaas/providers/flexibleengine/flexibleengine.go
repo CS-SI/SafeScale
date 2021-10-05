@@ -21,8 +21,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
@@ -30,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"

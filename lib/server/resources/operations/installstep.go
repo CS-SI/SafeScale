@@ -236,8 +236,9 @@ type step struct {
 	WallTime time.Duration
 	// YamlKey contains the root yaml key on the specification file
 	YamlKey string
-	// OptionsFileContent contains the "options file" if it exists (for DCOS cluster for now)
-	OptionsFileContent string
+	// VPL: not used anymore
+	// // OptionsFileContent contains the "options file" if it exists (for DCOS cluster for now)
+	// OptionsFileContent string
 	// Serial tells if step can be performed in parallel on selected host or not
 	Serial bool
 }
@@ -485,24 +486,25 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		return stepResult{err: problem}, problem
 	}
 
-	// If options file is defined, upload it to the remote rh
-	if is.OptionsFileContent != "" {
-		opItem := remotefile.Item{
-			Remote:       utils.TempFolder + "/options.json",
-			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
-			RemoteRights: "ug+rw-x,o-rwx",
-		}
-		defer func() {
-			_ = os.Remove(opItem.Local)
-		}()
-		xerr = opItem.UploadString(task.Context(), is.OptionsFileContent, p.Host)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			logrus.Warnf("TBR: failure uploading script: %v", xerr)
-			problem := fail.Wrap(xerr, "failure uploading script")
-			return stepResult{err: problem}, problem
-		}
-	}
+	// VPL: not used anymore
+	// // If options file is defined, upload it to the remote rh
+	// if is.OptionsFileContent != "" {
+	// 	opItem := remotefile.Item{
+	// 		Remote:       utils.TempFolder + "/options.json",
+	// 		RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
+	// 		RemoteRights: "ug+rw-x,o-rwx",
+	// 	}
+	// 	defer func() {
+	// 		_ = os.Remove(opItem.Local)
+	// 	}()
+	// 	xerr = opItem.UploadString(task.Context(), is.OptionsFileContent, p.Host)
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		logrus.Warnf("TBR: failure uploading script: %v", xerr)
+	// 		problem := fail.Wrap(xerr, "failure uploading script")
+	// 		return stepResult{err: problem}, problem
+	// 	}
+	// }
 
 	hidesOutput := strings.Contains(command, "set +x\n")
 	if hidesOutput {

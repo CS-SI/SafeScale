@@ -17,7 +17,7 @@
 package clusterflavors
 
 import (
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -37,7 +37,7 @@ type Makers struct {
 	DefaultMasterSizing    func(c resources.Cluster) abstract.HostSizingRequirements                     // default sizing of master(s)
 	DefaultNodeSizing      func(c resources.Cluster) abstract.HostSizingRequirements                     // default sizing of node(s)
 	DefaultImage           func(c resources.Cluster) string                                              // default image of server(s)
-	// GetNodeInstallationScript func(c resources.Cluster, nodeType clusternodetype.Enum) (string, data.Map)
+	// GetNodeInstallationScript func(c resources.Cluster, nodeType clusternodetype.Enum) (string, map[string]interface{})
 	// GetGlobalSystemRequirements func(c resources.Cluster) (string, fail.Error)
 	// GetTemplateBox         func() (*rice.Box, fail.Error)
 	ConfigureGateway       func(c resources.Cluster) fail.Error

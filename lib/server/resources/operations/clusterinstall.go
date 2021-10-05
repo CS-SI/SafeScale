@@ -482,15 +482,15 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 		return invalid, "", "", xerr
 	}
 
-	finalData := make(map[string]interface{}, len(data)+len(bashLibraryVariables))
-	for k, v := range data {
-		finalData[k] = v
+	finalVariables := make(map[string]interface{}, len(variables)+len(bashLibraryVariables))
+	for k, v := range variables {
+		finalVariables[k] = v
 	}
 	for k, v := range bashLibraryVariables {
-		finalData[k] = v
+		finalVariables[k] = v
 	}
-	data["Revision"] = system.REV
-	script, path, xerr := realizeTemplate(box, tmplName, finalData, tmplName)
+	variables["Revision"] = system.REV
+	script, path, xerr := realizeTemplate(box, tmplName, finalVariables, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)

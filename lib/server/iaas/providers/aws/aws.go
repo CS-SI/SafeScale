@@ -20,12 +20,11 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"

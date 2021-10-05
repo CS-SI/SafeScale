@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 

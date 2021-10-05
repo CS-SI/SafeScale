@@ -17,21 +17,20 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var (
@@ -99,7 +98,7 @@ func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
-	results, xerr := c.AddFeature(ctx, "kubernetes", data.Map{}, resources.FeatureSettings{})
+	results, xerr := c.AddFeature(ctx, "kubernetes", map[string]interface{}{}, resources.FeatureSettings{})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
 	}
@@ -110,7 +109,7 @@ func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 		return xerr
 	}
 
-	results, xerr = c.AddFeature(ctx, "helm3", data.Map{}, resources.FeatureSettings{})
+	results, xerr = c.AddFeature(ctx, "helm3", map[string]interface{}{}, resources.FeatureSettings{})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'helm3'", clusterName)
 	}

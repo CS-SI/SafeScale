@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -29,12 +30,10 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
@@ -559,6 +558,12 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		// }
 	}
 
+	// add target specific variables
+	xerr = w.target.ComplementFeatureParameters(ctx, v)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// Now enumerate steps and execute each of them
 	for _, k := range order {
 		stepKey := stepsKey + "." + k
@@ -574,6 +579,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		if xerr != nil {
 			return outcomes, xerr
 		}
+
 		subtask, xerr = subtask.Start(w.taskLaunchStep, taskLaunchStepParameters{
 			stepName:  k,
 			stepKey:   stepKey,
@@ -674,7 +680,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	var (
 		runContent string
 		stepT      = stepTargets{}
-		options    = map[string]string{}
+		// options    = map[string]string{}
 	)
 
 	// Determine list of hosts concerned by the step
@@ -719,14 +725,12 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}()
 
 	// Get the content of the action based on method
-	keyword := yamlRunKeyword
+	var keyword string
 	switch w.method {
-	case installmethod.Apt:
-		fallthrough
-	case installmethod.Yum:
-		fallthrough
-	case installmethod.Dnf:
+	case installmethod.Apt, installmethod.Yum, installmethod.Dnf:
 		keyword = yamlPackageKeyword
+	default:
+		keyword = yamlRunKeyword
 	}
 	runContent, ok = p.stepMap[keyword].(string)
 	if ok {
@@ -739,43 +743,44 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlRunKeyword)
 	}
 
-	// If there is an options file (for now specific to DCOS), upload it to the remote host
-	optionsFileContent := ""
-	if anon, ok = p.stepMap[yamlOptionsKeyword]; ok {
-		for i, j := range anon.(map[string]interface{}) {
-			options[i] = j.(string)
-		}
-		var (
-			avails  = map[string]interface{}{}
-			content interface{}
-		)
-		complexity, xerr := w.cluster.GetComplexity()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		c := strings.ToLower(complexity.String())
-		for k, anon := range options {
-			avails[strings.ToLower(k)] = anon
-		}
-		if content, ok = avails[c]; !ok {
-			if c == strings.ToLower(clustercomplexity.Large.String()) {
-				c = clustercomplexity.Normal.String()
-			}
-			if c == strings.ToLower(clustercomplexity.Normal.String()) {
-				if content, ok = avails[c]; !ok {
-					content, ok = avails[clustercomplexity.Small.String()]
-				}
-			}
-		}
-		if ok {
-			optionsFileContent = content.(string)
-			p.variables["options"] = fmt.Sprintf("--options=%s/options.json", utils.TempFolder)
-		}
-	} else {
-		p.variables["options"] = ""
-	}
+	// VPL: not used anymore
+	// // If there is an options file (for now specific to DCOS), upload it to the remote host
+	// optionsFileContent := ""
+	// if anon, ok = p.stepMap[yamlOptionsKeyword]; ok {
+	// 	for i, j := range anon.(map[string]interface{}) {
+	// 		options[i] = j.(string)
+	// 	}
+	// 	var (
+	// 		avails  = map[string]interface{}{}
+	// 		content interface{}
+	// 	)
+	// 	complexity, xerr := w.cluster.GetComplexity()
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		return nil, xerr
+	// 	}
+	//
+	// 	c := strings.ToLower(complexity.String())
+	// 	for k, anon := range options {
+	// 		avails[strings.ToLower(k)] = anon
+	// 	}
+	// 	if content, ok = avails[c]; !ok {
+	// 		if c == strings.ToLower(clustercomplexity.Large.String()) {
+	// 			c = clustercomplexity.Normal.String()
+	// 		}
+	// 		if c == strings.ToLower(clustercomplexity.Normal.String()) {
+	// 			if content, ok = avails[c]; !ok {
+	// 				content, ok = avails[clustercomplexity.Small.String()]
+	// 			}
+	// 		}
+	// 	}
+	// 	if ok {
+	// 		optionsFileContent = content.(string)
+	// 		p.variables["options"] = fmt.Sprintf("--options=%s/options.json", utils.TempFolder)
+	// 	}
+	// } else {
+	// 	p.variables["options"] = ""
+	// }
 
 	wallTime := temporal.GetLongOperationTimeout()
 	if anon, ok = p.stepMap[yamlTimeoutKeyword]; ok {
@@ -820,7 +825,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		Action:             w.action,
 		Script:             templateCommand,
 		WallTime:           wallTime,
-		OptionsFileContent: optionsFileContent,
+		// OptionsFileContent: optionsFileContent,
 		YamlKey:            p.stepKey,
 		Serial:             serial,
 	}

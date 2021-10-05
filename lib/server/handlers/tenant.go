@@ -30,7 +30,7 @@ import (
 
 	scribble "github.com/nanobox-io/golang-scribble"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server"

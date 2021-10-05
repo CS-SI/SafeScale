@@ -17,9 +17,8 @@
 package nfs
 
 import (
+	"context"
 	"path/filepath"
-
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/system/nfs/enums/securityflavor"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"

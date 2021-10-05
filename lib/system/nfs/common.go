@@ -25,7 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"

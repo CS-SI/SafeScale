@@ -23,10 +23,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate rice embed-go

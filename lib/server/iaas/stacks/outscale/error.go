@@ -22,8 +22,9 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/outscale/osc-sdk-go/osc"
+
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 type outscaleError struct {

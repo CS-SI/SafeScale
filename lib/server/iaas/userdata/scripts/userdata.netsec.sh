@@ -1439,14 +1439,14 @@ function enable_at_daemon() {
 
 # for testing purposes
 function unsafe_update_credentials() {
-  echo "{{.User}}:safescale" | chpasswd
+  echo "{{.Username}}:safescale" | chpasswd
 
-  dd if=/dev/urandom of=/home/{{.User}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
-  echo "{{.FinalPublicKey}}" >/home/{{.User}}/.ssh/authorized_keys
-  dd if=/dev/urandom of=/home/{{.User}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
-  echo "{{.FinalPrivateKey}}" >/home/{{.User}}/.ssh/id_rsa
-  chmod 0700 /home/{{.User}}/.ssh
-  chmod -R 0600 /home/{{.User}}/.ssh/*
+  dd if=/dev/urandom of=/home/{{.Username}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
+  echo "{{.FinalPublicKey}}" >/home/{{.Username}}/.ssh/authorized_keys
+  dd if=/dev/urandom of=/home/{{.Username}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
+  echo "{{.FinalPrivateKey}}" >/home/{{.Username}}/.ssh/id_rsa
+  chmod 0700 /home/{{.Username}}/.ssh
+  chmod -R 0600 /home/{{.Username}}/.ssh/*
 }
 
 function check_unsupported() {

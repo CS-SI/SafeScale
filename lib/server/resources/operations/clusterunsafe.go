@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"time"
 
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
