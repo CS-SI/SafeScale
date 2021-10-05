@@ -42,7 +42,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         name: SafeScale ${{ steps.get_version.outputs.version }}
-        prerelease: ${{ contains(steps.get_version.outputs.version, "-rc") }}
+        prerelease: ${{ contains(steps.get_version.outputs.version, '-rc') }}
         files: |
           safescale-${{ steps.get_version.outputs.version }}*
           
