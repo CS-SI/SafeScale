@@ -8,6 +8,11 @@ on:
 jobs:
 
   release:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    
     - uses: actions/checkout@v2
 
     - id: get_version
