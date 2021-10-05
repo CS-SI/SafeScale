@@ -101,8 +101,30 @@ feature:
                             sfFail 197 "master didn't join (no .joined file)"
 
             add:
-                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
+                pace: ca-certs,sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
                 steps:
+                    ca-certs:
+                        targets:
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            # Fixes Let's Encrypt root certificate expiration error with wget occurring 09/30/21
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfWaitForApt
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y ca-certificates || sfFail 192
+                                    ;;
+                                redhat|rhel|fedora|centos)
+                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum install -y ca-certificates || sfFail 193
+                                    ;;
+                                *)
+                                    echo "Unmanaged Linux distribution '$LINUX_KIND'"
+                                    sfFail 194
+                                    ;;
+                            esac
+                            sfExit
+
                     sysconf:
                         targets:
                             gateways: all
@@ -129,10 +151,10 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
-                                    sfStandardRetry sfApt install -y ebtables socat || sfFail 193 "Error installing etables and socat"
+                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfApt install -y ebtables socat || sfFail 193 "Error installing etables and socat"
                                     ;;
                                 redhat|rhel|fedora|centos)
-                                    sfStandardRetry yum install -y ebtables socat || sfFail 194 "Error installing etables and socat"
+                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} yum install -y ebtables socat || sfFail 194 "Error installing etables and socat"
 
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
                             net.bridge.bridge-nf-call-ip6tables = 1
@@ -188,11 +210,11 @@ feature:
                                 case $(sfGetFact "linux_kind") in
                                     debian|ubuntu)
                                         sfApt update
-                                        sfStandardRetry sfApt install -y auditd quota quotatool || sfFail 196 "Error installing auditd quota quotatool"
+                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfApt install -y auditd quota quotatool || sfFail 196 "Error installing auditd quota quotatool"
                                         ;;
 
                                     centos|fedora|redhat|rhel)
-                                        sfStandardRetry yum -y install audit audit-libs quota || sfFail 197 "Error installing audit audit-libs quota"
+                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} yum -y install audit audit-libs quota || sfFail 197 "Error installing audit audit-libs quota"
                                         ;;
 
                                     *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
@@ -529,7 +551,7 @@ feature:
                             metricsBindAddress: 0.0.0.0:10249
                             EOF
 
-                            sfRetry $(sfDockerImagePullTimeout) $(sfDefaultDelay) kubeadm config images pull || sfFail 208 "Kubeadm error pulling images"
+                            sfRetry {{ or .reserved_DockerImagePullTimeout "10m" }} {{ or .reserved_DefaultDelay 10 }} kubeadm config images pull || sfFail 208 "Kubeadm error pulling images"
                             sudo kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 209 "Kubeadm error init config"
                             cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 210 "Kubeadm error creating tokens"
                             cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -n 1) || sfFail 211 "Kubeadm error uploading certs"
@@ -697,9 +719,9 @@ feature:
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 218 "failure checking apiserver"
-                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 219 "failure checking controller"
-                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 220 "failure checking scheduler"
+                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 218 "failure checking apiserver"
+                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 219 "failure checking controller"
+                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 220 "failure checking scheduler"
 
                             echo "cp1 init done"
                             touch /etc/kubernetes/.cp1
@@ -756,15 +778,15 @@ feature:
 
                             [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 225 "failure due to missing cp_join_cmd.sh"
                             # sometimes, etcd cluster appears to be unhealthy when calling this... So retries!
-                            sfRetry $(sfClusterJoinTimeout) $(sfDefaultDelay) bash -x ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 226 "failure running cp_join_cmd.sh"
+                            sfRetry {{ or .reserved_ClusterJoinTimeout "14m" }} {{ or .reserved_DefaultDelay 10 }} bash -x ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 226 "failure running cp_join_cmd.sh"
                             [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 227 "failure due to missing init_cluster_admin_kube.sh"
                             bash -x ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 228 "failure running init_cluster_admin_kube.sh"
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 229 "failure running k8s apiserver"
-                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 230 "failure running k8s controller"
-                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 231 "failure running k8s scheduler"
+                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 229 "failure running k8s apiserver"
+                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 230 "failure running k8s controller"
+                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 231 "failure running k8s scheduler"
 
                             touch /etc/kubernetes/.joined
                             echo "cpx init done"
@@ -853,10 +875,10 @@ feature:
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                    sfStandardRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 237 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 237 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
                                 else
                                     if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                        sfStandardRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 238 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 238 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
                                     fi
                                 fi
                             fi

@@ -829,6 +829,7 @@ message ClusterNetwork {
 	string endpoint_ip = 11;
 	//ClusterNetworkState network_state = 12;      // ???
 	// repeated Host gateways = 13; // To allow less limited number of gateways in the future ?
+	string subnet_id = 14;
 }
 
 message ClusterResponse {

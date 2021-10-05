@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 
 	"github.com/sirupsen/logrus"
@@ -265,7 +266,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 						return xerr
 					}
 
-					rgw, xerr := subnetInstance.(*Subnet).UnsafeInspectGateway(true)
+					rgw, xerr := subnetInstance.unsafeInspectGateway(true)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return xerr
@@ -292,7 +293,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 					}
 
 					// Secondary gateway may not exist...
-					rgw, xerr = subnetInstance.(*Subnet).UnsafeInspectGateway(false)
+					rgw, xerr = subnetInstance.unsafeInspectGateway(false)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
@@ -401,7 +402,7 @@ func (instance *Host) IsNull() bool {
 }
 
 // carry ...
-func (instance *Host) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *Host) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -428,10 +429,10 @@ func (instance *Host) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 
 		}
@@ -676,8 +677,8 @@ func (instance *Host) GetState() (state hoststate.Enum) {
 // If the metadata is already carrying a Host, returns fail.ErrNotAvailable
 // In case of error occurring after Host resource creation, 'instance' still contains ID of the Host created. This can be used to
 // defer Host deletion in case of error
-func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (_ *userdata.Content, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (_ *userdata.Content, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
@@ -800,10 +801,10 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 
 		defer func() {
-			if xerr != nil && !hostReq.KeepOnFailure {
+			if ferr != nil && !hostReq.KeepOnFailure {
 				derr := undoCreateSingleHostNetworking()
 				if derr != nil {
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 				}
 			}
 		}()
@@ -835,7 +836,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		}
 
 		if hostReq.DefaultRouteIP == "" {
-			hostReq.DefaultRouteIP = func() string { out, _ := defaultSubnet.(*Subnet).UnsafeGetDefaultRouteIP(); return out }()
+			hostReq.DefaultRouteIP = func() string { out, _ := defaultSubnet.(*Subnet).unsafeGetDefaultRouteIP(); return out }()
 		}
 
 		// list IDs of Security Groups to apply to Host
@@ -885,9 +886,9 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}
 
 	defer func() {
-		if xerr != nil && !hostReq.KeepOnFailure {
+		if ferr != nil && !hostReq.KeepOnFailure {
 			if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(xerr), ahf.Core.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name))
 			}
 		}
 	}()
@@ -907,10 +908,10 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}
 
 	defer func() {
-		if xerr != nil && !hostReq.KeepOnFailure {
+		if ferr != nil && !hostReq.KeepOnFailure {
 			if derr := instance.MetadataCore.Delete(); derr != nil {
-				logrus.Errorf("cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(xerr), ahf.Core.Name, derr)
-				_ = xerr.AddConsequence(derr)
+				logrus.Errorf("cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name, derr)
+				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
@@ -994,7 +995,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	if xerr != nil {
 		return nil, xerr
 	}
-	defer instance.undoSetSecurityGroups(&xerr, hostReq.KeepOnFailure)
+	defer instance.undoSetSecurityGroups(&ferr, hostReq.KeepOnFailure)
 
 	logrus.Infof("Compute resource '%s' created", instance.GetName())
 
@@ -1049,8 +1050,8 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	}
 
 	defer func() {
-		if xerr != nil {
-			instance.undoUpdateSubnets(hostReq, &xerr)
+		if ferr != nil {
+			instance.undoUpdateSubnets(hostReq, &ferr)
 		}
 	}()
 
@@ -1143,7 +1144,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 	}
 
 	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) (innerXErr fail.Error) {
+		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) (finnerXErr fail.Error) {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1156,7 +1157,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				defaultAbstractSubnet *abstract.Subnet
 				defaultSubnetID       string
 			)
-			innerXErr = defaultSubnet.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			innerXErr := defaultSubnet.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 				var ok bool
 				defaultAbstractSubnet, ok = clonable.(*abstract.Subnet)
 				if !ok {
@@ -1182,9 +1183,9 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				}
 
 				defer func() {
-					if innerXErr != nil && !req.KeepOnFailure {
+					if finnerXErr != nil && !req.KeepOnFailure {
 						if derr := gwsg.UnbindFromHost(context.Background(), instance); derr != nil {
-							_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(innerXErr), gwsg.GetName(), instance.GetName()))
+							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), gwsg.GetName(), instance.GetName()))
 						}
 					}
 				}()
@@ -1211,9 +1212,9 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				}
 
 				defer func() {
-					if innerXErr != nil && !req.KeepOnFailure {
+					if finnerXErr != nil && !req.KeepOnFailure {
 						if derr := pubipsg.UnbindFromHost(context.Background(), instance); derr != nil {
-							_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(innerXErr), pubipsg.GetName(), instance.GetName()))
+							_ = finnerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group '%s' from Host '%s'", ActionFromError(finnerXErr), pubipsg.GetName(), instance.GetName()))
 						}
 					}
 				}()
@@ -1230,7 +1231,7 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 
 			// Apply internal Security Group of each other subnets
 			defer func() {
-				if innerXErr != nil && !req.KeepOnFailure {
+				if finnerXErr != nil && !req.KeepOnFailure {
 					var (
 						sg     resources.SecurityGroup
 						derr   error
@@ -1271,11 +1272,11 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 							return nil
 						})
 						if deeperXErr != nil {
-							_ = innerXErr.AddConsequence(fail.Wrap(deeperXErr, "cleaning up on failure, failed to unbind Security Group '%s' from Host", sgName))
+							_ = finnerXErr.AddConsequence(fail.Wrap(deeperXErr, "cleaning up on failure, failed to unbind Security Group '%s' from Host", sgName))
 						}
 					}
 					if len(errors) > 0 {
-						_ = innerXErr.AddConsequence(fail.Wrap(fail.NewErrorList(errors), "failed to unbind Subnets Security Group from Host '%s'", sg.GetName(), req.ResourceName))
+						_ = finnerXErr.AddConsequence(fail.Wrap(fail.NewErrorList(errors), "failed to unbind Subnets Security Group from Host '%s'", sg.GetName(), req.ResourceName))
 					}
 				}
 			}()
@@ -1835,7 +1836,7 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 }
 
 // createSingleHostNetwork creates Single-Host Network and Subnet
-func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, xerr fail.Error) {
+func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
 	// Build network name
 	cfg, xerr := svc.GetConfigurationOptions()
 	if xerr != nil {
@@ -1920,17 +1921,17 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 			subnetRequest.DNSServers = dnsServers
 			subnetRequest.HA = false
 
-			xerr = subnetInstance.(*Subnet).CreateSubnetWithoutGateway(ctx, subnetRequest)
+			xerr = subnetInstance.CreateSubnetWithoutGateway(ctx, subnetRequest)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, nil, xerr
 			}
 
 			defer func() {
-				if xerr != nil && !singleHostRequest.KeepOnFailure {
+				if ferr != nil && !singleHostRequest.KeepOnFailure {
 					derr := subnetInstance.Delete(ctx)
 					if derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", singleHostRequest.ResourceName))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", singleHostRequest.ResourceName))
 					}
 				}
 			}()
@@ -3240,24 +3241,26 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 
 			sgID := sgInstance.GetID()
 			// If the Security Group is already bound to the Host with the exact same state, considered as a success
-			if v, ok := hsgV1.ByID[sgID]; ok && v.Disabled == !bool(enable) {
+			item, ok := hsgV1.ByID[sgID]
+			if ok && item.Disabled == !bool(enable) {
 				return nil
 			}
-
-			// Not found, add it
-			item := &propertiesv1.SecurityGroupBond{
-				ID:       sgID,
-				Name:     sgInstance.GetName(),
-				Disabled: bool(!enable),
+			if !ok { // Not found, update bind metadata of Host
+				item = &propertiesv1.SecurityGroupBond{
+					ID:       sgID,
+					Name:     sgInstance.GetName(),
+				}
+				hsgV1.ByID[sgID] = item
+				hsgV1.ByName[item.Name] = item.ID
 			}
-			hsgV1.ByID[sgID] = item
-			hsgV1.ByName[item.Name] = item.ID
+			item.Disabled = bool(!enable)
 
 			// If enabled, apply it
-			if innerXErr := sgInstance.BindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
+			if innerXErr := sgInstance.(*SecurityGroup).unsafeBindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental); innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate:
-					// already bound, success
+					// already bound, consider as a success
+					break
 				default:
 					return innerXErr
 				}
@@ -3268,7 +3271,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 }
 
 // UnbindSecurityGroup unbinds a security group from the Host
-func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.SecurityGroup) (xerr fail.Error) {
+func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -3277,8 +3280,8 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if sg == nil {
-		return fail.InvalidParameterCannotBeNilError("sg")
+	if sgInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("sgInstance")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -3299,21 +3302,21 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	sgName := sg.GetName()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
+	sgName := sgInstance.GetName()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			sgID := sg.GetID()
+			sgID := sgInstance.GetID()
 			// Check if the security group is listed for the Host
 			found := false
 			for k, v := range hsgV1.ByID {
@@ -3335,13 +3338,30 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sg resources.Secu
 			}
 
 			// unbind security group from Host on remote service side
-			if innerXErr := sg.UnbindFromHost(ctx, instance); innerXErr != nil {
+			if innerXErr := sgInstance.UnbindFromHost(ctx, instance); innerXErr != nil {
 				return innerXErr
 			}
 
 			// found, delete it from properties
 			delete(hsgV1.ByID, sgID)
-			delete(hsgV1.ByName, sg.GetName())
+			delete(hsgV1.ByName, sgInstance.GetName())
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	// -- Remove Host reference in Security Group
+	return sgInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			delete(sghV1.ByID, instance.GetID())
+			delete(sghV1.ByName, instance.GetName())
 			return nil
 		})
 	})
@@ -3589,7 +3609,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 }
 
 // ReserveCIDRForSingleHost returns the first available CIDR and its index inside the Network 'network'
-func ReserveCIDRForSingleHost(networkInstance resources.Network) (string, uint, fail.Error) {
+func ReserveCIDRForSingleHost(networkInstance resources.Network) (_ string, _ uint, ferr fail.Error) {
 	var index uint
 	xerr := networkInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SingleHostsV1, func(clonable data.Clonable) fail.Error {
@@ -3607,11 +3627,11 @@ func ReserveCIDRForSingleHost(networkInstance resources.Network) (string, uint, 
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := FreeCIDRForSingleHost(networkInstance, index)
-			_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, networkInstance.GetName()))
+			_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, networkInstance.GetName()))
 			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()

@@ -110,6 +110,7 @@ func ClusterDefaultsFromPropertyToProtocol(in propertiesv2.ClusterDefaults) *pro
 func ClusterNetworkFromPropertyToProtocol(in propertiesv3.ClusterNetwork) *protocol.ClusterNetwork {
 	return &protocol.ClusterNetwork{
 		NetworkId:          in.NetworkID,
+		SubnetId: in.SubnetID,
 		Cidr:               in.CIDR,
 		Domain:             in.Domain,
 		GatewayId:          in.GatewayID,

@@ -19,11 +19,12 @@ package operations
 import (
 	"context"
 	"fmt"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"net"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -569,9 +570,9 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	req.Name = strings.ToLower(strings.TrimSpace(req.Name))
 
 	// Creates Network
-	var rn resources.Network
+	var networkInstance resources.Network
 	if req.NetworkID != "" {
-		rn, xerr = LoadNetwork(instance.GetService(), req.NetworkID)
+		networkInstance, xerr = LoadNetwork(instance.GetService(), req.NetworkID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to use network %s to contain Cluster Subnet", req.NetworkID)
@@ -584,13 +585,13 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 			KeepOnFailure: req.KeepOnFailure,
 		}
 
-		rn, xerr = NewNetwork(instance.GetService())
+		networkInstance, xerr = NewNetwork(instance.GetService())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to instantiate new Network")
 		}
 
-		xerr = rn.Create(ctx, networkReq)
+		xerr = networkInstance.Create(ctx, networkReq)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to create Network '%s'", req.Name)
@@ -599,7 +600,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		defer func() {
 			if xerr != nil && !req.KeepOnFailure {
 				// Using context.Background() here disables abort
-				if derr := rn.Delete(context.Background()); derr != nil {
+				if derr := networkInstance.Delete(context.Background()); derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:
 						// missing Network is considered as a successful deletion, continue
@@ -618,7 +619,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			networkV3.NetworkID = rn.GetID()
+			networkV3.NetworkID = networkInstance.GetID()
 			networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
 			networkV3.CIDR = req.CIDR
 			return nil
@@ -640,7 +641,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	logrus.Debugf("[Cluster %s] creating Subnet '%s'", req.Name, req.Name)
 	subnetReq := abstract.SubnetRequest{
 		Name:          req.Name,
-		NetworkID:     rn.GetID(),
+		NetworkID:     networkInstance.GetID(),
 		CIDR:          req.CIDR,
 		HA:            !gwFailoverDisabled,
 		ImageRef:      gatewaysDef.Image,
@@ -674,12 +675,12 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 				return nil, nil, xerr
 			}
 			if subXErr := subnetInstance.Create(ctx, subnetReq, "", gatewaysDef); subXErr != nil {
-				return nil, nil, fail.Wrap(subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)", subnetReq.Name, subnetReq.CIDR, rn.GetName(), req.CIDR)
+				return nil, nil, fail.Wrap(subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)", subnetReq.Name, subnetReq.CIDR, networkInstance.GetName(), req.CIDR)
 			}
 			logrus.Infof("CIDR '%s' used successfully for Subnet, there will be less available private IP Addresses than expected.", subnetReq.CIDR)
 			xerr = nil
 		default:
-			return nil, nil, fail.Wrap(xerr, "failed to create Subnet '%s' in Network '%s'", req.Name, rn.GetName())
+			return nil, nil, fail.Wrap(xerr, "failed to create Subnet '%s' in Network '%s'", req.Name, networkInstance.GetName())
 		}
 	}
 
@@ -754,8 +755,8 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		return nil, nil, xerr
 	}
 
-	logrus.Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, rn.GetName(), req.Name)
-	return rn, subnetInstance, nil
+	logrus.Debugf("[Cluster %s] Subnet '%s' in Network '%s' creation successful.", req.Name, networkInstance.GetName(), req.Name)
+	return networkInstance, subnetInstance, nil
 }
 
 // createHostResources creates and configures hosts for the Cluster

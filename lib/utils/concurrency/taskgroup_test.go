@@ -342,7 +342,7 @@ func TestChildrenWaitingGameEnoughTimeAfterWF(t *testing.T) {
 				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
 				t.Logf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
 				failures++
-				if failures > (rounds / 2) {
+				if failures > (75 * rounds / 100) {
 					t.Errorf("Test %d: too many failures", index)
 					t.FailNow()
 					return

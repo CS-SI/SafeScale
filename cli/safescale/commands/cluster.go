@@ -256,12 +256,12 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 	var sgwpubip string
 	if c.Network != nil {
 		result["network_id"] = c.Network.NetworkId
+		result["subnet_id"] = c.Network.SubnetId
 		result["cidr"] = c.Network.Cidr
 		result["default_route_ip"] = c.Network.DefaultRouteIp
 		result["primary_gateway_ip"] = c.Network.GatewayIp
 		result["endpoint_ip"] = c.Network.EndpointIp
 		result["primary_public_ip"] = c.Network.EndpointIp
-		result["secondary_gateway_ip"] = sgwpubip
 		if sgwpubip = c.Network.SecondaryPublicIp; sgwpubip != "" {
 			result["secondary_public_ip"] = sgwpubip
 			result["secondary_gateway_ip"] = c.Network.SecondaryGatewayIp
@@ -322,7 +322,7 @@ var clusterCreateCommand = &cli.Command{
 			Name:    "flavor",
 			Aliases: []string{"F"},
 			Value:   "K8S",
-			Usage: `Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S
+			Usage: `Defines the type of the cluster; can be BOH, K8S
 	Default sizing for each cluster type is:
 		BOH: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
 		K8S: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[15-32], disk=[80])

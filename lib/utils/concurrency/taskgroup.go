@@ -354,6 +354,15 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
+	started, xerr := instance.Started()
+	if xerr != nil {
+		return nil, xerr
+	}
+	// If nothing has been started, WaitGroup succeeds immediately
+	if started == 0 {
+		return nil, nil
+	}
+
 	tid, xerr := instance.GetID()
 	if xerr != nil {
 		return nil, xerr

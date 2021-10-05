@@ -39,7 +39,9 @@ import (
 )
 
 // SecurityGroupListener security-group service server grpc
-type SecurityGroupListener struct{}
+type SecurityGroupListener struct{
+	protocol.UnimplementedSecurityGroupServiceServer
+}
 
 // List lists hosts managed by SafeScale only, or all hosts.
 func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityGroupListRequest) (_ *protocol.SecurityGroupListResponse, err error) {

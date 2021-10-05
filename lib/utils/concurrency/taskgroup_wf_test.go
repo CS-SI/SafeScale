@@ -206,7 +206,7 @@ func TestCallingReadyTaskGroup(t *testing.T) {
 
 	res, err := overlord.Wait()
 	require.Empty(t, res)
-	require.NotNil(t, err)
+	require.Nil(t, err) // recent change: waiting on TaskGroup where nothing has been started is now a success
 
 	done, res, err := overlord.WaitFor(10 * time.Millisecond)
 	require.False(t, done)
@@ -262,7 +262,7 @@ func TestChildrenWaitingGameEnoughTime(t *testing.T) {
 				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
 				t.Logf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
 				failures++
-				if failures > (rounds / 2) {
+				if failures > (75 * rounds / 100) {
 					t.Errorf("Test %d: too many failures", index)
 					t.FailNow()
 					return
@@ -412,7 +412,7 @@ func TestChildrenWaitingGameEnoughTimeAfter(t *testing.T) {
 				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
 				t.Logf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
 				failures++
-				if failures > (rounds / 2) {
+				if failures > (75 * rounds / 100) {
 					t.Errorf("Test %d: too many failures", index)
 					t.FailNow()
 					return

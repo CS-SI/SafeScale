@@ -100,7 +100,7 @@ func randomInt(min, max int) int {
 	return mrand.Intn(max-min) + min
 }
 
-func Randomized(bottom time.Duration, top time.Duration) *Officer { // FIXME: OPP Implement this
+func Randomized(bottom time.Duration, top time.Duration) *Officer { // FIXME: Use this
 	o := Officer{
 		Block: func(t Try) {
 			sleepTime := time.Duration(randomInt(int(bottom.Milliseconds()), int(top.Milliseconds()))) * time.Millisecond

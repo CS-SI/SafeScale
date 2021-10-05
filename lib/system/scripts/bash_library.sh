@@ -31,54 +31,12 @@ export FULL_VERSION_ID=
 function versionchk() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
 export -f versionchk
 
-function sfVercomp() {
-	if [[ $1 == $2 ]]; then
-		return 0
-	fi
-	local IFS=.
-	local i ver1=($1) ver2=($2)
-	# fill empty fields in ver1 with zeros
-	for ((i = ${#ver1[@]}; i < ${#ver2[@]}; i++)); do
-		ver1[i]=0
-	done
-	for ((i = 0; i < ${#ver1[@]}; i++)); do
-		if [[ -z ${ver2[i]} ]]; then
-			# fill empty fields in ver2 with zeros
-			ver2[i]=0
-		fi
-		if ((10#${ver1[i]} > 10#${ver2[i]})); then
-			return 1
-		fi
-		if ((10#${ver1[i]} < 10#${ver2[i]})); then
-			return 2
-		fi
-	done
-	return 0
-}
-export -f sfVercomp
-
-function sfTestvercomp() {
-	sfVercomp $1 $2
-	case $? in
-	0) ope='=' ;;
-	1) ope='>' ;;
-	2) ope='<' ;;
-	esac
-	if [[ $ope != $3 ]]; then
-		echo "FAIL: Expected '$3', Actual '$ope', Arg1 '$1', Arg2 '$2'"
-		return 1
-	else
-		return 0
-	fi
-}
-export -f sfTestvercomp
-
 function sfFail() {
 	if [ $# -eq 1 ]; then
-		if [ $1 -ne 0 ]; then
+		if [ "$1" -ne 0 ]; then
 			echo "Exiting with error $1"
 		fi
-	elif [ $# -eq 2 -a $1 -ne 0 ]; then
+	elif [ $# -eq 2 ] && [ "$1" -ne 0 ]; then
 		echo "Exiting with error $1: $2"
 	fi
 	(
@@ -87,7 +45,7 @@ function sfFail() {
 		sleep 2
 	) || true
 	echo "exiting with errorcode $1"
-	exit $1
+	exit "$1"
 }
 export -f sfFail
 
@@ -110,9 +68,10 @@ function sfFinishPreviousInstall() {
 		return 0
 	else
 		echo "there are unconfigured packages !"
-		sudo dpkg --configure -a --force-all
-		[ $? -ne 0 ] && return $?
-		return 1
+		sudo dpkg --configure -a --force-all && {
+		  return $?
+		}
+		return 0
 	fi
 }
 export -f sfFinishPreviousInstall
@@ -134,7 +93,7 @@ function sfApt() {
 	sfWaitForApt
 	[ $? -ne 0 ] && return $?
 	echo "running apt " "$@"
-	DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
+	DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt -o Dpkg::Options::=--force-confnew "$@" && rc=$?
 	[ $rc -eq -1 ] && return 1
 	return $rc
 }
@@ -164,7 +123,7 @@ function sfAvail() {
 		fi
 		;;
 	debian | ubuntu)
-		DEBIAN_FRONTEND=noninteractive apt search "$@" &>/dev/null && rc=$?
+		DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt search "$@" &>/dev/null && rc=$?
 		;;
 	esac
 	[ $rc -eq -1 ] && return 1
@@ -213,7 +172,7 @@ function sfLong2IP() {
 		ip=$((ui32 & 0xff))${ip:+.}$ip
 		ui32=$((ui32 >> 8))
 	done
-	echo $ip
+	echo "$ip"
 }
 export -f sfLong2IP
 
@@ -362,11 +321,6 @@ function sfRetry() {
 }
 export -f sfRetry
 
-function sfStandardRetry() {
-	sfRetry $(sfDefaultTimeout) $(sfDefaultDelay) "$@"
-}
-export -f sfStandardRetry
-
 # sfSalvageDBusIfNeeded restarts dbus-daemon if needed (ie there are no or more than 1 dbus-daemon)
 # returns 0 if nothing has been done, 1 if dbus has been salvaged
 # Note: often dbus cannot be restarted automatically. It's necessary to restart a service that has dusb as dependency to
@@ -455,6 +409,7 @@ function sfInstall() {
 	case $LINUX_KIND in
 	debian | ubuntu)
 		export DEBIAN_FRONTEND=noninteractive
+		export UCF_FORCE_CONFFNEW=1
 		sfRetry 5m 3 "sfApt update"
 		sfApt install $1 -y --force-yes || return 194
 		command -v $1 || return 194
@@ -815,7 +770,7 @@ function sfPgsqlUpdatePassword() {
 		for i in {{ range .ClusterMasterIPs }}{{.}} {{end}}; do
 			id=$(ssh $__cluster_admin_ssh_options__ cladm@$i docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_pooler | cut -d: -f2)
 			retcode=$?
-			if [ $retcode -eq 0 -a ! -z "$id" ]; then
+			if [ $retcode -eq 0 ] && [ ! -z "$id" ]; then
 				ssh $__cluster_admin_ssh_options__ cladm@$i docker exec $id /usr/local/bin/update_password.sh $username "$password"
 				retcode=$?
 			fi
@@ -830,7 +785,7 @@ export -f sfPgsqlUpdatePassword
 # Intended to be use on target masters:any
 function sfKeycloakRun() {
 	local id=$(sfGetFact "keycloak4platform_docker_id")
-	[ $? -ne 0 -o -z ${id+x} ] && echo "failed to find keycloak container" && return 1
+	[ $? -ne 0 ] || [ -z ${id+x} ] && echo "failed to find keycloak container" && return 1
 
 	local _stdin=
 	local _fc
@@ -892,7 +847,7 @@ function sfKeycloakDeleteGroup() {
 	local name=$1
 	shift
 
-	local clientID=$(sfKeycloakGetGroup $name "$@")
+	local clientID=$(sfKeycloakGetGroup "$name" "$@")
 	[ -z "$clientID" ] && return 1
 
 	sfKeycloakRun delete clients/$clientID "$@"
@@ -900,7 +855,7 @@ function sfKeycloakDeleteGroup() {
 export -f sfKeycloakDeleteGroup
 
 function sfSystemctl-exists() {
-	[ $(systemctl list-unit-files "${1}*" | wc -l) -gt 3 ]
+	[ "$(systemctl list-unit-files "${1}*" | wc -l)" -gt 3 ]
 }
 export -f sfSystemctl-exists
 
@@ -1018,7 +973,7 @@ function sfDoesDockerRunContainer() {
 	local LIST=$(docker container ls {{ "--format '{{.Image}}|{{.Names}}|{{.Status}}'" }})
 	[ -z "$LIST" ] && return 1
 	[ "$IMAGE" != "$(echo "$LIST" | cut -d'|' -f1 | grep "$IMAGE" | uniq)" ] && return 1
-	[ ! -z "$INSTANCE" -a "$INSTANCE" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE" | uniq)" ] && return 1
+	[ ! -z "$INSTANCE" ] && [ "$INSTANCE" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE" | uniq)" ] && return 1
 	echo $LIST | cut -d'|' -f3 | grep -i "^up" &>/dev/null || return 1
 	return 0
 }

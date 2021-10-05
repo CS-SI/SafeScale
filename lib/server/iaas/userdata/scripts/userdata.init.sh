@@ -15,18 +15,19 @@
 # limitations under the License.
 
 #{{.Revision}}
+# Script customized for {{.ProviderName}} driver
 
 {{.Header}}
 
 function print_error() {
-	read line file <<<$(caller)
-	echo "An error occurred in line $line of file $file:" "{"$(sed "${line}q;d" "$file")"}" >&2
+	read -r line file <<<"$(caller)"
+	echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
 	{{.ExitOnError}}
 }
 trap print_error ERR
 
 function fail() {
-	MYIP="$(ip -br a | grep UP | awk {'print $3'})"
+	MYIP="$(ip -br a | grep UP | awk '{print $3}') | head -n 1"
 	if [ $# -eq 1 ]; then
 		echo "PROVISIONING_ERROR: $1"
 		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" >/opt/safescale/var/state/user_data.init.done
@@ -61,25 +62,42 @@ set -x
 
 LINUX_KIND=
 VERSION_ID=
+FULL_HOSTNAME=
+FULL_VERSION_ID=
 
 function sfDetectFacts() {
 	[ -f /etc/os-release ] && {
 		. /etc/os-release
 		LINUX_KIND=$ID
+    FULL_HOSTNAME=$VERSION_ID
+    FULL_VERSION_ID=$VERSION_ID
 	} || {
 		command -v lsb_release &>/dev/null && {
 			LINUX_KIND=$(lsb_release -is)
 			LINUX_KIND=${LINUX_KIND,,}
 			VERSION_ID=$(lsb_release -rs | cut -d. -f1)
+      FULL_VERSION_ID=$(lsb_release -rs)
 		} || {
-			[ -f /etc/redhat-release ] && {
+      [[ -f /etc/redhat-release ]] && {
 				LINUX_KIND=$(cat /etc/redhat-release | cut -d' ' -f1)
 				LINUX_KIND=${LINUX_KIND,,}
 				VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3 | cut -d. -f1)
+        FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f3)
+        case $VERSION_ID in
+        '' | *[!0-9]*)
+            VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4 | cut -d. -f1)
+            FULL_VERSION_ID=$(cat /etc/redhat-release | cut -d' ' -f4)
+            ;;
+        *) ;;
+
+        esac
 			}
 		}
 	}
 }
+export -f sfDetectFacts
+
+# Detect facts
 sfDetectFacts
 
 function create_user() {
@@ -153,9 +171,11 @@ function create_user() {
 		chmod ug+r-wx,o-rwx $i
 	done
 
-	echo done
+  echo "done"
 }
 
+# Follows the CentOS rules:
+# - /etc/hostname contains short hostname
 function put_hostname_in_hosts() {
 	echo "{{ .HostName }}" >/etc/hostname
 	hostname {{ .HostName }}
@@ -200,6 +220,16 @@ function disable_services() {
 	esac
 }
 
+function disable_upgrades() {
+  case $LINUX_KIND in
+  ubuntu)
+    sfApt remove -y unattended-upgrades || true
+    ;;
+  *)
+    ;;
+  esac
+}
+
 function no_daily_update() {
 	case $LINUX_KIND in
 	debian | ubuntu)
@@ -237,11 +267,14 @@ function no_daily_update() {
 # ---- Main
 
 export DEBIAN_FRONTEND=noninteractive
+export UCF_FORCE_CONFFNEW=1
 
 put_hostname_in_hosts
 disable_cloudinit_network_autoconf
 disable_services
+disable_upgrades
 
+#unsafe_sshd
 secure_sshd
 create_user
 

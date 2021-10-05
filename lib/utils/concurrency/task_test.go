@@ -433,8 +433,6 @@ func TestResultCheck(t *testing.T) {
 
 	tr, xerr := got.Result()
 	require.Nil(t, xerr)
-	// Why would be this a problem ?, Result() was coded when the only states were RUNNING and DONE, long long time ago
-	// this is no longer true, Result needs review
 	require.NotNil(t, tr)
 }
 

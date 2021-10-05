@@ -117,7 +117,7 @@ feature:
                             {{ else }}
                             PREFIX="elassandra"
                             {{ end }}
-                            sfStandardRetry docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep running
+                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep running
 
             remove:
                 pace: stop,remove

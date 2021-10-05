@@ -127,7 +127,6 @@ func (instance *Cluster) InstalledFeatures() []string {
 	return out
 }
 
-// ComplementFeatureParameters FIXME: include the Cluster part of setImplicitParameters() from feature
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
 func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error {
@@ -490,6 +489,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	for k, v := range bashLibraryVariables {
 		finalData[k] = v
 	}
+	data["Revision"] = system.REV
 	script, path, xerr := realizeTemplate(box, tmplName, finalData, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -661,6 +661,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 		}
 	}
 
+	// FIXME: reuse ComplementFeatureParameters?
 	var dnsServers []string
 	cfg, xerr := instance.GetService().GetConfigurationOptions()
 	xerr = debug.InjectPlannedFail(xerr)

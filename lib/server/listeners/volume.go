@@ -45,7 +45,9 @@ import (
 var VolumeHandler = handlers.NewVolumeHandler
 
 // VolumeListener is the volume service gRPC server
-type VolumeListener struct{}
+type VolumeListener struct{
+	protocol.UnimplementedVolumeServiceServer
+}
 
 // List the available volumes
 func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeListResponse, err error) {

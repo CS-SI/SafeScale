@@ -275,7 +275,7 @@ func (s stack) rpcDeleteVms(vmIDs []string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateNetwork(name, cidr string) (osc.Net, fail.Error) {
+func (s stack) rpcCreateNetwork(name, cidr string) (_ osc.Net, ferr fail.Error) {
 	if cidr == "" {
 		return osc.Net{}, fail.InvalidParameterError("cidr", "cannot be empty string")
 	}
@@ -303,9 +303,9 @@ func (s stack) rpcCreateNetwork(name, cidr string) (osc.Net, fail.Error) {
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteNetwork(resp.Net.NetId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", name))
 			}
 		}
 	}()

@@ -43,6 +43,12 @@ func NormalizeError(err error) fail.Error {
 
 	switch e := err.(type) {
 	case fail.Error:
+		// Note: must check if the cause is a gophercloud error...
+		cause := e.Cause()
+		if cause != nil {
+			tracer.Trace("received 'fail.Error' with a cause, normalizing on this cause...")
+			return NormalizeError(cause)
+		}
 		tracer.Trace("received 'fail.Error', throwing it as-is")
 		return e
 	case gophercloud.ErrDefault400: // bad request

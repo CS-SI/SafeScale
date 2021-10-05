@@ -36,7 +36,9 @@ import (
 // safescale template list --all=false
 
 // TemplateListener host service server grpc
-type TemplateListener struct{}
+type TemplateListener struct{
+	protocol.UnimplementedTemplateServiceServer
+}
 
 // List available templates
 func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRequest) (_ *protocol.TemplateList, err error) {

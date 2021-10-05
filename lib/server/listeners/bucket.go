@@ -41,7 +41,9 @@ import (
 // safescale bucket inspect C1
 
 // BucketListener is the bucket service grpc server
-type BucketListener struct{}
+type BucketListener struct{
+	protocol.UnimplementedBucketServiceServer
+}
 
 // List available buckets
 func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl *protocol.BucketList, err error) {
@@ -270,3 +272,4 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 
 	return empty, handlers.NewBucketHandler(job).Unmount(bucketName, hostRef)
 }
+

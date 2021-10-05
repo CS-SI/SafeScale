@@ -293,7 +293,6 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				return innerXErr
 			}
 
-
 			// -- transfer Hosts attached to Network to Subnet --
 			innerXErr = props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 				networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
