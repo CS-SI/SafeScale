@@ -477,8 +477,6 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
-	data["reserved_BashLibrary"] = bashLibrary
-	data["Revision"] = system.REV
 
 	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
 	if xerr != nil {
@@ -492,6 +490,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	for k, v := range bashLibraryVariables {
 		finalData[k] = v
 	}
+	data["Revision"] = system.REV
 	script, path, xerr := realizeTemplate(box, tmplName, finalData, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

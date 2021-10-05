@@ -19,10 +19,8 @@ package nfs
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	rice "github.com/GeertJohan/go.rice"
