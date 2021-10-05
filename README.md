@@ -131,6 +131,9 @@ For bugs and feature requests, [please create an issue](../../issues/new).
 ## Build
   [See Build file](doc/build/BUILDING.md)
 
+## Release
+  [See Release file](doc/contribute/RELEASE.md)
+
 ## Usage
   [See Usage file](doc/USAGE.md)
 
