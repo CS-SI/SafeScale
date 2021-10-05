@@ -21,18 +21,18 @@ vet:
 
 all: clean gensrc
 ifeq ($(BUILD_TAGS),)
-	@$(GO) build $(RACE_CHECK) -o $(EXEC)
+	@CGO_ENABLED=0 $(GO) build $(RACE_CHECK) -o $(EXEC)
 else
-	@$(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
+	@CGO_ENABLED=0 $(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
 endif
 	
 allcover: clean gensrc
 ifeq ($(BUILD_TAGS),)
-	@$(GO) build $(RACE_CHECK) -o $(EXEC)
-	@$(GO) test -o $(EXEC-COVER) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
+	@CGO_ENABLED=0 $(GO) build $(RACE_CHECK) -o $(EXEC)
+	@CGO_ENABLED=0 $(GO) test -o $(EXEC-COVER) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
 else
-	@$(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
-	@$(GO) test -o $(EXEC-COVER) -tags $(BUILD_TAGS) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
+	@CGO_ENABLED=0 $(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
+	@CGO_ENABLED=0 $(GO) test -o $(EXEC-COVER) -tags $(BUILD_TAGS) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
 endif
 
 

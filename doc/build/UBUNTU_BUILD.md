@@ -10,7 +10,7 @@ $ sudo apt-get install -y build-essential make wget unzip vim git
 ```bash
 $ wget https://dl.google.com/go/go1.16.5.linux-amd64.tar.gz
 $ sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
-$ rm ./go1.16.2.linux-amd64.tar.gz
+$ rm ./go1.16.8.linux-amd64.tar.gz
 ```
 
 ## Install Protoc 3.17.3
