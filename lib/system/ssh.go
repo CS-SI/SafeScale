@@ -872,13 +872,13 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 }
 
 // CreateTunneling ...
-func (sconf *SSHConfig) CreateTunneling() (_ SSHTunnels, _ *SSHConfig, xerr fail.Error) {
+func (sconf *SSHConfig) CreateTunneling() (_ SSHTunnels, _ *SSHConfig, ferr fail.Error) {
 	var tunnels SSHTunnels
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := tunnels.Close()
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to close SSH tunnels"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to close SSH tunnels"))
 			}
 		}
 	}()

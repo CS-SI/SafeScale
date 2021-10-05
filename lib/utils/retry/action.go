@@ -477,7 +477,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 }
 
 // loopWithSoftTimeout executes the tries and stops if the elapsed time is gone beyond the timeout (hence the "soft timeout")
-func (a action) loopWithSoftTimeout() (xerr fail.Error) {
+func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 	arbiter := a.Arbiter
 	start := time.Now()
 
@@ -496,8 +496,8 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 
 		if a.Timeout != 0 {
 			if !all {
-				if xerr != nil {
-					switch xerr.(type) {
+				if ferr != nil {
+					switch ferr.(type) {
 					case *fail.ErrAborted:
 						return
 					}
@@ -515,7 +515,7 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 					if count == 1 {
 						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) is too close to the mark (%s)", duration, a.Timeout), "", 0)
 						logrus.Warnf(msg)
-					} else if xerr != nil {
+					} else if ferr != nil {
 						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
 						logrus.Warnf(msg)
 					}
@@ -565,7 +565,7 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 }
 
 // loopWithHardTimeout executes the tries and stops at the exact timeout (hence the "hard timeout")
-func (a action) loopWithHardTimeout() (xerr fail.Error) {
+func (a action) loopWithHardTimeout() (ferr fail.Error) {
 	timeout := a.Timeout
 	if timeout == 0 {
 		timeout = temporal.GetOperationTimeout()
@@ -594,8 +594,8 @@ func (a action) loopWithHardTimeout() (xerr fail.Error) {
 
 		if a.Timeout != 0 {
 			if !all {
-				if xerr != nil {
-					switch xerr.(type) {
+				if ferr != nil {
+					switch ferr.(type) {
 					case *fail.ErrAborted:
 						return
 					}
@@ -613,7 +613,7 @@ func (a action) loopWithHardTimeout() (xerr fail.Error) {
 					if count == 1 {
 						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) is too close to the mark (%s)", duration, a.Timeout), "", 0)
 						logrus.Warnf(msg)
-					} else if xerr != nil {
+					} else if ferr != nil {
 						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
 						logrus.Warnf(msg)
 					}

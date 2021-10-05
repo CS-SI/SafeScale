@@ -754,7 +754,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 	// -- updates target properties --
 	xerr = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+		innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) (ferr fail.Error) {
 			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -788,12 +788,12 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			}
 
 			defer func() {
-				if deeperXErr != nil {
+				if ferr != nil {
 					// Disable abort signal during the clean up
 					defer task.DisarmAbortSignal()()
 
 					if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
-						_ = deeperXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(deeperXErr), volumeName, targetName))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
 					}
 				}
 			}()

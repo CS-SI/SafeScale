@@ -59,7 +59,7 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 }
 
 // CreateNetwork creates a Network, ie a VPC in AWS terminology
-func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, xerr fail.Error) {
+func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network, ferr fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if s.IsNull() {
 		return nullAN, fail.InvalidInstanceError()
@@ -68,6 +68,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", req).WithStopwatch().Entering().Exiting()
 
 	// Check if network already there
+	var xerr fail.Error
 	if _, xerr = s.rpcDescribeVpcByName(aws.String(req.Name)); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -115,11 +116,11 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if theVpc != nil {
 				derr := s.DeleteNetwork(aws.StringValue(theVpc.VpcId))
 				if derr != nil {
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 				}
 			}
 		}
@@ -135,9 +136,9 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.rpcDetachInternetGateway(theVpc.VpcId, gw.InternetGatewayId); derr != nil {
-				_ = xerr.AddConsequence(normalizeError(derr))
+				_ = ferr.AddConsequence(normalizeError(derr))
 			}
 		}
 	}()
@@ -155,9 +156,9 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.rpcDeleteRoute(tables[0].RouteTableId, aws.String("0.0.0.0/0")); derr != nil {
-				_ = xerr.AddConsequence(normalizeError(derr))
+				_ = ferr.AddConsequence(normalizeError(derr))
 			}
 		}
 	}()
@@ -381,7 +382,7 @@ func toHostState(state *ec2.InstanceState) (hoststate.Enum, fail.Error) {
 }
 
 // CreateSubnet ...
-func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, xerr fail.Error) {
+func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
@@ -399,9 +400,9 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, x
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.DeleteSubnet(aws.StringValue(resp.SubnetId)); derr != nil {
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()

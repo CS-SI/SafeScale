@@ -38,7 +38,7 @@ import (
 )
 
 // FeatureListener feature service server grpc
-type FeatureListener struct{
+type FeatureListener struct {
 	protocol.UnimplementedFeatureServiceServer
 }
 
@@ -122,8 +122,8 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 }
 
 // Check ...
-func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
+func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionRequest) (empty *googleprotobuf.Empty, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
 
 	empty = &googleprotobuf.Empty{}
 	if s == nil {
@@ -162,11 +162,11 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.feature"), "(%d, %s, %s)", targetType, targetRefLabel, featureName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer func() {
-		if err != nil {
-			switch err.(type) {
+		if ferr != nil {
+			switch ferr.(type) {
 			case *fail.ErrNotFound:
 			default:
-				fail.OnExitLogError(err, tracer.TraceMessage())
+				fail.OnExitLogError(ferr, tracer.TraceMessage())
 			}
 		}
 	}()

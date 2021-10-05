@@ -182,27 +182,28 @@ func (instance *Subnet) unsafeHasVirtualIP() (bool, fail.Error) {
 	return found, xerr
 }
 
-func (instance *Subnet) UnsafeCreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, xerr fail.Error) {
+func (instance *Subnet) UnsafeCreateSecurityGroups(ctx context.Context, networkInstance resources.Network, keepOnFailure bool) (subnetGWSG, subnetInternalSG, subnetPublicIPSG resources.SecurityGroup, ferr fail.Error) {
+	var xerr fail.Error
 	subnetGWSG, xerr = instance.createGWSecurityGroup(ctx, networkInstance, keepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
-	defer instance.undoCreateSecurityGroup(&xerr, keepOnFailure, subnetGWSG)
+	defer instance.undoCreateSecurityGroup(&ferr, keepOnFailure, subnetGWSG)
 
 	subnetPublicIPSG, xerr = instance.createPublicIPSecurityGroup(ctx, networkInstance, keepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
-	defer instance.undoCreateSecurityGroup(&xerr, keepOnFailure, subnetPublicIPSG)
+	defer instance.undoCreateSecurityGroup(&ferr, keepOnFailure, subnetPublicIPSG)
 
 	subnetInternalSG, xerr = instance.createInternalSecurityGroup(ctx, networkInstance, keepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, nil, xerr
 	}
-	defer instance.undoCreateSecurityGroup(&xerr, keepOnFailure, subnetInternalSG)
+	defer instance.undoCreateSecurityGroup(&ferr, keepOnFailure, subnetInternalSG)
 
 	xerr = subnetGWSG.BindToSubnet(ctx, instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -210,9 +211,9 @@ func (instance *Subnet) UnsafeCreateSecurityGroups(ctx context.Context, networkI
 		return nil, nil, nil, xerr
 	}
 	defer func() {
-		if xerr != nil && !keepOnFailure {
+		if ferr != nil && !keepOnFailure {
 			if derr := subnetGWSG.UnbindFromSubnet(context.Background(), instance); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateways from Subnet", ActionFromError(xerr)))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unbind Security Group for gateways from Subnet", ActionFromError(ferr)))
 			}
 		}
 	}()
@@ -227,7 +228,7 @@ func (instance *Subnet) UnsafeCreateSecurityGroups(ctx context.Context, networkI
 }
 
 // createGWSecurityGroup creates a Security Group to be applied to gateways of the Subnet
-func (instance *Subnet) createGWSecurityGroup(ctx context.Context, network resources.Network, keepOnFailure bool) (_ resources.SecurityGroup, xerr fail.Error) {
+func (instance *Subnet) createGWSecurityGroup(ctx context.Context, network resources.Network, keepOnFailure bool) (_ resources.SecurityGroup, ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -264,9 +265,9 @@ func (instance *Subnet) createGWSecurityGroup(ctx context.Context, network resou
 	}
 
 	defer func() {
-		if xerr != nil && !keepOnFailure {
+		if ferr != nil && !keepOnFailure {
 			if derr := sg.Delete(context.Background(), true); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(xerr), sgName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), sgName))
 			}
 		}
 	}()
@@ -317,11 +318,13 @@ func (instance *Subnet) createGWSecurityGroup(ctx context.Context, network resou
 }
 
 // createPublicIPSecurityGroup creates a Security Group to be applied to host of the Subnet with public IP that is not a gateway
-func (instance *Subnet) createPublicIPSecurityGroup(ctx context.Context, network resources.Network, keepOnFailure bool) (_ resources.SecurityGroup, xerr fail.Error) {
+func (instance *Subnet) createPublicIPSecurityGroup(ctx context.Context, network resources.Network, keepOnFailure bool) (_ resources.SecurityGroup, ferr fail.Error) {
 	// Creates security group for hosts in Subnet to allow internal access
 	sgName := fmt.Sprintf(subnetPublicIPSecurityGroupNamePattern, instance.GetName(), network.GetName())
 
 	var sg resources.SecurityGroup
+	var xerr fail.Error
+
 	sg, xerr = NewSecurityGroup(instance.GetService())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -336,9 +339,9 @@ func (instance *Subnet) createPublicIPSecurityGroup(ctx context.Context, network
 	}
 
 	defer func() {
-		if xerr != nil && !keepOnFailure {
+		if ferr != nil && !keepOnFailure {
 			if derr := sg.Delete(context.Background(), true); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(xerr), sgName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), sgName))
 			}
 		}
 	}()
@@ -383,7 +386,7 @@ func (instance *Subnet) undoCreateSecurityGroup(errorPtr *fail.Error, keepOnFail
 }
 
 // Creates a Security Group to be applied on Hosts in Subnet to allow internal access
-func (instance *Subnet) createInternalSecurityGroup(ctx context.Context, network resources.Network, keepOnFailure bool) (_ resources.SecurityGroup, xerr fail.Error) {
+func (instance *Subnet) createInternalSecurityGroup(ctx context.Context, network resources.Network, keepOnFailure bool) (_ resources.SecurityGroup, ferr fail.Error) {
 	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, instance.GetName(), network.GetName())
 
 	cidr, xerr := instance.unsafeGetCIDR()
@@ -406,9 +409,9 @@ func (instance *Subnet) createInternalSecurityGroup(ctx context.Context, network
 	}
 
 	defer func() {
-		if xerr != nil && !keepOnFailure {
+		if ferr != nil && !keepOnFailure {
 			if derr := sg.Delete(context.Background(), true); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Security Group '%s'", ActionFromError(xerr), sgName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove Security Group '%s'", ActionFromError(ferr), sgName))
 			}
 		}
 	}()

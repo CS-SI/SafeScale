@@ -67,7 +67,8 @@ func (s Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 }
 
 // CreateNetwork creates a network named name
-func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, xerr fail.Error) {
+func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, ferr fail.Error) {
+	var xerr fail.Error
 	nullAN := abstract.NewNetwork()
 	if s.IsNull() {
 		return nullAN, fail.InvalidInstanceError()
@@ -110,7 +111,7 @@ func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 
 	// Starting from here, delete network if exit with error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := stacks.RetryableRemoteCall(
 				func() error {
 					return networks.Delete(s.NetworkClient, network.ID).ExtractErr()
@@ -119,7 +120,7 @@ func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 			)
 			if derr != nil {
 				logrus.Errorf("failed to delete Network '%s': %v", req.Name, derr)
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
@@ -343,7 +344,7 @@ func ToAbstractIPVersion(v int) ipversion.Enum {
 }
 
 // CreateSubnet creates a subnet
-func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet, xerr fail.Error) {
+func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
@@ -388,6 +389,7 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 	}
 
 	var subnet *subnets.Subnet
+	var xerr fail.Error
 	// Execute the operation and get back a subnets.Subnet struct
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
@@ -402,12 +404,12 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 
 	// Starting from here, delete subnet if exit with error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := s.DeleteSubnet(subnet.ID)
 			if derr != nil {
 				wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", subnet.Name)
 				logrus.Error(wrapErr.Error())
-				_ = xerr.AddConsequence(wrapErr)
+				_ = ferr.AddConsequence(wrapErr)
 			}
 		}
 	}()

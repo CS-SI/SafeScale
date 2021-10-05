@@ -177,7 +177,7 @@ func (s stack) rpcDescribeVpcByName(name *string) (*ec2.Vpc, fail.Error) {
 	return resp.Vpcs[0], nil
 }
 
-func (s stack) rpcCreateVpc(name, cidr *string) (*ec2.Vpc, fail.Error) {
+func (s stack) rpcCreateVpc(name, cidr *string) (_ *ec2.Vpc, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return &ec2.Vpc{}, xerr
 	}
@@ -201,9 +201,9 @@ func (s stack) rpcCreateVpc(name, cidr *string) (*ec2.Vpc, fail.Error) {
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteVpc(resp.Vpc.VpcId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network/VPC %s", aws.StringValue(resp.Vpc.VpcId)))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network/VPC %s", aws.StringValue(resp.Vpc.VpcId)))
 			}
 		}
 	}()
@@ -386,7 +386,7 @@ func (s stack) rpcDescribeSubnetByID(id *string) (*ec2.Subnet, fail.Error) {
 	return resp[0], nil
 }
 
-func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (*ec2.Subnet, fail.Error) {
+func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (_ *ec2.Subnet, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return &ec2.Subnet{}, xerr
 	}
@@ -418,9 +418,9 @@ func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (*ec2.Subnet, fa
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteSubnet(resp.Subnet.SubnetId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet %s", aws.StringValue(resp.Subnet.SubnetId)))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet %s", aws.StringValue(resp.Subnet.SubnetId)))
 			}
 		}
 	}()
@@ -746,10 +746,10 @@ func (s stack) rpcAuthorizeSecurityGroupEgress(id *string, egress []*ec2.IpPermi
 	)
 }
 
-func (s stack) rpcAllocateAddress(description string) (allocID *string, publicIP *string, xerr fail.Error) {
+func (s stack) rpcAllocateAddress(description string) (allocID *string, publicIP *string, ferr fail.Error) {
 	request := ec2.AllocateAddressInput{}
 	var resp *ec2.AllocateAddressOutput
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			resp, innerErr = s.EC2Service.AllocateAddress(&request)
 			return innerErr
@@ -764,10 +764,10 @@ func (s stack) rpcAllocateAddress(description string) (allocID *string, publicIP
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := s.rpcReleaseAddress(resp.AllocationId)
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to release Elastic IP"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to release Elastic IP"))
 			}
 		}
 	}()
@@ -1442,7 +1442,7 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (*ec2.Instance, fail.Error) {
+func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
 	nullInstance := &ec2.Instance{}
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nullInstance, xerr
@@ -1474,10 +1474,10 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := s.rpcDeleteNetworkInterface(nic.NetworkInterfaceId)
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete network interface"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete network interface"))
 			}
 		}
 	}()
@@ -1562,11 +1562,11 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			for _, v := range resp.Instances {
 				derr := s.rpcTerminateInstance(v)
 				if derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete instance %s", v.InstanceId))
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete instance %s", v.InstanceId))
 				}
 			}
 		}
@@ -2068,7 +2068,7 @@ func (s stack) rpcDescribeVolumeByName(name *string) (*ec2.Volume, fail.Error) {
 	return resp.Volumes[0], nil
 }
 
-func (s stack) rpcCreateVolume(name *string, size int64, speed string) (*ec2.Volume, fail.Error) {
+func (s stack) rpcCreateVolume(name *string, size int64, speed string) (_ *ec2.Volume, ferr fail.Error) {
 	if name == nil {
 		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("name")
 	}
@@ -2097,9 +2097,9 @@ func (s stack) rpcCreateVolume(name *string, size int64, speed string) (*ec2.Vol
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
 			}
 		}
 	}()
