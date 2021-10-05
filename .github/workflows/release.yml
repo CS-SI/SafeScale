@@ -34,7 +34,7 @@ jobs:
         sudo ln -s /opt/protoc/bin/protoc /usr/local/bin/
 
     - name: Make Release
-      run: make release
+      run: make release VERSION=${{ steps.get_version.outputs.version-without-v }}
       env:
         VERSION: ${{ steps.get_version.outputs.version-without-v }}
 
