@@ -20,6 +20,8 @@ import (
 	"context"
 	"reflect"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -37,8 +39,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
-	"github.com/sirupsen/logrus"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 type toV21_05_0 struct {

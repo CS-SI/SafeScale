@@ -17,7 +17,6 @@
 package system
 
 import (
-	"encoding/json"
 	"math"
 	"strings"
 	"sync/atomic"
@@ -25,6 +24,7 @@ import (
 
 	rice "github.com/GeertJohan/go.rice"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )

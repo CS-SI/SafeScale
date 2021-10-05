@@ -43,10 +43,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -432,7 +432,7 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 }
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
+func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, variables data.Map, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
@@ -482,7 +482,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 		return invalid, "", "", xerr
 	}
 
-	finalVariables := make(map[string]interface{}, len(variables)+len(bashLibraryVariables))
+	finalVariables := make(data.Map, len(variables)+len(bashLibraryVariables))
 	for k, v := range variables {
 		finalVariables[k] = v
 	}

@@ -16,20 +16,17 @@
 
 package serialize
 
-
 import (
 	stdjson "encoding/json"
 	"sync"
 
-	jsoniter "github.com/json-iterator/go"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/data/shielded"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
-
-var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // jsonProperty contains data and a RWMutex to handle sync
 type jsonProperty struct {
