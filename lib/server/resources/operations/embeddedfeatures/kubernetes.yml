@@ -113,10 +113,10 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} sfApt install -y ca-certificates || sfFail 192
+                                    sfRetry {{ or .TemplateOperationTimeout "10m" }} {{ or .TemplateOperationDelay 10 }} sfApt install -y ca-certificates || sfFail 192
                                     ;;
                                 redhat|rhel|fedora|centos)
-                                    sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} yum install -y ca-certificates || sfFail 193
+                                    sfRetry {{ or .TemplateOperationTimeout "10m" }} {{ or .TemplateOperationDelay 10 }} yum install -y ca-certificates || sfFail 193
                                     ;;
                                 *)
                                     echo "Unmanaged Linux distribution '$LINUX_KIND'"
