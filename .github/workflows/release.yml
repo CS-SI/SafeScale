@@ -43,6 +43,7 @@ jobs:
       with:
         name: SafeScale ${{ steps.get_version.outputs.version }}
         prerelease: ${{ contains(steps.get_version.outputs.version, '-rc') }}
+        body_path: ${{ github.workspace }}/CHANGELOG.md
         files: |
           safescale-${{ steps.get_version.outputs.version }}*
           
