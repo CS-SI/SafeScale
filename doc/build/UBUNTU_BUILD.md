@@ -6,10 +6,10 @@ $ sudo apt-get update -y
 $ sudo apt-get install -y build-essential make wget unzip vim git
 ```
 
-## Install GO 1.16.5
+## Install GO 1.16.8
 ```bash
-$ wget https://dl.google.com/go/go1.16.5.linux-amd64.tar.gz
-$ sudo tar -C /usr/local -xzf go1.16.5.linux-amd64.tar.gz
+$ wget https://dl.google.com/go/go1.16.8.linux-amd64.tar.gz
+$ sudo tar -C /usr/local -xzf go1.16.8.linux-amd64.tar.gz
 $ rm ./go1.16.8.linux-amd64.tar.gz
 ```
 
