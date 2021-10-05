@@ -2,7 +2,9 @@ name: Go Build CI
 
 on:
   push:
+    branches: [ review/ut ]
   pull_request:
+    branches: [ review/ut ]
 
 jobs:
 
