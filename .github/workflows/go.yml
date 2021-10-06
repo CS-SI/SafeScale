@@ -5,7 +5,7 @@ on:
   pull_request:
 
 env:
-  GOVERSION: [ '1.16.8', '1.17.1' ]
+  GOVERSION: '1.16.8' # The Go version to download (if necessary) and use.
   PROTOCVERSION: 3.17.3
 
 jobs:
@@ -14,15 +14,11 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        go: ${{ env.GOVERSION }}
-
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
       with:
-        go-version: ${{ matrix.go }}
+        go-version: ${{env.GOVERSION}}
     - name: Install Protoc
       run: |
         cd /tmp
@@ -43,15 +39,11 @@ jobs:
 
     runs-on: macos-latest
 
-    strategy:
-      matrix:
-        go: ${{ env.GOVERSION }}
-
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v2
       with:
-        go-version: ${{ matrix.go }}
+        go-version: ${{env.GOVERSION}}
     - name: Install Protoc
       run: |
         brew update
