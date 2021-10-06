@@ -1751,11 +1751,13 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 
 	logrus.Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
 
+	waitingTime := 4 * time.Minute // FIXME: Hardcoded time
+
 	// Reboot Host
 	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
-	rebootCtx, cancelReboot := context.WithTimeout(ctx, 3*time.Minute)
+	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 	defer cancelReboot()
-	_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
+	_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
@@ -1772,7 +1774,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations/subnet.go)
 	if !userdataContent.IsGateway {
 		// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
-		xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, 3*time.Minute) // FIXME: This needs a timeout
+		xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, waitingTime)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			theCause := fail.Cause(xerr)
@@ -1786,9 +1788,9 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		// Reboot Host
 		logrus.Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
 		command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
-		rebootCtx, cancelReboot := context.WithTimeout(ctx, 3*time.Minute)
+		rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 		defer cancelReboot()
-		_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
+		_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
 		if xerr != nil {
 			logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 		}
@@ -1801,7 +1803,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		}
 
 		// execute userdata.PHASE5_FINAL script to final install/configure of the Host (no need to reboot)
-		xerr = instance.runInstallPhase(ctx, userdata.PHASE5_FINAL, userdataContent, 3*time.Minute)
+		xerr = instance.runInstallPhase(ctx, userdata.PHASE5_FINAL, userdataContent, waitingTime)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -3276,8 +3278,8 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 			}
 			if !ok { // Not found, update bind metadata of Host
 				item = &propertiesv1.SecurityGroupBond{
-					ID:       sgID,
-					Name:     sgInstance.GetName(),
+					ID:   sgID,
+					Name: sgInstance.GetName(),
 				}
 				hsgV1.ByID[sgID] = item
 				hsgV1.ByName[item.Name] = item.ID

@@ -414,7 +414,7 @@ func (s stack) rpcDeleteSubnet(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (osc.Subnet, fail.Error) {
+func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (_ osc.Subnet, ferr fail.Error) {
 	if name == "" {
 		return osc.Subnet{}, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -449,9 +449,9 @@ func (s stack) rpcCreateSubnet(name, vpcID, cidr string) (osc.Subnet, fail.Error
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteSubnet(resp.Subnet.SubnetId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", name))
 			}
 		}
 	}()
@@ -622,7 +622,7 @@ func (s stack) rpcReadNics(subnetID, hostID string) ([]osc.Nic, fail.Error) {
 	return resp.Nics, nil
 }
 
-func (s stack) rpcCreateNic(subnetID, name, description string, sgs []string) (osc.Nic, fail.Error) {
+func (s stack) rpcCreateNic(subnetID, name, description string, sgs []string) (_ osc.Nic, ferr fail.Error) {
 	if subnetID == "" {
 		return osc.Nic{}, fail.InvalidParameterError("subnetID", "cannot be empty string")
 	}
@@ -658,9 +658,9 @@ func (s stack) rpcCreateNic(subnetID, name, description string, sgs []string) (o
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteNic(resp.Nic.NicId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Nic '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Nic '%s'", name))
 			}
 		}
 	}()
@@ -912,7 +912,7 @@ func (s stack) rpcUpdateVMSecurityGroups(id string, sgs []string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateVolume(name string, size int32, iops int32, speed string) (osc.Volume, fail.Error) {
+func (s stack) rpcCreateVolume(name string, size int32, iops int32, speed string) (_ osc.Volume, ferr fail.Error) {
 	createVolumeOpts := osc.CreateVolumeOpts{
 		CreateVolumeRequest: optional.NewInterface(osc.CreateVolumeRequest{
 			Iops:          iops,
@@ -939,9 +939,9 @@ func (s stack) rpcCreateVolume(name string, size int32, iops int32, speed string
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteVolume(resp.Volume.VolumeId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
 			}
 		}
 	}()
@@ -1171,7 +1171,7 @@ func (s stack) rpcDeleteInternetService(id string) fail.Error {
 	)
 }
 
-func (s stack) rpcCreateInternetService(name string) (osc.InternetService, fail.Error) {
+func (s stack) rpcCreateInternetService(name string) (_ osc.InternetService, ferr fail.Error) {
 	if name == "" {
 		return osc.InternetService{}, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -1193,9 +1193,9 @@ func (s stack) rpcCreateInternetService(name string) (osc.InternetService, fail.
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteInternetService(resp.InternetService.InternetServiceId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete internet service '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete internet service '%s'", name))
 			}
 		}
 	}()

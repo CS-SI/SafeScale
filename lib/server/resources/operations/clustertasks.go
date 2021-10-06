@@ -83,13 +83,13 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	// Starting from here, delete metadata if exiting with error
 	// but if the next cleaning steps fail, we must keep the metadata to try again, so we have the cleanFailure flag to detect that issue
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure && !cleanFailure {
-			logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(xerr), req.Name)
+		if ferr != nil && !req.KeepOnFailure && !cleanFailure {
+			logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
 			if derr := instance.MetadataCore.Delete(); derr != nil {
-				logrus.Errorf("cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(xerr), req.Name)
-				_ = xerr.AddConsequence(derr)
+				logrus.Errorf("cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name)
+				_ = ferr.AddConsequence(derr)
 			} else {
-				logrus.Debugf("Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(xerr), req.Name)
+				logrus.Debugf("Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name)
 			}
 		}
 	}()
@@ -140,7 +140,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			logrus.Debugf("Cleaning up on failure, deleting Subnet '%s'...", subnetInstance.GetName())
 			if derr := subnetInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
@@ -149,13 +149,13 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 					debug.IgnoreError(derr)
 				default:
 					cleanFailure = true
-					logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(xerr), subnetInstance.GetName())
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(xerr)))
+					logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr), subnetInstance.GetName())
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 				}
 			} else {
-				logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(xerr), subnetInstance.GetName())
+				logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr), subnetInstance.GetName())
 				if req.NetworkID == "" {
-					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(xerr), networkInstance.GetName())
+					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
 					if derr := networkInstance.Delete(context.Background()); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
@@ -163,11 +163,11 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 							debug.IgnoreError(derr)
 						default:
 							cleanFailure = true
-							logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(xerr), networkInstance.GetName())
-							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(xerr)))
+							logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr), networkInstance.GetName())
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr)))
 						}
 					} else {
-						logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(xerr), networkInstance.GetName())
+						logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr), networkInstance.GetName())
 					}
 				}
 			}
@@ -183,7 +183,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 	// Starting from here, exiting with error deletes hosts if req.keepOnFailure is false
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
@@ -201,7 +201,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 			})
 			if derr != nil {
 				cleanFailure = true
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 				return
 			}
 
@@ -209,7 +209,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 				tg, tgerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"))
 				if tgerr != nil {
 					cleanFailure = true
-					_ = xerr.AddConsequence(tgerr)
+					_ = ferr.AddConsequence(tgerr)
 					return
 				}
 
@@ -219,7 +219,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 						_, tgerr = tg.Start(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: captured}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", captured.Name)))
 						if tgerr != nil {
 							cleanFailure = true
-							_ = xerr.AddConsequence(tgerr)
+							_ = ferr.AddConsequence(tgerr)
 						}
 					}
 				}
@@ -227,7 +227,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 				// FIXME: WaitGroupFor NEEDS more UT
 				if _, _, tgerr = tg.WaitGroupFor(temporal.GetLongOperationTimeout()); tgerr != nil {
 					cleanFailure = true
-					_ = xerr.AddConsequence(tgerr)
+					_ = ferr.AddConsequence(tgerr)
 				}
 			}
 		}
@@ -685,14 +685,14 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := subnetInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Subnet is considered as a successful deletion, continue
 					debug.IgnoreError(derr)
 				default:
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 				}
 			}
 		}
@@ -782,14 +782,14 @@ func (instance *Cluster) createHostResources(
 	var startedTasks []concurrency.Task
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
 			taskID := func(t concurrency.Task) string {
 				tid, cleanErr := t.ID()
 				if cleanErr != nil {
-					_ = xerr.AddConsequence(cleanErr)
+					_ = ferr.AddConsequence(cleanErr)
 					tid = "<unknown>"
 				}
 				return tid
@@ -798,12 +798,12 @@ func (instance *Cluster) createHostResources(
 			// On error, instructs Tasks/TaskGroups to abort, to stop as soon as possible
 			for _, v := range startedTasks {
 				if !v.Aborted() {
-					logrus.Warnf("aborting because of %s", xerr.Error())
+					logrus.Warnf("aborting because of %s", ferr.Error())
 					cleanErr := v.Abort()
 					if cleanErr != nil {
 						cleanErr = fail.Wrap(cleanErr, "cleaning up on failure, failed to abort Task/TaskGroup %s spawn by createHostResources()", reflect.TypeOf(v).String(), taskID(v))
 						logrus.Error(cleanErr.Error())
-						_ = xerr.AddConsequence(cleanErr)
+						_ = ferr.AddConsequence(cleanErr)
 					}
 				}
 			}
@@ -813,7 +813,7 @@ func (instance *Cluster) createHostResources(
 				_, _, werr := v.WaitFor(temporal.GetLongOperationTimeout())
 				if werr != nil {
 					werr = fail.Wrap(werr, "cleaning up on failure, failed to wait for %s %s", reflect.TypeOf(v).String(), taskID(v))
-					_ = xerr.AddConsequence(werr)
+					_ = ferr.AddConsequence(werr)
 				}
 			}
 		}
@@ -918,20 +918,20 @@ func (instance *Cluster) createHostResources(
 
 	// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
 	defer func() {
-		if xerr != nil && !keepOnFailure {
+		if ferr != nil && !keepOnFailure {
 			// Disable abort signal during the clean up
 			defer task.DisarmAbortSignal()()
 
 			list, merr := instance.UnsafeListMasters()
 			if merr != nil {
-				_ = xerr.AddConsequence(merr)
+				_ = ferr.AddConsequence(merr)
 				return
 			}
 
 			if len(list) > 0 {
 				tg, tgerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"))
 				if tgerr != nil {
-					_ = xerr.AddConsequence(tgerr)
+					_ = ferr.AddConsequence(tgerr)
 					return
 				}
 
@@ -940,12 +940,12 @@ func (instance *Cluster) createHostResources(
 					if captured.ID != "" {
 						_, derr := tg.Start(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: captured}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", captured.Name)))
 						if derr != nil {
-							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete master '%s'", captured.Name))
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete master '%s'", captured.Name))
 						}
 					}
 				}
 				if _, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout()); derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for master deletions"))
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for master deletions"))
 				}
 			}
 		}
@@ -978,20 +978,20 @@ func (instance *Cluster) createHostResources(
 
 	// Starting from here, if exiting with error, delete nodes
 	defer func() {
-		if xerr != nil && !keepOnFailure {
+		if ferr != nil && !keepOnFailure {
 			// Disable abort signal during the clean up
 			defer task.DisarmAbortSignal()()
 
 			list, merr := instance.unsafeListNodes()
 			if merr != nil {
-				_ = xerr.AddConsequence(merr)
+				_ = ferr.AddConsequence(merr)
 				return
 			}
 
 			if len(list) > 0 {
 				tg, tgerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/onfailure"))
 				if tgerr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(tgerr, "cleaning up on failure, failed to create TaskGroup"))
+					_ = ferr.AddConsequence(fail.Wrap(tgerr, "cleaning up on failure, failed to create TaskGroup"))
 					return
 				}
 
@@ -1000,12 +1000,12 @@ func (instance *Cluster) createHostResources(
 					if captured.ID != "" {
 						_, derr := tg.Start(instance.taskDeleteNodeOnFailure, taskDeleteNodeOnFailureParameters{node: captured}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/delete", captured.Name)))
 						if derr != nil {
-							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete node '%s'", captured.Name))
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete node '%s'", captured.Name))
 						}
 					}
 				}
 				if _, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout()); derr != nil {
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for node deletions"))
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for node deletions"))
 				}
 			}
 		}
@@ -1553,7 +1553,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 
 	// Starting from here, if exiting with error, remove entry from master nodes of the metadata
 	defer func() {
-		if xerr != nil && !p.keepOnFailure {
+		if ferr != nil && !p.keepOnFailure {
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -1566,7 +1566,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove master from Cluster metadata", ActionFromError(xerr)))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove master from Cluster metadata", ActionFromError(ferr)))
 			}
 		}
 	}()
@@ -1633,14 +1633,14 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	defer func() {
-		if xerr != nil && !p.keepOnFailure {
+		if ferr != nil && !p.keepOnFailure {
 			if derr := hostInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Host is considered as a successful deletion, continue
 					debug.IgnoreError(derr)
 				default:
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 				}
 			}
 		}
@@ -1737,8 +1737,8 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	started := time.Now()
 
 	defer func() {
-		if xerr != nil {
-			logrus.Debugf("[Cluster %s] Masters configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(xerr), temporal.FormatDuration(time.Since(started)))
+		if ferr != nil {
+			logrus.Debugf("[Cluster %s] Masters configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr), temporal.FormatDuration(time.Since(started)))
 		} else {
 			logrus.Debugf("[Cluster %s] Masters configuration successful in [%s].", instance.GetName(), temporal.FormatDuration(time.Since(started)))
 		}
@@ -2073,7 +2073,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	// Starting from here, if exiting with error, remove entry from node of the metadata
 	defer func() {
-		if xerr != nil && !p.keepOnFailure {
+		if ferr != nil && !p.keepOnFailure {
 			// Disable abort signal during the clean up
 			defer task.DisarmAbortSignal()()
 
@@ -2089,7 +2089,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove node from Cluster metadata", ActionFromError(xerr)))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove node from Cluster metadata", ActionFromError(ferr)))
 			}
 		}
 	}()
@@ -2150,14 +2150,14 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	}
 
 	defer func() {
-		if xerr != nil && !p.keepOnFailure {
+		if ferr != nil && !p.keepOnFailure {
 			if derr := hostInstance.Delete(context.Background()); derr != nil {
 				switch derr.(type) {
 				case *fail.ErrNotFound:
 					// missing Host is considered as a successful deletion, continue
 					debug.IgnoreError(derr)
 				default:
-					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(xerr), hostInstance.GetName()))
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), hostInstance.GetName()))
 				}
 			}
 		}
@@ -2202,7 +2202,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 
 	// Starting from here, rollback on cluster metadata in case of failure
 	defer func() {
-		if xerr != nil && !p.keepOnFailure {
+		if ferr != nil && !p.keepOnFailure {
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) (innerXErr fail.Error) {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -2226,7 +2226,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove node '%s' from metadata of cluster '%s'", hostInstance.GetName(), instance.GetName()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove node '%s' from metadata of cluster '%s'", hostInstance.GetName(), instance.GetName()))
 			}
 		}
 	}()
@@ -2264,8 +2264,8 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 	started := time.Now()
 
 	defer func() {
-		if xerr != nil {
-			logrus.Debugf("[Cluster %s] Nodes configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(xerr), temporal.FormatDuration(time.Since(started)))
+		if ferr != nil {
+			logrus.Debugf("[Cluster %s] Nodes configuration FAILED with [%s] in [%s].", instance.GetName(), spew.Sdump(ferr), temporal.FormatDuration(time.Since(started)))
 		} else {
 			logrus.Debugf("[Cluster %s] Nodes configuration successful in [%s].", instance.GetName(), temporal.FormatDuration(time.Since(started)))
 		}

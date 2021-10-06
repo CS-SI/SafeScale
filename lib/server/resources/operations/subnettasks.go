@@ -40,8 +40,8 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -103,7 +103,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 
 	// Starting from here, deletes the gateway if exiting with error
 	defer func() {
-		if xerr != nil && !hostReq.KeepOnFailure {
+		if ferr != nil && !hostReq.KeepOnFailure {
 			// Disable abort signal during clean up
 			defer task.DisarmAbortSignal()()
 
@@ -120,11 +120,11 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 				default:
 					logrus.Errorf(msgRoot+": %v", hostReq.ResourceName, derr)
 				}
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			} else {
 				logrus.Infof("Cleaning up on failure, gateway '%s' deleted", hostReq.ResourceName)
 			}
-			_ = xerr.AddConsequence(derr)
+			_ = ferr.AddConsequence(derr)
 		}
 	}()
 
@@ -208,12 +208,14 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		debug.IgnoreError(xerr)
 	}
 
+	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
+
 	// intermediate gateway reboot
 	logrus.Infof("Rebooting gateway '%s'", gwname)
 	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
-	rebootCtx, cancelReboot := context.WithTimeout(task.Context(), 3*time.Minute)
+	rebootCtx, cancelReboot := context.WithTimeout(task.Context(), waitingTime)
 	defer cancelReboot()
-	_, _, _, xerr = objgw.Run(rebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
+	_, _, _, xerr = objgw.Run(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
@@ -226,7 +228,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	}
 
 	// final phase...
-	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE5_FINAL, userData, 3*time.Minute)
+	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE5_FINAL, userData, waitingTime)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -235,9 +237,9 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	// Final gateway reboot
 	logrus.Infof("Rebooting gateway '%s'", gwname)
 	command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
-	lastRebootCtx, lastCancelReboot := context.WithTimeout(task.Context(), 3*time.Minute)
+	lastRebootCtx, lastCancelReboot := context.WithTimeout(task.Context(), waitingTime)
 	defer lastCancelReboot()
-	_, _, _, xerr = objgw.Run(lastRebootCtx, command, outputs.COLLECT, 10*time.Second, 3*time.Minute)
+	_, _, _, xerr = objgw.Run(lastRebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}

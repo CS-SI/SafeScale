@@ -140,7 +140,7 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fa
 }
 
 // Mount a bucket on an host on the given mount point
-func (handler *bucketHandler) Mount(bucketName, hostName, path string) (xerr fail.Error) {
+func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fail.Error) {
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -154,11 +154,11 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (xerr fai
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	defer func() {
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to mount bucket '%s' on '%s:%s'", bucketName, hostName, path)
+		if ferr != nil {
+			ferr = fail.Wrap(ferr, "failed to mount bucket '%s' on '%s:%s'", bucketName, hostName, path)
 		}
 	}()
 
@@ -172,7 +172,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (xerr fai
 }
 
 // Unmount a bucket
-func (handler *bucketHandler) Unmount(bucketName, hostName string) (xerr fail.Error) {
+func (handler *bucketHandler) Unmount(bucketName, hostName string) (ferr fail.Error) {
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -186,11 +186,11 @@ func (handler *bucketHandler) Unmount(bucketName, hostName string) (xerr fail.Er
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('%s', '%s')", bucketName, hostName).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
 
 	defer func() {
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to unmount bucket '%s' from host '%s'", bucketName, hostName)
+		if ferr != nil {
+			ferr = fail.Wrap(ferr, "failed to unmount bucket '%s' from host '%s'", bucketName, hostName)
 		}
 	}()
 

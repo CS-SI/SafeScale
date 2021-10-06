@@ -110,12 +110,6 @@ RACE_CHECK_TEST=
 endif
 endif
 
-ifneq ($(OS),Windows_NT)
-STRICT=$(shell $(GO) version | egrep -c "15.10 |15.9 ")
-else
-STRICT=1
-endif
-
 ifeq (, $(shell $(WHICH) git))
 $(error "No git in your PATH: [$(PATH)], you must have git installed and available through your PATH")
 endif

@@ -1138,7 +1138,8 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, xerr fail.Error) {
+func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, ferr fail.Error) {
+	var xerr fail.Error
 	var tags []string
 	for k := range sgs {
 		tags = append(tags, k)
@@ -1242,9 +1243,9 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteInstance(name); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "Cleaning up on failure, failed to delete instance '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "Cleaning up on failure, failed to delete instance '%s'", name))
 			}
 		}
 	}()

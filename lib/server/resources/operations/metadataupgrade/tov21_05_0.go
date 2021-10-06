@@ -145,7 +145,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 	}
 	subnetName = currentInstance.GetName()
 
-	xerr := currentInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := currentInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) (ferr fail.Error) {
 		abstractNetwork, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -233,23 +233,23 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			}
 
 			defer func() {
-				if innerXErr != nil {
+				if ferr != nil {
 					sgName := gwSG.GetName()
 					derr := gwSG.Delete(context.Background(), true)
 					if derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 					}
 
 					sgName = internalSG.GetName()
 					derr = internalSG.Delete(context.Background(), true)
 					if derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 					}
 
 					sgName = publicSG.GetName()
 					derr = publicSG.Delete(context.Background(), true)
 					if derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
 					}
 				} else {
 					gwSG.Released()

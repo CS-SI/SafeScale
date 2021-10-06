@@ -49,7 +49,7 @@ func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 
 // CreateSecurityGroup creates a security group
 // Actually creates GCP Firewall Rules corresponding to the Security Group rules
-func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -74,17 +74,17 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 	asg.Rules = rules
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			for _, v := range asg.Rules {
 				for _, r := range v.IDs {
 					if derr := s.rpcDeleteFirewallRuleByID(r); derr != nil {
-						switch xerr.(type) {
+						switch ferr.(type) {
 						case *fail.ErrNotFound:
 							// rule not found, considered as a removal success
-							debug.IgnoreError(xerr)
+							debug.IgnoreError(ferr)
 							continue
 						default:
-							_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
 						}
 					}
 					logrus.Debugf("Deleted rule: %s", r)
@@ -94,6 +94,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 	}()
 
 	for k, v := range asg.Rules {
+		var xerr fail.Error
 		asg, xerr = s.AddRuleToSecurityGroup(asg, v)
 		if xerr != nil {
 			return nullASG, fail.Wrap(xerr, "failed adding rule #%d", k)

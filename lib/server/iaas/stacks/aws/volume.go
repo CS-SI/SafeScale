@@ -17,9 +17,10 @@
 package aws
 
 import (
-	"github.com/sirupsen/logrus"
 	"sort"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -34,14 +35,14 @@ import (
 )
 
 // CreateVolume ...
-func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if s.IsNull() {
 		return nullAV, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	defer fail.OnExitLogError(&ferr)
 
 	volumeType, minSize := fromAbstractVolumeSpeed(request.Speed)
 	if request.Size < minSize {
@@ -55,9 +56,9 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", request.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", request.Name))
 			}
 		}
 	}()

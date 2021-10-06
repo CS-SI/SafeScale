@@ -80,7 +80,7 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 }
 
 // CreateSecurityGroup creates a security group
-func (s stack) CreateSecurityGroup(networkID, name, description string, rules abstract.SecurityGroupRules) (asg *abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) CreateSecurityGroup(networkID, name, description string, rules abstract.SecurityGroupRules) (asg *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -98,9 +98,9 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules ab
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteSecurityGroup(resp.SecurityGroupId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
 			}
 		}
 	}()

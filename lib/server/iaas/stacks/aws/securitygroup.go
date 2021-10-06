@@ -57,7 +57,7 @@ func (s stack) ListSecurityGroups(networkID string) ([]*abstract.SecurityGroup, 
 
 // CreateSecurityGroup creates a security group
 // Note: parameter 'networkRef' is used in AWS, Security Groups scope is Network/VPC-wide.
-func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	nullSG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullSG, fail.InvalidInstanceError()
@@ -81,9 +81,9 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteSecurityGroup(resp); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
 			}
 		}
 	}()

@@ -187,8 +187,8 @@ type taskReadParameters struct {
 }
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
@@ -210,7 +210,7 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			xerr = fail.ConvertError(panicErr)
+			ferr = fail.ConvertError(panicErr)
 		}
 	}()
 	defer fail.OnPanic(&panicErr)

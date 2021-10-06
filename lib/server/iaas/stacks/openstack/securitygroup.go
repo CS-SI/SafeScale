@@ -68,7 +68,7 @@ func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 // Parameter 'networkRef' is not used in Openstack, Security Groups are tenant-wide.
 // Returns nil, *fail.ErrDuplicate if already 1 security group exists with that name
 // Returns nil, *fail.ErrDuplicate(with a cause *fail.ErrDuplicate) if more than 1 security group exist with that name
-func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error) {
+func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -118,9 +118,9 @@ func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules a
 
 	// Starting from here, delete security group on error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.DeleteSecurityGroup(asg); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete security group"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete security group"))
 			}
 		}
 	}()

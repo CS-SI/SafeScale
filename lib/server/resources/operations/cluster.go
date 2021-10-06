@@ -221,7 +221,7 @@ func (instance *Cluster) IsNull() bool {
 }
 
 // carry ...
-func (instance *Cluster) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *Cluster) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -245,9 +245,9 @@ func (instance *Cluster) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
 	}()
@@ -1067,8 +1067,8 @@ func (instance *Cluster) AddNode(ctx context.Context, def abstract.HostSizingReq
 }
 
 // AddNodes adds several nodes
-func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, keepOnFailure bool) (_ []resources.Host, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -1175,21 +1175,21 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	// Starting from here, if exiting with error, delete created nodes if allowed (cf. keepOnFailure)
 	defer func() {
-		if xerr != nil && !keepOnFailure && len(nodes) > 0 {
+		if ferr != nil && !keepOnFailure && len(nodes) > 0 {
 			// Note: using context.Background() disable cancellation mechanism for a workload that needs to go to the end
 			tg, derr := concurrency.NewTaskGroupWithContext(context.Background())
 			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 			derr = tg.SetID("/onfailure")
 			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 
 			for _, v := range nodes {
 				_, derr = tg.Start(instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: HostLightOption})
 				if derr != nil {
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 					abErr := tg.Abort()
 					if abErr != nil {
 						logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
@@ -1199,7 +1199,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 			}
 			_, derr = tg.WaitGroup()
 			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
@@ -2773,7 +2773,7 @@ func containsClusterNode(list []uint, numericalID uint) (bool, int) {
 
 // configureCluster ...
 // params contains a data.Map with primary and secondary getGateway hosts
-func (instance *Cluster) configureCluster(ctx context.Context) (xerr fail.Error) {
+func (instance *Cluster) configureCluster(ctx context.Context) (ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2797,10 +2797,10 @@ func (instance *Cluster) configureCluster(ctx context.Context) (xerr fail.Error)
 
 	logrus.Infof("[Cluster %s] configuring Cluster...", instance.GetName())
 	defer func() {
-		if xerr == nil {
+		if ferr == nil {
 			logrus.Infof("[Cluster %s] configuration successful.", instance.GetName())
 		} else {
-			logrus.Errorf("[Cluster %s] configuration failed: %s", instance.GetName(), xerr.Error())
+			logrus.Errorf("[Cluster %s] configuration failed: %s", instance.GetName(), ferr.Error())
 		}
 	}()
 
