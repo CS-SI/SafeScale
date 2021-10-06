@@ -1,7 +1,18 @@
 #!/bin/sh
 
-# Make sure the style is right and also run the tests
-make gofmt precommittest
+if [ "$NO_VERIFY" ]; then
+    echo 'pre-commit hook skipped' 1>&2
+    exit 0
+fi
+
+# Make sure format and build are OK
+make gofmt checkbuild
+RESULT=$?
+
+[ $RESULT -ne 0 ] && exit 1
+
+# Run UT before commit
+make precommittest
 RESULT=$?
 
 [ $RESULT -ne 0 ] && exit 1
