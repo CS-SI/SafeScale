@@ -719,8 +719,8 @@ type runOnHostParameters struct {
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
-func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	defer func() {
 		if result != nil {
@@ -728,13 +728,13 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
 					dur := spew.Sdump(result)
 					if !strings.Contains(dur, "check_") {
-						logrus.Warnf("TBR: task result: %s", spew.Sdump(result)) // TBR, remove this later
+						logrus.Warningf("TBR: task result: %s", spew.Sdump(result)) // TBR, remove this later
 					}
 				}
 			}
 		}
-		if xerr != nil {
-			logrus.Warnf("TBR: task error: %v", xerr) // TBR, remove this later
+		if ferr != nil {
+			logrus.Warningf("TBR: task error: %v", ferr) // TBR, remove this later
 		}
 	}()
 

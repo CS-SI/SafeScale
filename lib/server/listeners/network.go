@@ -40,14 +40,14 @@ const (
 )
 
 // NetworkListener network service server grpc
-type NetworkListener struct{
+type NetworkListener struct {
 	protocol.UnimplementedNetworkServiceServer
 }
 
 // Create a new network
-func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err, "cannot create network")
+func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitLogError(&ferr, "cannot create network")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -101,11 +101,11 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	}
 
 	defer func() {
-		if err != nil && !in.GetKeepOnFailure() {
+		if ferr != nil && !in.GetKeepOnFailure() {
 			// VPL: using context.Background() instead of job.Context() disables the cancellation
 			// defer job.Task().DisarmAbortSignal()()
-			if derr := networkInstance.Delete(context.Background()); derr != nil {
-				_ = fail.ConvertError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
+			if dferr := networkInstance.Delete(context.Background()); dferr != nil {
+				_ = fail.ConvertError(ferr).AddConsequence(fail.Wrap(dferr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
 			}
 		}
 	}()

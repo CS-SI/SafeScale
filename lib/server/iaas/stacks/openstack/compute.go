@@ -48,7 +48,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -600,7 +599,8 @@ func (s Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 }
 
 // CreateHost creates a new host
-func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
+func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+	var xerr fail.Error
 	nullAHF := abstract.NewHostFull()
 	nullUDC := userdata.NewContent()
 	if s.IsNull() {
@@ -608,7 +608,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
@@ -631,9 +631,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	userData = userdata.NewContent()
 	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to prepare user data content")
-		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-		return nullAHF, nullUDC, xerr
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
@@ -767,7 +765,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			logrus.Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
 			if derr := s.DeleteHost(ahc.ID); derr != nil {
 				switch derr.(type) {
@@ -778,7 +776,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
 				}
-				_ = fail.AddConsequence(xerr, derr)
+				_ = fail.AddConsequence(ferr, derr)
 			}
 		}
 	}()
@@ -871,16 +869,16 @@ func (s Stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) 
 }
 
 // identifyOpenstackSubnetsAndPorts ...
-func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, xerr fail.Error) {
+func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) {
 	nets = []servers.Network{}
 	netPorts = []ports.Port{}
 	createdPorts = []string{}
 
 	// cleanup if exiting with error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.deletePortsInSlice(createdPorts); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
 			}
 		}
 	}()

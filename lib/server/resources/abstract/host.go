@@ -291,7 +291,7 @@ func (hc *HostCore) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates an IPAddress
-func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
+func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 	if hc == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -299,7 +299,7 @@ func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			xerr = fail.ConvertError(panicErr) // If panic occured, transforms err to a fail.Error if needed
+			ferr = fail.ConvertError(panicErr) // If panic occurred, transforms err to a fail.Error if needed
 		}
 	}()
 	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic

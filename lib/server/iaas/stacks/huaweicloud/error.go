@@ -65,6 +65,8 @@ func reduceHuaweicloudError(in []byte) (xerr fail.Error) {
 				return fail.NotFoundError("failed to find VPC")
 			case "VPC.0209":
 				return fail.NotAvailableError("subnet still in use")
+			case "APIGW.0101":
+				return fail.NotFoundError("API not found") // FIXME: Check this
 			}
 		}
 	}

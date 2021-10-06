@@ -98,7 +98,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 	return toAbstractNetwork(resp), nil
 }
 
-func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fail.Error {
+func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) (ferr fail.Error) {
 	if len(req.DNSServers) == 0 {
 		return nil
 	}
@@ -114,9 +114,9 @@ func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fai
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := s.deleteDhcpOptions(net, false)
-			_ = xerr.AddConsequence(derr)
+			_ = ferr.AddConsequence(derr)
 		}
 	}()
 
@@ -347,7 +347,7 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 }
 
 // CreateSubnet creates a Subnet
-func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xerr fail.Error) {
+func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
@@ -377,9 +377,9 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.rpcDeleteSubnet(resp.SubnetId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
 			}
 		}
 	}()

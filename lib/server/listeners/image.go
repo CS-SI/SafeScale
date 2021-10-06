@@ -32,7 +32,7 @@ import (
 // safescale image list --all=false
 
 // ImageListener image service server grpc
-type ImageListener struct{
+type ImageListener struct {
 	protocol.UnimplementedImageServiceServer
 }
 

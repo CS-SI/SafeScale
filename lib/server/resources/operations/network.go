@@ -436,7 +436,7 @@ func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Net
 }
 
 var (
-	removingNetworkAbstractContextKey = "removing_network_abstract"
+	removingNetworkAbstractContextKey   = "removing_network_abstract"
 	removingNetworkPropertiesContextKey = "removing_network_properties"
 )
 

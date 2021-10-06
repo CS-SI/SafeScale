@@ -956,7 +956,7 @@ func (w *worker) parseClusterSizingRequest(_/*request*/ string) (int, int, float
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
-func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
+func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1089,15 +1089,15 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 			}
 
 			defer func() {
-				if xerr != nil {
+				if ferr != nil {
 					logrus.Warnf("aborting because of %s", xerr.Error())
 					derr := tg.Abort()
 					if derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort TaskGroup"))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort TaskGroup"))
 					} else {
 						_, derr = tg.WaitGroup()
 						if derr != nil {
-							_ = xerr.AddConsequence(derr)
+							_ = ferr.AddConsequence(derr)
 						}
 					}
 				}

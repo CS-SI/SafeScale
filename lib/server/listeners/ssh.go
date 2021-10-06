@@ -39,7 +39,7 @@ import (
 // safescale ssh copy host1:/file/test.txt /tmp
 
 // SSHListener SSH service server grpc
-type SSHListener struct{
+type SSHListener struct {
 	protocol.UnimplementedSshServiceServer
 }
 

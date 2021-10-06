@@ -82,7 +82,7 @@ func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ ser
 }
 
 // JobManagerListener service server gRPC
-type JobManagerListener struct{
+type JobManagerListener struct {
 	protocol.UnimplementedJobServiceServer
 }
 

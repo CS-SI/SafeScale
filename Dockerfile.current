@@ -1,4 +1,4 @@
-FROM ubuntu:bionic
+FROM ubuntu:bionic as builder
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -7,7 +7,7 @@ ARG LANG=C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 ENV BUILD_ENV docker
 ENV BRANCH_NAME develop
-ENV GOVERSION 1.16.2
+ENV GOVERSION 1.16.8
 ENV PROTOVERSION 3.17.3
 
 # -----------------
@@ -46,12 +46,12 @@ RUN python3 -c "print('testing UTF8: 👌')"
 WORKDIR /tmp
 
 # ----------------------
-# Install GO 1.16.2
+# Install GO 1.16.8
 # ----------------------
-RUN wget https://dl.google.com/go/go1.16.2.linux-amd64.tar.gz \
-&& tar -C /usr/local -xzf go1.16.2.linux-amd64.tar.gz \
-&& rm /tmp/go1.16.2.linux-amd64.tar.gz
-ENV PATH /home/oscar/.gvm/pkgsets/go1.16.7/global/bin:/home/oscar/.gvm/gos/go1.16.7/bin:/home/oscar/.gvm/pkgsets/go1.16.7/global/overlay/bin:/home/oscar/.gvm/bin:/home/oscar/.gvm/bin:/home/oscar/.nvm/versions/node/v10.16.3/bin:/home/oscar/.pyenv/plugins/pyenv-virtualenv/shims:/home/oscar/.pyenv/shims:/home/oscar/.pyenv/bin:/home/oscar/.cargo/bin:/home/oscar/.cargo/bin:/home/oscar/.local/alt/shims:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/oscar/.garden/bin:/home/oscar/Apps:/home/oscar/.fzf/bin:/usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+RUN wget https://dl.google.com/go/go1.16.8.linux-amd64.tar.gz \
+&& tar -C /usr/local -xzf go1.16.8.linux-amd64.tar.gz \
+&& rm /tmp/go1.16.8.linux-amd64.tar.gz
+ENV PATH /usr/local/go/bin:/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # ----------------------
 # Install Protoc 3.17.3
@@ -70,3 +70,30 @@ ADD . /go/SafeScale
 CMD sleep 5
 
 RUN cd /opt && ./build-safescale-local.sh
+
+# --
+
+FROM golang:1.16.8-alpine
+LABEL maintainer="CS SI"
+ARG http_proxy=""
+ARG https_proxy=""
+ARG LC_ALL=C.UTF-8
+ARG LANG=C.UTF-8
+ENV BUILD_ENV docker
+
+RUN apk update && \
+    apk add --no-cache \
+    curl \
+    wget \
+    openssl \
+    ca-certificates \
+    iproute2 \
+    iperf
+
+RUN ln -s /usr/lib/tc /lib/tc
+RUN mkdir /exported
+
+RUN apk add --no-cache bash
+
+COPY --from=builder /exported/safescaled /exported/safescaled
+COPY --from=builder /exported/safescale /exported/safescale

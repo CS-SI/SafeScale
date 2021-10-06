@@ -160,7 +160,7 @@ func NewTenantHandler(job server.Job) TenantHandler {
 }
 
 // Scan scans the tenant and updates the database
-func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, xerr fail.Error) {
+func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -173,7 +173,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 
 	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	svc := handler.job.Service()
 	task := handler.job.Task()
@@ -200,15 +200,15 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 			templatesToScan = append(templatesToScan, *template)
 		}
 	} else {
-		if xerr = handler.dumpImages(); xerr != nil {
+		if xerr := handler.dumpImages(); xerr != nil {
 			return nil, xerr
 		}
 
-		if xerr = handler.dumpTemplates(); xerr != nil {
+		if xerr := handler.dumpTemplates(); xerr != nil {
 			return nil, xerr
 		}
 
-		templatesToScan, xerr = svc.ListTemplates(false)
+		templatesToScan, xerr := svc.ListTemplates(false)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -221,6 +221,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	logrus.Infof("Starting scan of tenant %q with templates: %v", tenantName, templateNamesToScan)
 	logrus.Infof("Using %q image", defaultScanImage)
 
+	var xerr fail.Error
 	handler.scannedHostImage, xerr = svc.SearchImage(defaultScanImage)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not find needed image in given service")
@@ -237,7 +238,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		if derr != nil {
 			logrus.Warnf("Error deleting network '%s'", network.GetID())
 		}
-		_ = xerr.AddConsequence(derr)
+		_ = ferr.AddConsequence(derr)
 	}()
 
 	logrus.Infof("Creating scan subnet: %q", scanSubnetName)
@@ -248,7 +249,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	defer func() {
 		if derr := subnet.Delete(context.Background()); derr != nil {
 			logrus.Warnf("Error deleting subnet '%s'", subnet.GetID())
-			_ = xerr.AddConsequence(derr)
+			_ = ferr.AddConsequence(derr)
 		}
 	}()
 

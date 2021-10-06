@@ -1,4 +1,4 @@
-FROM ubuntu:bionic
+FROM ubuntu:bionic as builder
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -7,11 +7,11 @@ ARG LANG=C.UTF-8
 ENV DEBIAN_FRONTEND noninteractive
 ENV BUILD_ENV docker
 ARG BRANCH_NAME
-ARG GOVERSION=1.16.2
+ARG GOVERSION=1.16.8
 ARG PROTOVERSION=3.17.3
 
 # -----------------
-# Standard packages
+# Install Standard packages
 # -----------------
 RUN apt-get update -y \
 && apt-get install -y --allow-unauthenticated \
@@ -70,3 +70,30 @@ CMD sleep 5
 COPY marker /dev/null
 
 RUN cd /opt && ./build-safescale.sh
+
+# --
+
+FROM golang:$GOVERSION-alpine
+LABEL maintainer="CS SI"
+ARG http_proxy=""
+ARG https_proxy=""
+ARG LC_ALL=C.UTF-8
+ARG LANG=C.UTF-8
+ENV BUILD_ENV docker
+
+RUN apk update && \
+    apk add --no-cache \
+    curl \
+    wget \
+    openssl \
+    ca-certificates \
+    iproute2 \
+    iperf
+
+RUN ln -s /usr/lib/tc /lib/tc
+RUN mkdir /exported
+
+RUN apk add --no-cache bash
+
+COPY --from=builder /exported/safescaled /exported/safescaled
+COPY --from=builder /exported/safescale /exported/safescale

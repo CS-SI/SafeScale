@@ -45,7 +45,7 @@ import (
 // safescale network subnet inspect net1 subnet-1
 
 // SubnetListener subnet service server gRPC
-type SubnetListener struct{
+type SubnetListener struct {
 	protocol.UnimplementedSubnetServiceServer
 }
 

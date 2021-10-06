@@ -298,10 +298,10 @@ function identify_nics() {
   fi
 
   if [[ "{{.ProviderName}}" == "huaweicloud" ]]; then
-    echo "It actually IS FlexibleEngine"
+    echo "It actually IS huaweicloud"
     FEN=1
   else
-    echo "It is NOT FlexibleEngine"
+    echo "It is NOT huaweicloud"
     FEN=0
   fi
 

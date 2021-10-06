@@ -45,7 +45,7 @@ import (
 var VolumeHandler = handlers.NewVolumeHandler
 
 // VolumeListener is the volume service gRPC server
-type VolumeListener struct{
+type VolumeListener struct {
 	protocol.UnimplementedVolumeServiceServer
 }
 

@@ -1,11 +1,11 @@
-name: Go Build CI
+name: Latest Go Build CI
 
 on:
   push:
   pull_request:
 
 env:
-  GOVERSION: '1.16.8' # The Go version to download (if necessary) and use.
+  GOVERSION: '1.17.1' # The Go version to download (if necessary) and use.
   PROTOCVERSION: 3.17.3
 
 jobs:

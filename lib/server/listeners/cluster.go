@@ -39,7 +39,7 @@ import (
 )
 
 // ClusterListener host service server grpc
-type ClusterListener struct{
+type ClusterListener struct {
 	protocol.UnimplementedClusterServiceServer
 }
 

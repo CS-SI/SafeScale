@@ -1,4 +1,4 @@
-FROM ubuntu:bionic
+FROM ubuntu:bionic as builder
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
@@ -11,7 +11,7 @@ ENV GOVERSION $GOVERSION
 ENV PROTOVERSION $PROTOVERSION
 
 # -----------------
-# Standard packages
+# Install Standard packages
 # -----------------
 RUN apt-get update -y \
 && apt-get install -y --allow-unauthenticated \
@@ -72,3 +72,30 @@ CMD sleep 5
 COPY marker /dev/null
 
 RUN cd /opt && ./build-safescale-cover-local.sh
+
+# --
+
+FROM golang:$GOVERSION-alpine
+LABEL maintainer="CS SI"
+ARG http_proxy=""
+ARG https_proxy=""
+ARG LC_ALL=C.UTF-8
+ARG LANG=C.UTF-8
+ENV BUILD_ENV docker
+
+RUN apk update && \
+    apk add --no-cache \
+    curl \
+    wget \
+    openssl \
+    ca-certificates \
+    iproute2 \
+    iperf
+
+RUN ln -s /usr/lib/tc /lib/tc
+RUN mkdir /exported
+
+RUN apk add --no-cache bash
+
+COPY --from=builder /exported/safescaled-cover /exported/safescaled-cover
+COPY --from=builder /exported/safescale-cover /exported/safescale-cover

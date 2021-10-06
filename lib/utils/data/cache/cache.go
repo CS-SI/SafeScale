@@ -322,7 +322,7 @@ func (instance *cache) unsafeFreeEntry(key string) fail.Error {
 const reservationTimeoutForAddition = 5 * time.Second
 
 // Add adds a content in cache
-func (instance *cache) Add(content Cacheable) (_ *Entry, xerr fail.Error) {
+func (instance *cache) Add(content Cacheable) (_ *Entry, ferr fail.Error) {
 	if instance == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -334,15 +334,15 @@ func (instance *cache) Add(content Cacheable) (_ *Entry, xerr fail.Error) {
 	defer instance.lock.Unlock()
 
 	id := content.GetID()
-	xerr = instance.unsafeReserveEntry(id, reservationTimeoutForAddition)
+	xerr := instance.unsafeReserveEntry(id, reservationTimeoutForAddition)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := instance.unsafeFreeEntry(id); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry '%s' in cache %s", id, instance.GetName()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry '%s' in cache %s", id, instance.GetName()))
 			}
 		}
 	}()

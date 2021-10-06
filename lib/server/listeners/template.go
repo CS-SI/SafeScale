@@ -36,7 +36,7 @@ import (
 // safescale template list --all=false
 
 // TemplateListener host service server grpc
-type TemplateListener struct{
+type TemplateListener struct {
 	protocol.UnimplementedTemplateServiceServer
 }
 
