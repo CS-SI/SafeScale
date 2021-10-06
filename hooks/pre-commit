@@ -1,8 +1,9 @@
 #!/bin/sh
 
-# Run UT before commit
-make precommittest
+# Make sure the style is right and also run the tests
+make gofmt precommittest
 RESULT=$?
 
 [ $RESULT -ne 0 ] && exit 1
+
 exit 0
