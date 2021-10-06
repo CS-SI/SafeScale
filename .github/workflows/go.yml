@@ -1,10 +1,8 @@
-name: Go Build CI (stable version)
+name: Go Build CI
 
 on:
   push:
-    branches: [ develop review/ut ]
   pull_request:
-    branches: [ develop review/ut ]
 
 env:
   GOVERSION: '1.16.8' # The Go version to download (if necessary) and use.
