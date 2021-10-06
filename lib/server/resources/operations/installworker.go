@@ -28,6 +28,7 @@ import (
 	txttmpl "text/template"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -43,13 +44,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -61,7 +61,7 @@ const (
 	yamlTargetsKeyword = "targets"
 	yamlRunKeyword     = "run"
 	yamlPackageKeyword = "package"
-	yamlOptionsKeyword = "options"
+	// yamlOptionsKeyword = "options"
 	yamlTimeoutKeyword = "timeout"
 	yamlSerialKeyword  = "serialized"
 )
@@ -743,45 +743,6 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlRunKeyword)
 	}
 
-	// VPL: not used anymore
-	// // If there is an options file (for now specific to DCOS), upload it to the remote host
-	// optionsFileContent := ""
-	// if anon, ok = p.stepMap[yamlOptionsKeyword]; ok {
-	// 	for i, j := range anon.(map[string]interface{}) {
-	// 		options[i] = j.(string)
-	// 	}
-	// 	var (
-	// 		avails  = map[string]interface{}{}
-	// 		content interface{}
-	// 	)
-	// 	complexity, xerr := w.cluster.GetComplexity()
-	// 	xerr = debug.InjectPlannedFail(xerr)
-	// 	if xerr != nil {
-	// 		return nil, xerr
-	// 	}
-	//
-	// 	c := strings.ToLower(complexity.String())
-	// 	for k, anon := range options {
-	// 		avails[strings.ToLower(k)] = anon
-	// 	}
-	// 	if content, ok = avails[c]; !ok {
-	// 		if c == strings.ToLower(clustercomplexity.Large.String()) {
-	// 			c = clustercomplexity.Normal.String()
-	// 		}
-	// 		if c == strings.ToLower(clustercomplexity.Normal.String()) {
-	// 			if content, ok = avails[c]; !ok {
-	// 				content, ok = avails[clustercomplexity.Small.String()]
-	// 			}
-	// 		}
-	// 	}
-	// 	if ok {
-	// 		optionsFileContent = content.(string)
-	// 		p.variables["options"] = fmt.Sprintf("--options=%s/options.json", utils.TempFolder)
-	// 	}
-	// } else {
-	// 	p.variables["options"] = ""
-	// }
-
 	wallTime := temporal.GetLongOperationTimeout()
 	if anon, ok = p.stepMap[yamlTimeoutKeyword]; ok {
 		if _, ok := anon.(int); ok {
@@ -796,7 +757,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, xerr := normalizeScript(p.variables, data.Map{
+	templateCommand, xerr := normalizeScript(&p.variables, data.Map{
 		"reserved_Name":    w.feature.GetName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
@@ -868,7 +829,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			if cuk != nil {
 				if !cuk.Successful() && cuk.Completed() {
 					// TBR: It's one of those
-					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %v with [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
+					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %v with [%s]", w.action.String(), p.stepName, key/*cuk.Error()*/, spew.Sdump(cuk))
 					logrus.Warnf(msg.Error())
 					newerrpack = append(newerrpack, msg)
 				}
@@ -990,7 +951,7 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 }
 
 // parseClusterSizingRequest returns count, cpu and ram components of request
-func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, fail.Error) {
+func (w *worker) parseClusterSizingRequest(_/*request*/ string) (int, int, float32, fail.Error)  {
 	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 
@@ -1319,11 +1280,30 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
-func normalizeScript(params, reserved map[string]interface{}) (string, fail.Error) {
+func normalizeScript(params *data.Map, reserved data.Map) (string, fail.Error) {
 	var (
 		err         error
 		tmplContent string
 	)
+
+	// Configures BashLibrary template var
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return "", xerr
+	}
+
+	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return "", xerr
+	}
+
+	for k, v := range reserved {
+		(*params)[k] = v
+	}
+	for k, v := range bashLibraryVariables {
+		(*params)[k] = v
+	}
 
 	anon := featureScriptTemplate.Load()
 	if anon == nil {
@@ -1342,35 +1322,13 @@ func normalizeScript(params, reserved map[string]interface{}) (string, fail.Erro
 		}
 
 		// Set template to generate error if there is missing key in params during Execute
-		_ = r.Option("missingkey=error")
+		r = r.Option("missingkey=error")
 		featureScriptTemplate.Store(r)
 		anon = featureScriptTemplate.Load()
 	}
 
-	// Configures BashLibrary template var
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-
-	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
-	if xerr != nil {
-		return "", xerr
-	}
-	
-	finalParams := make(map[string]interface{}, len(params)+len(reserved)+len(bashLibraryVariables))
-	for k, v := range params {
-		finalParams[k] = v
-	}
-	for k, v := range reserved {
-		finalParams[k] = v
-	}
-	for k, v := range bashLibraryVariables {
-		finalParams[k] = v
-	}
 	dataBuffer := bytes.NewBufferString("")
-	err = anon.(*txttmpl.Template).Option("missingkey=error").Execute(dataBuffer, finalParams)
+	err = anon.(*txttmpl.Template).Execute(dataBuffer, *params)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
