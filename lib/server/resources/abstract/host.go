@@ -17,7 +17,7 @@
 package abstract
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 	"fmt"
 	"time"
 
@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -306,7 +307,7 @@ func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
 	jserr := json.Unmarshal(buf, hc)
 	if jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			return fail.NewError(jserr.Error())

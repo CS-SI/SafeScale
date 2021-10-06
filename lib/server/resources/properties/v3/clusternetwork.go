@@ -20,7 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterNetwork contains network information relative to cluster

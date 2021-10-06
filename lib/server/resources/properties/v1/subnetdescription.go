@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // SubnetDescription contains additional information describing the subnet, in V1

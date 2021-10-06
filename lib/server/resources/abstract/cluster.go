@@ -17,11 +17,12 @@
 package abstract
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -133,7 +134,7 @@ func (i *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
 	jserr := json.Unmarshal(buf, i)
 	if jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			return fail.NewError(jserr.Error())

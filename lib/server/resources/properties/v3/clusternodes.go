@@ -19,7 +19,7 @@ package propertiesv3
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterNode describes a node in the cluster
