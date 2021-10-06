@@ -828,4 +828,6 @@ func TestAwfulSimpleTaskActionWithHardRetry(t *testing.T) {
 	default:
 		t.Errorf("unexpected error occurred: %v", xerr)
 	}
+
+	time.Sleep(1 * time.Second)
 }

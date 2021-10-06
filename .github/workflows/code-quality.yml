@@ -13,10 +13,10 @@ name: "CodeQuality"
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ develop review/ut ]
   pull_request:
     # The branches below must be a subset of the branches above
-    branches: [ develop ]
+    branches: [ develop review/ut ]
 
 jobs:
   analyze:

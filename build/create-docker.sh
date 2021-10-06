@@ -23,12 +23,18 @@ fi
 
 stamp=`date +"%s"`
 
-#BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD) GOVERSION=1.16.8 envsubst <Dockerfile > Dockerfile.$stamp
 [ -z "$BRANCH_NAME" ] && BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
 [ -z "$GOVERSION" ] && GOVERSION=1.16.8
-echo docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy --build-arg BRANCH_NAME=$BRANCH_NAME --build-arg GOVERSION=$GOVERSION -f ${WRKDIR}/Dockerfile -t "safescale:${BRANCH_NAME/\//_}" $WRKDIR
-docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy --build-arg BRANCH_NAME=$BRANCH_NAME --build-arg GOVERSION=$GOVERSION -f ${WRKDIR}/Dockerfile -t "safescale:${BRANCH_NAME/\//_}" $WRKDIR
-[ $? -ne 0 ] && echo "Docker build failed !!" && rm -f ./marker && exit 1
+[ -z "$PROTOVERSION" ] && PROTOVERSION=3.17.3
+
+BRANCH_NAME=$BRANCH_NAME PROTOVERSION=$PROTOVERSION GOVERSION=$GOVERSION envsubst <Dockerfile > Dockerfile.$stamp
+echo docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy --build-arg BRANCH_NAME=$BRANCH_NAME --build-arg GOVERSION=$GOVERSION -f ${WRKDIR}/Dockerfile.$stamp -t "safescale:${BRANCH_NAME/\//_}" $WRKDIR
+docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy --build-arg BRANCH_NAME=$BRANCH_NAME --build-arg GOVERSION=$GOVERSION -f ${WRKDIR}/Dockerfile.$stamp -t "safescale:${BRANCH_NAME/\//_}" $WRKDIR
+[ $? -ne 0 ] && echo "Docker build failed !!" && {
+  rm -f ./marker
+  rm -f ./Dockerfile.$stamp
+  exit 1
+}
 
 echo "Docker build OK"
 

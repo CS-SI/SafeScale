@@ -1,10 +1,10 @@
-name: Docker Image CI
+name: Docker Image CI (Stable)
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ develop review/ut ]
   pull_request:
-    branches: [ develop ]
+    branches: [ develop review/ut ]
 
 jobs:
 
