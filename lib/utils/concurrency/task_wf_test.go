@@ -341,6 +341,7 @@ func TestChildrenWaitingGameWithContextDeadlinesWF(t *testing.T) {
 	funk(6, 40, 10, 30, false)  // terminate normally
 	funk(7, 140, 20, 40, false) // terminate normally
 	funk(8, 140, 40, 20, true)  // cancel (aborted)
+	funk(9, 140, 40, 10, true)  // cancel (aborted)
 }
 
 func TestDoesAbortReallyAbortOrIsJustFakeNewsWF(t *testing.T) {
