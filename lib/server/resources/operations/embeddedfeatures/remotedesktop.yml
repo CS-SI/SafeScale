@@ -377,8 +377,8 @@ feature:
                             cat >${SF_ETCDIR}/remotedesktop/build/user-mapping.xml <<'EOF'
                             <user-mapping>
                                 <authorize
-                                    username="{{ .Username }}"
-                                    password="{{ .Password }}">
+                                    username="{{ .ClusterAdminUsername }}"
+                                    password="{{ .ClusterAdminPassword }}">
 
                                     <!-- First authorized connection -->
                                     <connection name="{{ .Hostname }}">

@@ -38,8 +38,8 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || exit 192
-                            exit 0
+                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || sfFail 192
+                            sfExit
 
             add:
                 # pace: config,secret,network,start
@@ -92,7 +92,7 @@ feature:
                             #         external: true
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/postgres4gateway/docker-compose.yml
-                            exit 0
+                            sfExit
 
                     # secret:
                     #     targets:
@@ -128,9 +128,9 @@ feature:
                             nodes: no
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d >> ${SF_LOGDIR}/docker.log 2>&1 || exit 194
-                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || exit 195
-                            exit 0
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 194
+                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || sfFail 195
+                            sfExit
 
             remove:
                 pace: compose,cleanup
@@ -143,10 +143,9 @@ feature:
                             nodes: no
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || exit 196
+                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
                             docker image rm -f postgres:11-alpine
-                            # docker secret rm postgres4gateway &>/dev/null
-                            exit 0
+                            sfExit
 
                     cleanup:
                         targets:

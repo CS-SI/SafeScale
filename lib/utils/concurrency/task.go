@@ -832,6 +832,7 @@ func (instance *task) processTerminated(traceR *tracer) {
 	instance.lock.Lock()
 	instance.stats.controllerDuration = time.Since(instance.stats.controllerBegin)
 	instance.controllerTerminated = true
+	// instance.status = DONE
 	instance.lock.Unlock()
 	instance.controllerTerminatedCh <- struct{}{}
 	close(instance.controllerTerminatedCh) // VPL: this channel MUST BE CLOSED
@@ -1272,11 +1273,6 @@ func (instance *task) Abort() (err fail.Error) {
 	abortDisarmed := instance.abortDisengaged
 	instance.lock.RUnlock()
 
-	// // If controller is terminated, consider Abort signal received successfully (but Task.Wait() will not return a *fail.ErrAborted)
-	// if instance.controllerTerminated {
-	// 	return nil
-	// }
-
 	// If abort signal is disengaged, return an error
 	if abortDisarmed {
 		return fail.NotAvailableError("abort signal is disengaged on task %s", tid)
@@ -1321,6 +1317,7 @@ func (instance *task) forceAbort() {
 	case UNKNOWN:
 		fallthrough
 	default:
+		break
 	}
 }
 

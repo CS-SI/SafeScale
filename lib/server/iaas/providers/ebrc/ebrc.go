@@ -53,7 +53,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 
-	username, _ := identity["User"].(string)
+	username, _ := identity["Username"].(string)
 	password, _ := identity["Password"].(string)
 	insecure, _ := identity["Insecure"].(string)
 	region, _ := compute["Region"].(string)

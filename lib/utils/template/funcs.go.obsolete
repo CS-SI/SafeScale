@@ -17,9 +17,11 @@
 package template
 
 import (
+	"html/template"
 	"reflect"
 	txttmpl "text/template"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/Masterminds/sprig"
 )
 
@@ -59,7 +61,7 @@ func empty(param interface{}) bool {
 
 // MergeFuncs merges the template functions passed as parameter with FuncMap content
 // If overwrite is true, will overwrite any existing entry
-func MergeFuncs(funcs map[string]interface{}, overwrite bool) map[string]interface{} {
+func MergeFuncs(funcs map[string]interface{}, overwrite bool) template.FuncMap {
 	out := sprig.FuncMap()
 	for k, v := range FuncMap {
 		out[k] = v

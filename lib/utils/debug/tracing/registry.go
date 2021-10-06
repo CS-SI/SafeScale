@@ -17,10 +17,11 @@
 package tracing
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 )
 
 var settings map[string]map[string]bool = nil

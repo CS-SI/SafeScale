@@ -23,6 +23,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -41,10 +44,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
 )
 
 const (

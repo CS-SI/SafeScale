@@ -18,7 +18,6 @@ package iaas
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"sync"
@@ -31,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -58,7 +58,7 @@ func GetTenantNames() (map[string]string, fail.Error) {
 }
 
 // GetTenants returns all known tenants
-func GetTenants() ([]interface{}, fail.Error) {
+func GetTenants() ([]map[string]interface{}, fail.Error) {
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
@@ -85,8 +85,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		svcProvider    = "__not_found__"
 	)
 
-	for _, t := range tenants {
-		tenant, _ := t.(map[string]interface{})
+	for _, tenant := range tenants {
 		name, found = tenant["name"].(string)
 		if !found {
 			logrus.Error("tenant found without 'name'")
@@ -652,8 +651,7 @@ func loadConfig() fail.Error {
 	if err != nil {
 		return err
 	}
-	for _, t := range tenantsCfg {
-		tenant, _ := t.(map[string]interface{})
+	for _, tenant := range tenantsCfg {
 		if name, ok := tenant["name"].(string); ok {
 			if provider, ok := tenant["client"].(string); ok {
 				allTenants[name] = provider
@@ -667,7 +665,7 @@ func loadConfig() fail.Error {
 	return nil
 }
 
-func getTenantsFromCfg() ([]interface{}, *viper.Viper, fail.Error) {
+func getTenantsFromCfg() ([]map[string]interface{}, *viper.Viper, fail.Error) {
 	v := viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("$HOME/.safescale")
@@ -680,7 +678,23 @@ func getTenantsFromCfg() ([]interface{}, *viper.Viper, fail.Error) {
 		logrus.Errorf(msg)
 		return nil, v, fail.SyntaxError(msg)
 	}
-	settings := v.AllSettings()
-	tenantsCfg, _ := settings["tenants"].([]interface{})
-	return tenantsCfg, v, nil
+//	settings := v.AllSettings()
+
+	var tenantsCfg []map[string]interface{}
+	err := v.UnmarshalKey("tenants", &tenantsCfg)
+	if err != nil {
+		return nil, v, fail.SyntaxError("failed to convert tenants file to map[string]interface{}")
+	}
+
+	jsoned, err := json.Marshal(tenantsCfg)
+	if err != nil {
+		return nil, v, fail.ConvertError(err)
+	}
+
+	var out []map[string]interface{}
+	err = json.Unmarshal(jsoned, &out)
+	if err != nil {
+		return nil, v, fail.ConvertError(err)
+	}
+	return out, v, nil
 }

@@ -19,12 +19,11 @@ package operations
 import (
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Tenant structure to handle name and GetService for a tenant
@@ -47,13 +46,7 @@ func CurrentTenant() *Tenant {
 
 		// Set unique tenant as selected
 		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
-		for k, anon := range tenants {
-			tenant, ok := anon.(map[string]interface{})
-			if !ok {
-				logrus.Errorf(fail.SyntaxError("tenant entry #%d not in the right format", k+1).Error())
-				continue
-			}
-
+		for _, tenant := range tenants {
 			name := tenant["name"].(string)
 
 			service, xerr := loadTenant(name)

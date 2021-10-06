@@ -17,12 +17,13 @@
 package abstract
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 	"net"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -428,7 +429,7 @@ func (sg *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
 
 	if jserr := json.Unmarshal(buf, sg); jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			return fail.NewError(jserr.Error())

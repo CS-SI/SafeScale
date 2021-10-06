@@ -80,9 +80,9 @@ feature:
                             sfExit
 
             add:
-                pace: docker-ce,docker-compose,config,firewall,enable,verify
+                pace: cleanup,docker-ce,docker-compose,config,firewall,enable,verify
                 steps:
-                    docker-cleanup:
+                    cleanup:
                         targets:
                             hosts: yes
                             gateways: all
@@ -184,10 +184,10 @@ feature:
                             VERSION="{{.DockerComposeVersion}}"
                             if [[ "latest" = "${VERSION}" ]]; then
                                 VERSION=$(sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "curl -kSsL https://api.github.com/repos/docker/compose/releases/{{.DockerComposeVersion}} | jq -r .name") && op=$? || true
-                                [ $op -ne 0 ] && sfFail 206 "error getting last docker version"
+                                [ $op -ne 0 ] && sfFail 206 "error getting last docker-compose version"
                             fi
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
-                            sfDownload "$URL" docker-compose 3m 5 || sfFail 207 "error downloading last docker version"
+                            sfDownload "$URL" docker-compose 3m 5 || sfFail 207 "error downloading last docker-compose ${VERSION}"
                             chmod +x docker-compose && mv docker-compose /usr/bin
                             sfExit
 

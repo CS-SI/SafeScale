@@ -21,16 +21,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"github.com/asaskevich/govalidator"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"

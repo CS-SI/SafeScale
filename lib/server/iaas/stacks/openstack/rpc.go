@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
@@ -29,6 +28,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 func (s Stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
