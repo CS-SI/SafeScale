@@ -36,7 +36,7 @@ import (
 )
 
 // TenantListener server is used to implement SafeScale.safescale.
-type TenantListener struct{
+type TenantListener struct {
 	protocol.UnimplementedTenantServiceServer
 }
 

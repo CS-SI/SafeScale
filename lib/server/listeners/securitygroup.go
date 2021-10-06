@@ -39,7 +39,7 @@ import (
 )
 
 // SecurityGroupListener security-group service server grpc
-type SecurityGroupListener struct{
+type SecurityGroupListener struct {
 	protocol.UnimplementedSecurityGroupServiceServer
 }
 

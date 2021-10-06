@@ -114,7 +114,6 @@ func (sgr *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 		return false
 	}
 
-
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range sgr.Sources {
 		found := false
@@ -208,8 +207,8 @@ func (sgr *SecurityGroupRule) Validate() fail.Error {
 		break
 	case "tcp", "udp":
 		if sgr.PortFrom <= 0 {
-				return fail.InvalidRequestError("rule --port-from must contain a positive integer")
-			}
+			return fail.InvalidRequestError("rule --port-from must contain a positive integer")
+		}
 		if len(sgr.Sources) == 0 && len(sgr.Targets) == 0 {
 			return fail.InvalidRequestError("rule --cidr must be defined")
 		}

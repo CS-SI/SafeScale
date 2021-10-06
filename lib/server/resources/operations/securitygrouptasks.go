@@ -86,7 +86,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params 
 
 type taskUnbindFromHostsAttachedToSubnetParams struct {
 	subnetID, subnetName string
-	subnetHosts *propertiesv1.SubnetHosts
+	subnetHosts          *propertiesv1.SubnetHosts
 }
 
 // taskUnbindFromHostsAttachedToSubnet unbinds security group from hosts attached to a Subnet

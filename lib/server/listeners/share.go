@@ -44,7 +44,7 @@ import (
 // safescale share inspect share1
 
 // ShareListener Share service server grpc
-type ShareListener struct{
+type ShareListener struct {
 	protocol.UnimplementedShareServiceServer
 }
 
