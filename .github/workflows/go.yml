@@ -33,7 +33,12 @@ jobs:
       if: failure()
       with:
         name: linux-artefacts
-        path: test_results.log
+        path: |
+          generation_results.log
+          vet_results.log
+          test_results.log
+          go.mod
+          go.sum
 
   build-macos:
 
@@ -49,9 +54,14 @@ jobs:
         brew update
         brew install protoc-gen-go
 
-    - run: make 
+    - run: make all
     - uses: actions/upload-artifact@v2
       if: failure()
       with:
         name: macos-artefacts
-        path: test_results.log
+        path: |
+          generation_results.log
+          vet_results.log
+          test_results.log
+          go.mod
+          go.sum
