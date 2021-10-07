@@ -154,7 +154,7 @@ feature:
                             {{ else }}
                             PREFIX="elasticsearch"
                             {{ end }}
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} ${PREFIX}_server_1"
+                            sfRetry sfDefaultTimeout sfDefaultDelay "sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} ${PREFIX}_server_1"
 
                     ready:
                         targets:
@@ -167,7 +167,7 @@ feature:
                             {{ else }}
                             URL="http://{{.HostIP}}:9200/_cat/health"
                             {{ end }}
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "curl -k ${URL} &>/dev/null" || sfFail 196
+                            sfRetry sfDefaultTimeout sfDefaultDelay "curl -k ${URL} &>/dev/null" || sfFail 196
                             sfExit
 
             remove:

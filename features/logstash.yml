@@ -157,7 +157,7 @@ feature:
                             {{ else }}
                             PREFIX="logstash"
                             {{ end }}
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running || sfFail 192
+                            sfRetry sfDefaultTimeout sfDefaultDelay docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running || sfFail 192
                             sfExit
 
             remove:

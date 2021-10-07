@@ -92,16 +92,16 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt remove -y docker docker-engine docker.io containerd runc"
+                                    sfRetry sfDefaultTimeout sfDefaultDelay "sfApt update"
+                                    sfRetry sfDefaultTimeout sfDefaultDelay "sfApt remove -y docker docker-engine docker.io containerd runc"
                                     ;;
                                 centos|redhat)
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "yum remove -y docker docker-client ocker-client-latest \
+                                    sfRetry sfDefaultTimeout sfDefaultDelay "yum remove -y docker docker-client ocker-client-latest \
                                                                    docker-common docker-latest docker-latest-logrotate \
                                                                    docker-logrotate docker-engine"
                                     ;;
                                 fedora)
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "dnf remove -y docker docker-client docker-client-latest docker-common \
+                                    sfRetry sfDefaultTimeout sfDefaultDelay "dnf remove -y docker docker-client docker-client-latest docker-common \
                                                                    docker-latest docker-latest-logrotate docker-logrotate \
                                                                    docker-selinux docker-engine-selinux docker-engine"
                                     ;;
@@ -183,7 +183,7 @@ feature:
                             op=-1
                             VERSION="{{.DockerComposeVersion}}"
                             if [[ "latest" = "${VERSION}" ]]; then
-                                VERSION=$(sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "curl -kSsL https://api.github.com/repos/docker/compose/releases/{{.DockerComposeVersion}} | jq -r .name") && op=$? || true
+                                VERSION=$(sfRetry sfDefaultTimeout sfDefaultDelay "curl -kSsL https://api.github.com/repos/docker/compose/releases/{{.DockerComposeVersion}} | jq -r .name") && op=$? || true
                                 [ $op -ne 0 ] && sfFail 206 "error getting last docker-compose version"
                             fi
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
@@ -277,7 +277,7 @@ feature:
                             sfService enable docker || sfFail 211
                             sfService restart docker || sfFail 212
                             op=-1
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfService status docker &>/dev/null" && op=$? || true
+                            sfRetry sfDefaultTimeout sfDefaultDelay "sfService status docker &>/dev/null" && op=$? || true
                             [ $op -ne 0 ] && sfFail 213
                             sfExit
 

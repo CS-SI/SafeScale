@@ -132,7 +132,7 @@ feature:
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
                             sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfDoesDockerRunContainer docker.elastic.co/beats/filebeat:{{ .Version }} filebeat4safescale_agent_1" || sfFail 194
+                            sfRetry sfDefaultTimeout sfDefaultDelay "sfDoesDockerRunContainer docker.elastic.co/beats/filebeat:{{ .Version }} filebeat4safescale_agent_1" || sfFail 194
                             sfExit
 
             remove:

@@ -62,7 +62,7 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update && sfApt install -y ntp" || sfFail 192
+                                    sfRetry sfDefaultTimeout sfDefaultDelay "sfApt update && sfApt install -y ntp" || sfFail 192
                                     ;;
                                 centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
@@ -104,7 +104,7 @@ feature:
                                     sfService enable ntp || sfFail 195
                                     sfService restart ntp || sfFail 196
                                     op=-1
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfService status ntp &>/dev/null && op=$? || true
+                                    sfRetry sfDefaultTimeout sfDefaultDelay sfService status ntp &>/dev/null && op=$? || true
                                     [ $op -ne 0 ] && sfFail 197
                                     ;;
                                 centos|fedora|redhat|rhel)
@@ -118,11 +118,11 @@ feature:
 
                                     if [[ -n $(which dnf) ]]; then
                                         op=-1
-                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfService status chronyd &>/dev/null && op=$? || true
+                                        sfRetry sfDefaultTimeout sfDefaultDelay sfService status chronyd &>/dev/null && op=$? || true
                                         [ $op -ne 0 ] && sfFail 197
                                     else
                                         op=-1
-                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfService status ntpd &>/dev/null && op=$? || true
+                                        sfRetry sfDefaultTimeout sfDefaultDelay sfService status ntpd &>/dev/null && op=$? || true
                                         [ $op -ne 0 ] && sfFail 197
                                     fi
                                     ;;

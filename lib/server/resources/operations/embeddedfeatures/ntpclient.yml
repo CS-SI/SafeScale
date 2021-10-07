@@ -65,8 +65,8 @@ feature:
                           case $LINUX_KIND in
                               debian|ubuntu)
                                   export DEBIAN_FRONTEND=noninteractive
-                                  sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                  sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -y ntpdate" || sfFail 192
+                                  sfRetry sfDefaultTimeout sfDefaultDelay "sfApt update"
+                                  sfRetry sfDefaultTimeout sfDefaultDelay "sfApt install -y ntpdate" || sfFail 192
                                   ;;
                               centos|fedora|redhat|rhel)
                                   if [[ -n $(which dnf) ]]; then
@@ -91,11 +91,11 @@ feature:
                         run: |
                             case $LINUX_KIND in
                                 debian|ubuntu)
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} ntpdate -u pool.ntp.org || sfFail 194
+                                    sfRetry sfDefaultTimeout sfDefaultDelay ntpdate -u pool.ntp.org || sfFail 194
                                     timedatectl set-ntp off
 
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -y ntp ntpstat" || sfFail 195
+                                    sfRetrysfDefaultTimeout sfDefaultDelay "sfApt install -y ntp ntpstat" || sfFail 195
                                     {{ if .Peers }}
                                     sed -i '/^pool...ubuntu.pool.ntp.org/ s/^/#/' /etc/ntp.conf || sfFail 196
                                     sed -i '/^pool ntp.ubuntu.com/ s/^/#/' /etc/ntp.conf || sfFail 197
@@ -103,12 +103,12 @@ feature:
                                     ;;
                                 centos|fedora|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} chronyc -a makestep || sfFail 194
+                                        sfRetry sfDefaultTimeout sfDefaultDelay chronyc -a makestep || sfFail 194
                                         {{ if .Peers }}
                                         sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/chrony.conf || sfFail 196
                                         {{ end }}
                                     else
-                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} ntpdate -u pool.ntp.org || sfFail 194
+                                        sfRetry sfDefaultTimeout sfDefaultDelay ntpdate -u pool.ntp.org || sfFail 194
                                         yum install -y ntp || sfFail 195
                                         {{ if .Peers }}
                                         sed -i '/^server...centos.pool.ntp.org/ s/^/#/' /etc/ntp.conf || sfFail 196
@@ -172,7 +172,7 @@ feature:
                                     sfService enable ntp || sfFail 199
                                     sfService restart ntp || sfFail 200
                                     op=-1
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfService status ntp &>/dev/null && op=$? || true
+                                    sfRetry sfDefaultTimeout sfDefaultDelay sfService status ntp &>/dev/null && op=$? || true
                                     [ $op -ne 0 ] && sfFail 201
                                     ;;
                                 centos|fedora|redhat|rhel)
@@ -186,11 +186,11 @@ feature:
 
                                     if [[ -n $(which dnf) ]]; then
                                         op=-1
-                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfService status chronyd &>/dev/null && op=$? || true
+                                        sfRetry sfDefaultTimeout sfDefaultDelay sfService status chronyd &>/dev/null && op=$? || true
                                         [ $op -ne 0 ] && sfFail 204
                                     else
                                         op=-1
-                                        sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} sfService status ntpd &>/dev/null && op=$? || true
+                                        sfRetry sfDefaultTimeout sfDefaultDelay sfService status ntpd &>/dev/null && op=$? || true
                                         [ $op -ne 0 ] && sfFail 204
                                     fi
                                     ;;
