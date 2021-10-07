@@ -289,9 +289,10 @@ function sfAsyncWait() {
 }
 export -f sfAsyncWait
 
-# sfRetry <timeout> <delay> command
-# retries command until success, with sleep of <delay> seconds
-function sfRetry() {
+# sfRetryEx <timeout> <delay> command
+# Retries command until success, with sleep of <delay> seconds
+# Will timeout after <timeout>
+function sfRetryEx() {
 	local timeout=$1
 	local delay=$2
 	shift 2
@@ -318,6 +319,11 @@ function sfRetry() {
 	[ $rc -eq 0 ] && echo $result && return 0
 	echo "sfRetry: timeout!"
 	return $rc
+}
+export -f sfRetryEx
+
+function sfRetry {
+	sfRetryEx $(sfDefaultTimeout) $(sfDefaultDelay) $*
 }
 export -f sfRetry
 
@@ -410,7 +416,7 @@ function sfInstall() {
 	debian | ubuntu)
 		export DEBIAN_FRONTEND=noninteractive
 		export UCF_FORCE_CONFFNEW=1
-		sfRetry 5m 3 "sfApt update"
+		sfRetryEx 5m 3 "sfApt update"
 		sfApt install $1 -y --force-yes || return 194
 		command -v $1 || return 194
 		;;

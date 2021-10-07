@@ -131,8 +131,8 @@ feature:
                             nodes: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
-                            sfRetry sfDefaultTimeout sfDefaultDelay "sfDoesDockerRunContainer docker.elastic.co/beats/filebeat:{{ .Version }} filebeat4safescale_agent_1" || sfFail 194
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
+                            sfRetry "sfDoesDockerRunContainer docker.elastic.co/beats/filebeat:{{ .Version }} filebeat4safescale_agent_1" || sfFail 194
                             sfExit
 
             remove:
@@ -146,7 +146,7 @@ feature:
                             nodes: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/filebeat4safescale/docker-compose.yml -p filebeat4safescale rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
                             sfExit
 
                     cleanup:

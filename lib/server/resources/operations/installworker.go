@@ -829,7 +829,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			if cuk != nil {
 				if !cuk.Successful() && cuk.Completed() {
 					// TBR: It's one of those
-					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %v with [%s]", w.action.String(), p.stepName, key/*cuk.Error()*/, spew.Sdump(cuk))
+					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with [%v]", w.action.String(), p.stepName, key/*cuk.Error()*/, spew.Sdump(cuk))
 					logrus.Warnf(msg.Error())
 					newerrpack = append(newerrpack, msg)
 				}

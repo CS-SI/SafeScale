@@ -128,8 +128,8 @@ feature:
                             nodes: no
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 194
-                            sfRetry 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || sfFail 195
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 194
+                            sfRetryEx 5m 5 "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || sfFail 195
                             sfExit
 
             remove:
@@ -143,7 +143,7 @@ feature:
                             nodes: no
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
                             docker image rm -f postgres:11-alpine
                             sfExit
 
