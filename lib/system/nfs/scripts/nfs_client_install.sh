@@ -52,8 +52,8 @@ case $LINUX_KIND in
         sfWaitForApt
         finishPreviousInstall
 
-        sfRetry 3m 5 "sfWaitForApt && apt -y update"
-        sfRetry 5m 5 "sfWaitForApt && apt-get install -qqy --force-yes nfs-common"
+        sfRetryEx 3m 5 "sfWaitForApt && apt -y update"
+        sfRetryEx 5m 5 "sfWaitForApt && apt-get install -qqy --force-yes nfs-common"
         ;;
 
     rhel|centos)

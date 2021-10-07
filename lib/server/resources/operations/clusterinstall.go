@@ -159,10 +159,8 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
 	v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
 	v["NetworkUsesVIP"] = networkCfg.SecondaryGatewayIP != ""
-	if networkCfg.SecondaryGatewayIP != "" {
-		v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
-		v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
-	}
+	v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
+	v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
 	v["EndpointIP"] = networkCfg.EndpointIP
 	v["PublicIP"] = v["EndpointIP"] // legacy ...
 	if _, ok := v["IPRanges"]; !ok {

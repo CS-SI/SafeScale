@@ -41,7 +41,7 @@ feature:
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     rm -f /tmp/docker-fail.txt || true
                                     op=-1
-                                    sfRetry 5m 5 docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                                    sfRetryEx 5m 5 docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
                                     if [[ $op -ne 0 ]]; then
                                         sfFail $op "$(cat /tmp/docker-fail.txt)"
                                     fi
@@ -53,7 +53,7 @@ feature:
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     rm -f /tmp/docker-fail.txt || true
                                     op=-1
-                                    sfRetry 5m 5 docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                                    sfRetryEx 5m 5 docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
                                     if [[ $op -ne 0 ]]; then
                                         sfFail $op "$(cat /tmp/docker-fail.txt)"
                                     fi
@@ -65,7 +65,7 @@ feature:
                                     docker ps &>/dev/null || sfFail 1 "Docker daemon not running"
                                     rm -f /tmp/docker-fail.txt || true
                                     op=-1
-                                    sfRetry 5m 5 docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
+                                    sfRetryEx 5m 5 docker pull hello-world 2>/tmp/docker-fail.txt && op=$? || op=$?
                                     if [[ $op -ne 0 ]]; then
                                         sfFail $op "$(cat /tmp/docker-fail.txt)"
                                     fi
@@ -92,16 +92,16 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt remove -y docker docker-engine docker.io containerd runc"
+                                    sfRetry "sfApt update"
+                                    sfRetry "sfApt remove -y docker docker-engine docker.io containerd runc"
                                     ;;
                                 centos|redhat)
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "yum remove -y docker docker-client ocker-client-latest \
+                                    sfRetry "yum remove -y docker docker-client ocker-client-latest \
                                                                    docker-common docker-latest docker-latest-logrotate \
                                                                    docker-logrotate docker-engine"
                                     ;;
                                 fedora)
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "dnf remove -y docker docker-client docker-client-latest docker-common \
+                                    sfRetry "dnf remove -y docker docker-client docker-client-latest docker-common \
                                                                    docker-latest docker-latest-logrotate docker-logrotate \
                                                                    docker-selinux docker-engine-selinux docker-engine"
                                     ;;
@@ -122,35 +122,35 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes gnupg2 || sfApt install -qqy --force-yes gnupg"
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes gnupg2 || sfApt install -qqy --force-yes gnupg"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes apt-transport-https ca-certificates curl software-properties-common" || sfFail 193 "error installing apt tools (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "curl -fsSL https://download.docker.com/linux/$LINUX_KIND/gpg | apt-key add -" || sfFail 194 "error updating gpg keys"
                                     echo "deb [arch=amd64] https://download.docker.com/linux/$LINUX_KIND $(lsb_release -cs) stable" >/etc/apt/sources.list.d/docker.list
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -qqy --force-yes docker-ce" || sfFail 195 "error installing docker-ce (exit code $?)"
                                     ;;
                                 centos|redhat|rhel)
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 196 "error installing yum prerequisites"
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo" || sfFail 197 "error adding docker-ce repo"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 196 "error installing yum prerequisites"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo" || sfFail 197 "error adding docker-ce repo"
                                     kop=0
                                     op=-1
                                     yum install -y curl --nobest &>/dev/null && op=$? || true
                                     if [ $op -ne 0 ]; then
-                                        sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y curl &>/dev/null" && op=$? || true
+                                        sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y curl &>/dev/null" && op=$? || true
                                         if [ $op -ne 0 ]; then
                                             sfFail 198 "error installing curl"
                                         else
-                                            sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y docker-ce docker-ce-cli containerd.io" || sfFail 199 "error installing docker-ce (exit code $?)"
+                                            sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y docker-ce docker-ce-cli containerd.io" || sfFail 199 "error installing docker-ce (exit code $?)"
                                         fi
                                     else
-                                        sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y docker-ce docker-ce-cli containerd.io --nobest" || sfFail 200"error installing docker-ce --nobest (exit code $?)"
+                                        sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "yum install -y docker-ce docker-ce-cli containerd.io --nobest" || sfFail 200"error installing docker-ce --nobest (exit code $?)"
                                     fi
                                     cat /etc/redhat-release | grep 8. && systemctl enable --now docker || true
                                     ;;
                                 fedora)
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 201
-                                    sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo"
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y yum-utils device-mapper-persistent-data lvm2" || sfFail 201
+                                    sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf config-manager --add-repo=https://download.docker.com/linux/fedora/docker-ce.repo"
                                     kop=0
                                     op=-1
                                     dnf install -y curl --nobest &>/dev/null && op=$? || true
@@ -159,10 +159,10 @@ feature:
                                         if [ $op -ne 0 ]; then
                                             sfFail 202 "error installing curl"
                                         else
-                                            sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y docker-ce docker-ce-cli containerd.io" || sfFail 203 "error installing docker-ce (exit code $?)" 
+                                            sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y docker-ce docker-ce-cli containerd.io" || sfFail 203 "error installing docker-ce (exit code $?)"
                                         fi
                                     else
-                                        sfRetry {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y docker-ce docker-ce-cli containerd.io --nobest" || sfFail 204 "error installing docker-ce (exit code $?)"
+                                        sfRetryEx {{ or .reserved_LongTimeout "6m" }} {{ or .reserved_DefaultDelay 10 }} "dnf install -y docker-ce docker-ce-cli containerd.io --nobest" || sfFail 204 "error installing docker-ce (exit code $?)"
                                     fi
                                     systemctl enable --now docker || true
                                     ;;
@@ -183,7 +183,7 @@ feature:
                             op=-1
                             VERSION="{{.DockerComposeVersion}}"
                             if [[ "latest" = "${VERSION}" ]]; then
-                                VERSION=$(sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "curl -kSsL https://api.github.com/repos/docker/compose/releases/{{.DockerComposeVersion}} | jq -r .name") && op=$? || true
+                                VERSION=$(sfRetry "curl -kSsL https://api.github.com/repos/docker/compose/releases/{{.DockerComposeVersion}} | jq -r .name") && op=$? || true
                                 [ $op -ne 0 ] && sfFail 206 "error getting last docker-compose version"
                             fi
                             URL="https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m)"
@@ -277,7 +277,7 @@ feature:
                             sfService enable docker || sfFail 211
                             sfService restart docker || sfFail 212
                             op=-1
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfService status docker &>/dev/null" && op=$? || true
+                            sfRetry "sfService status docker &>/dev/null" && op=$? || true
                             [ $op -ne 0 ] && sfFail 213
                             sfExit
 
@@ -292,7 +292,7 @@ feature:
                             sleep {{ or .reserved_DefaultDelay 10 }}
                             rm -f /tmp/docker-fail.txt || true
                             op=-1
-                            sfRetry 5m 5 "docker pull hello-world 2>>/tmp/fail.txt 7>>/tmp/fail.txt" && op=$? || op=$?
+                            sfRetryEx 5m 5 "docker pull hello-world 2>>/tmp/fail.txt 7>>/tmp/fail.txt" && op=$? || op=$?
                             if [[ $op -ne 0 ]]; then
                                 sfFail 214 "$(cat /tmp/docker-fail.txt)\nexit code $op"
                             fi

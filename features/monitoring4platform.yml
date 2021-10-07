@@ -352,7 +352,7 @@ feature:
                             ENTRYPOINT ["/prometheus-am-executor"]
                             EOF
 
-                            sfRetry 15m 5 docker build --network host -t safescale/am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || sfFail 193
+                            sfRetryEx 15m 5 docker build --network host -t safescale/am-executor:latest ${SF_ETCDIR}/monitoring4platform/am-executor || sfFail 193
                             sfExit
 
                     alertmanager:
@@ -830,7 +830,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfDoesDockerRunService prom/prometheus:{{ .PrometheusVersion }} monitoring4platform_prometheus" || sfFail 199
+                            sfRetry "sfDoesDockerRunService prom/prometheus:{{ .PrometheusVersion }} monitoring4platform_prometheus" || sfFail 199
                             sfExit
 
             remove:

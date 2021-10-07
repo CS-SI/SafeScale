@@ -99,7 +99,7 @@ export -f install_common_requirements
 
 case $(sfGetFact "linux_kind") in
     debian|ubuntu)
-        sfRetry 3m 5 "sfApt update" || sfFail 192 "Problem installing node common requirements"
+        sfRetryEx 3m 5 "sfApt update" || sfFail 192 "Problem installing node common requirements"
         curl -kqSsL --fail -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cp rclone-*-linux-amd64/rclone /usr/local/bin && \

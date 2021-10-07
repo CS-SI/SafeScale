@@ -321,7 +321,7 @@ feature:
                         targets:
                             masters: any
                         run: |
-                            sfRetry 5m 5 sfDoesDockerRunStack consul4platform || sfFail 197
+                            sfRetryEx 5m 5 sfDoesDockerRunStack consul4platform || sfFail 197
                             sfExit
 
             remove:

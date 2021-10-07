@@ -69,24 +69,24 @@ feature:
                             case $LINUX_KIND in
                                 ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
+                                    sfRetry "sfApt update"
                                     apt-cache showpkg software-properties-common && apt-get install -y software-properties-common
                                     apt-cache showpkg python-software-properties && apt-get install -y python-software-properties
                                     apt-add-repository --yes --update ppa:ansible/ansible
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -y ansible"
+                                    sfRetry "sfApt update"
+                                    sfRetry "sfApt install -y ansible"
                                     ;;
                                 debian)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
+                                    sfRetry "sfApt update"
                                     echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" >> /etc/apt/sources.list
                                     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 -y
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt update"
-                                    sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfApt install -y ansible"
+                                    sfRetry "sfApt update"
+                                    sfRetry "sfApt install -y ansible"
                                     ;;
                                 centos|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        sfRetry 3m 5 "dnf install --enablerepo=epel -y ansible" || sfFail 192
+                                        sfRetryEx 3m 5 "dnf install --enablerepo=epel -y ansible" || sfFail 192
                                     else
                                         yum install -y ansible || sfFail 192
                                     fi

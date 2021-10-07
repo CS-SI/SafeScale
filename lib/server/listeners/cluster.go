@@ -526,12 +526,12 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	}
 
 	out := &protocol.ClusterNodeListResponse{}
-	out.Nodes = make([]*protocol.Host, len(list))
-	for k, v := range list {
-		out.Nodes[k] = &protocol.Host{
+	out.Nodes = make([]*protocol.Host, 0, len(list))
+	for _, v := range list {
+		out.Nodes = append(out.Nodes, &protocol.Host{
 			Id:   v.ID,
 			Name: v.Name,
-		}
+		})
 	}
 	return out, nil
 }

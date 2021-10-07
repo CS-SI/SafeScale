@@ -180,8 +180,8 @@ feature:
                             nodes: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat_agent_1" || sfFail 194
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
+                            sfRetry "sfDoesDockerRunContainer docker.elastic.co/beats/metricbeat:{{ .Version }} metricbeat_agent_1" || sfFail 194
                             sfExit
 
             remove:
@@ -195,7 +195,7 @@ feature:
                             nodes: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/metricbeat/docker-compose.yml -p metricbeat rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
                             sfExit
 
                     cleanup:
