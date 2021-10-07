@@ -811,11 +811,11 @@ var clusterExpandCommand = cli.Command{
 	<operator> can be =,<,> (except for disk where valid operators are only = or >)
 	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
 		},
-        cli.BoolFlag{
-            Name:  "keep-on-failure, k",
-            Usage: "If used, the resources are not deleted on failure (default: not set)",
-        },
-    },
+		cli.BoolFlag{
+			Name:  "keep-on-failure, k",
+			Usage: "If used, the resources are not deleted on failure (default: not set)",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: {%s}, {%s} with args {%s}", clusterCommandName, c.Command.Name, c.Args())
 		err := extractClusterArgument(c)
@@ -859,8 +859,8 @@ var clusterExpandCommand = cli.Command{
 				}
 			}
 		}
-        nodesDef.KeepOnFailure = c.Bool("keep-on-failure")
-        
+		nodesDef.KeepOnFailure = c.Bool("keep-on-failure")
+
 		hosts, err := clusterInstance.AddNodes(concurrency.RootTask(), count, nodesDef)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
