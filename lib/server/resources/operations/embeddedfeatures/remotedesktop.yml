@@ -554,7 +554,7 @@ feature:
                             {{ if .PrimaryGatewayIP }}
                             sfFirewall --zone=sf_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 206 "Firewall problem adding primary gateway as source"
                             {{ end }}
-                            sfFirewall --zone=sf_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 207 "Firewall problem adding secondatyr gateway as source"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 207 "Firewall problem adding secondary gateway as source"
                             {{ end }}
                             sfFirewallReload || sfFail 208 "Firewall problem"
 
