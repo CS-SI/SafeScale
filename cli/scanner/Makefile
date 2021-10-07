@@ -13,7 +13,7 @@ REV := `git rev-parse HEAD 2>/dev/null || echo ""`
 default: all
 
 all: clean gensrc
-	@$(GO) build $(RACE_CHECK) -o $(EXEC) $(BUILD_TAGS)
+	@CGO_ENABLED=0 $(GO) build $(RACE_CHECK) -o $(EXEC) $(BUILD_TAGS)
 
 vet:
 	@$(GO) vet $(BUILD_TAGS) ./...
