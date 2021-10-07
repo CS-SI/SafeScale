@@ -519,6 +519,8 @@ function sfDropzonePush() {
 }
 export -f sfDropzonePush
 
+__cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error"
+
 # Copy content of local dropzone to remote dropzone (parameter can be IP or name)
 function sfDropzoneSync() {
 	local remote="$1"
