@@ -1,4 +1,4 @@
-//go:build !race,alltests
+//go:build !race && alltests
 // +build !race,alltests
 
 /*

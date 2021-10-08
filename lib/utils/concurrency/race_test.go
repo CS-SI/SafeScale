@@ -1,4 +1,4 @@
-//go:build race,ignore
+//go:build race && ignore
 // +build race,ignore
 
 /*
