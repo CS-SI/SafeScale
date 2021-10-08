@@ -678,7 +678,7 @@ func getTenantsFromCfg() ([]map[string]interface{}, *viper.Viper, fail.Error) {
 		logrus.Errorf(msg)
 		return nil, v, fail.SyntaxError(msg)
 	}
-//	settings := v.AllSettings()
+	//	settings := v.AllSettings()
 
 	var tenantsCfg []map[string]interface{}
 	err := v.UnmarshalKey("tenants", &tenantsCfg)

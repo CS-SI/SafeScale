@@ -781,14 +781,14 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	stepInstance := step{
-		Worker:             w,
-		Name:               p.stepName,
-		Action:             w.action,
-		Script:             templateCommand,
-		WallTime:           wallTime,
+		Worker:   w,
+		Name:     p.stepName,
+		Action:   w.action,
+		Script:   templateCommand,
+		WallTime: wallTime,
 		// OptionsFileContent: optionsFileContent,
-		YamlKey:            p.stepKey,
-		Serial:             serial,
+		YamlKey: p.stepKey,
+		Serial:  serial,
 	}
 	r, xerr := stepInstance.Run(task, hostsList, p.variables, w.settings)
 	// If an error occurred, do not execute the remaining steps, fail immediately
@@ -829,7 +829,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			if cuk != nil {
 				if !cuk.Successful() && cuk.Completed() {
 					// TBR: It's one of those
-					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with [%v]", w.action.String(), p.stepName, key/*cuk.Error()*/, spew.Sdump(cuk))
+					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))
 					logrus.Warnf(msg.Error())
 					newerrpack = append(newerrpack, msg)
 				}
@@ -951,7 +951,7 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 }
 
 // parseClusterSizingRequest returns count, cpu and ram components of request
-func (w *worker) parseClusterSizingRequest(_/*request*/ string) (int, int, float32, fail.Error)  {
+func (w *worker) parseClusterSizingRequest(_ /*request*/ string) (int, int, float32, fail.Error) {
 	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 

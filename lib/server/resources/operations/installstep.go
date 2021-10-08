@@ -332,114 +332,114 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 
 	// logrus.Warnf("TBR: Installing %s feature in parallel", is.Worker.feature.GetName())
 	return is.loopConcurrentlyOnHosts(task, hosts, v)
-		// var tg concurrency.TaskGroup
-		// tg, xerr = concurrency.NewTaskGroupWithParent(task)
-		// if xerr != nil {
-		// 	return nil, xerr
-		// }
-		//
-		// subtasks := map[string]concurrency.Task{}
-		// for _, th := range hosts {
-		// 	h := th
-		// 	is.Worker.startTime = time.Now()
-		//
-		// 	cloneV := v.Clone()
-		// 	cloneV["HostIP"], xerr = h.GetPrivateIP()
-		// 	xerr = debug.InjectPlannedFail(xerr)
-		// 	if xerr != nil {
-		// 		logrus.Warnf("aborting because of %s", xerr.Error())
-		// 		_ = tg.Abort()
-		// 		break
-		// 	}
-		//
-		// 	cloneV["ShortHostname"] = h.GetName()
-		// 	domain := ""
-		// 	xerr = h.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// 		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-		// 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-		// 			if !ok {
-		// 				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		// 			}
-		//
-		// 			domain = hostDescriptionV1.Domain
-		// 			if domain != "" {
-		// 				domain = "." + domain
-		// 			}
-		// 			return nil
-		// 		})
-		// 	})
-		// 	xerr = debug.InjectPlannedFail(xerr)
-		// 	if xerr != nil {
-		// 		logrus.Warnf("aborting because of %s", xerr.Error())
-		// 		_ = tg.Abort()
-		// 		break
-		// 	}
-		//
-		// 	cloneV["Hostname"] = h.GetName() + domain
-		// 	cloneV, xerr = realizeVariables(cloneV)
-		// 	xerr = debug.InjectPlannedFail(xerr)
-		// 	if xerr != nil {
-		// 		logrus.Warnf("aborting because of %s", xerr.Error())
-		// 		_ = tg.Abort()
-		// 		break
-		// 	}
-		//
-		// 	var subtask concurrency.Task
-		// 	subtask, xerr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
-		// 	xerr = debug.InjectPlannedFail(xerr)
-		// 	if xerr != nil {
-		// 		logrus.Warnf("aborting because of %s", xerr.Error())
-		// 		_ = tg.Abort()
-		// 		break
-		// 	}
-		//
-		// 	subtasks[h.GetName()] = subtask
-		// }
-		//
-		// tgr, werr := tg.WaitGroup()
-		// werr = debug.InjectPlannedFail(werr)
-		// if werr != nil {
-		// 	if xerr != nil {
-		// 		_ = xerr.AddConsequence(werr)
-		// 	} else {
-		// 		xerr = werr
-		// 	}
-		// }
-		// if xerr != nil {
-		// 	if len(subtasks) != len(hosts) {
-		// 		logrus.Errorf("TBR: no matter what, this should fail because something happened starting tasks")
-		// 	}
-		// 	logrus.Warnf("TBR: at this point, we failed because we have [%s]", spew.Sdump(xerr))
-		// 	logrus.Warnf("TBR: when it happened, the outcomes were:")
-		// 	wrongs := 0
-		// 	for _, s := range subtasks {
-		// 		sid, _ := s.ID()
-		// 		outcome := tgr[sid]
-		// 		if outcome != nil {
-		// 			oko := outcome.(stepResult)
-		// 			logrus.Warnf("TBR: output '%s' and err '%v'", oko.output, oko.err)
-		// 			if oko.err != nil {
-		// 				wrongs++
-		// 				continue
-		// 			}
-		// 			if !strings.Contains(oko.output, "exit 0") {
-		// 				wrongs++
-		// 				continue
-		// 			}
-		// 		}
-		// 	}
-		// 	if wrongs == 0 && (len(subtasks) == len(hosts)) {
-		// 		logrus.Warnf("TBR: this is BAD")
-		// 	}
-		// }
-		// for k, s := range subtasks {
-		// 	sid, _ := s.ID()
-		// 	outcome := tgr[sid]
-		// 	if outcome != nil {
-		// 		oko := outcome.(resources.UnitResult)
-		// 		outcomes.AddOne(k, oko)
-		// 	}
-		// }
+	// var tg concurrency.TaskGroup
+	// tg, xerr = concurrency.NewTaskGroupWithParent(task)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
+	// subtasks := map[string]concurrency.Task{}
+	// for _, th := range hosts {
+	// 	h := th
+	// 	is.Worker.startTime = time.Now()
+	//
+	// 	cloneV := v.Clone()
+	// 	cloneV["HostIP"], xerr = h.GetPrivateIP()
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		logrus.Warnf("aborting because of %s", xerr.Error())
+	// 		_ = tg.Abort()
+	// 		break
+	// 	}
+	//
+	// 	cloneV["ShortHostname"] = h.GetName()
+	// 	domain := ""
+	// 	xerr = h.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+	// 			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+	// 			if !ok {
+	// 				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 			}
+	//
+	// 			domain = hostDescriptionV1.Domain
+	// 			if domain != "" {
+	// 				domain = "." + domain
+	// 			}
+	// 			return nil
+	// 		})
+	// 	})
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		logrus.Warnf("aborting because of %s", xerr.Error())
+	// 		_ = tg.Abort()
+	// 		break
+	// 	}
+	//
+	// 	cloneV["Hostname"] = h.GetName() + domain
+	// 	cloneV, xerr = realizeVariables(cloneV)
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		logrus.Warnf("aborting because of %s", xerr.Error())
+	// 		_ = tg.Abort()
+	// 		break
+	// 	}
+	//
+	// 	var subtask concurrency.Task
+	// 	subtask, xerr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		logrus.Warnf("aborting because of %s", xerr.Error())
+	// 		_ = tg.Abort()
+	// 		break
+	// 	}
+	//
+	// 	subtasks[h.GetName()] = subtask
+	// }
+	//
+	// tgr, werr := tg.WaitGroup()
+	// werr = debug.InjectPlannedFail(werr)
+	// if werr != nil {
+	// 	if xerr != nil {
+	// 		_ = xerr.AddConsequence(werr)
+	// 	} else {
+	// 		xerr = werr
+	// 	}
+	// }
+	// if xerr != nil {
+	// 	if len(subtasks) != len(hosts) {
+	// 		logrus.Errorf("TBR: no matter what, this should fail because something happened starting tasks")
+	// 	}
+	// 	logrus.Warnf("TBR: at this point, we failed because we have [%s]", spew.Sdump(xerr))
+	// 	logrus.Warnf("TBR: when it happened, the outcomes were:")
+	// 	wrongs := 0
+	// 	for _, s := range subtasks {
+	// 		sid, _ := s.ID()
+	// 		outcome := tgr[sid]
+	// 		if outcome != nil {
+	// 			oko := outcome.(stepResult)
+	// 			logrus.Warnf("TBR: output '%s' and err '%v'", oko.output, oko.err)
+	// 			if oko.err != nil {
+	// 				wrongs++
+	// 				continue
+	// 			}
+	// 			if !strings.Contains(oko.output, "exit 0") {
+	// 				wrongs++
+	// 				continue
+	// 			}
+	// 		}
+	// 	}
+	// 	if wrongs == 0 && (len(subtasks) == len(hosts)) {
+	// 		logrus.Warnf("TBR: this is BAD")
+	// 	}
+	// }
+	// for k, s := range subtasks {
+	// 	sid, _ := s.ID()
+	// 	outcome := tgr[sid]
+	// 	if outcome != nil {
+	// 		oko := outcome.(resources.UnitResult)
+	// 		outcomes.AddOne(k, oko)
+	// 	}
+	// }
 }
 
 func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, xerr fail.Error) {
@@ -558,9 +558,9 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 		clonedV, xerr = is.initLoopTurnForHost(h, v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-		 	logrus.Warnf("aborting because of %s", xerr.Error())
-		 	_ = tg.Abort()
-		 	break
+			logrus.Warnf("aborting because of %s", xerr.Error())
+			_ = tg.Abort()
+			break
 		}
 
 		// is.Worker.startTime = time.Now()

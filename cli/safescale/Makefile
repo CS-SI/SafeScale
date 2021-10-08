@@ -53,3 +53,4 @@ gensrc:
 	@echo "    Revision = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo "    Tags = \"$(BUILD_TAGS)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
+	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1

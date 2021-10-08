@@ -17,7 +17,7 @@
 package abstract
 
 import (
-	stdjson"encoding/json"
+	stdjson "encoding/json"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/json"
