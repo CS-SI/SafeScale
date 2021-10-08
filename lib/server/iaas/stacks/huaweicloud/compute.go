@@ -602,6 +602,8 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 }
 
 // InspectHost updates the data inside host with the data from provider
+// Returns:
+// - *abstract.HostFull, nil if no error occurs
 func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
@@ -614,21 +616,27 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	}
 
 	server, xerr := s.WaitHostState(ahf, hoststate.Started, temporal.GetOperationTimeout())
-	if xerr != nil {
-		return nullAHF, xerr
-	}
+	// Note: if xerr != nil AND server != nil, server still contains meaningful information that may be useful
 	if server == nil {
-		return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
+		if xerr == nil {
+			xerr = abstract.ResourceNotFoundError("host", hostRef)
+		}
+		return nullAHF, xerr
 	}
 
-	if host, xerr = s.complementHost(ahf.Core, server); xerr != nil {
-		return nullAHF, xerr
+	var cerr fail.Error
+	host, cerr = s.complementHost(ahf.Core, server)
+	if cerr != nil {
+		if xerr != nil {
+			_ = xerr.AddConsequence(cerr)
+		} else {
+			xerr = cerr
+		}
 	}
 	if !host.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
-
-	return host, nil
+	return host, xerr
 }
 
 // complementHost complements IPAddress data with content of server parameter
@@ -648,9 +656,6 @@ func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (
 		host.Name = server.Name
 	}
 	host.LastState = toHostState(server.Status)
-	if host.LastState != hoststate.Started {
-		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
-	}
 
 	completedHost = abstract.NewHostFull()
 	completedHost.Core = host

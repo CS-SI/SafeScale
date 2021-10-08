@@ -1,3 +1,4 @@
+//go:build !libvirt,!ignore
 // +build !libvirt,!ignore
 
 /*

@@ -54,12 +54,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -548,13 +548,11 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 		}
 
 		abstractHostFull, innerXErr := instance.GetService().InspectHost(ahc.ID)
-		if innerXErr != nil {
-			return innerXErr
+		if abstractHostFull != nil {
+			state = abstractHostFull.Core.LastState
+			return nil
 		}
-
-		ahc = abstractHostFull.Core
-		state = ahc.LastState
-		return nil
+		return innerXErr
 	})
 	return state, xerr
 }

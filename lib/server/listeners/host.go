@@ -22,11 +22,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
-
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -35,17 +30,21 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostListener host service server grpc

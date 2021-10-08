@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package remotefile
+package operations
 
 import (
+	"context"
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/system"

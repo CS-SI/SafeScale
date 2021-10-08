@@ -744,41 +744,39 @@ func TestWaitingForGameZero(t *testing.T) {
 		d time.Duration
 	}
 	var j int
-	// for ; j < 20000; j++ {
-		var tarray []run
-		for ind := 0; ind < LOOPCOUNT; ind++ {
-			got, err := NewUnbreakableTask()
-			require.Nil(t, err)
-			require.NotNil(t, got)
+	var tarray []run
+	for ind := 0; ind < LOOPCOUNT; ind++ {
+		got, err := NewUnbreakableTask()
+		require.Nil(t, err)
+		require.NotNil(t, got)
 
-			duration := time.Duration(randomInt(50, 250)) * time.Millisecond
-			theTask, err := got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				time.Sleep(duration)
-				return "waiting game", nil
-			}, nil)
-			if err == nil {
-				tarray = append(tarray, run{theTask, duration})
-			} else {
-				t.Errorf("Shouldn't happen")
-			}
+		duration := time.Duration(randomInt(50, 250)) * time.Millisecond
+		theTask, err := got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(duration)
+			return "waiting game", nil
+		}, nil)
+		if err == nil {
+			tarray = append(tarray, run{theTask, duration})
+		} else {
+			t.Errorf("Shouldn't happen")
 		}
+	}
 
-		waited := 0
-		for _, itta := range tarray {
-			good, res, err := itta.t.WaitFor(0)
-			require.Nil(t, err)
-			require.True(t, good)
-			// require.NotNil(t, res)
-			if res == nil {
-				t.Errorf("[#%d] res == nil, shouldn't happen (task #%d, duration=%v)", j, waited, itta.d)
-			}
-			waited++
+	waited := 0
+	for _, itta := range tarray {
+		good, res, err := itta.t.WaitFor(0)
+		require.Nil(t, err)
+		require.True(t, good)
+		// require.NotNil(t, res)
+		if res == nil {
+			t.Errorf("[#%d] res == nil, shouldn't happen (task #%d, duration=%v)", j, waited, itta.d)
 		}
+		waited++
+	}
 
-		if waited != LOOPCOUNT {
-			t.Errorf("Not enough waiting...: %d", waited)
-		}
-	// }
+	if waited != LOOPCOUNT {
+		t.Errorf("Not enough waiting...: %d", waited)
+	}
 }
 
 func TestSingleTaskTryWait(t *testing.T) {
