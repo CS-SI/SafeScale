@@ -67,6 +67,4 @@ ADD . /go/src/github.com/CS-SI/SafeScale
 
 CMD sleep 5
 
-COPY marker /dev/null
-
 RUN cd /opt && ./build-safescale-local.sh
