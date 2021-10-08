@@ -48,6 +48,8 @@ export BUILD_TAGS
 all: begin ground getdevdeps ensure generate lib cli err vet-light
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build SUCCESSFUL $(NO_COLOR)\n";
 
+fastall: begin lib cli
+
 common: begin ground getdevdeps ensure generate
 
 versioncut:
@@ -125,7 +127,9 @@ ensure:
 		$$(dep ensure) && break || printf "%b" "$(OK_COLOR)$(INFO_STRING) timeout resolving dependencies, retrying..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n"; \
 	done
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing protobuf... $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@(govendor get github.com/golang/protobuf/protoc-gen-go@1.2.0 && GOBIN=$(GOPATH)/bin $(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go)
+	@which protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
+		govendor get github.com/golang/protobuf/protoc-gen-go@1.2.0  && GOBIN=$(GOPATH)/bin $(GO) install ./vendor/github.com/golang/protobuf/protoc-gen-go; \
+	fi
 
 sdk:
 	@(cd lib && $(MAKE) $(@))

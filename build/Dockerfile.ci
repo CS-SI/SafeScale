@@ -1,4 +1,4 @@
-FROM safescale:$THISBRANCH
+FROM safescale:$BRANCH_NAME
 LABEL maintainer="CS SI"
 ARG http_proxy=""
 ARG https_proxy=""
