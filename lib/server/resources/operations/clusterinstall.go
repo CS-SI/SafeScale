@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/remotefile"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
@@ -503,7 +502,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	}
 
 	// Uploads the script into remote file
-	rfcItem := remotefile.Item{Remote: path}
+	rfcItem := Item{Remote: path}
 	xerr = rfcItem.UploadString(task.Context(), script, host)
 	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)

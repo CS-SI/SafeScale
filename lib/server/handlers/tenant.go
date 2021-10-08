@@ -17,7 +17,7 @@
 package handlers
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -28,7 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"context"
 	scribble "github.com/nanobox-io/golang-scribble"
 	"github.com/sirupsen/logrus"
 
@@ -43,6 +42,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"

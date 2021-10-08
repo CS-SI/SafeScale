@@ -744,7 +744,6 @@ func TestWaitingForGameZero(t *testing.T) {
 		d time.Duration
 	}
 	var j int
-	// for ; j < 20000; j++ {
 	var tarray []run
 	for ind := 0; ind < LOOPCOUNT; ind++ {
 		got, err := NewUnbreakableTask()
@@ -778,7 +777,6 @@ func TestWaitingForGameZero(t *testing.T) {
 	if waited != LOOPCOUNT {
 		t.Errorf("Not enough waiting...: %d", waited)
 	}
-	// }
 }
 
 func TestSingleTaskTryWait(t *testing.T) {

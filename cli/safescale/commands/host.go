@@ -207,7 +207,8 @@ var hostInspect = &cli.Command{
 }
 
 var hostStatus = &cli.Command{
-	Name:      "status",
+	Name:      "state",
+	Aliases:   []string{"status"},
 	Usage:     "status Host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {

@@ -548,13 +548,11 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 		}
 
 		abstractHostFull, innerXErr := instance.GetService().InspectHost(ahc.ID)
-		if innerXErr != nil {
-			return innerXErr
+		if abstractHostFull != nil {
+			state = abstractHostFull.Core.LastState
+			return nil
 		}
-
-		ahc = abstractHostFull.Core
-		state = ahc.LastState
-		return nil
+		return innerXErr
 	})
 	return state, xerr
 }

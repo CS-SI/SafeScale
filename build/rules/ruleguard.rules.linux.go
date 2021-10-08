@@ -1,3 +1,4 @@
+//go:build ignore, !windows
 // +build ignore, !windows
 
 /*

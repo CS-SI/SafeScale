@@ -1,3 +1,4 @@
+//go:build vcloud,!ignore
 // +build vcloud,!ignore
 
 /*
