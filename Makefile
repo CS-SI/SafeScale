@@ -92,9 +92,10 @@ begin: versioncut
 
 mod:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(GO) mod download)
-	@($(GO) mod tidy)
-	@($(GO) mod download)
+	@($(GO) mod download &>/dev/null || true)
+	@($(GO) mod tidy &>/dev/null || true)
+	@($(GO) mod download &>/dev/null || true)
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
 libvirt:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Libvirt driver enabled$(NO_COLOR)\n";
