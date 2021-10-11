@@ -455,7 +455,7 @@ func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (
 				item["ether_type_label"] = strings.ToLower(ipversion.Enum(etherType).String())
 			}
 		} else {
-			out["rules"] = nil
+			out["rules"] = struct{}{}
 		}
 	}
 
@@ -817,8 +817,14 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			Protocol:  c.String("protocol"),
 			PortFrom:  int32(c.Int("port-from")),
 			PortTo:    int32(c.Int("port-to")),
-			Targets:   c.StringSlice("cidr"),
 		}
+		switch rule.Direction {
+		case securitygroupruledirection.Ingress:
+			rule.Sources = c.StringSlice("cidr")
+		case securitygroupruledirection.Egress:
+			rule.Targets = c.StringSlice("cidr")
+		}
+
 		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
