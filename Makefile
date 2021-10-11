@@ -93,6 +93,8 @@ begin: versioncut
 mod:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(GO) mod download)
+	@($(GO) mod tidy)
+	@($(GO) mod download)
 
 libvirt:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Libvirt driver enabled$(NO_COLOR)\n";
@@ -186,7 +188,10 @@ getdevdeps: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing without version tags. $(NO_COLOR)\n";
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(WHICH) rice > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) get $(RICE)@v1.0.2 &>/dev/null && $(GO) install $(RICE)/rice &>/dev/null; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n"; \
+		$(GO) get $(RICE)@v1.0.2 &>/dev/null; \
+		$(GO) get $(RICE)/rice &>/dev/null; \
+		$(GO) install $(RICE)/rice &>/dev/null; \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing rice module...$(NO_COLOR)\n" && $(GO) mod download github.com/GeertJohan/go.rice &>/dev/null; \
 	fi
 	@sleep 5
@@ -264,6 +269,7 @@ installci:
 	@(mkdir -p $(CIBIN) || true)
 	@($(CP) -f $(EXECS) $(CIBIN) || true)
 	@($(CP) -f $(COVEREXECS) $(CIBIN) > /dev/null 2>&1 || true)
+	@($(CP) -f go.mod go.sum $(CIBIN) > /dev/null 2>&1 || true)
 
 godocs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
