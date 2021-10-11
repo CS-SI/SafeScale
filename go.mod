@@ -3,6 +3,7 @@ module github.com/CS-SI/SafeScale
 go 1.16
 
 require (
+	cloud.google.com/go v0.65.0 // indirect
 	github.com/GeertJohan/go.rice v1.0.2
 	github.com/Masterminds/goutils v1.1.0 // indirect
 	github.com/Masterminds/semver v1.5.0 // indirect
@@ -59,7 +60,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
 	golang.org/x/net v0.0.0-20210908191846-a5e095526f91 // indirect
-	golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84
+	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/sys v0.0.0-20211007075335-d3039528d8ac
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.30.0
