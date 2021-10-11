@@ -27,7 +27,6 @@ require (
 	github.com/itchyny/gojq v0.12.4
 	github.com/jcelliott/lumber v0.0.0-20160324203708-dd349441af25 // indirect
 	github.com/json-iterator/go v1.1.8
-	github.com/kisielk/errcheck v1.6.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/libvirt/libvirt-go v4.8.0+incompatible
 	github.com/libvirt/libvirt-go-xml v4.8.0+incompatible
@@ -42,7 +41,6 @@ require (
 	github.com/ovh/go-ovh v0.0.0-20181109152953-ba5adb4cf014
 	github.com/pelletier/go-toml v1.9.0 // indirect
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
-	github.com/quasilyte/go-ruleguard/dsl v0.3.6
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sanity-io/litter v1.3.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b
@@ -60,15 +58,13 @@ require (
 	github.com/xrash/smetrics v0.0.0-20170218160415-a3153f7040e9
 	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
 	golang.org/x/exp v0.0.0-20210916165020-5cb4fee858ee
-	golang.org/x/net v0.0.0-20210908191846-a5e095526f91
+	golang.org/x/net v0.0.0-20210908191846-a5e095526f91 // indirect
 	golang.org/x/oauth2 v0.0.0-20210313182246-cd4f82c27b84
 	golang.org/x/sys v0.0.0-20210908233432-aa78b53d3365
-	golang.org/x/tools v0.1.0 // indirect
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.41.0
-	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0 // indirect
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
