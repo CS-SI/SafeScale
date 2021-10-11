@@ -2,9 +2,7 @@ name: Legacy Docker Image
 
 on:
   push:
-    branches: [ release/v20.06 ]
   pull_request:
-    branches: [ release/v20.06 ]
 
 jobs:
 
@@ -15,4 +13,4 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build the Docker image
-        run: docker build . --file Dockerfile.current --tag safescale-release-v20.06:$(date +%s)
+        run: docker build . --file Dockerfile.current
