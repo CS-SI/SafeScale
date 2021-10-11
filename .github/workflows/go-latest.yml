@@ -41,29 +41,3 @@ jobs:
           test_results.log
           go.mod
           go.sum
-
-  build-macos:
-
-    runs-on: macos-latest
-
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-go@v2
-      with:
-        go-version: ${{env.GOVERSION}}
-    - name: Install Protoc
-      run: |
-        brew update
-        brew install protoc-gen-go
-
-    - run: make all
-    - uses: actions/upload-artifact@v2
-      if: failure()
-      with:
-        name: macos-artefacts
-        path: |
-          generation_results.log
-          vet_results.log
-          test_results.log
-          go.mod
-          go.sum
