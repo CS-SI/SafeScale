@@ -174,6 +174,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnPanic(&ferr)
 
 	svc := handler.job.Service()
 	task := handler.job.Task()
