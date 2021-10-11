@@ -115,3 +115,5 @@ lib/server/iaas/userdata/version.go
 helpers/
 
 *.swp
+
+git-hooks-env
