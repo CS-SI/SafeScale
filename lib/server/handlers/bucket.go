@@ -50,6 +50,7 @@ func NewBucketHandler(job server.Job) BucketHandler {
 
 // List retrieves all available buckets
 func (handler *bucketHandler) List() (rv []string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -67,6 +68,7 @@ func (handler *bucketHandler) List() (rv []string, xerr fail.Error) {
 
 // Create a bucket
 func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -99,6 +101,7 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 
 // Delete a bucket
 func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -120,6 +123,7 @@ func (handler *bucketHandler) Delete(name string) (xerr fail.Error) {
 
 // Inspect a bucket
 func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -141,6 +145,7 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fa
 
 // Mount a bucket on an host on the given mount point
 func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -173,6 +178,7 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fai
 
 // Unmount a bucket
 func (handler *bucketHandler) Unmount(bucketName, hostName string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}

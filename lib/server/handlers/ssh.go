@@ -71,6 +71,8 @@ func NewSSHHandler(job server.Job) SSHHandler {
 
 // GetConfig creates SSHConfig to connect to an host
 func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -89,7 +91,6 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	host, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
@@ -305,6 +306,8 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnPanic(&xerr)
+
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
 	host, xerr := hostfactory.Load(handler.job.Service(), hostRef)
@@ -419,6 +422,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnPanic(&xerr)
 
 	hostName := ""
 	var upload bool
