@@ -172,64 +172,62 @@ coverdeps: begin ground
 	@$(WHICH) cover > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading cover...\n" && $(GO) install $(COVER)@v0.1.0 &>/dev/null || true; \
 	fi
+	@sleep 5
 	@$(WHICH) covertool > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading covertool...\n" && $(GO) install $(COVERTOOL) &>/dev/null || true; \
 	fi
+	@sleep 5
 	@$(WHICH) go2xunit > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading go2xunit...\n" && $(GO) install $(XUNIT)@v1.4.10 &>/dev/null || true; \
 	fi
+	@sleep 5
 
 getdevdeps: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing without version tags. $(NO_COLOR)\n";
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Testing prerequisites, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(WHICH) rice > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) get $(RICE)/rice@v1.0.2 &>/dev/null && $(GO) install $(RICE)/rice &>/dev/null; \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing rice module...$(NO_COLOR)\n" && $(GO) mod download github.com/GeertJohan/go.rice &>/dev/null; \
-	fi
-	@sleep 2
-	@$(WHICH) rice > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n" && $(GO) get $(RICE)@v1.0.2 &>/dev/null && $(GO) install $(RICE)/rice &>/dev/null; \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing rice module...$(NO_COLOR)\n" && $(GO) mod download github.com/GeertJohan/go.rice &>/dev/null; \
 	fi
-	@sleep 2
+	@sleep 5
 	@$(WHICH) protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null && $(GO) install github.com/golang/protobuf/protoc-gen-go &>/dev/null; \
 	fi
-	@sleep 2
+	@sleep 5
 	@$(WHICH) protoc-gen-go-grpc > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go-grpc...\n" && $(GO) get google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null && $(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null; \
 	fi
-	@sleep 2
+	@sleep 5
 	@$(WHICH) minimock > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) get $(MINIMOCK)@v3.0.9 &>/dev/null || true; \
 		$(GO) install $(MINIMOCK) &>/dev/null || true; \
 	fi
-	@sleep 2
+	@sleep 5
 	@$(WHICH) errcheck > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get $(ERRCHECK)@v1.6.0 &>/dev/null || true; \
 		$(GO) install $(ERRCHECK) &>/dev/null || true; \
 	fi
-	@sleep 2
+	@sleep 5
 	@$(WHICH) goconvey > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get $(CONVEY)@v1.6.4 &>/dev/null || true; \
 		$(GO) install $(CONVEY) &>/dev/null || true; \
 	fi
-	@sleep 2
+	@sleep 5
 	@$(WHICH) golint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get $(LINTER)@v0.0.0-20201208152925-83fdc39ff7b5 &>/dev/null || true; \
 		$(GO) install $(LINTER) &>/dev/null || true; \
 	fi
-	@sleep 2
+	@sleep 5
 	@$(WHICH) stringer > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get $(STRINGER)@v0.1.0 &>/dev/null || true; \
 		$(GO) install $(STRINGER) &>/dev/null || true; \
 	fi
-	@sleep 2
+	@sleep 5
 	@$(WHICH) golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.26.0 || true; \
 	fi
-	@sleep 15
+	@sleep 25
 
 ensure: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
