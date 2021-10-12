@@ -64,7 +64,7 @@ fastall: begin
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build assumes all dependencies are already there and code generation is also up to date $(NO_COLOR)\n";
 	@(cd lib && $(MAKE) all)
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 120s -v ./lib/utils/concurrency/... > test_results.log || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";grep FAIL ./test_results.log;exit 1)
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 120s -v ./lib/utils/concurrency/... > test_results.log || (printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";grep FAIL ./test_results.log;exit 1)
 	@$(RM) ./test_results.log || true
 	@(cd cli && $(MAKE) all)
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -139,16 +139,16 @@ ground: begin
 #CI dependencies
 cideps: begin ground
 	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...$(NO_COLOR)\n" && $(GO) get $(GOJQ)@v0.12.3 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...$(NO_COLOR)\n" && $(GO) install $(GOJQ)@v0.12.3 &>/dev/null || true; \
 	fi
 	@$(WHICH) gron > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...$(NO_COLOR)\n" && $(GO) get $(GRON)@v0.6.1 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...$(NO_COLOR)\n" && $(GO) install $(GRON)@v0.6.1 &>/dev/null || true; \
 	fi
 	@$(WHICH) jsontoml > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...$(NO_COLOR)\n" && $(GO) get $(JSONTOML)/cmd/jsontoml@v1.9.0 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...$(NO_COLOR)\n" && $(GO) install $(JSONTOML)/cmd/jsontoml@v1.9.0 &>/dev/null || true; \
 	fi
 	@$(WHICH) tomljson > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...$(NO_COLOR)\n" && $(GO) get $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...$(NO_COLOR)\n" && $(GO) install $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
 	fi
 
 installbats: begin ground
@@ -175,15 +175,15 @@ coverdeps: begin ground
 	@$(WHICH) cover > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading cover...\n" && $(GO) install $(COVER)@v0.1.0 &>/dev/null || true; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) covertool > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading covertool...\n" && $(GO) install $(COVERTOOL) &>/dev/null || true; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) go2xunit > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading go2xunit...\n" && $(GO) install $(XUNIT)@v1.4.10 &>/dev/null || true; \
 	fi
-	@sleep 5
+	@sleep 2
 
 getdevdeps: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing without version tags. $(NO_COLOR)\n";
@@ -191,44 +191,45 @@ getdevdeps: begin ground
 	@$(WHICH) rice > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading rice...$(NO_COLOR)\n"; \
 		$(GO) get $(RICE)@v1.0.2 &>/dev/null; \
-		$(GO) get $(RICE)/rice &>/dev/null; \
-		$(GO) install $(RICE)/rice &>/dev/null; \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing rice module...$(NO_COLOR)\n" && $(GO) mod download github.com/GeertJohan/go.rice &>/dev/null; \
+		$(GO) install $(RICE)/rice@v1.0.2 &>/dev/null; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) protoc-gen-go > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n" && $(GO) get github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null && $(GO) install github.com/golang/protobuf/protoc-gen-go &>/dev/null; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go...\n"; \
+		$(GO) install github.com/golang/protobuf/protoc-gen-go@v1.3.2 &>/dev/null; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) protoc-gen-go-grpc > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go-grpc...\n" && $(GO) get google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null && $(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading protoc-gen-go-grpc...\n"; \
+		$(GO) install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1.0 &>/dev/null; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) minimock > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n" && $(GO) get $(MINIMOCK)@v3.0.9 &>/dev/null || true; \
-		$(GO) install $(MINIMOCK) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading minimock...\n"; \
+		$(GO) get -d $(MINIMOCK)@v3.0.10 &>/dev/null || true; \
+		$(GO) install $(MINIMOCK)@v3.0.10 &>/dev/null || true; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) errcheck > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n" && $(GO) get $(ERRCHECK)@v1.6.0 &>/dev/null || true; \
-		$(GO) install $(ERRCHECK) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading errcheck...\n"; \
+		$(GO) install $(ERRCHECK)@v1.6.0 &>/dev/null || true; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) goconvey > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n" && $(GO) get $(CONVEY)@v1.6.4 &>/dev/null || true; \
-		$(GO) install $(CONVEY) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading convey...\n"; \
+		$(GO) install $(CONVEY)@v1.6.6 &>/dev/null || true; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) golint > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n" && $(GO) get $(LINTER)@v0.0.0-20201208152925-83fdc39ff7b5 &>/dev/null || true; \
-		$(GO) install $(LINTER) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading linter...\n"; \
+		$(GO) install $(LINTER)@v0.0.0-20201208152925-83fdc39ff7b5 &>/dev/null || true; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) stringer > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n" && $(GO) get $(STRINGER)@v0.1.0 &>/dev/null || true; \
-		$(GO) install $(STRINGER) &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading stringer...\n"; \
+		$(GO) install $(STRINGER)@v0.1.0 &>/dev/null || true; \
 	fi
-	@sleep 5
+	@sleep 2
 	@$(WHICH) golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
 		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.26.0 || true; \
@@ -239,6 +240,9 @@ ensure: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	
 sdk: getdevdeps
+	@(cd lib && $(MAKE) $(@))
+
+force_sdk_python: sdk
 	@(cd lib && $(MAKE) $(@))
 
 lib: common
@@ -271,6 +275,7 @@ installci:
 	@($(CP) -f $(EXECS) $(CIBIN) || true)
 	@($(CP) -f $(COVEREXECS) $(CIBIN) > /dev/null 2>&1 || true)
 	@($(CP) -f go.mod go.sum $(CIBIN) > /dev/null 2>&1 || true)
+	@($(CP) -f lib/protocol/python3/safescale_pb2.py lib/protocol/python3/safescale_pb2_grpc.py $(CIBIN) > /dev/null 2>&1 || true)
 
 godocs:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running godocs in background, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -285,7 +290,7 @@ conveystop:
 	@(ps -ef | grep goconvey | grep -v grep | grep 8082 | awk {'print $$2'} | xargs kill -9 || true)
 
 generate: sdk
-	@sleep 5
+	@sleep 2
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./generation_results.log || true
 	@$(GO) generate -run stringer ./... 2>&1 | $(TEE) -a generation_results.log
@@ -300,9 +305,9 @@ mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
@@ -310,9 +315,9 @@ precommittest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running precommit unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
@@ -320,7 +325,7 @@ test: begin coverdeps # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 900s -v ./lib/utils/... -p 1 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/utils/... -p 1 2>&1 > test_results.log || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
@@ -375,7 +380,7 @@ style-full: begin generate gofmt
 
 coverage: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) test $(RACE_CHECK_TEST) -timeout 900s -v ./... -coverprofile=cover.out > coverage_results.log 2>&1 || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -coverprofile=cover.out > coverage_results.log 2>&1 || true
 	@$(GO) tool cover -html=cover.out -o cover.html || true
 
 show-cov: begin generate

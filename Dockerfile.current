@@ -30,7 +30,7 @@ iproute2 \
 iputils-ping \
 openssh-server \
 python3.6 \
-python3-pip \
+python3-pip --no-install-recommends \
 && apt-get autoclean -y \
 && apt-get autoremove -y \
 && rm -rf /var/lib/apt/lists/*
