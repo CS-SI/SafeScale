@@ -22,26 +22,25 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
+	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -72,6 +71,8 @@ func NewSSHHandler(job server.Job) SSHHandler {
 
 // GetConfig creates SSHConfig to connect to an host
 func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -90,7 +91,6 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "(%s)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	host, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
@@ -306,6 +306,8 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnPanic(&xerr)
+
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
 	host, xerr := hostfactory.Load(handler.job.Service(), hostRef)
@@ -420,6 +422,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnPanic(&xerr)
 
 	hostName := ""
 	var upload bool

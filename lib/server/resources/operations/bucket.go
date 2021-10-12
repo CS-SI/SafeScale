@@ -35,9 +35,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -561,7 +561,7 @@ func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Er
 	}
 
 	var buffer bytes.Buffer
-	err = tpl.Execute(&buffer, data)
+	err = tpl.Option("missingkey=error").Execute(&buffer, data)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)

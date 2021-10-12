@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -38,16 +37,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/remotefile"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -128,7 +126,6 @@ func (instance *Cluster) InstalledFeatures() []string {
 	return out
 }
 
-// ComplementFeatureParameters FIXME: include the Cluster part of setImplicitParameters() from feature
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
 func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error {
@@ -161,10 +158,8 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
 	v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
 	v["NetworkUsesVIP"] = networkCfg.SecondaryGatewayIP != ""
-	if networkCfg.SecondaryGatewayIP != "" {
-		v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
-		v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
-	}
+	v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
+	v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
 	v["EndpointIP"] = networkCfg.EndpointIP
 	v["PublicIP"] = v["EndpointIP"] // legacy ...
 	if _, ok := v["IPRanges"]; !ok {
@@ -434,7 +429,7 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 }
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
+func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, variables data.Map, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
@@ -473,30 +468,26 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	}
 
 	// Configures reserved_BashLibrary template var
-	bashLibrary, xerr := system.GetBashLibrary()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", xerr
 	}
-	data["reserved_BashLibrary"] = bashLibrary
-	data["Revision"] = system.REV
 
-	// Sets delays and timeouts for script
-	data["reserved_DefaultDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
-	data["reserved_DefaultTimeout"] = strings.Replace(
-		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_LongTimeout"] = strings.Replace(
-		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_ClusterJoinTimeout"] = strings.Replace(
-		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_DockerImagePullTimeout"] = strings.Replace(
-		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
-	)
+	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
 
-	script, path, xerr := realizeTemplate(box, tmplName, data, tmplName)
+	finalVariables := make(data.Map, len(variables)+len(bashLibraryVariables))
+	for k, v := range variables {
+		finalVariables[k] = v
+	}
+	for k, v := range bashLibraryVariables {
+		finalVariables[k] = v
+	}
+	variables["Revision"] = system.REV
+	script, path, xerr := realizeTemplate(box, tmplName, finalVariables, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)
@@ -511,7 +502,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	}
 
 	// Uploads the script into remote file
-	rfcItem := remotefile.Item{Remote: path}
+	rfcItem := Item{Remote: path}
 	xerr = rfcItem.UploadString(task.Context(), script, host)
 	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -667,6 +658,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 		}
 	}
 
+	// FIXME: reuse ComplementFeatureParameters?
 	var dnsServers []string
 	cfg, xerr := instance.GetService().GetConfigurationOptions()
 	xerr = debug.InjectPlannedFail(xerr)

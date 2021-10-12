@@ -17,19 +17,20 @@
 package fail
 
 import (
-	"encoding/json"
 	"fmt"
 	"os/exec"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
+
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 // consequencer is the interface exposing the methods manipulating consequences

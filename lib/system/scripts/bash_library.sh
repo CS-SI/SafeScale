@@ -230,6 +230,35 @@ function sfInterfaceWithIP() {
 }
 export -f sfInterfaceWithIP
 
+#------ delays and timeouts ------
+
+function sfDefaultDelay() {
+	echo {{ default 10 .reserved_DefaultDelay }}
+}
+export -f sfDefaultDelay
+
+function sfDefaultTimeout() {
+	echo {{ default "3m" .reserved_DefaultTimeout }}
+}
+export -f sfDefaultTimeout
+
+function sfLongTimeout() {
+	echo {{ default "6m" .reserved_LongTimeout }}
+}
+export -f sfLongTimeout
+
+function sfClusterJoinTimeout() {
+	echo {{ default "14m" .reserved_ClusterJoinTimeout }}
+}
+export -f sfClusterJoinTimeout
+
+function sfDockerImagePullTimeout() {
+	echo {{ default "10m" .reserved_DockerImagePullTimeout }}
+}
+export -f sfDockerImagePullTimeout
+
+#------
+
 # sfAsyncStart <what> <duration> <command>...
 function sfAsyncStart() {
 	local pid=${1}_PID
@@ -260,9 +289,10 @@ function sfAsyncWait() {
 }
 export -f sfAsyncWait
 
-# sfRetry <timeout> <delay> command
-# retries command until success, with sleep of <delay> seconds
-function sfRetry() {
+# sfRetryEx <timeout> <delay> command
+# Retries command until success, with sleep of <delay> seconds
+# Will timeout after <timeout>
+function sfRetryEx() {
 	local timeout=$1
 	local delay=$2
 	shift 2
@@ -289,6 +319,11 @@ function sfRetry() {
 	[ $rc -eq 0 ] && echo $result && return 0
 	echo "sfRetry: timeout!"
 	return $rc
+}
+export -f sfRetryEx
+
+function sfRetry {
+	sfRetryEx $(sfDefaultTimeout) $(sfDefaultDelay) $*
 }
 export -f sfRetry
 
@@ -381,7 +416,7 @@ function sfInstall() {
 	debian | ubuntu)
 		export DEBIAN_FRONTEND=noninteractive
 		export UCF_FORCE_CONFFNEW=1
-		sfRetry 5m 3 "sfApt update"
+		sfRetryEx 5m 3 "sfApt update"
 		sfApt install $1 -y --force-yes || return 194
 		command -v $1 || return 194
 		;;
@@ -489,6 +524,8 @@ function sfDropzonePush() {
 	return 0
 }
 export -f sfDropzonePush
+
+__cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error"
 
 # Copy content of local dropzone to remote dropzone (parameter can be IP or name)
 function sfDropzoneSync() {
@@ -624,206 +661,6 @@ function sfReverseProxyReload() {
 	sfEdgeProxyReload
 }
 export -f sfReverseProxyReload
-
-function sfIngressReload() {
-	id=$(sfGetFact "ingress4platform_docker_id")
-	if [ ! -z ${id+x} ]; then
-		docker exec $id kong reload >/dev/null
-		return $?
-	fi
-	return 1
-}
-export -f sfIngressReload
-
-# This function allows to create a database on platform PostgreSQL
-# It is intended to be used on one of the platform PostgreSQL servers in the cluster
-function sfPgsqlCreateDatabase() {
-	[ $# -eq 0 ] && echo "missing dbname" && return 1
-	local dbname=$1
-	if [ -z "$dbname" ]; then
-		echo "missing dbname"
-		return 1
-	fi
-	local owner=
-	[ $# -eq 2 ] && owner=$2
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	if [ ! -z ${id+x} ]; then
-		local cmd='CREATE DATABASE "'$dbname'"'
-		[ ! -z "$owner" ] && cmd="$cmd OWNER $owner"
-		docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
-		return $?
-	fi
-	return 1
-}
-export -f sfPgsqlCreateDatabase
-
-function sfPgsqlDropDatabase() {
-	local dbname=$1
-	if [ -z "$dbname" ]; then
-		echo "missing dbname"
-		return 1
-	fi
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	[ -z ${id+x} ] && return 1
-
-	local cmd="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = '${dbname}'"
-	docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
-	retcode=$?
-	if [ $retcode -eq 0 ]; then
-		sfRetry 1m 5 "docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c 'DROP DATABASE IF EXISTS \"'$dbname'\"'"
-		retcode=$?
-	fi
-	return $retcode
-}
-export -f sfPgsqlDropDatabase
-
-# This function allows to create a database on platform PostgreSQL
-# Role name and optional options are passed as parameter, password is passed in stdin. example:
-#     echo "toto" | sfPgsqlCreateRole my_role CREATEDB LOGIN
-#     "toto" is the password, "my_role" is the role name
-# It is intended to be used on one of the platform PostgreSQL servers in the cluster
-function sfPgsqlCreateRole() {
-	local rolename=$1
-	shift
-	[ -z "$rolename" ] && echo "missing role name" && return 1
-	local options="$*"
-
-	local password=
-	read -t 1 password
-
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	[ -z ${id+x} ] && return 1
-
-	local cmd="CREATE ROLE $rolename"
-	[ ! -z "$options" ] && cmd="$cmd $options"
-	docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd" && echo -n "$password" | sfPgsqlUpdatePassword $rolename
-}
-export -f sfPgsqlCreateRole
-
-# This function allows to drop a database on platform PostgreSQL
-# Role name is passed as parameter
-# It is intended to be used on one of the platform PostgreSQL servers in the cluster
-function sfPgsqlDropRole() {
-	local rolename=$1
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	[ -z ${id+x} ] && return 1
-
-	sleep 1
-	local cmd="DROP ROLE IF EXISTS $rolename"
-	sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'$cmd'"
-}
-export -f sfPgsqlDropRole
-
-__cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error"
-
-# This function allows to update password of a user on platform PostgreSQL
-# Username is passed as parameter to the function, password is passed in stdin. example:
-#     echo "toto" | sfPgPoolUpdatePassword tata
-#     "toto" is the password, "tata" is the username
-# It is intended to be used on one of the platform PostgreSQL servers in the cluster
-function sfPgsqlUpdatePassword() {
-	local username=${1}
-	if [ -z "$username" ]; then
-		echo "username is missing"
-		return 1
-	fi
-
-	local password
-	read -t 1 password
-	[ -z "$password" ] && echo "missing password from pipe" && return 1
-
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	[ -z ${id+x} ] && return 1
-
-	docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "ALTER USER $username WITH PASSWORD '$password'"
-	retcode=$?
-	if [ $retcode -eq 0 ]; then
-		for i in {{ range .ClusterMasterIPs }}{{.}} {{end}}; do
-			id=$(ssh $__cluster_admin_ssh_options__ cladm@$i docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_pooler | cut -d: -f2)
-			retcode=$?
-			if [ $retcode -eq 0 ] && [ ! -z "$id" ]; then
-				ssh $__cluster_admin_ssh_options__ cladm@$i docker exec $id /usr/local/bin/update_password.sh $username "$password"
-				retcode=$?
-			fi
-			[ $retcode -ne 0 ] && break
-		done
-	fi
-	return $retcode
-}
-export -f sfPgsqlUpdatePassword
-
-# sfKeycloakRun allows to execute keycloak admin command
-# Intended to be use on target masters:any
-function sfKeycloakRun() {
-	local id=$(sfGetFact "keycloak4platform_docker_id")
-	[ $? -ne 0 ] || [ -z ${id+x} ] && echo "failed to find keycloak container" && return 1
-
-	local _stdin=
-	local _fc
-	read -N1 -t1 _fc && {
-		[ $? -le 128 ] && {
-			IFS= read -rd '' _stdin
-			_stdin="$_fc$_stdin"
-		}
-	}
-
-	if [ -z "$_stdin" ]; then
-		docker exec -i $id bash <<BASH
-/opt/jboss/keycloak/bin/kcadm.sh $@ --no-config --server http://{{ .HostIP }}:63010/auth
-BASH
-	else
-		docker exec -i $id bash <<BASH
-/opt/jboss/keycloak/bin/kcadm.sh $@ --no-config --server http://{{ .HostIP }}:63010/auth -f - <<KCADM
-$_stdin
-KCADM
-BASH
-	fi
-}
-export -f sfKeycloakRun
-
-# Returns all the information about the client passed as first parameters
-# Subsequent parameters ((--realm, --user, --password, ...) are passed as-is to kcadm.sh
-function sfKeycloakGetClient() {
-	[ $# -eq 0 ] && return 1
-	local name=$1
-	shift
-	sfKeycloakRun get clients "$@" | tail -n +1 | jq ".[] | select(.clientId == \"$name\")"
-}
-export -f sfKeycloakGetClient
-
-function sfKeycloakDeleteClient() {
-	[ $# -eq 0 ] && return 1
-	local name=$1
-	shift
-
-	local clientID=$(sfKeycloakGetClient $name "$@")
-	[ -z "$clientID" ] && return 1
-
-	sfKeycloakRun delete clients/$clientID "$@"
-}
-export -f sfKeycloakDeleteClient
-
-# Returns all the information about the group passed as first parameters
-# Subsequent parameters ((--realm, --user, --password, ...) are passed as-is to kcadm.sh
-function sfKeycloakGetGroup() {
-	[ $# -eq 0 ] && return 1
-	local name=$1
-	shift
-	sfKeycloakRun get groups "$@" | tail -n +1 | jq ".[] | select(.name == \"$name\")"
-}
-export -f sfKeycloakGetGroup
-
-function sfKeycloakDeleteGroup() {
-	[ $# -eq 0 ] && return 1
-	local name=$1
-	shift
-
-	local clientID=$(sfKeycloakGetGroup "$name" "$@")
-	[ -z "$clientID" ] && return 1
-
-	sfKeycloakRun delete clients/$clientID "$@"
-}
-export -f sfKeycloakDeleteGroup
 
 function sfSystemctl-exists() {
 	[ "$(systemctl list-unit-files "${1}*" | wc -l)" -gt 3 ]
@@ -1162,14 +999,15 @@ function sfDetectFacts() {
 		[ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
 		FACTS["edgeproxy4subnet_docker_id"]=$id
 
-		id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
-		FACTS["ingress4platform_docker_id"]=$id
-
-		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2 || true)
-		FACTS["postgresql4platform_docker_id"]=$id
-
-		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2 || true)
-		FACTS["keycloak4platform_docker_id"]=$id
+# VPL: not used anymore
+#		id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
+#		FACTS["ingress4platform_docker_id"]=$id
+#
+#		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2 || true)
+#		FACTS["postgresql4platform_docker_id"]=$id
+#
+#		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2 || true)
+#		FACTS["keycloak4platform_docker_id"]=$id
 	fi
 
 	# "Serialize" facts to file

@@ -27,10 +27,10 @@ import (
 	sharefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/share"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 //go:generate minimock -o ../mocks/mock_nasapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.ShareHandler
@@ -70,6 +70,8 @@ func (handler *shareHandler) Create(
 	shareName, hostName, path string, options string, /*securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
 ) (share resources.Share, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -90,7 +92,6 @@ func (handler *shareHandler) Create(
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	objs, xerr := sharefactory.New(handler.job.Service())
 	if xerr != nil {
@@ -107,6 +108,8 @@ func (handler *shareHandler) Create(
 
 // Delete a share from host
 func (handler *shareHandler) Delete(name string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -121,7 +124,6 @@ func (handler *shareHandler) Delete(name string) (xerr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	objs, xerr := sharefactory.Load(handler.job.Service(), name)
 	if xerr != nil {

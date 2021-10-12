@@ -41,7 +41,7 @@ import (
 // safescale bucket inspect C1
 
 // BucketListener is the bucket service grpc server
-type BucketListener struct{
+type BucketListener struct {
 	protocol.UnimplementedBucketServiceServer
 }
 
@@ -272,4 +272,3 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 
 	return empty, handlers.NewBucketHandler(job).Unmount(bucketName, hostRef)
 }
-

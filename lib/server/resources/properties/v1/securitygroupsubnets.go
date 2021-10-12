@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // SecurityGroupSubnets contains information about attached subnets to a security group

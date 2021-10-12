@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package remotefile
+package operations
 
 import (
+	"context"
 	"strings"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/system"

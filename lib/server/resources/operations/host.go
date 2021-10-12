@@ -28,9 +28,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -44,8 +41,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
@@ -55,12 +54,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -549,13 +548,11 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 		}
 
 		abstractHostFull, innerXErr := instance.GetService().InspectHost(ahc.ID)
-		if innerXErr != nil {
-			return innerXErr
+		if abstractHostFull != nil {
+			state = abstractHostFull.Core.LastState
+			return nil
 		}
-
-		ahc = abstractHostFull.Core
-		state = ahc.LastState
-		return nil
+		return innerXErr
 	})
 	return state, xerr
 }
@@ -1422,35 +1419,6 @@ func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequiremen
 
 	return template.ID, nil
 }
-
-// VPL: deprecated, replaced by determineImageID()
-// func (instance *Host) findImageID(imageName string) (string, fail.Error) {
-// 	svc := instance.GetService()
-// 	if imageName == "" {
-// 		cfg, xerr := svc.GetConfigurationOptions()
-// 		xerr = debug.InjectPlannedFail(xerr)
-// 		if xerr != nil {
-// 			return "", xerr
-// 		}
-//
-// 		imageName = cfg.GetString("DefaultImage")
-// 	}
-//
-// 	var img *abstract.Image
-// 	xerr := retry.WhileUnsuccessfulDelay1Second(
-// 		func() error {
-// 			var innerXErr fail.Error
-// 			img, innerXErr = svc.SearchImage(imageName)
-// 			return innerXErr
-// 		},
-// 		temporal.GetOperationTimeout(),
-// 	)
-// 	xerr = debug.InjectPlannedFail(xerr)
-// 	if xerr != nil {
-// 		return "", xerr
-// 	}
-// 	return img.ID, nil
-// }
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
 func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration) fail.Error {

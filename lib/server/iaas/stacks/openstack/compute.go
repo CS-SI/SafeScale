@@ -1070,19 +1070,16 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			ahf.Core.ID = server.ID // makes sure that on next turn we get IPAddress by ID
 			lastState := toHostState(server.Status)
 			// If state matches, we consider this a success no matter what
-			if lastState == state {
+			switch lastState {
+			case state:
 				return nil
-			}
-
-			if lastState == hoststate.Error {
+			case hoststate.Error:
 				return retry.StopRetryError(fail.NotAvailableError("state of Host '%s' is 'ERROR'", hostLabel))
+			case hoststate.Starting, hoststate.Stopping:
+				return fail.NewError("host '%s' not ready yet", hostLabel)
+			default:
+				return retry.StopRetryError(fail.NewError("host status of '%s' is in state '%s'", hostLabel, lastState.String()))
 			}
-
-			if lastState != hoststate.Starting && lastState != hoststate.Stopping {
-				return retry.StopRetryError(nil, "host status of '%s' is in state '%s', and that's not a transition state", hostLabel, server.Status)
-			}
-
-			return fail.NewError("host '%s' not ready yet", hostLabel)
 		},
 		temporal.GetMinDelay(),
 		timeout,
@@ -1092,7 +1089,11 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		case *fail.ErrTimeout:
 			return nullServer, fail.Wrap(fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
 		case *fail.ErrAborted:
-			return nullServer, fail.Wrap(fail.Cause(retryErr), "stopping retries")
+			cause := retryErr.Cause()
+			if cause != nil {
+				retryErr = fail.ConvertError(cause)
+			}
+			return server, retryErr
 		default:
 			return nullServer, retryErr
 		}

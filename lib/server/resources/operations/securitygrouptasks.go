@@ -25,9 +25,9 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // taskUnbindFromHost unbinds a Host from the security group
@@ -86,7 +86,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params 
 
 type taskUnbindFromHostsAttachedToSubnetParams struct {
 	subnetID, subnetName string
-	subnetHosts *propertiesv1.SubnetHosts
+	subnetHosts          *propertiesv1.SubnetHosts
 }
 
 // taskUnbindFromHostsAttachedToSubnet unbinds security group from hosts attached to a Subnet

@@ -17,12 +17,13 @@
 package abstract
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 	"net"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -113,7 +114,6 @@ func (sgr *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 	if sgr.PortTo != in.PortTo {
 		return false
 	}
-
 
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range sgr.Sources {
@@ -208,8 +208,8 @@ func (sgr *SecurityGroupRule) Validate() fail.Error {
 		break
 	case "tcp", "udp":
 		if sgr.PortFrom <= 0 {
-				return fail.InvalidRequestError("rule --port-from must contain a positive integer")
-			}
+			return fail.InvalidRequestError("rule --port-from must contain a positive integer")
+		}
 		if len(sgr.Sources) == 0 && len(sgr.Targets) == 0 {
 			return fail.InvalidRequestError("rule --cidr must be defined")
 		}
@@ -428,7 +428,7 @@ func (sg *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
 
 	if jserr := json.Unmarshal(buf, sg); jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			return fail.NewError(jserr.Error())

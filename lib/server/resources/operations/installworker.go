@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -27,14 +28,13 @@ import (
 	txttmpl "text/template"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
@@ -44,13 +44,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -62,7 +61,7 @@ const (
 	yamlTargetsKeyword = "targets"
 	yamlRunKeyword     = "run"
 	yamlPackageKeyword = "package"
-	yamlOptionsKeyword = "options"
+	// yamlOptionsKeyword = "options"
 	yamlTimeoutKeyword = "timeout"
 	yamlSerialKeyword  = "serialized"
 )
@@ -84,7 +83,7 @@ exec 1<&-
 exec 2<&-
 exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 2>&1
-sudo chown {{.User}}:{{.User}} %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+sudo chown {{.Username}}:{{.Username}} %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 set -x
 
 {{ .reserved_BashLibrary }}
@@ -559,6 +558,12 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		// }
 	}
 
+	// add target specific variables
+	xerr = w.target.ComplementFeatureParameters(ctx, v)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// Now enumerate steps and execute each of them
 	for _, k := range order {
 		stepKey := stepsKey + "." + k
@@ -574,6 +579,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		if xerr != nil {
 			return outcomes, xerr
 		}
+
 		subtask, xerr = subtask.Start(w.taskLaunchStep, taskLaunchStepParameters{
 			stepName:  k,
 			stepKey:   stepKey,
@@ -674,7 +680,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	var (
 		runContent string
 		stepT      = stepTargets{}
-		options    = map[string]string{}
+		// options    = map[string]string{}
 	)
 
 	// Determine list of hosts concerned by the step
@@ -719,14 +725,12 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}()
 
 	// Get the content of the action based on method
-	keyword := yamlRunKeyword
+	var keyword string
 	switch w.method {
-	case installmethod.Apt:
-		fallthrough
-	case installmethod.Yum:
-		fallthrough
-	case installmethod.Dnf:
+	case installmethod.Apt, installmethod.Yum, installmethod.Dnf:
 		keyword = yamlPackageKeyword
+	default:
+		keyword = yamlRunKeyword
 	}
 	runContent, ok = p.stepMap[keyword].(string)
 	if ok {
@@ -737,44 +741,6 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	} else {
 		msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
 		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlRunKeyword)
-	}
-
-	// If there is an options file (for now specific to DCOS), upload it to the remote host
-	optionsFileContent := ""
-	if anon, ok = p.stepMap[yamlOptionsKeyword]; ok {
-		for i, j := range anon.(map[string]interface{}) {
-			options[i] = j.(string)
-		}
-		var (
-			avails  = map[string]interface{}{}
-			content interface{}
-		)
-		complexity, xerr := w.cluster.GetComplexity()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		c := strings.ToLower(complexity.String())
-		for k, anon := range options {
-			avails[strings.ToLower(k)] = anon
-		}
-		if content, ok = avails[c]; !ok {
-			if c == strings.ToLower(clustercomplexity.Large.String()) {
-				c = clustercomplexity.Normal.String()
-			}
-			if c == strings.ToLower(clustercomplexity.Normal.String()) {
-				if content, ok = avails[c]; !ok {
-					content, ok = avails[clustercomplexity.Small.String()]
-				}
-			}
-		}
-		if ok {
-			optionsFileContent = content.(string)
-			p.variables["options"] = fmt.Sprintf("--options=%s/options.json", utils.TempFolder)
-		}
-	} else {
-		p.variables["options"] = ""
 	}
 
 	wallTime := temporal.GetLongOperationTimeout()
@@ -791,7 +757,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, xerr := normalizeScript(data.Map{
+	templateCommand, xerr := normalizeScript(&p.variables, data.Map{
 		"reserved_Name":    w.feature.GetName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
@@ -815,14 +781,14 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	stepInstance := step{
-		Worker:             w,
-		Name:               p.stepName,
-		Action:             w.action,
-		Script:             templateCommand,
-		WallTime:           wallTime,
-		OptionsFileContent: optionsFileContent,
-		YamlKey:            p.stepKey,
-		Serial:             serial,
+		Worker:   w,
+		Name:     p.stepName,
+		Action:   w.action,
+		Script:   templateCommand,
+		WallTime: wallTime,
+		// OptionsFileContent: optionsFileContent,
+		YamlKey: p.stepKey,
+		Serial:  serial,
 	}
 	r, xerr := stepInstance.Run(task, hostsList, p.variables, w.settings)
 	// If an error occurred, do not execute the remaining steps, fail immediately
@@ -863,7 +829,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			if cuk != nil {
 				if !cuk.Successful() && cuk.Completed() {
 					// TBR: It's one of those
-					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %v with [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
+					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))
 					logrus.Warnf(msg.Error())
 					newerrpack = append(newerrpack, msg)
 				}
@@ -985,7 +951,7 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 }
 
 // parseClusterSizingRequest returns count, cpu and ram components of request
-func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, fail.Error) {
+func (w *worker) parseClusterSizingRequest(_ /*request*/ string) (int, int, float32, fail.Error) {
 	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 
@@ -1314,11 +1280,30 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
-func normalizeScript(params map[string]interface{}) (string, fail.Error) {
+func normalizeScript(params *data.Map, reserved data.Map) (string, fail.Error) {
 	var (
 		err         error
 		tmplContent string
 	)
+
+	// Configures BashLibrary template var
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return "", xerr
+	}
+
+	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return "", xerr
+	}
+
+	for k, v := range reserved {
+		(*params)[k] = v
+	}
+	for k, v := range bashLibraryVariables {
+		(*params)[k] = v
+	}
 
 	anon := featureScriptTemplate.Load()
 	if anon == nil {
@@ -1335,20 +1320,15 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 		if xerr != nil {
 			return "", fail.SyntaxError("error parsing bash template: %s", xerr.Error())
 		}
+
+		// Set template to generate error if there is missing key in params during Execute
+		r = r.Option("missingkey=error")
 		featureScriptTemplate.Store(r)
 		anon = featureScriptTemplate.Load()
 	}
 
-	// Configures BashLibrary template var
-	bashLibrary, xerr := system.GetBashLibrary()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-	params["reserved_BashLibrary"] = bashLibrary
-
 	dataBuffer := bytes.NewBufferString("")
-	err = anon.(*txttmpl.Template).Execute(dataBuffer, params)
+	err = anon.(*txttmpl.Template).Execute(dataBuffer, *params)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)

@@ -1,3 +1,4 @@
+//go:build alltests
 // +build alltests
 
 /*
@@ -19,6 +20,7 @@
 package serialize
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"

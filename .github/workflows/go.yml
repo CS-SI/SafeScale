@@ -2,7 +2,9 @@ name: Go Build CI
 
 on:
   push:
+    branches: [ develop ]
   pull_request:
+    branches: [ develop ]
 
 env:
   PROTOCVERSION: 3.17.3
@@ -31,4 +33,9 @@ jobs:
       if: failure()
       with:
         name: ${{ matrix.os }}-artefacts
-        path: test_results.log
+        path: |
+          generation_results.log
+          vet_results.log
+          test_results.log
+          go.mod
+          go.sum

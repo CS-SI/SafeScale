@@ -43,14 +43,15 @@ func GetCurrentTenant() *Tenant {
 			return nil
 		}
 
-		// Set unique tenant as selected
+		// Set unique tenant as current
 		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
-		for _, anon := range tenants {
-			name := anon.(string)
+		for _, tenant := range tenants {
+			name := tenant["name"].(string)
 			service, err := iaas.UseService(name, operations.MinimumMetadataVersion)
 			if err != nil {
 				return nil
 			}
+
 			currentTenant.Store(&Tenant{Name: name, Service: service})
 			break // nolint
 		}
@@ -70,6 +71,7 @@ func SetCurrentTenant(tenantName string) error {
 	if err != nil {
 		return err
 	}
+
 	tenant = &Tenant{Name: tenantName, Service: service}
 	currentTenant.Store(tenant)
 	return nil

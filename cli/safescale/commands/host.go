@@ -164,6 +164,7 @@ var hostList = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
+
 		jsoned, _ := json.Marshal(hosts.GetHosts())
 		var result []map[string]interface{}
 		err = json.Unmarshal(jsoned, &result)
@@ -206,7 +207,8 @@ var hostInspect = &cli.Command{
 }
 
 var hostStatus = &cli.Command{
-	Name:      "status",
+	Name:      "state",
+	Aliases:   []string{"status"},
 	Usage:     "status Host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {

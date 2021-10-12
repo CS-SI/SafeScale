@@ -35,11 +35,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -436,7 +436,7 @@ func (instance *Network) Browse(ctx context.Context, callback func(*abstract.Net
 }
 
 var (
-	removingNetworkAbstractContextKey = "removing_network_abstract"
+	removingNetworkAbstractContextKey   = "removing_network_abstract"
 	removingNetworkPropertiesContextKey = "removing_network_properties"
 )
 

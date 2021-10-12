@@ -175,7 +175,7 @@ feature:
                             OPTIONS=
                             {{ end -}}
                             echo "docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1  || sfFail 198
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1  || sfFail 198
                             sfExit
 
                     running:
@@ -189,7 +189,7 @@ feature:
                             {{ else }}
                             PREFIX="elastalert"
                             {{ end -}}
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || sfFail 200
+                            sfRetry "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || sfFail 200
                             sfExit
 
                     ready:
@@ -198,7 +198,7 @@ feature:
                             masters: any
                             nodes: no
                         run: |
-                            sfRetry {{ or .reserved_DefaultTimeout "3m" }} {{ or .reserved_DefaultDelay 10 }} "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || sfFail 201
+                            sfRetry "curl -k http://{{ .HostIP }}:3030/ &>/dev/null" || sfFail 201
                             sfExit
 
             remove:
@@ -217,7 +217,7 @@ feature:
                                 OPTIONS=
                                 {{ end -}}
                                 echo "docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                                sfRetry 10m 5 docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 203
+                                sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/elastalert/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 203
                             fi
                             sfExit
 

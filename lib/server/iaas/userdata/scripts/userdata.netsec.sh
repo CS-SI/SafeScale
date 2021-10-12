@@ -61,7 +61,7 @@ set -x
 uptime >/opt/safescale/var/state/user_data.netsec.done
 
 # Includes the BashLibrary
-{{ .BashLibrary }}
+{{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.netsec.done
 
 function reset_fw() {
@@ -70,32 +70,32 @@ function reset_fw() {
   case $LINUX_KIND in
   debian)
     echo "Reset firewall"
-    sfRetry 3m 5 "sfApt update &>/dev/null" || failure 206 "failure running apt update"
+    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 206 "failure running apt update"
     if [[ $(lsb_release -rs | cut -d. -f1) -eq 10 ]]; then
       codename=$(sfGetFact "linux_codename")
-      sfRetry 3m 5 "sfApt install -q -y -t ${codename}-backports iptables" || failure 206 "failure installing iptables"
-      sfRetry 3m 5 "sfApt install -q -y -t ${codename}-backports firewalld"  || failure 206 "failure installing firewalld"
+      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports iptables" || failure 206 "failure installing iptables"
+      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports firewalld"  || failure 206 "failure installing firewalld"
     else
-      sfRetry 3m 5 "sfApt install -q -y iptables" || failure 206 "failure installing iptables"
-      sfRetry 3m 5 "sfApt install -q -y firewalld" || failure 206 "failure installing firewalld"
+      sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 206 "failure installing iptables"
+      sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 206 "failure installing firewalld"
     fi
 
     echo "Stopping ufw"
     systemctl stop ufw || true    # set to true to fix issues
     systemctl disable ufw || true # set to true to fix issues
-    sfRetry 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 206 "failure purging ufw"
+    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 206 "failure purging ufw"
     ;;
 
   ubuntu)
     echo "Reset firewall"
-    sfRetry 3m 5 "sfApt update &>/dev/null" || failure 206 "failure running apt update"
-    sfRetry 3m 5 "sfApt install -q -y iptables" || failure 206 "failure installing iptables"
-    sfRetry 3m 5 "sfApt install -q -y firewalld" || failure 206 "failure installing firewalld"
+    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 206 "failure running apt update"
+    sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 206 "failure installing iptables"
+    sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 206 "failure installing firewalld"
 
     echo "Stopping ufw"
     systemctl stop ufw || failure 206 "failure stopping ufw"
     systemctl disable ufw || failure 206 "failure disabling ufw"
-    sfRetry 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 206 "failure purging ufw"
+    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 206 "failure purging ufw"
     ;;
 
   redhat | rhel | centos | fedora)
@@ -103,7 +103,7 @@ function reset_fw() {
     if ! systemctl is-active firewalld &>/dev/null; then
       if ! systemctl status firewalld &>/dev/null; then
         is_network_reachable || failure 206 "failure installing firewalld because repositories are not reachable"
-        sfRetry 3m 5 "sfYum install -q -y firewalld" || failure 206 "failure installing firewalld"
+        sfRetryEx 3m 5 "sfYum install -q -y firewalld" || failure 206 "failure installing firewalld"
       fi
     fi
     ;;
@@ -342,7 +342,7 @@ function ensure_curl_is_installed() {
     if [[ -n $(which curl) ]]; then
       return 0
     fi
-    sfRetry 3m 5 "sfYum install -y -q curl &>/dev/null" || return 1
+    sfRetryEx 3m 5 "sfYum install -y -q curl &>/dev/null" || return 1
     ;;
   *)
     failure 216 "PROVISIONING_ERROR: Unsupported Linux distribution '$LINUX_KIND'!"
@@ -422,22 +422,22 @@ function install_route_if_needed() {
   case $LINUX_KIND in
   debian)
     if [[ -z $(which route) ]]; then
-      sfRetry 3m 5 "sfApt install -y net-tools" || return 1
+      sfRetryEx 3m 5 "sfApt install -y net-tools" || return 1
     fi
     ;;
   ubuntu)
     if [[ -z $(which route) ]]; then
-      sfRetry 3m 5 "sfApt install -y net-tools" || return 1
+      sfRetryEx 3m 5 "sfApt install -y net-tools" || return 1
     fi
     ;;
   redhat | rhel | centos)
     if [[ -z $(which route) ]]; then
-      sfRetry 3m 5 "sfYum install -y net-tools" || return 1
+      sfRetryEx 3m 5 "sfYum install -y net-tools" || return 1
     fi
     ;;
   fedora)
     if [[ -z $(which route) ]]; then
-      sfRetry 3m 5 "sfYum install -y net-tools" || return 1
+      sfRetryEx 3m 5 "sfYum install -y net-tools" || return 1
     fi
     ;;
   *)
@@ -799,7 +799,7 @@ function configure_network_redhat_without_nmcli() {
   stop_svc NetworkManager &>/dev/null
   disable_svc NetworkManager &>/dev/null
   if [[ ${FEN} -eq 0 ]]; then
-    sfRetry 3m 5 "sfYum remove -y NetworkManager &>/dev/null"
+    sfRetryEx 3m 5 "sfYum remove -y NetworkManager &>/dev/null"
     echo "exclude=NetworkManager" >>/etc/yum.conf
 
     if which dnf; then
@@ -953,10 +953,10 @@ function check_for_network_refined() {
   [ $REACHED -eq 0 ] && echo "Unable to reach network" && return 1
 
   [ ! -z "$PU_IF" ] && {
-    sfRetry 3m 10 check_for_ip $PU_IF || return 1
+    sfRetryEx 3m 10 check_for_ip $PU_IF || return 1
   }
   for i in $PR_IFs; do
-    sfRetry 3m 10 check_for_ip $i || return 1
+    sfRetryEx 3m 10 check_for_ip $i || return 1
   done
   return 0
 }
@@ -1157,9 +1157,9 @@ function install_drivers_nvidia() {
   ubuntu)
     sfFinishPreviousInstall
     add-apt-repository -y ppa:graphics-drivers &>/dev/null
-    sfRetry 3m 5 "sfApt update" || failure 201 "apt update failed"
-    sfRetry 3m 5 "sfApt -y install nvidia-410 &>/dev/null" || {
-      sfRetry 3m 5 "sfApt -y install nvidia-driver-410 &>/dev/null" || failure 201 "failed nvidia driver install"
+    sfRetryEx 3m 5 "sfApt update" || failure 201 "apt update failed"
+    sfRetryEx 3m 5 "sfApt -y install nvidia-410 &>/dev/null" || {
+      sfRetryEx 3m 5 "sfApt -y install nvidia-driver-410 &>/dev/null" || failure 201 "failed nvidia driver install"
     }
     ;;
 
@@ -1168,11 +1168,11 @@ function install_drivers_nvidia() {
       echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
       rmmod nouveau
     fi
-    sfRetry 3m 5 "sfApt update &>/dev/null"
-    sfRetry 3m 5 "sfApt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null" || failure 202 "failure installing nvdiia requirements"
+    sfRetryEx 3m 5 "sfApt update &>/dev/null"
+    sfRetryEx 3m 5 "sfApt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null" || failure 202 "failure installing nvdiia requirements"
     dpkg --add-architecture i386 &>/dev/null
-    sfRetry 3m 5 "sfApt update &>/dev/null"
-    sfRetry 3m 5 "sfApt install -y lib32z1 lib32ncurses5 &>/dev/null" || failure 203 "failure installing nvidia requirements"
+    sfRetryEx 3m 5 "sfApt update &>/dev/null"
+    sfRetryEx 3m 5 "sfApt install -y lib32z1 lib32ncurses5 &>/dev/null" || failure 203 "failure installing nvidia requirements"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null || failure 204 "failure downloading nvidia installer"
     bash NVIDIA-Linux-x86_64-410.78.run -s || failure 205 "failure running nvidia installer"
     ;;
@@ -1183,7 +1183,7 @@ function install_drivers_nvidia() {
       dracut --force
       rmmod nouveau
     fi
-    sfRetry 3m 5 "sfYum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null" || failure 206 "failure installing nvidia requirements"
+    sfRetryEx 3m 5 "sfYum -y -q install kernel-devel.$(uname -i) kernel-headers.$(uname -i) gcc make &>/dev/null" || failure 206 "failure installing nvidia requirements"
     wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run || failure 207 "failure downloading nvidia installer"
     # if there is a version mismatch between kernel sources and running kernel, building the driver would require 2 reboots to get it done, right now this is unsupported
     if [ $(uname -r) == $(sfYum list installed | grep kernel-headers | awk {'print $2'}).$(uname -i) ]; then
@@ -1351,20 +1351,20 @@ function add_common_repos() {
   redhat | rhel | centos)
     if which dnf; then
     # Install EPEL repo ...
-      sfRetry 3m 5 "dnf install -y epel-release" || failure 217 "failure installing epel repo"
-      sfRetry 3m 5 "dnf makecache fast -y || dnf makecache -y" || failure 218 "failure updating cache"
+      sfRetryEx 3m 5 "dnf install -y epel-release" || failure 217 "failure installing epel repo"
+      sfRetryEx 3m 5 "dnf makecache fast -y || dnf makecache -y" || failure 218 "failure updating cache"
       # ... but don't enable it by default
       dnf config-manager --set-disabled epel &>/dev/null || true
     else
       # Install EPEL repo ...
-      sfRetry 3m 5 "yum install -y epel-release" || failure 217 "failure installing epel repo"
-      sfRetry 3m 5 "yum makecache fast || yum makecache" || failure 218 "failure updating cache"
+      sfRetryEx 3m 5 "yum install -y epel-release" || failure 217 "failure installing epel repo"
+      sfRetryEx 3m 5 "yum makecache fast || yum makecache" || failure 218 "failure updating cache"
       # ... but don't enable it by default
       yum-config-manager --disablerepo=epel &>/dev/null || true
     fi
     ;;
   fedora)
-    sfRetry 3m 5 "dnf makecache fast -y || dnf makecache -y" || failure 218 "failure updating cache"
+    sfRetryEx 3m 5 "dnf makecache fast -y || dnf makecache -y" || failure 218 "failure updating cache"
     ;;
   esac
 }
@@ -1411,14 +1411,14 @@ function update_kernel_settings() {
 }
 
 function update_credentials() {
-  echo "{{.User}}:{{.Password}}" | chpasswd
+	echo "{{.Username}}:{{.Password}}" | chpasswd
 
-  dd if=/dev/urandom of=/home/{{.User}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
-  echo "{{.FinalPublicKey}}" >/home/{{.User}}/.ssh/authorized_keys
-  dd if=/dev/urandom of=/home/{{.User}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
-  echo "{{.FinalPrivateKey}}" >/home/{{.User}}/.ssh/id_rsa
-  chmod 0700 /home/{{.User}}/.ssh
-  chmod -R 0600 /home/{{.User}}/.ssh/*
+	dd if=/dev/urandom of=/home/{{.Username}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
+	echo "{{.FinalPublicKey}}" >/home/{{.Username}}/.ssh/authorized_keys
+	dd if=/dev/urandom of=/home/{{.Username}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
+	echo "{{.FinalPrivateKey}}" >/home/{{.Username}}/.ssh/id_rsa
+	chmod 0700 /home/{{.Username}}/.ssh
+	chmod -R 0600 /home/{{.Username}}/.ssh/*
 }
 
 function enable_at_daemon() {
@@ -1430,7 +1430,7 @@ function enable_at_daemon() {
         echo "@reboot sleep 30 && /usr/sbin/dhclient eth0"
       } | crontab -
     fi
-    sfRetry 1m 5 "service atd start" || true
+    sfRetryEx 1m 5 "service atd start" || true
     sleep 4
     ;;
   *) ;;
@@ -1439,14 +1439,14 @@ function enable_at_daemon() {
 
 # for testing purposes
 function unsafe_update_credentials() {
-  echo "{{.User}}:safescale" | chpasswd
+  echo "{{.Username}}:safescale" | chpasswd
 
-  dd if=/dev/urandom of=/home/{{.User}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
-  echo "{{.FinalPublicKey}}" >/home/{{.User}}/.ssh/authorized_keys
-  dd if=/dev/urandom of=/home/{{.User}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
-  echo "{{.FinalPrivateKey}}" >/home/{{.User}}/.ssh/id_rsa
-  chmod 0700 /home/{{.User}}/.ssh
-  chmod -R 0600 /home/{{.User}}/.ssh/*
+  dd if=/dev/urandom of=/home/{{.Username}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
+  echo "{{.FinalPublicKey}}" >/home/{{.Username}}/.ssh/authorized_keys
+  dd if=/dev/urandom of=/home/{{.Username}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
+  echo "{{.FinalPrivateKey}}" >/home/{{.Username}}/.ssh/id_rsa
+  chmod 0700 /home/{{.Username}}/.ssh
+  chmod -R 0600 /home/{{.Username}}/.ssh/*
 }
 
 function check_unsupported() {
