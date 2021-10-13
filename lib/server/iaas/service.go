@@ -643,18 +643,8 @@ func (svc *service) SearchImage(osname string) (*abstract.Image, error) {
 			if insensitiveContains(osname, "Ubuntu 20.04") {
 				osname = "ami-078bc46c55d0e1238"
 			}
-
-			// Debian
-			if insensitiveContains(osname, "Debian 9") {
-				osname = "ami-0f58cbd7f9b556613"
-			}
-
-			if insensitiveContains(osname, "Debian 10") {
-				osname = "ami-04989b617bd4f8f95"
-			}
-		} else {
-			return nil, fail.Errorf(fmt.Sprintf("unsupported region: %s", region), nil)
 		}
+		// no direct mapping for other regions
 	}
 
 	// If is an exact match for an Image return that image
