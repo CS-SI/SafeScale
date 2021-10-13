@@ -17,12 +17,13 @@
 package abstract
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 	"net"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -114,23 +115,6 @@ func (sgr *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 		return false
 	}
 
-	if len(sgr.IDs) != len(in.IDs) {
-		return false
-	}
-	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for _, v := range sgr.IDs {
-		found := false
-		for _, w := range in.IDs {
-			if w == v {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return false
-		}
-	}
-
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range sgr.Sources {
 		found := false
@@ -158,6 +142,7 @@ func (sgr *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -195,6 +180,47 @@ func concernsGroups(in []string) (bool, fail.Error) {
 		return false, fail.InvalidRequestError("missing valid sources/targets in rule")
 	}
 	return idFound > 0, nil
+}
+
+// Validate returns an error if the content of the rule is incomplete
+func (sgr *SecurityGroupRule) Validate() fail.Error {
+	// Note: DO NOT USE SecurityGroupRule.IsNull() here
+	if sgr == nil {
+		return fail.InvalidInstanceError()
+	}
+
+	switch sgr.EtherType {
+	case ipversion.IPv4, ipversion.IPv6:
+		break
+	default:
+		return fail.InvalidRequestError("rule --type must be 'ipv4' or 'ipv6'")
+	}
+
+	switch sgr.Direction {
+	case securitygroupruledirection.Egress, securitygroupruledirection.Ingress:
+		break
+	default:
+		return fail.InvalidRequestError("rule --direction must be 'egress' or 'ingress'")
+	}
+
+	switch sgr.Protocol {
+	case "icmp":
+		break
+	case "tcp", "udp":
+		if sgr.PortFrom <= 0 {
+			return fail.InvalidRequestError("rule --port-from must contain a positive integer")
+		}
+		if len(sgr.Sources) == 0 && len(sgr.Targets) == 0 {
+			return fail.InvalidRequestError("rule --cidr must be defined")
+		}
+	default:
+		// protocol may be empty, meaning allow everything, only if there are no ports defined
+		if sgr.PortFrom > 0 || sgr.PortTo > 0 {
+			return fail.InvalidRequestError("rule --protocol must be 'tcp', 'udp' or 'icmp'")
+		}
+	}
+
+	return nil
 }
 
 // NewSecurityGroupRule creates an abstract.SecurityGroupRule
@@ -248,7 +274,7 @@ func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (i
 		}
 	}
 	if !found {
-		return -1, fail.NotFoundError("no comparable rule found")
+		return -1, fail.NotFoundError("no corresponding rule found")
 	}
 	return index, nil
 }
@@ -372,9 +398,9 @@ func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 
 	src := p.(*SecurityGroup)
 	*sg = *src
-	sg.Rules = make(SecurityGroupRules, 0, len(src.Rules))
-	for _, v := range src.Rules {
-		sg.Rules = append(sg.Rules, v.Clone().(*SecurityGroupRule))
+	sg.Rules = make(SecurityGroupRules, len(src.Rules))
+	for k, v := range src.Rules {
+		sg.Rules[k] = v.Clone().(*SecurityGroupRule)
 	}
 	return sg
 }
@@ -402,7 +428,7 @@ func (sg *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
 
 	if jserr := json.Unmarshal(buf, sg); jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			return fail.NewError(jserr.Error())

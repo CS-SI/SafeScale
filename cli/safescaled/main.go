@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/dlespiau/covertool/pkg/exit"
+	"github.com/makholm/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
@@ -166,11 +166,13 @@ func assembleListenString(c *cli.Context) string {
 				listen = defaultDaemonHost + ":" + port
 			}
 		}
+
+		// At last, if listen is empty, build it from defaults
+		if listen == "" {
+			listen = defaultDaemonHost + ":" + defaultDaemonPort
+		}
 	}
-	// At last, if listen is empty, build it from defaults
-	if listen == "" {
-		listen = defaultDaemonHost + ":" + defaultDaemonPort
-	}
+
 	return listen
 }
 

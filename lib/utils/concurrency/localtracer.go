@@ -51,7 +51,7 @@ const (
 // newTracer creates a new tracer instance
 func newTracer(task Task, enabled bool) *tracer {
 	t := tracer{
-		taskSig: task.GetSignature(),
+		taskSig: task.Signature(),
 		enabled: enabled,
 	}
 
@@ -102,7 +102,7 @@ func (t *tracer) exiting() *tracer {
 
 // buildMessage builds the message with available information from stack trace
 func (t *tracer) buildMessage() string {
-	if t.isNull() {
+	if t == nil || t.isNull() {
 		return ""
 	}
 

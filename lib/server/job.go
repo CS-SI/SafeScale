@@ -105,12 +105,12 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 		return nil, xerr
 	}
 
-	if xerr = task.SetID(id+description); xerr != nil {
+	if xerr = task.SetID(id + description); xerr != nil {
 		return nil, xerr
 	}
 
 	// attach task instance to the context
-	ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task)
+	ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task) // FIXME don't use string as key
 
 	nj := job{
 		description: description,
@@ -221,7 +221,7 @@ func (j job) Aborted() bool {
 		return false
 	}
 
-	status, _ := j.task.GetStatus()
+	status, _ := j.task.Status()
 	return status == concurrency.ABORTED
 }
 

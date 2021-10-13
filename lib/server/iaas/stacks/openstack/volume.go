@@ -269,7 +269,7 @@ func (s Stack) DeleteVolume(id string) (xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
 	var timeout = temporal.GetOperationTimeout()
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
@@ -285,17 +285,20 @@ func (s Stack) DeleteVolume(id string) (xerr fail.Error) {
 			}
 			return innerXErr
 		},
+		temporal.GetDefaultDelay(),
 		timeout,
 	)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
+		case *fail.ErrTimeout:
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		case *retry.ErrStopRetry:
-			if xerr.Cause() != nil {
-				xerr = fail.ConvertError(xerr.Cause())
-			}
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		default:
+			return xerr
 		}
 	}
-	return xerr
+	return nil
 }
 
 // CreateVolumeAttachment attaches a volume to an host

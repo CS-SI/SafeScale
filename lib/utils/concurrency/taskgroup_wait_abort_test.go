@@ -58,7 +58,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpWhenWeAlreadyStartedWaiting(t 
 		chansize := 10
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 3 {
 				break
 			}
 			if enough {
@@ -226,7 +226,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStarte
 
 		for {
 			iter++
-			if iter > 10 {
+			if iter > 5 {
 				break
 			}
 			if enough || caught {
@@ -401,7 +401,7 @@ func TestThingsThatActuallyTakeTimeCleaningUpAndMayPanicWhenWeAlreadyStartedWait
 		chansize := 20
 		for {
 			iter++
-			if iter > 10 {
+			if iter > 5 {
 				break
 			}
 			if enough || caught {
@@ -550,7 +550,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 		chansize := 10
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 3 {
 				break
 			}
 			if enough {
@@ -569,6 +569,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 			for ind := 0; ind < chansize; ind++ {  // with the same number of tasks, good
 				_, xerr = overlord.Start(
 					func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+						tid, _ := t.ID()
 						weWereAborted := false
 						for { // do some work, then look for aborted, again and again
 							// some work
@@ -593,6 +594,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 
 						// flip a coin, true and we panic, false we don't
 						if randomInt(0, 2) == 1 {
+							fmt.Printf("%s: fail!\n", tid)
 							atomic.AddInt32(&failureCounter, 1)
 							return "mistakes happen", fail.NewError("It was head")
 						}
@@ -667,6 +669,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAndFailWhenWeAlreadyStartedWai
 				// or maybe we were fast enough and we are quitting only because of Abort, but no problem, we have more iterations...
 				case *fail.ErrRuntimePanic:
 					t.Errorf("That shouldn't happen")
+					t.Fail()
 					return
 				case *fail.ErrorList:
 					errorList := cerr.ToErrorSlice()
@@ -756,7 +759,7 @@ func TestAbortThingsThatActuallyTakeTimeCleaningUpAbortAndWaitLater(t *testing.T
 		chansize := 10
 		for {
 			iter++
-			if iter > 6 {
+			if iter > 3 {
 				break
 			}
 			if enough {
@@ -893,7 +896,7 @@ func TestAbortAlreadyFinishedSuccessfullyThingsThenWait(t *testing.T) {
 	iter := 0
 	for {
 		iter++
-		if iter > 10 {
+		if iter > 5 {
 			break
 		}
 

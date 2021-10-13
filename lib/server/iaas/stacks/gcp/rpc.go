@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -56,31 +57,41 @@ func refreshResult(oco opContext) (res result, xerr fail.Error) {
 			if ierr != nil {
 				return res, fail.ConvertError(ierr)
 			}
+
 			zone := getResourceNameFromSelfLink(*zoneURL)
 			oco.Operation, err = oco.Service.ZoneOperations.Get(oco.ProjectID, zone, oco.Operation.Name).Do()
+			if err != nil {
+				return res, fail.ConvertError(err)
+			}
 		} else if oco.Operation.Region != "" {
 			regionURL, ierr := url.Parse(oco.Operation.Region)
 			if ierr != nil {
 				return res, fail.ConvertError(ierr)
 			}
+
 			region := getResourceNameFromSelfLink(*regionURL)
 			oco.Operation, err = oco.Service.RegionOperations.Get(oco.ProjectID, region, oco.Operation.Name).Do()
+			if err != nil {
+				return res, fail.ConvertError(err)
+			}
 		} else {
 			oco.Operation, err = oco.Service.GlobalOperations.Get(oco.ProjectID, oco.Operation.Name).Do()
+			if err != nil {
+				return res, fail.ConvertError(err)
+			}
 		}
 
 		if oco.Operation == nil {
-			if err == nil {
-				return res, fail.NewError("no operation")
-			}
-			return res, fail.ConvertError(err)
+			return res, fail.NewError("no operation")
 		}
 
 		res.State = oco.Operation.Status
-		res.Error = err
+		if oco.Operation.Error != nil {
+			res.Error = normalizeOperationError(oco.Operation.Error)
+		}
 		res.Done = res.State == oco.DesiredState
 
-		return res, fail.ConvertError(err)
+		return res, fail.ConvertError(res.Error)
 	}
 
 	return res, fail.NewError("no operation")
@@ -117,6 +128,9 @@ func indexOf(element string, data []string) int {
 }
 
 func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation, poll time.Duration, duration time.Duration) (xerr fail.Error) {
+	if opp == nil {
+		return fail.InvalidParameterCannotBeNilError("opp")
+	}
 	oco := opContext{
 		Operation:    opp,
 		ProjectID:    s.GcpConfig.ProjectID,
@@ -129,6 +143,7 @@ func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation
 			if anerr != nil {
 				return anerr
 			}
+
 			if !r.Done {
 				return fmt.Errorf("not finished yet")
 			}
@@ -137,8 +152,18 @@ func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation
 		poll,
 		duration,
 	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
+		case *retry.ErrTimeout:
+			return fail.Wrap(fail.Cause(retryErr), "timeout")
+		default:
+			return retryErr
+		}
+	}
 
-	return fail.ConvertError(retryErr)
+	return nil
 }
 
 func (s stack) rpcGetSubnetByID(id string) (*compute.Subnetwork, fail.Error) {
@@ -150,12 +175,27 @@ func (s stack) rpcGetSubnetByID(id string) (*compute.Subnetwork, fail.Error) {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Subnetworks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, id).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return nil, xerr
+		}
 	}
 	return resp, nil
 }
@@ -195,12 +235,27 @@ func (s stack) rpcDeleteSubnetByName(name string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Subnetworks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
@@ -227,12 +282,27 @@ func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.S
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Subnetworks.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Region, &request).Context(context.Background()).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return &compute.Subnetwork{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return &compute.Subnetwork{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return &compute.Subnetwork{}, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return &compute.Subnetwork{}, xerr
+		}
 	}
 
 	if err := s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout()); err != nil {
@@ -251,12 +321,27 @@ func (s stack) rpcListSubnets(filter string) ([]*compute.Subnetwork, fail.Error)
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Subnetworks.List(s.GcpConfig.ProjectID, s.GcpConfig.Region).Filter(filter).PageToken(token).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 		if xerr != nil {
-			return nil, xerr
+			switch xerr.(type) {
+			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+				return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+				return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+			default:
+				return nil, xerr
+			}
 		}
 
 		out = append(out, resp.Items...)
@@ -276,12 +361,27 @@ func (s stack) rpcGetFirewallRuleByName(name string) (*compute.Firewall, fail.Er
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Firewalls.Get(s.GcpConfig.ProjectID, name).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return nil, xerr
+		}
 	}
 	return resp, nil
 }
@@ -296,12 +396,27 @@ func (s stack) rpcGetFirewallRuleByID(id string) (*compute.Firewall, fail.Error)
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Firewalls.List(s.GcpConfig.ProjectID).Filter(filter).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return nil, xerr
+		}
 	}
 
 	if len(resp.Items) == 0 {
@@ -357,12 +472,27 @@ func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, directi
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Firewalls.Insert(s.GcpConfig.ProjectID, &request).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return nil, xerr
+		}
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
@@ -400,12 +530,27 @@ func (s stack) rpcListFirewallRules(networkRef string, ids []string) ([]*compute
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Firewalls.List(s.GcpConfig.ProjectID).Filter(filter).PageToken(token).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 		if xerr != nil {
-			return []*compute.Firewall{}, xerr
+			switch xerr.(type) {
+			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+				return []*compute.Firewall{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+				return []*compute.Firewall{}, fail.Wrap(fail.Cause(xerr), "timeout")
+			default:
+				return []*compute.Firewall{}, xerr
+			}
 		}
 		if len(resp.Items) > 0 {
 			out = append(out, resp.Items...)
@@ -426,12 +571,27 @@ func (s stack) rpcDeleteFirewallRuleByID(id string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Firewalls.Delete(s.GcpConfig.ProjectID, id).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), temporal.GetHostTimeout())
@@ -449,12 +609,27 @@ func (s stack) rpcEnableFirewallRuleByName(name string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Firewalls.Patch(s.GcpConfig.ProjectID, name, &request).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
@@ -472,12 +647,27 @@ func (s stack) rpcDisableFirewallRuleByName(name string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Firewalls.Patch(s.GcpConfig.ProjectID, name, &request).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
@@ -492,6 +682,14 @@ func (s stack) rpcGetNetworkByID(id string) (*compute.Network, fail.Error) {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Networks.Get(s.GcpConfig.ProjectID, id).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
@@ -510,13 +708,29 @@ func (s stack) rpcGetNetworkByName(name string) (*compute.Network, fail.Error) {
 	var resp *compute.Network
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.ComputeService.Networks.Get(s.GcpConfig.ProjectID, name).Do()
-			return err
+			ans, err := s.ComputeService.Networks.Get(s.GcpConfig.ProjectID, name).Do()
+			if err != nil {
+				return err
+			}
+			if ans != nil {
+				resp = ans
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
+			return nil
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return &compute.Network{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return &compute.Network{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return &compute.Network{}, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return &compute.Network{}, xerr
+		}
 	}
 	return resp, nil
 }
@@ -531,12 +745,27 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Networks.Insert(s.GcpConfig.ProjectID, &request).Context(context.Background()).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return nil, xerr
+		}
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout()); xerr != nil {
@@ -547,12 +776,27 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			out, err = s.ComputeService.Networks.Get(s.GcpConfig.ProjectID, name).Do()
+			if err != nil {
+				return err
+			}
+			if out != nil {
+				if out.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", out.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return nil, xerr
+		}
 	}
 	return out, nil
 }
@@ -566,12 +810,27 @@ func (s stack) rpcGetRouteByName(name string) (*compute.Route, fail.Error) {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Routes.Get(s.GcpConfig.ProjectID, name).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return nil, xerr
+		}
 	}
 	return resp, nil
 }
@@ -601,12 +860,27 @@ func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*comput
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Routes.Insert(s.GcpConfig.ProjectID, &request).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return nil, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return nil, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return nil, xerr
+		}
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout()); xerr != nil {
@@ -625,12 +899,27 @@ func (s stack) rpcDeleteRoute(name string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Routes.Delete(s.GcpConfig.ProjectID, name).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
@@ -649,12 +938,27 @@ func (s stack) rpcListImages() ([]*compute.Image, fail.Error) {
 			xerr := stacks.RetryableRemoteCall(
 				func() (err error) {
 					resp, err = s.ComputeService.Images.List(f).Filter(filter).PageToken(token).Do()
+					if err != nil {
+						return err
+					}
+					if resp != nil {
+						if resp.HTTPStatusCode != 200 {
+							logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+						}
+					}
 					return err
 				},
 				normalizeError,
 			)
 			if xerr != nil {
-				return []*compute.Image{}, xerr
+				switch xerr.(type) {
+				case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+					return []*compute.Image{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
+				case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+					return []*compute.Image{}, fail.Wrap(fail.Cause(xerr), "timeout")
+				default:
+					return []*compute.Image{}, xerr
+				}
 			}
 			out = append(out, resp.Items...)
 			if token = resp.NextPageToken; token == "" {
@@ -680,12 +984,27 @@ func (s stack) rpcGetImageByID(id string) (*compute.Image, fail.Error) {
 			xerr := stacks.RetryableRemoteCall(
 				func() (err error) {
 					resp, err = s.ComputeService.Images.List(f).Filter(filter).PageToken(token).Do()
+					if err != nil {
+						return err
+					}
+					if resp != nil {
+						if resp.HTTPStatusCode != 200 {
+							logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+						}
+					}
 					return err
 				},
 				normalizeError,
 			)
 			if xerr != nil {
-				return &compute.Image{}, xerr
+				switch xerr.(type) {
+				case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+					return &compute.Image{}, fail.Wrap(fail.Cause(xerr), "stopping retries")
+				case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+					return &compute.Image{}, fail.Wrap(fail.Cause(xerr), "timeout")
+				default:
+					return &compute.Image{}, xerr
+				}
 			}
 			out = append(out, resp.Items...)
 			if token = resp.NextPageToken; token == "" {
@@ -708,15 +1027,31 @@ func (s stack) rpcListMachineTypes() ([]*compute.MachineType, fail.Error) {
 		resp *compute.MachineTypeList
 	)
 	for token := ""; ; {
+		zero := []*compute.MachineType{}
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.MachineTypes.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 		if xerr != nil {
-			return []*compute.MachineType{}, xerr
+			switch xerr.(type) {
+			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+				return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+				return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+			default:
+				return zero, xerr
+			}
 		}
 		out = append(out, resp.Items...)
 		if token = resp.NextPageToken; token == "" {
@@ -732,15 +1067,31 @@ func (s stack) rpcGetMachineType(id string) (*compute.MachineType, fail.Error) {
 	}
 
 	var resp *compute.MachineType
+	zero := &compute.MachineType{}
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.MachineTypes.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return &compute.MachineType{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 	return resp, nil
 }
@@ -751,15 +1102,31 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 		resp *compute.InstanceList
 	)
 	for token := ""; ; {
+		zero := []*compute.Instance{}
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Instances.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 		if xerr != nil {
-			return []*compute.Instance{}, xerr
+			switch xerr.(type) {
+			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+				return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+				return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+			default:
+				return zero, xerr
+			}
 		}
 		if len(resp.Items) > 0 {
 			out = append(out, resp.Items...)
@@ -771,7 +1138,8 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, xerr fail.Error) {
+func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, ferr fail.Error) {
+	var xerr fail.Error
 	var tags []string
 	for k := range sgs {
 		tags = append(tags, k)
@@ -847,21 +1215,37 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	}
 
 	var op *compute.Operation
+	zero := &compute.Instance{}
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Instances.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Zone, &request).Do()
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return &compute.Instance{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteInstance(name); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "Cleaning up on failure, failed to delete instance '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "Cleaning up on failure, failed to delete instance '%s'", name))
 			}
 		}
 	}()
@@ -875,12 +1259,27 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, name).IfNoneMatch(etag).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return &compute.Instance{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 
 	return resp, nil
@@ -891,12 +1290,27 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, id).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	// remove startup-script from metadata to prevent it to rerun at reboot (standard behaviour in GCP)
@@ -914,13 +1328,25 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
-				_, err = s.ComputeService.Instances.SetMetadata(s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata).Do()
+				op, err := s.ComputeService.Instances.SetMetadata(s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata).Do()
+				if op != nil {
+					if op.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 		if xerr != nil {
-			return xerr
+			switch xerr.(type) {
+			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+				return fail.Wrap(fail.Cause(xerr), "stopping retries")
+			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+				return fail.Wrap(fail.Cause(xerr), "timeout")
+			default:
+				return xerr
+			}
 		}
 	}
 	return nil
@@ -930,10 +1356,19 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 		Name: name,
 	}
 	var op *compute.Operation
+	zero := &compute.Address{}
 	if global {
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
 				op, err = s.ComputeService.GlobalAddresses.Insert(s.GcpConfig.ProjectID, &query).Do()
+				if err != nil {
+					return err
+				}
+				if op != nil {
+					if op.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
@@ -942,13 +1377,28 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
 				op, err = s.ComputeService.Addresses.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Region, &query).Do()
+				if err != nil {
+					return err
+				}
+				if op != nil {
+					if op.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 	}
 	if xerr != nil {
-		return &compute.Address{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
@@ -960,6 +1410,14 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.GlobalAddresses.Get(s.GcpConfig.ProjectID, name).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
@@ -968,13 +1426,28 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Addresses.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 	}
 	if xerr != nil {
-		return &compute.Address{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 
 	return resp, nil
@@ -986,15 +1459,31 @@ func (s stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
 	}
 
 	var resp *compute.Instance
+	zero := &compute.Instance{}
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return &compute.Instance{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 	return resp, nil
 }
@@ -1010,12 +1499,27 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Instances.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, instance.Name).Do()
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to delete instance '%s'", instance.Name)
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout()); xerr != nil {
@@ -1037,10 +1541,19 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 
 func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
 	var resp *compute.Address
+	zero := &compute.Address{}
 	if global {
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.GlobalAddresses.Get(s.GcpConfig.ProjectID, name).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
@@ -1049,35 +1562,82 @@ func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Addre
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Addresses.Get(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 	}
 	if xerr != nil {
-		return &compute.Address{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 	return resp, nil
 }
 
 func (s stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
 	if global {
-		return stacks.RetryableRemoteCall(
+		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
-				_, err = s.ComputeService.GlobalAddresses.Delete(s.GcpConfig.ProjectID, name).Do()
+				op, err := s.ComputeService.GlobalAddresses.Delete(s.GcpConfig.ProjectID, name).Do()
+				if op != nil {
+					if op.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+				return fail.Wrap(fail.Cause(xerr), "stopping retries")
+			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+				return fail.Wrap(fail.Cause(xerr), "timeout")
+			default:
+				return xerr
+			}
+		}
+		return nil
 	}
 
-	return stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			_, err = s.ComputeService.Addresses.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
+			op, err := s.ComputeService.Addresses.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Region, name).Do()
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
+	}
+	return nil
 }
 
 func (s stack) rpcStopInstance(ref string) fail.Error {
@@ -1089,12 +1649,27 @@ func (s stack) rpcStopInstance(ref string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Instances.Stop(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
@@ -1109,12 +1684,27 @@ func (s stack) rpcStartInstance(ref string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Instances.Start(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
@@ -1129,12 +1719,27 @@ func (s stack) rpcListZones() ([]*compute.Zone, fail.Error) {
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Zones.List(s.GcpConfig.ProjectID).PageToken(token).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 		if xerr != nil {
-			return emptySlice, xerr
+			switch xerr.(type) {
+			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+				return emptySlice, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+				return emptySlice, fail.Wrap(fail.Cause(xerr), "timeout")
+			default:
+				return emptySlice, xerr
+			}
 		}
 		out = append(out, resp.Items...)
 		if token = resp.NextPageToken; token == "" {
@@ -1150,15 +1755,31 @@ func (s stack) rpcListRegions() ([]*compute.Region, fail.Error) {
 		resp *compute.RegionList
 	)
 	for token := ""; ; {
+		zero := []*compute.Region{}
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Regions.List(s.GcpConfig.ProjectID).PageToken(token).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 		if xerr != nil {
-			return []*compute.Region{}, xerr
+			switch xerr.(type) {
+			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+				return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+				return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+			default:
+				return zero, xerr
+			}
 		}
 		out = append(out, resp.Items...)
 		if token = resp.NextPageToken; token == "" {
@@ -1180,12 +1801,27 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostID).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	newTags := resp.Tags
@@ -1206,12 +1842,27 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Instances.SetTags(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostID, newTags).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
@@ -1229,12 +1880,27 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostID).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	newTags := resp.Tags
@@ -1255,12 +1921,27 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			opp, err = s.ComputeService.Instances.SetTags(s.GcpConfig.ProjectID, s.GcpConfig.Zone, hostID, newTags).Do()
+			if err != nil {
+				return err
+			}
+			if opp != nil {
+				if opp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", opp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
@@ -1272,15 +1953,31 @@ func (s stack) rpcListNetworks() (_ []*compute.Network, xerr fail.Error) {
 		resp *compute.NetworkList
 	)
 	for token := ""; ; {
+		zero := []*compute.Network{}
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()
+				if err != nil {
+					return err
+				}
+				if resp != nil {
+					if resp.HTTPStatusCode != 200 {
+						logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+					}
+				}
 				return err
 			},
 			normalizeError,
 		)
 		if xerr != nil {
-			return []*compute.Network{}, xerr
+			switch xerr.(type) {
+			case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+				return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+			case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+				return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+			default:
+				return zero, xerr
+			}
 		}
 
 		out = append(out, resp.Items...)
@@ -1301,15 +1998,27 @@ func (s stack) rpcDeleteNetworkByID(id string) (xerr fail.Error) {
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Networks.Delete(s.GcpConfig.ProjectID, id).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
-	}
-	if resp == nil {
-		return fail.NotFoundError("failed to find Network with ID %s", id)
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(resp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
@@ -1324,15 +2033,31 @@ func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail
 		Zone:   s.GcpConfig.Zone,
 	}
 	var op *compute.Operation
+	zero := &compute.Disk{}
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Disks.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Zone, &request).Do()
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return &compute.Disk{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
@@ -1348,15 +2073,31 @@ func (s stack) rpcGetDisk(ref string) (*compute.Disk, fail.Error) {
 	}
 
 	var resp *compute.Disk
+	zero := &compute.Disk{}
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.ComputeService.Disks.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
+			if err != nil {
+				return err
+			}
+			if resp != nil {
+				if resp.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", resp.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return &compute.Disk{}, xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 	if resp == nil {
 		return &compute.Disk{}, fail.NotFoundError("failed to find Volume named '%s'", ref)
@@ -1372,12 +2113,27 @@ func (s stack) rpcDeleteDisk(ref string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Disks.Delete(s.GcpConfig.ProjectID, s.GcpConfig.Zone, ref).Do()
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
@@ -1406,15 +2162,31 @@ func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Er
 		Source:     disk.SelfLink,
 	}
 	var op *compute.Operation
+	zero := ""
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Instances.AttachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, instance.Name, &request).Do()
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return "", xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return zero, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return zero, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return zero, xerr
+		}
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
@@ -1436,12 +2208,27 @@ func (s stack) rpcDeleteDiskAttachment(vaID string) fail.Error {
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
 			op, err = s.ComputeService.Instances.DetachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverName, diskName).Do()
+			if err != nil {
+				return err
+			}
+			if op != nil {
+				if op.HTTPStatusCode != 200 {
+					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
+				}
+			}
 			return err
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return xerr
+		}
 	}
 
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())

@@ -35,9 +35,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -129,6 +129,12 @@ func (instance *bucket) IsNull() bool {
 
 // carry ...
 func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
@@ -143,7 +149,7 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -154,7 +160,6 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
-
 		}
 	}()
 
@@ -191,11 +196,12 @@ func (instance *bucket) GetHost(ctx context.Context) (_ string, xerr fail.Error)
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
 		default:
+			return "", xerr
 		}
-	}
-	if xerr != nil {
-		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -238,11 +244,12 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
 		default:
+			return "", xerr
 		}
-	}
-	if xerr != nil {
-		return "", xerr
 	}
 
 	if task.Aborted() {
@@ -272,8 +279,16 @@ func (instance *bucket) GetMountPoint(ctx context.Context) (string, fail.Error) 
 func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	if instance == nil {
 		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		bucketName := instance.GetName()
+		if bucketName != "" {
+			return fail.NotAvailableError("already carrying Share '%s'", bucketName)
+		}
+		return fail.InvalidInstanceContentError("s", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -288,11 +303,12 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -338,11 +354,12 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	tracer := debug.NewTracer(task, true, "").WithStopwatch().Entering()
@@ -376,11 +393,12 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -467,11 +485,12 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -542,7 +561,7 @@ func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Er
 	}
 
 	var buffer bytes.Buffer
-	err = tpl.Execute(&buffer, data)
+	err = tpl.Option("missingkey=error").Execute(&buffer, data)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)

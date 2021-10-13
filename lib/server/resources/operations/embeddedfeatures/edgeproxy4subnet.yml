@@ -38,7 +38,6 @@ feature:
                             curl -Ssl -I -k https://localhost:8444/ 2>&1 | grep HTTP | grep 200 | grep OK &>/dev/null || sfFail 192
 
             add:
-#                pace: config,secret,networks,start
                 pace: config,networks,start
                 steps:
                     config:
@@ -113,23 +112,7 @@ feature:
                             ENTRYPOINT ["/my-docker-entrypoint.sh"]
                             CMD ["kong", "docker-start"]
                             EOF
-                            docker build --network=host -t edgeproxy4subnet:latest ${SF_ETCDIR}/edgeproxy4subnet
-
-                            # cat >${SF_ETCDIR}/edgeproxy4subnet/konga.userdb.data <<-EOF
-                            # module.exports = [
-                            #     {
-                            #         "username": "safescale",
-                            #         "email": "{{ .ClusterAdminUsername }}@safescale",
-                            #         "firstName": "SafeScale",
-                            #         "lastName": "Administrator",
-                            #         "node_id": "https://127.0.0.1:8444",
-                            #         "admin": true,
-                            #         "active" : true,
-                            #         "password": "{{.Password}}"
-                            #     }
-                            # ]
-                            # EOF
-                            # chmod go-rwx ${SF_ETCDIR}/edgeproxy4subnet/konga.userdb.data
+                            sfRetryEx 15m 5 docker build --network=host -t edgeproxy4subnet:latest ${SF_ETCDIR}/edgeproxy4subnet
 
                             cat >${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml <<-EOF
                             version: '2.1'
@@ -153,7 +136,7 @@ feature:
                                     volumes:
                                         - ${SF_ETCDIR}/edgeproxy4subnet/kong.conf:/etc/kong/kong.conf:ro
                                         - ${SF_ETCDIR}/edgeproxy4subnet/includes:/etc/kong/includes:ro
-                                    network_mode: "host"
+                                    # network_mode: "host"
                                     ports:
                                         - "0.0.0.0:443:443"
                                         - "{{ .HostIP }}:6443:6443"
@@ -163,50 +146,7 @@ feature:
                                         test: ["CMD-SHELL", "curl -I -s -k -L https://127.0.0.1:8444 || sfFail 1"]
                                         interval: 5s
                                         retries: 10
-                            #         secrets:
-                            #             - safescale.postgresxl.password
-                            #             - safescale.edgeproxy.db_password
-
-                            # secrets:
-                            #     safescale.postgresxl.password:
-                            #         external: true
-                            #     safescale.edgeproxy.db_password:
-                            #         external: true
-
-                            # networks:
-                            #     safescale-gw:
-                            #         external: true
                             EOF
-
-                                # gui:
-                                #     image: pantsel/konga
-                                #     volumes:
-                                #         - ${SF_ETCDIR}/edgeproxy4subnet/konga.userdb.data:/usr/local/etc/userdb.data:ro
-                                #     environment:
-                                #         - TOKEN_SECRET="$(sfRandomString 32 [:alnum:])"
-                                #         - DB_ADAPTER=postgres
-                                #         - DB_DATABASE=edgeproxy4subnet-gui
-                                #         - DB_USER=edgeproxy4subnet
-                                #         - DB_PASSWORD="${DB_PASSWORD}"
-                                #         - NODE_ENV=production
-                                #         - KONGA_SEED_USER_DATA_SOURCE_FILE=/usr/local/etc/userdb.data
-                                #     network:
-                                #         - safescale-gw
-                                #     ports:
-                                #         - target: 1337
-                                #           published: 1337
-                                #           protocol: tcp
-                                #           mode: "host"
-                                #     deploy:
-                                #         mode: global
-                                #         placement:
-                                #             constraints:
-                                #                 - node.role == manager
-                                #         restart_policy:
-                                #             condition: on-failure
-                                #             delay: 5s
-                                #             max_attempts: 3
-                                #             window: 120s
 
                             chmod go-rwx ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml
 
@@ -220,38 +160,10 @@ feature:
                             EOF
                             sfExit
 
-                    # secret:
-                    #     targets:
-                    #         hosts: no
-                    #         gateways: any
-                    #         masters: no
-                    #         nodes: no
-                    #     run: |
-                    #         docker secret rm safescale.edgeproxy.db_password &>/dev/null || true
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create safescale.edgeproxy.db_password - &>/dev/null || sfFail 192
-                    #         sfExit
-
                     networks:
                         targets:
                             gateways: all
                         run: |
-                            # {{ if .ClusterFlavor }}
-                            # IMAGE=kong4safescale
-                            # KONG_PUB_BRIDGE=br_k4s_pub
-                            # KONG_DB_BRIDGE=br_k4s_db
-                            # {{ else }}
-                            # IMAGE=kong
-                            # KONG_PUB_BRIDGE=br_k_pub
-                            # KONG_DB_BRIDGE=br_k_db
-                            # {{ end}}
-                            # KONG_PUB_NET="${IMAGE}_pubnet"
-                            # KONG_DB_NET="${IMAGE}_dbnet"
-
-                            # docker network create --driver bridge --attachable --opt "com.docker.network.bridge.name=${KONG_PUB_BRIDGE}" ${KONG_PUB_NET}
-                            # docker network create --driver bridge --attachable --internal --opt "com.docker.network.bridge.name=${KONG_DB_BRIDGE}" ${KONG_DB_NET}
-
-                            # sfFirewallAdd --zone=trusted --add-interface=${KONG_PUB_BRIDGE} && \
-                            # sfFirewallAdd --zone=trusted --add-interface=${KONG_DB_BRIDGE} && \
                             sfFirewallAdd --zone=public --add-service=https && sfFirewallReload || sfFail 204 "Firewall problem"
                             sfExit
 
@@ -260,8 +172,8 @@ feature:
                             gateways: all
                         run: |
                             echo "docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                            docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
-                            sfRetry 5m 5 "sfDoesDockerRunContainer edgeproxy4subnet:latest edgeproxy4subnet_proxy_1" || sfFail 194
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 193
+                            sfRetryEx 5m 5 "sfDoesDockerRunContainer edgeproxy4subnet:latest edgeproxy4subnet_proxy_1" || sfFail 194
                             sfExit
 
             remove:
@@ -273,7 +185,7 @@ feature:
                         run: |
                             if [ -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml ]; then
                                 echo "docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                                docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
+                                sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/edgeproxy4subnet/docker-compose.yml -p edgeproxy4subnet rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
                                 # docker secret rm safescale.edgeproxy.db_password &>/dev/null
                                 docker image rm -f edgeproxy4subnet:latest
                                 rm -rf ${SF_ETCDIR}/edgeproxy4subnet
@@ -281,13 +193,13 @@ feature:
                             else
                                 if [ -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml ]; then
                                     echo "docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                                    docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
+                                    sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/kong4gateway/docker-compose.yml -p kong4gateway rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 196
                                     docker image rm -f kong4gateway:latest
                                     rm -rf ${SF_ETCDIR}/kong4gateway
                                 fi
                                 if [ -f ${SF_ETCDIR}/kong/docker-compose.yml ]; then
                                     echo "docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml -p kong rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
-                                    docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml -p kong rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 197
+                                    sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/kong/docker-compose.yml -p kong rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 197
                                     docker image rm -f kong:latest
                                     rm -rf ${SF_ETCDIR}/kong
                                 fi
@@ -298,20 +210,7 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            # {{ if .ClusterFlavor }}
-                            # KONG_PUB_BRIDGE=br_k4s_pub
-                            # KONG_DB_BRIDGE=br_k4s_db
-                            # {{ else }}
-                            # KONG_PUB_BRIDGE=br_k_pub
-                            # KONG_BRIDGE=br_k_db
-                            # {{ end}}
-
-                            # sfFirewallAdd --zone=trusted --remove-interface=${KONG_PUB_BRIDGE} && \
-                            # sfFirewallAdd --zone=trusted --remove-interface=${KONG_DB_BRIDGE} && \
                             sfFirewallAdd --zone=public --remove-service=https && sfFirewallReload || sfFail 204 "Firewall problem"
-
-                            # docker network rm ${KONG_PUB_BRIDGE}
-                            # docker network rm ${KONG_DB_BRIDGE}
                             sfExit
 
     security:

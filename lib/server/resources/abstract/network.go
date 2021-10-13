@@ -47,6 +47,7 @@ type Network struct {
 	Name       string   `json:"name"`                  // name of the network
 	CIDR       string   `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
 	DNSServers []string `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
+	Imported   bool     `json:"imported,omitempty"`    // tells if the Network has been imported (making it not deleteable by SafeScale)
 
 	Domain             string         `json:"domain,omitempty"`               // DEPRECATED: contains the domain used to define host FQDN
 	GatewayID          string         `json:"gateway_id,omitempty"`           // DEPRECATED: contains the id of the host acting as primary gateway for the network

@@ -20,6 +20,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
@@ -33,24 +35,30 @@ import (
 )
 
 // CreateVolume ...
-func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if s.IsNull() {
 		return nullAV, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.volume"), "(%v)", request).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitLogError(&xerr)
+	defer fail.OnExitLogError(&ferr)
 
-	resp, xerr := s.rpcCreateVolume(aws.String(request.Name), int64(request.Size), fromAbstractVolumeSpeed(request.Speed))
+	volumeType, minSize := fromAbstractVolumeSpeed(request.Speed)
+	if request.Size < minSize {
+		logrus.Infof("AWS minimum size for requested volume type is %d (%d requested); using minimum size", minSize, request.Size)
+		request.Size = 125
+	}
+
+	resp, xerr := s.rpcCreateVolume(aws.String(request.Name), int64(request.Size), volumeType)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", request.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", request.Name))
 			}
 		}
 	}()
@@ -64,7 +72,6 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	}
 	return &volume, nil
 }
-
 
 // InspectVolume ...
 func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
@@ -121,14 +128,14 @@ func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
 	return &volume, nil
 }
 
-func fromAbstractVolumeSpeed(speed volumespeed.Enum) string {
+func fromAbstractVolumeSpeed(speed volumespeed.Enum) (string, int) {
 	switch speed {
 	case volumespeed.Cold:
-		return "sc1"
+		return "sc1", 125
 	case volumespeed.Ssd:
-		return "gp2"
+		return "gp2", 1
 	}
-	return "st1"
+	return "st1", 125
 }
 
 func toAbstractVolumeSpeed(t *string) volumespeed.Enum {
@@ -259,14 +266,13 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.network"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr)
 
-
 	availableDevices := initAvailableDevices()
 	var resp *ec2.VolumeAttachment
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			var (
 				deviceName string
-				innerXErr fail.Error
+				innerXErr  fail.Error
 			)
 			deviceName, availableDevices, innerXErr = s.findNextAvailableDevice(request.HostID, availableDevices)
 			if xerr != nil {
@@ -344,7 +350,7 @@ func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]
 		deviceName = "xvd"
 	}
 	deviceName += availableKeys[0]
-	delete(availableSlots, availableKeys[0])    // selected, remove it from availableSlots for optional next rounds
+	delete(availableSlots, availableKeys[0]) // selected, remove it from availableSlots for optional next rounds
 	return deviceName, availableSlots, nil
 }
 

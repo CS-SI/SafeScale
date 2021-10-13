@@ -18,11 +18,8 @@ package iaas
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"regexp"
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -33,6 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -60,7 +58,7 @@ func GetTenantNames() (map[string]string, fail.Error) {
 }
 
 // GetTenants returns all known tenants
-func GetTenants() ([]interface{}, fail.Error) {
+func GetTenants() ([]map[string]interface{}, fail.Error) {
 	tenants, _, err := getTenantsFromCfg()
 	if err != nil {
 		return nil, err
@@ -87,8 +85,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		svcProvider    = "__not_found__"
 	)
 
-	for _, t := range tenants {
-		tenant, _ := t.(map[string]interface{})
+	for _, tenant := range tenants {
 		name, found = tenant["name"].(string)
 		if !found {
 			logrus.Error("tenant found without 'name'")
@@ -136,25 +133,51 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		if xerr != nil {
 			return NullService(), fail.Wrap(xerr, "error initializing tenant '%s' on provider '%s'", tenantName, provider)
 		}
-		serviceCfg, xerr := providerInstance.GetConfigurationOptions()
+
+		newS := &service{
+			Provider:   providerInstance,
+			cache:      serviceCache{map[string]*ResourceCache{}},
+			cacheLock:  &sync.Mutex{},
+			tenantName: tenantName,
+		}
+
+		// allRegions, xerr := newS.ListRegions()
+		// if xerr != nil {
+		// 	switch xerr.(type) {
+		// 	case *fail.ErrNotFound:
+		// 		break
+		// 	default:
+		// 		return NullService(), xerr
+		// 	}
+		// }
+
+		authOpts, xerr := providerInstance.GetAuthenticationOptions()
 		if xerr != nil {
 			return NullService(), xerr
 		}
 
+		// Validate region parameter in compute section
+		// VPL: does not work with Outscale "cloudgouv"...
+		// computeRegion := authOpts.GetString("Region")
+		// xerr = validateRegionName(computeRegion, allRegions)
+		// if xerr != nil {
+		// 	return NullService(), fail.Wrap(xerr, "invalid region in section 'compute'")
+		// }
+
 		// Initializes Object Storage
-		var (
-			objectStorageLocation objectstorage.Location
-			authOpts              providers.Config
-		)
+		var objectStorageLocation objectstorage.Location
 		if tenantObjectStorageFound {
-			authOpts, xerr = providerInstance.GetAuthenticationOptions()
-			if xerr != nil {
-				return NullService(), xerr
-			}
 			objectStorageConfig, xerr := initObjectStorageLocationConfig(authOpts, tenant)
 			if xerr != nil {
 				return NullService(), xerr
 			}
+
+			// VPL: disable region validation, may need to update allRegions for objectstorage/metadata)
+			// xerr = validateRegionName(objectStorageConfig.Region, allRegions)
+			// if xerr != nil {
+			// 	return nil, fail.Wrap(xerr, "invalid region in section 'objectstorage")
+			// }
+
 			objectStorageLocation, xerr = objectstorage.NewLocation(objectStorageConfig)
 			if xerr != nil {
 				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location")
@@ -175,12 +198,23 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 				return NullService(), err
 			}
 
+			// VPL: disable region validation, may need to update allRegions for objectstorage/metadata)
+			// xerr = validateRegionName(metadataLocationConfig.Region, allRegions)
+			// if xerr != nil {
+			// 	return nil, fail.Wrap(xerr, "invalid region in section 'metadata'")
+			// }
+
 			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
 			if err != nil {
 				return NullService(), fail.Wrap(err, "error connecting to Object Storage location to store metadata")
 			}
 
 			if metadataLocationConfig.BucketName == "" {
+				serviceCfg, xerr := providerInstance.GetConfigurationOptions()
+				if xerr != nil {
+					return NullService(), xerr
+				}
+
 				anon, found := serviceCfg.Get("MetadataBucketName")
 				if !found {
 					return NullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
@@ -232,22 +266,34 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		}
 
 		// service is ready
-		newS := &service{
-			Provider:       providerInstance,
-			Location:       objectStorageLocation,
-			metadataBucket: metadataBucket,
-			metadataKey:    metadataCryptKey,
-			cache:          serviceCache{map[string]*ResourceCache{}},
-			cacheLock:      &sync.Mutex{},
-			tenantName:     tenantName,
-		}
-		return newS, validateRegexps(newS /*tenantClient*/, tenant)
+		newS.Location = objectStorageLocation
+		newS.metadataBucket = metadataBucket
+		newS.metadataKey = metadataCryptKey
+
+		return newS, validateRegexps(newS, tenant)
 	}
 
 	if !tenantInCfg {
 		return NullService(), fail.NotFoundError("tenant '%s' not found in configuration", tenantName)
 	}
 	return NullService(), fail.NotFoundError("provider builder for '%s'", svcProvider)
+}
+
+// validateRegionName validates the availability of the region passed as parameter
+func validateRegionName(name string, allRegions []string) fail.Error {
+	if len(allRegions) > 0 {
+		regionIsValidInput := false
+		for _, vr := range allRegions {
+			if name == vr {
+				regionIsValidInput = true
+			}
+		}
+		if !regionIsValidInput {
+			return fail.NotFoundError("region '%s' not found", name)
+		}
+	}
+
+	return nil
 }
 
 // validateRegexps validates regexp values from tenants file
@@ -384,9 +430,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 	if config.Region, ok = ostorage["Region"].(string); !ok {
 		config.Region, _ = compute["Region"].(string)
-		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-			return config, err
-		}
+		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+		// 	return config, err
+		// }
 	}
 
 	if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
@@ -427,18 +473,18 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	return config, nil
 }
 
-func validateOVHObjectStorageRegionNaming(context, region, authURL string) fail.Error {
-	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
-	// Object Storage regions don't contain anymore an index like compute regions
-	if strings.Contains(authURL, "ovh.") {
-		rLen := len(region)
-		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
-			region = region[:rLen-1]
-			return fail.InvalidRequestError(fmt.Sprintf(`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`, context, region))
-		}
-	}
-	return nil
-}
+// func validateOVHObjectStorageRegionNaming(context, region, authURL string) fail.Error {
+// 	// If AuthURL contains OVH, special treatment due to change in object storage 'region'-ing since 2020/02/17
+// 	// Object Storage regions don't contain anymore an index like compute regions
+// 	if strings.Contains(authURL, "ovh.") {
+// 		rLen := len(region)
+// 		if _, err := strconv.Atoi(region[rLen-1:]); err == nil {
+// 			region = region[:rLen-1]
+// 			return fail.InvalidRequestError(fmt.Sprintf(`region names for OVH Object Storage have changed since 2020/02/17. Please set or update the %s tenant definition with 'Region = "%s"'.`, context, region))
+// 		}
+// 	}
+// 	return nil
+// }
 
 // initMetadataLocationConfig initializes objectstorage.Config struct with map
 func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]interface{}) (objectstorage.Config, fail.Error) {
@@ -553,9 +599,9 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		if config.Region, ok = ostorage["Region"].(string); !ok {
 			config.Region, _ = compute["Region"].(string)
 		}
-		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-			return config, err
-		}
+		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
+		// 	return config, err
+		// }
 	}
 
 	if config.AvailabilityZone, ok = metadata["AvailabilityZone"].(string); !ok {
@@ -605,8 +651,7 @@ func loadConfig() fail.Error {
 	if err != nil {
 		return err
 	}
-	for _, t := range tenantsCfg {
-		tenant, _ := t.(map[string]interface{})
+	for _, tenant := range tenantsCfg {
 		if name, ok := tenant["name"].(string); ok {
 			if provider, ok := tenant["client"].(string); ok {
 				allTenants[name] = provider
@@ -620,7 +665,7 @@ func loadConfig() fail.Error {
 	return nil
 }
 
-func getTenantsFromCfg() ([]interface{}, *viper.Viper, fail.Error) {
+func getTenantsFromCfg() ([]map[string]interface{}, *viper.Viper, fail.Error) {
 	v := viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("$HOME/.safescale")
@@ -633,7 +678,23 @@ func getTenantsFromCfg() ([]interface{}, *viper.Viper, fail.Error) {
 		logrus.Errorf(msg)
 		return nil, v, fail.SyntaxError(msg)
 	}
-	settings := v.AllSettings()
-	tenantsCfg, _ := settings["tenants"].([]interface{})
-	return tenantsCfg, v, nil
+	// settings := v.AllSettings()
+
+	var tenantsCfg []map[string]interface{}
+	err := v.UnmarshalKey("tenants", &tenantsCfg)
+	if err != nil {
+		return nil, v, fail.SyntaxError("failed to convert tenants file to map[string]interface{}")
+	}
+
+	jsoned, err := json.Marshal(tenantsCfg)
+	if err != nil {
+		return nil, v, fail.ConvertError(err)
+	}
+
+	var out []map[string]interface{}
+	err = json.Unmarshal(jsoned, &out)
+	if err != nil {
+		return nil, v, fail.ConvertError(err)
+	}
+	return out, v, nil
 }

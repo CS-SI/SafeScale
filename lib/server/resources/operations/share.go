@@ -17,18 +17,16 @@
 package operations
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"path"
 	"reflect"
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
-
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
@@ -39,8 +37,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 const (
@@ -154,21 +154,10 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 		return nil, xerr
 	}
 
-	options := []data.ImmutableKeyValue{
-		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-			rs, innerXErr := NewShare(svc)
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = rs.Read(ref); innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			return rs, nil
-		}),
-	}
+	options := iaas.CacheMissOption(
+		func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) },
+		temporal.GetMetadataTimeout(),
+	)
 	cacheEntry, xerr := shareCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -195,6 +184,21 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 	return rs, nil
 }
 
+// onShareCacheMiss is called when there is no instance in cache of Share 'ref'
+func onShareCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+	shareInstance, innerXErr := NewShare(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if innerXErr = shareInstance.Read(ref); innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	return shareInstance, nil
+}
+
 // IsNull tells if the instance should be considered as a null value
 func (instance *Share) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
@@ -202,6 +206,12 @@ func (instance *Share) IsNull() bool {
 
 // carry creates metadata and add Volume to service cache
 func (instance *Share) carry(clonable data.Clonable) (xerr fail.Error) {
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		return fail.InvalidInstanceContentError("instance", "is not null value, cannot overwrite")
+	}
 	if clonable == nil {
 		return fail.InvalidParameterCannotBeNilError("clonable")
 	}
@@ -216,7 +226,7 @@ func (instance *Share) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -253,7 +263,10 @@ func (instance *Share) carry(clonable data.Clonable) (xerr fail.Error) {
 func (instance *Share) Browse(ctx context.Context, callback func(string, string) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	// Note: Browse is intended to be callable from null value, so do not validate instance
+	// Note: Do not test with Isnull here, as Browse may be used from null value
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
@@ -267,11 +280,12 @@ func (instance *Share) Browse(ctx context.Context, callback func(string, string)
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -312,8 +326,16 @@ func (instance *Share) Create(
 
 	defer fail.OnPanic(&xerr)
 
-	if instance == nil || instance.IsNull() {
+	// note: do not test IsNull() here, it's expected to be IsNull() actually
+	if instance == nil {
 		return fail.InvalidInstanceError()
+	}
+	if !instance.IsNull() {
+		shareName := instance.GetName()
+		if shareName != "" {
+			return fail.NotAvailableError("already carrying Share '%s'", shareName)
+		}
+		return fail.InvalidInstanceContentError("instance", "is not null value")
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
@@ -331,11 +353,12 @@ func (instance *Share) Create(
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
-	}
-	if xerr != nil {
-		return xerr
 	}
 
 	if task.Aborted() {
@@ -612,11 +635,12 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	if task.Aborted() {
@@ -651,7 +675,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 		return nil, xerr
 	}
 
-	// serverID = rhServer.GetID()
+	// serverID = rhServer.ID()
 	// serverName = rhServer.GetName()
 	serverPrivateIP, xerr := rhServer.GetPrivateIP()
 	if xerr != nil {
@@ -1020,13 +1044,13 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
 		default:
+			return xerr
 		}
 	}
-	if xerr != nil {
-		return xerr
-	}
-
 	if task.Aborted() {
 		return fail.AbortedError(nil, "aborted")
 	}
@@ -1040,7 +1064,7 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 	)
 
 	// -- Retrieve info about the Share --
-	// Note: we do not use GetName() and GetID() to avoid 2 consecutive instance.Inspect()
+	// Note: we do not use GetName() and ID() to avoid 2 consecutive instance.Inspect()
 	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 		si, ok := clonable.(*ShareIdentity)
 		if !ok {

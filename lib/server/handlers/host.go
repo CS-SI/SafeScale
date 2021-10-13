@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 /*
@@ -31,10 +32,10 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 //go:generate mockgen -destination=../mocks/mock_hostapi.go -package=mocks github.com/CS-SI/SafeScale/lib/server/handlers HostHandler
@@ -66,6 +67,8 @@ func NewHostHandler(job server.Job) HostHandler {
 
 // Start starts a host
 func (handler *hostHandler) Start(ref string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -87,6 +90,8 @@ func (handler *hostHandler) Start(ref string) (xerr fail.Error) {
 
 // Stop stops a host
 func (handler *hostHandler) Stop(ref string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -111,6 +116,8 @@ func (handler *hostHandler) Stop(ref string) (xerr fail.Error) {
 
 // Reboot reboots a host
 func (handler *hostHandler) Reboot(ref string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -135,6 +142,8 @@ func (handler *hostHandler) Reboot(ref string) (xerr fail.Error) {
 
 // Resize ...
 func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequirements) (newHost resources.Host, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -149,7 +158,6 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s', %v)", ref, sizing).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	objh, xerr := hostfactory.Load(task, handler.job.Service(), ref)
 	if xerr != nil {
@@ -186,6 +194,7 @@ func (handler *hostHandler) Resize(ref string, sizing abstract.HostSizingRequire
 func (handler *hostHandler) Create(
 	req abstract.HostRequest, sizing abstract.HostSizingRequirements, force bool,
 ) (newHost resources.Host, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
@@ -212,7 +221,6 @@ func (handler *hostHandler) Create(
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s', '%s', '%s', %v, <sizingParam>, %v)", req.ResourceName, subnetName, req.ImageRef, req.PublicIP, force).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
 
 	hostInstance, xerr := hostfactory.New(handler.job.GetService())
 	if xerr != nil {
@@ -227,6 +235,8 @@ func (handler *hostHandler) Create(
 
 // List returns the host list
 func (handler *hostHandler) List(all bool) (hosts abstract.HostList, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -240,25 +250,13 @@ func (handler *hostHandler) List(all bool) (hosts abstract.HostList, xerr fail.E
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	return hostfactory.List(task, handler.job.Service(), all)
-	//if all {
-	//	return handler.job.Service().ListHosts(true)
-	//}
-	//
-	//objh, xerr := hostfactory.New(handler.job.GetService())
-	//if xerr != nil {
-	//	return nil, xerr
-	//}
-	//hosts = abstract.HostList{}
-	//xerr = objh.Browse(task, func(ahc *abstract.HostCore) fail.Error {
-	//	hosts = append(hosts, converters.HostCoreToHostFull(*ahc))
-	//	return nil
-	//})
-	//return hosts, xerr
 }
 
 // Inspect returns the host identified by ref, ref can be the name or the id
 // If not found, returns (nil, nil)
 func (handler *hostHandler) Inspect(ref string) (host resources.Host, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -287,6 +285,8 @@ func (handler *hostHandler) Inspect(ref string) (host resources.Host, xerr fail.
 
 // Delete deletes host referenced by ref
 func (handler *hostHandler) Delete(ref string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -301,7 +301,6 @@ func (handler *hostHandler) Delete(ref string) (xerr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.host"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	objh, xerr := hostfactory.Load(task, handler.job.Service(), ref)
 	if xerr != nil {
@@ -312,6 +311,8 @@ func (handler *hostHandler) Delete(ref string) (xerr fail.Error) {
 
 // SSH returns ssh parameters to access the host referenced by ref
 func (handler *hostHandler) SSH(ref string) (sshConfig *system.SSHConfig, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}

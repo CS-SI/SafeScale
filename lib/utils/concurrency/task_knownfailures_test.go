@@ -37,7 +37,7 @@ func TestRealCharge(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	gorrs := 800
+	gorrs := 200
 	abortOccurred := false
 	started := 0
 	for ind := 0; ind < gorrs; ind++ {
@@ -78,7 +78,7 @@ func TestRealCharges(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	gorrs := 800
+	gorrs := 200
 
 	ids := make(map[string]string)
 
@@ -87,7 +87,7 @@ func TestRealCharges(t *testing.T) {
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
-		ntId, xerr := nt.GetID()
+		ntId, xerr := nt.ID()
 		if xerr != nil {
 			t.Errorf("Unexpected: %v", xerr)
 		}
@@ -110,7 +110,7 @@ func TestRealCharges(t *testing.T) {
 		t.Errorf("This is open for interpretation, if we do a WaitFor and quit before finish waiting, should we offer partial results of those functions that finished, or not ?")
 	}
 
-	if len(res.(map[string]TaskResult)) != 800 {
+	if len(res.(map[string]TaskResult)) != 200 {
 		for k := range res.(map[string]TaskResult) {
 			if _, ok := ids[k]; !ok {
 				t.Errorf("Task with wrong ID: %s", k)
@@ -138,7 +138,7 @@ func TestRealTryCharges(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	gorrs := 800
+	gorrs := 200
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
@@ -176,7 +176,7 @@ func TestTryWaitRecoversErrorContent(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	gorrs := 800
+	gorrs := 200
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
@@ -225,7 +225,7 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithoutTimeout(t *testing.T) 
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	gorrs := 800
+	gorrs := 200
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
@@ -272,7 +272,7 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithTimeout(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	gorrs := 800
+	gorrs := 200
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.StartWithTimeout(taskgen(200, 250, 40, 0, 0, 0, false), nil, 190*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
@@ -312,7 +312,7 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithAbort(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	gorrs := 800
+	gorrs := 200
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.StartWithTimeout(taskgen(200, 250, 10, 0, 0, 0, false), nil, 190*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
@@ -354,7 +354,7 @@ func TestTryWaitRecoversErrorContentAlsoWhenRunningWithErrors(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotEmpty(t, theID)
 
-	gorrs := 800
+	gorrs := 200
 
 	for ind := 0; ind < gorrs; ind++ {
 		_, xerr := overlord.StartWithTimeout(taskgen(200, 250, 40, 0, 0.75, 0, false), nil, 190*time.Millisecond, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))

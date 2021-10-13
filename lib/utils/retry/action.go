@@ -25,13 +25,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const minNumRetries = 3
@@ -48,12 +49,8 @@ type action struct {
 	Officer *Officer
 	// Arbiter is called for every try to determine if next try is wanted
 	Arbiter Arbiter
-	// First is called before the loop of retries
-	First func() error
 	// Run is called for every try
 	Run func() error
-	// Last is called after the loop of retries (being successful or not)
-	Last func() error
 	// Notify
 	Notify Notify
 	// Timeout if any
@@ -82,14 +79,35 @@ func Action(
 		return fail.InvalidParameterError("officer", "cannot be nil!")
 	}
 
-	return action{
+	selector := DefaultTimeoutSelector()
+	return selector(action{
 		Officer: officer,
 		Arbiter: arbiter,
-		First:   first,
-		Last:    last,
 		Run:     run,
 		Notify:  notify,
-	}.loopWithSoftTimeout()
+	})
+}
+
+func TimeoutSelector(hard bool) func(action) fail.Error {
+	if hard {
+		return action.loopWithHardTimeout
+	}
+	return action.loopWithSoftTimeout
+}
+
+func DefaultTimeoutSelector() func(action) fail.Error {
+	if delayAlgo := os.Getenv("SAFESCALE_TIMEOUT_STYLE"); delayAlgo != "" {
+		switch delayAlgo {
+		case "Hard":
+			return TimeoutSelector(true)
+		case "Soft":
+			return TimeoutSelector(false)
+		default:
+			return TimeoutSelector(false)
+		}
+	}
+
+	return TimeoutSelector(false)
 }
 
 func BackoffSelector() Backoff {
@@ -128,15 +146,15 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 	} else {
 		arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
 	}
-	return action{
+
+	selector := DefaultTimeoutSelector()
+	return selector(action{
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
-		First:   nil,
-		Last:    nil,
 		Notify:  nil,
 		Timeout: timeout,
-	}.loopWithSoftTimeout()
+	})
 }
 
 func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, timeout time.Duration, retries uint) fail.Error {
@@ -161,15 +179,14 @@ func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, 
 			arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
 		}
 	}
-	return action{
+	selector := DefaultTimeoutSelector()
+	return selector(action{
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
-		First:   nil,
-		Last:    nil,
 		Notify:  nil,
 		Timeout: timeout,
-	}.loopWithSoftTimeout()
+	})
 }
 
 // WhileUnsuccessfulWithHardTimeout retries every 'delay' while 'run' is unsuccessful with a 'timeout'
@@ -191,11 +208,9 @@ func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, tim
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
-		First:   nil,
-		Last:    nil,
 		Notify:  DefaultNotifier(),
 		Timeout: timeout,
-	}.loopWithHardTimeout(timeout)
+	}.loopWithHardTimeout()
 }
 
 // WhileUnsuccessfulWithHardTimeoutWithNotifier retries every 'delay' while 'run' is unsuccessful with a 'timeout'
@@ -217,28 +232,9 @@ func WhileUnsuccessfulWithHardTimeoutWithNotifier(run func() error, delay time.D
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
-		First:   nil,
-		Last:    nil,
 		Notify:  notify,
 		Timeout: timeout,
-	}.loopWithHardTimeout(timeout)
-}
-
-// WhileUnsuccessfulDelay1Second retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
-// waiting 1 second after each try, expiring after 'timeout'
-func WhileUnsuccessfulDelay1Second(run func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessful(run, time.Second, timeout)
-}
-
-// WhileUnsuccessfulDelay5Seconds retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
-// waiting 5 seconds after each try, expiring after 'timeout'
-func WhileUnsuccessfulDelay5Seconds(run func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessful(run, 5*time.Second, timeout)
-}
-
-// WhileUnsuccessfulDelay5SecondsTimeout ...
-func WhileUnsuccessfulDelay5SecondsTimeout(run func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessfulWithHardTimeout(run, 5*time.Second, timeout)
+	}.loopWithHardTimeout()
 }
 
 // WhileUnsuccessfulWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
@@ -262,15 +258,14 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 	} else {
 		arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
 	}
-	return action{
+	selector := DefaultTimeoutSelector()
+	return selector(action{
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
-		First:   nil,
-		Last:    nil,
 		Notify:  notify,
 		Timeout: timeout,
-	}.loopWithSoftTimeout()
+	})
 }
 
 // WhileUnsuccessfulWhereRetcode255WithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil
@@ -294,36 +289,14 @@ func WhileUnsuccessfulWhereRetcode255WithNotify(run func() error, delay time.Dur
 	} else {
 		arbiter = PrevailDone(Unsuccessful(), Timeout(timeout))
 	}
-	return action{
+	selector := DefaultTimeoutSelector()
+	return selector(action{
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
-		First:   nil,
-		Last:    nil,
 		Notify:  notify,
 		Timeout: timeout,
-	}.loopWithSoftTimeout()
-}
-
-// WhileUnsuccessfulDelay1SecondWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
-// waiting 1 second after each try, expiring after a duration of 'timeout'.
-// 'notify' is called after each try for feedback.
-func WhileUnsuccessfulDelay1SecondWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
-	return WhileUnsuccessfulWithNotify(run, time.Second, timeout, notify)
-}
-
-// WhileUnsuccessfulDelay5SecondsWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil),
-// waiting 5 seconds after each try, expiring after a duration of 'timeout'.
-// 'notify' is called after each try for feedback.
-func WhileUnsuccessfulDelay5SecondsWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
-	return WhileUnsuccessfulWithNotify(run, time.Second*5, timeout, notify)
-}
-
-// WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify retries while 'run' is unsuccessful (ie 'run' returns an error != nil
-// and this error has 255 as exit status code), waiting 5 seconds after each try, expiring after a duration of 'timeout'.
-// 'notify' is called after each try for feedback.
-func WhileUnsuccessfulWhereRetcode255Delay5SecondsWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
-	return WhileUnsuccessfulWhereRetcode255WithNotify(run, time.Second*5, timeout, notify)
+	})
 }
 
 func DefaultNotifier() func(t Try, v verdict.Enum) {
@@ -373,6 +346,8 @@ func DefaultMetadataNotifier(metaID string) func(t Try, v verdict.Enum) {
 	}
 }
 
+// FIXME: not used...
+// DefaultNotifierWithContext ...
 func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum) {
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics == "" {
 		return func(t Try, v verdict.Enum) {
@@ -381,19 +356,22 @@ func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum)
 
 	ctxID := ""
 
-	// FIXME: OPP Too specific, this should go into a function that gets the id from the interface{}
-	if ctx != nil {
-		if ctx != context.TODO() {
-			res := ctx.Value(concurrency.KeyForTaskInContext)
-			if res != nil {
-				switch rt := res.(type) {
-				case string:
-					ctxID = rt
-				case concurrency.TaskCore:
-					ctxID, _ = rt.GetID()
-				}
-			}
-		}
+	//if ctx != nil && {
+	//	if ctx != context.TODO() {
+	//		res := ctx.Value(concurrency.KeyForTaskInContext)
+	//		if res != nil {
+	//			switch rt := res.(type) {
+	//			case string:
+	//				ctxID = rt
+	//			case concurrency.TaskCore:
+	//				ctxID, _ = rt.ID()
+	//			}
+	//		}
+	//	}
+	//}
+	task, xerr := concurrency.TaskFromContext(ctx)
+	if xerr == nil {
+		ctxID, _ = task.ID()
 	}
 
 	if ctxID == "" {
@@ -455,27 +433,15 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 	} else {
 		arbiter = PrevailDone(Successful(), Timeout(timeout))
 	}
-	return action{
+
+	selector := DefaultTimeoutSelector()
+	return selector(action{
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
-		First:   nil,
-		Last:    nil,
 		Notify:  nil,
 		Timeout: timeout,
-	}.loopWithSoftTimeout()
-}
-
-// WhileSuccessfulDelay1Second retries while 'run' is successful (ie 'run' returns an error == nil),
-// waiting 1 second after each try, expiring after a duration of 'timeout'.
-func WhileSuccessfulDelay1Second(run func() error, timeout time.Duration) fail.Error {
-	return WhileSuccessful(run, time.Second, timeout)
-}
-
-// WhileSuccessfulDelay5Seconds retries while 'run' is successful (ie 'run' returns an error == nil),
-// waiting 5 seconds after each try, expiring after a duration of 'timeout'.
-func WhileSuccessfulDelay5Seconds(run func() error, timeout time.Duration) fail.Error {
-	return WhileSuccessful(run, 5*time.Second, timeout)
+	})
 }
 
 // WhileSuccessfulWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),
@@ -500,33 +466,18 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 	} else {
 		arbiter = PrevailDone(Successful(), Timeout(timeout))
 	}
-	return action{
+	selector := DefaultTimeoutSelector()
+	return selector(action{
 		Arbiter: arbiter,
 		Officer: BackoffSelector()(delay),
 		Run:     run,
-		First:   nil,
-		Last:    nil,
 		Notify:  notify,
 		Timeout: timeout,
-	}.loopWithSoftTimeout()
-}
-
-// WhileSuccessfulDelay1SecondWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),
-// waiting 1 second after each try, expiring after a duration of 'timeout'.
-// 'notify' is called after each try for feedback.
-func WhileSuccessfulDelay1SecondWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
-	return WhileSuccessfulWithNotify(run, time.Second, timeout, notify)
-}
-
-// WhileSuccessfulDelay5SecondsWithNotify retries while 'run' is successful (ie 'run' returns an error == nil),
-// waiting 5 seconds after each try, expiring after a duration of 'timeout'.
-// 'notify' is called after each try for feedback.
-func WhileSuccessfulDelay5SecondsWithNotify(run func() error, timeout time.Duration, notify Notify) fail.Error {
-	return WhileSuccessfulWithNotify(run, 5*time.Second, timeout, notify)
+	})
 }
 
 // loopWithSoftTimeout executes the tries and stops if the elapsed time is gone beyond the timeout (hence the "soft timeout")
-func (a action) loopWithSoftTimeout() (xerr fail.Error) {
+func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 	arbiter := a.Arbiter
 	start := time.Now()
 
@@ -545,8 +496,8 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 
 		if a.Timeout != 0 {
 			if !all {
-				if xerr != nil {
-					switch xerr.(type) {
+				if ferr != nil {
+					switch ferr.(type) {
 					case *fail.ErrAborted:
 						return
 					}
@@ -559,17 +510,16 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 					msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) exceeded the mark (%s)", duration, a.Timeout), "", 0)
 					logrus.Warnf(msg)
 				}
-			} else if duration > time.Duration(55*a.Timeout/100) {
+			} else if duration > 55*a.Timeout/100 {
 				if count <= minNumRetries {
 					if count == 1 {
 						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) is too close to the mark (%s)", duration, a.Timeout), "", 0)
 						logrus.Warnf(msg)
-					} else {
-						if xerr != nil {
-							msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
-							logrus.Warnf(msg)
-						}
+					} else if ferr != nil {
+						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
+						logrus.Warnf(msg)
 					}
+
 				}
 			}
 		}
@@ -577,13 +527,6 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 
 	if arbiter == nil {
 		arbiter = DefaultArbiter
-	}
-
-	if a.First != nil {
-		err := a.First()
-		if err != nil {
-			return fail.ConvertError(err)
-		}
 	}
 
 	for ; ; count++ {
@@ -608,23 +551,9 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 		switch v {
 		case verdict.Done:
 			// Returns the error if no retry is wanted
-			var errLast error
-			if a.Last != nil {
-				errLast = a.Last()
-				if errLast != nil {
-					return fail.NewErrorList([]error{errLast, retryErr})
-				}
-			}
 			return retryErr
 		case verdict.Abort:
 			// Abort wanted, returns an error explaining why
-			var errLast error
-			if a.Last != nil {
-				errLast = a.Last()
-				if errLast != nil {
-					return fail.NewErrorList([]error{errLast, retryErr})
-				}
-			}
 			return retryErr
 		default:
 			// Retry is wanted, so blocks the loop the amount of time needed
@@ -636,7 +565,12 @@ func (a action) loopWithSoftTimeout() (xerr fail.Error) {
 }
 
 // loopWithHardTimeout executes the tries and stops at the exact timeout (hence the "hard timeout")
-func (a action) loopWithHardTimeout(timeout time.Duration) (xerr fail.Error) {
+func (a action) loopWithHardTimeout() (ferr fail.Error) {
+	timeout := a.Timeout
+	if timeout == 0 {
+		timeout = temporal.GetOperationTimeout()
+	}
+
 	var (
 		arbiter = a.Arbiter
 		start   = time.Now()
@@ -647,13 +581,6 @@ func (a action) loopWithHardTimeout(timeout time.Duration) (xerr fail.Error) {
 
 	var duration time.Duration
 	count := uint(1)
-
-	if a.First != nil {
-		err := a.First()
-		if err != nil {
-			return fail.ConvertError(err)
-		}
-	}
 
 	defer func() {
 		if checkTimeouts := os.Getenv("SAFESCALE_CHECK"); checkTimeouts != "ok" && checkTimeouts != "all" {
@@ -667,8 +594,8 @@ func (a action) loopWithHardTimeout(timeout time.Duration) (xerr fail.Error) {
 
 		if a.Timeout != 0 {
 			if !all {
-				if xerr != nil {
-					switch xerr.(type) {
+				if ferr != nil {
+					switch ferr.(type) {
 					case *fail.ErrAborted:
 						return
 					}
@@ -681,17 +608,16 @@ func (a action) loopWithHardTimeout(timeout time.Duration) (xerr fail.Error) {
 					msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) exceeded the mark (%s)", duration, a.Timeout), "", 0)
 					logrus.Warnf(msg)
 				}
-			} else if duration > time.Duration(55*a.Timeout/100) {
+			} else if duration > 55*a.Timeout/100 {
 				if count <= minNumRetries {
 					if count == 1 {
 						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this timeout (%s) is too close to the mark (%s)", duration, a.Timeout), "", 0)
 						logrus.Warnf(msg)
-					} else {
-						if xerr != nil {
-							msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
-							logrus.Warnf(msg)
-						}
+					} else if ferr != nil {
+						msg := callstack.DecorateWith("wrong retry-timeout cfg: ", fmt.Sprintf("this is not retried enough times (only %d)...", count), "", 0)
+						logrus.Warnf(msg)
 					}
+
 				}
 			}
 		}
@@ -736,23 +662,9 @@ func (a action) loopWithHardTimeout(timeout time.Duration) (xerr fail.Error) {
 		switch v {
 		case verdict.Done:
 			// Returns the error if no retry is wanted
-			var errLast error
-			if a.Last != nil {
-				errLast = a.Last()
-				if errLast != nil {
-					return fail.NewErrorList([]error{errLast, retryErr})
-				}
-			}
 			return retryErr
 		case verdict.Abort:
 			// Abort wanted, returns an error explaining why
-			var errLast error
-			if a.Last != nil {
-				errLast = a.Last()
-				if errLast != nil {
-					return fail.NewErrorList([]error{errLast, retryErr})
-				}
-			}
 			return retryErr
 		default:
 			// Retry is wanted, so blocks the loop the amount of time needed

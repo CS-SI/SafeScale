@@ -72,21 +72,21 @@ func toAbstractSecurityGroupRule(in osc.SecurityGroupRule, direction securitygro
 	out := &abstract.SecurityGroupRule{
 		Direction: direction,
 		Protocol:  in.IpProtocol,
-		PortFrom:  int32(in.FromPortRange),
-		PortTo:    int32(in.ToPortRange),
+		PortFrom:  in.FromPortRange,
+		PortTo:    in.ToPortRange,
 		Targets:   in.IpRanges,
 	}
 	return out
 }
 
 // CreateSecurityGroup creates a security group
-func (s stack) CreateSecurityGroup(networkID, name, description string, rules abstract.SecurityGroupRules) (asg *abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) CreateSecurityGroup(networkID, name, description string, rules abstract.SecurityGroupRules) (asg *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
 	}
 	if name == "" {
-		return nil, fail.InvalidParameterCannotBeEmptyStringError("name")
+		return nullASG, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.outscale"), "('%s')", name).WithStopwatch().Entering()
@@ -98,9 +98,9 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules ab
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteSecurityGroup(resp.SecurityGroupId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
 			}
 		}
 	}()
@@ -121,7 +121,7 @@ func (s stack) CreateSecurityGroup(networkID, name, description string, rules ab
 	for k, v := range rules {
 		asg, xerr = s.AddRuleToSecurityGroup(asg, v)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to add rule #%d", k)
+			return nullASG, fail.Wrap(xerr, "failed to add rule #%d", k)
 		}
 	}
 
@@ -295,8 +295,8 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (_ string, _ 
 		in.Protocol = "-1"
 	}
 	rule.IpProtocol = in.Protocol
-	rule.FromPortRange = int32(in.PortFrom)
-	rule.ToPortRange = int32(in.PortTo)
+	rule.FromPortRange = in.PortFrom
+	rule.ToPortRange = in.PortTo
 	if rule.FromPortRange == 0 && rule.ToPortRange == 0 {
 		switch in.Protocol {
 		case "icmp", "-1":
@@ -334,7 +334,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 	}
 	asg, sgLabel, xerr := stacks.ValidateSecurityGroupParameter(sgParam)
 	if xerr != nil {
-		return nil, xerr
+		return nullASG, xerr
 	}
 	if !asg.IsConsistent() {
 		asg, xerr = s.InspectSecurityGroup(asg.ID)
@@ -353,11 +353,18 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 
 	flow, oscRule, xerr := fromAbstractSecurityGroupRule(rule)
 	if xerr != nil {
-		return nil, xerr
+		return nullASG, xerr
 	}
 
-	if xerr := s.rpcDeleteSecurityGroupRules(asg.ID, flow, []osc.SecurityGroupRule{oscRule}); xerr != nil {
-		return nil, xerr
+	xerr = s.rpcDeleteSecurityGroupRules(asg.ID, flow, []osc.SecurityGroupRule{oscRule})
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// consider a missing rule as a successful deletion and continue
+			break
+		default:
+			return nullASG, xerr
+		}
 	}
 
 	return s.InspectSecurityGroup(asg.ID)

@@ -100,13 +100,13 @@ func ProvideCredentialsIfNeeded(request *abstract.HostRequest) (xerr fail.Error)
 	// If no password is supplied, generate one
 	if request.Password == "" {
 		request.Password = os.Getenv("SAFESCALE_UNSAFE_PASSWORD")
-	}
-	if request.Password == "" {
-		password, err := utils.GeneratePassword(16)
-		if err != nil {
-			return fail.Wrap(err, "failed to generate operator password")
+		if request.Password == "" {
+			password, err := utils.GeneratePassword(16)
+			if err != nil {
+				return fail.Wrap(err, "failed to generate operator password")
+			}
+			request.Password = password
 		}
-		request.Password = password
 	}
 
 	return nil

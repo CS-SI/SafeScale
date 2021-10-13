@@ -39,7 +39,9 @@ import (
 )
 
 // ClusterListener host service server grpc
-type ClusterListener struct{}
+type ClusterListener struct {
+	protocol.UnimplementedClusterServiceServer
+}
 
 // List lists clusters
 func (s *ClusterListener) List(ctx context.Context, in *protocol.Reference) (hl *protocol.ClusterListResponse, err error) {
@@ -125,6 +127,8 @@ func (s *ClusterListener) Create(ctx context.Context, in *protocol.ClusterCreate
 		return nil, xerr
 	}
 
+	defer instance.Released()
+
 	return instance.ToProtocol()
 }
 
@@ -165,6 +169,7 @@ func (s *ClusterListener) State(ctx context.Context, in *protocol.Reference) (ht
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	defer instance.Released()
 
 	st, xerr := instance.GetState()
@@ -468,9 +473,9 @@ func (s *ClusterListener) Shrink(ctx context.Context, in *protocol.ClusterResize
 }
 
 func fromClusterNodes(in []*propertiesv3.ClusterNode) []*protocol.Host {
-	out := make([]*protocol.Host, 0, len(in))
-	for _, v := range in {
-		out = append(out, converters.ClusterNodeFromPropertyToProtocol(*v))
+	out := make([]*protocol.Host, len(in))
+	for k, v := range in {
+		out[k] = converters.ClusterNodeFromPropertyToProtocol(*v)
 	}
 	return out
 }
@@ -523,11 +528,10 @@ func (s *ClusterListener) ListNodes(ctx context.Context, in *protocol.Reference)
 	out := &protocol.ClusterNodeListResponse{}
 	out.Nodes = make([]*protocol.Host, 0, len(list))
 	for _, v := range list {
-		item := &protocol.Host{
+		out.Nodes = append(out.Nodes, &protocol.Host{
 			Id:   v.ID,
 			Name: v.Name,
-		}
-		out.Nodes = append(out.Nodes, item)
+		})
 	}
 	return out, nil
 }
@@ -713,8 +717,7 @@ func (s *ClusterListener) StopNode(ctx context.Context, in *protocol.ClusterNode
 	}
 	defer hostInstance.Released()
 
-	xerr = hostInstance.Stop(job.Context())
-	return empty, xerr
+	return empty, hostInstance.Stop(job.Context())
 }
 
 // StartNode starts a stopped node of the cluster

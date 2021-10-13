@@ -45,7 +45,9 @@ import (
 var VolumeHandler = handlers.NewVolumeHandler
 
 // VolumeListener is the volume service gRPC server
-type VolumeListener struct{}
+type VolumeListener struct {
+	protocol.UnimplementedVolumeServiceServer
+}
 
 // List the available volumes
 func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListRequest) (_ *protocol.VolumeListResponse, err error) {
@@ -63,10 +65,8 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
 	}
 
 	job, err := PrepareJob(ctx, in.GetTenantId(), "/volumes/list")
@@ -74,10 +74,9 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 		return nil, err
 	}
 	defer job.Close()
-	task := job.Task()
 
 	all := in.GetAll()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.volume"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -127,11 +126,10 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.Task()
 
 	speed := in.GetSpeed()
 	size := in.GetSize()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.volume"), "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "('%s', %s, %d)", name, speed.String(), size).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 	handler := handlers.NewVolumeHandler(job)
@@ -325,9 +323,8 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.Task()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.volume"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.volume"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

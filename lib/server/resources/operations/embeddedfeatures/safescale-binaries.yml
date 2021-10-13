@@ -53,7 +53,7 @@ feature:
                             masters: one
                         run: |
                             cd /var/tmp
-                            sfDownload https://github.cop/CS-SI/SafeScale/releases/{{.SafeScaleRelease}}/sources.tgz || sfExit 192 "failed to download SafeScale sources"
+                            sfDownload https://github.com/CS-SI/SafeScale/releases/{{.SafeScaleRelease}}/sources.tgz || sfExit 192 "failed to download SafeScale sources"
                             tar zxvf sources.tgz || sfExit 193 "Failed to unpack sources"
                             sfExit
 
@@ -64,7 +64,7 @@ feature:
                         timeout: 15
                         run: |
                             cd /var/tmp/SafeScale
-                            docker build --network host -f build.docker.yml .
+                            sfRetryEx 15m 5 docker build --network host -f build.docker.yml .
 
                             sfExit
 

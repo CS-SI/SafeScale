@@ -109,22 +109,27 @@ func (f MetadataFolder) Path() string {
 	return f.path
 }
 
-// absolutePath returns the fullpath to reach the 'path'+'name' starting from the MetadataFolder path
+// absolutePath returns the full path to reach the 'path'+'name' starting from the MetadataFolder path
 func (f MetadataFolder) absolutePath(path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
 	}
 	var relativePath string
 	for _, item := range path {
-		if item != "" {
+		if item != "" && item != "/" {
 			relativePath += "/" + item
 		}
 	}
 	relativePath = strings.Trim(relativePath, "/")
-	if f.path != "" {
-		return strings.Join([]string{f.path, relativePath}, "/")
+	if relativePath != "" {
+		absolutePath := strings.Replace(relativePath, "//", "/", -1)
+		if f.path != "" {
+			absolutePath = f.path + "/" + relativePath
+			absolutePath = strings.Replace(absolutePath, "//", "/", -1)
+		}
+		return absolutePath
 	}
-	return relativePath
+	return f.path
 }
 
 // Lookup tells if the object named 'name' is inside the ObjectStorage MetadataFolder
@@ -190,7 +195,14 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "timeout")
+		case *retry.ErrStopRetry:
+			return fail.Wrap(xerr.Cause(), "stopping retries")
+		default:
+			return fail.Wrap(xerr, "failed to read '%s/%s' in Metadata Storage", path, name)
+		}
 	}
 
 	doCrypt := f.crypt
@@ -297,7 +309,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 					return nil
 				},
 				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
-				retry.Fibonacci(1*time.Second),
+				retry.Fibonacci(temporal.GetMinDelay()),
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
@@ -308,15 +320,19 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 				},
 			)
 			if innerXErr != nil {
-				switch innerXErr.(type) { //nolint
+				switch innerXErr.(type) {
+				case *retry.ErrStopRetry:
+					return fail.Wrap(innerXErr.Cause(), "stopping retries")
 				case *retry.ErrTimeout:
-					innerXErr = fail.Wrap(innerXErr.Cause(), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
+					return fail.Wrap(innerXErr.Cause(), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
+				default:
+					return innerXErr
 				}
 			}
-			return innerXErr
+			return nil
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
-		retry.Constant(1*time.Second),
+		retry.Constant(temporal.GetMinDelay()),
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
@@ -328,12 +344,16 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "timeout")
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
+			return fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath)
+		default:
+			return xerr
 		}
 	}
-	return xerr
+	return nil
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'callback' on each entry
@@ -352,12 +372,16 @@ func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail
 	}
 
 	// If there is a single entry equals to absolute path, then there is nothing, it's an empty MetadataFolder
-	if len(list) == 1 && list[0] == absPath {
+	if len(list) == 1 && strings.Trim(list[0], "/") == absPath {
 		return nil
 	}
 
 	var err error
 	for _, i := range list {
+		i = strings.Trim(i, "/")
+		if i == absPath {
+			continue
+		}
 		var buffer bytes.Buffer
 		xerr = f.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
 		xerr = debug.InjectPlannedFail(xerr)

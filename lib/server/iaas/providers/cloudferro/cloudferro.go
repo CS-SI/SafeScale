@@ -22,12 +22,11 @@ import (
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
@@ -36,7 +35,7 @@ import (
 
 var (
 	cloudferroIdentityEndpoint = "https://cf2.cloudferro.com:5000/v3"
-	cloudferroDefaultImage     = "Ubuntu 18.04"
+	cloudferroDefaultImage     = "Ubuntu 20.04"
 	cloudferroDNSServers       = []string{"185.48.234.234", "185.48.234.238"}
 )
 

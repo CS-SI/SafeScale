@@ -62,12 +62,14 @@ func (rfc RemoteFileItem) Upload(clientSession *Session, hostname string) error 
 		}
 		cmd += "sudo chmod " + rfc.RemoteRights + " " + rfc.Remote
 	}
-	retcode, _, _, xerr = clientSession.SSH.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if xerr != nil {
-		return xerr
-	}
-	if retcode != 0 {
-		return fail.NewError("failed to update owner and/or access rights of the remote file")
+	if cmd != "" {
+		retcode, _, _, xerr = clientSession.SSH.Run(hostname, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		if xerr != nil {
+			return xerr
+		}
+		if retcode != 0 {
+			return fail.NewError("failed to update owner and/or access rights of the remote file")
+		}
 	}
 
 	return nil
@@ -147,9 +149,10 @@ func (rfh *RemoteFilesHandler) Upload(clientSession *Session, hostname string) e
 	if clientSession == nil {
 		return fail.InvalidParameterCannotBeNilError("clientSession")
 	}
-	if hostname != "" {
+	if hostname == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("hostname")
 	}
+
 	for _, v := range rfh.items {
 		err := v.Upload(clientSession, hostname)
 		if err != nil {

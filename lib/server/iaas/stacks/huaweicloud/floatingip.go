@@ -117,7 +117,7 @@ type createResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a get operation. Call its Extract
+// Result represents the result of a get operation. Call its Extract
 // method to interpret it as a FloatingIP.
 type getResult struct {
 	commonResult
@@ -133,7 +133,7 @@ func (s stack) ListFloatingIPs() pagination.Pager {
 		return pagination.Pager{}
 	}
 
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips"
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
 	return pagination.NewPager(s.Stack.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
 		return floatingIPPage{pagination.LinkedPageBase{PageResult: r}}
 	})
@@ -146,7 +146,7 @@ func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 	}
 
 	r := getResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -208,9 +208,12 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 }
 
 // CreateFloatingIP creates a floating IP
-func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
+func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
 	if s.IsNull() {
 		return &FloatingIP{}, fail.InvalidInstanceError()
+	}
+	if host == nil {
+		return &FloatingIP{}, fail.InvalidParameterCannotBeNilError("host")
 	}
 
 	ipOpts := ipCreateOpts{
@@ -220,8 +223,9 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
 	bandwidthOpts := bandwidthCreateOpts{
-		Name:      "bandwidth-" + s.vpc.Name,
+		Name:      "bandwidth-" + host.Networking.SubnetsByID[host.Networking.DefaultSubnetID],
 		Size:      1000,
 		ShareType: "PER",
 	}
@@ -229,13 +233,14 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
 	// Merger bi in bb
 	for k, v := range bi {
 		bb[k] = v
 	}
 
 	r := createResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips"
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONBody:     bb,
 		JSONResponse: &r.Body,
@@ -255,6 +260,7 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
 	return fip, nil
 }
 
@@ -265,7 +271,7 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 	}
 
 	r := deleteResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},

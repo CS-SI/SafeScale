@@ -17,15 +17,15 @@
 package operations
 
 import (
-	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
+	"context"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -88,10 +88,10 @@ func (i *noneInstaller) Add(ctx context.Context, f resources.Feature, t resource
 	r, xerr = w.Proceed(ctx, v, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+		return r, fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 
-	return r, xerr
+	return r, nil
 }
 
 // Remove uninstalls the Feature
@@ -122,10 +122,10 @@ func (i *noneInstaller) Remove(ctx context.Context, f resources.Feature, t resou
 	r, xerr = w.Proceed(ctx, v, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+		return r, fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
 
-	return r, xerr
+	return r, nil
 }
 
 // newNoneInstaller creates a new instance

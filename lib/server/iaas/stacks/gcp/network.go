@@ -22,6 +22,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -40,6 +41,7 @@ const (
 // ------ network methods ------
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+// No default network settings supported by GCP
 func (s stack) HasDefaultNetwork() bool {
 	return false
 }
@@ -129,7 +131,9 @@ func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 	if xerr != nil {
 		return nullAN, xerr
 	}
-	return toAbstractNetwork(*resp), nil
+
+	anet := toAbstractNetwork(*resp)
+	return anet, nil
 }
 
 func toAbstractNetwork(in compute.Network) *abstract.Network {
@@ -174,8 +178,10 @@ func (s stack) DeleteNetwork(ref string) (xerr fail.Error) {
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	metadata := true
 	theNetwork, xerr := s.InspectNetwork(ref)
 	if xerr != nil {
+		metadata = false
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
@@ -185,11 +191,19 @@ func (s stack) DeleteNetwork(ref string) (xerr fail.Error) {
 		}
 	}
 
-	if theNetwork != nil {
-		return s.rpcDeleteNetworkByID(theNetwork.ID)
+	if metadata {
+		if theNetwork != nil { // maybe nullAn
+			if theNetwork.ID != "" {
+				return s.rpcDeleteNetworkByID(theNetwork.ID)
+			}
+		}
 	}
 
-	return nil
+	xerr = s.rpcDeleteNetworkByID(ref)
+	if _, ok := xerr.(*fail.ErrNotFound); ok {
+		return nil
+	}
+	return xerr
 }
 
 // ------ VIP methods ------
@@ -309,7 +323,7 @@ func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 // ------ Subnet methods ------
 
 // CreateSubnet creates a new subnet
-func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, xerr fail.Error) {
+func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
@@ -333,9 +347,9 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, xer
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.rpcDeleteSubnetByName(req.Name); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", req.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", req.Name))
 			}
 		}
 	}()
@@ -360,7 +374,7 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, xer
 		}
 	}()
 
-	// _ = as.OK()
+	_ = as.OK()
 
 	return as, nil
 }
@@ -438,11 +452,14 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.E
 			switch xerr.(type) { //nolint
 			case *fail.ErrNotFound:
 				an, xerr = s.InspectNetworkByName(networkRef)
+				if xerr != nil {
+					return emptySlice, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
+				}
+			default:
+				return emptySlice, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
 			}
 		}
-		if xerr != nil {
-			return emptySlice, fail.Wrap(xerr, "failed to find Network '%s'", networkRef)
-		}
+
 		filter = `selfLink eq "` + s.selfLinkPrefix + `/global/networks/` + an.Name + `"`
 	}
 
@@ -463,6 +480,8 @@ func toAbstractSubnet(in compute.Subnetwork) *abstract.Subnet {
 	item.Name = in.Name
 	item.ID = strconv.FormatUint(in.Id, 10)
 	item.CIDR = in.IpCidrRange
+	parts := strings.Split(in.Network, "/")
+	item.Network = parts[len(parts)-1]
 	return item
 }
 
@@ -478,33 +497,47 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	// Delete NAT route
+	natRouteName := fmt.Sprintf(natRouteNameFormat, id)
+	if xerr = s.rpcDeleteRoute(natRouteName); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// consider missing route as a successful removal
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	}
+
 	subn, xerr := s.rpcGetSubnetByID(id)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a missing Subnet as a successful removal
 			debug.IgnoreError(xerr)
+			return nil
 		default:
 			return xerr
 		}
-	} else {
-		// Delete Subnet
-		if xerr = s.rpcDeleteSubnetByName(subn.Name); xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrTimeout:
-				return fail.Wrap(xerr.Cause(), "timeout waiting for Subnet deletion")
-			default:
-				return xerr
-			}
+	}
+
+	// Delete Subnet
+	if xerr = s.rpcDeleteSubnetByName(subn.Name); xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(xerr), "error deleting Subnet '%s', stopping retries", subn.Name)
+		case *fail.ErrTimeout:
+			return fail.Wrap(fail.Cause(xerr), "timeout waiting for Subnet '%s' deletion", subn.Name)
+		default:
+			return xerr
 		}
 	}
 
-	// Delete NAT route
-	natRuleName := fmt.Sprintf(natRouteNameFormat, id)
-	if xerr = s.rpcDeleteRoute(natRuleName); xerr != nil {
+	// Check Subnet no longer exists
+	if _, xerr = s.rpcGetSubnetByName(subn.Name); xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// consider missing route as a successful removal
+			// consider missing network as a successful removal
 			debug.IgnoreError(xerr)
 		default:
 			return xerr

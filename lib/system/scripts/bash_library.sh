@@ -31,54 +31,12 @@ export FULL_VERSION_ID=
 function versionchk() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
 export -f versionchk
 
-function sfVercomp() {
-	if [[ $1 == $2 ]]; then
-		return 0
-	fi
-	local IFS=.
-	local i ver1=($1) ver2=($2)
-	# fill empty fields in ver1 with zeros
-	for ((i = ${#ver1[@]}; i < ${#ver2[@]}; i++)); do
-		ver1[i]=0
-	done
-	for ((i = 0; i < ${#ver1[@]}; i++)); do
-		if [[ -z ${ver2[i]} ]]; then
-			# fill empty fields in ver2 with zeros
-			ver2[i]=0
-		fi
-		if ((10#${ver1[i]} > 10#${ver2[i]})); then
-			return 1
-		fi
-		if ((10#${ver1[i]} < 10#${ver2[i]})); then
-			return 2
-		fi
-	done
-	return 0
-}
-export -f sfVercomp
-
-function sfTestvercomp() {
-	sfVercomp $1 $2
-	case $? in
-	0) ope='=' ;;
-	1) ope='>' ;;
-	2) ope='<' ;;
-	esac
-	if [[ $ope != $3 ]]; then
-		echo "FAIL: Expected '$3', Actual '$ope', Arg1 '$1', Arg2 '$2'"
-		return 1
-	else
-		return 0
-	fi
-}
-export -f sfTestvercomp
-
 function sfFail() {
 	if [ $# -eq 1 ]; then
-		if [ $1 -ne 0 ]; then
+		if [ "$1" -ne 0 ]; then
 			echo "Exiting with error $1"
 		fi
-	elif [ $# -eq 2 -a $1 -ne 0 ]; then
+	elif [ $# -eq 2 ] && [ "$1" -ne 0 ]; then
 		echo "Exiting with error $1: $2"
 	fi
 	(
@@ -86,7 +44,8 @@ function sfFail() {
 		echo 3 >/proc/sys/vm/drop_caches
 		sleep 2
 	) || true
-	exit $1
+	echo "exiting with errorcode $1"
+	exit "$1"
 }
 export -f sfFail
 
@@ -96,6 +55,7 @@ function sfExit() {
 		echo 3 >/proc/sys/vm/drop_caches
 		sleep 2
 	) || true
+	echo "exiting with errorcode 0"
 	exit 0
 }
 export -f sfExit
@@ -108,9 +68,10 @@ function sfFinishPreviousInstall() {
 		return 0
 	else
 		echo "there are unconfigured packages !"
-		sudo dpkg --configure -a --force-all
-		[ $? -ne 0 ] && return $?
-		return 1
+		sudo dpkg --configure -a --force-all && {
+		  return $?
+		}
+		return 0
 	fi
 }
 export -f sfFinishPreviousInstall
@@ -132,7 +93,7 @@ function sfApt() {
 	sfWaitForApt
 	[ $? -ne 0 ] && return $?
 	echo "running apt " "$@"
-	DEBIAN_FRONTEND=noninteractive apt "$@" && rc=$?
+	DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt -o Dpkg::Options::=--force-confnew "$@" && rc=$?
 	[ $rc -eq -1 ] && return 1
 	return $rc
 }
@@ -162,7 +123,7 @@ function sfAvail() {
 		fi
 		;;
 	debian | ubuntu)
-		DEBIAN_FRONTEND=noninteractive apt search "$@" &>/dev/null && rc=$?
+		DEBIAN_FRONTEND=noninteractive UCF_FORCE_CONFFNEW=1 apt search "$@" &>/dev/null && rc=$?
 		;;
 	esac
 	[ $rc -eq -1 ] && return 1
@@ -211,7 +172,7 @@ function sfLong2IP() {
 		ip=$((ui32 & 0xff))${ip:+.}$ip
 		ui32=$((ui32 >> 8))
 	done
-	echo $ip
+	echo "$ip"
 }
 export -f sfLong2IP
 
@@ -328,9 +289,10 @@ function sfAsyncWait() {
 }
 export -f sfAsyncWait
 
-# sfRetry <timeout> <delay> command
-# retries command until success, with sleep of <delay> seconds
-function sfRetry() {
+# sfRetryEx <timeout> <delay> command
+# Retries command until success, with sleep of <delay> seconds
+# Will timeout after <timeout>
+function sfRetryEx() {
 	local timeout=$1
 	local delay=$2
 	shift 2
@@ -358,12 +320,12 @@ function sfRetry() {
 	echo "sfRetry: timeout!"
 	return $rc
 }
-export -f sfRetry
+export -f sfRetryEx
 
-function sfStandardRetry() {
-	sfRetry $(sfDefaultTimeout) $(sfDefaultDelay) "$@"
+function sfRetry {
+	sfRetryEx $(sfDefaultTimeout) $(sfDefaultDelay) $*
 }
-export -f sfStandardRetry
+export -f sfRetry
 
 # sfSalvageDBusIfNeeded restarts dbus-daemon if needed (ie there are no or more than 1 dbus-daemon)
 # returns 0 if nothing has been done, 1 if dbus has been salvaged
@@ -453,7 +415,8 @@ function sfInstall() {
 	case $LINUX_KIND in
 	debian | ubuntu)
 		export DEBIAN_FRONTEND=noninteractive
-		sfRetry 5m 3 "sfApt update"
+		export UCF_FORCE_CONFFNEW=1
+		sfRetryEx 5m 3 "sfApt update"
 		sfApt install $1 -y --force-yes || return 194
 		command -v $1 || return 194
 		;;
@@ -472,6 +435,8 @@ export -f sfInstall
 
 # sfDownload url filename timeout delay
 function sfDownload() {
+    mkdir -p $SF_LOGDIR || true
+
 	local url="$1"
 	local encoded
 	encoded=$(echo "$url" | md5sum | cut -d' ' -f1)
@@ -512,6 +477,8 @@ function sfDownload() {
 export -f sfDownload
 
 __create_dropzone() {
+    mkdir -p $SF_LOGDIR || true
+
 	[[ ! -d ~cladm/.dropzone ]] && {
 		mkdir -p ~cladm/.dropzone
 		[ $? -ne 0 ] && return $?
@@ -530,6 +497,7 @@ function sfDownloadInDropzone() {
 		sfDownload "$@"
 		[ $? -ne 0 ] && return $?
 	}
+	cd ~cladm/.dropzone || return 1
 	return 0
 }
 export -f sfDownloadInDropzone
@@ -538,15 +506,26 @@ export -f sfDownloadInDropzone
 function sfDropzonePush() {
 	local file
 	file="$1"
-	__create_dropzone || echo "failed to create dropzone (exit code $?)"
-	[ $? -ne 0 ] && return $?
-	cp -rf "$file" ~cladm/.dropzone/ || echo "failed to copy '$file' in dropzone (exit code $?)"
-	[ $? -ne 0 ] && return $?
-	chown -R cladm:cladm ~cladm/.dropzone || echo "failed to set ownership of dropzone (exit code $?)"
-	[ $? -ne 0 ] && return $?
+	__create_dropzone || {
+	    rco=$?
+	    echo "failed to create dropzone (exit code $rco)"
+	    return $rco
+	}
+	cp -rf "$file" ~cladm/.dropzone/ || {
+	    rco=$?
+	    echo "failed to copy '$file' in dropzone (exit code $rco)"
+	    return $rco
+	}
+	chown -R cladm:cladm ~cladm/.dropzone || {
+	    rco=$?
+	    echo "failed to set ownership of dropzone (exit code $rco)"
+	    return $rco
+	}
 	return 0
 }
 export -f sfDropzonePush
+
+__cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error"
 
 # Copy content of local dropzone to remote dropzone (parameter can be IP or name)
 function sfDropzoneSync() {
@@ -566,15 +545,30 @@ function sfDropzonePop() {
 	local dest="$1"
 	local file=
 	[ $# -eq 2 ] && file="$2"
-	__create_dropzone || echo "failed to create dropzone (exit code $?)"
-	[ $? -ne 0 ] && return $?
-	mkdir -p "$dest" >/dev/null || echo "failed to create '$dest' folder (exit code $?)"
+	__create_dropzone || {
+	    rco=$?
+	    echo "failed to create dropzone (exit code $rco)"
+	    return $rco
+	}
+	if [ ! -d "$dest" ]; then
+        mkdir -p "$dest" >/dev/null || {
+            rco=$?
+            echo "failed to create '$dest' folder (exit code $rco)"
+            return $rco
+        }
+	fi
 	if [ $# -eq 1 ]; then
-		mv -f ~cladm/.dropzone/* "$dest" || echo "failed to move all files in dropzone to '$dest' (exit code $?)"
-		[ $? -ne 0 ] && return $?
+		mv -f ~cladm/.dropzone/* "$dest" || {
+		    rco=$?
+		    echo "failed to move all files in dropzone to '$dest' (exit code $rco)"
+		    return $rco
+		}
 	else
-		mv -f ~cladm/.dropzone/"$file" "$dest" || echo "failed to move file '$file' in dropzone to '$dest' (exit code $?)"
-		[ $? -ne 0 ] && return $?
+		mv -f ~cladm/.dropzone/"$file" "$dest" || {
+		    rco=$?
+		    echo "failed to move file '$file' in dropzone to '$dest' (exit code $rco)"
+		    return $rco
+		}
 	fi
 	return 0
 }
@@ -644,20 +638,6 @@ function sfHelm() {
 }
 export -f sfHelm
 
-function sfDcos() {
-	sudo -u cladm -i dcos "$@"
-	[ $? -ne 0 ] && return $?
-    return 0
-}
-export -f sfDcos
-
-function sfMarathon() {
-	sudo -u cladm -i marathon "$@"
-	[ $? -ne 0 ] && return $?
-    return 0
-}
-export -f sfMarathon
-
 function sfProbeGPU() {
 	if command -v lspci &>/dev/null; then
 		val=$(lspci | grep nvidia 2>/dev/null) || true
@@ -682,208 +662,8 @@ function sfReverseProxyReload() {
 }
 export -f sfReverseProxyReload
 
-function sfIngressReload() {
-	id=$(sfGetFact "ingress4platform_docker_id")
-	if [ ! -z ${id+x} ]; then
-		docker exec $id kong reload >/dev/null
-		return $?
-	fi
-	return 1
-}
-export -f sfIngressReload
-
-# This function allows to create a database on platform PostgreSQL
-# It is intended to be used on one of the platform PostgreSQL servers in the cluster
-function sfPgsqlCreateDatabase() {
-	[ $# -eq 0 ] && echo "missing dbname" && return 1
-	local dbname=$1
-	if [ -z "$dbname" ]; then
-		echo "missing dbname"
-		return 1
-	fi
-	local owner=
-	[ $# -eq 2 ] && owner=$2
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	if [ ! -z ${id+x} ]; then
-		local cmd='CREATE DATABASE "'$dbname'"'
-		[ ! -z "$owner" ] && cmd="$cmd OWNER $owner"
-		docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
-		return $?
-	fi
-	return 1
-}
-export -f sfPgsqlCreateDatabase
-
-function sfPgsqlDropDatabase() {
-	local dbname=$1
-	if [ -z "$dbname" ]; then
-		echo "missing dbname"
-		return 1
-	fi
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	[ -z ${id+x} ] && return 1
-
-	local cmd="SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = '${dbname}'"
-	docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd"
-	retcode=$?
-	if [ $retcode -eq 0 ]; then
-		sfRetry 1m 5 "docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c 'DROP DATABASE IF EXISTS \"'$dbname'\"'"
-		retcode=$?
-	fi
-	return $retcode
-}
-export -f sfPgsqlDropDatabase
-
-# This function allows to create a database on platform PostgreSQL
-# Role name and optional options are passed as parameter, password is passed in stdin. example:
-#     echo "toto" | sfPgsqlCreateRole my_role CREATEDB LOGIN
-#     "toto" is the password, "my_role" is the role name
-# It is intended to be used on one of the platform PostgreSQL servers in the cluster
-function sfPgsqlCreateRole() {
-	local rolename=$1
-	shift
-	[ -z "$rolename" ] && echo "missing role name" && return 1
-	local options="$*"
-
-	local password=
-	read -t 1 password
-
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	[ -z ${id+x} ] && return 1
-
-	local cmd="CREATE ROLE $rolename"
-	[ ! -z "$options" ] && cmd="$cmd $options"
-	docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "$cmd" && echo -n "$password" | sfPgsqlUpdatePassword $rolename
-}
-export -f sfPgsqlCreateRole
-
-# This function allows to drop a database on platform PostgreSQL
-# Role name is passed as parameter
-# It is intended to be used on one of the platform PostgreSQL servers in the cluster
-function sfPgsqlDropRole() {
-	local rolename=$1
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	[ -z ${id+x} ] && return 1
-
-	sleep 1
-	local cmd="DROP ROLE IF EXISTS $rolename"
-	sfRetry 1m 5 docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "'$cmd'"
-}
-export -f sfPgsqlDropRole
-
-__cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oPubkeyAuthentication=yes -oPasswordAuthentication=no -oLogLevel=error"
-
-# This function allows to update password of a user on platform PostgreSQL
-# Username is passed as parameter to the function, password is passed in stdin. example:
-#     echo "toto" | sfPgPoolUpdatePassword tata
-#     "toto" is the password, "tata" is the username
-# It is intended to be used on one of the platform PostgreSQL servers in the cluster
-function sfPgsqlUpdatePassword() {
-	local username=${1}
-	if [ -z "$username" ]; then
-		echo "username is missing"
-		return 1
-	fi
-
-	local password
-	read -t 1 password
-	[ -z "$password" ] && echo "missing password from pipe" && return 1
-
-	id=$(sfGetFact "postgresql4platform_docker_id")
-	[ -z ${id+x} ] && return 1
-
-	docker exec $id psql -h {{ .DefaultRouteIP }} -p 63008 -U postgres -c "ALTER USER $username WITH PASSWORD '$password'"
-	retcode=$?
-	if [ $retcode -eq 0 ]; then
-		for i in {{ range .ClusterMasterIPs }}{{.}} {{end}}; do
-			id=$(ssh $__cluster_admin_ssh_options__ cladm@$i docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_pooler | cut -d: -f2)
-			retcode=$?
-			if [ $retcode -eq 0 -a ! -z "$id" ]; then
-				ssh $__cluster_admin_ssh_options__ cladm@$i docker exec $id /usr/local/bin/update_password.sh $username "$password"
-				retcode=$?
-			fi
-			[ $retcode -ne 0 ] && break
-		done
-	fi
-	return $retcode
-}
-export -f sfPgsqlUpdatePassword
-
-# sfKeycloakRun allows to execute keycloak admin command
-# Intended to be use on target masters:any
-function sfKeycloakRun() {
-	local id=$(sfGetFact "keycloak4platform_docker_id")
-	[ $? -ne 0 -o -z ${id+x} ] && echo "failed to find keycloak container" && return 1
-
-	local _stdin=
-	local _fc
-	read -N1 -t1 _fc && {
-		[ $? -le 128 ] && {
-			IFS= read -rd '' _stdin
-			_stdin="$_fc$_stdin"
-		}
-	}
-
-	if [ -z "$_stdin" ]; then
-		docker exec -i $id bash <<BASH
-/opt/jboss/keycloak/bin/kcadm.sh $@ --no-config --server http://{{ .HostIP }}:63010/auth
-BASH
-	else
-		docker exec -i $id bash <<BASH
-/opt/jboss/keycloak/bin/kcadm.sh $@ --no-config --server http://{{ .HostIP }}:63010/auth -f - <<KCADM
-$_stdin
-KCADM
-BASH
-	fi
-}
-export -f sfKeycloakRun
-
-# Returns all the information about the client passed as first parameters
-# Subsequent parameters ((--realm, --user, --password, ...) are passed as-is to kcadm.sh
-function sfKeycloakGetClient() {
-	[ $# -eq 0 ] && return 1
-	local name=$1
-	shift
-	sfKeycloakRun get clients "$@" | tail -n +1 | jq ".[] | select(.clientId == \"$name\")"
-}
-export -f sfKeycloakGetClient
-
-function sfKeycloakDeleteClient() {
-	[ $# -eq 0 ] && return 1
-	local name=$1
-	shift
-
-	local clientID=$(sfKeycloakGetClient $name "$@")
-	[ -z "$clientID" ] && return 1
-
-	sfKeycloakRun delete clients/$clientID "$@"
-}
-export -f sfKeycloakDeleteClient
-
-# Returns all the information about the group passed as first parameters
-# Subsequent parameters ((--realm, --user, --password, ...) are passed as-is to kcadm.sh
-function sfKeycloakGetGroup() {
-	[ $# -eq 0 ] && return 1
-	local name=$1
-	shift
-	sfKeycloakRun get groups "$@" | tail -n +1 | jq ".[] | select(.name == \"$name\")"
-}
-export -f sfKeycloakGetGroup
-
-function sfKeycloakDeleteGroup() {
-	[ $# -eq 0 ] && return 1
-	local name=$1
-	shift
-
-	local clientID=$(sfKeycloakGetGroup $name "$@")
-	[ -z "$clientID" ] && return 1
-
-	sfKeycloakRun delete clients/$clientID "$@"
-}
-export -f sfKeycloakDeleteGroup
-
 function sfSystemctl-exists() {
-	[ $(systemctl list-unit-files "${1}*" | wc -l) -gt 3 ]
+	[ "$(systemctl list-unit-files "${1}*" | wc -l)" -gt 3 ]
 }
 export -f sfSystemctl-exists
 
@@ -1001,7 +781,7 @@ function sfDoesDockerRunContainer() {
 	local LIST=$(docker container ls {{ "--format '{{.Image}}|{{.Names}}|{{.Status}}'" }})
 	[ -z "$LIST" ] && return 1
 	[ "$IMAGE" != "$(echo "$LIST" | cut -d'|' -f1 | grep "$IMAGE" | uniq)" ] && return 1
-	[ ! -z "$INSTANCE" -a "$INSTANCE" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE" | uniq)" ] && return 1
+	[ ! -z "$INSTANCE" ] && [ "$INSTANCE" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE" | uniq)" ] && return 1
 	echo $LIST | cut -d'|' -f3 | grep -i "^up" &>/dev/null || return 1
 	return 0
 }
@@ -1133,7 +913,7 @@ export -f sfRandomString
 # Workaround for associative array not exported in bash
 declare -x SERIALIZED_FACTS=$(mktemp)
 function factsCleanup() {
-	rm -f "$SERIALIZED_FACTS" &>/dev/null
+	rm -f "$SERIALIZED_FACTS" &>/dev/null || true
 }
 trap factsCleanup exit
 # --------
@@ -1219,14 +999,15 @@ function sfDetectFacts() {
 		[ -z "$id" ] && id=$(docker ps --filter "name=kong_proxy_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
 		FACTS["edgeproxy4subnet_docker_id"]=$id
 
-		id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
-		FACTS["ingress4platform_docker_id"]=$id
-
-		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2 || true)
-		FACTS["postgresql4platform_docker_id"]=$id
-
-		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2 || true)
-		FACTS["keycloak4platform_docker_id"]=$id
+# VPL: not used anymore
+#		id=$(docker ps --filter "name=ingress4platform_server_1" {{ "--format '{{.ID}}'" }} 2>/dev/null || true)
+#		FACTS["ingress4platform_docker_id"]=$id
+#
+#		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep postgresql4platform_db | cut -d: -f2 || true)
+#		FACTS["postgresql4platform_docker_id"]=$id
+#
+#		id=$(docker ps {{ "--format '{{.Names}}:{{.ID}}'" }} 2>/dev/null | grep keycloak4platform_server | cut -d: -f2 || true)
+#		FACTS["keycloak4platform_docker_id"]=$id
 	fi
 
 	# "Serialize" facts to file
@@ -1252,6 +1033,9 @@ function waitForUserdata() {
 }
 export -f waitForUserdata
 
-waitForUserdata
-sfDetectFacts
-set -x
+# .bats files are only on dev environments
+if [ ! -f ./bash_library.bats ]; then
+    set -x
+    waitForUserdata
+    sfDetectFacts
+fi

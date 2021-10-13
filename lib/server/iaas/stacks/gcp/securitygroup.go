@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	uuid "github.com/satori/go.uuid"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -48,7 +49,7 @@ func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 
 // CreateSecurityGroup creates a security group
 // Actually creates GCP Firewall Rules corresponding to the Security Group rules
-func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, xerr fail.Error) {
+func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -73,18 +74,27 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 	asg.Rules = rules
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			for _, v := range asg.Rules {
 				for _, r := range v.IDs {
 					if derr := s.rpcDeleteFirewallRuleByID(r); derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
+						switch ferr.(type) {
+						case *fail.ErrNotFound:
+							// rule not found, considered as a removal success
+							debug.IgnoreError(ferr)
+							continue
+						default:
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete firewall rule %s", r))
+						}
 					}
+					logrus.Debugf("Deleted rule: %s", r)
 				}
 			}
 		}
 	}()
 
 	for k, v := range asg.Rules {
+		var xerr fail.Error
 		asg, xerr = s.AddRuleToSecurityGroup(asg, v)
 		if xerr != nil {
 			return nullASG, fail.Wrap(xerr, "failed adding rule #%d", k)
@@ -184,10 +194,13 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 					switch xerr.(type) {
 					case *fail.ErrNotFound:
 						// rule not found, considered as a removal success
+						debug.IgnoreError(xerr)
+						continue
 					default:
 						return fail.Wrap(xerr, "failed to delete rule %d", k)
 					}
 				}
+				logrus.Debugf("Deleted rule: %s", r)
 			}
 		}
 	}
@@ -195,7 +208,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 }
 
 // InspectSecurityGroup returns information about a security group
-// Actually there is no Security Group resource in GCP, so this function always returns a *fail.ErrNotAvailable error
+// Actually there is no Security Group resource in GCP, so this function always returns a *fail.NotImplementedError error
 func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	if s.IsNull() {
 		return &abstract.SecurityGroup{}, fail.InvalidInstanceError()
@@ -205,7 +218,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		return asg, fail.InvalidParameterError("sgParam", "must be consistent")
 	}
 
-	return asg, fail.NotAvailableError("no real Security Group resource proposed by gcp")
+	return asg, fail.NotImplementedError("no real Security Group resource proposed by gcp")
 }
 
 // ClearSecurityGroup removes all rules but keep group
@@ -229,8 +242,16 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 		for k, v := range asg.Rules {
 			for _, r := range v.IDs {
 				if xerr = s.rpcDeleteFirewallRuleByID(r); xerr != nil {
-					return asg, fail.Wrap(xerr, "failed to delete rule %d", k)
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						// rule not found, considered as a removal success
+						debug.IgnoreError(xerr)
+						continue
+					default:
+						return asg, fail.Wrap(xerr, "failed to delete rule %d", k)
+					}
 				}
+				logrus.Debugf("Deleted rule: %s", r)
 			}
 			v.IDs = []string{}
 		}
@@ -267,12 +288,14 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 	if xerr != nil {
 		return asg, xerr
 	}
+
 	ruleName := fmt.Sprintf("%s-%d", asg.ID, len(asg.Rules))
-	// description := fmt.Sprintf("SafeScale SG '%s', rule #%d", asg.Name, len(asg.Rules))
 	resp, xerr := s.rpcCreateFirewallRule(ruleName, asg.Network, rule.Description, direction, sourcesUseGroups, sources, targetsUseGroups, destinations, allowed, nil)
 	if xerr != nil {
 		return asg, xerr
 	}
+
+	logrus.Debugf("Created rule: %d with name %s", resp.Id, resp.Name)
 	rule.IDs = append(rule.IDs, fmt.Sprintf("%d", resp.Id))
 	asg.Rules = append(asg.Rules, rule)
 	return asg, nil

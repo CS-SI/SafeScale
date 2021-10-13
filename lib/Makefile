@@ -25,7 +25,11 @@ vet:
 	@$(GO) vet ./...
 
 test:
-	@$(GO) test $(RACE_CHECK_TEST) -v ./...
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -v ./...
+	@(cd system && $(MAKE) $(@))
+
+bashtest:
+	@(cd system && $(MAKE) $(@))
 
 gensrc:
 	@(mkdir -p mocks) || true
@@ -37,6 +41,12 @@ generate: gensrc sdk
 	@(cd server && $(MAKE) $@)
 	@(cd system && $(MAKE) $@)
 	@(cd utils && $(MAKE) $@)
+
+sdk: gensrc
+	@(cd protocol && $(MAKE) $@)
+
+force_sdk_python: gensrc
+	@(cd protocol && $(MAKE) force_sdk_python)
 
 lib/protocol:
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Building protocol, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

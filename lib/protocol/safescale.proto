@@ -65,6 +65,7 @@ message TenantCleanupRequest {
 message TenantUpgradeRequest {
 	string name = 1;
 	bool force = 2;
+	bool dry_run = 3;
 }
 
 message TenantScanRequest {
@@ -383,6 +384,7 @@ message Host {
 	repeated string attached_volume_names = 12;
 	string password = 13;
 	int32 ssh_port = 14;
+	string state_label = 15;
 }
 
 message HostStatus {
@@ -827,6 +829,7 @@ message ClusterNetwork {
 	string endpoint_ip = 11;
 	//ClusterNetworkState network_state = 12;      // ???
 	// repeated Host gateways = 13; // To allow less limited number of gateways in the future ?
+	string subnet_id = 14;
 }
 
 message ClusterResponse {

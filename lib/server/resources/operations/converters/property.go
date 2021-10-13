@@ -110,6 +110,7 @@ func ClusterDefaultsFromPropertyToProtocol(in propertiesv2.ClusterDefaults) *pro
 func ClusterNetworkFromPropertyToProtocol(in propertiesv3.ClusterNetwork) *protocol.ClusterNetwork {
 	return &protocol.ClusterNetwork{
 		NetworkId:          in.NetworkID,
+		SubnetId:           in.SubnetID,
 		Cidr:               in.CIDR,
 		Domain:             in.Domain,
 		GatewayId:          in.GatewayID,
@@ -142,10 +143,10 @@ func ClusterFeaturesFromPropertyToProtocol(in propertiesv1.ClusterFeatures) (*pr
 		}
 
 		item := &protocol.FeatureResponse{
-			Name: k,
-			FileName: v.FileName,
+			Name:       k,
+			FileName:   v.FileName,
 			RequiredBy: requiredBy,
-			Requires: requires,
+			Requires:   requires,
 		}
 		installed.Features = append(installed.Features, item)
 	}

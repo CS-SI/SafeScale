@@ -25,7 +25,10 @@ fi
 
 stamp=`date +"%s"`
 
-BRANCH_NAME=$VERNAME PROTOVERSION=3.17.3 GOVERSION=1.15.9 envsubst <Dockerfile.cover.local > Dockerfile.$stamp
+[ -z "$GOVERSION" ] && GOVERSION=1.16.8
+[ -z "$PROTOVERSION" ] && PROTOVERSION=3.17.3
+
+BRANCH_NAME=$VERNAME PROTOVERSION=$PROTOVERSION GOVERSION=$GOVERSION envsubst <Dockerfile.cover.local > Dockerfile.$stamp
 docker build --rm --network host --build-arg http_proxy=$http_proxy --build-arg https_proxy=$https_proxy -f ${WRKDIR}/Dockerfile.$stamp -t safescale:local-$VERNAME ${WRKDIR}
 if [ $? -ne 0 ]; then
   echo "Docker build failed !!"

@@ -35,6 +35,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 )
@@ -42,67 +43,36 @@ import (
 // Content is the structure to apply to userdata.sh template
 type Content struct {
 	// BashLibrary contains the bash library
-	BashLibrary string
-	// Header is the bash header for scripts
-	Header string
-	// Revision is the git revision used to build SafeScale
-	Revision string
-	// User is the name of the default user (api.DefaultUser)
-	User string
-	// ExitOnError helper to quit script on error
-	ExitOnError string
-	// Password for the user safescale (for troubleshoot use, usable only in console)
-	Password string
-	// FirstPublicKey is the public key used for first connection after Host creation
-	FirstPublicKey string
-	// FirstPrivateKey is the private key used for first connection after Host creation
-	FirstPrivateKey string
-	// FirstPublicKey is the public key used to connect to Host starting phase3 (disabling FirstPublicKey)
-	FinalPublicKey string
-	// FinalPrivateKey is the private key used to connect tp Host starting phase3 (disabling FirstPrivateKey)
-	FinalPrivateKey string
-	// ConfIF, if set to true, configure all interfaces to DHCP
-	ConfIF bool
-	// IsGateway, if set to true, activate IP forwarding
-	IsGateway bool
-	// PublicIP contains a public IP binded to the host
-	PublicIP string
-	// AddGateway, if set to true, configure default gateway
-	AddGateway bool
-	// DNSServers contains the list of DNS servers to use
-	// Used only if IsGateway is true
-	DNSServers []string
-	// CIDR contains the cidr of the network
-	CIDR string
-	// DefaultRouteIP is the IP of the gateway or the VIP if gateway HA is enabled
-	DefaultRouteIP string
-	// EndpointIP is the IP of the gateway or the VIP if gateway HA is enabled
-	EndpointIP string
-	// PrimaryGatewayPrivateIP is the private IP of the primary gateway
-	PrimaryGatewayPrivateIP string
-	// PrimaryGatewayPublicIP is the public IP of the primary gateway
-	PrimaryGatewayPublicIP string
-	// SecondaryGatewayPrivateIP is the private IP of the secondary gateway
-	SecondaryGatewayPrivateIP string
-	// SecondaryGatewayPublicIP is the public IP of the secondary gateway
-	SecondaryGatewayPublicIP string
-	// EmulatedPublicNet is a private network which is used to emulate a public one
-	EmulatedPublicNet string
-	// HostName contains the name wanted as host name (default == name of the Cloud resource)
-	HostName string
-	// Tags contains tags and their content(s); a tag is named #<tag> in the template
-	Tags map[Phase]map[string][]string
-	// IsPrimaryGateway tells if the host is a primary gateway
-	IsPrimaryGateway bool
-	// // PrivateVIP contains the private IP of the VIP instance if it exists
-	// PublicVIP string // VPL: change to getEndpointIP
-	// // PrivateVIP contains the private IP of the VIP instance if it exists
-	// PrivateVIP string // VPL: change to defaultRouteIP
-	// GatewayHAKeepalivedPassword contains the password to use in keepalived configurations
-	GatewayHAKeepalivedPassword string
+	system.BashLibraryDefinition
 
-	ProviderName     string
-	BuildSubnetworks bool
+	Header                      string                        // is the bash header for scripts
+	Revision                    string                        // is the git revision used to build SafeScale
+	Username                    string                        // is the name of the default user (api.DefaultUser)
+	ExitOnError                 string                        // helper to quit script on error
+	Password                    string                        // for the user safescale (for troubleshoot use, usable only in console)
+	FirstPublicKey              string                        // is the public key used for first connection after Host creation
+	FirstPrivateKey             string                        // is the private key used for first connection after Host creation
+	FinalPublicKey              string                        // is the public key used to connect to Host starting phase3 (disabling FirstPublicKey)
+	FinalPrivateKey             string                        // is the private key used to connect tp Host starting phase3 (disabling FirstPrivateKey)
+	ConfIF                      bool                          // if set to true, configure all interfaces to DHCP
+	IsGateway                   bool                          // if set to true, activate IP forwarding
+	PublicIP                    string                        // contains a public IP binded to the host
+	AddGateway                  bool                          // if set to true, configure default gateway
+	DNSServers                  []string                      // contains the list of DNS servers to use; used only if IsGateway is true
+	CIDR                        string                        // contains the cidr of the network
+	DefaultRouteIP              string                        // is the IP of the gateway or the VIP if gateway HA is enabled
+	EndpointIP                  string                        // is the IP of the gateway or the VIP if gateway HA is enabled
+	PrimaryGatewayPrivateIP     string                        // is the private IP of the primary gateway
+	PrimaryGatewayPublicIP      string                        // is the public IP of the primary gateway
+	SecondaryGatewayPrivateIP   string                        // is the private IP of the secondary gateway
+	SecondaryGatewayPublicIP    string                        // is the public IP of the secondary gateway
+	EmulatedPublicNet           string                        // is a private network which is used to emulate a public one
+	HostName                    string                        // contains the name wanted as host name (default == name of the Cloud resource)
+	Tags                        map[Phase]map[string][]string // contains tags and their content(s); a tag is named #<tag> in the template
+	IsPrimaryGateway            bool                          // tells if the host is a primary gateway
+	GatewayHAKeepalivedPassword string                        // contains the password to use in keepalived configurations
+	ProviderName                string
+	BuildSubnetworks            bool
 	// Dashboard bool // Add kubernetes dashboard
 }
 
@@ -127,7 +97,7 @@ func NewContent() *Content {
 // OK ...
 func (ud Content) OK() bool { // FIXME: Complete function, mark struct fields as optional, then validate
 	result := true
-	result = result && ud.BashLibrary != ""
+	result = result && ud.BashLibraryDefinition.Content != ""
 	result = result && ud.HostName != ""
 	return result
 }
@@ -169,9 +139,9 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		dnsList = []string{"1.1.1.1"}
 	}
 
-	bashLibrary, err := system.GetBashLibrary()
-	if err != nil {
-		return err
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	if xerr != nil {
+		return xerr
 	}
 
 	exitOnErrorHeader := ""
@@ -184,10 +154,10 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		}
 	}
 
-	ud.BashLibrary = bashLibrary
+	ud.BashLibraryDefinition = *bashLibraryDefinition
 	ud.Header = scriptHeader
 	ud.Revision = REV
-	ud.User = operatorUsername
+	ud.Username = operatorUsername
 	ud.ExitOnError = exitOnErrorHeader
 	ud.FinalPublicKey = strings.Trim(request.KeyPair.PublicKey, "\n")
 	ud.FinalPrivateKey = strings.Trim(request.KeyPair.PrivateKey, "\n")
@@ -218,6 +188,20 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	ud.FirstPublicKey = kp.PublicKey
 
 	return nil
+}
+
+func (ud Content) ToMap() (map[string]interface{}, fail.Error) {
+	jsoned, err := json.Marshal(ud)
+	if err != nil {
+		return nil, fail.Wrap(err, "failed to convert struct to json")
+	}
+	var mapped map[string]interface{}
+	err = json.Unmarshal(jsoned, &mapped)
+	if err != nil {
+		return nil, fail.Wrap(err, "failed to convert json string to map")
+	}
+
+	return mapped, nil
 }
 
 // Generate generates the script file corresponding to the phase
@@ -267,6 +251,7 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 	if !ok {
 		return nil, fail.NotImplementedError("phase '%s' not managed", phase)
 	}
+
 	var tmpl *txttmpl.Template
 	if anon != nil {
 		tmpl = anon.Load().(*txttmpl.Template)
@@ -292,11 +277,19 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 		userdataPhaseTemplates[phase] = new(atomic.Value)
 		userdataPhaseTemplates[phase].Store(tmpl)
 	}
+
+	// Transforms struct content to map using json
+	mapped, xerr := ud.ToMap()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	buf := bytes.NewBufferString("")
-	err = tmpl.Execute(buf, ud)
+	err = tmpl.Option("missingkey=error").Execute(buf, mapped)
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
+
 	result = buf.Bytes()
 	for tagname, tagcontent := range ud.Tags[phase] {
 		for _, str := range tagcontent {

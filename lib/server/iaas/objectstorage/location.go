@@ -184,6 +184,39 @@ func (l location) ObjectStorageProtocol() string {
 	return l.config.Type
 }
 
+func (l location) estimateSize(prefix string) (int, error) {
+	containerSet := make(map[string]bool) // New empty set
+	currentPageSize := 10
+
+	for {
+		err := stow.WalkContainers(
+			l.stowLocation, prefix, currentPageSize,
+			func(c stow.Container, err error) error {
+				if err != nil {
+					return err
+				}
+
+				if containerSet[c.Name()] {
+					return fail.DuplicateError(fmt.Sprintf("we found a duplicate: %s, we had %d items by then", c.Name(), len(containerSet)))
+				}
+				containerSet[c.Name()] = true
+
+				return nil
+			},
+		)
+		if err != nil {
+			if _, ok := err.(fail.ErrDuplicate); ok { // begin again with twice the capacity
+				currentPageSize = 2 * currentPageSize
+				containerSet = make(map[string]bool)
+				continue
+			}
+			return -1, err
+		}
+		break
+	}
+	return currentPageSize, nil
+}
+
 // ListBuckets ...
 func (l location) ListBuckets(prefix string) (_ []string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -195,7 +228,13 @@ func (l location) ListBuckets(prefix string) (_ []string, xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", prefix).Entering().Exiting()
 
 	var list []string
-	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
+
+	estimatedPageSize, err := l.estimateSize(prefix)
+	if err != nil {
+		return list, fail.ConvertError(err)
+	}
+
+	err = stow.WalkContainers(l.stowLocation, stow.NoPrefix, estimatedPageSize,
 		func(c stow.Container, err error) error {
 			if err != nil {
 				return err
@@ -226,7 +265,13 @@ func (l location) FindBucket(bucketName string) (_ bool, xerr fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "(%s)", bucketName).Entering().Exiting()
 
 	found := false
-	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
+
+	estimatedPageSize, err := l.estimateSize(stow.NoPrefix)
+	if err != nil {
+		return false, fail.ConvertError(err)
+	}
+
+	err = stow.WalkContainers(l.stowLocation, stow.NoPrefix, estimatedPageSize,
 		func(c stow.Container, err error) error {
 			if err != nil {
 				logrus.Debugf("%v", err)
@@ -476,6 +521,7 @@ func (l location) ReadObject(bucketName, objectName string, writer io.Writer, fr
 		return err
 	}
 
+	objectName = strings.Trim(objectName, "/")
 	o, err := newObject(&b, objectName)
 	if err != nil {
 		return err

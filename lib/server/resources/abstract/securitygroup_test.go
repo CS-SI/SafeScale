@@ -66,3 +66,29 @@ func TestSecurityGroup_Clone(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestSecurityGroup_Replace(t *testing.T) {
+	sg := NewSecurityGroup()
+	sg.Name = "securitygroup"
+
+	sg.Rules = append(sg.Rules, &SecurityGroupRule{
+		Description: "run for cover",
+	})
+	sg.Rules = append(sg.Rules, &SecurityGroupRule{
+		Description: "the road is long",
+	})
+
+	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "don't")
+	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "look")
+	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "back")
+
+	sgc := NewSecurityGroup()
+	sgcr := sgc.Replace(sg)
+	assert.Equal(t, sgc, sgcr)
+
+	areEqual := reflect.DeepEqual(*sg, *(sgcr.(*SecurityGroup)))
+	if areEqual {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
+}

@@ -62,7 +62,7 @@ func randomIntWithReseed(min, max int) int {
 }
 
 func validTest(st int, latency int) bool {
-	iterations := int64(math.Ceil(float64(float64(st) / float64(latency))))
+	iterations := int64(math.Ceil(float64(st) / float64(latency)))
 	tempo := time.Duration(latency) * time.Millisecond
 	count := int64(0)
 	begin := time.Now()
@@ -77,151 +77,113 @@ func validTest(st int, latency int) bool {
 	}
 
 	elapsed := time.Since(begin)
-	if elapsed > time.Duration(st+latency)*time.Millisecond {
-		// fmt.Printf("this happened %d, %d, %d, %s\n", st, latency, iterations, elapsed)
-		return false
-	}
+	return elapsed <= time.Duration(st+latency)*time.Millisecond
+}
 
-	return true
+func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool, custom func(chan string) error) TaskAction {
+	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
+		traceR := newTracer(t, false) // change to true to display traces
+
+		type internalRes struct {
+			ir  interface{}
+			err error
+		}
+
+		if actionHandlesPanicByItself {
+			defer fail.OnPanic(&xerr)
+		}
+
+		ctx := t.Context()
+
+		weWereAborted := false
+		rd := randomInt(low, high)
+
+		resch := make(chan internalRes)
+		go func() {
+			iterations := int64(math.Ceil(float64(rd) / float64(latency)))
+			tempo := time.Duration(math.Min(float64(latency), float64(rd))) * time.Millisecond
+			count := int64(0)
+			begin := time.Now()
+			defer func() {
+				traceR.trace("low=%d, high=%d, tempo=%v, iterations=%d, took %v", low, high, tempo, iterations, time.Since(begin))
+			}()
+
+			wrongTest := false
+			realTime := time.Now()
+			for { // do some work, then look for aborted, again and again
+				if count >= iterations {
+					break
+				}
+				// some work
+				time.Sleep(tempo) // that is actually the latency between abortion and its check t.Aborted() in the line below
+				count++
+				if t.Aborted() {
+					// if so, we shouldn't be still running, sleep adds too much overhead
+					if time.Since(realTime) > time.Duration(rd+latency)*time.Millisecond {
+						wrongTest = true
+					}
+					traceR.trace("aborted after %d iterations (max allowed=%d)", count, iterations)
+					// Cleaning up first before leaving... ;)
+					if cleanfactor > 0 {
+						time.Sleep(time.Duration(randomInt(cleanfactor*low, cleanfactor*high)) * time.Millisecond)
+					}
+					weWereAborted = true
+					if custom != nil {
+						_ = custom(parameters.(chan string)) // for side-effects
+					}
+					break
+				}
+			}
+
+			// simulation of error conditions, starting by panic
+			coinFlip := rand.Float32() < probPanic
+			if coinFlip {
+				panic("it hurts")
+			}
+
+			if weWereAborted {
+				if wrongTest {
+					resch <- internalRes{
+						ir:  "",
+						err: fail.AbortedError(nil, "inconsistent"),
+					}
+					return
+				}
+				resch <- internalRes{
+					ir:  "we were killed",
+					err: fail.AbortedError(nil, "we were killed"),
+				}
+				return
+			}
+
+			if custom != nil {
+				_ = custom(parameters.(chan string)) // for side-effects
+			}
+
+			coinFlip = rand.Float32() < probError
+			var iErr error = nil
+			if coinFlip {
+				iErr = fmt.Errorf("it was head")
+			}
+
+			resch <- internalRes{
+				ir:  "Ahhhh",
+				err: fail.ConvertError(iErr),
+			}
+			return // nolint
+		}()
+
+		select {
+		case res := <-resch:
+			return res.ir, fail.ConvertError(res.err)
+		case <-time.After(time.Duration(rd-1) * time.Millisecond):
+			return "Ahhhh", nil
+		case <-ctx.Done():
+			return "we were killed", fail.AbortedError(nil, "we were killed")
+		}
+	}
 }
 
 func taskgen(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool) TaskAction {
-	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
-		traceR := newTracer(t, true) // change to true to display traces
-
-		if actionHandlesPanicByItself {
-			defer fail.OnPanic(&xerr)
-		}
-
-		weWereAborted := false
-		rd := randomInt(low, high)
-
-		/*
-			if !validTest(high, latency) {
-				fmt.Printf("This is a dangerous configuration: %d, %d\n", high, latency)
-				return "", fail.AbortedError(nil, "inconsistent")
-			}
-		*/
-
-		iterations := int64(math.Ceil(float64(float64(rd) / float64(latency))))
-		tempo := time.Duration(math.Min(float64(latency), float64(high))) * time.Millisecond
-		count := int64(0)
-		begin := time.Now()
-		defer func() {
-			traceR.trace("low=%d, high=%d, tempo=%v, iterations=%d, took %v", low, high, tempo, iterations, time.Since(begin))
-		}()
-
-		wrongTest := false
-		realTime := time.Now()
-		for { // do some work, then look for aborted, again and again
-			if count >= iterations {
-				break
-			}
-			// some work
-			time.Sleep(tempo) // that is actually the latency between abortion and its check t.Aborted() in the line below
-			count++
-			if t.Aborted() {
-				// if so, we shouldn't be still running, sleep adds too much overhead
-				if time.Since(realTime) > time.Duration(rd+latency)*time.Millisecond {
-					wrongTest = true
-				}
-				traceR.trace("aborted after %d iterations (max allowed=%d)", count, iterations)
-				// Cleaning up first before leaving... ;)
-				if cleanfactor > 0 {
-					time.Sleep(time.Duration(randomInt(cleanfactor*low, cleanfactor*high)) * time.Millisecond)
-				}
-				weWereAborted = true
-				break
-			}
-		}
-
-		// simulation of error conditions, starting by panic
-		coinFlip := rand.Float32() < probPanic
-		if coinFlip {
-			panic("it hurts")
-		}
-
-		if weWereAborted {
-			if wrongTest {
-				return "", fail.AbortedError(nil, "inconsistent")
-			}
-			return "", fail.AbortedError(nil, "we were killed") // better to return a 'zero' value as the 1st return value
-		}
-
-		coinFlip = rand.Float32() < probError
-		var iErr error = nil
-		if coinFlip {
-			iErr = fmt.Errorf("it was head")
-		}
-
-		return "Ahhhh", fail.ConvertError(iErr)
-	}
-}
-
-func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, probError float32, probPanic float32, actionHandlesPanicByItself bool, custom func() error) TaskAction {
-	return func(t Task, parameters TaskParameters) (_ TaskResult, xerr fail.Error) {
-		traceR := newTracer(t, true) // change to true to display traces
-
-		if actionHandlesPanicByItself {
-			defer fail.OnPanic(&xerr)
-		}
-		rd := randomInt(low, high)
-
-		/*
-			if !validTest(high, latency) {
-				fmt.Printf("This is a dangerous configuration: %d, %d\n", rd, latency)
-				return "", fail.AbortedError(nil, "inconsistent")
-			}
-		*/
-
-		iterations := int64(math.Ceil(float64(float64(rd) / float64(latency))))
-		tempo := time.Duration(math.Min(float64(latency), float64(high))) * time.Millisecond
-		count := int64(0)
-		var iErr error = nil
-		begin := time.Now()
-		defer func() {
-			traceR.trace("low=%d, high=%d, tempo=%v, iterations=%d, took %v", low, high, tempo, iterations, time.Since(begin))
-		}()
-
-		weWereAborted := false
-		for { // do some work, then look for aborted, again and again
-			if count >= iterations {
-				break
-			}
-			// some work
-			time.Sleep(tempo) // that is actually the latency between abortion and its check t.Aborted() in the line below
-			if t.Aborted() {
-				// Cleaning up first before leaving... ;)
-				if cleanfactor > 0 {
-					time.Sleep(time.Duration(randomInt(cleanfactor*low, cleanfactor*high)) * time.Millisecond)
-				}
-				weWereAborted = true
-				if custom != nil {
-					_ = custom() // for side-effects
-				}
-				break
-			}
-			count++
-		}
-
-		if custom != nil {
-			_ = custom() // for side-effects
-		}
-		// simulation of error conditions, starting by panic
-		coinFlip := rand.Float32() < probPanic
-		if coinFlip {
-			panic("it hurts")
-		}
-
-		if weWereAborted {
-			return "", fail.AbortedError(nil, "we were killed")
-		}
-
-		coinFlip = rand.Float32() < probError
-		if coinFlip {
-			iErr = fmt.Errorf("it was head")
-		}
-
-		return "Ahhhh", fail.ConvertError(iErr)
-	}
+	return taskgenWithCustomFunc(low, high, latency, cleanfactor, probError, probPanic, actionHandlesPanicByItself, nil)
 }

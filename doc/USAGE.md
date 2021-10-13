@@ -465,7 +465,7 @@ The following actions are available:
         "disk_size_Gb": 20,
         "hypervisor": "KVM",
         "image_id": "c48cd747-14be-4e73-9a8b-6c9a1bec6ceb",
-        "image_name": "Ubuntu 18.04",
+        "image_name": "Ubuntu 20.04",
         "last_updated": "Wednesday, 24-Feb-21 18:53:22 CET",
         "main_disk_speed_MBps": 228.61,
         "main_disk_type": "HDD",
@@ -531,7 +531,7 @@ The following actions are proposed:
         <li><code>--gwname &lt;host_name&gt;</code>
             Name of the gateway (<code>gw-&lt;subnet_name&gt;</code> by default)</li>
         <li><code>--os "&lt;os_name&gt;"</code>
-            Image name for the gateway (default: "Ubuntu 18.04")</li>
+            Image name for the gateway (default: "Ubuntu 20.04")</li>
         <li><code>--failover</code>
             creates 2 gateways for the network and a Virtual IP used as internal default route for the automatically created <code>Subnet</code></li>
         <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of gateway (refer to <a href="#safescale_sizing">Host sizing definition</a>a> paragraph for details)</li>
@@ -692,7 +692,7 @@ The following actions are proposed:
       <ul>
         <li><code>--cidr &lt;cidr&gt;</code> CIDR of the network (default: "192.168.0.0/24")</li>
         <li><code>--gwname &lt;name&gt;</code> name of the gateway (default: <code>gw-&lt;subnet_name&gt;</code>)</li>
-        <li><code>--os "&lt;os name&gt;"</code> Image name for the gateway (default: "Ubuntu 18.04")</li>
+        <li><code>--os "&lt;os name&gt;"</code> Image name for the gateway (default: "Ubuntu 20.04")</li>
         <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of gateway (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details)</li>
         <li><code>--failover</code>creates 2 gateways for the network with a VIP used as internal default route. The names of the gateways cannot be changed, and will be <code>gw-&lt;subnet_name&gt;</code> and <code>gw2-&lt;subnet_name&gt;</code>
         </li>
@@ -2238,7 +2238,7 @@ The following actions are proposed:
               <li><code>helm</code> (flavor K8S)</li>
             </ul>
         </li>
-        <li><code>--os value</code> Image name for the servers (default: "Ubuntu 18.04", may be overriden by a cluster flavor)</li>
+        <li><code>--os value</code> Image name for the servers (default: "Ubuntu 20.04", may be overriden by a cluster flavor)</li>
         <li><code>-k</code> Keeps infrastructure created on failure; default behavior is to delete resources</li>
         <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of all hosts (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details)</li>
         <li><code>--gw-sizing &lt;sizing&gt;</code> Describes gateway sizing specifically (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details); takes precedence over <code>--sizing</code></li>
@@ -2270,7 +2270,7 @@ The following actions are proposed:
       <pre>$ safescale cluster inspect mycluster</pre>
       response on success:
       <pre>
-{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 18.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"XXXX"},"status":"success"}
+{"result":{"admin_login":"cladm","admin_password":"xxxxxxxxxxxxxx","cidr":"192.168.0.0/16","complexity":1,"complexity_label":"Small","default_route_ip":"192.168.2.245","defaults":{"gateway":{"max_cores":4,"max_ram_size":16,"min_cores":2,"min_disk_size":50,"min_gpu":-1,"min_ram_size":7},"image":"Ubuntu 20.04","master":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15},"node":{"max_cores":8,"max_ram_size":32,"min_cores":4,"min_disk_size":80,"min_gpu":-1,"min_ram_size":15}},"endpoint_ip":"51.83.34.144","features":{"disabled":{"proxycache":{}},"installed":{}},"flavor":2,"flavor_label":"K8S","gateway_ip":"192.168.2.245","last_state":5,"last_state_label":"Created","name":"mycluster","network_id":"6669a8db-db31-4272-9acd-da49dca07e14","nodes":{"masters":[{"id":"9874cbc6-bd17-4473-9552-1f7c9c7a2d6f","name":"mycluster-master-1","private_ip":"192.168.0.86","public_ip":""}],"nodes":[{"id":"019d2bcc-9d8c-4c76-a638-cf5612322dfa","name":"mycluster-node-1","private_ip":"192.168.1.74","public_ip":""}]},"primary_gateway_ip":"192.168.2.245","primary_public_ip":"51.83.34.144","remote_desktop":{"mycluster-master-1":["https://51.83.34.144/_platform/remotedesktop/mycluster-master-1/"]},"tenant":"XXXX"},"status":"success"}
       </pre>
       response on failure:
       <pre>

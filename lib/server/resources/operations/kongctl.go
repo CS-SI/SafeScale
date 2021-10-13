@@ -19,25 +19,24 @@ package operations
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -75,7 +74,6 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 		return nil, fail.InvalidParameterCannotBeNilError("subnet")
 	}
 
-
 	addressedGateway, xerr := subnet.InspectGateway(addressPrimaryGateway)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -109,7 +107,7 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 			xerr = addressedGateway.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) (innerXErr fail.Error) {
 					featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
-					if !ok{
+					if !ok {
 						return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
@@ -130,43 +128,9 @@ func NewKongController(ctx context.Context, svc iaas.Service, subnet resources.S
 			present = true
 		}
 
-
-	}
-
-	// entry, xerr := kongProxyCheckedCache.GetEntry(subnet.GetName())
-	// if xerr == nil {
-	// 	present = entry.Content().(cache.Bool).Value()
-	// } else {
-	// 	xerr := kongProxyCheckedCache.ReserveEntry(subnet.GetName())
-	// 	if xerr != nil {
-	// 		return nil, xerr
-	// 	}
-	//
-	// 	defer func() {
-	// 		if xerr != nil {
-	// 			derr := kongProxyCheckedCache.FreeEntry(subnet.GetName())
-	// 			if derr != nil {
-	// 				_ = xerr.AddConsequence(derr)
-	// 			}
-	// 		}
-	// 	}()
-	//
-	// 	results, xerr := featureInstance.Check(ctx, addressedGateway, data.Map{}, resources.FeatureSettings{})
-	// 	xerr = debug.InjectPlannedFail(xerr)
-	// 	if xerr != nil {
-	// 		return nil, fail.Wrap(xerr, "failed to check if feature 'edgeproxy4subnet' is installed on gateway '%s'", addressedGateway.GetName())
-	// 	}
-	// 	if !results.Successful() {
-	// 		return nil, fail.NotFoundError("feature 'edgeproxy4subnet' is not installed on gateway '%s'", addressedGateway.GetName())
-	// 	}
-	// 	entry, xerr = kongProxyCheckedCache.CommitEntry(subnet.GetName(), cache.NewBool(subnet.GetName(), true))
-	// 	if xerr != nil {
-	// 		return nil, xerr
-	// 	}
-	// 	present = true
-	// }
-	if !present {
-		return nil, fail.NotFoundError("'edgeproxy4subnet' feature is not installed on gateway '%s'", addressedGateway.GetName())
+		if !present {
+			return nil, fail.NotFoundError("'edgeproxy4subnet' feature is not installed on gateway '%s'", addressedGateway.GetName())
+		}
 	}
 
 	ctrl := &KongController{
@@ -351,7 +315,7 @@ func (k *KongController) realizeRuleData(content string, v data.Map) (string, fa
 		return "", fail.Wrap(xerr, "error preparing rule")
 	}
 	dataBuffer := bytes.NewBufferString("")
-	err := contentTmpl.Execute(dataBuffer, v)
+	err := contentTmpl.Option("missingkey=error").Execute(dataBuffer, v)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)

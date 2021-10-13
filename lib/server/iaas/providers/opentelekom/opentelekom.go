@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
@@ -29,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
@@ -36,6 +35,8 @@ import (
 )
 
 const (
+	opentelekomDefaultImage = "Ubuntu 20.04"
+
 	identityEndpointTemplate string = "https://iam.%s.otc.t-systems.com"
 )
 
@@ -86,6 +87,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = opentelekomDefaultImage
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -127,6 +133,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		ProviderName:       providerName,
 		DefaultNetworkName: vpcName,
 		DefaultNetworkCIDR: vpcCIDR,
+		DefaultImage:       defaultImage,
 	}
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
 	if xerr != nil {

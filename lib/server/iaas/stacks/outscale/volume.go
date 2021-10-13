@@ -28,7 +28,7 @@ import (
 )
 
 // CreateVolume creates a block volume
-func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, ferr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if s.IsNull() {
 		return nullAV, fail.InvalidInstanceError()
@@ -40,10 +40,19 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%v)", request).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	v, _ := s.InspectVolumeByName(request.Name)
-	if v != nil {
+	v, xerr := s.InspectVolumeByName(request.Name)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
+			break // nolint
+		default:
+			return nullAV, xerr
+		}
+	} else if v != nil {
 		return nullAV, abstract.ResourceDuplicateError("volume", request.Name)
 	}
+
 	IOPS := 0
 	if request.Speed == volumespeed.Ssd {
 		IOPS = request.Size * 300
@@ -57,9 +66,9 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume"))
 			}
 		}
 	}()
@@ -122,7 +131,7 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale"), "(%s)", volumeID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return retry.WhileUnsuccessfulDelay5SecondsTimeout(
+	return retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
 			vol, innerErr := s.InspectVolume(volumeID)
 			if innerErr != nil {
@@ -133,6 +142,7 @@ func (s stack) WaitForVolumeState(volumeID string, state volumestate.Enum) (xerr
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetHostTimeout(),
 	)
 }

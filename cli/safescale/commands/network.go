@@ -240,8 +240,8 @@ var networkCreate = &cli.Command{
 			Usage:   "If used, the resource(s) is(are) not deleted on failure (default: not set)",
 		},
 		&cli.StringFlag{
-			Name:  "os",
-			Value: "Ubuntu 18.04",
+			Name: "os",
+			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the gateway",
 		},
 		&cli.StringFlag{
@@ -418,7 +418,7 @@ var networkSecurityGroupInspect = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
-		formatted, err := reformatSecurityGroup(resp, false)
+		formatted, err := reformatSecurityGroup(resp, true)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -455,7 +455,7 @@ func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (
 				item["ether_type_label"] = strings.ToLower(ipversion.Enum(etherType).String())
 			}
 		} else {
-			out["rules"] = nil
+			out["rules"] = struct{}{}
 		}
 	}
 
@@ -621,13 +621,13 @@ var networkSecurityGroupBonds = &cli.Command{
 			result["hosts"] = hosts
 		}
 		if len(list.Subnets) > 0 {
-			networks := make([]map[string]interface{}, len(list.Subnets))
+			subnets := make([]map[string]interface{}, len(list.Subnets))
 			jsoned, _ := json.Marshal(list.Subnets)
-			err = json.Unmarshal(jsoned, &networks)
+			err = json.Unmarshal(jsoned, &subnets)
 			if err != nil {
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
 			}
-			result["networks"] = networks
+			result["subnets"] = subnets
 		}
 		if len(result) > 0 {
 			return clitools.SuccessResponse(result)
@@ -729,6 +729,12 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 			PortTo:      int32(c.Int("port-to")),
 			Targets:     c.StringSlice("cidr"),
 		}
+		switch rule.Direction {
+		case securitygroupruledirection.Ingress:
+			rule.Sources = c.StringSlice("cidr")
+		case securitygroupruledirection.Egress:
+			rule.Targets = c.StringSlice("cidr")
+		}
 
 		if err := clientSession.SecurityGroup.AddRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout()); err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -811,8 +817,14 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			Protocol:  c.String("protocol"),
 			PortFrom:  int32(c.Int("port-from")),
 			PortTo:    int32(c.Int("port-to")),
-			Targets:   c.StringSlice("cidr"),
 		}
+		switch rule.Direction {
+		case securitygroupruledirection.Ingress:
+			rule.Sources = c.StringSlice("cidr")
+		case securitygroupruledirection.Egress:
+			rule.Targets = c.StringSlice("cidr")
+		}
+
 		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -995,8 +1007,8 @@ var subnetCreate = &cli.Command{
 			Usage:   "cidr of the network",
 		},
 		&cli.StringFlag{
-			Name:  "os",
-			Value: "Ubuntu 18.04",
+			Name: "os",
+			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the gateway",
 		},
 		&cli.StringFlag{
@@ -1320,7 +1332,7 @@ var subnetSecurityGroupAddCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.BindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), c.Bool("disabled"), temporal.GetExecutionTimeout())
+		err := clientSession.Subnet.BindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "adding security group to network", false).Error())))
@@ -1369,7 +1381,7 @@ var subnetSecurityGroupRemoveCommand = &cli.Command{
 
 var subnetSecurityGroupListCommand = &cli.Command{
 	Name:      "list",
-	Aliases:   []string{"show"},
+	Aliases:   []string{"show", "ls"},
 	Usage:     "lists security groups bound to subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF",
 	Flags: []cli.Flag{

@@ -22,6 +22,17 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/pengux/check"
+	"github.com/sirupsen/logrus"
+
+	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
+	"github.com/gophercloud/gophercloud/pagination"
+
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -32,14 +43,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
-	"github.com/gophercloud/gophercloud/pagination"
-	"github.com/pengux/check"
-	"github.com/sirupsen/logrus"
 )
 
 // VPCRequest defines a request to create a VPC
@@ -116,7 +119,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 		return nullAN, normalizeError(err)
 	}
 
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs"
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs" // FIXME: Hardcoded endpoint
 	resp := vpcCreateResult{}
 	opts := gophercloud.RequestOpts{
 		JSONBody:     b,
@@ -191,7 +194,7 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	}
 
 	r := vpcGetResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -263,7 +266,7 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	}
 
 	r := vpcCommonResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs"
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs" // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -303,7 +306,7 @@ func (s stack) DeleteNetwork(id string) fail.Error {
 	}
 
 	r := vpcCommonResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201, 204},
@@ -350,11 +353,12 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (subnet *abstract.Subnet
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(req.NetworkID)
+			if xerr != nil {
+				return nullAS, xerr
+			}
 		default:
+			return nullAS, xerr
 		}
-	}
-	if xerr != nil {
-		return nullAS, xerr
 	}
 
 	// Checks if CIDR is valid for huaweicloud
@@ -471,7 +475,7 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	}
 
 	r := subnetGetResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets/" + id
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -506,7 +510,7 @@ func (s stack) ListSubnets(networkRef string) ([]*abstract.Subnet, fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets"
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets" // FIXME: Hardcoded endpoint
 	if networkRef != "" {
 		url += "?vpc_id=" + networkRef
 	}
@@ -566,7 +570,7 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 		}
 	}
 
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + as.Network + "/subnets/" + id
+	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + as.Network + "/subnets/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		OkCodes: []int{204},
 	}
@@ -594,6 +598,7 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 				case "409":
 					logrus.Debugf("Subnet still owns host(s), retrying in %s...", temporal.GetDefaultDelay())
 				default:
+					logrus.Warningf("unexpected error: %s", spew.Sdump(t.Err))
 					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), temporal.GetDefaultDelay())
 				}
 			}
@@ -682,7 +687,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	}
 
 	respCreate := subnetCreateResult{}
-	url := fmt.Sprintf("%sv1/%s/subnets", s.Stack.NetworkClient.Endpoint, s.authOpts.ProjectID)
+	url := fmt.Sprintf("%sv1/%s/subnets", s.Stack.NetworkClient.Endpoint, s.authOpts.ProjectID) // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONBody:     b,
 		JSONResponse: &respCreate.Body,
@@ -709,7 +714,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	opts.JSONResponse = &respGet.Body
 	opts.JSONBody = nil
 
-	retryErr := retry.WhileUnsuccessfulDelay1SecondWithNotify(
+	retryErr := retry.WhileUnsuccessfulWithNotify(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
@@ -726,6 +731,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 			}
 			return normalizeError(err)
 		},
+		temporal.GetMinDelay(),
 		temporal.GetContextTimeout(),
 		func(try retry.Try, v verdict.Enum) {
 			if v != verdict.Done {
@@ -733,7 +739,18 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 			}
 		},
 	)
-	return &subnet.Subnet, retryErr
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return nil, fail.Wrap(fail.Cause(retryErr), "stopping retries")
+		case *retry.ErrTimeout:
+			return nil, fail.Wrap(fail.Cause(retryErr), "timeout")
+		default:
+			return nil, retryErr
+		}
+	}
+
+	return &subnet.Subnet, nil
 }
 
 func fromIntIPVersion(v int) ipversion.Enum {

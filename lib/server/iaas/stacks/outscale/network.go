@@ -52,7 +52,7 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 }
 
 // CreateNetwork creates a network named name (in OutScale terminology, a Network corresponds to a VPC)
-func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network, xerr fail.Error) {
+func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network, ferr fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if s.IsNull() {
 		return nullAN, fail.InvalidInstanceError()
@@ -69,9 +69,9 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.DeleteNetwork(resp.NetId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", req.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", req.Name))
 			}
 		}
 	}()
@@ -98,7 +98,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 	return toAbstractNetwork(resp), nil
 }
 
-func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fail.Error {
+func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) (ferr fail.Error) {
 	if len(req.DNSServers) == 0 {
 		return nil
 	}
@@ -114,9 +114,9 @@ func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fai
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := s.deleteDhcpOptions(net, false)
-			_ = xerr.AddConsequence(derr)
+			_ = ferr.AddConsequence(derr)
 		}
 	}()
 
@@ -347,7 +347,7 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 }
 
 // CreateSubnet creates a Subnet
-func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xerr fail.Error) {
+func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
@@ -377,9 +377,9 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.rpcDeleteSubnet(resp.SubnetId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
 			}
 		}
 	}()
@@ -440,13 +440,14 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(networkRef)
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
 			return nil, xerr
 		}
 	}
-	if xerr != nil {
-		return nil, xerr
-	}
+
 	networkID = an.ID
 
 	resp, xerr := s.rpcReadSubnets(networkID, nil)
@@ -505,9 +506,9 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.E
 
 	if networkRef == "" {
 		networkRef = s.Options.Network.DefaultNetworkName
-	}
-	if networkRef == "" {
-		return nil, fail.InvalidParameterError("networkRef", "cannot be empty string if tenant does not set keyword 'VPCNAME' or 'DefaultNetworkName'")
+		if networkRef == "" {
+			return nil, fail.InvalidParameterError("networkRef", "cannot be empty string if tenant does not set keyword 'VPCNAME' or 'DefaultNetworkName'")
+		}
 	}
 
 	an, xerr := s.InspectNetwork(networkRef)

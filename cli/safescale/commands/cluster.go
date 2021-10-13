@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
@@ -34,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -256,14 +256,15 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 	var sgwpubip string
 	if c.Network != nil {
 		result["network_id"] = c.Network.NetworkId
+		result["subnet_id"] = c.Network.SubnetId
 		result["cidr"] = c.Network.Cidr
 		result["default_route_ip"] = c.Network.DefaultRouteIp
 		result["primary_gateway_ip"] = c.Network.GatewayIp
 		result["endpoint_ip"] = c.Network.EndpointIp
 		result["primary_public_ip"] = c.Network.EndpointIp
 		if sgwpubip = c.Network.SecondaryPublicIp; sgwpubip != "" {
-			result["secondary_gateway_ip"] = sgwpubip
 			result["secondary_public_ip"] = sgwpubip
+			result["secondary_gateway_ip"] = c.Network.SecondaryGatewayIp
 		}
 	}
 
@@ -293,37 +294,8 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 	}
 
 	result["last_state"] = c.State
+	result["last_state_label"] = c.State.String()
 	result["admin_login"] = "cladm"
-
-	// // Add information not directly in cluster GetConfig()
-	// // TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
-	// found := false
-	// if c.DisabledFeatures != nil && len(c.DisabledFeatures.Features) > 0 {
-	// 	for _, v := range c.DisabledFeatures.Features {
-	// 		if v.Name == "remotedesktop" {
-	// 			found = true
-	// 			break
-	// 		}
-	// 	}
-	// 	if !found {
-	// 		remoteDesktops := map[string][]string{}
-	// 		const urlFmt = "https://%s/_platform/remotedesktop/%s/"
-	// 		for _, v := range nodes["masters"] {
-	// 			urls := []string{fmt.Sprintf(urlFmt, result["EndpointIP"], v.Name)}
-	// 			if sgwpubip != "" {
-	// 				// VPL: no public VIP IP yet, so don't repeat primary gateway public IP
-	// 				// urls = append(urls, fmt.Sprintf(+urlFmt, netCfg.PrimaryPublicIP, host.Name))
-	// 				urls = append(urls, fmt.Sprintf(urlFmt, sgwpubip, v.Name))
-	// 			}
-	// 			remoteDesktops[v.Name] = urls
-	// 		}
-	// 		result["remote_desktop"] = remoteDesktops
-	// 	}
-	// }
-	// if found {
-	// 	result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale cluster add-feature %s remotedesktop'.",
-	// 		clusterName)
-	// }
 
 	return result, nil
 }
@@ -350,7 +322,7 @@ var clusterCreateCommand = &cli.Command{
 			Name:    "flavor",
 			Aliases: []string{"F"},
 			Value:   "K8S",
-			Usage: `Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S
+			Usage: `Defines the type of the cluster; can be BOH, K8S
 	Default sizing for each cluster type is:
 		BOH: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
 		K8S: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[15-32], disk=[80])
@@ -909,7 +881,7 @@ var clusterHelmCommand = &cli.Command{
 		}
 
 		clientID := GenerateClientIdentity()
-		useTLS := " --tls"
+		// useTLS := " --tls"
 		var filteredArgs []string
 		args := c.Args().Tail()
 		ignoreNext := false
@@ -922,16 +894,16 @@ var clusterHelmCommand = &cli.Command{
 			}
 			ignore := false
 			switch arg {
-			case "--help":
-				useTLS = ""
+			//case "--help":
+			//	useTLS = ""
 			case "init":
 				if idx == 0 {
 					return cli.NewExitError("helm init is forbidden", int(exitcode.InvalidArgument))
 				}
-			case "search", "repo", "help":
-				if idx == 0 {
-					useTLS = ""
-				}
+			//case "search", "repo", "help", "install", "uninstall":
+			//	if idx == 0 {
+			//		useTLS = ""
+			//	}
 			case "--":
 				ignore = true
 			case "-f", "--values":
@@ -985,7 +957,7 @@ var clusterHelmCommand = &cli.Command{
 				filteredArgs = append(filteredArgs, arg)
 			}
 		}
-		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") + useTLS
+		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") // + useTLS
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -1212,8 +1184,8 @@ var clusterNodeDeleteCommand = &cli.Command{
 
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:    "assume-yes",
-			Aliases: []string{"yes", "y"},
+			Name:    "yes",
+			Aliases: []string{"y"},
 			Usage:   "If set, respond automatically yes to all questions",
 		},
 		&cli.BoolFlag{
@@ -1235,16 +1207,26 @@ var clusterNodeDeleteCommand = &cli.Command{
 		yes := c.Bool("yes")
 		force := c.Bool("force")
 
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		_, err = clientSession.Cluster.Inspect(clusterName, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
+		}
+
+		if len(nodeList) == 0 {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, "missing nodes"))
+		}
+
 		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node%s '%s' of the cluster '%s'", strprocess.Plural(uint(len(nodeList))), strings.Join(nodeList, ","), clusterName)) {
 			return clitools.SuccessResponse("Aborted")
 		}
 		if force {
 			logrus.Println("'-f,--force' does nothing yet")
-		}
-
-		clientSession, xerr := client.New(c.String("server"))
-		if xerr != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
 		err = clientSession.Cluster.DeleteNode(clusterName, nodeList, 0)

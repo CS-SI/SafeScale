@@ -33,7 +33,7 @@ type TaskGroupResult = map[string]TaskResult
 
 // TaskGroupGuard is the task group interface defining method to wait the TaskGroup
 type TaskGroupGuard interface {
-	GetStarted() (uint, fail.Error)
+	Started() (uint, fail.Error)
 	TryWaitGroup() (bool, map[string]TaskResult, fail.Error)
 	WaitGroup() (map[string]TaskResult, fail.Error)
 	WaitGroupFor(time.Duration) (bool, map[string]TaskResult, fail.Error)
@@ -47,7 +47,7 @@ type TaskGroup interface {
 	TaskGuard
 	TaskGroupGuard
 
-	GetGroupStatus() (map[TaskStatus][]string, fail.Error)
+	GroupStatus() (map[TaskStatus][]string, fail.Error)
 }
 
 type subTask struct {
@@ -128,12 +128,12 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 
 	if len(options) > 0 {
 		for _, v := range options {
-			switch v.Key() {
+			switch v.Key() { // nolint
 			case keywordInheritParentIDOption:
 				// this option orders copying ParentTask.ID to children; the latter are responsible to update their own ID
 				value, ok := v.Value().(bool)
 				if ok && value && parentTask != nil {
-					id, xerr := parentTask.GetID()
+					id, xerr := parentTask.ID()
 					if xerr != nil {
 						return nil, xerr
 					}
@@ -179,11 +179,11 @@ func (instance *taskGroup) GetID() (string, fail.Error) {
 		return "", fail.InvalidInstanceError()
 	}
 
-	return instance.task.GetID()
+	return instance.task.ID()
 }
 
-// GetSignature builds the "signature" of the task group, ie a string representation of the task ID in the format "{taskgroup <id>}".
-func (instance *taskGroup) GetSignature() string {
+// Signature builds the "signature" of the task group, ie a string representation of the task ID in the format "{taskgroup <id>}".
+func (instance *taskGroup) Signature() string {
 	if instance.isNull() {
 		return ""
 	}
@@ -193,22 +193,22 @@ func (instance *taskGroup) GetSignature() string {
 	return `{taskGroup ` + tid + `}`
 }
 
-// GetStatus returns the current status of the TaskGroup (ie the parent Task running the children)
-func (instance *taskGroup) GetStatus() (TaskStatus, fail.Error) {
+// Status returns the current status of the TaskGroup (ie the parent Task running the children)
+func (instance *taskGroup) Status() (TaskStatus, fail.Error) {
 	if instance.isNull() {
 		return TaskStatus(0), fail.InvalidInstanceError()
 	}
 
-	return instance.task.GetStatus()
+	return instance.task.Status()
 }
 
-// GetContext returns the current task status
-func (instance *taskGroup) GetContext() context.Context {
+// Context returns the TaskGroup context
+func (instance *taskGroup) Context() context.Context {
 	if instance.isNull() {
 		return context.TODO()
 	}
 
-	return instance.task.GetContext()
+	return instance.task.Context()
 }
 
 // SetID allows specifying task ID. The uniqueness of the ID through all the tasks
@@ -243,7 +243,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	instance.children.lock.Lock()
 	defer instance.children.lock.Unlock()
 
-	status, err := instance.GetStatus()
+	status, err := instance.Status()
 	if err != nil {
 		return instance, err
 	}
@@ -270,7 +270,9 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 			for _, v := range options {
 				switch v.Key() {
 				case "normalize_error":
-					newChild.normalizeError = v.Value().(func(error) error) // FIXME: Unchecked cast
+					if casted, ok := v.Value().(func(error) error); ok {
+						newChild.normalizeError = casted
+					}
 				default:
 				}
 			}
@@ -279,7 +281,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 		if timeout > 0 {
 			_, xerr = subtask.StartWithTimeout(action, params, timeout, options...)
 		} else {
-			_, xerr = subtask.Start(action, params)
+			_, xerr = subtask.Start(action, params, options...)
 		}
 		if xerr != nil {
 			return nil, err
@@ -301,7 +303,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 					if aborted {
 						return nil, fail.AbortedError(nil)
 					}
-					time.Sleep(50 * time.Millisecond) // FIXME: hardcoded value :-(
+					time.Sleep(100 * time.Microsecond) // FIXME: hardcoded value :-(
 				}
 			}
 
@@ -323,18 +325,6 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 	default:
 		return nil, fail.InconsistentError("cannot start a new Task in TaskGroup: unknown status (%s)", status)
 	}
-}
-
-// IsSuccessful tells if the TaskGroup has been executed without error
-func (instance *taskGroup) IsSuccessful() (bool, fail.Error) {
-	if instance.isNull() {
-		return false, fail.InvalidInstanceError()
-	}
-
-	instance.task.lock.RLock()
-	defer instance.task.lock.RUnlock()
-
-	return instance.task.IsSuccessful()
 }
 
 // Wait is a synonym to WaitGroup (exists to satisfy interface Task)
@@ -364,16 +354,22 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
+	started, xerr := instance.Started()
+	if xerr != nil {
+		return nil, xerr
+	}
+	// If nothing has been started, WaitGroup succeeds immediately
+	if started == 0 {
+		return nil, nil
+	}
+
 	tid, xerr := instance.GetID()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	childrenErrors := make(map[string]error)
-	results := make(TaskGroupResult, len(instance.children.tasks))
-
 	for {
-		status, xerr := instance.GetStatus()
+		status, xerr := instance.Status()
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -384,7 +380,12 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 
 		case DONE:
 			instance.task.lock.RLock()
+			//goland:noinspection GoDeferInLoop
 			defer instance.task.lock.RUnlock()
+
+			if fail.Cause(instance.task.err) == context.Canceled {
+				return instance.result, fail.AbortedError(instance.task.err)
+			}
 
 			return instance.result, instance.task.err
 
@@ -397,7 +398,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			// previousErr := instance.task.err
 			// instance.task.lock.RUnlock()
 
-			results, childrenErrors = instance.waitChildren()
+			results, childrenErrors := instance.waitChildren()
 			instance.result = results
 			if len(childrenErrors) == 0 {
 				instance.children.ended = true
@@ -451,7 +452,7 @@ func (instance *taskGroup) addErrorsAsConsequence(in map[string]error, out *fail
 		added := false
 		switch cerr := e.(type) {
 		case *fail.ErrAborted:
-			cause := fail.ConvertError(cerr.Cause())
+			cause := fail.ConvertError(fail.Cause(cerr))
 			if cause != nil {
 				_ = (*out).AddConsequence(fail.Wrap(cause, "%s", i))
 				added = true
@@ -471,7 +472,7 @@ func (instance *taskGroup) buildErrorList(in map[string]error) fail.Error {
 		added := false
 		switch cerr := e.(type) {
 		case *fail.ErrAborted:
-			cause := fail.ConvertError(cerr.Cause())
+			cause := fail.ConvertError(fail.Cause(cerr))
 			if cause != nil {
 				errors = append(errors, fail.Wrap(cause, "%s", child))
 				added = true
@@ -497,7 +498,7 @@ func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
 
 	for _, s := range instance.children.tasks {
 		for {
-			sid, err := s.task.GetID()
+			sid, err := s.task.ID()
 			if err != nil {
 				break
 			}
@@ -506,10 +507,18 @@ func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
 			if err != nil {
 				if s.normalizeError != nil {
 					if normalizedError := s.normalizeError(err); normalizedError != nil {
-						errorList[sid] = normalizedError
+						if fail.Cause(normalizedError) == context.Canceled {
+							errorList[sid] = fail.AbortedError(normalizedError)
+						} else {
+							errorList[sid] = normalizedError
+						}
 					}
 				} else {
-					errorList[sid] = err
+					if fail.Cause(err) == context.Canceled {
+						errorList[sid] = fail.AbortedError(err)
+					} else {
+						errorList[sid] = err
+					}
 				}
 			}
 
@@ -545,7 +554,7 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 		return false, nil, xerr
 	}
 
-	taskStatus, xerr := instance.task.GetStatus()
+	taskStatus, xerr := instance.task.Status()
 	if xerr != nil {
 		return false, nil, xerr
 	}
@@ -616,16 +625,16 @@ func (instance *taskGroup) WaitFor(duration time.Duration) (bool, TaskResult, fa
 	return instance.WaitGroupFor(duration)
 }
 
-// WaitGroupFor waits for the task to end, for 'duration' duration
+// WaitGroupFor waits for the task to end, for 'timeout' duration
+// Note: if 'timeout' is reached, the TaskGroup IS NOT ABORTED. You have to abort then wait for it explicitly if needed.
 // Returns:
 // - true, TaskGroupResult, nil: Wait worked and TaskGroup generated no error
-// - false, nil, *fail.ErrInconsistent: cannot wait on a TaskGroup not started
-// - true, TaskGroupResult, *fail.ErrAborted: TaskGroup terminated on Abort (and possible generated error after
-//                                           abort signal has been received would be attached to the error as consequence)
+// - true, TaskGroupResult, *fail.ErrAborted: TaskGroup terminated on Abort (and possible generated error, after
+//                                            abort signal has been received, would be attached to the error as consequence)
 // - true, TaskGroupResult, fail.Error: TaskGroup terminated, but generated an error
-// - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out; TaskGroup is aborted in case of timeout (and possible generated
-//                                 error after abort signal has been received would be attached to the error as consequence)
-func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroupResult, fail.Error) {
+// - false, nil, *fail.ErrInconsistent: cannot wait on a TaskGroup not started
+// - false, nil, *fail.ErrTimeout: WaitGroupFor has timed out
+func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupResult, fail.Error) {
 	if instance.isNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
@@ -635,7 +644,7 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 		return false, nil, xerr
 	}
 
-	taskStatus, xerr := instance.task.GetStatus()
+	taskStatus, xerr := instance.task.Status()
 	if xerr != nil {
 		return false, nil, xerr
 	}
@@ -647,6 +656,8 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 		return false, nil, fail.InconsistentError("cannot wait TaskGroup '%s': not started", tid)
 
 	case DONE:
+		instance.task.lock.RLock()
+		defer instance.task.lock.RUnlock()
 		return true, instance.result, instance.task.err
 
 	case TIMEOUT:
@@ -680,10 +691,13 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 				return nil, nil
 			}, nil,
 		)
+		if xerr != nil {
+			return false, nil, fail.Wrap(xerr, "failed to start task to wait")
+		}
 
-		if duration > 0 {
+		if timeout > 0 {
 			select {
-			case <-time.After(duration):
+			case <-time.After(timeout):
 				// VPL: too late...
 				// if done, xerr := waiterTask.IsSuccessful(); xerr == nil && done {
 				// 	fmt.Println("waiterTask is done but we reached timeout!!!")
@@ -691,15 +705,15 @@ func (instance *taskGroup) WaitGroupFor(duration time.Duration) (bool, TaskGroup
 
 				// signal waiterTask to abort (and do not wait for it, it will terminate)
 				waiterTask.(*task).forceAbort()
-				forgedError := fail.TimeoutError(nil, duration, fmt.Sprintf("timeout of %s waiting for TaskGroup '%s'", duration, tid))
+				forgedError := fail.TimeoutError(nil, timeout, fmt.Sprintf("timeout of %s waiting for TaskGroup '%s'", timeout, tid))
 
-				// Now send abort signal to TaskGroup
-				xerr = instance.Abort()
-				if xerr != nil {
-					_ = forgedError.AddConsequence(xerr)
-				}
-				// We do not wait on TaskGroup after the Abort, because if the TaskActions are badly coded and never
-				// terminate, WaitGroup would not terminate neither... So bad for leaked go routines but this function has to end...
+				// // Now send abort signal to TaskGroup
+				// xerr = instance.Abort()
+				// if xerr != nil {
+				// 	_ = forgedError.AddConsequence(xerr)
+				// }
+				// // We do not wait on TaskGroup after the Abort, because if the TaskActions are badly coded and never
+				// // terminate, WaitGroup would not terminate neither... So bad for leaked go routines but this function has to end...
 				return false, nil, forgedError
 
 			case <-doneWaitingCh:
@@ -771,7 +785,12 @@ func (instance *taskGroup) Aborted() bool {
 		case *fail.ErrAborted, *fail.ErrTimeout:
 			return true
 		default:
+			return false
 		}
+	case READY: // this is awful
+		return false
+	case UNKNOWN: // this is bad
+		return false
 	}
 
 	return false
@@ -786,8 +805,8 @@ func (instance *taskGroup) New() (Task, fail.Error) {
 	return newTask(context.TODO(), instance.task)
 }
 
-// GetGroupStatus returns a map of the status of all children running in TaskGroup, ordered by TaskStatus
-func (instance *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error) {
+// GroupStatus returns a map of the status of all children running in TaskGroup, ordered by TaskStatus
+func (instance *taskGroup) GroupStatus() (map[TaskStatus][]string, fail.Error) {
 	if instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -797,8 +816,8 @@ func (instance *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error
 
 	status := make(map[TaskStatus][]string)
 	for _, sub := range instance.children.tasks {
-		if tid, err := sub.task.GetID(); err == nil {
-			st, _ := sub.task.GetStatus()
+		if tid, err := sub.task.ID(); err == nil {
+			st, _ := sub.task.Status()
 			if len(status[st]) == 0 {
 				status[st] = []string{}
 			}
@@ -808,8 +827,8 @@ func (instance *taskGroup) GetGroupStatus() (map[TaskStatus][]string, fail.Error
 	return status, nil
 }
 
-// GetStarted returns the number of subtasks started in the TaskGroup
-func (instance *taskGroup) GetStarted() (uint, fail.Error) {
+// Started returns the number of subtasks started in the TaskGroup
+func (instance *taskGroup) Started() (uint, fail.Error) {
 	if instance.isNull() {
 		return 0, fail.InvalidInstanceError()
 	}

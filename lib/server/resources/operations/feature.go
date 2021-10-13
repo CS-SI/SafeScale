@@ -139,6 +139,8 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 
 	v := viper.New()
 	v.AddConfigPath(".")
+	v.AddConfigPath("./features")
+	v.AddConfigPath("./.safescale/features")
 	v.AddConfigPath("$HOME/.safescale/features")
 	v.AddConfigPath("$HOME/.config/safescale/features")
 	v.AddConfigPath("/etc/safescale/features")
@@ -172,6 +174,8 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 		}
 		xerr = nil
 	}
+
+	logrus.Debugf("loaded feature '%s' (%s)", casted.GetDisplayFilename(), casted.GetFilename())
 
 	// if we can log the sha256 of the feature, do it
 	filename := v.ConfigFileUsed()
@@ -339,11 +343,12 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	featureName := f.GetName()
@@ -420,8 +425,8 @@ func checkParameters(f Feature, v data.Map) fail.Error {
 
 // Add installs the Feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if f.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -439,11 +444,12 @@ func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.M
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	featureName := f.GetName()
@@ -538,11 +544,12 @@ func (f *Feature) Remove(ctx context.Context, target resources.Targetable, v dat
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
+			return nil, xerr
 		}
-	}
-	if xerr != nil {
-		return nil, xerr
 	}
 
 	featureName := f.GetName()
@@ -680,8 +687,11 @@ func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targe
 		for _, k := range results.Keys() {
 			r := results.ResultsOfKey(k)
 			for _, l := range r.Keys() {
-				if s := r.ResultOfKey(l); s.Successful() {
-					successfulHosts[l] = struct{}{}
+				s := r.ResultOfKey(l)
+				if s != nil {
+					if s.Successful() {
+						successfulHosts[l] = struct{}{}
+					}
 				}
 			}
 		}
@@ -706,8 +716,11 @@ func unregisterOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Tar
 		for _, k := range results.Keys() {
 			r := results.ResultsOfKey(k)
 			for _, l := range r.Keys() {
-				if s := r.ResultOfKey(l); s.Successful() {
-					successfulHosts[l] = struct{}{}
+				s := r.ResultOfKey(l)
+				if s != nil {
+					if s.Successful() {
+						successfulHosts[l] = struct{}{}
+					}
 				}
 			}
 		}

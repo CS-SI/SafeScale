@@ -96,7 +96,7 @@ func badTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult,
 	var iRes int
 
 	defer func(err *fail.Error) {
-		if st, _ := t.GetStatus(); st == ABORTED {
+		if st, _ := t.Status(); st == ABORTED {
 			if iRes > 1 {
 				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
@@ -384,5 +384,31 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 	count := len(stCh)
 	if count < 5 {
 		t.Fail()
+	}
+}
+
+func TestAwfulSimpleTaskActionCitizen(t *testing.T) {
+	single, xerr := NewTask()
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	stCh := make(chan string, 100)
+	_, xerr = single.StartWithTimeout(horribleTaskActionCitizen, stCh, 4*time.Second)
+	if xerr != nil {
+		t.Logf("The task is just starting.., it shouldn't fail")
+		t.Fail()
+	}
+
+	_, _, xerr = single.WaitFor(4 * time.Second)
+	if xerr == nil { // It should fail with a timeout
+		t.Logf("This should have failed with a timeout")
+		t.Fail()
+	}
+
+	switch xerr.(type) {
+	case *fail.ErrTimeout:
+		t.Logf("timeout occurred as expected, Task cannot end the goroutine never returns and also ignores the timeout parameter")
+	default:
+		t.Errorf("unexpected error occurred: %v", xerr)
 	}
 }

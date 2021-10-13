@@ -17,7 +17,7 @@
 package handlers
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -30,7 +30,6 @@ import (
 
 	scribble "github.com/nanobox-io/golang-scribble"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server"
@@ -43,10 +42,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -98,7 +98,7 @@ const (
 	scanNetworkCIDR   string  = "192.168.20.0/24"
 	scanSubnetName    string  = "safescale-scan-subnet"
 	scanSubnetCIDR    string  = "192.168.20.0/26"
-	defaultScanImage  string  = "Ubuntu 18.04"
+	defaultScanImage  string  = "Ubuntu 20.04"
 	scannedHostPrefix string  = "scanhost-"
 	maxParallelScans  float64 = 4.0
 )
@@ -160,7 +160,7 @@ func NewTenantHandler(job server.Job) TenantHandler {
 }
 
 // Scan scans the tenant and updates the database
-func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, xerr fail.Error) {
+func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -173,7 +173,8 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 
 	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+	defer fail.OnPanic(&ferr)
 
 	svc := handler.job.Service()
 	task := handler.job.Task()
@@ -200,15 +201,15 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 			templatesToScan = append(templatesToScan, *template)
 		}
 	} else {
-		if xerr = handler.dumpImages(); xerr != nil {
+		if xerr := handler.dumpImages(); xerr != nil {
 			return nil, xerr
 		}
 
-		if xerr = handler.dumpTemplates(); xerr != nil {
+		if xerr := handler.dumpTemplates(); xerr != nil {
 			return nil, xerr
 		}
 
-		templatesToScan, xerr = svc.ListTemplates(false)
+		templatesToScan, xerr := svc.ListTemplates(false)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -221,6 +222,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	logrus.Infof("Starting scan of tenant %q with templates: %v", tenantName, templateNamesToScan)
 	logrus.Infof("Using %q image", defaultScanImage)
 
+	var xerr fail.Error
 	handler.scannedHostImage, xerr = svc.SearchImage(defaultScanImage)
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "could not find needed image in given service")
@@ -233,11 +235,11 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	defer func() {
-		derr := network.Delete(task.GetContext())
+		derr := network.Delete(task.Context())
 		if derr != nil {
 			logrus.Warnf("Error deleting network '%s'", network.GetID())
 		}
-		_ = xerr.AddConsequence(derr)
+		_ = ferr.AddConsequence(derr)
 	}()
 
 	logrus.Infof("Creating scan subnet: %q", scanSubnetName)
@@ -248,7 +250,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	defer func() {
 		if derr := subnet.Delete(context.Background()); derr != nil {
 			logrus.Warnf("Error deleting subnet '%s'", subnet.GetID())
-			_ = xerr.AddConsequence(derr)
+			_ = ferr.AddConsequence(derr)
 		}
 	}()
 
@@ -340,7 +342,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 		Image: defaultScanImage,
 	}
 
-	if _, xerr = host.Create(task.GetContext(), req, def); xerr != nil {
+	if _, xerr = host.Create(task.Context(), req, def); xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': error creation", template.Name, hostName)
 	}
 
@@ -356,7 +358,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 		}
 	}()
 
-	_, cout, _, xerr := host.Run(task.GetContext(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 8*time.Minute) // FIXME: hardcoded timeout
+	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 5*temporal.GetContextTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 	}
@@ -516,7 +518,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 			Name: scanNetworkName,
 			CIDR: scanNetworkCIDR,
 		}
-		if xerr = network.Create(task.GetContext(), req); xerr != nil {
+		if xerr = network.Create(task.Context(), req); xerr != nil {
 			return nil, xerr
 		}
 		return network, xerr
@@ -546,7 +548,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 		subnetHostSizing := abstract.HostSizingRequirements{
 			MinGPU: -1,
 		}
-		if xerr = subnet.Create(task.GetContext(), req, "", &subnetHostSizing); xerr != nil {
+		if xerr = subnet.Create(task.Context(), req, "", &subnetHostSizing); xerr != nil {
 			return nil, xerr
 		}
 

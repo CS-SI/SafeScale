@@ -24,21 +24,22 @@ import (
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sirupsen/logrus"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/remotefile"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -235,8 +236,6 @@ type step struct {
 	WallTime time.Duration
 	// YamlKey contains the root yaml key on the specification file
 	YamlKey string
-	// OptionsFileContent contains the "options file" if it exists (for DCOS cluster for now)
-	OptionsFileContent string
 	// Serial tells if step can be performed in parallel on selected host or not
 	Serial bool
 }
@@ -246,169 +245,288 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 	outcomes = &unitResults{}
 
 	if task.Aborted() {
+		if lerr, err := task.LastError(); err == nil {
+			return outcomes, fail.AbortedError(lerr, "aborted")
+		}
 		return outcomes, fail.AbortedError(nil, "aborted")
 	}
 
+	if is.Serial || s.Serialize {
+		// logrus.Warnf("TBR: Installing %s feature serialized", is.Worker.feature.GetName())
+		return is.loopSeriallyOnHosts(task, hosts, v)
+	}
+
+	// logrus.Warnf("TBR: Installing %s feature in parallel", is.Worker.feature.GetName())
+	return is.loopConcurrentlyOnHosts(task, hosts, v)
+}
+
+func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, xerr fail.Error) {
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	if is.Serial || s.Serialize {
+	outcomes = &unitResults{}
 
-		for _, h := range hosts {
-			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
-			is.Worker.startTime = time.Now()
+	var (
+		subtask concurrency.Task
+		outcome concurrency.TaskResult
+		clonedV data.Map
+	)
 
-			cloneV := v.Clone()
-			cloneV["HostIP"], xerr = h.GetPrivateIP()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
+	for _, h := range hosts {
+		tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
+		clonedV, xerr = is.initLoopTurnForHost(h, v)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
 
-			cloneV["ShortHostname"] = h.GetName()
-			domain := ""
-			xerr = h.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
+		// is.Worker.startTime = time.Now()
+		//
+		// cloneV := v.Clone()
+		// cloneV["HostIP"], xerr = h.GetPrivateIP()
+		// xerr = debug.InjectPlannedFail(xerr)
+		// if xerr != nil {
+		// 	return nil, xerr
+		// }
+		//
+		// cloneV["ShortHostname"] = h.GetName()
+		// domain := ""
+		// xerr = h.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// 	return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+		// 		hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+		// 		if !ok {
+		// 			return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		// 		}
+		//
+		// 		domain = hostDescriptionV1.Domain
+		// 		if domain != "" {
+		// 			domain = "." + domain
+		// 		}
+		// 		return nil
+		// 	})
+		// })
+		// xerr = debug.InjectPlannedFail(xerr)
+		// if xerr != nil {
+		// 	return nil, xerr
+		// }
+		//
+		// cloneV["Hostname"] = h.GetName() + domain
+		// cloneV, xerr = realizeVariables(cloneV)
+		// xerr = debug.InjectPlannedFail(xerr)
+		// if xerr != nil {
+		// 	return nil, xerr
+		// }
 
-					domain = hostDescriptionV1.Domain
-					if domain != "" {
-						domain = "." + domain
-					}
-					return nil
-				})
-			})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
-			cloneV["Hostname"] = h.GetName() + domain
+		subtask, xerr = concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
 
-			cloneV, xerr = realizeVariables(cloneV)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
+		outcome, xerr = subtask.Run(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
 
-			subtask, xerr := concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			outcome, xerr := subtask.Run(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
-
+		if outcome != nil {
 			outcomes.AddOne(h.GetName(), outcome.(resources.UnitResult))
+		}
 
-			if !outcomes.Successful() {
-				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
-					tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present",
-						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
-						temporal.FormatDuration(time.Since(is.Worker.startTime)))
-				} else { // other steps are expected to succeed
-					tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
-						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
-						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
-				}
-			} else {
-				tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
+		if !outcomes.Successful() {
+			if is.Worker.action == installaction.Check { // Checks can fail and it's ok
+				tracer.Trace("%s(%s):step(%s)@%s finished in %s: not present",
 					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
 					temporal.FormatDuration(time.Since(is.Worker.startTime)))
+			} else { // other steps are expected to succeed
+				tracer.Trace("%s(%s):step(%s)@%s failed in %s: %s",
+					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
+					temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
 			}
-		}
-	} else {
-		subtasks := map[string]concurrency.Task{}
-		for _, h := range hosts {
-			tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
-			is.Worker.startTime = time.Now()
-
-			cloneV := v.Clone()
-			cloneV["HostIP"], xerr = h.GetPrivateIP()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			cloneV["ShortHostname"] = h.GetName()
-			domain := ""
-			xerr = h.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-					hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-					}
-
-					domain = hostDescriptionV1.Domain
-					if domain != "" {
-						domain = "." + domain
-					}
-					return nil
-				})
-			})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			cloneV["Hostname"] = h.GetName() + domain
-			cloneV, xerr = realizeVariables(cloneV)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			subtask, xerr := concurrency.NewTaskWithParent(task)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			subtask, xerr = subtask.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: cloneV})
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
-
-			subtasks[h.GetName()] = subtask
-		}
-		for k, s := range subtasks {
-			outcome, xerr := s.Wait()
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				logrus.Warn(tracer.TraceMessage(": %s(%s):step(%s)@%s finished after %s, but failed to recover result",
-					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k, temporal.FormatDuration(time.Since(is.Worker.startTime))))
-				continue
-			}
-			if outcome != nil {
-				outcomes.AddOne(k, outcome.(resources.UnitResult))
-			}
-
-			if !outcomes.Successful() {
-				if is.Worker.action == installaction.Check { // Checks can fail and it's ok
-					tracer.Trace(": %s(%s):step(%s)@%s finished in %s: not present",
-						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
-						temporal.FormatDuration(time.Since(is.Worker.startTime)))
-				} else { // other steps are expected to succeed
-					tracer.Trace(": %s(%s):step(%s)@%s failed in %s: %s",
-						is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
-						temporal.FormatDuration(time.Since(is.Worker.startTime)), outcomes.ErrorMessages())
-				}
-			} else {
-				tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
-					is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, k,
-					temporal.FormatDuration(time.Since(is.Worker.startTime)))
-			}
+		} else {
+			tracer.Trace("%s(%s):step(%s)@%s succeeded in %s.",
+				is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName(),
+				temporal.FormatDuration(time.Since(is.Worker.startTime)))
 		}
 	}
+
 	return outcomes, nil
+}
+
+func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, xerr fail.Error) {
+	tracer := debug.NewTracer(task, true, "").Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+
+	outcomes = &unitResults{}
+
+	var (
+		clonedV data.Map
+		subtask concurrency.Task
+	)
+
+	tg, xerr := concurrency.NewTaskGroupWithParent(task)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	subtasks := map[string]concurrency.Task{}
+	for _, h := range hosts {
+		clonedV, xerr = is.initLoopTurnForHost(h, v)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			logrus.Warnf("aborting because of %s", xerr.Error())
+			_ = tg.Abort()
+			break
+		}
+
+		// is.Worker.startTime = time.Now()
+		//
+		// cloneV := v.Clone()
+		// cloneV["HostIP"], xerr = h.GetPrivateIP()
+		// xerr = debug.InjectPlannedFail(xerr)
+		// if xerr != nil {
+		// 	logrus.Warnf("aborting because of %s", xerr.Error())
+		// 	_ = tg.Abort()
+		// 	break
+		// }
+		//
+		// cloneV["ShortHostname"] = h.GetName()
+		// domain := ""
+		// xerr = h.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// 	return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+		// 		hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+		// 		if !ok {
+		// 			return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		// 		}
+		//
+		// 		domain = hostDescriptionV1.Domain
+		// 		if domain != "" {
+		// 			domain = "." + domain
+		// 		}
+		// 		return nil
+		// 	})
+		// })
+		// xerr = debug.InjectPlannedFail(xerr)
+		// if xerr != nil {
+		// 	logrus.Warnf("aborting because of %s", xerr.Error())
+		// 	_ = tg.Abort()
+		// 	break
+		// }
+		//
+		// cloneV["Hostname"] = h.GetName() + domain
+		// cloneV, xerr = realizeVariables(cloneV)
+		// xerr = debug.InjectPlannedFail(xerr)
+		// if xerr != nil {
+		// 	logrus.Warnf("aborting because of %s", xerr.Error())
+		// 	_ = tg.Abort()
+		// 	break
+		// }
+
+		subtask, xerr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			logrus.Warnf("aborting because of %s", xerr.Error())
+			_ = tg.Abort()
+			break
+		}
+
+		subtasks[h.GetName()] = subtask
+	}
+
+	tgr, werr := tg.WaitGroup()
+	werr = debug.InjectPlannedFail(werr)
+	if werr != nil {
+		if xerr != nil {
+			_ = xerr.AddConsequence(werr)
+		} else {
+			xerr = werr
+		}
+	}
+	if xerr != nil {
+		if len(subtasks) != len(hosts) {
+			logrus.Errorf("TBR: no matter what, this should fail because something happened starting tasks")
+		}
+		logrus.Warnf("TBR: at this point, we failed because we have [%s]", spew.Sdump(xerr))
+		logrus.Warnf("TBR: when it happened, the outcomes were:")
+		wrongs := 0
+		for _, s := range subtasks {
+			sid, _ := s.ID()
+			outcome := tgr[sid]
+			if outcome != nil {
+				oko := outcome.(stepResult)
+				logrus.Warnf("TBR: output '%s' and err '%v'", oko.output, oko.err)
+				if oko.err != nil {
+					wrongs++
+					continue
+				}
+				if !strings.Contains(oko.output, "exit 0") {
+					wrongs++
+					continue
+				}
+			}
+		}
+		if wrongs == 0 && (len(subtasks) == len(hosts)) {
+			logrus.Warnf("TBR: this is BAD")
+		}
+	}
+	for k, s := range subtasks {
+		sid, _ := s.ID()
+		outcome := tgr[sid]
+		if outcome != nil {
+			oko := outcome.(resources.UnitResult)
+			outcomes.AddOne(k, oko)
+		}
+	}
+
+	return outcomes, xerr
+}
+
+// initLoopTurnForHost inits the coming loop turn for a specific Host
+func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV data.Map, xerr fail.Error) {
+	// FIXME: why here ? It seems too frequent if the goal is to time the overall worker duration...
+	is.Worker.startTime = time.Now()
+
+	clonedV = v.Clone()
+	clonedV["HostIP"], xerr = host.GetPrivateIP()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		logrus.Warnf("aborting because of %s", xerr.Error())
+		return nil, xerr
+	}
+
+	clonedV["ShortHostname"] = host.GetName()
+	domain := ""
+	xerr = host.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+			hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			domain = hostDescriptionV1.Domain
+			if domain != "" {
+				domain = "." + domain
+			}
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		logrus.Warnf("aborting because of %s", xerr.Error())
+		return nil, xerr
+	}
+
+	clonedV["Hostname"] = host.GetName() + domain
+	clonedV, xerr = realizeVariables(clonedV)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		logrus.Warnf("aborting because of %s", xerr.Error())
+		return nil, xerr
+	}
+
+	return clonedV, nil
 }
 
 type runOnHostParameters struct {
@@ -419,8 +537,24 @@ type runOnHostParameters struct {
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
-func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	defer func() {
+		if result != nil {
+			if sres, ok := result.(stepResult); ok {
+				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
+					dur := spew.Sdump(result)
+					if !strings.Contains(dur, "check_") {
+						logrus.Warningf("TBR: task result: %s", spew.Sdump(result)) // TBR, remove this later
+					}
+				}
+			}
+		}
+		if ferr != nil {
+			logrus.Warningf("TBR: task error: %v", ferr) // TBR, remove this later
+		}
+	}()
 
 	var ok bool
 	if params == nil {
@@ -434,31 +568,33 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
 	// Updates variables in step script
 	command, xerr := replaceVariablesInString(is.Script, p.Variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return stepResult{err: fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)}, nil
+		problem := fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)
+		return stepResult{err: problem}, problem
 	}
 
-	// If options file is defined, upload it to the remote rh
-	if is.OptionsFileContent != "" {
-		rfcItem := remotefile.Item{
-			Remote:       utils.TempFolder + "/options.json",
-			RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
-			RemoteRights: "ug+rw-x,o-rwx",
-		}
-		xerr = rfcItem.UploadString(task.GetContext(), is.OptionsFileContent, p.Host)
-		_ = os.Remove(rfcItem.Local)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return stepResult{err: xerr}, nil
-		}
-	}
+	// VPL: not used anymore
+	// // If options file is defined, upload it to the remote rh
+	// if is.OptionsFileContent != "" {
+	// 	opItem := remotefile.Item{
+	// 		Remote:       utils.TempFolder + "/options.json",
+	// 		RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
+	// 		RemoteRights: "ug+rw-x,o-rwx",
+	// 	}
+	// 	defer func() {
+	// 		_ = os.Remove(opItem.Local)
+	// 	}()
+	// 	xerr = opItem.UploadString(task.Context(), is.OptionsFileContent, p.Host)
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		logrus.Warnf("TBR: failure uploading script: %v", xerr)
+	// 		problem := fail.Wrap(xerr, "failure uploading script")
+	// 		return stepResult{err: problem}, problem
+	// 	}
+	// }
 
 	hidesOutput := strings.Contains(command, "set +x\n")
 	if hidesOutput {
@@ -470,14 +606,19 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 	// Uploads then executes command
 	filename := fmt.Sprintf("%s/feature.%s.%s_%s.sh", utils.TempFolder, is.Worker.feature.GetName(), strings.ToLower(is.Action.String()), is.Name)
-	rfcItem := remotefile.Item{
+	rfcItem := Item{
 		Remote: filename,
 	}
-	xerr = rfcItem.UploadString(task.GetContext(), command, p.Host)
-	_ = os.Remove(rfcItem.Local)
+
+	defer func() {
+		_ = os.Remove(rfcItem.Local)
+	}()
+	xerr = rfcItem.UploadString(task.Context(), command, p.Host)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return stepResult{err: xerr}, nil
+		logrus.Warnf("TBR: failure uploading script: %v", xerr)
+		problem := fail.Wrap(xerr, "failure uploading script")
+		return stepResult{err: problem}, problem
 	}
 
 	if !hidesOutput {
@@ -486,12 +627,58 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		command = fmt.Sprintf("sudo -- bash -x -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -x -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS};cat $captf; rm $captf; exit ${rc}'", filename, filename)
 	}
 
-	// Executes the script on the remote host
-	retcode, outrun, _, xerr := p.Host.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		_ = xerr.Annotate("stdout", outrun)
-		return stepResult{err: xerr, retcode: retcode, output: outrun}, nil
+	// If retcode is 126, iterate a few times...
+	rounds := 10
+	var retcode int
+	var outrun string
+	var outerr string
+	for {
+		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+		if retcode == 126 {
+			logrus.Debugf("Text busy happened")
+		}
+
+		// Executes the script on the remote host
+		if retcode != 126 || rounds == 0 {
+			if retcode == 126 {
+				logrus.Warnf("Text busy killed the script")
+			}
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				_ = xerr.Annotate("retcode", retcode)
+				_ = xerr.Annotate("stdout", outrun)
+				_ = xerr.Annotate("stderr", outerr)
+				return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
+			}
+			break
+		}
+
+		if !(strings.Contains(outrun, "bad interpreter") || strings.Contains(outerr, "bad interpreter")) {
+			if xerr == nil {
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					_ = xerr.Annotate("retcode", retcode)
+					_ = xerr.Annotate("stdout", outrun)
+					_ = xerr.Annotate("stderr", outerr)
+					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
+				}
+				break
+			}
+
+			if !strings.Contains(xerr.Error(), "bad interpreter") {
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					_ = xerr.Annotate("retcode", retcode)
+					_ = xerr.Annotate("stdout", outrun)
+					_ = xerr.Annotate("stderr", outerr)
+					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
+				}
+				break
+			}
+		}
+
+		rounds--
+		time.Sleep(temporal.GetMinDelay())
 	}
 
 	return stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil
@@ -506,14 +693,14 @@ func realizeVariables(variables data.Map) (data.Map, fail.Error) {
 			varTemplate, xerr := template.Parse("realize_var", variable)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				return nil, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
+				return cloneV, fail.SyntaxError("error parsing variable '%s': %s", k, xerr.Error())
 			}
 
 			buffer := bytes.NewBufferString("")
-			err := varTemplate.Execute(buffer, variables)
+			err := varTemplate.Option("missingkey=error").Execute(buffer, variables)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return nil, fail.ConvertError(err)
+				return cloneV, fail.ConvertError(err)
 			}
 
 			cloneV[k] = buffer.String()
@@ -532,7 +719,7 @@ func replaceVariablesInString(text string, v data.Map) (string, fail.Error) {
 	}
 
 	dataBuffer := bytes.NewBufferString("")
-	err := tmpl.Execute(dataBuffer, v)
+	err := tmpl.Option("missingkey=error").Execute(dataBuffer, v)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.Wrap(err, "failed to replace variables")

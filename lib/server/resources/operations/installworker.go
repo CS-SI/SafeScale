@@ -18,6 +18,7 @@ package operations
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"reflect"
@@ -27,13 +28,13 @@ import (
 	txttmpl "text/template"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
@@ -43,13 +44,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -61,7 +61,7 @@ const (
 	yamlTargetsKeyword = "targets"
 	yamlRunKeyword     = "run"
 	yamlPackageKeyword = "package"
-	yamlOptionsKeyword = "options"
+	// yamlOptionsKeyword = "options"
 	yamlTimeoutKeyword = "timeout"
 	yamlSerialKeyword  = "serialized"
 )
@@ -78,11 +78,12 @@ print_error() {
 trap print_error ERR
 
 set +x
-rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
+sudo rm -f %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 1<&-
 exec 2<&-
 exec 1<>%s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 exec 2>&1
+sudo chown {{.Username}}:{{.Username}} %s/feature.{{.reserved_Name}}.{{.reserved_Action}}_{{.reserved_Step}}.log
 set -x
 
 {{ .reserved_BashLibrary }}
@@ -517,6 +518,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		if len(steps) == 0 {
 			return nil, fail.InvalidRequestError("nothing to do")
 		}
+
 		order = strings.Split(pace, ",")
 	}
 
@@ -556,6 +558,12 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		// }
 	}
 
+	// add target specific variables
+	xerr = w.target.ComplementFeatureParameters(ctx, v)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// Now enumerate steps and execute each of them
 	for _, k := range order {
 		stepKey := stepsKey + "." + k
@@ -565,12 +573,14 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
 		}
 
+		var problem error
 		subtask, xerr := concurrency.NewTaskWithParent(task)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return outcomes, xerr
 		}
-		_, xerr = subtask.Start(w.taskLaunchStep, taskLaunchStepParameters{
+
+		subtask, xerr = subtask.Start(w.taskLaunchStep, taskLaunchStepParameters{
 			stepName:  k,
 			stepKey:   stepKey,
 			stepMap:   stepMap,
@@ -578,18 +588,32 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action.String()), strings.ToLower(w.target.TargetType().String()), k)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return outcomes, xerr
+			problem = xerr
+			abErr := subtask.Abort()
+			if abErr != nil {
+				logrus.Warn("problem aborting task")
+			}
 		}
 
-		tr, xerr := subtask.Wait()
+		var tr concurrency.TaskResult
+		tr, xerr = subtask.Wait()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			if problem != nil {
+				_ = xerr.AddConsequence(problem)
+			}
+			if tr != nil {
+				if outcome, ok := tr.(*resources.UnitResults); ok {
+					_ = outcomes.Add(k, *outcome)
+				}
+			}
 			return outcomes, xerr
 		}
 
 		if tr != nil {
-			outcome := tr.(*resources.UnitResults)
-			_ = outcomes.Add(k, *outcome)
+			if outcome, ok := tr.(*resources.UnitResults); ok {
+				_ = outcomes.Add(k, *outcome)
+			}
 		}
 	}
 
@@ -640,26 +664,29 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	if task.Aborted() {
+		if lerr, err := task.LastError(); err == nil {
+			return nil, fail.AbortedError(lerr, "aborted")
+		}
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
 	defer fail.OnExitLogError(&xerr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
 	defer temporal.NewStopwatch().OnExitLogWithLevel(
 		fmt.Sprintf("Starting execution of step '%s::%s'...", w.action.String(), p.stepName),
-		fmt.Sprintf("Ending execution of step '%s::%s'", w.action.String(), p.stepName),
+		fmt.Sprintf("Ending execution of step '%s::%s' with error '%s'", w.action.String(), p.stepName, xerr),
 		logrus.DebugLevel,
 	)
 
 	var (
 		runContent string
 		stepT      = stepTargets{}
-		options    = map[string]string{}
+		// options    = map[string]string{}
 	)
 
 	// Determine list of hosts concerned by the step
 	var hostsList []resources.Host
 	if w.target.TargetType() == featuretargettype.Host {
-		hostsList, xerr = w.identifyHosts(task.GetContext(), map[string]string{"hosts": "1"})
+		hostsList, xerr = w.identifyHosts(task.Context(), map[string]string{"hosts": "1"})
 	} else {
 		anon, ok = p.stepMap[yamlTargetsKeyword]
 		if ok {
@@ -680,7 +707,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlTargetsKeyword)
 		}
 
-		hostsList, xerr = w.identifyHosts(task.GetContext(), stepT)
+		hostsList, xerr = w.identifyHosts(task.Context(), stepT)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -698,14 +725,12 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}()
 
 	// Get the content of the action based on method
-	keyword := yamlRunKeyword
+	var keyword string
 	switch w.method {
-	case installmethod.Apt:
-		fallthrough
-	case installmethod.Yum:
-		fallthrough
-	case installmethod.Dnf:
+	case installmethod.Apt, installmethod.Yum, installmethod.Dnf:
 		keyword = yamlPackageKeyword
+	default:
+		keyword = yamlRunKeyword
 	}
 	runContent, ok = p.stepMap[keyword].(string)
 	if ok {
@@ -716,44 +741,6 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	} else {
 		msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
 		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlRunKeyword)
-	}
-
-	// If there is an options file (for now specific to DCOS), upload it to the remote host
-	optionsFileContent := ""
-	if anon, ok = p.stepMap[yamlOptionsKeyword]; ok {
-		for i, j := range anon.(map[string]interface{}) {
-			options[i] = j.(string)
-		}
-		var (
-			avails  = map[string]interface{}{}
-			content interface{}
-		)
-		complexity, xerr := w.cluster.GetComplexity()
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return nil, xerr
-		}
-
-		c := strings.ToLower(complexity.String())
-		for k, anon := range options {
-			avails[strings.ToLower(k)] = anon
-		}
-		if content, ok = avails[c]; !ok {
-			if c == strings.ToLower(clustercomplexity.Large.String()) {
-				c = clustercomplexity.Normal.String()
-			}
-			if c == strings.ToLower(clustercomplexity.Normal.String()) {
-				if content, ok = avails[c]; !ok {
-					content, ok = avails[clustercomplexity.Small.String()]
-				}
-			}
-		}
-		if ok {
-			optionsFileContent = content.(string)
-			p.variables["options"] = fmt.Sprintf("--options=%s/options.json", utils.TempFolder)
-		}
-	} else {
-		p.variables["options"] = ""
 	}
 
 	wallTime := temporal.GetLongOperationTimeout()
@@ -770,7 +757,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, xerr := normalizeScript(data.Map{
+	templateCommand, xerr := normalizeScript(&p.variables, data.Map{
 		"reserved_Name":    w.feature.GetName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
@@ -794,14 +781,14 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	stepInstance := step{
-		Worker:             w,
-		Name:               p.stepName,
-		Action:             w.action,
-		Script:             templateCommand,
-		WallTime:           wallTime,
-		OptionsFileContent: optionsFileContent,
-		YamlKey:            p.stepKey,
-		Serial:             serial,
+		Worker:   w,
+		Name:     p.stepName,
+		Action:   w.action,
+		Script:   templateCommand,
+		WallTime: wallTime,
+		// OptionsFileContent: optionsFileContent,
+		YamlKey: p.stepKey,
+		Serial:  serial,
 	}
 	r, xerr := stepInstance.Run(task, hostsList, p.variables, w.settings)
 	// If an error occurred, do not execute the remaining steps, fail immediately
@@ -813,19 +800,45 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if !r.Successful() {
 		// If there are some not completed steps, reports them and break
 		if !r.Completed() {
-			msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), p.stepName, r.Uncompleted())
-			logrus.Errorf(strprocess.Capitalize(msg))
-			return &r, fail.NewError(msg)
+			var errpack []error
+			for _, key := range r.Keys() {
+				cuk := r.ResultOfKey(key)
+				if cuk != nil {
+					if !cuk.Successful() && !cuk.Completed() {
+						// TBR: It's one of those
+						msg := fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v with [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
+						logrus.Warnf(msg.Error())
+						errpack = append(errpack, msg)
+					}
+				}
+			}
+
+			if len(errpack) > 0 {
+				return &r, fail.NewErrorList(errpack)
+			}
 		}
+
 		// not successful but completed, if action is check means the Feature is not installed, it's an information not a failure
 		if w.action == installaction.Check {
 			return &r, nil
 		}
 
-		// For any other situations, raise error and break
-		msg := fmt.Sprintf("execution of step '%s::%s' failed on: %v", w.action.String(), p.stepName, r.ErrorMessages())
-		logrus.Errorf(strprocess.Capitalize(msg))
-		return &r, fail.NewError(msg)
+		var newerrpack []error
+		for _, key := range r.Keys() {
+			cuk := r.ResultOfKey(key)
+			if cuk != nil {
+				if !cuk.Successful() && cuk.Completed() {
+					// TBR: It's one of those
+					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))
+					logrus.Warnf(msg.Error())
+					newerrpack = append(newerrpack, msg)
+				}
+			}
+		}
+
+		if len(newerrpack) > 0 {
+			return &r, fail.NewErrorList(newerrpack)
+		}
 	}
 
 	return &r, nil
@@ -938,12 +951,12 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 }
 
 // parseClusterSizingRequest returns count, cpu and ram components of request
-func (w *worker) parseClusterSizingRequest(request string) (int, int, float32, fail.Error) {
+func (w *worker) parseClusterSizingRequest(_ /*request*/ string) (int, int, float32, fail.Error) {
 	return 0, 0, 0.0, fail.NotImplementedError("parseClusterSizingRequest() not yet implemented")
 }
 
 // setReverseProxy applies the reverse proxy rules defined in specification file (if there are some)
-func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
+func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -957,7 +970,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 		return nil
 	}
 
-	// FIXME: there are valid scenarii for reverse proxy settings when Feature applied to Host...
+	// FIXME: there are valid scenarios for reverse proxy settings when Feature applied to Host...
 	if w.cluster == nil {
 		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
@@ -1076,14 +1089,15 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 			}
 
 			defer func() {
-				if xerr != nil {
+				if ferr != nil {
+					logrus.Warnf("aborting because of %s", xerr.Error())
 					derr := tg.Abort()
 					if derr != nil {
-						_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort TaskGroup"))
+						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort TaskGroup"))
 					} else {
-						_, derr = tg.Wait()
+						_, derr = tg.WaitGroup()
 						if derr != nil {
-							_ = xerr.AddConsequence(derr)
+							_ = ferr.AddConsequence(derr)
 						}
 					}
 				}
@@ -1129,7 +1143,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (xerr fail.Error) {
 				}
 			}
 
-			_, xerr = tg.Wait()
+			_, xerr = tg.WaitGroup()
 			if xerr != nil {
 				return xerr
 			}
@@ -1158,6 +1172,9 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 	}
 
 	if task.Aborted() {
+		if lerr, err := task.LastError(); err == nil {
+			return nil, fail.AbortedError(lerr, "aborted")
+		}
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
@@ -1263,11 +1280,30 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
-func normalizeScript(params map[string]interface{}) (string, fail.Error) {
+func normalizeScript(params *data.Map, reserved data.Map) (string, fail.Error) {
 	var (
 		err         error
 		tmplContent string
 	)
+
+	// Configures BashLibrary template var
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return "", xerr
+	}
+
+	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return "", xerr
+	}
+
+	for k, v := range reserved {
+		(*params)[k] = v
+	}
+	for k, v := range bashLibraryVariables {
+		(*params)[k] = v
+	}
 
 	anon := featureScriptTemplate.Load()
 	if anon == nil {
@@ -1278,26 +1314,21 @@ func normalizeScript(params map[string]interface{}) (string, fail.Error) {
 		}
 
 		// parse then execute the template
-		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder)
+		tmpl := fmt.Sprintf(tmplContent, utils.LogFolder, utils.LogFolder, utils.LogFolder)
 		r, xerr := template.Parse("normalize_script", tmpl)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return "", fail.SyntaxError("error parsing bash template: %s", xerr.Error())
 		}
+
+		// Set template to generate error if there is missing key in params during Execute
+		r = r.Option("missingkey=error")
 		featureScriptTemplate.Store(r)
 		anon = featureScriptTemplate.Load()
 	}
 
-	// Configures BashLibrary template var
-	bashLibrary, xerr := system.GetBashLibrary()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return "", xerr
-	}
-	params["reserved_BashLibrary"] = bashLibrary
-
 	dataBuffer := bytes.NewBufferString("")
-	err = anon.(*txttmpl.Template).Execute(dataBuffer, params)
+	err = anon.(*txttmpl.Template).Execute(dataBuffer, *params)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
@@ -1357,6 +1388,9 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 
 	for k, rule := range rules {
 		if task.Aborted() {
+			if lerr, err := task.LastError(); err == nil {
+				return fail.AbortedError(lerr, "aborted")
+			}
 			return fail.AbortedError(nil, "aborted")
 		}
 
@@ -1390,6 +1424,9 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			var commaSplitted []string
 			if ports, ok := r["ports"].(int); ok {
 				sgRule.Description = description + fmt.Sprintf(" (port %d)", ports) + forFeature
+				if ports > 65535 {
+					return fail.SyntaxError("invalid value '%s' for field 'ports'", ports)
+				}
 				sgRule.PortFrom = int32(ports)
 
 				xerr = gwSG.AddRule(ctx, sgRule)
@@ -1428,6 +1465,12 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 							}
 							sgRule.Description += fmt.Sprintf(" (port%s %s)", strprocess.Plural(uint(dashCount)), dashSplitted)
 
+							if portFrom > 65535 {
+								return fail.SyntaxError("invalid value '%d' for field 'portFrom'", portFrom)
+							}
+							if portTo > 65535 {
+								return fail.SyntaxError("invalid value '%d' for field 'portTo'", portTo)
+							}
 							sgRule.PortFrom = int32(portFrom)
 							sgRule.PortTo = int32(portTo)
 						}

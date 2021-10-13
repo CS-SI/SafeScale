@@ -18,11 +18,43 @@ package iaas
 
 import (
 	"sync"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
+
+const (
+	cacheOptionOnMissKeyword        = "on_miss"
+	cacheOptionOnMissTimeoutKeyword = "on_miss_timeout"
+)
+
+// CacheMissOption returns []data.ImmutableKeyValue options to use on cache miss with timeout
+func CacheMissOption(fn func() (cache.Cacheable, fail.Error), timeout time.Duration) []data.ImmutableKeyValue {
+	if timeout <= 0 {
+		return []data.ImmutableKeyValue{
+			data.NewImmutableKeyValue(cacheOptionOnMissKeyword, func() (cache.Cacheable, fail.Error) {
+				return nil, fail.InvalidRequestError("invalid timeout for function provided to react on cache miss event: cannot be less or equal to 0")
+			}),
+			data.NewImmutableKeyValue(cacheOptionOnMissTimeoutKeyword, timeout),
+		}
+	}
+
+	if fn != nil {
+		return []data.ImmutableKeyValue{
+			data.NewImmutableKeyValue(cacheOptionOnMissKeyword, fn),
+			data.NewImmutableKeyValue(cacheOptionOnMissTimeoutKeyword, timeout),
+		}
+	}
+
+	return []data.ImmutableKeyValue{
+		data.NewImmutableKeyValue(cacheOptionOnMissKeyword, func() (cache.Cacheable, fail.Error) {
+			return nil, fail.InvalidRequestError("invalid function provided to react on cache miss event: cannot be nil")
+		}),
+		data.NewImmutableKeyValue(cacheOptionOnMissTimeoutKeyword, timeout),
+	}
+}
 
 // ResourceCache contains the caches for all kinds of resources
 type ResourceCache struct {
@@ -50,13 +82,13 @@ func NewResourceCache(name string) (*ResourceCache, fail.Error) {
 }
 
 // isNull tells if rc is a null value of *ResourceCache
-func (rc *ResourceCache) isNull() bool {
-	return rc == nil || rc.byID == nil || rc.byName == nil
+func (instance *ResourceCache) isNull() bool {
+	return instance == nil || instance.byID == nil || instance.byName == nil
 }
 
 // Get returns the content associated with key
-func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) {
-	if rc.isNull() {
+func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce *cache.Entry, xerr fail.Error) {
+	if instance == nil || instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
@@ -64,42 +96,72 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 	}
 
 	// Search in the cache by ID
-	if ce, xerr = rc.byID.GetEntry(key); xerr == nil {
+	if ce, xerr = instance.byID.Entry(key); xerr == nil {
 		return ce, nil
 	}
 
 	// Not found, search an entry in the cache by name to get id and search again by id
-	rc.lock.Lock()
-	if id, ok := rc.byName[key]; ok {
-		if ce, xerr = rc.byID.GetEntry(id); xerr == nil {
-			rc.lock.Unlock()
+	instance.lock.Lock()
+	if id, ok := instance.byName[key]; ok {
+		if ce, xerr = instance.byID.Entry(id); xerr == nil {
+			instance.lock.Unlock()
 			return ce, nil
 		}
 	}
-	rc.lock.Unlock()
+	instance.lock.Unlock()
 
 	// We have a cache miss, check if we have a function to get the missing content
 	if len(options) > 0 {
-		var onMissFunc func() (cache.Cacheable, fail.Error)
+		var (
+			onMissFunc    func() (cache.Cacheable, fail.Error)
+			onMissTimeout time.Duration
+		)
 		for _, v := range options {
-			switch v.Key() { //nolint
-			case "onMiss":
+			switch v.Key() {
+			case cacheOptionOnMissKeyword:
 				onMissFunc = v.Value().(func() (cache.Cacheable, fail.Error))
+			case cacheOptionOnMissTimeoutKeyword:
+				onMissTimeout = v.Value().(time.Duration)
 			default:
 			}
 		}
 
 		if onMissFunc != nil {
-			if xerr := rc.unsafeReserveEntry(key); xerr != nil {
+			if onMissTimeout <= 0 {
+				_, xerr = onMissFunc() // onMissFunc() knows what the error is
 				return nil, xerr
+			}
+			xerr := instance.unsafeReserveEntry(key, onMissTimeout)
+			if xerr != nil {
+				switch xerr.(type) {
+				case *fail.ErrDuplicate:
+					// Search in the cache by ID
+					if ce, xerr = instance.byID.Entry(key); xerr == nil {
+						return ce, nil
+					}
+
+					// Not found, search an entry in the cache by name to get id and search again by id
+					instance.lock.Lock()
+					if id, ok := instance.byName[key]; ok {
+						ce, xerr = instance.byID.Entry(id)
+						if xerr == nil {
+							instance.lock.Unlock()
+							return ce, nil
+						}
+					}
+					instance.lock.Unlock()
+					return nil, xerr
+				default:
+					return nil, xerr
+				}
 			}
 
 			var content cache.Cacheable
 			if content, xerr = onMissFunc(); xerr == nil {
-				ce, xerr = rc.unsafeCommitEntry(key, content)
+				ce, xerr = instance.unsafeCommitEntry(key, content)
 			}
 			if xerr != nil {
-				if derr := rc.unsafeFreeEntry(key); derr != nil {
+				if derr := instance.unsafeFreeEntry(key); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
 				}
 				return nil, xerr
@@ -112,84 +174,87 @@ func (rc *ResourceCache) Get(key string, options ...data.ImmutableKeyValue) (ce 
 }
 
 // ReserveEntry sets a cache entry to reserve the key and returns the Entry associated
-func (rc *ResourceCache) ReserveEntry(key string) fail.Error {
-	if rc.isNull() {
+func (instance *ResourceCache) ReserveEntry(key string, timeout time.Duration) fail.Error {
+	if instance == nil || instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
+	if timeout <= 0 {
+		return fail.InvalidParameterError("timeout", "cannot be less or equal to 0")
+	}
 
-	rc.lock.Lock()
-	defer rc.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	return rc.unsafeReserveEntry(key)
+	return instance.unsafeReserveEntry(key, timeout)
 }
 
 // unsafeReserveEntry sets a cache entry to reserve the key and returns the Entry associated
-func (rc *ResourceCache) unsafeReserveEntry(key string) fail.Error {
-	return rc.byID.ReserveEntry(key)
+func (instance *ResourceCache) unsafeReserveEntry(key string, timeout time.Duration) fail.Error {
+	return instance.byID.Reserve(key, timeout)
 }
 
 // CommitEntry confirms the entry in the cache with the content passed as parameter
-func (rc *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if rc.isNull() {
+func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
+	if instance == nil || instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 	if key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	rc.lock.Lock()
-	defer rc.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	return rc.unsafeCommitEntry(key, content)
+	return instance.unsafeCommitEntry(key, content)
 }
 
 // unsafeCommitEntry confirms the entry in the cache with the content passed as parameter
-func (rc *ResourceCache) unsafeCommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if ce, xerr = rc.byID.CommitEntry(key, content); xerr != nil {
+func (instance *ResourceCache) unsafeCommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
+	if ce, xerr = instance.byID.Commit(key, content); xerr != nil {
 		return nil, xerr
 	}
 
-	rc.byName[content.GetName()] = content.GetID()
+	instance.byName[content.GetName()] = content.GetID()
 	return ce, nil
 }
 
 // FreeEntry removes the reservation in cache
-func (rc *ResourceCache) FreeEntry(key string) fail.Error {
-	if rc.isNull() {
+func (instance *ResourceCache) FreeEntry(key string) fail.Error {
+	if instance == nil || instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
 	if key == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	rc.lock.Lock()
-	defer rc.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	return rc.unsafeFreeEntry(key)
+	return instance.unsafeFreeEntry(key)
 }
 
 // unsafeFreeEntry removes the reservation in cache
-func (rc *ResourceCache) unsafeFreeEntry(key string) fail.Error {
-	return rc.byID.FreeEntry(key)
+func (instance *ResourceCache) unsafeFreeEntry(key string) fail.Error {
+	return instance.byID.Free(key)
 }
 
 // AddEntry ...
-func (rc *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
-	if rc.isNull() {
+func (instance *ResourceCache) AddEntry(content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
+	if instance == nil || instance.isNull() {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	rc.lock.Lock()
-	defer rc.lock.Unlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
-	if ce, xerr = rc.byID.AddEntry(content); xerr != nil {
+	if ce, xerr = instance.byID.Add(content); xerr != nil {
 		return nil, xerr
 	}
 
-	rc.byName[content.GetName()] = content.GetID()
+	instance.byName[content.GetName()] = content.GetID()
 	return ce, nil
 }
 

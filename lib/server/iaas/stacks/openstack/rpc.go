@@ -28,6 +28,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 )
 
 func (s Stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
@@ -124,7 +125,9 @@ func (s Stack) rpcGetMetadataOfInstance(id string) (map[string]string, fail.Erro
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			return emptyMap, xerr
+			return emptyMap, fail.Wrap(fail.Cause(xerr), "timeout")
+		case *retry.ErrStopRetry:
+			return emptyMap, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
 			return emptyMap, xerr
 		}

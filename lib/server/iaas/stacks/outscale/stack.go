@@ -176,13 +176,14 @@ func (s *stack) initDefaultNetwork() fail.Error {
 					CIDR: s.Options.Network.DefaultNetworkCIDR,
 				}
 				an, xerr = s.CreateNetwork(req)
+				if xerr != nil {
+					return fail.Wrap(xerr, "failed to initialize default Network '%s'", s.Options.Network.DefaultNetworkName)
+				}
 			default:
 				return xerr
 			}
 		}
-		if xerr != nil {
-			return fail.Wrap(xerr, "failed to initialize default Network '%s'", s.Options.Network.DefaultNetworkName)
-		}
+
 		s.vpc = an
 	}
 	return nil

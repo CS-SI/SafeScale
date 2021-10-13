@@ -17,8 +17,9 @@
 package abstract
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
@@ -26,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -83,6 +85,10 @@ type HostSizingRequirements struct {
 	Template    string // if != "", describes the template to use and disables the use of other fields
 }
 
+func almostEqual(a, b float32) bool {
+	return math.Abs(float64(a-b)) <= 1e-3
+}
+
 func (hsr HostSizingRequirements) Equals(in HostSizingRequirements) bool {
 	if hsr.MinCores != in.MinCores {
 		return false
@@ -90,10 +96,10 @@ func (hsr HostSizingRequirements) Equals(in HostSizingRequirements) bool {
 	if hsr.MaxCores != in.MaxCores {
 		return false
 	}
-	if hsr.MinRAMSize != in.MinRAMSize {
+	if !almostEqual(hsr.MinRAMSize, in.MinRAMSize) {
 		return false
 	}
-	if hsr.MaxRAMSize != in.MaxRAMSize {
+	if !almostEqual(hsr.MaxRAMSize, in.MaxRAMSize) {
 		return false
 	}
 	if hsr.MinDiskSize != in.MinDiskSize {
@@ -102,7 +108,7 @@ func (hsr HostSizingRequirements) Equals(in HostSizingRequirements) bool {
 	if hsr.MinGPU != in.MinGPU {
 		return false
 	}
-	if hsr.MinCPUFreq != in.MinCPUFreq {
+	if !almostEqual(hsr.MinCPUFreq, in.MinCPUFreq) {
 		return false
 	}
 	return true
@@ -290,7 +296,7 @@ func (hc *HostCore) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates an IPAddress
-func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
+func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 	if hc == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -298,7 +304,7 @@ func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			xerr = fail.ConvertError(panicErr) // If panic occured, transforms err to a fail.Error if needed
+			ferr = fail.ConvertError(panicErr) // If panic occurred, transforms err to a fail.Error if needed
 		}
 	}()
 	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
@@ -306,7 +312,7 @@ func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
 	jserr := json.Unmarshal(buf, hc)
 	if jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			return fail.NewError(jserr.Error())

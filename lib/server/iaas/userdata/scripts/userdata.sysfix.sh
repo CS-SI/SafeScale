@@ -15,18 +15,19 @@
 # limitations under the License.
 
 #{{.Revision}}
+# Script customized for {{.ProviderName}} driver
 
 {{.Header}}
 
 function print_error() {
-	read line file <<<$(caller)
-	echo "An error occurred in line $line of file $file:" "{"$(sed "${line}q;d" "$file")"}" >&2
+	read -r line file <<<"$(caller)"
+	echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
 	{{.ExitOnError}}
 }
 trap print_error ERR
 
 function fail() {
-	MYIP="$(ip -br a | grep UP | awk {'print $3'})"
+	MYIP="$(ip -br a | grep UP | awk '{print $3}') | head -n 1"
 	if [ $# -eq 1 ]; then
 		echo "PROVISIONING_ERROR: $1"
 		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" >/opt/safescale/var/state/user_data.sysfix.done
@@ -57,9 +58,10 @@ exec > >(tee ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'sysfix' is already done (otherwise will deadlock)
->/opt/safescale/var/state/user_data.sysfix.done
+uptime >/opt/safescale/var/state/user_data.sysfix.done
+
 # Includes the BashLibrary
-{{ .BashLibrary }}
+{{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.sysfix.done
 
 # ---- Main

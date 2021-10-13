@@ -18,19 +18,19 @@ package nfs
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
@@ -65,27 +65,33 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
 			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return "", xerr
+			}
 		default:
+			return "", xerr
 		}
-	}
-	if xerr != nil {
-		return "", xerr
 	}
 
 	if task.Aborted() {
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
-	bashLibrary, xerr := system.GetBashLibrary()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.ConvertError(err)
 		return "", xerr
 	}
-	data["reserved_BashLibrary"] = bashLibrary
-	data["Revision"] = system.REV
 
+	mapped, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return "", xerr
+	}
+	for k, v := range mapped {
+		data[k] = v
+	}
+	data["Revision"] = system.REV
 	scriptHeader := "set -u -o pipefail"
 	if suffixCandidate := os.Getenv("SAFESCALE_SCRIPTS_FAIL_FAST"); suffixCandidate != "" {
 		if strings.EqualFold("True", strings.TrimSpace(suffixCandidate)) {
@@ -108,28 +114,23 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	// get file content as string
 	tmplContent, err := tmplBox.String(name)
 	if err != nil {
-		// return 255, "", "", fail.ConvertError(err)
 		xerr = fail.ExecutionError(err)
 		_ = xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.ConvertError(err)
 		return "", xerr
 	}
 
 	// Prepare the template for execution
 	tmplPrepared, err := template.Parse(name, tmplContent)
 	if err != nil {
-		// return 255, "", "", fail.ConvertError(err)
 		xerr = fail.ExecutionError(err)
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.ConvertError(err)
 		return "", xerr
 	}
 
 	var buffer bytes.Buffer
-	if err := tmplPrepared.Execute(&buffer, data); err != nil {
+	if err := tmplPrepared.Option("missingkey=error").Execute(&buffer, data); err != nil {
 		xerr = fail.ExecutionError(err, "failed to execute template")
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.Wrap(err, "failed to execute template")
 		return "", xerr
 	}
 	content := buffer.String()
@@ -143,7 +144,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	f, xerr := system.CreateTempFileFromString(content, 0600)
 	if xerr != nil {
 		xerr.Annotate("retcode", 255)
-		// return 255, "", "", fail.Wrap(err, "failed to create temporary file")
 		return "", xerr
 	}
 
@@ -154,9 +154,9 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	}()
 
 	filename := utils.TempFolder + "/" + name
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := sshconfig.Copy(ctx, filename, f.Name(), true)
+			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(ctx, filename, f.Name(), true, temporal.GetOperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
@@ -165,23 +165,31 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 				_ = innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 				return innerXErr
 			}
+
+			// FIXME: Add crc
+
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetHostTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return "", fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout:
+			return "", fail.Wrap(fail.Cause(xerr), "timeout")
 		case *fail.ErrExecution:
+			return "", xerr
 		default:
-			xerr = fail.ExecutionError(xerr, "failed to copy script to remote host")
-			xerr.Annotate("retcode", 255)
+			yerr := fail.ExecutionError(xerr, "failed to copy script to remote host")
+			_ = yerr.Annotate("retcode", 255)
+			return "", yerr
 		}
-		// return 255, "", "", fail.Wrap(err, "failed to copy script to remote host")
-		return "", xerr
 	}
 
 	// if k != nil {
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			sshCmd, innerXErr := sshconfig.NewSudoCommand(ctx, "which scp")
 			if innerXErr != nil {
@@ -195,10 +203,18 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetHostTimeout(),
 	)
 	if xerr != nil {
-		return "", xerr
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return "", fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout:
+			return "", fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return "", xerr
+		}
 	}
 
 	// Execute script on remote host with retries if needed

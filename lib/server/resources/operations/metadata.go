@@ -48,7 +48,7 @@ func CheckMetadataVersion(svc iaas.Service) (string, fail.Error) {
 		return "", xerr
 	}
 
-	xerr = folder.Read("", "version", func(data []byte) fail.Error {
+	xerr = folder.Read("/", "version", func(data []byte) fail.Error {
 		currentMetadataVersion = string(data)
 		return nil
 	}, data.NewImmutableKeyValue("doNotCrypt", true),

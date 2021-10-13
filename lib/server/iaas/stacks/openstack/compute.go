@@ -48,7 +48,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -275,8 +274,10 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	)
 	if xerr != nil {
 		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return emptySlice, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		case *fail.ErrTimeout:
-			return emptySlice, xerr
+			return emptySlice, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return emptySlice, xerr
 		}
@@ -318,7 +319,7 @@ func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	kp, err := keypairs.Get(s.ComputeClient, id).Extract()
+	kp, err := keypairs.Get(s.ComputeClient, id, nil).Extract() // FIXME: Maybe needed
 	if err != nil {
 		return nil, fail.Wrap(err, "error getting keypair")
 	}
@@ -343,7 +344,7 @@ func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	var kpList []abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			return keypairs.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
+			return keypairs.List(s.ComputeClient, nil).EachPage(func(page pagination.Page) (bool, error) { // FIXME: Maybe needed
 				list, err := keypairs.ExtractKeyPairs(page)
 				if err != nil {
 					return false, err
@@ -382,7 +383,7 @@ func (s Stack) DeleteKeyPair(id string) fail.Error {
 
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			return keypairs.Delete(s.ComputeClient, id).ExtractErr()
+			return keypairs.Delete(s.ComputeClient, id, nil).ExtractErr() // FIXME: Maybe needed
 		},
 		NormalizeError,
 	)
@@ -598,7 +599,8 @@ func (s Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 }
 
 // CreateHost creates a new host
-func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
+func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+	var xerr fail.Error
 	nullAHF := abstract.NewHostFull()
 	nullUDC := userdata.NewContent()
 	if s.IsNull() {
@@ -606,7 +608,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
@@ -629,9 +631,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	userData = userdata.NewContent()
 	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to prepare user data content")
-		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-		return nullAHF, nullUDC, xerr
+		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
@@ -667,7 +667,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		hostPorts    []ports.Port
 		createdPorts []string
 	)
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
+	xerr = retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
 
@@ -694,7 +694,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
-					innerXErr = fail.ConvertError(innerXErr.Cause())
+					return fail.Wrap(fail.Cause(innerXErr), "stopping retries")
 				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(innerXErr)
 				}
@@ -750,25 +750,22 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetLongOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-			if cerr := xerr.Cause(); cerr != nil {
-				xerr = fail.ConvertError(cerr)
-			}
+			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "timeout")
 		case *retry.ErrStopRetry:
-			if cerr := xerr.Cause(); cerr != nil {
-				xerr = fail.ConvertError(cerr)
-			}
+			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		}
 		return nullAHF, nullUDC, xerr
 	}
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			logrus.Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
 			if derr := s.DeleteHost(ahc.ID); derr != nil {
 				switch derr.(type) {
@@ -779,7 +776,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
 				}
-				_ = fail.AddConsequence(xerr, derr)
+				_ = fail.AddConsequence(ferr, derr)
 			}
 		}
 	}()
@@ -872,16 +869,16 @@ func (s Stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) 
 }
 
 // identifyOpenstackSubnetsAndPorts ...
-func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, xerr fail.Error) {
+func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) {
 	nets = []servers.Network{}
 	netPorts = []ports.Port{}
 	createdPorts = []string{}
 
 	// cleanup if exiting with error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.deletePortsInSlice(createdPorts); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete ports"))
 			}
 		}
 	}()
@@ -1073,19 +1070,16 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			ahf.Core.ID = server.ID // makes sure that on next turn we get IPAddress by ID
 			lastState := toHostState(server.Status)
 			// If state matches, we consider this a success no matter what
-			if lastState == state {
+			switch lastState {
+			case state:
 				return nil
+			case hoststate.Error:
+				return retry.StopRetryError(fail.NotAvailableError("state of Host '%s' is 'ERROR'", hostLabel))
+			case hoststate.Starting, hoststate.Stopping:
+				return fail.NewError("host '%s' not ready yet", hostLabel)
+			default:
+				return retry.StopRetryError(fail.NewError("host status of '%s' is in state '%s'", hostLabel, lastState.String()))
 			}
-
-			if lastState == hoststate.Error {
-				return retry.StopRetryError(abstract.ResourceNotAvailableError("host", hostLabel), "")
-			}
-
-			if lastState != hoststate.Starting && lastState != hoststate.Stopping {
-				return retry.StopRetryError(nil, "host status of '%s' is in state '%s', and that's not a transition state", hostLabel, server.Status)
-			}
-
-			return fail.NewError("host '%s' not ready yet", hostLabel)
 		},
 		temporal.GetMinDelay(),
 		timeout,
@@ -1093,13 +1087,16 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *fail.ErrTimeout:
-			retryErr = fail.TimeoutError(retryErr.Cause(), timeout, "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
+			return nullServer, fail.Wrap(fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
 		case *fail.ErrAborted:
-			retryErr = fail.ConvertError(retryErr.Cause())
+			cause := retryErr.Cause()
+			if cause != nil {
+				retryErr = fail.ConvertError(cause)
+			}
+			return server, retryErr
+		default:
+			return nullServer, retryErr
 		}
-	}
-	if retryErr != nil {
-		return nullServer, retryErr
 	}
 	if server == nil {
 		return nullServer, fail.NotFoundError("failed to query Host")
@@ -1270,7 +1267,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			// If check succeeds but state is Error, retry the deletion.
 			// If check fails and error is not 'not found', retry
 			var state hoststate.Enum = hoststate.Unknown
-			innerXErr := retry.WhileUnsuccessfulDelay5Seconds(
+			innerXErr := retry.WhileUnsuccessful(
 				func() error {
 					server, gerr := s.rpcGetServer(ahf.Core.ID)
 					if gerr != nil {
@@ -1287,10 +1284,18 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					}
 					return fail.NewError("host %s state is '%s'", hostRef, server.Status)
 				},
+				temporal.GetDefaultDelay(),
 				temporal.GetContextTimeout(),
 			)
 			if innerXErr != nil {
-				return innerXErr
+				switch innerXErr.(type) {
+				case *retry.ErrStopRetry:
+					return fail.Wrap(fail.Cause(innerXErr), "stopping retries")
+				case *retry.ErrTimeout:
+					return fail.Wrap(fail.Cause(innerXErr), "timeout")
+				default:
+					return innerXErr
+				}
 			}
 			if state == hoststate.Error {
 				return fail.NotAvailableError("failed to trigger server deletion, retrying...")
@@ -1301,14 +1306,21 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		temporal.GetHostCleanupTimeout(),
 	)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrTimeout, *retry.ErrStopRetry:
-			// On timeout or abort, recover the error cause
-			xerr = fail.ConvertError(xerr.Cause())
-		}
-	}
-	if xerr != nil {
-		switch xerr.(type) {
+		switch xerr.(type) { // FIXME: Look at that
+		case *retry.ErrTimeout:
+			cause := fail.Cause(xerr)
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(xerr)
+			} else {
+				return fail.ConvertError(cause)
+			}
+		case *retry.ErrStopRetry:
+			cause := fail.Cause(xerr)
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				debug.IgnoreError(xerr)
+			} else {
+				return fail.ConvertError(cause)
+			}
 		case *fail.ErrNotFound:
 			// if host disappeared (rpcListPorts succeeded and host was still there at this moment), consider the error as a successful deletion;
 			// leave a chance to remove ports

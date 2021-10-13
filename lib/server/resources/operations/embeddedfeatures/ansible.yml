@@ -69,24 +69,24 @@ feature:
                             case $LINUX_KIND in
                                 ubuntu)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfStandardRetry "sfApt update"
+                                    sfRetry "sfApt update"
                                     apt-cache showpkg software-properties-common && apt-get install -y software-properties-common
                                     apt-cache showpkg python-software-properties && apt-get install -y python-software-properties
                                     apt-add-repository --yes --update ppa:ansible/ansible
-                                    sfStandardRetry "sfApt update"
-                                    sfStandardRetry "sfApt install -y ansible"
+                                    sfRetry "sfApt update"
+                                    sfRetry "sfApt install -y ansible"
                                     ;;
                                 debian)
                                     export DEBIAN_FRONTEND=noninteractive
-                                    sfStandardRetry "sfApt update"
+                                    sfRetry "sfApt update"
                                     echo "deb http://ppa.launchpad.net/ansible/ansible/ubuntu trusty main" >> /etc/apt/sources.list
                                     sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 93C4A3FD7BB9C367 -y
-                                    sfStandardRetry "sfApt update"
-                                    sfStandardRetry "sfApt install -y ansible"
+                                    sfRetry "sfApt update"
+                                    sfRetry "sfApt install -y ansible"
                                     ;;
                                 centos|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        sfRetry 3m 5 "dnf install --enablerepo=epel -y ansible" || sfFail 192
+                                        sfRetryEx 3m 5 "dnf install --enablerepo=epel -y ansible" || sfFail 192
                                     else
                                         yum install -y ansible || sfFail 192
                                     fi
@@ -179,9 +179,9 @@ feature:
                             ansible_python_interpreter=/usr/bin/python3
                             EOF
 
-                            chown -R {{ .ClusterAdminUsername }} ${SF_ETCDIR}/ansible
-                            chmod -R ug+rw,o-rw ${SF_ETCDIR}/ansible
-                            find ${SF_ETCDIR}/ansible -type d -exec chmod ug+x,o-x {} \;
+                            chown -R {{ .ClusterAdminUsername }}:root ${SF_ETCDIR}/ansible
+                            chmod -R ug+rw-x,o+r-wx ${SF_ETCDIR}/ansible
+                            find ${SF_ETCDIR}/ansible -type d -exec chmod a+x {} \;
                             sfExit
 
             remove:

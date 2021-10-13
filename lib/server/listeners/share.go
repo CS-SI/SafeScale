@@ -20,8 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -34,18 +32,21 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// safescale nas|share create share1 host1 --path="/shared/data"
-// safescale nas|share delete share1
-// safescale nas|share mount share1 host2 --path="/data"
-// safescale nas|share umount share1 host2
-// safescale nas|share list
-// safescale nas|share inspect share1
+// safescale share create --path="/shared/data" share1 host1
+// safescale share delete share1
+// safescale share mount --path="/data" share1 host2
+// safescale share umount share1 host2
+// safescale share list
+// safescale share inspect share1
 
 // ShareListener Share service server grpc
-type ShareListener struct{}
+type ShareListener struct {
+	protocol.UnimplementedShareServiceServer
+}
 
 // Create calls share service creation
 func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition) (_ *protocol.ShareDefinition, err error) {
@@ -73,12 +74,11 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.Task()
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	sharePath := in.GetPath()
 	shareType := in.GetType()
-	tracer := debug.NewTracer(task, true, "('%s', %s, '%s', %s)", shareName, hostRefLabel, sharePath, shareType).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true, "('%s', %s, '%s', %s)", shareName, hostRefLabel, sharePath, shareType).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -92,22 +92,24 @@ func (s *ShareListener) Create(ctx context.Context, in *protocol.ShareDefinition
 		return nil, xerr
 	}
 
-	rs, xerr := sharefactory.New(svc)
+	shareInstance, xerr := sharefactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = rs.Create(task.GetContext(), shareName, rh, sharePath, in.OptionsAsString)
+	xerr = shareInstance.Create(job.Context(), shareName, rh, sharePath, in.OptionsAsString)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	psml, xerr := rs.ToProtocol()
+	defer shareInstance.Released()
+
+	out, xerr := shareInstance.ToProtocol()
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return psml.Share, nil
+	return out.Share, nil
 }
 
 // Delete call share service deletion
@@ -137,18 +139,19 @@ func (s *ShareListener) Delete(ctx context.Context, in *protocol.Reference) (emp
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.Task()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.share"), "('%s')", shareName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.share"), "('%s')", shareName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := sharefactory.Load(job.Service(), shareName)
+	shareInstance, xerr := sharefactory.Load(job.Service(), shareName)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rs.Delete(task.GetContext()); xerr != nil {
+	defer shareInstance.Released()
+
+	if xerr = shareInstance.Delete(job.Context()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -315,15 +318,17 @@ func (s *ShareListener) Inspect(ctx context.Context, in *protocol.Reference) (sm
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewShareHandler(job)
-	rh, xerr := handler.Inspect(shareRef)
+	shareInstance, xerr := handler.Inspect(shareRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// DEFENSIVE CODING: this _must not_ happen, but InspectHost has different implementations for each stack, and sometimes mistakes happens, so the test is necessary
-	if rh == nil {
+	if shareInstance == nil {
 		return nil, abstract.ResourceNotFoundError("share", shareRef)
 	}
 
-	return rh.ToProtocol()
+	defer shareInstance.Released()
+
+	return shareInstance.ToProtocol()
 }

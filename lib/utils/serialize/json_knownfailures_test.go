@@ -1,3 +1,4 @@
+//go:build alltests
 // +build alltests
 
 /*

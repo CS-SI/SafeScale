@@ -17,8 +17,6 @@
 package openstack
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"regexp"
 
 	"github.com/sirupsen/logrus"
@@ -29,10 +27,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+)
+
+const (
+	openstackDefaultImage = "Ubuntu 20.04"
 )
 
 // provider is the provider implementation of the openstack provider respecting api.Provider
@@ -81,6 +84,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		floatingIPPool = providerNetwork
 	}
 	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = openstackDefaultImage
+	}
+
 	dnsServers, _ := network["DNSServers"].([]string)
 	if len(dnsServers) == 0 {
 		dnsServers = []string{"8.8.8.8", "1.1.1.1"}

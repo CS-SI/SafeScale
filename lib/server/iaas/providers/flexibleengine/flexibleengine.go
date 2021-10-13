@@ -21,8 +21,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
@@ -30,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"
@@ -38,6 +37,8 @@ import (
 )
 
 const (
+	flexibleEngineDefaultImage = "Ubuntu 20.04"
+
 	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com/v3"
 )
 
@@ -114,6 +115,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = flexibleEngineDefaultImage
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -155,6 +161,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		DefaultSecurityGroupName: "default",
 		DefaultNetworkName:       vpcName,
 		DefaultNetworkCIDR:       vpcCIDR,
+		DefaultImage:             defaultImage,
 		// WhitelistTemplateRegexp: whitelistTemplatePattern,
 		// BlacklistTemplateRegexp: blacklistTemplatePattern,
 		// WhitelistImageRegexp:    whitelistImagePattern,
@@ -187,6 +194,7 @@ func (p *provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error
 	if xerr != nil {
 		return nullAHT, xerr
 	}
+
 	addGPUCfg(&tpl)
 	return tpl, nil
 }
@@ -201,6 +209,15 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 
 	var tpls []abstract.HostTemplate
 	for _, tpl := range allTemplates {
+		// Ignore templates containing ".mcs."
+		if strings.Contains(tpl.Name, ".mcs.") {
+			continue
+		}
+		// Ignore template starting with "physical."
+		if strings.HasPrefix(tpl.Name, "physical.") {
+			continue
+		}
+
 		addGPUCfg(&tpl)
 		tpls = append(tpls, tpl)
 	}

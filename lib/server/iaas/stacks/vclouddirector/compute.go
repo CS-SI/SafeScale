@@ -1,3 +1,4 @@
+//go:build vcloud && !ignore
 // +build vcloud,!ignore
 
 /*
@@ -25,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/go-vcloud-director/types/v56"
 
@@ -376,7 +378,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 
 	vapp, err := vdc.FindVAppByName(request.ResourceName)
 	if err != nil {
-		retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+		retryErr := retry.WhileUnsuccessful(
 			func() error {
 				// FIXME: vdc.ComposeVAppWithDHCP doesn't exist anymore; use of vdc.ComposeVapp + another call ?
 				task, innerErr := vdc.ComposeVAppWithDHCP(nets, vapptemplate, storageProfileReference, request.ResourceName, fmt.Sprintf("%s description", request.ResourceName), true)
@@ -388,7 +390,8 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 				logrus.Warning(innerXErr)
 				return innerXErr
 			},
-			10*time.Minute,
+			temporal.GetDefaultDelay(),
+			temporal.GetHostCreationTimeout(),
 		)
 		if retryErr != nil {
 			return nullAhf, userData, fail.Wrap(retryErr, "error creating vapp")
@@ -441,7 +444,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 
 	log.Printf("Renaming vapp to %s", request.ResourceName)
 
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			task, innerErr := vapp.ChangeVMName(request.ResourceName)
 			if innerErr != nil {
@@ -449,6 +452,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 			}
 			return normalizeError(task.WaitTaskCompletion())
 		},
+		temporal.GetDefaultDelay(),
 		10*time.Minute,
 	)
 	if retryErr != nil {
@@ -479,7 +483,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 		return nullAhf, userData, xerr
 	}
 
-	retryErr = retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			task, innerErr := vapp.RunCustomizationScript(request.ResourceName, string(phase1Content))
 			if innerErr != nil {
@@ -487,13 +491,14 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 			}
 			return task.WaitTaskCompletion()
 		},
+		temporal.GetDefaultDelay(),
 		10*time.Minute,
 	)
 	if retryErr != nil {
 		return nullAhf, userData, fail.Wrap(retryErr, "error running customization script'")
 	}
 
-	retryErr = retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			task, innerErr := vapp.PowerOn()
 			if innerErr != nil {
@@ -501,6 +506,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 			}
 			return normalizeError(task.WaitTaskCompletion())
 		},
+		temporal.GetDefaultDelay(),
 		10*time.Minute,
 	)
 	if retryErr != nil {
@@ -509,7 +515,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 
 	capturedIP := ""
 
-	retryErr = retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr = retry.WhileUnsuccessful(
 		func() error {
 			vm, innerErr := vdc.FindVMByName(vapp, vapp.VApp.Name)
 			if innerErr != nil {
@@ -535,6 +541,7 @@ func (s *stack) CreateHost(request abstract.HostRequest) (hostFull *abstract.Hos
 
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		3*time.Minute,
 	)
 	if retryErr != nil {

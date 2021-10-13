@@ -14,11 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-rm -f /opt/safescale/var/log/node_install_requirements.log
-exec 1<&-
-exec 2<&-
-exec 1<>/opt/safescale/var/log/k8s_install_node.log
-exec 2>&1
+# Redirects outputs to /opt/safescale/var/log/node_install_requirements.log
+LOGFILE=/opt/safescale/var/log/node_install_requirements.log
+
+### All output to one file and all output to the screen
+exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
+set -x
 
 {{ .reserved_BashLibrary }}
 
@@ -98,7 +99,7 @@ export -f install_common_requirements
 
 case $(sfGetFact "linux_kind") in
     debian|ubuntu)
-        sfRetry 3m 5 "sfApt update && sfApt install -y wget curl time jq unzip" || sfFail 192 "Problem installing node common requirements"
+        sfRetryEx 3m 5 "sfApt update" || sfFail 192 "Problem installing node common requirements"
         curl -kqSsL --fail -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
         unzip rclone-current-linux-amd64.zip && \
         cp rclone-*-linux-amd64/rclone /usr/local/bin && \
@@ -111,10 +112,10 @@ case $(sfGetFact "linux_kind") in
         ;;
     redhat|centos)
         yum makecache fast || sfFail 192 "Problem updating sources"
-        yum install -y wget curl time rclone jq unzip || sfFail 192 "Problem installing node common requirements"
+        yum install -y rclone || sfFail 192 "Problem installing node common requirements"
         ;;
     fedora)
-        dnf install wget curl time rclone jq unzip || sfFail 192 "Problem installing node common requirements"
+        dnf install -y rclone || sfFail 192 "Problem installing node common requirements"
         ;;
     *)
         sfFail 1 "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"

@@ -21,21 +21,23 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"github.com/asaskevich/govalidator"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+)
+
+const (
+	ovhDefaultImage = "Ubuntu 20.04"
 )
 
 type gpuCfg struct {
@@ -130,6 +132,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = ovhDefaultImage
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
@@ -171,9 +178,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		OperatorUsername:         operatorUsername,
 		ProviderName:             providerName,
 		DefaultSecurityGroupName: "default",
+		DefaultImage:             defaultImage,
 	}
 
-	serviceVersions := map[string]string{"volume": "v1"}
+	serviceVersions := map[string]string{"volume": "v2"}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
 	if xerr != nil {
@@ -184,6 +192,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Stack:            stack,
 		tenantParameters: params,
 	}
+
 	return newP, nil
 }
 

@@ -26,8 +26,6 @@ import (
 	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-
 	"github.com/gophercloud/gophercloud"
 	nics "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/attachinterfaces"
 	exbfv "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
@@ -44,9 +42,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -294,7 +292,8 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 }
 
 // CreateHost creates a new host
-func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, xerr fail.Error) {
+func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+	var xerr fail.Error
 	nullAhf := abstract.NewHostFull()
 	nullUdc := userdata.NewContent()
 	if s.IsNull() {
@@ -302,7 +301,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
@@ -344,9 +343,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	userData = userdata.NewContent()
 	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to prepare user data content")
-		logrus.Debugf(strprocess.Capitalize(xerr.Error()))
-		return nullAhf, nullUdc, xerr
+		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
 	}
 
 	template, xerr := s.InspectTemplate(request.TemplateID)
@@ -433,7 +430,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		r      servers.CreateResult
 		server *servers.Server
 	)
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() (innerErr error) {
@@ -499,15 +496,23 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetLongOperationTimeout(),
 	)
 	if retryErr != nil {
-		return nil, userData, retryErr
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return nil, userData, fail.Wrap(fail.Cause(retryErr), "stopping retries")
+		case *retry.ErrTimeout:
+			return nil, userData, fail.Wrap(fail.Cause(retryErr), "timeout")
+		default:
+			return nil, userData, retryErr
+		}
 	}
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := s.DeleteHost(ahc.ID)
 			if derr != nil {
 				switch derr.(type) {
@@ -518,7 +523,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				default:
 					logrus.Errorf("Cleaning up on failure, failed to delete host '%s': '%v'", ahc.Name, derr)
 				}
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
@@ -527,6 +532,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	if xerr != nil {
 		return nil, nil, xerr
 	}
+
 	host.Networking.DefaultSubnetID = defaultSubnetID
 	// host.Networking.DefaultGatewayID = defaultGatewayID
 	// host.Networking.DefaultGatewayPrivateIP = defaultGatewayPrivateIP
@@ -536,7 +542,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	if request.PublicIP {
 		var fip *FloatingIP
-		if fip, xerr = s.attachFloatingIP(ahc); xerr != nil {
+		if fip, xerr = s.attachFloatingIP(host); xerr != nil {
 			return nil, userData, fail.Wrap(xerr, "error attaching public IP for host '%s'", request.ResourceName)
 		}
 		if fip == nil {
@@ -596,6 +602,8 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 }
 
 // InspectHost updates the data inside host with the data from provider
+// Returns:
+// - *abstract.HostFull, nil if no error occurs
 func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
@@ -608,21 +616,27 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	}
 
 	server, xerr := s.WaitHostState(ahf, hoststate.Started, temporal.GetOperationTimeout())
-	if xerr != nil {
-		return nullAHF, xerr
-	}
+	// Note: if xerr != nil AND server != nil, server still contains meaningful information that may be useful
 	if server == nil {
-		return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
+		if xerr == nil {
+			xerr = abstract.ResourceNotFoundError("host", hostRef)
+		}
+		return nullAHF, xerr
 	}
 
-	if host, xerr = s.complementHost(ahf.Core, server); xerr != nil {
-		return nullAHF, xerr
+	var cerr fail.Error
+	host, cerr = s.complementHost(ahf.Core, server)
+	if cerr != nil {
+		if xerr != nil {
+			_ = xerr.AddConsequence(cerr)
+		} else {
+			xerr = cerr
+		}
 	}
 	if !host.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
-
-	return host, nil
+	return host, xerr
 }
 
 // complementHost complements IPAddress data with content of server parameter
@@ -642,9 +656,6 @@ func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (
 		host.Name = server.Name
 	}
 	host.LastState = toHostState(server.Status)
-	if host.LastState != hoststate.Started {
-		logrus.Warnf("[TRACE] Unexpected host's last state: %v", host.LastState)
-	}
 
 	completedHost = abstract.NewHostFull()
 	completedHost.Core = host
@@ -904,7 +915,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			// If check fails and error isn't 'resource not found', retry
 			if resourcePresent {
 				var host *servers.Server
-				innerRetryErr := retry.WhileUnsuccessfulDelay5Seconds(
+				innerRetryErr := retry.WhileUnsuccessful(
 					func() error {
 						commRetryErr := stacks.RetryableRemoteCall(
 							func() (innerErr error) {
@@ -927,15 +938,18 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						}
 						return commRetryErr
 					},
+					temporal.GetDefaultDelay(),
 					temporal.GetHostCleanupTimeout(),
 				)
 				if innerRetryErr != nil {
-					if _, ok := innerRetryErr.(*retry.ErrTimeout); ok {
-						// retry deletion...
-						return fail.Wrap(abstract.ResourceTimeoutError("host", hostRef, temporal.GetContextTimeout()),
-							"host '%s' not deleted after %v", hostRef, temporal.GetContextTimeout())
+					switch innerRetryErr.(type) {
+					case *retry.ErrStopRetry:
+						return fail.Wrap(fail.Cause(innerRetryErr), "stopping retries")
+					case *retry.ErrTimeout:
+						return fail.Wrap(fail.Cause(innerRetryErr), "timeout")
+					default:
+						return innerRetryErr
 					}
-					return innerRetryErr
 				}
 			}
 			if !resourcePresent {
@@ -947,8 +961,14 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		temporal.GetHostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
-		logrus.Errorf("failed to remove host '%s': %s", hostRef, outerRetryErr.Error())
-		return outerRetryErr
+		switch outerRetryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return fail.Wrap(fail.Cause(outerRetryErr), "stopping retries")
+		case *retry.ErrTimeout:
+			return fail.Wrap(fail.Cause(outerRetryErr), "timeout")
+		default:
+			return outerRetryErr
+		}
 	}
 	if !resourcePresent {
 		return abstract.ResourceNotFoundError("host", hostRef)
@@ -993,13 +1013,13 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 }
 
 // attachFloatingIP creates a Floating IP and attaches it to an host
-func (s stack) attachFloatingIP(host *abstract.HostCore) (*FloatingIP, fail.Error) {
-	fip, xerr := s.CreateFloatingIP()
+func (s stack) attachFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
+	fip, xerr := s.CreateFloatingIP(host)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	xerr = s.AssociateFloatingIP(host, fip.ID)
+	xerr = s.AssociateFloatingIP(host.Core, fip.ID)
 	if xerr != nil {
 		derr := s.DeleteFloatingIP(fip.ID)
 		if derr != nil {
@@ -1008,6 +1028,7 @@ func (s stack) attachFloatingIP(host *abstract.HostCore) (*FloatingIP, fail.Erro
 		_ = xerr.AddConsequence(derr)
 		return nil, xerr
 	}
+
 	return fip, nil
 }
 
@@ -1018,7 +1039,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 	)
 
 	// Sometimes, getOpenstackPortID doesn't find network interface, so let's retry in case it's a bad timing issue
-	retryErr := retry.WhileUnsuccessfulDelay5SecondsTimeout(
+	retryErr := retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
 			var innerErr fail.Error
 			portID, innerErr = s.getOpenstackPortID(host)
@@ -1030,10 +1051,18 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetOperationTimeout(),
 	)
 	if retryErr != nil {
-		return fail.Wrap(retryErr, "failed to enable Router Mode on host '%s'", host.Core.Name)
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry: // here it should never happen
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
+		case *retry.ErrTimeout:
+			return fail.Wrap(fail.Cause(retryErr), "timeout")
+		default:
+			return retryErr
+		}
 	}
 
 	commRetryErr := stacks.RetryableRemoteCall(
