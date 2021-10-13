@@ -217,7 +217,7 @@ func TestChildrenWaitingGameWithContextTimeoutsWF(t *testing.T) {
 
 		begin := time.Now()
 
-		_, xerr := single.Start(taskgen(int(sleep), int(sleep), 4, 0, 0, 0, false), nil)
+		_, xerr := single.Start(taskgen(sleep, sleep, 4, 0, 0, 0, false), nil)
 		require.Nil(t, xerr)
 
 		go func() {

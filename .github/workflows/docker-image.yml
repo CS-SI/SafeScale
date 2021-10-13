@@ -2,9 +2,9 @@ name: Docker Image CI Go Stable
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ bugfix/develop ]
   pull_request:
-    branches: [ develop ]
+    branches: [ bugfix/develop ]
 
 jobs:
 
