@@ -96,3 +96,60 @@ func TestChildrenWaitingGameWithContextCancelfuncsWF(t *testing.T) {
 		funk(16, 60, 20, 83, false) // if we go far enough, no errors
 	}
 }
+
+func TestChildrenWaitingGameEnoughTimeTooManyFailures(t *testing.T) {
+	funk := func(index int, rounds int, lower int, upper int, latency int, margin int, gcpressure int) {
+		failures := 0
+		for iter := 0; iter < rounds; iter++ {
+			overlord, xerr := NewTaskGroupWithParent(nil)
+			require.NotNil(t, overlord)
+			require.Nil(t, xerr)
+			xerr = overlord.SetID("/parent")
+			require.Nil(t, xerr)
+
+			theID, xerr := overlord.GetID()
+			require.Nil(t, xerr)
+			require.NotEmpty(t, theID)
+
+			begin := time.Now()
+			for ind := 0; ind < gcpressure; ind++ {
+				_, xerr := overlord.Start(taskgen(lower, upper, latency, 0, 0, 0, false), nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+				if xerr != nil {
+					t.Errorf("Test %d: Unexpected: %s", index, xerr)
+					t.FailNow()
+					return
+				}
+			}
+			childrenStartDuration := time.Since(begin)
+			upbound := int(math.Ceil(float64(upper)/float64(latency)) * float64(latency))
+			timeout := time.Duration(upbound+margin) * time.Millisecond
+			// Waits that all children have started to access max safely
+			begin = time.Now()
+			fastEnough, res, xerr := overlord.WaitFor(timeout)
+			waitForRealDuration := time.Since(begin)
+			if !fastEnough {
+				t.Logf("WaitFor failed: %s", xerr)
+				if childrenStartDuration > 5*time.Millisecond { // however, it grows with gcpressure
+					t.Logf("Launching children took %v", childrenStartDuration)
+				}
+				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
+				t.Logf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
+				failures++
+				if failures > (75 * rounds / 100) {
+					t.Errorf("Test %d: too many failures", index)
+					t.FailNow()
+					return
+				}
+			} else {
+				require.Nil(t, xerr)
+				require.NotEmpty(t, res)
+			}
+		}
+	}
+
+	// Look at the pressure supported by GC
+	funk(1, 10, 100, 125, 25, 25, 10)
+	funk(2, 10, 100, 125, 25, 25, 10)
+	funk(3, 10, 100, 125, 25, 25, 10)
+	funk(4, 10, 100, 125, 25, 25, 10)
+}

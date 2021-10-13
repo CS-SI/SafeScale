@@ -34,6 +34,12 @@ $(error "Cross compilation requires both GOOS and GOARCH to be specified. Stoppi
 endif
 endif
 
+ifneq (, $(GOTESTTAGS))
+GO_TEST_TAGS=-tags $GOTESTTAGS
+else
+GO_TEST_TAGS=
+endif
+
 ifeq (, $(GOOS))
 RACE_CHECK=-race
 RACE_CHECK_TEST=-race

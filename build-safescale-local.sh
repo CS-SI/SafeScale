@@ -21,18 +21,27 @@ sed -i "s#\(.*\)develop#\1${BRANCH_NAME}#" common.mk
 # Compile
 # ----------------------
 
+echo "deps"
+make getdevdeps
+
+sleep 4
+
 echo "mod"
 make mod
 
-sleep 15
+sleep 4
 
 make sdk
 
-sleep 15
+sleep 4
+
+make force_sdk_python
+
+sleep 4
 
 make generate
 
-sleep 15
+sleep 4
 
 echo "Make All"
 make all
@@ -48,5 +57,8 @@ mkdir -p /exported
 
 CIBIN=/exported make installci
 [ $? -ne 0 ] && echo "Export failure" && exit 1
+
+cp ${WRKDIR}/SafeScale/go.mod /exported
+cp ${WRKDIR}/SafeScale/go.sum /exported
 
 exit 0

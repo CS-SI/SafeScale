@@ -61,7 +61,7 @@ if [ ! -f ./markerCi-$1-$2-$OSHASH-$4 ]; then
 	curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./markerCi-$1-$2-$OSHASH-$4
 else
   curl https://api.github.com/repos/CS-SI/SafeScale/commits/$(git rev-parse --abbrev-ref HEAD) 2>&1 | grep '"date"' | tail -n 1 > ./newMarkerCi-$1-$2-$OSHASH-$4
-  diff ./markerCi-$1-$2-$OSHASH-$4 ./newMarkerCi-$1-$2-$OSHASH-$4 1>/dev/null && rm ./newMarkerCi-$1-$2-$OSHASH-$4 && echo "Nothing to do !, if you want to force a ci test lauch with -f flag" && exit 0
+  diff ./markerCi-$1-$2-$OSHASH-$4 ./newMarkerCi-$1-$2-$OSHASH-$4 1>/dev/null && rm ./newMarkerCi-$1-$2-$OSHASH-$4 && echo "Nothing to do !, if you want to force a ci test launch with -f flag" && exit 0
 fi
 
 THISBRANCH=$(git rev-parse --abbrev-ref HEAD | sed 's#/#\-#g') TENANT=$1 CLUTYPE=$2 CLUSIZE=$4 envsubst <Dockerfile.ci > Dockerfile.cibranch-$1-$2-$OSHASH-$4
