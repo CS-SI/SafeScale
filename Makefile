@@ -139,16 +139,25 @@ ground: begin
 #CI dependencies
 cideps: begin ground
 	@$(WHICH) gojq > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...$(NO_COLOR)\n" && $(GO) install $(GOJQ)@v0.12.3 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gojq...$(NO_COLOR)\n"; \
+		$(GO) install $(GOJQ)@v0.12.3 &>/dev/null || true; \
 	fi
 	@$(WHICH) gron > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...$(NO_COLOR)\n" && $(GO) install $(GRON)@v0.6.1 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gron...$(NO_COLOR)\n";
+		$(GO) install $(GRON)@v0.6.1 &>/dev/null || true; \
 	fi
 	@$(WHICH) jsontoml > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...$(NO_COLOR)\n" && $(GO) install $(JSONTOML)/cmd/jsontoml@v1.9.0 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading jsontoml...$(NO_COLOR)\n"; \
+		$(GO) install $(JSONTOML)/cmd/jsontoml@v1.9.0 &>/dev/null || true; \
 	fi
 	@$(WHICH) tomljson > /dev/null; if [ $$? -ne 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...$(NO_COLOR)\n" && $(GO) install $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading tomljson...$(NO_COLOR)\n"; \
+		$(GO) install $(JSONTOML)/cmd/tomljson@v1.9.0 &>/dev/null || true; \
+	fi
+
+batscheck: begin
+	@if [ ! -s ./helpers/bin/bats ]; then \
+		printf "%b" "$(ERROR_COLOR)$(INFO_STRING) Cannot run bats tests: bats is not installed, use the target installbats to do it.  Aborting.$(NO_COLOR)\n" >&2; exit 1; \
 	fi
 
 installbats: begin ground
@@ -156,19 +165,21 @@ installbats: begin ground
 	@mkdir -p ./helpers/tmp || true
 	@if [ ! -s ./helpers/bin/bats ]; then git clone https://github.com/sstephenson/bats.git ./helpers/tmp;./helpers/tmp/install.sh ./helpers;rm -rf ./helpers/tmp; fi
 
-bashtest:
-	@if [ ! -s ./helpers/bin/bats ]; then \
-		printf "%b" "$(ERROR_COLOR)$(INFO_STRING) Cannot run bash tests: bats is not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; \
-	fi
+bashtest: begin batscheck
 	@(cd lib && $(MAKE) $(@))
+
+trivycheck: begin
+	@if [ ! -s ./helpers/bin/trivy ]; then \
+		printf "%b" "$(ERROR_COLOR)$(INFO_STRING) Cannot run trivy tests: trivy is not installed, use the target installtrivy to do it.  Aborting.$(NO_COLOR)\n" >&2; exit 1; \
+	fi
 
 installtrivy: begin ground
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing trivy...$(NO_COLOR)\n"
 	@mkdir -p ./helpers/tmp || true
 	@if [ ! -s ./helpers/bin/trivy ]; then curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | bash -s -- -b `pwd`/helpers/bin v0.19.2;rm -rf ./helpers/tmp; fi
 
-trivyreport: begin ground
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Generating trivy report in background...$(NO_COLOR)\n"
+trivyreport: begin ground trivycheck
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Generating trivy report in background (trivy-report.log) ...$(NO_COLOR)\n"
 	@find . | grep yml | xargs grep FROM | awk {'print $$3'} | sort | uniq | grep : | xargs -I _ ./helpers/bin/trivy image -s CRITICAL _ > trivy-report.log &
 
 coverdeps: begin ground
@@ -230,11 +241,22 @@ getdevdeps: begin ground
 		$(GO) install $(STRINGER)@v0.1.0 &>/dev/null || true; \
 	fi
 	@sleep 2
+	@$(WHICH) ruleguard > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading ruleguard...\n"; \
+		$(GO) install $(RULES)@v0.3.10 &>/dev/null || true; \
+		$(GO) get -d $(RULES_DSL)@v0.3.10 &>/dev/null || true; \
+	fi
+	@sleep 2
+	@$(WHICH) gogrep > /dev/null; if [ $$? -ne 0 ]; then \
+		printf "%b" "$(OK_COLOR)$(INFO_STRING) Downloading gogrep...\n" && $(GO) get $(GOGREP)@v0.0.0-20210331191051-e50df5835157 &>/dev/null || true; \
+		$(GO) install $(GOGREP)@v0.0.0-20210331191051-e50df5835157 &>/dev/null || true; \
+	fi
+	@sleep 2
 	@$(WHICH) golangci-lint > /dev/null; if [ $$? -ne 0 ]; then \
 		printf "%b" "$(OK_COLOR)$(INFO_STRING) Installing golangci...\n" || true; \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.26.0 || true; \
+		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(shell $(GO) env GOPATH)/bin v1.42.1 || true; \
 	fi
-	@sleep 25
+	@sleep 5
 
 ensure: common
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Code generation, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
@@ -257,6 +279,10 @@ clean:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Cleaning..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(cd cli && $(MAKE) $(@))
 	@(cd lib && $(MAKE) $(@))
+
+zipsources:
+	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Creating a tar.gz file safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz with the sources..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@(git archive --format tar.gz --output safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz master)
 
 mrproper: clean
 	@(git clean -xdf -e .idea -e vendor -e .vscode || true)
@@ -349,6 +375,7 @@ vet: begin generate
 
 semgrep: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running semgrep checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
+	@($(WHICH) ruleguard > /dev/null || (echo "ruleguard not installed in your system" && exit 1))
 	@ruleguard -c=0 -rules build/rules/ruleguard.rules.$(CERR).go ./... | $(TEE) semgrep_results.log
 	@if [ -s ./semgrep_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) semgrep FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
