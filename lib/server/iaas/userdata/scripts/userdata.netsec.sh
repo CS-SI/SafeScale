@@ -231,48 +231,7 @@ function is_ip_private() {
   return 1
 }
 
-function identify_nics() {
-  NICS=$(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
-  NICS=${NICS/[[:cntrl:]]/ }
-
-  NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
-
-  for IF in ${NICS}; do
-    IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-    [[ ! -z $IP ]] && is_ip_private $IP && PR_IFs="$PR_IFs $IF"
-  done
-  PR_IFs=$(echo ${PR_IFs} | xargs) || true
-  PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null) || true
-  PU_IP=$(ip a | grep ${PU_IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
-  if [[ ! -z ${PU_IP} ]]; then
-    if is_ip_private $PU_IP; then
-      PU_IF=
-
-      NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null | grep 404) || true
-      if [[ -z $NO404 ]]; then
-        # Works with FlexibleEngine and potentially with AWS (not tested yet)
-        PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null) || true
-        [[ -z $PU_IP ]] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
-      fi
-    fi
-  fi
-  [[ -z ${PR_IFs} ]] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
-
-  # Keeps track of interfaces identified for future scripting use
-  echo "$PR_IFs" >${SF_VARDIR}/state/private_nics
-  echo "$PU_IF" >${SF_VARDIR}/state/public_nics
-
-  if [[ ! -z ${PU_IP} ]]; then
-    if [[ -z ${PU_IF} ]]; then
-      if [[ -z ${NO404} ]]; then
-        echo "It seems AWS"
-        AWS=1
-      else
-        AWS=0
-      fi
-    fi
-  fi
-
+function check_providers() {
   if [[ "{{.ProviderName}}" == "aws" ]]; then
     echo "It actually IS AWS"
     AWS=1
@@ -304,6 +263,40 @@ function identify_nics() {
     echo "It is NOT huaweicloud"
     FEN=0
   fi
+}
+
+function identify_nics() {
+  NICS=$(for i in $(find /sys/devices -name net -print | grep -v virtual); do ls $i; done)
+  NICS=${NICS/[[:cntrl:]]/ }
+
+  NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
+
+  for IF in ${NICS}; do
+    IP=$(ip a | grep $IF | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
+    [[ ! -z $IP ]] && is_ip_private $IP && PR_IFs="$PR_IFs $IF"
+  done
+  PR_IFs=$(echo ${PR_IFs} | xargs) || true
+  PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null) || true
+  PU_IP=$(ip a | grep ${PU_IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
+  if [[ ! -z ${PU_IP} ]]; then
+    if is_ip_private $PU_IP; then
+      PU_IF=
+
+      NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null | grep 404) || true
+      if [[ -z $NO404 ]]; then
+        # Works with FlexibleEngine and potentially with AWS (not tested yet)
+        PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null) || true
+        [[ -z $PU_IP ]] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
+      fi
+    fi
+  fi
+  [[ -z ${PR_IFs} ]] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
+
+  # Keeps track of interfaces identified for future scripting use
+  echo "$PR_IFs" >${SF_VARDIR}/state/private_nics
+  echo "$PU_IF" >${SF_VARDIR}/state/public_nics
+
+  check_providers
 
   echo "NICS identified: $NICS"
   echo "    private NIC(s): $PR_IFs"
@@ -1467,6 +1460,7 @@ function check_unsupported() {
 
 check_unsupported
 #unsafe_update_credentials
+check_providers
 update_credentials
 configure_locale
 configure_dns
