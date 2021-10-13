@@ -675,7 +675,8 @@ function configure_network_systemd_networkd() {
 
   NETERR=0
 
-  netplan generate && netplan apply || failure 202 "failure running netplan"
+  netplan generate || failure 202 "failure running netplan generate"
+  netplan apply || failure 203 "failure running netplan apply"
 
   configure_dhclient
   sleep 5
@@ -1245,13 +1246,15 @@ function early_packages_update() {
 
     if dpkg --compare-versions $(sfGetFact "linux_version") ge 17.10; then
       sfApt install -y --force-yes pciutils || failure 210 "problem installing pciutils"
-      if [[ ${FEN} -eq 0 ]]; then
+      if [[ ! -z ${FEN} && ${FEN} -eq 0 ]]; then
         which netplan || {
           sfApt install -y --force-yes netplan.io || failure 210 "problem installing netplan.io"
         }
       else
         sfApt install -y --force-yes netplan.io || failure 210 "problem installing netplan.io"
       fi
+      # netplan.io may break networking... So ensure networking is working as expected
+      ensure_network_connectivity
       sfApt install -y --force-yes sudo || failure 210 "problem installing sudo"
     else
       sfApt install -y systemd pciutils sudo || failure 211
