@@ -9,6 +9,7 @@ ENV BUILD_ENV docker
 ENV BRANCH_NAME $BRANCH_NAME
 ENV GOVERSION $GOVERSION
 ENV PROTOVERSION $PROTOVERSION
+ENV COMMITSHA $COMMITSHA
 
 RUN apt-get update -y \
 && apt-get install -y --allow-unauthenticated --no-install-recommends \
@@ -69,7 +70,7 @@ CMD sleep 5
 
 COPY marker /dev/null
 
-RUN cd /opt && ./build-safescale.sh
+RUN cd /opt && COMMITSHA=$COMMITSHA ./build-safescale.sh
 
 # --
 
