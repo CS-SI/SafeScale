@@ -28,6 +28,7 @@ jobs:
     - uses: arduino/setup-protoc@v1
       with:
         version: ${{ env.PROTOCVERSION }}
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
     - run: make all
     - uses: actions/upload-artifact@v2
       if: failure()
