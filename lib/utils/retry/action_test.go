@@ -493,16 +493,18 @@ func TestErrCheckStdError(t *testing.T) {
 	xerr := WhileUnsuccessful(
 		func() error {
 			iteration = iteration + 1
-			return fail.NewError("It failed %d", iteration)
+			return fail.NewError("It failed at iteration #%d", iteration)
 		},
-		10*time.Millisecond, 80*time.Millisecond)
+		10*time.Millisecond,
+		80*time.Millisecond,
+	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "the checking failed")
 	}
 
 	if xerr != nil {
 		t.Logf(xerr.Error())
-		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(xerr.Error(), "failed 7") || strings.Contains(xerr.Error(), "failed 8") || strings.Contains(xerr.Error(), "failed 9")) {
+		if !(strings.Contains(xerr.Error(), "failed at iteration") && (strings.Contains(xerr.Error(), "#6") || strings.Contains(xerr.Error(), "#7") || strings.Contains(xerr.Error(), "#8") || strings.Contains(xerr.Error(), "#9"))) {
 			t.FailNow()
 		}
 	}
@@ -513,16 +515,18 @@ func TestErrCheckStdErrorHard(t *testing.T) {
 	xerr := WhileUnsuccessfulWithHardTimeout(
 		func() error {
 			iteration = iteration + 1
-			return fail.NewError("It failed %d", iteration)
+			return fail.NewError("It failed at iteration #%d", iteration)
 		},
-		10*time.Millisecond, 80*time.Millisecond)
+		10*time.Millisecond,
+		80*time.Millisecond,
+	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "the checking failed")
 	}
 
 	if xerr != nil {
 		t.Logf(xerr.Error())
-		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(xerr.Error(), "failed 7") || strings.Contains(xerr.Error(), "failed 8") || strings.Contains(xerr.Error(), "failed 9")) {
+		if !(strings.Contains(xerr.Error(), "failed at iteration") && (strings.Contains(xerr.Error(), "#6") || strings.Contains(xerr.Error(), "#7") || strings.Contains(xerr.Error(), "#8") || strings.Contains(xerr.Error(), "#9"))) {
 			if !strings.Contains(xerr.Error(), "desist") {
 				t.FailNow()
 			}
@@ -537,11 +541,13 @@ func TestErrCheckStopStdError(t *testing.T) {
 		func() error {
 			iteration = iteration + 1
 			if iteration == 4 {
-				return StopRetryError(fail.NewError("It failed %d", iteration), "last error before stopping retries was")
+				return StopRetryError(fail.NewError("It failed at iteration #%d", iteration), "last error before stopping retries was")
 			}
-			return fail.NewError("It failed %d", iteration)
+			return fail.NewError("It failed at iteration #%d", iteration)
 		},
-		10*time.Millisecond, 60*time.Millisecond)
+		10*time.Millisecond,
+		60*time.Millisecond,
+	)
 	if xerr != nil {
 		errCause = fail.RootCause(xerr)
 		xerr = fail.Wrap(xerr, "the checking failed")
@@ -549,14 +555,14 @@ func TestErrCheckStopStdError(t *testing.T) {
 
 	if xerr != nil {
 		t.Logf(xerr.Error())
-		if !strings.Contains(xerr.Error(), "failed 4") {
+		if !strings.Contains(xerr.Error(), "failed at iteration #4") {
 			t.FailNow()
 		}
 	}
 
 	if errCause != nil {
 		t.Logf(errCause.Error())
-		if !strings.Contains(errCause.Error(), "failed 4") {
+		if !strings.Contains(errCause.Error(), "failed at iteration #4") {
 			t.FailNow()
 		}
 	}
