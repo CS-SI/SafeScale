@@ -32,6 +32,8 @@ var DefaultArbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
 
 var CommonArbiter = PrevailDone(Min(5), Max(10))
 
+type ArbiterAggregator func(arbiters ...Arbiter) Arbiter
+
 // PrevailRetry aggregates verdicts from Arbiters for a try:
 // - Returns Abort and the error as soon as an arbiter decides for an Abort.
 // - If at least one arbiter returns Retry without any Abort from others, returns Retry with nil error.
@@ -92,6 +94,28 @@ func Unsuccessful() Arbiter {
 			}
 		}
 		return verdict.Done, nil
+	}
+}
+
+func OrArbiter(arbiters ...Arbiter) Arbiter {
+	return func(t Try) (verdict.Enum, fail.Error) {
+		final := verdict.Retry
+		var lastErr fail.Error
+
+		for _, a := range arbiters {
+			v, err := a(t)
+
+			switch v {
+			case verdict.Done:
+				return verdict.Done, nil
+			case verdict.Abort:
+				final = verdict.Abort
+				lastErr = err
+			case verdict.Undecided:
+				continue
+			}
+		}
+		return final, lastErr
 	}
 }
 

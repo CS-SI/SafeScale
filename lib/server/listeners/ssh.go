@@ -91,7 +91,9 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 
 	defer hostInstance.Released()
 
-	retcode, stdout, stderr, xerr := hostInstance.Run(job.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := hostInstance.Run(
+		job.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout(),
+	)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -103,7 +105,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	}, nil
 }
 
-// Copy copy file from/to an host
+// Copy copies file from/to an host
 func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot copy by ssh")
@@ -177,9 +179,13 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 	defer hostInstance.Released()
 
 	if pull {
-		retcode, stdout, stderr, xerr = hostInstance.Pull(job.Context(), hostPath, localPath, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = hostInstance.Pull(
+			job.Context(), hostPath, localPath, temporal.GetLongOperationTimeout(),
+		)
 	} else {
-		retcode, stdout, stderr, xerr = hostInstance.Push(job.Context(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = hostInstance.Push(
+			job.Context(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout(),
+		)
 	}
 	if xerr != nil {
 		return nil, xerr

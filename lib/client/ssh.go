@@ -94,7 +94,9 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 				}
 			}(sshCmd)
 
-			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, executionTimeout) // FIXME: What if ssh never returns ?
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(
+				ctx, outs, executionTimeout,
+			) // FIXME: What if ssh never returns ?
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -110,7 +112,9 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 			}
 			// If retcode == 255, ssh connection failed, retry
 			if retcode == 255 /*|| !ready*/ {
-				return fail.NotAvailableError("Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname)
+				return fail.NotAvailableError(
+					"Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname,
+				)
 			}
 			return nil
 		},
@@ -266,7 +270,9 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 	retcode := -1
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			iretcode, istdout, istderr, xerr := sshCfg.CopyWithTimeout(ctx, remotePath, localPath, upload, executionTimeout)
+			iretcode, istdout, istderr, xerr := sshCfg.CopyWithTimeout(
+				ctx, remotePath, localPath, upload, executionTimeout,
+			)
 			xerr = debug.InjectPlannedFail(xerr)
 			// logrus.Warningf("'%d', '%s', '%s', '%s'", iretcode, istdout, istderr, spew.Sdump(xerr))
 			if xerr != nil {
@@ -283,7 +289,9 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 						return finnerXerr
 					}
 
-					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
+					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
+						crcCtx, outputs.COLLECT, executionTimeout,
+					)
 					finnerXerr = debug.InjectPlannedFail(finnerXerr)
 					if finnerXerr != nil {
 						_ = finnerXerr.Annotate("retcode", fretcode)
@@ -314,7 +322,9 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 			if iretcode != 0 {
 				xerr = fail.NewError("failure copying '%s' to '%s': scp error code %d", toPath, hostTo, iretcode)
 				if iretcode == 255 {
-					xerr = fail.NewError("failure copying '%s' to '%s': failed to connect to '%s'", toPath, hostTo, hostTo)
+					xerr = fail.NewError(
+						"failure copying '%s' to '%s': failed to connect to '%s'", toPath, hostTo, hostTo,
+					)
 				}
 
 				_ = xerr.Annotate("stdout", istdout)
@@ -342,7 +352,9 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 						return finnerXerr
 					}
 
-					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(crcCtx, outputs.COLLECT, executionTimeout)
+					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
+						crcCtx, outputs.COLLECT, executionTimeout,
+					)
 					finnerXerr = debug.InjectPlannedFail(finnerXerr)
 					if finnerXerr != nil {
 						_ = finnerXerr.Annotate("retcode", fretcode)
@@ -358,7 +370,10 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 						return finnerXerr
 					}
 					if !strings.Contains(fstdout, md5hash) {
-						logrus.Warnf("TBR: WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath, fstdout, fstderr, md5hash)
+						logrus.Warnf(
+							"TBR: WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath,
+							fstdout, fstderr, md5hash,
+						)
 						return fail.NewError("wrong md5 of '%s'", remotePath)
 					}
 					return nil
@@ -415,12 +430,13 @@ func (s ssh) Connect(hostname, username, shell string, timeout time.Duration) er
 		return xerr
 	}
 
-	return retry.WhileUnsuccessfulWhereRetcode255WithNotify(
+	return retry.WhileUnsuccessfulWithAggregator(
 		func() error {
 			return sshCfg.Enter(username, shell)
 		},
 		temporal.GetDefaultDelay(),
 		temporal.GetConnectSSHTimeout(),
+		retry.OrArbiter, // if sshCfg.Ender succeeds, we don't care about the timeout
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...", hostname)
@@ -449,7 +465,8 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 	sshCfg.Port = remotePort
 	sshCfg.LocalPort = localPort
 
-	return retry.WhileUnsuccessfulWhereRetcode255WithNotify(
+	return retry.WhileUnsuccessfulWithNotify(
+		// FIXME: Test if we have the timout message here
 		func() error {
 			_, _, innerErr := sshCfg.CreateTunneling()
 			return innerErr
@@ -482,7 +499,10 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 		sshCfg.IPAddress = "127.0.0.1"
 	}
 
-	cmdString := fmt.Sprintf("ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig.User, sshCfg.GatewayConfig.IPAddress)
+	cmdString := fmt.Sprintf(
+		"ssh .* %s:%s:%s %s@%s .*", localPort, sshCfg.IPAddress, remotePort, sshCfg.GatewayConfig.User,
+		sshCfg.GatewayConfig.IPAddress,
+	)
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
 	if err == nil {

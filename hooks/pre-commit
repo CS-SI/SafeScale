@@ -5,6 +5,11 @@ if [ "$NO_VERIFY" ]; then
     exit 0
 fi
 
+(git rev-parse -q --verify MERGE_HEAD) && {
+	echo 'we are merging, pre-commit hook skipped' 1>&2
+	exit 0
+}
+
 if [ -x ./git-hooks-env ]; then
     . ./git-hooks-env
 fi
