@@ -26,6 +26,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -71,10 +73,12 @@ func CreateErrorWithNConsequences(n uint) (xerr fail.Error) {
 }
 
 func CreateSkippableError() (xerr fail.Error) {
-	xerr = WhileSuccessful(func() error {
-		fmt.Println("Around the world...")
-		return StopRetryError(fail.NotFoundError("wrong place"), "no more")
-	}, 1*time.Second, 60*time.Millisecond)
+	xerr = WhileSuccessful(
+		func() error {
+			fmt.Println("Around the world...")
+			return StopRetryError(fail.NotFoundError("wrong place"), "no more")
+		}, 1*time.Second, 60*time.Millisecond,
+	)
 	return xerr
 }
 
@@ -165,7 +169,9 @@ func TestVerifyErrorType(t *testing.T) {
 
 		if cause := fail.Cause(recovered); cause != nil {
 			if _, ok := cause.(*fail.ErrNotFound); !ok {
-				t.Errorf("It should be a 'fail.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String())
+				t.Errorf(
+					"It should be a 'fail.ErrNotFound', but it's instead a '%s'", reflect.TypeOf(recovered).String(),
+				)
 			}
 		}
 	}
@@ -287,11 +293,13 @@ func TestWhileUnsuccessfulDelay5Seconds(t *testing.T) {
 		{"UntilTimeouts", args{quickSleepyFailure, time.Duration(15) * 10 * time.Millisecond}, true},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := WhileUnsuccessfulDelay50ms(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
-				t.Errorf("WhileUnsuccessfulDelay50ms() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if err := WhileUnsuccessfulDelay50ms(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
+					t.Errorf("WhileUnsuccessfulDelay50ms() error = %v, wantErr %v", err, tt.wantErr)
+				}
+			},
+		)
 	}
 }
 
@@ -312,24 +320,31 @@ func TestWhileUnsuccessfulDelay5SecondsCheck(t *testing.T) {
 		{"UntilTimeouts", args{quickSleepyFailure, time.Duration(15) * 10 * time.Millisecond}, true, true},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			testStart := time.Now()
-			var err error
-			if err = WhileUnsuccessfulDelay50ms(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
-				t.Errorf("WhileUnsuccessfulDelay50ms() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if err != nil {
-				if tt.wantTOErr {
-					if _, ok := err.(*ErrTimeout); !ok {
-						t.Errorf("'ErrTimeout' not received...")
+		t.Run(
+			tt.name, func(t *testing.T) {
+				testStart := time.Now()
+				var err error
+				if err = WhileUnsuccessfulDelay50ms(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
+					t.Errorf("WhileUnsuccessfulDelay50ms() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if err != nil {
+					if tt.wantTOErr {
+						if _, ok := err.(*ErrTimeout); !ok {
+							t.Errorf("'ErrTimeout' not received...")
+						}
 					}
 				}
-			}
-			delta := time.Since(testStart)
-			if delta.Seconds() >= tt.args.timeout.Seconds()+2 && !tt.wantTOErr {
-				t.Errorf("WhileUnsuccessfulDelay50ms() error = %v", fmt.Errorf("it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
-			}
-		})
+				delta := time.Since(testStart)
+				if delta.Seconds() >= tt.args.timeout.Seconds()+2 && !tt.wantTOErr {
+					t.Errorf(
+						"WhileUnsuccessfulDelay50ms() error = %v", fmt.Errorf(
+							"it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(),
+							tt.args.timeout.Seconds(),
+						),
+					)
+				}
+			},
+		)
 	}
 }
 
@@ -358,24 +373,33 @@ func TestWhileUnsuccessfulDelay5SecondsCheckStrictTimeout(t *testing.T) {
 		{"UntilTimeouts", args{quickSleepyFailure, time.Duration(15) * 10 * time.Millisecond}, true, false},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			testStart := time.Now()
-			var err error
-			if err = WhileUnsuccessfulDelay50msSecondsTimeout(tt.args.run, tt.args.timeout); (err != nil) != tt.wantErr {
-				t.Errorf("WhileUnsuccessfulDelay50msSecondsTimeout() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if err != nil {
-				if tt.wantTOErr {
-					if _, ok := err.(*ErrTimeout); !ok {
-						t.Errorf("ErrTimeout error not received...")
+		t.Run(
+			tt.name, func(t *testing.T) {
+				testStart := time.Now()
+				var err error
+				if err = WhileUnsuccessfulDelay50msSecondsTimeout(
+					tt.args.run, tt.args.timeout,
+				); (err != nil) != tt.wantErr {
+					t.Errorf("WhileUnsuccessfulDelay50msSecondsTimeout() error = %v, wantErr %v", err, tt.wantErr)
+				}
+				if err != nil {
+					if tt.wantTOErr {
+						if _, ok := err.(*ErrTimeout); !ok {
+							t.Errorf("ErrTimeout error not received...")
+						}
 					}
 				}
-			}
-			delta := time.Since(testStart)
-			if delta.Seconds() >= tt.args.timeout.Seconds()+1.5 { // 0.5 seconds tolerance
-				t.Errorf("WhileUnsuccessfulDelay50msSecondsTimeout() error = %v", fmt.Errorf("it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(), tt.args.timeout.Seconds()))
-			}
-		})
+				delta := time.Since(testStart)
+				if delta.Seconds() >= tt.args.timeout.Seconds()+1.5 { // 0.5 seconds tolerance
+					t.Errorf(
+						"WhileUnsuccessfulDelay50msSecondsTimeout() error = %v", fmt.Errorf(
+							"it's not a real timeout, il tasted %f and the limit was %f", delta.Seconds(),
+							tt.args.timeout.Seconds(),
+						),
+					)
+				}
+			},
+		)
 	}
 }
 
@@ -495,14 +519,17 @@ func TestErrCheckStdError(t *testing.T) {
 			iteration = iteration + 1
 			return fail.NewError("It failed %d", iteration)
 		},
-		10*time.Millisecond, 80*time.Millisecond)
+		10*time.Millisecond, 80*time.Millisecond,
+	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "the checking failed")
 	}
 
 	if xerr != nil {
 		t.Logf(xerr.Error())
-		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(xerr.Error(), "failed 7") || strings.Contains(xerr.Error(), "failed 8") || strings.Contains(xerr.Error(), "failed 9")) {
+		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(
+			xerr.Error(), "failed 7",
+		) || strings.Contains(xerr.Error(), "failed 8") || strings.Contains(xerr.Error(), "failed 9")) {
 			t.FailNow()
 		}
 	}
@@ -515,14 +542,17 @@ func TestErrCheckStdErrorHard(t *testing.T) {
 			iteration = iteration + 1
 			return fail.NewError("It failed %d", iteration)
 		},
-		10*time.Millisecond, 80*time.Millisecond)
+		10*time.Millisecond, 80*time.Millisecond,
+	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "the checking failed")
 	}
 
 	if xerr != nil {
 		t.Logf(xerr.Error())
-		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(xerr.Error(), "failed 7") || strings.Contains(xerr.Error(), "failed 8") || strings.Contains(xerr.Error(), "failed 9")) {
+		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(
+			xerr.Error(), "failed 7",
+		) || strings.Contains(xerr.Error(), "failed 8") || strings.Contains(xerr.Error(), "failed 9")) {
 			if !strings.Contains(xerr.Error(), "desist") {
 				t.FailNow()
 			}
@@ -537,11 +567,14 @@ func TestErrCheckStopStdError(t *testing.T) {
 		func() error {
 			iteration = iteration + 1
 			if iteration == 4 {
-				return StopRetryError(fail.NewError("It failed %d", iteration), "last error before stopping retries was")
+				return StopRetryError(
+					fail.NewError("It failed %d", iteration), "last error before stopping retries was",
+				)
 			}
 			return fail.NewError("It failed %d", iteration)
 		},
-		10*time.Millisecond, 60*time.Millisecond)
+		10*time.Millisecond, 60*time.Millisecond,
+	)
 	if xerr != nil {
 		errCause = fail.RootCause(xerr)
 		xerr = fail.Wrap(xerr, "the checking failed")
@@ -767,9 +800,11 @@ func TestAwfulSimpleTaskActionWithSoftRetry(t *testing.T) {
 				func() error {
 					time.Sleep(900 * time.Millisecond)
 					return fmt.Errorf("Nope")
-				}, 0, 40*time.Millisecond)
+				}, 0, 40*time.Millisecond,
+			)
 			return "", xerr
-		}, stCh, 200*time.Millisecond)
+		}, stCh, 200*time.Millisecond,
+	)
 	if xerr != nil { // It should fail because it's an aborted task...
 		t.Errorf("Failed to start")
 	}
@@ -806,9 +841,11 @@ func TestAwfulSimpleTaskActionWithHardRetry(t *testing.T) {
 				func() error {
 					time.Sleep(900 * time.Millisecond)
 					return fmt.Errorf("Nope")
-				}, 0, 40*time.Millisecond)
+				}, 0, 40*time.Millisecond,
+			)
 			return "", xerr
-		}, stCh, 200*time.Millisecond)
+		}, stCh, 200*time.Millisecond,
+	)
 	if xerr != nil { // It should fail because it's an aborted task...
 		t.Errorf("Failed to start")
 	}
@@ -830,4 +867,33 @@ func TestAwfulSimpleTaskActionWithHardRetry(t *testing.T) {
 	}
 
 	time.Sleep(1 * time.Second)
+}
+
+func TestDontComplainWhenWeHaveATimeoutButItsOK(t *testing.T) {
+	begin := time.Now()
+
+	xerr := WhileUnsuccessfulWithAggregator(
+		func() error {
+			time.Sleep(400 * time.Millisecond)
+			return genHappy()
+		},
+		50*time.Millisecond,
+		300*time.Millisecond,
+		OrArbiter,
+		func(t Try, v verdict.Enum) {
+			if v == verdict.Retry {
+				logrus.Infof("Oh la la la")
+			}
+		},
+	)
+	if xerr != nil {
+		t.Errorf("It shouln't fail nor retry: %v", xerr)
+		t.FailNow()
+	}
+
+	delta := time.Since(begin)
+	if delta > 450*time.Millisecond {
+		t.Errorf("There was a retry and it should have been none, timeout shoudn't be able to dictate when the retry finishes")
+		t.FailNow()
+	}
 }
