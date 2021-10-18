@@ -427,13 +427,7 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	}
 
 	// -- update SecurityGroups in Network metadata
-	networkInstance, xerr := LoadNetwork(svc, networkID)
-	if xerr != nil {
-		return xerr
-	}
-	defer networkInstance.Released()
-
-	xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	updateFunc := func(props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			nsgV1, ok := clonable.(*propertiesv1.NetworkSecurityGroups)
 			if !ok {
@@ -444,7 +438,21 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 			nsgV1.ByName[asg.Name] = asg.ID
 			return nil
 		})
-	})
+	}
+	currentNetworkProps := ctx.Value(CurrentNetworkPropertiesContextKey).(*serialize.JSONProperties)
+	if currentNetworkProps != nil {
+		xerr = updateFunc(currentNetworkProps)
+	} else {
+		networkInstance, xerr := LoadNetwork(svc, networkID)
+		if xerr != nil {
+			return xerr
+		}
+		defer networkInstance.Released()
+
+		xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return updateFunc(props)
+		})
+	}
 	if xerr != nil {
 		return xerr
 	}

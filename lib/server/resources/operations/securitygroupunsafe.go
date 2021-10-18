@@ -59,7 +59,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 		networkID  string
 	)
 
-	value := ctx.Value(removingNetworkAbstractContextKey)
+	value := ctx.Value(CurrentNetworkAbstractContextKey)
 	if value != nil {
 		networkID = value.(*abstract.Network).ID
 	}
@@ -185,7 +185,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 	}
 
 	// delete Security Groups in Network metadata if the current operation is not to remove this Network (otherwise may deadlock)
-	removingNetworkAbstract := ctx.Value(removingNetworkAbstractContextKey)
+	removingNetworkAbstract := ctx.Value(CurrentNetworkAbstractContextKey)
 	if removingNetworkAbstract == nil {
 		return instance.updateNetworkMetadataOnRemoval(networkID)
 	}
