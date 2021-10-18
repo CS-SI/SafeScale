@@ -758,7 +758,7 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 		return xerr
 	}
 	clusterName := identity.GetName()
-	subnetName := "net-"+clusterName
+	subnetName := "net-" + clusterName
 
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(clusterproperty.NetworkV3) {
