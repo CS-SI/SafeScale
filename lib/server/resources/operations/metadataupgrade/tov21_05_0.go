@@ -204,8 +204,9 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				networkName = abstractOwningNetwork.Name
 			}
 
-			subnetID = currentInstance.GetID()
-			abstractSubnet.ID = subnetID
+			// Complement abstracted Subnet fields
+			// subnetID = currentInstance.GetID()
+			// abstractSubnet.ID = subnetID
 			abstractSubnet.Name = subnetName
 			abstractSubnet.Network = owningInstance.GetID()
 			abstractSubnet.IPVersion = ipversion.IPv4
@@ -437,18 +438,16 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				subnetInstance, innerXErr := operations.LoadSubnet(instance.GetService(), "", hnV1.DefaultNetworkID)
+				subnetName, ok := hnV1.NetworksByID[hnV1.DefaultNetworkID]
+				if !ok {
+					return fail.InconsistentError("failed to find the default Network name")
+				}
+
+				subnetInstance, innerXErr := operations.LoadSubnet(instance.GetService(), "", subnetName)
 				if innerXErr != nil {
 					return innerXErr
 				}
-
 				defer subnetInstance.Released()
-				// subnetInstance, innerXErr := operations.LoadSubnet(instance.GetService(), hnV1.DefaultNetworkID, subnetInstance.GetName())
-				// if innerXErr != nil {
-				// 	return innerXErr
-				// }
-				//
-				// defer subnetInstance.Released()
 
 				hostNetworkingV2.DefaultSubnetID = subnetInstance.GetID()
 				hostNetworkingV2.IPv4Addresses = map[string]string{subnetInstance.GetID(): hnV1.IPv4Addresses[subnetInstance.GetID()]}
@@ -754,7 +753,14 @@ func (tv toV21_05_0) upgradeClusterNodesPropertyIfNeeded(instance *operations.Cl
 
 // upgradeClusterNetworkPropertyIfNeeded creates a clusterproperty.NetworkV3 property if previous versions are found
 func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.Cluster) fail.Error {
-	xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
+	identity, xerr := instance.GetIdentity()
+	if xerr != nil {
+		return xerr
+	}
+	clusterName := identity.GetName()
+	subnetName := "net-"+clusterName
+
+	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(clusterproperty.NetworkV3) {
 			return fail.AlteredNothingError()
 		}
@@ -772,7 +778,7 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 					return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				networkInstance, subnetInstance, clusterCreatedNetwork, innerXErr := inspectNetworkAndSubnet(instance, networkV2.NetworkID)
+				networkInstance, subnetInstance, clusterCreatedNetwork, innerXErr := inspectNetworkAndSubnet(instance, subnetName)
 				innerXErr = debug.InjectPlannedFail(innerXErr)
 				if innerXErr != nil {
 					return innerXErr
@@ -806,7 +812,7 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 					return fail.InconsistentError()
 				}
 
-				networkInstance, subnetInstance, clusterCreatedNetwork, innerXErr := inspectNetworkAndSubnet(instance, networkV1.NetworkID)
+				networkInstance, subnetInstance, clusterCreatedNetwork, innerXErr := inspectNetworkAndSubnet(instance, subnetName)
 				innerXErr = debug.InjectPlannedFail(innerXErr)
 				if innerXErr != nil {
 					return innerXErr
@@ -857,8 +863,8 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 	return nil
 }
 
-func inspectNetworkAndSubnet(instance *operations.Cluster, networkID string) (resources.Network, resources.Subnet, bool, fail.Error) {
-	subnetInstance, xerr := operations.LoadSubnet(instance.GetService(), "", networkID)
+func inspectNetworkAndSubnet(instance *operations.Cluster, networkName string) (resources.Network, resources.Subnet, bool, fail.Error) {
+	subnetInstance, xerr := operations.LoadSubnet(instance.GetService(), "", networkName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, false, xerr

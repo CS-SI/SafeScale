@@ -674,7 +674,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			hostNets, hostPorts, createdPorts, innerXErr = s.identifyOpenstackSubnetsAndPorts(request, defaultSubnet)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
-				case *fail.ErrDuplicate: // This kind of error means actually there is no more Ip address available
+				case *fail.ErrDuplicate, *fail.ErrNotFound: // This kind of error means actually there is no more Ip address available
 					return retry.StopRetryError(innerXErr)
 				default:
 					return fail.Wrap(xerr, "failed to construct list of Subnets for the Host")
