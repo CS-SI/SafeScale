@@ -1707,8 +1707,8 @@ func (instance *Subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 }
 
 var (
-	removingSubnetAbstractContextKey   = "removing_subnet_abstract"
-	removingSubnetPropertiesContextKey = "removing_subnet_properties"
+	currentSubnetAbstractContextKey   = "removing_subnet_abstract"
+	currentSubnetPropertiesContextKey = "removing_subnet_properties"
 )
 
 // Delete deletes a Subnet
@@ -1732,8 +1732,8 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		ctx = context.WithValue(ctx, removingSubnetAbstractContextKey, subnetAbstract)
-		ctx = context.WithValue(ctx, removingSubnetPropertiesContextKey, props)
+		ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract)
+		ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)
 
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
