@@ -1134,34 +1134,56 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		stdout, stderr string
 	)
 
+	cmdCloseFunc := func(cmd *SSHCommand, deferErr *fail.Error) {
+		derr := cmd.Close()
+		if derr != nil {
+			if deferErr != nil {
+				if *deferErr == nil {
+					*deferErr = derr
+				} else {
+					*deferErr = fail.ConvertError(*deferErr)
+					_ = (*deferErr).AddConsequence(derr)
+				}
+			}
+		}
+	}
+
 	retcode := -1
 	iterations := 0
 	begins := time.Now()
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
 			iterations++
+
+			// -- Try to see if 'phase' file exists... --
 			sshCmd, innerXErr := sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.%s.done", utils.VarFolder, phase))
 			if innerXErr != nil {
 				return innerXErr
 			}
 
 			// Do not forget to close command, ie close SSH tunnel
-			defer func(cmd *SSHCommand) {
-				derr := cmd.Close()
-				if derr != nil {
-					if innerErr == nil {
-						innerErr = derr
-					} else {
-						innerXErr = fail.ConvertError(innerErr)
-						_ = innerXErr.AddConsequence(derr)
-						innerErr = innerXErr
-					}
-				}
-			}(sshCmd)
+			defer func(cmd *SSHCommand) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout) // FIXME: What if this never returns
 			if innerXErr != nil {
 				return innerXErr
+			}
+			if retcode != 0 {
+				if phase == "final" {
+					// Before v21.05.0, final provisioning state is store in user_data.phase2.done file, so try to see if legacy file exists...
+					sshCmd, innerXErr = sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.phase2.done", utils.VarFolder))
+					if innerXErr != nil {
+						return innerXErr
+					}
+
+					// Do not forget to close command, ie close SSH tunnel
+					defer func(cmd *SSHCommand) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
+
+					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout) // FIXME: What if this never returns
+					if innerXErr != nil {
+						return innerXErr
+					}
+				}
 			}
 			if retcode != 0 {
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
@@ -1172,6 +1194,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 				_ = fe.Annotate("iterations", iterations)
 				return fe
 			}
+
 			return nil
 		},
 		temporal.GetDefaultDelay(),
