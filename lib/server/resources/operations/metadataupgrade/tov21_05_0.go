@@ -20,8 +20,6 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -40,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 type toV21_05_0 struct {
@@ -205,8 +204,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			}
 
 			// Complement abstracted Subnet fields
-			// subnetID = currentInstance.GetID()
-			// abstractSubnet.ID = subnetID
+			subnetID = abstractSubnet.GetID()
 			abstractSubnet.Name = subnetName
 			abstractSubnet.Network = owningInstance.GetID()
 			abstractSubnet.IPVersion = ipversion.IPv4
@@ -358,21 +356,23 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 		return xerr
 	}
 
-	// -- add reference to subnet in Network properties --
-	xerr = owningInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-			subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
-			}
-			subnetsV1.ByName[subnetName] = subnetID
-			subnetsV1.ByID[subnetID] = subnetName
-			return nil
+	// -- add reference to subnet in own ing Network properties --
+	if subnetID != "" && subnetName != "" {
+		xerr = owningInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
+				subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
+				}
+				subnetsV1.ByName[subnetName] = subnetID
+				subnetsV1.ByID[subnetID] = subnetName
+				return nil
+			})
 		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	// delete currentInstance in metadata if owningInstance is different than currentInstance
@@ -449,12 +449,28 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 				}
 				defer subnetInstance.Released()
 
-				hostNetworkingV2.DefaultSubnetID = subnetInstance.GetID()
-				hostNetworkingV2.IPv4Addresses = map[string]string{subnetInstance.GetID(): hnV1.IPv4Addresses[subnetInstance.GetID()]}
-				hostNetworkingV2.IPv6Addresses = map[string]string{subnetInstance.GetID(): hnV1.IPv6Addresses[subnetInstance.GetID()]}
+				var previousID string
+				subnetID := subnetInstance.GetID()
+				_, ok = hnV1.IPv4Addresses[subnetID]
+				if ok {
+					previousID = subnetID
+				}
+				if previousID == "" {
+					_, ok = hnV1.IPv4Addresses[hnV1.DefaultNetworkID]
+					if ok {
+						previousID = hnV1.DefaultNetworkID
+					}
+				}
+				if previousID == "" {
+					return fail.InconsistentError("failed to find ID corresponding to the previous default Network IP Address")
+				}
+
+				hostNetworkingV2.DefaultSubnetID = subnetID
+				hostNetworkingV2.IPv4Addresses = map[string]string{subnetID: hnV1.IPv4Addresses[previousID]}
+				hostNetworkingV2.IPv6Addresses = map[string]string{subnetID: hnV1.IPv6Addresses[previousID]}
 				hostNetworkingV2.IsGateway = hnV1.IsGateway
-				hostNetworkingV2.SubnetsByID = map[string]string{subnetInstance.GetID(): subnetInstance.GetName()}
-				hostNetworkingV2.SubnetsByName = map[string]string{subnetInstance.GetName(): subnetInstance.GetID()}
+				hostNetworkingV2.SubnetsByID = map[string]string{subnetID: subnetName}
+				hostNetworkingV2.SubnetsByName = map[string]string{subnetName: subnetID}
 				hostNetworkingV2.PublicIPv4 = hnV1.PublicIPv4
 				hostNetworkingV2.PublicIPv6 = hnV1.PublicIPv6
 				return nil
