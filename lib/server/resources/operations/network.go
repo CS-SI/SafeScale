@@ -80,7 +80,7 @@ func NewNetwork(svc iaas.Service) (resources.Network, fail.Error) {
 }
 
 // LoadNetwork loads the metadata of a subnet
-func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, ferr fail.Error) {
+func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Network, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be null value")
 	}
@@ -110,7 +110,7 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, ferr fail.
 		}
 	}
 
-	if rn = cacheEntry.Content().(resources.Network); rn == nil {
+	if networkInstance = cacheEntry.Content().(resources.Network); networkInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
 	_ = cacheEntry.LockContent()
@@ -121,7 +121,7 @@ func LoadNetwork(svc iaas.Service, ref string) (rn resources.Network, ferr fail.
 		}
 	}()
 
-	return rn, nil
+	return networkInstance, nil
 }
 
 // onNetworkCacheMiss is called when there is no instance in cache of Network 'ref'

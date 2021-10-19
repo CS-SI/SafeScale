@@ -176,8 +176,8 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 
 	// -- First step: identify subnetID from (networkRef, subnetRef) --
 	var (
-		subnetID string
-		rn       resources.Network
+		subnetID        string
+		networkInstance resources.Network
 	)
 	networkRef = strings.TrimSpace(networkRef)
 	switch networkRef {
@@ -186,7 +186,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		subnetID = subnetRef
 	default:
 		// Try to load Network metadata
-		rn, xerr = LoadNetwork(svc, networkRef)
+		networkInstance, xerr = LoadNetwork(svc, networkRef)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -197,9 +197,9 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 			}
 		}
 
-		if rn != nil { //nolint
+		if networkInstance != nil { //nolint
 			// Network metadata loaded, find the ID of the Subnet (subnetRef may be ID or Name)
-			xerr = rn.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			xerr = networkInstance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 					subnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
 					if !ok {
@@ -215,7 +215,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 						}
 					}
 					if !found {
-						return fail.NotFoundError("failed to find a Subnet referenced by '%s' in network '%s'", subnetRef, rn.GetName())
+						return fail.NotFoundError("failed to find a Subnet referenced by '%s' in network '%s'", subnetRef, networkInstance.GetName())
 					}
 					return nil
 				})
