@@ -75,13 +75,13 @@ func (instance *Subnet) unsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {
 			return nil
 		}
 		if len(as.GatewayIDs) > 0 {
-			rh, innerErr := LoadHost(instance.GetService(), as.GatewayIDs[0])
+			hostInstance, innerErr := LoadHost(instance.GetService(), as.GatewayIDs[0])
 			if innerErr != nil {
 				return innerErr
 			}
-			defer rh.Released()
+			defer hostInstance.Released()
 
-			ip, xerr = rh.GetPrivateIP()
+			ip, xerr = hostInstance.GetPrivateIP()
 			if xerr != nil {
 				return xerr
 			}
@@ -91,7 +91,6 @@ func (instance *Subnet) unsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {
 		return fail.NotFoundError("failed to find default route IP: no gateway defined")
 	})
 	return ip, xerr
-
 }
 
 // unsafeGetVirtualIP returns an abstract.VirtualIP used by gateway HA

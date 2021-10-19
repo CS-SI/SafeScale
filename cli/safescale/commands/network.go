@@ -154,18 +154,24 @@ var networkInspect = &cli.Command{
 				jsoned, _ := json.Marshal(subnet)
 				_ = json.Unmarshal(jsoned, &subnetMapped)
 
-				mapped["network_id"] = mapped["id"]
-				mapped["network_cidr"] = mapped["cidr"]
-				delete(mapped, "cidr")
 				for k, v := range subnetMapped {
+					switch k {
+					case "name":
+						k = "subnet_name"
+					case "id":
+						k = "subnet_id"
+					case "cidr":
+						k = "subnet_cidr"
+					case "state":
+						k = "subnet_state"
+					}
 					mapped[k] = v
 				}
 
-				if err = queryGatewaysInformation(clientSession, subnet, mapped); err != nil {
+				if err = queryGatewaysInformation(clientSession, subnet, mapped, false); err != nil {
 					return err
 				}
 
-				// Remove entry 'subnets'
 				delete(mapped, "subnets")
 			}
 		}
@@ -175,11 +181,11 @@ var networkInspect = &cli.Command{
 }
 
 // Get gateway(s) information
-func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, mapped map[string]interface{}) (err error) {
+func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, mapped map[string]interface{}, subnetContext bool) (err error) {
 	var pgw, sgw *protocol.Host
 	gwIDs := subnet.GetGatewayIds()
 
-	var gateways = make([]string, 0, len(gwIDs))
+	var gateways = make([]map[string]string, len(gwIDs), len(gwIDs))
 	if len(gwIDs) > 0 {
 		pgw, err = session.Host.Inspect(gwIDs[0], temporal.GetExecutionTimeout())
 		if err != nil {
@@ -191,8 +197,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 			xerr := fail.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %sgateway", what))
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
 		}
-		mapped["gateway_name"] = pgw.Name
-		gateways = append(gateways, pgw.Name)
+		gateways[0] = map[string]string{pgw.Name: pgw.Id}
 	}
 	if len(gwIDs) > 1 {
 		sgw, err = session.Host.Inspect(gwIDs[1], temporal.GetExecutionTimeout())
@@ -201,12 +206,17 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 			xerr := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
 		}
-		mapped["secondary_gateway_name"] = sgw.Name
-		gateways = append(gateways, sgw.Name)
+		gateways[1] = map[string]string{sgw.Name: sgw.Id}
 	}
 	if len(gateways) > 0 {
-		mapped["gateways"] = gateways
+		switch subnetContext {
+		case true:
+			mapped["gateways"] = gateways
+		case false:
+			mapped["subnet_gateways"] = gateways
+		}
 	}
+	delete(mapped, "gateway_ids")
 
 	// Remove entry 'virtual_ip' if empty
 	if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
@@ -987,7 +997,7 @@ var subnetInspect = &cli.Command{
 		jsoned, _ := json.Marshal(subnet)
 		_ = json.Unmarshal(jsoned, &mapped)
 
-		if err = queryGatewaysInformation(clientSession, subnet, mapped); err != nil {
+		if err = queryGatewaysInformation(clientSession, subnet, mapped, true); err != nil {
 			return err
 		}
 		return clitools.SuccessResponse(mapped)
