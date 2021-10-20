@@ -1774,10 +1774,6 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	var (
-		hostsLen uint
-		hostList []string
-	)
 	svc := instance.GetService()
 	subnetName := instance.GetName()
 	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -1794,8 +1790,8 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hostsLen = uint(len(shV1.ByName))
-			hostList = make([]string, 0, hostsLen)
+			hostsLen := uint(len(shV1.ByName))
+			hostList := make([]string, 0, hostsLen)
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
@@ -1805,13 +1801,15 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 					}
 				}
 			}
-			if len(hostList) > 0 {
-				verb := "are"
+			hostsLen = uint(len(hostList))
+			if hostsLen > 0 {
+				var verb string
 				if hostsLen == 1 {
 					verb = "is"
+				} else {
+					verb = "are"
 				}
-				errorMsg = fmt.Sprintf("cannot delete Subnet '%s': %d host%s %s still attached to it: %s",
-					as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
+				errorMsg = fmt.Sprintf("cannot delete Subnet '%s': %d host%s %s still attached to it: %s", as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
 				return fail.NotAvailableError(errorMsg)
 			}
 			return nil

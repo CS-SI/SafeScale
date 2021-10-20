@@ -131,7 +131,7 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 				_, xerr = onMissFunc() // onMissFunc() knows what the error is
 				return nil, xerr
 			}
-			xerr := instance.unsafeReserveEntry(key, onMissTimeout)
+			xerr := instance.ReserveEntry(key, onMissTimeout)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrDuplicate:
@@ -142,14 +142,14 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 
 					// Not found, search an entry in the cache by name to get id and search again by id
 					instance.lock.Lock()
+					defer instance.lock.Unlock()
+
 					if id, ok := instance.byName[key]; ok {
 						ce, xerr = instance.byID.Entry(id)
 						if xerr == nil {
-							instance.lock.Unlock()
 							return ce, nil
 						}
 					}
-					instance.lock.Unlock()
 					return nil, xerr
 				default:
 					return nil, xerr
@@ -158,10 +158,10 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 
 			var content cache.Cacheable
 			if content, xerr = onMissFunc(); xerr == nil {
-				ce, xerr = instance.unsafeCommitEntry(key, content)
+				ce, xerr = instance.CommitEntry(key, content)
 			}
 			if xerr != nil {
-				if derr := instance.unsafeFreeEntry(key); derr != nil {
+				if derr := instance.FreeEntry(key); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
 				}
 				return nil, xerr
@@ -188,11 +188,6 @@ func (instance *ResourceCache) ReserveEntry(key string, timeout time.Duration) f
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.unsafeReserveEntry(key, timeout)
-}
-
-// unsafeReserveEntry sets a cache entry to reserve the key and returns the Entry associated
-func (instance *ResourceCache) unsafeReserveEntry(key string, timeout time.Duration) fail.Error {
 	return instance.byID.Reserve(key, timeout)
 }
 
@@ -208,11 +203,6 @@ func (instance *ResourceCache) CommitEntry(key string, content cache.Cacheable) 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.unsafeCommitEntry(key, content)
-}
-
-// unsafeCommitEntry confirms the entry in the cache with the content passed as parameter
-func (instance *ResourceCache) unsafeCommitEntry(key string, content cache.Cacheable) (ce *cache.Entry, xerr fail.Error) {
 	if ce, xerr = instance.byID.Commit(key, content); xerr != nil {
 		return nil, xerr
 	}
@@ -233,11 +223,6 @@ func (instance *ResourceCache) FreeEntry(key string) fail.Error {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.unsafeFreeEntry(key)
-}
-
-// unsafeFreeEntry removes the reservation in cache
-func (instance *ResourceCache) unsafeFreeEntry(key string) fail.Error {
 	return instance.byID.Free(key)
 }
 

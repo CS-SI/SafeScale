@@ -77,6 +77,12 @@ func (tv toV21_05_0) Upgrade(svc iaas.Service, from string, dryRun bool) fail.Er
 		return xerr
 	}
 
+	xerr = tv.updateSecurityGroupBonds(svc)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
 	return nil
 }
 
@@ -1137,5 +1143,104 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 
 			return nil
 		})
+	})
+}
+
+// updateSecurityGroupBonds updates the Security Groups for each Host
+func (tv toV21_05_0) updateSecurityGroupBonds(svc iaas.Service) fail.Error {
+	subnetBrowserInstance, xerr := operations.NewSubnet(svc)
+	if xerr != nil {
+		return xerr
+	}
+
+	return subnetBrowserInstance.Browse(context.Background(), func(subnetAbstract *abstract.Subnet) fail.Error {
+		subnetInstance, innerXErr := operations.LoadSubnet(svc, "", subnetAbstract.ID)
+		innerXErr = debug.InjectPlannedFail(innerXErr)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer subnetInstance.Released()
+
+		var (
+			subnetHosts    map[string]string
+			abstractSubnet *abstract.Subnet
+		)
+		innerXErr = subnetInstance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			var ok bool
+			abstractSubnet, ok = clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+				subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				subnetHosts = subnetHostsV1.ByID
+				return nil
+			})
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		sgGW, innerXErr := operations.LoadSecurityGroup(svc, subnetAbstract.GWSecurityGroupID)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer sgGW.Released()
+
+		sgPubIP, innerXErr := operations.LoadSecurityGroup(svc, subnetAbstract.PublicIPSecurityGroupID)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer sgPubIP.Released()
+
+		sgLAN, innerXErr := operations.LoadSecurityGroup(svc, subnetAbstract.InternalSecurityGroupID)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer sgLAN.Released()
+
+		// Bind gateways to appropriate Security Groups...
+		for _, v := range abstractSubnet.GatewayIDs {
+			hostInstance, innerXErr := operations.LoadHost(svc, v)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			defer func(item resources.Host) {
+				item.Released()
+			}(hostInstance)
+
+			innerXErr = hostInstance.BindSecurityGroup(context.Background(), sgLAN, true)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			innerXErr = hostInstance.BindSecurityGroup(context.Background(), sgGW, true)
+			if innerXErr != nil {
+				return innerXErr
+			}
+		}
+
+		// Bind Hosts in Subnet (except gateways) to appropriate Security Group...
+		for k := range subnetHosts {
+			hostInstance, innerXErr := operations.LoadHost(svc, k)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			defer func(item resources.Host) {
+				item.Released()
+			}(hostInstance)
+
+			innerXErr = hostInstance.BindSecurityGroup(context.Background(), sgLAN, true)
+			if innerXErr != nil {
+				return innerXErr
+			}
+		}
+		return nil
 	})
 }
