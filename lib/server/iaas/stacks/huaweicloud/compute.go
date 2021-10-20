@@ -615,7 +615,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nullAHF, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Started, temporal.GetOperationTimeout())
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
 	// Note: if xerr != nil AND server != nil, server still contains meaningful information that may be useful
 	if server == nil {
 		if xerr == nil {
