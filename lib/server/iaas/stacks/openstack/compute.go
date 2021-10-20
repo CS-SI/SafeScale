@@ -445,7 +445,7 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Started, temporal.GetOperationTimeout())
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -1069,6 +1069,12 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 
 			ahf.Core.ID = server.ID // makes sure that on next turn we get IPAddress by ID
 			lastState := toHostState(server.Status)
+
+			// If we had a response, and the target state is Any, this is a success no matter what
+			if state == hoststate.Any {
+				return nil
+			}
+
 			// If state matches, we consider this a success no matter what
 			switch lastState {
 			case state:
