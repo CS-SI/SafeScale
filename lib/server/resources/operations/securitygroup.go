@@ -294,8 +294,8 @@ func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstra
 // Create creates a new SecurityGroup and its metadata.
 // If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a SecurityGroup, returns fail.ErrNotAvailable
-func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
@@ -439,10 +439,14 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 			return nil
 		})
 	}
-	currentNetworkProps := ctx.Value(CurrentNetworkPropertiesContextKey).(*serialize.JSONProperties)
-	if currentNetworkProps != nil {
-		xerr = updateFunc(currentNetworkProps)
-	} else {
+
+	currentNetworkProps, ok := ctx.Value(CurrentNetworkPropertiesContextKey).(*serialize.JSONProperties)
+	if !ok { // Is nil or is something else
+		if ctx.Value(CurrentNetworkPropertiesContextKey) != nil { // If it's something else, return inconsistent error
+			return fail.InconsistentError("wrong value of type %T stored in context value, *serialize.JSONProperties was expected instead", ctx.Value(CurrentNetworkPropertiesContextKey))
+		}
+
+		// so it's nil...
 		networkInstance, xerr := LoadNetwork(svc, networkID)
 		if xerr != nil {
 			return xerr
@@ -452,7 +456,18 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return updateFunc(props)
 		})
+
+		// this error and the error defined in line 324 are NOT the same error, even if they have the same local name
+		if xerr != nil {
+			return xerr
+		}
+
+		logrus.Infof("Security Group '%s' created successfully", name)
+		return nil
 	}
+
+	// it is a *serialize.JSONProperties, (it was ok, also avoid else if possible)
+	xerr = updateFunc(currentNetworkProps)
 	if xerr != nil {
 		return xerr
 	}
