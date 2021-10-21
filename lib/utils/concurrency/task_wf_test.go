@@ -51,10 +51,12 @@ func TestWaitingGameWF(t *testing.T) {
 		require.Nil(t, err)
 		require.NotNil(t, got)
 
-		theTask, err := got.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil)
+		theTask, err := got.Start(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil,
+		)
 		if err == nil {
 			tarray = append(tarray, theTask)
 		} else {
@@ -134,10 +136,12 @@ func TestResultCheckWF(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, theID)
 
-	_, err = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-		return "waiting game", nil
-	}, nil, 10*time.Millisecond)
+	_, err = got.StartWithTimeout(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+			return "waiting game", nil
+		}, nil, 10*time.Millisecond,
+	)
 	if err != nil {
 		t.Errorf("Shouldn't happen")
 	}
@@ -161,17 +165,21 @@ func TestResultCheckWithoutWF(t *testing.T) {
 		require.Nil(t, xerr)
 		require.NotEmpty(t, theID)
 
-		_, xerr = got.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			duration := time.Duration(randomInt(50, 250)) * time.Millisecond
-			time.Sleep(duration)
-			return "waiting game", nil
-		}, nil, 10*time.Millisecond)
+		_, xerr = got.StartWithTimeout(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				duration := time.Duration(randomInt(50, 250)) * time.Millisecond
+				time.Sleep(duration)
+				return "waiting game", nil
+			}, nil, 10*time.Millisecond,
+		)
 		if xerr != nil {
 			t.Errorf("Shouldn't happen")
 		}
 
 		res, xerr := got.Wait()
-		require.NotNil(t, xerr) // FIXME: CI failed, see https://github.com/CS-SI/SafeScale/suites/3973786152/artifacts/99924716
+		require.NotNil(
+			t, xerr,
+		) // FIXME: CI failed, see https://github.com/CS-SI/SafeScale/suites/3973786152/artifacts/99924716
 		if res == nil {
 			t.Errorf("on Wait, res == nil, should not happen")
 		}
@@ -188,10 +196,12 @@ func TestSingleTaskWF(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, err)
 
-	single, err = single.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(30) * time.Millisecond)
-		return "Ahhhh", nil
-	}, nil)
+	single, err = single.Start(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(30) * time.Millisecond)
+			return "Ahhhh", nil
+		}, nil,
+	)
 	require.Nil(t, err)
 
 	begin := time.Now()
@@ -237,7 +247,9 @@ func TestChildrenWaitingGameWithContextTimeoutsWF(t *testing.T) {
 		}
 
 		if !((err != nil) == errorExpected) {
-			t.Errorf("Failure in test %d (in error expected): %v, %v, %v, %t", ind, timeout, sleep, trigger, errorExpected)
+			t.Errorf(
+				"Failure in test %d (in error expected): %v, %v, %v, %t", ind, timeout, sleep, trigger, errorExpected,
+			)
 		}
 
 		tolerance := func(in float64, percent uint) float32 {
@@ -249,7 +261,10 @@ func TestChildrenWaitingGameWithContextTimeoutsWF(t *testing.T) {
 		tolerated := time.Duration(tolerance(min, 20)) * time.Millisecond
 
 		if end > tolerated {
-			t.Logf("Failure in test %d: %v, %v, %v, %t: We waited too much! %v > %v", ind, timeout, sleep, trigger, errorExpected, end, tolerated)
+			t.Logf(
+				"Failure in test %d: %v, %v, %v, %t: We waited too much! %v > %v", ind, timeout, sleep, trigger,
+				errorExpected, end, tolerated,
+			)
 		}
 	}
 
@@ -263,12 +278,14 @@ func TestChildrenWaitingGameWithContextTimeoutsWF(t *testing.T) {
 	// is this critical ?, maybe not today but...
 	// big problems have small beginnings...
 
-	funk(1, 30, 50, 10, true)           // canceled
-	funk(2, 10, 50, 30, true)           // timeout
-	funk(3, 30, 50, 80, true)           // timeout
-	funk(4, 80, 50, 10, true)           // canceled
-	funk(5, 40, 20, 10, true)           // canceled
-	funk(6, 40, 20, 30, false)          // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
+	funk(1, 30, 50, 10, true) // canceled
+	funk(2, 10, 50, 30, true) // timeout
+	funk(3, 30, 50, 80, true) // timeout
+	funk(4, 80, 50, 10, true) // canceled
+	funk(5, 40, 20, 10, true) // canceled
+	funk(
+		6, 40, 20, 30, false,
+	) // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
 	funk(7, 140, 20, 240 /*40*/, false) // same thing here
 	funk(8, 140, 20, 100, false)        // same thing here
 	funk(9, 140, 20, 120, false)        // same thing here
@@ -308,7 +325,9 @@ func TestChildrenWaitingGameWithContextDeadlinesWF(t *testing.T) {
 			case *fail.ErrTimeout:
 				// expected error types
 			default:
-				t.Errorf("Unexpected error occurred in test #%d: %s (%s)", ind, xerr.Error(), reflect.TypeOf(xerr).String())
+				t.Errorf(
+					"Unexpected error occurred in test #%d: %s (%s)", ind, xerr.Error(), reflect.TypeOf(xerr).String(),
+				)
 			}
 		}
 
@@ -330,16 +349,19 @@ func TestChildrenWaitingGameWithContextDeadlinesWF(t *testing.T) {
 		tolerated := time.Duration(tolerance(min, 20)) * time.Millisecond
 
 		if end > tolerated {
-			t.Logf("Failure in test %d: %v, %v, %v, %t: We waited too much! %v > %v", ind, timeout, sleep, trigger, errorExpected, end, tolerated)
+			t.Logf(
+				"Failure in test %d: %v, %v, %v, %t: We waited too much! %v > %v", ind, timeout, sleep, trigger,
+				errorExpected, end, tolerated,
+			)
 		}
 	}
 	funk(1, 30, 50, 10, true)   // cancel (aborted)
 	funk(2, 30, 50, 90, true)   // timeout
 	funk(3, 50, 30, 10, true)   // cancel (aborted)
-	funk(4, 50, 10, 30, false)  // terminate normally
+	funk(4, 50, 10, 30, false)  // terminate normally // FAIL
 	funk(5, 70, 30, 10, true)   // cancel (aborted)
-	funk(6, 40, 10, 30, false)  // terminate normally
-	funk(7, 140, 20, 40, false) // terminate normally
+	funk(6, 40, 10, 30, false)  // terminate normally // FAIL
+	funk(7, 140, 20, 40, false) // terminate normally // FAIL
 	funk(8, 140, 40, 20, true)  // cancel (aborted)
 	funk(9, 140, 40, 10, true)  // cancel (aborted)
 }
@@ -349,7 +371,9 @@ func TestDoesAbortReallyAbortOrIsJustFakeNewsWF(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
 
-	single, xerr = single.StartWithTimeout(taskgen(100, 250, 10, 0, 0, 0, false), nil, time.Duration(90)*time.Millisecond)
+	single, xerr = single.StartWithTimeout(
+		taskgen(100, 250, 10, 0, 0, 0, false), nil, time.Duration(90)*time.Millisecond,
+	)
 	require.Nil(t, xerr)
 
 	time.Sleep(time.Duration(300) * time.Millisecond)
@@ -384,21 +408,23 @@ func TestLikeBeforeWithoutAbortButContextWF(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
 
-	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		for {
-			time.Sleep(time.Duration(10) * time.Millisecond)
-			status, xerr := t.Status()
-			if xerr != nil {
-				return "Big failure...", nil
-			}
-			if status == ABORTED || status == TIMEOUT {
-				break
-			}
+	single, xerr = single.StartWithTimeout(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			for {
+				time.Sleep(time.Duration(10) * time.Millisecond)
+				status, xerr := t.Status()
+				if xerr != nil {
+					return "Big failure...", nil
+				}
+				if status == ABORTED || status == TIMEOUT {
+					break
+				}
 
-			fmt.Println("Forever young...")
-		}
-		return "I want to be forever young", nil
-	}, nil, time.Duration(200)*time.Millisecond)
+				fmt.Println("Forever young...")
+			}
+			return "I want to be forever young", nil
+		}, nil, time.Duration(200)*time.Millisecond,
+	)
 	if xerr != nil {
 		t.Errorf("This shouldn't happen")
 	}
@@ -444,17 +470,19 @@ func TestLikeBeforeWithoutLettingFinishWF(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
 
-	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		for {
-			time.Sleep(time.Duration(10) * time.Millisecond)
-			if t.Aborted() {
-				fmt.Println("There can be only one...")
-				return "There can be only one", fail.AbortedError(nil)
-			}
+	single, xerr = single.StartWithTimeout(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			for {
+				time.Sleep(time.Duration(10) * time.Millisecond)
+				if t.Aborted() {
+					fmt.Println("There can be only one...")
+					return "There can be only one", fail.AbortedError(nil)
+				}
 
-			fmt.Println("Forever young...")
-		}
-	}, nil, time.Duration(200)*time.Millisecond)
+				fmt.Println("Forever young...")
+			}
+		}, nil, time.Duration(200)*time.Millisecond,
+	)
 	require.Nil(t, xerr)
 
 	_, _, xerr = single.WaitFor(5 * time.Second)
@@ -498,16 +526,18 @@ func TestCheckTimeoutStatusWF(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
 
-	_, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		for {
-			time.Sleep(time.Duration(10) * time.Millisecond)
-			if t.Aborted() {
-				break
+	_, xerr = single.StartWithTimeout(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			for {
+				time.Sleep(time.Duration(10) * time.Millisecond)
+				if t.Aborted() {
+					break
+				}
+				fmt.Println("Forever young...")
 			}
-			fmt.Println("Forever young...")
-		}
-		return "I want to be forever young", nil
-	}, nil, time.Duration(40)*time.Millisecond)
+			return "I want to be forever young", nil
+		}, nil, time.Duration(40)*time.Millisecond,
+	)
 	require.Nil(t, xerr)
 
 	time.Sleep(time.Duration(100) * time.Millisecond)
@@ -530,15 +560,17 @@ func TestStartWithTimeoutWithTimeToFinishWF(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
 
-	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		for {
-			time.Sleep(time.Duration(10) * time.Millisecond)
-			if t.Aborted() {
-				return nil, fail.AbortedError(nil)
+	single, xerr = single.StartWithTimeout(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			for {
+				time.Sleep(time.Duration(10) * time.Millisecond)
+				if t.Aborted() {
+					return nil, fail.AbortedError(nil)
+				}
+				fmt.Println("Forever young...")
 			}
-			fmt.Println("Forever young...")
-		}
-	}, nil, time.Duration(400)*time.Millisecond)
+		}, nil, time.Duration(400)*time.Millisecond,
+	)
 	require.Nil(t, xerr)
 
 	time.Sleep(time.Duration(100) * time.Millisecond)
@@ -565,15 +597,17 @@ func TestStartWithTimeoutThatTimeoutsWF(t *testing.T) {
 	require.NotNil(t, single)
 	require.Nil(t, xerr)
 
-	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		for {
-			time.Sleep(time.Duration(10) * time.Millisecond)
-			if t.Aborted() {
-				return "aborted", fail.AbortedError(nil)
+	single, xerr = single.StartWithTimeout(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			for {
+				time.Sleep(time.Duration(10) * time.Millisecond)
+				if t.Aborted() {
+					return "aborted", fail.AbortedError(nil)
+				}
+				fmt.Println("Forever young...")
 			}
-			fmt.Println("Forever young...")
-		}
-	}, nil, time.Duration(100)*time.Millisecond)
+		}, nil, time.Duration(100)*time.Millisecond,
+	)
 	require.Nil(t, xerr)
 
 	// sleep more than duration defined in the timeout...
@@ -609,21 +643,23 @@ func TestAbortButThisTimeUsingTrueAbortChannelWF(t *testing.T) {
 	require.Nil(t, xerr)
 
 	trueAbort := make(chan struct{})
-	single, xerr = single.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		forever := true
-		for forever {
-			select {
-			case <-trueAbort:
-				fmt.Println("I'm Gotham's reckoning. Here to end the borrowed time you all have been living on. ")
-				forever = false
-				break
-			default:
-				time.Sleep(time.Duration(10) * time.Millisecond)
-				fmt.Println("Forever young...")
+	single, xerr = single.StartWithTimeout(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			forever := true
+			for forever {
+				select {
+				case <-trueAbort:
+					fmt.Println("I'm Gotham's reckoning. Here to end the borrowed time you all have been living on. ")
+					forever = false
+					break
+				default:
+					time.Sleep(time.Duration(10) * time.Millisecond)
+					fmt.Println("Forever young...")
+				}
 			}
-		}
-		return "I want to be forever young", nil
-	}, nil, time.Duration(40)*time.Millisecond)
+			return "I want to be forever young", nil
+		}, nil, time.Duration(40)*time.Millisecond,
+	)
 	require.Nil(t, xerr)
 
 	time.Sleep(time.Duration(200) * time.Millisecond)
