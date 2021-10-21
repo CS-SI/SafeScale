@@ -132,117 +132,117 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 }
 
 // isNull tells if the instance represents a null value
-func (j *job) isNull() bool {
-	return j == nil || j.uuid == ""
+func (instance *job) isNull() bool {
+	return instance == nil || instance.uuid == ""
 }
 
 // ID returns the id of the job (ie the uuid of gRPC message)
-func (j job) ID() string {
-	if j.isNull() {
+func (instance job) ID() string {
+	if instance.isNull() {
 		return ""
 	}
 
-	return j.uuid
+	return instance.uuid
 }
 
 // Name returns the name (== id) of the job
-func (j job) Name() string {
-	if j.isNull() {
+func (instance job) Name() string {
+	if instance.isNull() {
 		return ""
 	}
 
-	return j.uuid
+	return instance.uuid
 }
 
 // Tenant returns the tenant to use
-func (j job) Tenant() string {
-	if j.isNull() {
+func (instance job) Tenant() string {
+	if instance.isNull() {
 		return ""
 	}
 
-	return j.tenant
+	return instance.tenant
 }
 
 // Context returns the context of the job (should be the same than the one of the task)
-func (j job) Context() context.Context {
-	if j.isNull() {
+func (instance job) Context() context.Context {
+	if instance.isNull() {
 		return nil
 	}
 
-	return j.ctx
+	return instance.ctx
 }
 
 // Task returns the task instance
-func (j job) Task() concurrency.Task {
-	if j.isNull() {
+func (instance job) Task() concurrency.Task {
+	if instance.isNull() {
 		return nil
 	}
 
-	return j.task
+	return instance.task
 }
 
 // Service returns the service instance
-func (j job) Service() iaas.Service {
-	if j.isNull() {
+func (instance job) Service() iaas.Service {
+	if instance.isNull() {
 		return iaas.NullService()
 	}
 
-	return j.service
+	return instance.service
 }
 
 // Duration returns the duration of the job
-func (j job) Duration() time.Duration {
-	if j.isNull() {
+func (instance job) Duration() time.Duration {
+	if instance.isNull() {
 		return 0
 	}
 
-	return time.Since(j.startTime)
+	return time.Since(instance.startTime)
 }
 
 // Abort tells the job it has to abort operations
-func (j *job) Abort() (xerr fail.Error) {
+func (instance *job) Abort() (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
-	if j.isNull() {
+	if instance.isNull() {
 		return fail.InvalidInstanceError()
 	}
-	if j.cancel == nil {
-		return fail.InvalidInstanceContentError("j.cancel", "cannot be nil")
+	if instance.cancel == nil {
+		return fail.InvalidInstanceContentError("instance.cancel", "cannot be nil")
 	}
 
-	j.cancel()
-	j.cancel = nil
+	instance.cancel()
+	instance.cancel = nil
 	return nil
 }
 
 // Aborted tells if the job has been aborted
-func (j job) Aborted() bool {
-	if j.isNull() {
+func (instance job) Aborted() bool {
+	if instance.isNull() {
 		return false
 	}
 
-	status, _ := j.task.Status()
+	status, _ := instance.task.Status()
 	return status == concurrency.ABORTED
 }
 
 // Close tells the job to wait for end of operation; this ensure everything is cleaned up correctly
-func (j *job) Close() {
-	if j.isNull() {
+func (instance *job) Close() {
+	if instance.isNull() {
 		return
 	}
 
-	_ = deregister(j)
-	if j.cancel != nil {
-		j.cancel()
+	_ = deregister(instance)
+	if instance.cancel != nil {
+		instance.cancel()
 	}
 }
 
 // String returns a string representation of job information
-func (j job) String() string {
-	if j.isNull() {
+func (instance job) String() string {
+	if instance.isNull() {
 		return ""
 	}
-	return fmt.Sprintf("Job: %s (started at %s)", j.description, j.startTime.String())
+	return fmt.Sprintf("Job: %s (started at %s)", instance.description, instance.startTime.String())
 }
 
 // register ...
