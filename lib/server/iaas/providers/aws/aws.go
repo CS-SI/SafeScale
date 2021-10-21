@@ -19,6 +19,7 @@ package aws
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -142,6 +143,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
 
+	maxLifeTime := 0
+	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
+	}
+
 	operatorUsername, _ := computeCfg["OperatorUsername"].(string)
 	if operatorUsername == "" {
 		operatorUsername = abstract.DefaultUser
@@ -181,6 +187,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		ProviderName:     providerName,
 		// BuildSubnets:     false, // FIXME: AWS by default don't build subnetworks
 		DefaultSecurityGroupName: "default",
+		MaxLifeTime:              maxLifeTime,
 	}
 
 	awsStack, err := aws.New(authOptions, awsConf, cfgOptions)
@@ -228,6 +235,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("BuildSubnets", opts.BuildSubnets)
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }

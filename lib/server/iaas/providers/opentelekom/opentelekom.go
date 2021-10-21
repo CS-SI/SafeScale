@@ -19,6 +19,7 @@ package opentelekom
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -92,6 +93,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		defaultImage = opentelekomDefaultImage
 	}
 
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -103,10 +109,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
-		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
-		return rxp.Match([]byte(str))
-	})
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(
+		func(str string) bool {
+			rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
+			return rxp.Match([]byte(str))
+		},
+	)
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
@@ -134,6 +142,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		DefaultNetworkName: vpcName,
 		DefaultNetworkCIDR: vpcCIDR,
 		DefaultImage:       defaultImage,
+		MaxLifeTime:        maxLifeTime,
 	}
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
 	if xerr != nil {
@@ -192,6 +201,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }

@@ -35,7 +35,7 @@ import (
 
 //go:generate minimock -o ../mocks/mock_nasapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.ShareHandler
 
-// TODO: At service level, we need to log before returning, because it's the last chance to track the real issue in server side
+// NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
 // ShareHandler defines API to manipulate Shares
 type ShareHandler interface {

@@ -39,6 +39,7 @@ const (
 type provider struct {
 	api.Stack
 
+	tenantParameters map[string]interface{}
 	templatesWithGPU []string
 }
 
@@ -150,10 +151,13 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		Metadata: outscale.MetadataConfiguration{
 			AccessKey: get(metadata, "AccessKey", get(objstorage, "AccessKey", get(identity, "AccessKey"))),
 			SecretKey: get(metadata, "SecretKey", get(objstorage, "SecretKey", get(identity, "SecretKey"))),
-			Endpoint:  get(metadata, "Endpoint", get(objstorage, "Endpoint", fmt.Sprintf("https://oos.%s.outscale.com", get(compute, "Region")))),
-			Type:      get(metadata, "Type", get(objstorage, "Type", "s3")),
-			Bucket:    get(metadata, "Bucket", "0.safescale"),
-			CryptKey:  get(metadata, "CryptKey", "safescale"),
+			Endpoint: get(
+				metadata, "Endpoint",
+				get(objstorage, "Endpoint", fmt.Sprintf("https://oos.%s.outscale.com", get(compute, "Region"))),
+			),
+			Type:     get(metadata, "Type", get(objstorage, "Type", "s3")),
+			Bucket:   get(metadata, "Bucket", "0.safescale"),
+			CryptKey: get(metadata, "CryptKey", "safescale"),
 		},
 	}
 
@@ -162,6 +166,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		return nil, fail.ConvertError(err)
 	}
 	p.Stack = stack
+	p.tenantParameters = opt
 	return p, nil
 }
 
@@ -197,6 +202,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("BuildSubnets", false)
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }
@@ -207,9 +213,11 @@ func (p provider) GetName() string {
 }
 
 // GetTenantParameters returns the tenant parameters as-is
-// TODO:
 func (p provider) GetTenantParameters() map[string]interface{} {
-	return nil
+	if p.IsNull() {
+		return map[string]interface{}{}
+	}
+	return p.tenantParameters
 }
 
 // GetCapabilities returns the capabilities of the provider

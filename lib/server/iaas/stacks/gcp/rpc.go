@@ -218,7 +218,9 @@ func (s stack) rpcGetSubnetByNameAndRegion(subnetName, region string) (*compute.
 		return nil, xerr
 	}
 	if len(resp) == 0 {
-		return &compute.Subnetwork{}, fail.NotFoundError("failed to find a Subnet named '%s' in region '%s'", subnetName, region)
+		return &compute.Subnetwork{}, fail.NotFoundError(
+			"failed to find a Subnet named '%s' in region '%s'", subnetName, region,
+		)
 	}
 	if len(resp) > 1 {
 		return nil, fail.InconsistentError("found more than one Subnet named '%s' in region '%s'", subnetName, region)
@@ -281,7 +283,9 @@ func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.S
 	var opp *compute.Operation
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			opp, err = s.ComputeService.Subnetworks.Insert(s.GcpConfig.ProjectID, s.GcpConfig.Region, &request).Context(context.Background()).Do()
+			opp, err = s.ComputeService.Subnetworks.Insert(
+				s.GcpConfig.ProjectID, s.GcpConfig.Region, &request,
+			).Context(context.Background()).Do()
 			if err != nil {
 				return err
 			}
@@ -305,7 +309,9 @@ func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.S
 		}
 	}
 
-	if err := s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout()); err != nil {
+	if err := s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
+		opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout(),
+	); err != nil {
 		return &compute.Subnetwork{}, normalizeError(err)
 	}
 
@@ -320,7 +326,9 @@ func (s stack) rpcListSubnets(filter string) ([]*compute.Subnetwork, fail.Error)
 	for token := ""; ; {
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
-				resp, err = s.ComputeService.Subnetworks.List(s.GcpConfig.ProjectID, s.GcpConfig.Region).Filter(filter).PageToken(token).Do()
+				resp, err = s.ComputeService.Subnetworks.List(
+					s.GcpConfig.ProjectID, s.GcpConfig.Region,
+				).Filter(filter).PageToken(token).Do()
 				if err != nil {
 					return err
 				}
@@ -495,7 +503,9 @@ func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, directi
 		}
 	}
 
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
+		opp, temporal.GetMinDelay(), temporal.GetHostTimeout(),
+	); xerr != nil {
 		return nil, xerr
 	}
 
@@ -504,7 +514,9 @@ func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, directi
 
 func (s stack) rpcListFirewallRules(networkRef string, ids []string) ([]*compute.Firewall, fail.Error) {
 	if networkRef == "" && len(ids) == 0 {
-		return []*compute.Firewall{}, fail.InvalidParameterError("networkRef", "cannot be empty string if 'ids' is an empty slice")
+		return []*compute.Firewall{}, fail.InvalidParameterError(
+			"networkRef", "cannot be empty string if 'ids' is an empty slice",
+		)
 	}
 
 	var filter string
@@ -744,7 +756,9 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	var opp *compute.Operation
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			opp, err = s.ComputeService.Networks.Insert(s.GcpConfig.ProjectID, &request).Context(context.Background()).Do()
+			opp, err = s.ComputeService.Networks.Insert(
+				s.GcpConfig.ProjectID, &request,
+			).Context(context.Background()).Do()
 			if err != nil {
 				return err
 			}
@@ -768,7 +782,9 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 		}
 	}
 
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout()); xerr != nil {
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
+		opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout(),
+	); xerr != nil {
 		return nil, xerr
 	}
 
@@ -883,7 +899,9 @@ func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*comput
 		}
 	}
 
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout()); xerr != nil {
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
+		opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout(),
+	); xerr != nil {
 		return nil, xerr
 	}
 
@@ -925,7 +943,9 @@ func (s stack) rpcDeleteRoute(name string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 }
 
-var imageFamilies = []string{"centos-cloud", "debian-cloud", "rhel-cloud", "ubuntu-os-cloud", "suse-cloud", "rhel-sap-cloud", "suse-sap-cloud"}
+var imageFamilies = []string{
+	"centos-cloud", "debian-cloud", "rhel-cloud", "ubuntu-os-cloud", "suse-cloud", "rhel-sap-cloud", "suse-sap-cloud",
+}
 
 func (s stack) rpcListImages() ([]*compute.Image, fail.Error) {
 	var (
@@ -1030,7 +1050,9 @@ func (s stack) rpcListMachineTypes() ([]*compute.MachineType, fail.Error) {
 		zero := []*compute.MachineType{}
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
-				resp, err = s.ComputeService.MachineTypes.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
+				resp, err = s.ComputeService.MachineTypes.List(
+					s.GcpConfig.ProjectID, s.GcpConfig.Zone,
+				).PageToken(token).Do()
 				if err != nil {
 					return err
 				}
@@ -1105,7 +1127,9 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 		zero := []*compute.Instance{}
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
-				resp, err = s.ComputeService.Instances.List(s.GcpConfig.ProjectID, s.GcpConfig.Zone).PageToken(token).Do()
+				resp, err = s.ComputeService.Instances.List(
+					s.GcpConfig.ProjectID, s.GcpConfig.Zone,
+				).PageToken(token).Do()
 				if err != nil {
 					return err
 				}
@@ -1159,6 +1183,10 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 		tags = append(tags, fmt.Sprintf(natRouteTagFormat, subnetID))
 	}
 
+	managedTag := "safescale"
+	bucketName := s.Config.MetadataBucket
+	now := time.Now().Format(time.RFC3339)
+
 	request := compute.Instance{
 		Name:         name,
 		Description:  name,
@@ -1200,6 +1228,26 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 				{
 					Key:   "startup-script",
 					Value: &userdata,
+				},
+				{
+					Key:   "ManagedBy",
+					Value: &managedTag,
+				},
+				{
+					Key:   "DeclaredInBucket",
+					Value: &bucketName,
+				},
+				{
+					Key:   "Image",
+					Value: &imageURL,
+				},
+				{
+					Key:   "Template",
+					Value: &templateName,
+				},
+				{
+					Key:   "CreationDate",
+					Value: &now,
 				},
 			},
 		},
@@ -1251,14 +1299,18 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	}()
 
 	etag := op.Header.Get("Etag")
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
+		op, temporal.GetMinDelay(), temporal.GetHostTimeout(),
+	); xerr != nil {
 		return &compute.Instance{}, xerr
 	}
 
 	var resp *compute.Instance
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
-			resp, err = s.ComputeService.Instances.Get(s.GcpConfig.ProjectID, s.GcpConfig.Zone, name).IfNoneMatch(etag).Do()
+			resp, err = s.ComputeService.Instances.Get(
+				s.GcpConfig.ProjectID, s.GcpConfig.Zone, name,
+			).IfNoneMatch(etag).Do()
 			if err != nil {
 				return err
 			}
@@ -1328,7 +1380,9 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
-				op, err := s.ComputeService.Instances.SetMetadata(s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata).Do()
+				op, err := s.ComputeService.Instances.SetMetadata(
+					s.GcpConfig.ProjectID, s.GcpConfig.Zone, resp.Name, newMetadata,
+				).Do()
 				if op != nil {
 					if op.HTTPStatusCode != 200 {
 						logrus.Tracef("received http error code %d", op.HTTPStatusCode)
@@ -1401,7 +1455,9 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 		}
 	}
 
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
+		op, temporal.GetMinDelay(), temporal.GetHostTimeout(),
+	); xerr != nil {
 		return &compute.Address{}, xerr
 	}
 
@@ -1522,7 +1578,9 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 		}
 	}
 
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout()); xerr != nil {
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
+		op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout(),
+	); xerr != nil {
 		return xerr
 	}
 
@@ -2060,7 +2118,9 @@ func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail
 		}
 	}
 
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
+		op, temporal.GetMinDelay(), temporal.GetHostTimeout(),
+	); xerr != nil {
 		return &compute.Disk{}, xerr
 	}
 
@@ -2165,7 +2225,9 @@ func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Er
 	zero := ""
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
-			op, err = s.ComputeService.Instances.AttachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, instance.Name, &request).Do()
+			op, err = s.ComputeService.Instances.AttachDisk(
+				s.GcpConfig.ProjectID, s.GcpConfig.Zone, instance.Name, &request,
+			).Do()
 			if err != nil {
 				return err
 			}
@@ -2189,7 +2251,9 @@ func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Er
 		}
 	}
 
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout()); xerr != nil {
+	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
+		op, temporal.GetMinDelay(), temporal.GetHostTimeout(),
+	); xerr != nil {
 		return "", xerr
 	}
 
@@ -2207,7 +2271,9 @@ func (s stack) rpcDeleteDiskAttachment(vaID string) fail.Error {
 	var op *compute.Operation
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
-			op, err = s.ComputeService.Instances.DetachDisk(s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverName, diskName).Do()
+			op, err = s.ComputeService.Instances.DetachDisk(
+				s.GcpConfig.ProjectID, s.GcpConfig.Zone, serverName, diskName,
+			).Do()
 			if err != nil {
 				return err
 			}

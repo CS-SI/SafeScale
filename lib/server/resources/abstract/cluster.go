@@ -18,6 +18,7 @@ package abstract
 
 import (
 	stdjson "encoding/json"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
@@ -47,17 +48,30 @@ type ClusterRequest struct {
 
 // ClusterIdentity contains the bare minimum information about a cluster
 type ClusterIdentity struct {
-	Name       string                 `json:"name"`       // GetName is the name of the cluster
-	Flavor     clusterflavor.Enum     `json:"flavor"`     // Flavor tells what kind of cluster it is
-	Complexity clustercomplexity.Enum `json:"complexity"` // Complexity is the mode of cluster
-	Keypair    *KeyPair               `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
-	// AdminPassword contains the password of 'cladm' account. This password is used to connect via Guacamole, but cannot be used with SSH (by choice)
-	AdminPassword string `json:"admin_password"`
+	// FIXME: Add Os and Template info here...
+
+	Name                string                 `json:"name"`           // GetName is the name of the cluster
+	Flavor              clusterflavor.Enum     `json:"flavor"`         // Flavor tells what kind of cluster it is
+	Complexity          clustercomplexity.Enum `json:"complexity"`     // Complexity is the mode of cluster
+	Keypair             *KeyPair               `json:"keypair"`        // Keypair contains the key-pair used inside the Cluster
+	AdminPassword       string                 `json:"admin_password"` // AdminPassword contains the password of 'cladm' account. This password is used to connect via Guacamole, but cannot be used with SSH (by choice)
+	Tags                map[string]string      `json:"tags,omitempty"`
+	GatewaysDefImage    string                 `json:"gateways_def_image,omitempty"`
+	GatewaysDefTemplate string                 `json:"gateways_def_template,omitempty"`
+	MastersDefImage     string                 `json:"masters_def_image,omitempty"`
+	MastersDefTemplate  string                 `json:"masters_def_template,omitempty"`
+	NodesDefImage       string                 `json:"nodes_def_image,omitempty"`
+	NodesDefTemplate    string                 `json:"nodes_def_template,omitempty"`
 }
 
 // NewClusterIdentity ...
 func NewClusterIdentity() *ClusterIdentity {
-	return &ClusterIdentity{}
+	ci := &ClusterIdentity{
+		Tags: make(map[string]string),
+	}
+	ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+	ci.Tags["ManagedBy"] = "safescale"
+	return ci
 }
 
 // IsNull ...

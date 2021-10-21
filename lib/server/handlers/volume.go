@@ -50,7 +50,7 @@ type VolumeHandler interface {
 	Detach(volume string, host string) fail.Error
 }
 
-// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
 

@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"regexp"
+	"strconv"
 
 	"github.com/sirupsen/logrus"
 
@@ -88,6 +89,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		defaultImage = openstackDefaultImage
 	}
 
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
 	dnsServers, _ := network["DNSServers"].([]string)
 	if len(dnsServers) == 0 {
 		dnsServers = []string{"8.8.8.8", "1.1.1.1"}
@@ -133,6 +139,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			"standard":   volumespeed.Cold,
 			"performant": volumespeed.Hdd,
 		},
+		MaxLifeTime: maxLifeTime,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -175,6 +182,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }

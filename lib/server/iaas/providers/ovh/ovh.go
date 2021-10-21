@@ -19,6 +19,7 @@ package ovh
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -137,6 +138,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		defaultImage = ovhDefaultImage
 	}
 
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         openstackID,
@@ -148,10 +154,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
-		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
-		return rxp.Match([]byte(str))
-	})
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(
+		func(str string) bool {
+			rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
+			return rxp.Match([]byte(str))
+		},
+	)
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
@@ -179,6 +187,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		ProviderName:             providerName,
 		DefaultSecurityGroupName: "default",
 		DefaultImage:             defaultImage,
+		MaxLifeTime:              maxLifeTime,
 	}
 
 	serviceVersions := map[string]string{"volume": "v2"}
@@ -233,6 +242,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }

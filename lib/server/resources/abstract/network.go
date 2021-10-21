@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/sirupsen/logrus"
@@ -35,8 +36,8 @@ type NetworkRequest struct {
 	KeepOnFailure bool     // KeepOnFailure tells if resources have to be kept in case of failure (default behavior is to delete them)
 }
 
-// SubNetwork --DEPRECATED--
-type SubNetwork struct {
+// SubNetwork is deprecated
+type SubNetwork struct { // DEPRECATED
 	CIDR string `json:"subnetmask,omitempty"`
 	ID   string `json:"subnetid,omitempty"`
 }
@@ -47,19 +48,25 @@ type Network struct {
 	Name       string   `json:"name"`                  // name of the network
 	CIDR       string   `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
 	DNSServers []string `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
-	Imported   bool     `json:"imported,omitempty"`    // tells if the Network has been imported (making it not deleteable by SafeScale)
+	Imported   bool     `json:"imported,omitempty"`    // tells if the Network has been imported (making it not deletable by SafeScale)
 
-	Domain             string         `json:"domain,omitempty"`               // DEPRECATED: contains the domain used to define host FQDN
-	GatewayID          string         `json:"gateway_id,omitempty"`           // DEPRECATED: contains the id of the host acting as primary gateway for the network
-	SecondaryGatewayID string         `json:"secondary_gateway_id,omitempty"` // DEPRECATED: contains the id of the host acting as secondary gateway for the network
-	VIP                *VirtualIP     `json:"vip,omitempty"`                  // DEPRECATED: contains the VIP of the network if created with HA
-	IPVersion          ipversion.Enum `json:"ip_version,omitempty"`           // DEPRECATED: IPVersion is IPv4 or IPv6 (see IPVersion)
-	Subnetworks        []SubNetwork   `json:"subnetworks,omitempty"`          // DEPRECATED
+	Domain             string            `json:"domain,omitempty"`               // DEPRECATED: contains the domain used to define host FQDN
+	GatewayID          string            `json:"gateway_id,omitempty"`           // DEPRECATED: contains the id of the host acting as primary gateway for the network
+	SecondaryGatewayID string            `json:"secondary_gateway_id,omitempty"` // DEPRECATED: contains the id of the host acting as secondary gateway for the network
+	VIP                *VirtualIP        `json:"vip,omitempty"`                  // DEPRECATED: contains the VIP of the network if created with HA
+	IPVersion          ipversion.Enum    `json:"ip_version,omitempty"`           // DEPRECATED: IPVersion is IPv4 or IPv6 (see IPVersion)
+	Subnetworks        []SubNetwork      `json:"subnetworks,omitempty"`          // DEPRECATED
+	Tags               map[string]string `json:"tags,omitempty"`
 }
 
 // NewNetwork initializes a new instance of Network
 func NewNetwork() *Network {
-	return &Network{}
+	nn := &Network{
+		Tags: make(map[string]string),
+	}
+	nn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+	nn.Tags["ManagedBy"] = "safescale"
+	return nn
 }
 
 // Clone ...

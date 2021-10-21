@@ -58,13 +58,15 @@ func (s Stack) ListRegions() (list []string, xerr fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "",
+	).WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
 	xerr = stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			listOpts := regions.ListOpts{
-				//ParentRegionID: "RegionOne",
+				// ParentRegionID: "RegionOne",
 			}
 			allPages, innerErr = regions.List(s.IdentityClient, listOpts).AllPages()
 			return innerErr
@@ -94,7 +96,9 @@ func (s Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
+	tracer := debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "",
+	).Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -137,7 +141,9 @@ func (s Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "",
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -151,17 +157,19 @@ func (s Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 
 	// Define an anonymous function to be executed on each page's iteration
 	imgList = []abstract.Image{}
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
-		imageList, err := images.ExtractImages(page)
-		if err != nil {
-			return false, err
-		}
+	err := pager.EachPage(
+		func(page pagination.Page) (bool, error) {
+			imageList, err := images.ExtractImages(page)
+			if err != nil {
+				return false, err
+			}
 
-		for _, img := range imageList {
-			imgList = append(imgList, abstract.Image{ID: img.ID, Name: img.Name})
-		}
-		return true, nil
-	})
+			for _, img := range imageList {
+				imgList = append(imgList, abstract.Image{ID: img.ID, Name: img.Name})
+			}
+			return true, nil
+		},
+	)
 	if err != nil {
 		return emptySlice, NormalizeError(err)
 	}
@@ -178,7 +186,9 @@ func (s Stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var img *images.Image
@@ -211,7 +221,9 @@ func (s Stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Try to get template
@@ -244,7 +256,9 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "",
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	opts := flavors.ListOpts{}
@@ -252,23 +266,27 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	var flvList []abstract.HostTemplate
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			return flavors.ListDetail(s.ComputeClient, opts).EachPage(func(page pagination.Page) (bool, error) {
-				list, err := flavors.ExtractFlavors(page)
-				if err != nil {
-					return false, err
-				}
-				flvList = make([]abstract.HostTemplate, 0, len(list))
-				for _, v := range list {
-					flvList = append(flvList, abstract.HostTemplate{
-						Cores:    v.VCPUs,
-						RAMSize:  float32(v.RAM) / 1000.0,
-						DiskSize: v.Disk,
-						ID:       v.ID,
-						Name:     v.Name,
-					})
-				}
-				return true, nil
-			})
+			return flavors.ListDetail(s.ComputeClient, opts).EachPage(
+				func(page pagination.Page) (bool, error) {
+					list, err := flavors.ExtractFlavors(page)
+					if err != nil {
+						return false, err
+					}
+					flvList = make([]abstract.HostTemplate, 0, len(list))
+					for _, v := range list {
+						flvList = append(
+							flvList, abstract.HostTemplate{
+								Cores:    v.VCPUs,
+								RAMSize:  float32(v.RAM) / 1000.0,
+								DiskSize: v.Disk,
+								ID:       v.ID,
+								Name:     v.Name,
+							},
+						)
+					}
+					return true, nil
+				},
+			)
 		},
 		NormalizeError,
 	)
@@ -299,7 +317,9 @@ func (s Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return abstract.NewKeyPair(name)
@@ -316,7 +336,9 @@ func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 		return nullAKP, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	kp, err := keypairs.Get(s.ComputeClient, id, nil).Extract() // FIXME: Maybe needed
@@ -339,27 +361,33 @@ func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "",
+	).WithStopwatch().Entering().Exiting()
 
 	var kpList []abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			return keypairs.List(s.ComputeClient, nil).EachPage(func(page pagination.Page) (bool, error) { // FIXME: Maybe needed
-				list, err := keypairs.ExtractKeyPairs(page)
-				if err != nil {
-					return false, err
-				}
+			return keypairs.List(s.ComputeClient, nil).EachPage(
+				func(page pagination.Page) (bool, error) { // FIXME: Maybe needed
+					list, err := keypairs.ExtractKeyPairs(page)
+					if err != nil {
+						return false, err
+					}
 
-				for _, v := range list {
-					kpList = append(kpList, abstract.KeyPair{
-						ID:         v.Name,
-						Name:       v.Name,
-						PublicKey:  v.PublicKey,
-						PrivateKey: v.PrivateKey,
-					})
-				}
-				return true, nil
-			})
+					for _, v := range list {
+						kpList = append(
+							kpList, abstract.KeyPair{
+								ID:         v.Name,
+								Name:       v.Name,
+								PublicKey:  v.PublicKey,
+								PrivateKey: v.PrivateKey,
+							},
+						)
+					}
+					return true, nil
+				},
+			)
 		},
 		NormalizeError,
 	)
@@ -379,7 +407,9 @@ func (s Stack) DeleteKeyPair(id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id,
+	).WithStopwatch().Entering().Exiting()
 
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
@@ -443,7 +473,9 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 		return nullAHF, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel,
+	).WithStopwatch().Entering().Exiting()
 
 	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
 	if xerr != nil {
@@ -457,6 +489,11 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	state := toHostState(server.Status)
 	ahf.CurrentState, ahf.Core.LastState = state, state
+
+	// refresh tags
+	for k, v := range server.Metadata {
+		ahf.Core.Tags[k] = v
+	}
 
 	if !ahf.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
@@ -489,6 +526,9 @@ func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 		Created: server.Created,
 		Updated: server.Updated,
 	}
+
+	host.Core.Tags["Template"], _ = server.Image["id"].(string)
+	host.Core.Tags["Image"], _ = server.Flavor["id"].(string)
 
 	host.Sizing = s.toHostSize(server.Flavor)
 
@@ -562,15 +602,19 @@ func (s Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "('%s')", name,
+	).WithStopwatch().Entering().Exiting()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, r.Err = s.ComputeClient.Get(s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gophercloud.RequestOpts{
-				OkCodes: []int{200, 203},
-			})
+			_, r.Err = s.ComputeClient.Get(
+				s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gophercloud.RequestOpts{
+					OkCodes: []int{200, 203},
+				},
+			)
 			return r.Err
 		},
 		NormalizeError,
@@ -607,14 +651,19 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)",
+		request.ResourceName,
+	).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without --public flag and without attached Network/Subnet")
+		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError(
+			"host creation", "cannot create a host without --public flag and without attached Network/Subnet",
+		)
 	}
 
 	// The Default Networking is the first of the provided list, by convention
@@ -690,7 +739,9 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				}
 			}()
 
-			server, innerXErr = s.rpcCreateServer(request.ResourceName, hostNets, request.TemplateID, request.ImageID, userDataPhase1, azone)
+			server, innerXErr = s.rpcCreateServer(
+				request.ResourceName, hostNets, request.TemplateID, request.ImageID, userDataPhase1, azone,
+			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
@@ -700,7 +751,11 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				}
 				if server != nil && server.ID != "" {
 					if derr := s.DeleteHost(server.ID); derr != nil {
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName))
+						_ = innerXErr.AddConsequence(
+							fail.Wrap(
+								derr, "cleaning up on failure, failed to delete host '%s'", request.ResourceName,
+							),
+						)
 					}
 				}
 				return innerXErr
@@ -719,7 +774,11 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					logrus.Debugf("deleting unresponsive server '%s'...", request.ResourceName)
 					if derr := s.DeleteHost(ahc.ID); derr != nil {
 						logrus.Debugf(derr.Error())
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName))
+						_ = innerXErr.AddConsequence(
+							fail.Wrap(
+								derr, "cleaning up on failure, failed to delete Host '%s'", request.ResourceName,
+							),
+						)
 						return
 					}
 					logrus.Debugf("unresponsive server '%s' deleted", request.ResourceName)
@@ -732,7 +791,10 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			} else {
 				logrus.Tracef("Host '%s' successfully created in requested AZ '%s'", ahc.Name, creationZone)
 				if creationZone != azone && azone != "" {
-					logrus.Warnf("Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'", ahc.Name, azone, creationZone)
+					logrus.Warnf(
+						"Host '%s' created in the WRONG availability zone: requested '%s' and got instead '%s'",
+						ahc.Name, azone, creationZone,
+					)
 				}
 			}
 
@@ -740,7 +802,10 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			timeout := temporal.GetHostTimeout()
 			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timeout)
 			if innerXErr != nil {
-				logrus.Errorf("failed to reach server '%s' after %s; deleting it and trying again", request.ResourceName, temporal.FormatDuration(timeout))
+				logrus.Errorf(
+					"failed to reach server '%s' after %s; deleting it and trying again", request.ResourceName,
+					temporal.FormatDuration(timeout),
+				)
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
@@ -816,9 +881,11 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		// Associate floating IP to host
 		xerr = stacks.RetryableRemoteCall(
 			func() error {
-				return floatingips.AssociateInstance(s.ComputeClient, newHost.Core.ID, floatingips.AssociateOpts{
-					FloatingIP: ip.IP,
-				}).ExtractErr()
+				return floatingips.AssociateInstance(
+					s.ComputeClient, newHost.Core.ID, floatingips.AssociateOpts{
+						FloatingIP: ip.IP,
+					},
+				).ExtractErr()
 			},
 			NormalizeError,
 		)
@@ -890,14 +957,18 @@ func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 	if !s.cfgOpts.UseFloatingIP && request.PublicIP {
 		adminState := true
 		req := ports.CreateOpts{
-			NetworkID:    s.ProviderNetworkID,
-			Name:         fmt.Sprintf("nic_%s_external", request.ResourceName),
-			Description:  fmt.Sprintf("nic of host '%s' on external network %s", request.ResourceName, s.cfgOpts.ProviderNetwork),
+			NetworkID: s.ProviderNetworkID,
+			Name:      fmt.Sprintf("nic_%s_external", request.ResourceName),
+			Description: fmt.Sprintf(
+				"nic of host '%s' on external network %s", request.ResourceName, s.cfgOpts.ProviderNetwork,
+			),
 			AdminStateUp: &adminState,
 		}
 		port, xerr := s.rpcCreatePort(req)
 		if xerr != nil {
-			return nets, netPorts, createdPorts, fail.Wrap(xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork)
+			return nets, netPorts, createdPorts, fail.Wrap(
+				xerr, "failed to create port on external network '%s'", s.cfgOpts.ProviderNetwork,
+			)
 		}
 		createdPorts = append(createdPorts, port.ID)
 
@@ -915,7 +986,9 @@ func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 		}
 		port, xerr := s.rpcCreatePort(req)
 		if xerr != nil {
-			return nets, netPorts /*, sgs */, createdPorts, fail.Wrap(xerr, "failed to create port on subnet '%s'", n.Name)
+			return nets, netPorts /*, sgs */, createdPorts, fail.Wrap(
+				xerr, "failed to create port on subnet '%s'", n.Name,
+			)
 		}
 
 		createdPorts = append(createdPorts, port.ID)
@@ -993,7 +1066,7 @@ func (s Stack) SelectedAvailabilityZone() (string, fail.Error) {
 	return s.selectedAvailabilityZone, nil
 }
 
-// WaitHostReady waits an host achieve ready state
+// WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	nullAHC := abstract.NewHostCore()
@@ -1019,7 +1092,7 @@ func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	return ahf.Core, nil
 }
 
-// WaitHostState waits an host achieve defined state
+// WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
 	nullServer := &servers.Server{}
@@ -1032,7 +1105,10 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		return nullServer, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel, state.String(), timeout).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
+		state.String(), timeout,
+	).WithStopwatch().Entering().Exiting()
 
 	retryErr := retry.WhileUnsuccessful(
 		func() (innerErr error) {
@@ -1084,7 +1160,11 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			case hoststate.Starting, hoststate.Stopping:
 				return fail.NewError("host '%s' not ready yet", hostLabel)
 			default:
-				return retry.StopRetryError(fail.NewError("host status of '%s' is in state '%s'", hostLabel, lastState.String()))
+				return retry.StopRetryError(
+					fail.NewError(
+						"host status of '%s' is in state '%s'", hostLabel, lastState.String(),
+					),
+				)
 			}
 		},
 		temporal.GetMinDelay(),
@@ -1093,7 +1173,9 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *fail.ErrTimeout:
-			return nullServer, fail.Wrap(fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostLabel, timeout)
+			return nullServer, fail.Wrap(
+				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostLabel, timeout,
+			)
 		case *fail.ErrAborted:
 			cause := retryErr.Cause()
 			if cause != nil {
@@ -1117,7 +1199,9 @@ func (s Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "",
+	).WithStopwatch().Entering().Exiting()
 
 	host, xerr := s.InspectHost(hostParam)
 	if xerr != nil {
@@ -1133,34 +1217,38 @@ func (s Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "",
+	).WithStopwatch().Entering().Exiting()
 
 	hostList := abstract.HostList{}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			return servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
-				list, err := servers.ExtractServers(page)
-				if err != nil {
-					return false, err
-				}
-
-				for _, srv := range list {
-					ahc := abstract.NewHostCore()
-					ahc.ID = srv.ID
-					var ahf *abstract.HostFull
-					if details {
-						ahf, err = s.complementHost(ahc, srv, nil, nil)
-						if err != nil {
-							return false, err
-						}
-					} else {
-						ahf = abstract.NewHostFull()
-						ahf.Core = ahc
+			return servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(
+				func(page pagination.Page) (bool, error) {
+					list, err := servers.ExtractServers(page)
+					if err != nil {
+						return false, err
 					}
-					hostList = append(hostList, ahf)
-				}
-				return true, nil
-			})
+
+					for _, srv := range list {
+						ahc := abstract.NewHostCore()
+						ahc.ID = srv.ID
+						var ahf *abstract.HostFull
+						if details {
+							ahf, err = s.complementHost(ahc, srv, nil, nil)
+							if err != nil {
+								return false, err
+							}
+						} else {
+							ahf = abstract.NewHostFull()
+							ahf.Core = ahc
+						}
+						hostList = append(hostList, ahf)
+					}
+					return true, nil
+				},
+			)
 		},
 		NormalizeError,
 	)
@@ -1173,20 +1261,22 @@ func (s Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error
 	var fips []floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			return floatingips.List(s.ComputeClient).EachPage(func(page pagination.Page) (bool, error) {
-				list, err := floatingips.ExtractFloatingIPs(page)
-				if err != nil {
-					return false, err
-				}
-
-				for _, fip := range list {
-					if fip.InstanceID == hostID {
-						fips = append(fips, fip)
-						break // No need to go through the rest of the floating ip, as there can be only one Floating IP by host, by convention
+			return floatingips.List(s.ComputeClient).EachPage(
+				func(page pagination.Page) (bool, error) {
+					list, err := floatingips.ExtractFloatingIPs(page)
+					if err != nil {
+						return false, err
 					}
-				}
-				return true, nil
-			})
+
+					for _, fip := range list {
+						if fip.InstanceID == hostID {
+							fips = append(fips, fip)
+							break // No need to go through the rest of the floating ip, as there can be only one Floating IP by host, by convention
+						}
+					}
+					return true, nil
+				},
+			)
 		},
 		NormalizeError,
 	)
@@ -1197,7 +1287,9 @@ func (s Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error
 		return nil, fail.NotFoundError()
 	}
 	if len(fips) > 1 {
-		return nil, fail.InconsistentError("configuration error, more than one Floating IP associated to host '%s'", hostID)
+		return nil, fail.InconsistentError(
+			"configuration error, more than one Floating IP associated to host '%s'", hostID,
+		)
 	}
 	return &fips[0], nil
 }
@@ -1212,7 +1304,9 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef,
+	).WithStopwatch().Entering().Exiting()
 
 	// Detach floating IP
 	if s.cfgOpts.UseFloatingIP {
@@ -1226,9 +1320,11 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				return fail.Wrap(xerr, "failed to find floating ip of host '%s'", hostRef)
 			}
 		} else if fip != nil {
-			err := floatingips.DisassociateInstance(s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
-				FloatingIP: fip.IP,
-			}).ExtractErr()
+			err := floatingips.DisassociateInstance(
+				s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
+					FloatingIP: fip.IP,
+				},
+			).ExtractErr()
 			if err != nil {
 				return NormalizeError(err)
 			}
@@ -1277,7 +1373,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				func() error {
 					server, gerr := s.rpcGetServer(ahf.Core.ID)
 					if gerr != nil {
-						switch gerr.(type) { //nolint
+						switch gerr.(type) { // nolint
 						case *fail.ErrNotFound:
 							state = hoststate.Terminated
 							return nil
@@ -1386,7 +1482,9 @@ func (s Stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Er
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef,
+	).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(
 		func() error {
@@ -1406,14 +1504,20 @@ func (s Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef,
+	).WithStopwatch().Entering().Exiting()
 
 	// Try first a soft reboot, and if it fails (because host isn't in ACTIVE state), tries a hard reboot
 	return stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := servers.Reboot(s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.SoftReboot}).ExtractErr()
+			innerErr := servers.Reboot(
+				s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.SoftReboot},
+			).ExtractErr()
 			if innerErr != nil {
-				innerErr = servers.Reboot(s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot}).ExtractErr()
+				innerErr = servers.Reboot(
+					s.ComputeClient, ahf.Core.ID, servers.RebootOpts{Type: servers.HardReboot},
+				).ExtractErr()
 			}
 			return innerErr
 		},
@@ -1431,7 +1535,9 @@ func (s Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 		return xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef,
+	).WithStopwatch().Entering().Exiting()
 
 	return stacks.RetryableRemoteCall(
 		func() error {
@@ -1452,7 +1558,9 @@ func (s Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 		return nullAHF, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef,
+	).WithStopwatch().Entering().Exiting()
 
 	// TODO: RESIZE Resize IPAddress HERE
 	logrus.Warn("Trying to resize a Host...")
