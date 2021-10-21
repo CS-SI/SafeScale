@@ -440,7 +440,16 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 			return nil
 		})
 	}
-	currentNetworkProps, _ := ctx.Value(CurrentNetworkPropertiesContextKey).(*serialize.JSONProperties)
+
+	var currentNetworkProps *serialize.JSONProperties
+	anon := ctx.Value(CurrentNetworkPropertiesContextKey)
+	if anon != nil {
+		var ok bool
+		currentNetworkProps, ok = anon.(*serialize.JSONProperties)
+		if !ok {
+			return fail.InconsistentError("context value of key '%s' must be a type '*seiralize.JSONProperties'")
+		}
+	}
 	if currentNetworkProps != nil {
 		xerr = updateFunc(currentNetworkProps)
 	} else {

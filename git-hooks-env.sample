@@ -1,16 +1,16 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 release=develop
 folder="$HOME/Documents/Projects/SafeScale/${release}"
 
-if [[ ! -d ${folder} ]]; then
+if [ ! -d ${folder} ]; then
     echo "release '$release' ($folder) not found"
     return 2
 fi
 
 folder="${folder}/go"
 sources="${folder}/src/github.com/CS-SI/SafeScale"
-if [[ ! -d "${sources}" ]]; then
+if [ ! -d "${sources}" ]; then
     echo "no source found in folder '$sources'"
     return 3
 fi
