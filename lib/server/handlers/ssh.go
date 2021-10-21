@@ -48,7 +48,7 @@ const protocolSeparator = ":"
 
 //go:generate minimock -o ../mocks/mock_sshapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.SSHHandler
 
-// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
 // SSHHandler defines ssh management API
 type SSHHandler interface {
@@ -288,6 +288,8 @@ func (handler *sshHandler) WaitServerReady(hostParam stacks.HostParameter, timeo
 
 // Run tries to execute command 'cmd' on the host
 func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string, stdErr string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	const invalid = -1
 	if handler == nil {
 		return invalid, "", "", fail.InvalidInstanceError()
@@ -306,7 +308,6 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", cmd))
 
@@ -403,6 +404,7 @@ func extractPath(in string) (string, fail.Error) {
 
 // Copy copies file/directory from/to remote host
 func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	const invalid = -1
 
 	if handler == nil {
@@ -422,7 +424,6 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.ssh"), "('%s', '%s')", from, to).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
 	hostName := ""
 	var upload bool

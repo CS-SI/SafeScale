@@ -527,49 +527,6 @@ func (scmd *SSHCommand) Start() fail.Error {
 	return nil
 }
 
-// Run starts the specified command and waits for it to complete.
-//
-// The returned error is nil if the command runs, has no problems
-// copying stdin, stdout, and stderr, and exits with a zero exit
-// status.
-//
-// If the command starts but does not complete successfully, the error is of
-// type *ExitError. Other error types may be returned for other situations.
-//
-// WARNING : This function CAN lock, use .RunWithTimeout instead
-func (scmd *SSHCommand) Run(ctx context.Context, outs outputs.Enum) (int, string, string, fail.Error) {
-	const invalid = -1
-	if scmd == nil {
-		return invalid, "", "", fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return invalid, "", "", xerr
-			}
-		default:
-			return invalid, "", "", xerr
-		}
-	}
-
-	if task.Aborted() {
-		return invalid, "", "", fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s)", outs.String()).WithStopwatch().Entering()
-	defer tracer.Exiting()
-
-	return scmd.RunWithTimeout(ctx, outs, 0) // FIXME: Toxic timeout
-}
-
 // RunWithTimeout ...
 // returns:
 // - retcode int
@@ -629,7 +586,6 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		return invalid, "", "", xerr
 	}
 
-	// logrus.Warningf("TBR: waiting for '%s' a time of '%s'", spew.Sdump(scmd), timeout)
 	_, r, xerr := subtask.WaitFor(timeout)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1164,7 +1120,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			// Do not forget to close command, ie close SSH tunnel
 			defer func(cmd *SSHCommand) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
-			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout) // FIXME: What if this never returns
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1179,7 +1135,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 					// Do not forget to close command, ie close SSH tunnel
 					defer func(cmd *SSHCommand) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
-					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout) // FIXME: What if this never returns
+					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout)
 					if innerXErr != nil {
 						return innerXErr
 					}

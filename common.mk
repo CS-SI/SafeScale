@@ -97,6 +97,8 @@ endif
 endif
 
 ifeq ($(OS),Windows_NT)
+MAKE=mingw32-make.exe
+else
 MAKE=make
 endif
 

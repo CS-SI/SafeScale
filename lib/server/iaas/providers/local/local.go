@@ -228,29 +228,29 @@ func (p provider) GetName() string {
 }
 
 //
-//// ListImages ...
-//func (p provider) ListImages(all bool) ([]abstract.Image, error) {
+// // ListImages ...
+// func (p provider) ListImages(all bool) ([]abstract.Image, error) {
 //	return p.Stack.ListImages()
-//}
+// }
 //
-//// ListTemplates ...
-//func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+// // ListTemplates ...
+// func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 //	return p.Stack.ListTemplates()
-//}
+// }
 //
-//func (p provider) ListAvailabilityZones() (map[string]bool, error) {
+// func (p provider) ListAvailabilityZones() (map[string]bool, error) {
 //	return p.Stack.ListAvailabilityZones()
-//}
+// }
 //
-//// GetTenantParameters returns the tenant parameters as-is
-//func (p *provider) GetTenantParameters() map[string]interface{} {
+// // GetTenantParameters returns the tenant parameters as-is
+// func (p *provider) GetTenantParameters() map[string]interface{} {
 //	return p.tenantParameters
-//}
+// }
 //
-//// GetCapabilities returns the capabilities of the provider
-//func (p *provider) GetCapabilities() providers.Capabilities {
+// // GetCapabilities returns the capabilities of the provider
+// func (p *provider) GetCapabilities() providers.Capabilities {
 //	return providers.Capabilities{}
-//}
+// }
 
 // AddRuleToSecurityGroup adds a rule to a security group
 func (p *provider) AddRuleToSecurityGroup(groupRef string, rule abstract.SecurityGroupRule) fail.Error {

@@ -140,7 +140,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 	cmdNetSpeed,
 )
 
-// TODO At service level, we need to log before returning, because it's the last chance to track the real issue in server side
+// NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {
@@ -161,6 +161,7 @@ func NewTenantHandler(job server.Job) TenantHandler {
 
 // Scan scans the tenant and updates the database
 func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNamesToScan []string) (_ *protocol.ScanResultList, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -174,7 +175,6 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
-	defer fail.OnPanic(&ferr)
 
 	svc := handler.job.Service()
 	task := handler.job.Task()

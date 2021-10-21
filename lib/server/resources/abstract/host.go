@@ -226,17 +226,25 @@ func (ht HostTemplate) OK() bool {
 // These information should not change over time
 // TODO: profit of immutability status of HostCore to optimize some use (like SSHConfig), avoiding provider calls
 type HostCore struct {
-	ID         string         `json:"id,omitempty"`
-	Name       string         `json:"name,omitempty"`
-	PrivateKey string         `json:"private_key,omitempty"`
-	SSHPort    uint32         `json:"ssh_port,omitempty"`
-	Password   string         `json:"password,omitempty"`
-	LastState  hoststate.Enum `json:"last_state,omitempty"`
+	ID         string            `json:"id,omitempty"`
+	Name       string            `json:"name,omitempty"`
+	PrivateKey string            `json:"private_key,omitempty"`
+	SSHPort    uint32            `json:"ssh_port,omitempty"`
+	Password   string            `json:"password,omitempty"`
+	LastState  hoststate.Enum    `json:"last_state,omitempty"`
+	Tags       map[string]string `json:"tags,omitempty"`
 }
 
 // NewHostCore ...
 func NewHostCore() *HostCore {
-	return &HostCore{SSHPort: 22}
+	hc := &HostCore{
+		SSHPort: 22,
+		Tags:    make(map[string]string),
+	}
+
+	hc.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+	hc.Tags["ManagedBy"] = "safescale"
+	return hc
 }
 
 // IsNull tells if the instance should be considered as a null value

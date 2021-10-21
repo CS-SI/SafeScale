@@ -85,10 +85,10 @@ type AuthenticationOptions struct {
 	// Necessary only if UseFloatingIP is true
 	FloatingIPPool string
 
-	//// Name of the VPC (Virtual Private Cloud)
-	//DefaultNetworkName string
-	//// CIDR of the VPC
-	//DefaultNetworkCIDR string
+	// // Name of the VPC (Virtual Private Cloud)
+	// DefaultNetworkName string
+	// // CIDR of the VPC
+	// DefaultNetworkCIDR string
 }
 
 // ConfigurationOptions are the stack configuration options
@@ -142,4 +142,6 @@ type ConfigurationOptions struct {
 	WhitelistImageRegexp *regexp.Regexp
 	// BlacklistImageRegexp contains the regexp string to black list images
 	BlacklistImageRegexp *regexp.Regexp
+
+	MaxLifeTime int
 }

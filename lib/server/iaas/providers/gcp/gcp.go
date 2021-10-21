@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"regexp"
+	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -116,6 +117,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		defaultImage = gcpDefaultImage
 	}
 
+	maxLifeTime := 0
+	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
+	}
+
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
@@ -150,6 +156,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		OperatorUsername: operatorUsername,
 		UseNATService:    true,
 		ProviderName:     providerName,
+		MaxLifeTime:      maxLifeTime,
 	}
 
 	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
@@ -190,6 +197,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 	return cfg, nil
 }
 

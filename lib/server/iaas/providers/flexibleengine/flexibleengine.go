@@ -19,6 +19,7 @@ package flexibleengine
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/asaskevich/govalidator"
@@ -120,6 +121,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		defaultImage = flexibleEngineDefaultImage
 	}
 
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -131,10 +137,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
-		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
-		return rxp.Match([]byte(str))
-	})
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(
+		func(str string) bool {
+			rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
+			return rxp.Match([]byte(str))
+		},
+	)
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
@@ -166,6 +174,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		// BlacklistTemplateRegexp: blacklistTemplatePattern,
 		// WhitelistImageRegexp:    whitelistImagePattern,
 		// BlacklistImageRegexp:    blacklistImagePattern,
+		MaxLifeTime: maxLifeTime,
 	}
 
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
@@ -277,6 +286,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("DefaultNetworkName", opts.DefaultNetworkName)
 	cfg.Set("DefaultNetworkCIDR", opts.DefaultNetworkCIDR)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 	// cfg.Set("Customizations", opts.Customizations)
 
 	return cfg, nil

@@ -19,6 +19,7 @@ package openstack
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
@@ -61,9 +62,11 @@ func (s Stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	r := servers.GetResult{}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, r.Err = s.ComputeClient.Get(s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gophercloud.RequestOpts{
-				OkCodes: []int{200, 203},
-			})
+			_, r.Err = s.ComputeClient.Get(
+				s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gophercloud.RequestOpts{
+					OkCodes: []int{200, 203},
+				},
+			)
 			return r.Err
 		},
 		NormalizeError,
@@ -175,6 +178,13 @@ func (s Stack) rpcCreateServer(name string, networks []servers.Network, template
 		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("az")
 	}
 
+	metadata := make(map[string]string)
+	metadata["ManagedBy"] = "safescale"
+	metadata["DeclaredInBucket"] = s.cfgOpts.MetadataBucket
+	metadata["Image"] = imageID
+	metadata["Template"] = templateID
+	metadata["CreationDate"] = time.Now().Format(time.RFC3339)
+
 	srvOpts := servers.CreateOpts{
 		Name:             name,
 		Networks:         networks,
@@ -182,6 +192,7 @@ func (s Stack) rpcCreateServer(name string, networks []servers.Network, template
 		ImageRef:         imageID,
 		UserData:         userdata,
 		AvailabilityZone: az,
+		Metadata:         metadata,
 	}
 
 	var server *servers.Server
@@ -309,9 +320,11 @@ func (s Stack) rpcCreateFloatingIP() (*floatingips.FloatingIP, fail.Error) {
 	var resp *floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			resp, innerErr = floatingips.Create(s.ComputeClient, floatingips.CreateOpts{
-				Pool: s.authOpts.FloatingIPPool,
-			}).Extract()
+			resp, innerErr = floatingips.Create(
+				s.ComputeClient, floatingips.CreateOpts{
+					Pool: s.authOpts.FloatingIPPool,
+				},
+			).Extract()
 			return innerErr
 		},
 		NormalizeError,

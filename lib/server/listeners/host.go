@@ -103,7 +103,9 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -153,7 +155,9 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -200,7 +204,9 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -290,7 +296,9 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.home"), "('%s')", name,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -325,19 +333,24 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 				return nil, xerr
 			}
 
+			//goland:noinspection GoDeferInLoop
 			defer func(instance resources.Subnet) { // nolint
 				instance.Released()
 			}(subnetInstance)
 
-			xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				as, ok := clonable.(*abstract.Subnet)
-				if !ok {
-					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
+			xerr = subnetInstance.Review(
+				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					as, ok := clonable.(*abstract.Subnet)
+					if !ok {
+						return fail.InconsistentError(
+							"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+						)
+					}
 
-				subnets = append(subnets, as)
-				return nil
-			})
+					subnets = append(subnets, as)
+					return nil
+				},
+			)
 			if xerr != nil {
 				return nil, xerr
 			}
@@ -351,15 +364,19 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 
 		defer subnetInstance.Released()
 
-		xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+		xerr = subnetInstance.Review(
+			func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, ok := clonable.(*abstract.Subnet)
+				if !ok {
+					return fail.InconsistentError(
+						"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
 
-			subnets = append(subnets, as)
-			return nil
-		})
+				subnets = append(subnets, as)
+				return nil
+			},
+		)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -426,7 +443,9 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "('%s')", name,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -446,21 +465,27 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	defer hostInstance.Released()
 
 	reduce := false
-	xerr = hostInstance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
-			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+	xerr = hostInstance.Inspect(
+		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(
+				hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
+					hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+					if !ok {
+						return fail.InconsistentError(
+							"'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+						)
+					}
 
-			reduce = reduce || (sizing.MinCores < hostSizingV2.RequestedSize.MinCores)
-			reduce = reduce || (sizing.MinRAMSize < hostSizingV2.RequestedSize.MinRAMSize)
-			reduce = reduce || (sizing.MinGPU < hostSizingV2.RequestedSize.MinGPU)
-			reduce = reduce || (sizing.MinCPUFreq < hostSizingV2.RequestedSize.MinCPUFreq)
-			reduce = reduce || (sizing.MinDiskSize < hostSizingV2.RequestedSize.MinDiskSize)
-			return nil
-		})
-	})
+					reduce = reduce || (sizing.MinCores < hostSizingV2.RequestedSize.MinCores)
+					reduce = reduce || (sizing.MinRAMSize < hostSizingV2.RequestedSize.MinRAMSize)
+					reduce = reduce || (sizing.MinGPU < hostSizingV2.RequestedSize.MinGPU)
+					reduce = reduce || (sizing.MinCPUFreq < hostSizingV2.RequestedSize.MinCPUFreq)
+					reduce = reduce || (sizing.MinDiskSize < hostSizingV2.RequestedSize.MinDiskSize)
+					return nil
+				},
+			)
+		},
+	)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -507,7 +532,9 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -523,6 +550,12 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 
 	defer hostInstance.Released()
 
+	// Data sync
+	xerr = hostInstance.Reload()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	// Gather host state from Cloud Provider
 	state, xerr := hostInstance.ForceGetState(ctx)
 	if xerr != nil {
@@ -532,7 +565,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	return converters.HostStatusFromAbstractToProtocol(hostInstance.GetName(), state), nil
 }
 
-// Inspect an host
+// Inspect a host
 func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect host")
@@ -563,7 +596,9 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -614,7 +649,9 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -633,7 +670,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	return empty, nil
 }
 
-// SSH returns ssh parameters to access an host
+// SSH returns ssh parameters to access a host
 func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *protocol.SshConfig, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
@@ -664,7 +701,9 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -678,7 +717,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	return converters.SSHConfigFromAbstractToProtocol(*sshConfig), nil
 }
 
-// BindSecurityGroup attaches a Security Group to an host
+// BindSecurityGroup attaches a Security Group to a host
 func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot bind Security Group to Host")
@@ -709,13 +748,17 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/bind", hostRef, sgRef))
+	job, xerr := PrepareJob(
+		ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/bind", hostRef, sgRef),
+	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -747,7 +790,7 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 	return empty, nil
 }
 
-// UnbindSecurityGroup detaches a Security Group from an host
+// UnbindSecurityGroup detaches a Security Group from a host
 func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot unbind Security Group from Host")
@@ -778,13 +821,17 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/unbind", hostRef, sgRef))
+	job, xerr := PrepareJob(
+		ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/unbind", hostRef, sgRef),
+	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -836,13 +883,17 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/enable", hostRef, sgRef))
+	job, xerr := PrepareJob(
+		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/enable", hostRef, sgRef),
+	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -898,13 +949,17 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/disable", hostRef, sgRef))
+	job, xerr := PrepareJob(
+		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/disable", hostRef, sgRef),
+	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -981,7 +1036,9 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", hostRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", hostRefLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 

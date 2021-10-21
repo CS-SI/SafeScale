@@ -224,6 +224,9 @@ func (s stack) ListVolumes() (_ []abstract.Volume, xerr fail.Error) {
 		volume.Size = int(ov.Size)
 		volume.State = toAbstractVolumeState(ov.State)
 		volume.Name = getResourceTag(ov.Tags, "name", "")
+		volume.Tags["CreationDate"] = getResourceTag(ov.Tags, "CreationDate", "")
+		volume.Tags["ManagedBy"] = getResourceTag(ov.Tags, "ManagedBy", "")
+		volume.Tags["DeclaredInBucket"] = getResourceTag(ov.Tags, "DeclaredInBucket", "")
 		volumes = append(volumes, *volume)
 	}
 	return volumes, nil
