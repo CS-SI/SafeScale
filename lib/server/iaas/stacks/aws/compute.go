@@ -998,79 +998,79 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		default:
 			return xerr
 		}
-	} else {
-		// Get keypair and security group
-		var (
-			keyPairName     string
-			attachedVolumes []string
-		)
+	}
 
-		// inventory attached volumes
-		for _, attVol := range vm.BlockDeviceMappings {
-			if attVol != nil && attVol.Ebs != nil && attVol.Ebs.VolumeId != nil {
-				volume := aws.StringValue(attVol.Ebs.VolumeId)
-				if volume != "" {
-					attachedVolumes = append(attachedVolumes, volume)
-				}
+	// Get keypair and security group
+	var (
+		keyPairName     string
+		attachedVolumes []string
+	)
+
+	// inventory attached volumes
+	for _, attVol := range vm.BlockDeviceMappings {
+		if attVol != nil && attVol.Ebs != nil && attVol.Ebs.VolumeId != nil {
+			volume := aws.StringValue(attVol.Ebs.VolumeId)
+			if volume != "" {
+				attachedVolumes = append(attachedVolumes, volume)
 			}
 		}
+	}
 
-		keyPairName = aws.StringValue(vm.KeyName)
+	keyPairName = aws.StringValue(vm.KeyName)
 
-		// Stop instance forcibly
-		xerr := s.StopHost(ahf, false)
-		if xerr != nil {
-			return fail.Wrap(xerr, "failed to stop Host '%s'", ahf.Core.Name)
+	// Stop instance forcibly
+	xerr = s.StopHost(ahf, false)
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to stop Host '%s' with id '%s'", ahf.GetName(), ahf.GetID())
+	}
+
+	// Terminate instance
+	xerr = s.rpcTerminateInstance(vm)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
+			// continue
+		default:
+			return xerr
 		}
+	}
 
-		// Terminate instance
-		xerr = s.rpcTerminateInstance(vm)
+	// Remove volumes if some remain, mark errors as warnings
+	for _, volume := range attachedVolumes {
+		// FIXME: parallelize ?
+		xerr = stacks.RetryableRemoteCall(
+			func() error {
+				_, err := s.EC2Service.DeleteVolume(
+					&ec2.DeleteVolumeInput{
+						VolumeId: aws.String(volume),
+					},
+				)
+				return err
+			},
+			normalizeError,
+		)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
+				// A missing volume is considered as a successful deletion
 				debug.IgnoreError(xerr)
-				// continue
 			default:
-				return xerr
+				logrus.Warnf("failed to delete volume %s", volume)
 			}
 		}
+	}
 
-		// Remove volumes if some remain, mark errors as warnings
-		for _, volume := range attachedVolumes {
-			// FIXME: parallelize ?
-			xerr = stacks.RetryableRemoteCall(
-				func() error {
-					_, err := s.EC2Service.DeleteVolume(
-						&ec2.DeleteVolumeInput{
-							VolumeId: aws.String(volume),
-						},
-					)
-					return err
-				},
-				normalizeError,
-			)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					// A missing volume is considered as a successful deletion
-					debug.IgnoreError(xerr)
-				default:
-					logrus.Warnf("failed to delete volume %s", volume)
-				}
-			}
-		}
-
-		// Remove keypair
-		if keyPairName != "" {
-			xerr = s.rpcDeleteKeyPair(aws.String(keyPairName))
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					// A missing keypair is considered as a successful deletion
-					debug.IgnoreError(xerr)
-				default:
-					return fail.Wrap(xerr, "error deleting keypair '%s'", keyPairName)
-				}
+	// Remove keypair
+	if keyPairName != "" {
+		xerr = s.rpcDeleteKeyPair(aws.String(keyPairName))
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// A missing keypair is considered as a successful deletion
+				debug.IgnoreError(xerr)
+			default:
+				return fail.Wrap(xerr, "error deleting keypair '%s'", keyPairName)
 			}
 		}
 	}
