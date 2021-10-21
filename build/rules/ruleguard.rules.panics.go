@@ -67,5 +67,5 @@ func VolumeDanger(m dsl.Matcher) {
 
 func isNullIsDeprecated(m dsl.Matcher) {
 	m.Match(`if $x.isNull() { return $*_ }`).Where(m["x"].Text != "instance").Report("isNull is DANGEROUS when called upon something that is NOT a struct, consider using 'if $x == nil || ($x != nil && $x.isNull()) {'").
-		Suggest("if $x == nil || ($x != nil && $x.isNull()) {")
+		Suggest("if $x == nil || $x.isNull() {")
 }
