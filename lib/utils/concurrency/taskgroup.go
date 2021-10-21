@@ -763,6 +763,33 @@ func (instance *taskGroup) Abort() fail.Error {
 	return nil
 }
 
+func (instance *taskGroup) AbortWithCause(cerr fail.Error) fail.Error {
+	if instance.isNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	instance.task.lock.RLock()
+	status := instance.task.status
+	instance.task.lock.RUnlock()
+
+	// If taskGroup is not started, go directly to Abort
+	if status == READY {
+		instance.task.lock.Lock()
+		instance.task.status = DONE
+		instance.task.err = fail.AbortedError(cerr)
+		instance.task.lock.Unlock()
+		return nil
+	}
+
+	if !instance.task.Aborted() {
+		xerr := instance.task.Abort()
+		if xerr != nil {
+			return xerr
+		}
+	}
+	return nil
+}
+
 // Aborted tells if the task group is aborted
 func (instance *taskGroup) Aborted() bool {
 	if instance.isNull() || instance.task.IsNull() {

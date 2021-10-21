@@ -799,7 +799,7 @@ func TestAwfulSimpleTaskActionWithSoftRetry(t *testing.T) {
 			xerr := WhileUnsuccessful(
 				func() error {
 					time.Sleep(900 * time.Millisecond)
-					return fmt.Errorf("Nope")
+					return fmt.Errorf("nope")
 				}, 0, 40*time.Millisecond,
 			)
 			return "", xerr
@@ -840,7 +840,7 @@ func TestAwfulSimpleTaskActionWithHardRetry(t *testing.T) {
 			xerr := WhileUnsuccessfulWithHardTimeout(
 				func() error {
 					time.Sleep(900 * time.Millisecond)
-					return fmt.Errorf("Nope")
+					return fmt.Errorf("nope")
 				}, 0, 40*time.Millisecond,
 			)
 			return "", xerr

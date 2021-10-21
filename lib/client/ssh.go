@@ -315,7 +315,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 					if derr != nil {
 						logrus.Debugf("there was an error trying to delete the file: %s", derr)
 					}
-					return fmt.Errorf("Permission denied")
+					return fmt.Errorf("permission denied")
 				}
 			}
 

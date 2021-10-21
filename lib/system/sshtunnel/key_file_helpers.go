@@ -114,7 +114,7 @@ func GenerateRSAKeyPair(keylen int) (privKey string, pubKey string, err error) {
 
 // FIXME: Add UT, remove nolint
 // writePemToFile writes keys to a file
-func writeKeyToFile(keyBytes []byte, saveFileTo string) (err error) { //nolint
+func writeKeyToFile(keyBytes []byte, saveFileTo string) (err error) { // nolint
 	defer OnPanic(&err)
 
 	err = ioutil.WriteFile(saveFileTo, keyBytes, 0600)
@@ -127,7 +127,7 @@ func writeKeyToFile(keyBytes []byte, saveFileTo string) (err error) { //nolint
 
 // FIXME: Add UT, remove nolint
 // getHostKey retrieves a key on unix systems
-func getHostKey(host string) (_ ssh.PublicKey, err error) { //nolint
+func getHostKey(host string) (_ ssh.PublicKey, err error) { // nolint
 	defer OnPanic(&err)
 
 	// parse OpenSSH known_hosts file

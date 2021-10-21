@@ -313,7 +313,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
-					switch v { //nolint
+					switch v { // nolint
 					case verdict.Retry:
 						logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying check...", bucketName, absolutePath, t.Err.Error())
 					}
@@ -336,7 +336,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
-			switch v { //nolint
+			switch v { // nolint
 			case verdict.Retry:
 				logrus.Warnf("metadata '%s:%s' write not acknowledged after %s; considering write lost, retrying...", bucketName, absolutePath, temporal.FormatDuration(timeout+30*time.Second))
 			}

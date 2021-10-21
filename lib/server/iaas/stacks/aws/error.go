@@ -35,7 +35,7 @@ func normalizeError(err error) fail.Error {
 		return nil
 	}
 
-	switch cerr := err.(type) { //nolint
+	switch cerr := err.(type) { // nolint
 	case awserr.Error:
 		switch cerr.Code() {
 		case "InvalidGroupId.Malformed":

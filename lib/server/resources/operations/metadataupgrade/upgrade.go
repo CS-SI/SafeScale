@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -105,9 +106,13 @@ func Upgrade(svc iaas.Service, from, to string, dryRun, doNotBackup bool) fail.E
 
 // BackupMetadata creates a tar.gz archive of svc metadata content, with current date/time in name
 func BackupMetadata(svc iaas.Service, filename string) fail.Error {
-	if filename == "" {
-		filename = fmt.Sprintf("safescale.%s-metadata.backup", svc.GetName())
+	targetFilename := filename
+
+	if targetFilename == "" {
+		targetFilename = fmt.Sprintf("safescale.%s-metadata.backup", svc.GetName())
 	}
+
+	logrus.Warnf("trying to backup metadata into %s", targetFilename)
 
 	return fail.NotImplementedError()
 }

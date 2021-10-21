@@ -133,8 +133,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
-	defaultImage, _ := compute["DefaultImage"].(string)
-	if defaultImage == "" {
+	defaultImage, ok := compute["DefaultImage"].(string)
+	if !ok {
 		defaultImage = ovhDefaultImage
 	}
 

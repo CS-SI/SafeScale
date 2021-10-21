@@ -208,7 +208,10 @@ func qualifyFromBody(in []byte) (fail.Error, fail.Error) {
 	}
 	if errs, ok := jsoned["Errors"].([]interface{}); ok {
 		for _, v := range errs {
-			item := v.(map[string]interface{})
+			item, ok := v.(map[string]interface{})
+			if !ok {
+				return nil, fail.NewError("unable to qualify from body, found %T, expected map[string]interface{}", v)
+			}
 			var details string
 			if details, ok = item["Details"].(string); !ok {
 				details = ""

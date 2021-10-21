@@ -955,9 +955,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", request.HostName)
 						logrus.Errorf(strprocess.Capitalize(msg))
 						ferr = fail.AddConsequence(ferr, fail.Wrap(derr, msg))
-					} else {
-						logrus.Debugf("Cleaning up on failure, deleted Host '%s' successfully.", request.HostName)
+						return
 					}
+					logrus.Debugf("Cleaning up on failure, deleted Host '%s' successfully.", request.HostName)
 				}
 			}()
 
@@ -1042,7 +1042,11 @@ func (s stack) getDefaultSubnetID(request abstract.HostRequest) (string, fail.Er
 	if len(request.Subnets) == 0 {
 		return "", nil
 	}
-	return request.Subnets[0].ID, nil
+	if request.Subnets[0] != nil {
+		return request.Subnets[0].ID, nil
+	}
+
+	return "", fail.InconsistentError("Invalid request: %v", request)
 }
 
 func (s stack) deleteHost(id string) fail.Error {

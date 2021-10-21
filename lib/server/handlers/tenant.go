@@ -192,7 +192,7 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 	}
 
 	var templatesToScan []abstract.HostTemplate
-	if templateNamesToScan != nil { //nolint
+	if templateNamesToScan != nil { // nolint
 		for _, templateName := range templateNamesToScan {
 			template, err := svc.FindTemplateByName(templateName)
 			if err != nil {
@@ -238,8 +238,8 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		derr := network.Delete(task.Context())
 		if derr != nil {
 			logrus.Warnf("Error deleting network '%s'", network.GetID())
+			_ = ferr.AddConsequence(derr)
 		}
-		_ = ferr.AddConsequence(derr)
 	}()
 
 	logrus.Infof("Creating scan subnet: %q", scanSubnetName)
@@ -402,7 +402,7 @@ func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.
 	}
 
 	for _, template := range templates {
-		if templateNamesToScan != nil { //nolint
+		if templateNamesToScan != nil { // nolint
 			for _, givenName := range templateNamesToScan {
 				if givenName == template.Name {
 					resultList = append(resultList, &protocol.ScanResult{

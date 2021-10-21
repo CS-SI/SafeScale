@@ -82,8 +82,8 @@ func Test_normalizeErrorImprovedAndCheckIfRetriable(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-		{"temporal net error", args{in: NewMyError(fmt.Errorf("Encrypted"), true), out: NewMyError(fmt.Errorf("Encrypted"), true)}, true},
-		{"final net error", args{in: NewMyError(fmt.Errorf("Encrypted"), false), out: retry.StopRetryError(NewMyError(fmt.Errorf("Encrypted"), false))}, true},
+		{"temporal net error", args{in: NewMyError(fmt.Errorf("encrypted"), true), out: NewMyError(fmt.Errorf("encrypted"), true)}, true},
+		{"final net error", args{in: NewMyError(fmt.Errorf("encrypted"), false), out: retry.StopRetryError(NewMyError(fmt.Errorf("encrypted"), false))}, true},
 		{"crafted url error", args{in: &url.Error{
 			Op:  "something",
 			URL: "www.google.com",
