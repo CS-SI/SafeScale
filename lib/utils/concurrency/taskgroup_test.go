@@ -161,20 +161,24 @@ func TestIntrospectionWithErrorsWF(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 50; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil)
+		_, err := overlord.Start(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil,
+		)
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 			t.FailNow()
 		}
 	}
 
-	_, err = overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-		time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-		return "waiting game", fail.NewError("something happened")
-	}, nil)
+	_, err = overlord.Start(
+		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+			return "waiting game", fail.NewError("something happened")
+		}, nil,
+	)
 	if err != nil {
 		t.Errorf("Unexpected: %s", err)
 		t.FailNow()
@@ -242,7 +246,10 @@ func TestTimingOnlyOneWF(t *testing.T) {
 
 			begin := time.Now()
 			for ind := 0; ind < gcpressure; ind++ {
-				_, xerr := overlord.Start(taskgen(lower, upper, latency, 0, 0, 0, false), nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+				_, xerr := overlord.Start(
+					taskgen(lower, upper, latency, 0, 0, 0, false), nil, InheritParentIDOption,
+					AmendID(fmt.Sprintf("/child-%d", ind)),
+				)
 				if xerr != nil {
 					t.Errorf("Test %d: Unexpected: %s", index, xerr)
 					t.FailNow()
@@ -261,7 +268,7 @@ func TestTimingOnlyOneWF(t *testing.T) {
 					t.Logf("Launching children took %v", childrenStartDuration)
 				}
 				t.Logf("WaitFor really waited %v/%v", waitForRealDuration, timeout)
-				t.Errorf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
+				t.Logf("Test %d, It should be enough time but it wasn't at iteration #%d", index, iter)
 				failures++
 				if failures > 4 || (rounds > 100 && failures > 4*rounds/100) {
 					t.Errorf("Test %d: too many failures", index)
@@ -275,8 +282,6 @@ func TestTimingOnlyOneWF(t *testing.T) {
 				if res == nil {
 					t.Errorf("unexpected empty result")
 				}
-				//				require.Nil(t, xerr)
-				//				require.NotEmpty(t, res)
 			}
 		}
 	}
@@ -320,7 +325,10 @@ func TestChildrenWaitingGameEnoughTimeAfterWF(t *testing.T) {
 
 			begin := time.Now()
 			for ind := 0; ind < gcpressure; ind++ {
-				_, xerr := overlord.Start(taskgen(lower, upper, latency, 0, 0, 0, false), nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+				_, xerr := overlord.Start(
+					taskgen(lower, upper, latency, 0, 0, 0, false), nil, InheritParentIDOption,
+					AmendID(fmt.Sprintf("/child-%d", ind)),
+				)
 				if xerr != nil {
 					t.Errorf("Test %d: Unexpected: %s", index, xerr)
 					t.FailNow()
@@ -424,11 +432,13 @@ func TestTimeoutStateWF(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 1; ind++ {
-		_, xerr := overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil, 20*time.Millisecond,
-			InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
+		_, xerr := overlord.StartWithTimeout(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil, 20*time.Millisecond,
+			InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)),
+		)
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
@@ -443,7 +453,9 @@ func TestTimeoutStateWF(t *testing.T) {
 	require.Nil(t, xerr)
 	require.NotNil(t, st)
 	if st != RUNNING {
-		t.Errorf("This should be a RUNNING and it's not: %s", st) // VPL: overlord in itself never timed out... expected value is RUNNING
+		t.Errorf(
+			"This should be a RUNNING and it's not: %s", st,
+		) // VPL: overlord in itself never timed out... expected value is RUNNING
 	} // To make TaskGroup times out, you have to use a Deadline on its parent context
 
 	_, res, xerr := overlord.WaitFor(5 * time.Second)
@@ -470,10 +482,12 @@ func TestGrTimeoutStateWF(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 4; ind++ {
-		_, xerr = overlord.StartWithTimeout(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil, 20*time.Millisecond)
+		_, xerr = overlord.StartWithTimeout(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil, 20*time.Millisecond,
+		)
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
@@ -525,10 +539,12 @@ func TestChildrenWaitingGameWF(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 50; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil)
+		_, err := overlord.Start(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil,
+		)
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		}
@@ -552,10 +568,12 @@ func TestChildrenHaveDistinctIDsWF(t *testing.T) {
 	dictOfIDs := make(map[string]int)
 
 	for ind := 0; ind < numTasks; ind++ {
-		subtaskID, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
-			return "waiting game", nil
-		}, nil)
+		subtaskID, err := overlord.Start(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				time.Sleep(time.Duration(randomInt(50, 250)) * time.Millisecond)
+				return "waiting game", nil
+			}, nil,
+		)
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		} else {
@@ -594,15 +612,17 @@ func TestChildrenWaitingGameWithPanicWF(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 50; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := randomInt(50, 250)
-			time.Sleep(time.Duration(rint) * time.Millisecond)
-			if rint > 100 {
-				panic("Panic protection is needed")
-			}
+		_, err := overlord.Start(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				rint := randomInt(50, 250)
+				time.Sleep(time.Duration(rint) * time.Millisecond)
+				if rint > 100 {
+					panic("Panic protection is needed")
+				}
 
-			return "waiting game", nil
-		}, nil)
+				return "waiting game", nil
+			}, nil,
+		)
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		}
@@ -637,15 +657,17 @@ func TestChildrenWaitingGameWithRandomErrorWF(t *testing.T) {
 	require.NotEmpty(t, theID)
 
 	for ind := 0; ind < 50; ind++ {
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := randomInt(50, 250)
-			time.Sleep(time.Duration(rint) * time.Millisecond)
-			if rint > 55 {
-				return "", fail.NewError("suck it")
-			}
+		_, err := overlord.Start(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				rint := randomInt(50, 250)
+				time.Sleep(time.Duration(rint) * time.Millisecond)
+				if rint > 55 {
+					return "", fail.NewError("suck it")
+				}
 
-			return "waiting game", nil
-		}, nil)
+				return "waiting game", nil
+			}, nil,
+		)
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		}
@@ -671,14 +693,16 @@ func TestOneErrorOneOkWF(t *testing.T) {
 			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
 
 			return "waiting game", nil
-		}, nil)
+		}, nil,
+	)
 	_, err = overlord.Start(
 		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := randomInt(30, 50)
 			time.Sleep(time.Duration(rint) * 10 * time.Millisecond)
 
 			return nil, fail.NewError("Ouch")
-		}, nil)
+		}, nil,
+	)
 	_, _, err = overlord.WaitGroupFor(5 * time.Second)
 	if err != nil {
 		repr := err.Error()
@@ -726,12 +750,14 @@ func TestChildrenWaitingGameWithTimeoutsWF(t *testing.T) {
 
 	for ind := 0; ind < 100; ind++ {
 		fmt.Println("Iterating...")
-		_, err := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-			rint := time.Duration(randomInt(300, 500)) * time.Millisecond
-			fmt.Printf("Entering (sleeping %v)\n", rint)
-			time.Sleep(rint)
-			return "waiting game", nil
-		}, nil)
+		_, err := overlord.Start(
+			func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+				rint := time.Duration(randomInt(300, 500)) * time.Millisecond
+				fmt.Printf("Entering (sleeping %v)\n", rint)
+				time.Sleep(rint)
+				return "waiting game", nil
+			}, nil,
+		)
 		if err != nil {
 			t.Errorf("Unexpected: %s", err)
 		}
@@ -825,20 +851,22 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingInParallelWF(t *testing.T) {
 		for ind := 0; ind < 100; ind++ {
 			fmt.Println("Iterating...")
 			rint := time.Duration(rand.Intn(20)+30) * 10 * time.Millisecond
-			_, xerr := overlord.Start(func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
-				delay := parameters.(time.Duration)
-				fmt.Printf("Entering (waiting %v)\n", delay)
-				defer fmt.Println("Exiting")
+			_, xerr := overlord.Start(
+				func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
+					delay := parameters.(time.Duration)
+					fmt.Printf("Entering (waiting %v)\n", delay)
+					defer fmt.Println("Exiting")
 
-				dur := delay / 100
-				for i := 0; i < 100; i++ {
-					if t.Aborted() {
-						break
+					dur := delay / 100
+					for i := 0; i < 100; i++ {
+						if t.Aborted() {
+							break
+						}
+						time.Sleep(dur)
 					}
-					time.Sleep(dur)
-				}
-				return "waiting game", nil
-			}, rint)
+					return "waiting game", nil
+				}, rint,
+			)
 			if xerr != nil {
 				t.Errorf("Unexpected: %s", xerr)
 			}
