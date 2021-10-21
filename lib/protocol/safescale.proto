@@ -385,6 +385,7 @@ message Host {
 	string password = 13;
 	int32 ssh_port = 14;
 	string state_label = 15;
+	string creation_date = 16;
 }
 
 message HostStatus {
