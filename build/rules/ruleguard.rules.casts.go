@@ -25,7 +25,7 @@ import "github.com/quasilyte/go-ruleguard/dsl"
 
 func uncheckedCast(m dsl.Matcher) {
 	m.Match(`$x := $y.($z)`, `$x = $y.($z)`).Where(!m.File().Name.Matches(`.*test.go`)).
-		Report(`unchecked cast to $z, when this breaks, it panics... and adding 3 lines of code to prevent a panic is always, always, worths it`)
+		Report(`unchecked cast to $z, when this breaks, it panics... and adding 3 lines of code to prevent a panic is always, always, worthy`)
 }
 
 func ignoredCastError(m dsl.Matcher) {
@@ -35,10 +35,10 @@ func ignoredCastError(m dsl.Matcher) {
 
 func intermediateCast(m dsl.Matcher) {
 	m.Match(`$x := $y.($z).$w`, `$x = $y.($z).$w`).Where(!m.File().Name.Matches(`.*test.go`)).
-		Report(`unchecked cast to $z, then accessing a field, it's a panic waiting to happen... and adding 3 lines of code to prevent a panic is always, always, worths it`)
+		Report(`unchecked cast to $z, then accessing a field, it's a panic waiting to happen... and adding 3 lines of code to prevent a panic is always, always, worthy`)
 }
 
 func intermediateCastWithFunc(m dsl.Matcher) {
 	m.Match(`$x := $y.($z).$w($*_)`, `$x = $y.($z).$w($*_)`).Where(!m.File().Name.Matches(`.*test.go`)).
-		Report(`unchecked cast to $z, then calling a function, it's a panic waiting to happen... and adding 3 lines of code to prevent a panic is always, always, worths it`)
+		Report(`unchecked cast to $z, then calling a function, it's a panic waiting to happen... and adding 3 lines of code to prevent a panic is always, always, worthy`)
 }
