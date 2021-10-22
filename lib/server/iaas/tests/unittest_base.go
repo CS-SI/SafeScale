@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
-	libvirt "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/outscale"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -46,7 +45,6 @@ import (
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/gcp"            // Imported to initialize tenant gcp
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialize tenant local
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekom
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/outscale"       // Imported to initialize tenant outscale
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/ovh"            // Imported to initialize tenant ovh
@@ -64,7 +62,6 @@ func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	stack = aws.NullStack()         // nolint
 	stack = gcp.NullStack()         // nolint
 	stack = huaweicloud.NullStack() // nolint
-	stack = libvirt.NullStack()     // nolint
 	stack = openstack.NullStack()   // nolint
 	stack = outscale.NullStack()    // nolint
 
