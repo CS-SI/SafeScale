@@ -97,7 +97,7 @@ endif
 endif
 
 ifeq ($(OS),Windows_NT)
-MAKE=mingw32-make.exe
+MAKE=C:/ProgramData/chocolatey/lib/mingw/tools/install/mingw64/bin/mingw32-make.exe
 else
 MAKE=make
 endif
