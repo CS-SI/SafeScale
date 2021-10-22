@@ -281,43 +281,6 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 			return nil, xerr
 		}
 
-		// is.Worker.startTime = time.Now()
-		//
-		// cloneV := v.Clone()
-		// cloneV["HostIP"], xerr = h.GetPrivateIP()
-		// xerr = debug.InjectPlannedFail(xerr)
-		// if xerr != nil {
-		// 	return nil, xerr
-		// }
-		//
-		// cloneV["ShortHostname"] = h.GetName()
-		// domain := ""
-		// xerr = h.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// 	return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-		// 		hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-		// 		if !ok {
-		// 			return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		// 		}
-		//
-		// 		domain = hostDescriptionV1.Domain
-		// 		if domain != "" {
-		// 			domain = "." + domain
-		// 		}
-		// 		return nil
-		// 	})
-		// })
-		// xerr = debug.InjectPlannedFail(xerr)
-		// if xerr != nil {
-		// 	return nil, xerr
-		// }
-		//
-		// cloneV["Hostname"] = h.GetName() + domain
-		// cloneV, xerr = realizeVariables(cloneV)
-		// xerr = debug.InjectPlannedFail(xerr)
-		// if xerr != nil {
-		// 	return nil, xerr
-		// }
-
 		subtask, xerr = concurrency.NewTaskWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s", h.GetName())))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -376,74 +339,28 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 		clonedV, xerr = is.initLoopTurnForHost(h, v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Warnf("aborting because of %s", xerr.Error())
-			_ = tg.Abort()
+			abErr := tg.AbortWithCause(xerr)
+			if abErr != nil {
+				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+			}
 			break
 		}
-
-		// is.Worker.startTime = time.Now()
-		//
-		// cloneV := v.Clone()
-		// cloneV["HostIP"], xerr = h.GetPrivateIP()
-		// xerr = debug.InjectPlannedFail(xerr)
-		// if xerr != nil {
-		// 	logrus.Warnf("aborting because of %s", xerr.Error())
-		// 	_ = tg.Abort()
-		// 	break
-		// }
-		//
-		// cloneV["ShortHostname"] = h.GetName()
-		// domain := ""
-		// xerr = h.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		// 	return props.Inspect(hostproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
-		// 		hostDescriptionV1, ok := clonable.(*propertiesv1.HostDescription)
-		// 		if !ok {
-		// 			return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		// 		}
-		//
-		// 		domain = hostDescriptionV1.Domain
-		// 		if domain != "" {
-		// 			domain = "." + domain
-		// 		}
-		// 		return nil
-		// 	})
-		// })
-		// xerr = debug.InjectPlannedFail(xerr)
-		// if xerr != nil {
-		// 	logrus.Warnf("aborting because of %s", xerr.Error())
-		// 	_ = tg.Abort()
-		// 	break
-		// }
-		//
-		// cloneV["Hostname"] = h.GetName() + domain
-		// cloneV, xerr = realizeVariables(cloneV)
-		// xerr = debug.InjectPlannedFail(xerr)
-		// if xerr != nil {
-		// 	logrus.Warnf("aborting because of %s", xerr.Error())
-		// 	_ = tg.Abort()
-		// 	break
-		// }
 
 		subtask, xerr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Warnf("aborting because of %s", xerr.Error())
-			_ = tg.Abort()
+			abErr := tg.AbortWithCause(xerr)
+			if abErr != nil {
+				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+			}
 			break
 		}
 
 		subtasks[h.GetName()] = subtask
 	}
 
-	tgr, werr := tg.WaitGroup()
-	werr = debug.InjectPlannedFail(werr)
-	if werr != nil {
-		if xerr != nil {
-			_ = xerr.AddConsequence(werr)
-		} else {
-			xerr = werr
-		}
-	}
+	tgr, xerr := tg.WaitGroup()
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if len(subtasks) != len(hosts) {
 			logrus.Errorf("TBR: no matter what, this should fail because something happened starting tasks")
@@ -456,7 +373,7 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 			outcome := tgr[sid]
 			if outcome != nil {
 				oko := outcome.(stepResult)
-				logrus.Warnf("TBR: output '%s' and err '%v'", oko.output, oko.err)
+				logrus.Warningf("TBR: output '%s' and err '%v'", oko.output, oko.err)
 				if oko.err != nil {
 					wrongs++
 					continue
@@ -468,9 +385,10 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 			}
 		}
 		if wrongs == 0 && (len(subtasks) == len(hosts)) {
-			logrus.Warnf("TBR: this is BAD")
+			logrus.Warningf("TBR: this is BAD, there is a discrepancy between WaitGroup and its individual results")
 		}
 	}
+
 	for k, s := range subtasks {
 		sid, _ := s.ID()
 		outcome := tgr[sid]

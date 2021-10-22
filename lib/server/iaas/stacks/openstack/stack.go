@@ -55,7 +55,7 @@ type Stack struct {
 }
 
 // NullStack returns a null value of the stack
-func NullStack() *Stack { //nolint
+func NullStack() *Stack { // nolint
 	return &Stack{}
 }
 

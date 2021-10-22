@@ -635,7 +635,9 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 // InspectHost updates the data inside host with the data from provider
 // Returns:
 // - *abstract.HostFull, nil if no error occurs
-func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, xerr fail.Error) {
+func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostFull, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
@@ -647,23 +649,19 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	}
 
 	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
-	// Note: if xerr != nil AND server != nil, server still contains meaningful information that may be useful
-	if server == nil {
-		if xerr == nil {
-			xerr = abstract.ResourceNotFoundError("host", hostRef)
-		}
+	if xerr != nil {
 		return nullAHF, xerr
 	}
 
-	var cerr fail.Error
-	host, cerr = s.complementHost(ahf.Core, server)
-	if cerr != nil {
-		if xerr != nil {
-			_ = xerr.AddConsequence(cerr)
-		} else {
-			xerr = cerr
-		}
+	if server == nil {
+		return nullAHF, abstract.ResourceNotFoundError("host", hostRef)
 	}
+
+	host, xerr = s.complementHost(ahf.Core, server)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	if !host.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
@@ -1069,8 +1067,8 @@ func (s stack) attachFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Erro
 		derr := s.DeleteFloatingIP(fip.ID)
 		if derr != nil {
 			logrus.Warnf("Error deleting floating ip: %v", derr)
+			_ = xerr.AddConsequence(derr)
 		}
-		_ = xerr.AddConsequence(derr)
 		return nil, xerr
 	}
 

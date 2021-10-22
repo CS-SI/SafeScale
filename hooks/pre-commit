@@ -14,6 +14,9 @@ if [ -x ./git-hooks-env ]; then
     . ./git-hooks-env
 fi
 
+# If we don't find make, don't fail
+which make || exit 0
+
 # Make sure format and build are OK
 make gofmt checkbuild
 RESULT=$?

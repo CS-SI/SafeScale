@@ -276,8 +276,8 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 	return nil
 }
 
-//// CreateNetworkTest test
-//func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
+// // CreateNetworkTest test
+// func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
 //	// Get initial number of networks
 //	nets, err := tester.Service.ListNetworks()
 //	require.Nil(t, err)
@@ -309,7 +309,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 //	require.Nil(t, err)
 //
 //	require.True(t, networkFound)
-//}
+// }
 
 // Networks test
 func (tester *ServiceTester) Networks(t *testing.T) {
@@ -372,8 +372,8 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	assert.Equal(t, n1.Name, network1.Name)
 }
 
-//// CreateSubnetTest test
-//func (tester *ServiceTester) CreateSubnetTest(t *testing.T) {
+// // CreateSubnetTest test
+// func (tester *ServiceTester) CreateSubnetTest(t *testing.T) {
 //	// Get initial number of subnets
 //	subnets, err := tester.Service.ListSubnets(networkID)
 //	require.Nil(t, err)
@@ -405,7 +405,7 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 //	defer func() {
 //		_ = tester.Service.DeleteSubnet(subnet1.ID)
 //	}()
-//}
+// }
 
 // Subnets test
 func (tester *ServiceTester) Subnets(t *testing.T) {

@@ -23,10 +23,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-//const (
+// const (
 //	DefaultSecurityGroupName        string = "safescale-default-sg"
 //	DefaultSecurityGroupDescription string = "Default Security Group for SafeScale resources"
-//)
+// )
 
 // SecurityGroupParameter can represent a Security Group by a string as ID or an *abstract.SecurityGroup
 type SecurityGroupParameter interface{}
@@ -66,7 +66,7 @@ func DefaultTCPRules(sshPort int32) []abstract.SecurityGroupRule {
 			Description: "Ingress: TCP4: Allow everything",
 			Direction:   securitygroupruledirection.Ingress,
 			PortFrom:    sshPort,
-			//PortTo:      sshPort,
+			// PortTo:      sshPort,
 			EtherType: ipversion.IPv4,
 			Protocol:  "tcp",
 			Targets:   []string{"0.0.0.0/0"},
@@ -75,7 +75,7 @@ func DefaultTCPRules(sshPort int32) []abstract.SecurityGroupRule {
 			Description: "Ingress: TCP6: Allow everything",
 			Direction:   securitygroupruledirection.Ingress,
 			PortFrom:    sshPort,
-			//PortTo:      sshPort,
+			// PortTo:      sshPort,
 			EtherType: ipversion.IPv6,
 			Protocol:  "tcp",
 			Targets:   []string{"::/0"},

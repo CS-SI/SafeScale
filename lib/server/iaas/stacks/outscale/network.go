@@ -543,7 +543,7 @@ func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 
 	resp, xerr := s.rpcReadNics("", hostID)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
 			// No nics found, considered as a success and returns empty slices
 			debug.IgnoreError(xerr)

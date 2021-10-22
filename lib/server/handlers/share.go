@@ -57,7 +57,7 @@ func NewShareHandler(job server.Job) ShareHandler {
 	return &shareHandler{job: job}
 }
 
-func sanitize(in string) (string, fail.Error) { //nolint
+func sanitize(in string) (string, fail.Error) { // nolint
 	sanitized := path.Clean(in)
 	if !path.IsAbs(sanitized) {
 		return "", fail.InvalidRequestError("exposed path must be absolute")

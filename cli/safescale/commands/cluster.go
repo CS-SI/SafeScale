@@ -159,8 +159,6 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 					urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
 				}
 				config["remote_desktop"] = urls
-			} else {
-				remotedesktopInstalled = false
 			}
 		} else {
 			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
@@ -1202,8 +1200,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		var nodeList []string
-		nodeList = c.Args().Tail()
+		nodeList := c.Args().Tail()
 		yes := c.Bool("yes")
 		force := c.Bool("force")
 

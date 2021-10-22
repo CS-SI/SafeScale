@@ -64,7 +64,7 @@ var (
 )
 
 // NewJob creates a new instance of struct Job
-func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (_ *job, xerr fail.Error) { //nolint
+func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, description string) (_ *job, xerr fail.Error) { // nolint
 	defer fail.OnPanic(&xerr)
 
 	if ctx == nil {

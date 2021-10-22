@@ -40,7 +40,7 @@ type extendedLogger interface {
 	Errorf(string, ...interface{})
 }
 
-type dumper interface { //nolint
+type dumper interface { // nolint
 	Dump() string
 }
 
@@ -168,7 +168,7 @@ func (tunnel *SSHTunnel) netListenWithTimeout(network, address string, timeout t
 			resLis: theCli,
 			resErr: theErr,
 		}
-		return //nolint
+		return // nolint
 	}()
 
 	if timeout != 0 {
@@ -212,7 +212,11 @@ func (tunnel *SSHTunnel) Start() (err error) {
 
 	tunnel.isOpen = true
 	if tunnel.local.Port() == 0 {
-		tunnel.local.port = listener.Addr().(*net.TCPAddr).Port
+		tcpAddr, ok := listener.Addr().(*net.TCPAddr)
+		if !ok {
+			return fmt.Errorf("failure casting to *net.TCPAddr")
+		}
+		tunnel.local.port = tcpAddr.Port
 	}
 	tunnel.mu.Unlock()
 
@@ -242,7 +246,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 				defer close(errCh)
 				errCh <- cwErr
 			}
-			return //nolint
+			return // nolint
 		}()
 
 		tunnel.logf("listening for new ssh connections...")
@@ -289,7 +293,7 @@ func (tunnel *SSHTunnel) Start() (err error) {
 					tunnel.errorf("closing tunnel due to failure forwarding tunnel: %s", litter.Sdump(quittingErr))
 					tunnel.Close()
 				}
-				return //nolint
+				return // nolint
 			}()
 		}
 	}
@@ -388,7 +392,7 @@ func (tunnel *SSHTunnel) dialSSHWithTimeout(
 			resCli: theCli,
 			resErr: theErr,
 		}
-		return //nolint
+		return // nolint
 	}()
 
 	if timeout != 0 {
@@ -438,7 +442,7 @@ func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
 			resConn: theConn,
 			resErr:  theErr,
 		}
-		return //nolint
+		return // nolint
 	}()
 
 	if timeout != 0 {
@@ -534,7 +538,7 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 			default:
 				updown <- true
 			}
-			return //nolint
+			return // nolint
 		}()
 		select {
 		case <-endCopy:
@@ -599,7 +603,7 @@ func (tunnel *SSHTunnel) Close() {
 		tunnel.closer <- struct{}{}
 		close(tunnel.closer)
 	}
-	return //nolint
+	return // nolint
 }
 
 func NewSSHTunnelFromCfg(gw SSHJump, target Endpoint, local Entrypoint, options ...Option) (_ *SSHTunnel, err error) {

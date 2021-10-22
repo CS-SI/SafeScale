@@ -323,6 +323,7 @@ func (pbc *PipeBridgeController) Stop() fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrAborted:
 				// do nothing
+				debug.IgnoreError(xerr)
 			default:
 				return xerr
 			}

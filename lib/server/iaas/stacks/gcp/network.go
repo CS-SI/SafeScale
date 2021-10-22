@@ -449,7 +449,7 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.E
 	if networkRef != "" {
 		an, xerr = s.InspectNetwork(networkRef)
 		if xerr != nil {
-			switch xerr.(type) { //nolint
+			switch xerr.(type) { // nolint
 			case *fail.ErrNotFound:
 				an, xerr = s.InspectNetworkByName(networkRef)
 				if xerr != nil {

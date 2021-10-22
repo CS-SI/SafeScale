@@ -357,9 +357,9 @@ func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, dur
 		if derr != nil {
 			if xerr == nil {
 				xerr = derr
-			} else {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+				return
 			}
+			_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 		}
 	}()
 

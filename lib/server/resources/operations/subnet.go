@@ -197,7 +197,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 			}
 		}
 
-		if networkInstance != nil { //nolint
+		if networkInstance != nil { // nolint
 			// Network metadata loaded, find the ID of the Subnet (subnetRef may be ID or Name)
 			xerr = networkInstance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Inspect(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -831,6 +831,10 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		abErr := tg.AbortWithCause(xerr)
+		if abErr != nil {
+			logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+		}
 		return xerr
 	}
 
@@ -848,9 +852,9 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			abErr := tg.Abort()
+			abErr := tg.AbortWithCause(xerr)
 			if abErr != nil {
-				logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 		}
 	}
@@ -1095,7 +1099,10 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return xerr
+		abErr := tg.AbortWithCause(xerr)
+		if abErr != nil {
+			logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+		}
 	}
 
 	if req.HA {
@@ -1105,9 +1112,9 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			abErr := tg.Abort()
+			abErr := tg.AbortWithCause(xerr)
 			if abErr != nil {
-				logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 		}
 	}
@@ -1144,6 +1151,8 @@ func (instance *Subnet) bindInternalSecurityGroupToGateway(ctx context.Context, 
 
 // undoBindInternalSecurityGroupToGateway does what its name says
 func (instance *Subnet) undoBindInternalSecurityGroupToGateway(ctx context.Context, host resources.Host, keepOnFailure bool, xerr *fail.Error) {
+	// FIXME: Use ctx the right way
+
 	if xerr != nil && *xerr != nil && keepOnFailure {
 		_ = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			as, ok := clonable.(*abstract.Subnet)
@@ -1321,7 +1330,7 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 		})
 	} else {
 		rn = nil
-		switch xerr.(type) { //nolint
+		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
 			if !svc.HasDefaultNetwork() {
 				return nil, nil, xerr

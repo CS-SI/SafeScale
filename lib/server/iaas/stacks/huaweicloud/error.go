@@ -34,10 +34,10 @@ func normalizeError(err error) fail.Error {
 		return nil
 	}
 
-	switch lvl1 := err.(type) { //nolint
+	switch lvl1 := err.(type) { // nolint
 	case fail.Error:
 		if cause := lvl1.Cause(); cause != nil {
-			switch lvl2 := cause.(type) { //nolint
+			switch lvl2 := cause.(type) { // nolint
 			case gophercloud.ErrDefault400:
 				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.Body))
 			}
@@ -49,7 +49,7 @@ func normalizeError(err error) fail.Error {
 // reduceHuaweicloudError ...
 func reduceHuaweicloudError(in []byte) (xerr fail.Error) {
 	defer func() {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) { // nolint
 		case *fail.ErrRuntimePanic:
 			xerr = fail.InvalidRequestError(string(in))
 		}

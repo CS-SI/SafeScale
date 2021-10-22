@@ -96,7 +96,7 @@ type stack struct {
 }
 
 // NullStack returns a null value of the stack
-func NullStack() *stack { //nolint
+func NullStack() *stack { // nolint
 	return &stack{}
 }
 
@@ -106,7 +106,7 @@ func (s stack) GetStackName() string {
 }
 
 // New creates a new stack
-func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { //nolint
+func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
 	if options == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("options")
 	}

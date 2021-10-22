@@ -589,7 +589,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			problem = xerr
-			abErr := subtask.Abort()
+			abErr := subtask.AbortWithCause(xerr)
 			if abErr != nil {
 				logrus.Warn("problem aborting task")
 			}
@@ -1027,8 +1027,13 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		secondaryGatewayVariables = w.variables.Clone()
 	}
 	for _, r := range rules {
-
-		rule := r.(map[interface{}]interface{})
+		if r == nil {
+			continue
+		}
+		rule, ok := r.(map[interface{}]interface{})
+		if !ok {
+			return fail.InconsistentError("wrong r type %T, it should be a map[interface{}]interface{}", r)
+		}
 		targets := w.interpretRuleTargets(rule)
 		hosts, xerr := w.identifyHosts(ctx, targets)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -1043,7 +1048,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			}
 		}(hosts)
 
-		for _, h := range hosts {
+		for _, h := range hosts { // make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
 			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -1078,30 +1083,44 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 				return xerr
 			}
 
+			right := false
+			waited := false
+
+			// FIXME: Refactoring, this defer is actually dangerous
+			// each host iteration will trigger a defer function, and ALL the functions run at the same time at the end, triggered by the ferr error
+			// shared by everyone, this it clearly a bad idea, this needs refactoring
+			defer func(tag concurrency.TaskGroup, iwaited *bool, iright *bool) {
+				if ferr != nil {
+					if !*iright { // not for us
+						return
+					}
+
+					logrus.Warnf("aborting, then waiting because of %s", ferr.Error())
+					if !tag.Aborted() {
+						abErr := tag.AbortWithCause(ferr)
+						if abErr != nil {
+							_ = ferr.AddConsequence(fail.Wrap(abErr, "cleaning up on failure, failed to abort TaskGroup"))
+						}
+					}
+
+					if !*iwaited {
+						_, derr := tag.WaitGroup()
+						if derr != nil {
+							_ = ferr.AddConsequence(derr)
+						}
+					}
+				}
+			}(tg, &waited, &right)
+
 			_, xerr = tg.Start(taskApplyProxyRule, taskApplyProxyRuleParameters{
 				controller: primaryKongController,
 				rule:       r.(map[interface{}]interface{}),
 				variables:  &primaryGatewayVariables,
 			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/apply", primaryKongController.GetHostname())))
 			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return fail.Wrap(xerr, "failed to apply proxy rules")
+			if xerr != nil { // we should abort then wait, but the previous defer takes care of it
+				return xerr
 			}
-
-			defer func() {
-				if ferr != nil {
-					logrus.Warnf("aborting because of %s", xerr.Error())
-					derr := tg.Abort()
-					if derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to abort TaskGroup"))
-					} else {
-						_, derr = tg.WaitGroup()
-						if derr != nil {
-							_ = ferr.AddConsequence(derr)
-						}
-					}
-				}
-			}()
 
 			if secondaryKongController != nil {
 				secondaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
@@ -1138,15 +1157,18 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 					rule:       rule,
 					variables:  &secondaryGatewayVariables,
 				}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/apply", secondaryKongController.GetHostname())))
-				if xerr != nil {
+				if xerr != nil { // we should abort then wait, but defer above takes care of it
 					return xerr
 				}
 			}
 
+			waited = true
 			_, xerr = tg.WaitGroup()
 			if xerr != nil {
 				return xerr
 			}
+
+			right = true
 		}
 	}
 	return nil

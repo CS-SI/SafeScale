@@ -36,11 +36,11 @@ type stack struct {
 }
 
 // NullStack is not exposed through API, is needed essentially by testss
-func NullStack() *stack { //nolint
+func NullStack() *stack { // nolint
 	return &stack{}
 }
 
-func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { //nolint
+func New(auth stacks.AuthenticationOptions, localCfg stacks.LocalConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	return nil, gError
 }
 

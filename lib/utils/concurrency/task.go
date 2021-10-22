@@ -78,6 +78,7 @@ type TaskGuard interface {
 // TaskCore is the interface of core methods to control Task and TaskGroup
 type TaskCore interface {
 	Abort() fail.Error
+	AbortWithCause(fail.Error) fail.Error
 	Abortable() (bool, fail.Error)
 	Aborted() bool
 	DisarmAbortSignal() func()
@@ -1287,6 +1288,35 @@ func (instance *task) Abort() (err fail.Error) {
 	instance.forceAbort()
 	instance.lock.Lock()
 	instance.err = fail.AbortedError(nil)
+	instance.lock.Unlock()
+	return nil
+}
+
+func (instance *task) AbortWithCause(cerr fail.Error) (err fail.Error) {
+	if instance.IsNull() {
+		return fail.InvalidInstanceError()
+	}
+
+	instance.lock.RLock()
+	status := instance.status
+	tid := instance.id
+	abortDisarmed := instance.abortDisengaged
+	instance.lock.RUnlock()
+
+	// If abort signal is disengaged, return an error
+	if abortDisarmed {
+		return fail.NotAvailableError("abort signal is disengaged on task %s", tid)
+	}
+
+	// If Task is not started, nothing to Abort, fail.
+	if status == READY {
+		return fail.InvalidRequestError("abort signal cannot be used, Task is not started")
+	}
+
+	// force abort when something is started
+	instance.forceAbort()
+	instance.lock.Lock()
+	instance.err = fail.AbortedError(cerr)
 	instance.lock.Unlock()
 	return nil
 }

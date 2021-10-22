@@ -289,14 +289,21 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 							concurrency.AmendID(fmt.Sprintf("/host/%s/delete", captured.Name)),
 						)
 						if tgerr != nil {
-							cleanFailure = true
 							_ = ferr.AddConsequence(tgerr)
+							abErr := tg.AbortWithCause(tgerr)
+							if abErr != nil {
+								logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+							}
+							cleanFailure = true
+							break
 						}
 					}
 				}
 
 				// FIXME: WaitGroupFor NEEDS more UT
-				if _, _, tgerr = tg.WaitGroupFor(temporal.GetLongOperationTimeout()); tgerr != nil {
+				_, _, tgerr = tg.WaitGroupFor(temporal.GetLongOperationTimeout())
+				tgerr = debug.InjectPlannedFail(tgerr)
+				if tgerr != nil {
 					cleanFailure = true
 					_ = ferr.AddConsequence(tgerr)
 				}
@@ -936,8 +943,7 @@ func (instance *Cluster) createHostResources(
 			// On error, instructs Tasks/TaskGroups to abort, to stop as soon as possible
 			for _, v := range startedTasks {
 				if !v.Aborted() {
-					logrus.Warnf("aborting because of %s", ferr.Error())
-					cleanErr := v.Abort()
+					cleanErr := v.AbortWithCause(ferr)
 					if cleanErr != nil {
 						cleanErr = fail.Wrap(
 							cleanErr,
@@ -1104,10 +1110,17 @@ func (instance *Cluster) createHostResources(
 									derr, "cleaning up on failure, failed to delete master '%s'", captured.Name,
 								),
 							)
+							abErr := tg.AbortWithCause(derr)
+							if abErr != nil {
+								logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+							}
+							break
 						}
 					}
 				}
-				if _, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout()); derr != nil {
+				_, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout())
+				derr = debug.InjectPlannedFail(derr)
+				if derr != nil {
 					_ = ferr.AddConsequence(
 						fail.Wrap(
 							derr, "cleaning up on failure, failed to wait for master deletions",
@@ -1182,10 +1195,17 @@ func (instance *Cluster) createHostResources(
 									derr, "cleaning up on failure, failed to delete node '%s'", captured.Name,
 								),
 							)
+							abErr := tg.AbortWithCause(derr)
+							if abErr != nil {
+								logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+							}
+							break
 						}
 					}
 				}
-				if _, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout()); derr != nil {
+				_, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout())
+				derr = debug.InjectPlannedFail(derr)
+				if derr != nil {
 					_ = ferr.AddConsequence(
 						fail.Wrap(
 							derr, "cleaning up on failure, failed to wait for node deletions",
@@ -1656,10 +1676,9 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 		ierr = debug.InjectPlannedFail(ierr)
 		if ierr != nil {
 			collectedErs = append(collectedErs, ierr)
-			logrus.Warnf("Aborting master creations because one master task didn't start: %v", ierr)
-			abErr := tg.Abort()
+			abErr := tg.AbortWithCause(ierr)
 			if abErr != nil {
-				logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 			break
 		}
@@ -1667,6 +1686,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 
 	var tr concurrency.TaskGroupResult
 	tr, xerr = tg.WaitGroup()
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
 			logrus.Warnf("TBR: Timeouts !!")
@@ -2032,9 +2052,8 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 		host, xerr := LoadHost(instance.GetService(), capturedMaster.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Warnf("failed to get metadata of Host: %s", xerr.Error())
 			loadErrors = append(loadErrors, xerr)
-			abErr := tg.Abort()
+			abErr := tg.AbortWithCause(xerr)
 			if abErr != nil {
 				logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
@@ -2056,11 +2075,10 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			// a return here (unless is the first for iteration) will likely leave unchecked started tasks
-			logrus.Warnf("Aborting because of %v", xerr)
 			taskErrors = append(taskErrors, xerr)
-			abErr := tg.Abort()
+			abErr := tg.AbortWithCause(xerr)
 			if abErr != nil {
-				logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 			break
 		}
@@ -2227,21 +2245,21 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Warnf("aborting because of %s", xerr.Error())
-			abErr := tg.Abort()
+			abErr := tg.AbortWithCause(xerr)
 			if abErr != nil {
-				logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 			break
 		}
 	}
 
-	tr, err := tg.WaitGroup()
-	if err != nil {
+	tr, xerr := tg.WaitGroup()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
 		if withTimeout(xerr) {
 			logrus.Warnf("TBR: Timeouts !!")
 		}
-		rerr := fail.NewError("[Cluster %s] failed to create nodes(s): %s", instance.GetName(), err)
+		rerr := fail.NewError("[Cluster %s] failed to create nodes(s): %s", instance.GetName(), xerr)
 		return nil, rerr
 	}
 
@@ -2616,10 +2634,9 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 		if xerr != nil {
 			// a return here (unless is the first for iteration) will likely leave unchecked started tasks, which is bad
 			startErrs = append(startErrs, xerr)
-			logrus.Warnf("aborting because of %v", xerr)
-			abErr := tg.Abort()
+			abErr := tg.AbortWithCause(xerr)
 			if abErr != nil {
-				logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 			break
 		}

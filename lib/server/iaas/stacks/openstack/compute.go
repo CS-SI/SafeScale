@@ -872,9 +872,9 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
 					_ = xerr.AddConsequence(derr)
 					logrus.Error(derr.Error())
-				} else {
-					logrus.Debugf("Cleaning up on failure, floating ip '%s' successfully deleted", ip.ID)
+					return
 				}
+				logrus.Debugf("Cleaning up on failure, floating ip '%s' successfully deleted", ip.ID)
 			}
 		}()
 

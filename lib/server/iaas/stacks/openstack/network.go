@@ -514,7 +514,7 @@ func (s Stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 	if networkRef != "" {
 		an, xerr = s.InspectNetwork(networkRef)
 		if xerr != nil {
-			switch xerr.(type) { //nolint
+			switch xerr.(type) { // nolint
 			case *fail.ErrNotFound:
 				an, xerr = s.InspectNetworkByName(networkRef)
 				if xerr != nil {

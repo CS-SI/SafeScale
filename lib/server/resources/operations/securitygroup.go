@@ -295,8 +295,8 @@ func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstra
 // Create creates a new SecurityGroup and its metadata.
 // If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a SecurityGroup, returns fail.ErrNotAvailable
-func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
@@ -598,9 +598,9 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 			_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", hostInstance.GetName())))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				abErr := tg.Abort()
+				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -701,9 +701,9 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 			_, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, taskUnbindFromHostsAttachedToSubnetParams{subnetName: k, subnetHosts: subnetHosts}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/subnet/%s/unbind", k)))
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				abErr := tg.Abort()
+				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
@@ -1392,14 +1392,15 @@ func (instance *SecurityGroup) enableOnHostsAttachedToSubnet(task concurrency.Ta
 
 		for _, v := range subnetHosts.ByID {
 			if _, innerXErr := tg.Start(instance.taskBindEnabledOnHost, v); innerXErr != nil {
-				abErr := tg.Abort()
+				abErr := tg.AbortWithCause(innerXErr)
 				if abErr != nil {
-					logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
 		}
 		_, innerXErr := tg.WaitGroup()
+		innerXErr = debug.InjectPlannedFail(innerXErr)
 		return innerXErr
 	}
 	return nil
@@ -1417,14 +1418,15 @@ func (instance *SecurityGroup) disableOnHostsAttachedToSubnet(task concurrency.T
 		for _, v := range subnetHosts.ByID {
 			_, xerr = tg.Start(instance.taskBindDisabledOnHost, v)
 			if xerr != nil {
-				abErr := tg.Abort()
+				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
 		}
 		_, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
 		return xerr
 	}
 	return nil
@@ -1442,14 +1444,15 @@ func (instance *SecurityGroup) unbindFromHostsAttachedToSubnet(task concurrency.
 		for _, v := range subnetHosts.ByID {
 			_, xerr = tg.Start(instance.taskBindDisabledOnHost, v)
 			if xerr != nil {
-				abErr := tg.Abort()
+				abErr := tg.AbortWithCause(xerr)
 				if abErr != nil {
-					logrus.Errorf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 				}
 				break
 			}
 		}
 		_, xerr = tg.WaitGroup()
+		xerr = debug.InjectPlannedFail(xerr)
 		return xerr
 	}
 	return nil

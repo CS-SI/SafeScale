@@ -40,7 +40,7 @@ func newReservation(key string /*, duration time.Duration*/) *reservation {
 		key:         key,
 		freedCh:     make(chan struct{}, 1),
 		committedCh: make(chan struct{}, 1),
-		//timeout:     duration,
+		// timeout:     duration,
 		created: time.Now(),
 	}
 }

@@ -29,8 +29,13 @@ import (
 func TestTaskGroupFatherAbortion(t *testing.T) { // FIXME: CI Failed
 	for j := 0; j < 30; j++ {
 		overlord, xerr := NewTaskGroup()
-		_ = overlord.SetID("/overlord")
+		if xerr != nil {
+			t.FailNow()
+		}
+		require.Nil(t, xerr)
 		require.NotNil(t, overlord)
+
+		xerr = overlord.SetID("/overlord")
 		require.Nil(t, xerr)
 
 		count := 0

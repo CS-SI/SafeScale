@@ -90,6 +90,7 @@ func Action(
 	)
 }
 
+// TimeoutSelector chooses between loops with hard timeout or loops with soft timeout
 func TimeoutSelector(hard bool) func(action) fail.Error {
 	if hard {
 		return action.loopWithHardTimeout
@@ -367,8 +368,7 @@ func DefaultMetadataNotifier(metaID string) func(t Try, v verdict.Enum) {
 	}
 }
 
-// FIXME: not used...
-// DefaultNotifierWithContext ...
+// DefaultNotifierWithContext FIXME: not used...
 func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum) {
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics == "" {
 		return func(t Try, v verdict.Enum) {

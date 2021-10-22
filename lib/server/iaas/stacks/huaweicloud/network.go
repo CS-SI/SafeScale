@@ -210,7 +210,7 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		switch commRetryErr.(type) { //nolint
+		switch commRetryErr.(type) { // nolint
 		case *fail.ErrInvalidRequest: // In case of VPC, when id does not exist, huaweicloud returns InvalidRequest... which cannot be the case because we validated that id is not empty
 			return nil, fail.NotFoundError("failed to find Network with id %s", id)
 		}
@@ -644,7 +644,7 @@ type subnetCreateResult struct {
 type subnetGetResult struct {
 	subnetCommonResult
 }
-type subnetDeleteResult struct { //nolint
+type subnetDeleteResult struct { // nolint
 	gophercloud.ErrResult
 }
 

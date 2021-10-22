@@ -39,7 +39,7 @@ func newDefaultKeepAliveCfg() *keepAliveCfg {
 	return newKeepAliveCfg(7200, 75, 9)
 }
 
-func newKeepAliveCfgFromSystem() *keepAliveCfg { //nolint
+func newKeepAliveCfgFromSystem() *keepAliveCfg { // nolint
 	ka := newDefaultKeepAliveCfg()
 	ka.readFromCfg()
 	return ka

@@ -28,6 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sirupsen/logrus"
 )
 
 // taskUnbindFromHost unbinds a Host from the security group
@@ -91,8 +93,8 @@ type taskUnbindFromHostsAttachedToSubnetParams struct {
 
 // taskUnbindFromHostsAttachedToSubnet unbinds security group from hosts attached to a Subnet
 // 'params' expects to be a *propertiesv1.SubnetHosts
-func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -128,22 +130,26 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 					return nil, xerr
 				}
 			}
-			defer func(in resources.Host) {
-				in.Released()
+
+			//goland:noinspection GoDeferInLoop
+			defer func(ins resources.Host) {
+				ins.Released()
 			}(hostInstance)
 
 			_, xerr = tg.Start(instance.taskUnbindFromHost, hostInstance, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%s/unbind", v)))
 			if xerr != nil {
+				abErr := tg.AbortWithCause(xerr)
+				if abErr != nil {
+					logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+				}
 				break
 			}
 		}
+
 		_, werr := tg.WaitGroup()
+		werr = debug.InjectPlannedFail(werr)
 		if werr != nil {
-			if xerr != nil {
-				_ = xerr.AddConsequence(werr)
-			} else {
-				xerr = werr
-			}
+			return nil, werr
 		}
 
 		return nil, xerr

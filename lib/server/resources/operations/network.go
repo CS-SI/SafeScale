@@ -574,6 +574,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 					// -- delete Security Group
 					sgInstance.lock.Lock()
+					//goland:noinspection GoDeferInLoop
 					defer sgInstance.lock.Unlock()
 
 					propsXErr = sgInstance.unsafeDelete(ctx, true)
@@ -625,7 +626,6 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					return innerXErr
 				}
 			}
-			maybeDeleted = true
 
 			if maybeDeleted {
 				logrus.Warningf("TBR: The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)

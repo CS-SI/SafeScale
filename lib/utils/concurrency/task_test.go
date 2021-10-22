@@ -1123,7 +1123,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 				)
 			}
 		} else {
-			ok := (xerr != nil) == errorExpected
+			ok := false == errorExpected
 			if !ok {
 				t.Fail()
 			}
