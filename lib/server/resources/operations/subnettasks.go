@@ -215,7 +215,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
 	rebootCtx, cancelReboot := context.WithTimeout(task.Context(), waitingTime)
 	defer cancelReboot()
-	_, _, _, xerr = objgw.Run(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
+	_, _, _, xerr = objgw.Run(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
@@ -239,7 +239,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
 	lastRebootCtx, lastCancelReboot := context.WithTimeout(task.Context(), waitingTime)
 	defer lastCancelReboot()
-	_, _, _, xerr = objgw.Run(lastRebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
+	_, _, _, xerr = objgw.Run(lastRebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}

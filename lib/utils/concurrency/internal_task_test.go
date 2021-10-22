@@ -23,13 +23,13 @@ import (
 )
 
 func TestInvalidInternalTaskCtx(t *testing.T) {
-	ta, xerr := newTask(nil, nil)
+	ta, xerr := newTask(nil, nil) // nolint
 	require.Nil(t, ta)
 	require.NotNil(t, xerr)
 }
 
 func TestInternalChecks(t *testing.T) {
-	ta, xerr := newTaskGroup(nil, nil) // It doesn't behave the same way newTask does, it should
+	ta, xerr := newTaskGroup(nil, nil) // nolint
 	require.Nil(t, ta)
 	require.NotNil(t, xerr)
 }

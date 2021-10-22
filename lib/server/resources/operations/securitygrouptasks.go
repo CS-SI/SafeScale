@@ -190,7 +190,6 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(task concurrency.Task, para
 		case *fail.ErrNotFound:
 			// host vanished, considered as a success
 			debug.IgnoreError(innerXErr)
-			break
 		default:
 			return nil, innerXErr
 		}

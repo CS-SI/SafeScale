@@ -50,6 +50,18 @@ func MutatorForVersion(version string) (Mutator, string, fail.Error) {
 		return nil, "", fail.InvalidParameterCannotBeEmptyStringError("to")
 	}
 
+	validVersion := false
+	for _, v := range knownVersions {
+		if version == v {
+			validVersion = true
+			break
+		}
+	}
+
+	if !validVersion {
+		return nil, "", fail.NotFoundError("unknown version '%s'", version)
+	}
+
 	item, ok := mutators[version]
 	if ok {
 		return item.upgrader, item.next, nil

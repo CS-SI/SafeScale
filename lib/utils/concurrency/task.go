@@ -136,9 +136,6 @@ type task struct {
 	controllerTerminated bool // used to keep track of controller terminated state
 	resultObtained       bool // used to know that the result has been returned by the TaskAction
 
-	start    time.Time
-	duration time.Duration
-
 	stats taskStats
 }
 
@@ -1080,7 +1077,6 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 
 			instance.lock.Unlock()
 			// result not returned by TaskAction yet, continue
-			break
 
 		case UNKNOWN:
 			fallthrough

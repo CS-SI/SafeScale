@@ -51,8 +51,6 @@ type Session struct {
 	server     string
 	connection *grpc.ClientConn
 
-	tenantName string
-
 	task concurrency.Task
 }
 

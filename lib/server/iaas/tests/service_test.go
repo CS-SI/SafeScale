@@ -59,8 +59,7 @@ type searcher func(bool) ([]abstract.Image, fail.Error)
 // just a copy of original code from iaas/service.go, but mockable (the 1st parameter of this function can be replaced by a mock),
 // the only thing that changes is the method signature, the code inside is the same (even the commented/unused lines)
 func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail.Error) {
-	var aSearcher searcher
-	aSearcher = svc.ListImages
+	var aSearcher searcher = svc.ListImages
 	_ = aSearcher
 
 	imgs, xerr := svc.ListImages(false)
@@ -93,8 +92,7 @@ func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail
 }
 
 func SearchImageNew(svc iaas.Service, osname string) (*abstract.Image, fail.Error) {
-	var aSearcher searcher
-	aSearcher = svc.ListImages
+	var aSearcher searcher = svc.ListImages
 	_ = aSearcher
 
 	imgs, xerr := svc.ListImages(false)

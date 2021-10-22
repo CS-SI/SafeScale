@@ -496,9 +496,9 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				return problem
 			}
 
-			// FIXME: Add md5
+			// FIXME: Check remote MD5
 			if upload {
-
+				logrus.Tracef("Checking MD5 of remote file...")
 			}
 
 			retcode = iretcode

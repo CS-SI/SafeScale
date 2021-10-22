@@ -53,7 +53,7 @@ func randomInt(min, max int) int {
 }
 
 // randomIntWithReseed restarts pseudorandom seed then returns a random integer between a specified range.
-func randomIntWithReseed(min, max int) int {
+func randomIntWithReseed(min, max int) int { // nolint
 	if min == max {
 		return min
 	}
@@ -61,7 +61,7 @@ func randomIntWithReseed(min, max int) int {
 	return mrand.Intn(max-min) + min
 }
 
-func validTest(st int, latency int) bool {
+func validTest(st int, latency int) bool { // nolint
 	iterations := int64(math.Ceil(float64(st) / float64(latency)))
 	tempo := time.Duration(latency) * time.Millisecond
 	count := int64(0)

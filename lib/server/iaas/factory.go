@@ -280,7 +280,8 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 }
 
 // validateRegionName validates the availability of the region passed as parameter
-func validateRegionName(name string, allRegions []string) fail.Error {
+func validateRegionName(name string, allRegions []string) fail.Error { // nolint
+	// FIXME: Use this function
 	if len(allRegions) > 0 {
 		regionIsValidInput := false
 		for _, vr := range allRegions {

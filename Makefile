@@ -385,7 +385,7 @@ minimock: begin generate
 metalint: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=errcheck --enable=ineffassign --enable=interfacer --enable=depguard --enable=dogsled --disable=unused --disable=varcheck run ./... | grep -v _test || true
+	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=errcheck --enable=ineffassign  --enable=depguard --enable=dogsled --disable=unused --disable=varcheck run ./... | grep -v _test || true
 
 metalint-full: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

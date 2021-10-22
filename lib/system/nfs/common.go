@@ -188,35 +188,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		}
 	}
 
-	// if k != nil {
-	xerr = retry.WhileUnsuccessful(
-		func() error {
-			sshCmd, innerXErr := sshconfig.NewSudoCommand(ctx, "which scp")
-			if innerXErr != nil {
-				return innerXErr
-			}
-			defer func() { _ = sshCmd.Close() }()
-
-			_, _, _, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, temporal.GetBigDelay())
-			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "ssh operation failed")
-			}
-			return nil
-		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostTimeout(),
-	)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *retry.ErrStopRetry:
-			return "", fail.Wrap(fail.Cause(xerr), "stopping retries")
-		case *retry.ErrTimeout:
-			return "", fail.Wrap(fail.Cause(xerr), "timeout")
-		default:
-			return "", xerr
-		}
-	}
-
 	// Execute script on remote host with retries if needed
 	var (
 		cmd, stdout, stderr string

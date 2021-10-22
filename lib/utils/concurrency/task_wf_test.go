@@ -665,6 +665,7 @@ func TestAbortButThisTimeUsingTrueAbortChannelWF(t *testing.T) {
 	time.Sleep(time.Duration(200) * time.Millisecond)
 
 	xerr = single.Abort()
+	require.Nil(t, xerr)
 	trueAbort <- struct{}{}
 
 	time.Sleep(time.Duration(50) * time.Millisecond)

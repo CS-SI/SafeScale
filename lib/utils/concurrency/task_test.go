@@ -86,9 +86,7 @@ func TestInjectAndExtractFromContext(t *testing.T) {
 	require.Nil(t, nt)
 	require.NotNil(t, err)
 
-	// this is inconsistent, if we get a task from a wrong (nil) context, we are losing track of potential errors
-	// when taskFromContext receives a nil, it should be noted as a mistake, not hidden creating a VoidTask
-	nt, err = TaskFromContext(nil)
+	nt, err = TaskFromContext(nil) // nolint
 	require.Nil(t, nt)
 	require.NotNil(t, err)
 }

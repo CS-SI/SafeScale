@@ -2057,7 +2057,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
 	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 	defer cancelReboot()
-	_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
+	_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
@@ -2090,7 +2090,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
 		rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 		defer cancelReboot()
-		_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
+		_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
 		if xerr != nil {
 			logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 		}

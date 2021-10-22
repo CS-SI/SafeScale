@@ -695,6 +695,7 @@ func TestOneErrorOneOkWF(t *testing.T) {
 			return "waiting game", nil
 		}, nil,
 	)
+	require.Nil(t, err)
 	_, err = overlord.Start(
 		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := randomInt(30, 50)
@@ -703,6 +704,7 @@ func TestOneErrorOneOkWF(t *testing.T) {
 			return nil, fail.NewError("Ouch")
 		}, nil,
 	)
+	require.Nil(t, err)
 	_, _, err = overlord.WaitGroupFor(5 * time.Second)
 	if err != nil {
 		repr := err.Error()
@@ -803,7 +805,6 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingWF(t *testing.T) {
 		begin := time.Now()
 		xerr = overlord.Abort()
 		require.Nil(t, xerr)
-		end := time.Since(begin)
 
 		// did we abort ?
 		aborted := overlord.Aborted()
@@ -813,7 +814,7 @@ func TestChildrenWaitingGameWithTimeoutsButAbortingWF(t *testing.T) {
 
 		_, _, xerr = overlord.WaitFor(5 * time.Second)
 		require.NotNil(t, xerr)
-		end = time.Since(begin)
+		end := time.Since(begin)
 
 		if end >= (time.Millisecond * 200) { // this is 4x the maximum time... // FIXME: Move to another testset
 			t.Logf("Abort() lasted %v\n", end)

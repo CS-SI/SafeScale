@@ -126,7 +126,7 @@ func TestInvalidTask(t *testing.T) {
 }
 
 func TestInvalidTaskCtx(t *testing.T) {
-	ta, err := NewTaskWithContext(nil)
+	ta, err := NewTaskWithContext(nil) // nolint
 	require.Nil(t, ta)
 	require.NotNil(t, err)
 }

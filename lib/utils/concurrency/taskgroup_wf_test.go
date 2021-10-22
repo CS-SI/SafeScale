@@ -930,6 +930,7 @@ func TestNewMethodOptionsAborted(t *testing.T) {
 
 			return "waiting game", nil
 		}, nil)
+	require.Nil(t, err)
 
 	err = task.Abort()
 	require.Nil(t, err)
@@ -957,6 +958,7 @@ func TestOneErrorOneOk(t *testing.T) {
 
 			return "waiting game", nil
 		}, nil)
+	require.Nil(t, err)
 	_, err = overlord.Start(
 		func(t Task, parameters TaskParameters) (TaskResult, fail.Error) {
 			rint := randomInt(30, 50)
@@ -964,6 +966,7 @@ func TestOneErrorOneOk(t *testing.T) {
 
 			return nil, fail.NewError("Ouch")
 		}, nil)
+	require.Nil(t, err)
 	_, err = overlord.WaitGroup()
 	if err != nil {
 		repr := err.Error()
@@ -1062,7 +1065,6 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 		begin := time.Now()
 		xerr = overlord.Abort()
 		require.Nil(t, xerr)
-		end := time.Since(begin)
 
 		// did we abort ?
 		aborted := overlord.Aborted()
@@ -1072,7 +1074,7 @@ func TestChildrenWaitingGameWithTimeoutsButAborting(t *testing.T) {
 
 		_, _, xerr = overlord.WaitFor(5 * time.Second)
 		require.NotNil(t, xerr)
-		end = time.Since(begin)
+		end := time.Since(begin)
 
 		if end >= (time.Millisecond * 200) { // this is 4x the maximum time...
 			t.Logf("Abort() lasted %v\n", end)
@@ -1212,5 +1214,6 @@ func BenchmarkTryWaitGroup(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		_, _, xerr = overlord.TryWaitGroup()
+		require.Nil(b, xerr)
 	}
 }
