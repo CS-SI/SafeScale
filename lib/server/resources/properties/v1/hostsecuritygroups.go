@@ -40,12 +40,9 @@ func NewHostSecurityGroups() *HostSecurityGroups {
 	}
 }
 
-// Reset ...
-func (hsg *HostSecurityGroups) Reset() {
-	*hsg = HostSecurityGroups{
-		ByID:   map[string]*SecurityGroupBond{},
-		ByName: map[string]string{},
-	}
+// IsNull ...
+func (hsg *HostSecurityGroups) IsNull() bool {
+	return hsg == nil || len(hsg.ByID) == 0
 }
 
 // Clone ...

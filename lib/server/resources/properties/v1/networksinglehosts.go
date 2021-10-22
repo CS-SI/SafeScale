@@ -45,7 +45,7 @@ type FreeCIDRSlot struct {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type NetworkSingleHosts struct {
-	FreeSlots []FreeCIDRSlot `json:"free_slots,omitempty"` // contains a list of FreeCIDRSlot of free CIDR in Network for single Hosts
+	FreeSlots []FreeCIDRSlot `json:"free_slots,omitempty"` // contains a list of free CIDR in Network for single Hosts
 }
 
 // NewNetworkSingleHosts ...
@@ -53,9 +53,10 @@ func NewNetworkSingleHosts() *NetworkSingleHosts {
 	return &NetworkSingleHosts{}
 }
 
-// Content ... (data.Clonable interface)
-func (nsh *NetworkSingleHosts) Content() interface{} {
-	return nsh
+// IsNull ...
+// (data.Clonable interface)
+func (nsh *NetworkSingleHosts) IsNull() bool {
+	return nsh == nil || len(nsh.FreeSlots) == 0
 }
 
 // Clone ... (data.Clonable interface)

@@ -44,9 +44,9 @@ func (nh *NetworkHosts) Reset() {
 	}
 }
 
-// Content ... (data.Clonable interface)
-func (nh *NetworkHosts) Content() interface{} {
-	return nh
+// IsNull ... (data.Clonable interface)
+func (nh *NetworkHosts) IsNull() bool {
+	return nh == nil || len(nh.ByID) == 0
 }
 
 // Clone ... (data.Clonable interface)

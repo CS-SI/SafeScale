@@ -34,6 +34,11 @@ type jsonProperty struct {
 	module, key string
 }
 
+// IsNull tells if the jsonProperty is a Null Value
+func (jp *jsonProperty) IsNull() bool {
+	return jp == nil || jp.Shielded.IsNull()
+}
+
 func (jp jsonProperty) Clone() data.Clonable {
 	newP := &jsonProperty{}
 	return newP.Replace(&jp)
@@ -54,7 +59,7 @@ func (jp *jsonProperty) Replace(clonable data.Clonable) data.Clonable {
 // JSONProperties ...
 type JSONProperties struct {
 	// properties jsonProperties
-	Properties data.Map
+	Properties map[string]*jsonProperty
 	// This lock is used to make sure addition or removal of keys in JSonProperties won't collide in go routines
 	sync.RWMutex
 	module string
@@ -66,7 +71,7 @@ func NewJSONProperties(module string) (*JSONProperties, fail.Error) {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("module")
 	}
 	return &JSONProperties{
-		Properties: data.Map{},
+		Properties: map[string]*jsonProperty{},
 		module:     module,
 	}, nil
 }
@@ -80,8 +85,8 @@ func (x *JSONProperties) Lookup(key string) bool {
 	x.RLock()
 	defer x.RUnlock()
 
-	_, ok := x.Properties[key]
-	return ok
+	p, ok := x.Properties[key]
+	return ok && !p.IsNull()
 }
 
 // Clone ...
@@ -97,7 +102,7 @@ func (x *JSONProperties) Clone() *JSONProperties {
 		module: x.module,
 	}
 	for k, v := range x.Properties {
-		newP.Properties[k] = v
+		newP.Properties[k] = v.Clone().(*jsonProperty)
 	}
 	return newP
 }
@@ -134,7 +139,7 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		found bool
 	)
 	x.RLock()
-	if item, found = x.Properties[key].(*jsonProperty); !found {
+	if item, found = x.Properties[key]; !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
 		item = &jsonProperty{
 			Shielded: shielded.NewShielded(zeroValue),
@@ -180,7 +185,7 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 		found bool
 	)
 
-	if item, found = x.Properties[key].(*jsonProperty); !found {
+	if item, found = x.Properties[key]; !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
 		item = &jsonProperty{
 			Shielded: shielded.NewShielded(zeroValue),
@@ -191,7 +196,8 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 	}
 
 	clone := item.Clone()
-	if xerr := clone.(*jsonProperty).Alter(alterer); xerr != nil {
+	xerr := clone.(*jsonProperty).Alter(alterer)
+	if xerr != nil {
 		return xerr
 	}
 
@@ -232,7 +238,7 @@ func (x *JSONProperties) Serialize() ([]byte, fail.Error) {
 
 	var mapped = map[string]string{}
 	for k, v := range x.Properties {
-		ser, err := v.(*jsonProperty).Serialize()
+		ser, err := v.Serialize()
 		if err != nil {
 			return nil, err
 		}
@@ -248,7 +254,7 @@ func (x *JSONProperties) Serialize() ([]byte, fail.Error) {
 // Deserialize ...
 // Returns fail.SyntaxError if an JSON syntax error happens
 // satisfies interface data.Serializable
-func (x *JSONProperties) Deserialize( /*task concurrency.Task, */ buf []byte) (xerr fail.Error) {
+func (x *JSONProperties) Deserialize(buf []byte) (xerr fail.Error) {
 	if x == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -275,7 +281,7 @@ func (x *JSONProperties) Deserialize( /*task concurrency.Task, */ buf []byte) (x
 		ok   bool
 	)
 	for k, v := range unjsoned {
-		if prop, ok = x.Properties[k].(*jsonProperty); !ok {
+		if prop, ok = x.Properties[k]; !ok {
 			zeroValue := PropertyTypeRegistry.ZeroValue(x.module, k)
 			item := &jsonProperty{
 				Shielded: shielded.NewShielded(zeroValue),

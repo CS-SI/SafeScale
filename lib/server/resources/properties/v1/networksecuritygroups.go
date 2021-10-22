@@ -40,11 +40,8 @@ func NewNetworkSecurityGroups() *NetworkSecurityGroups {
 }
 
 // Reset ...
-func (nsg *NetworkSecurityGroups) Reset() {
-	*nsg = NetworkSecurityGroups{
-		ByID:   map[string]string{},
-		ByName: map[string]string{},
-	}
+func (nsg *NetworkSecurityGroups) IsNull() bool {
+	return nsg == nil || len(nsg.ByID) == 0
 }
 
 // Clone ...

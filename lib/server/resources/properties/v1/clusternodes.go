@@ -48,6 +48,12 @@ func newClusterNodes() *ClusterNodes {
 	}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (n *ClusterNodes) IsNull() bool {
+	return n == nil || (len(n.Masters) == 0 && len(n.PublicNodes) == 0 && len(n.PrivateNodes) == 0)
+}
+
 // Clone ... (data.Clonable interface)
 func (n ClusterNodes) Clone() data.Clonable {
 	return newClusterNodes().Replace(&n)

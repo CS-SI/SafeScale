@@ -38,9 +38,9 @@ func NewHostSystem() *HostSystem {
 	return &HostSystem{}
 }
 
-// Reset ...
-func (hs *HostSystem) Reset() {
-	*hs = HostSystem{}
+// IsNull ...
+func (hs *HostSystem) IsNull() bool {
+	return hs == nil || (hs.Type == "" && hs.Flavor == "" && hs.Image == "" && hs.HostName == "")
 }
 
 // Clone ...

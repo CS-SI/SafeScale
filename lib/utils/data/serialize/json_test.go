@@ -53,8 +53,8 @@ func newLikeFeatures() *LikeFeatures {
 
 // Content ...
 // satisfies interface data.Clonable
-func (f *LikeFeatures) Content() data.Clonable {
-	return f
+func (f *LikeFeatures) IsNull() bool {
+	return f == nil || (len(f.Installed) == 0 && len(f.Disabled) == 0)
 }
 
 func (f LikeFeatures) Clone() data.Clonable {

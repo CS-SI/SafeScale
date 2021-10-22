@@ -41,6 +41,12 @@ func (hcm *HostClusterMembership) Reset() {
 	*hcm = HostClusterMembership{}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (hcm *HostClusterMembership) IsNull() bool {
+	return hcm == nil || hcm.Cluster == ""
+}
+
 // Clone ...
 func (hcm HostClusterMembership) Clone() data.Clonable {
 	return NewHostClusterMembership().Replace(&hcm)

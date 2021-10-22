@@ -40,9 +40,9 @@ func NewVolumeDescription() *VolumeDescription {
 	return &VolumeDescription{}
 }
 
-// Content ...
-func (vd *VolumeDescription) Content() interface{} {
-	return vd
+// IsNull ...
+func (vd *VolumeDescription) IsNull() bool {
+	return vd == nil || (vd.Created.IsZero() && vd.Purpose == "")
 }
 
 // Clone ...
@@ -77,16 +77,10 @@ func NewVolumeAttachments() *VolumeAttachments {
 	}
 }
 
-// Reset resets the content of the property
-func (va *VolumeAttachments) Reset() {
-	*va = VolumeAttachments{
-		Hosts: map[string]string{},
-	}
-}
-
-// Content ... (data.Clonable interface)
-func (va *VolumeAttachments) Content() interface{} {
-	return va
+// IsNull ...
+// (data.Clonable interface)
+func (va *VolumeAttachments) IsNull() bool {
+	return va == nil || len(va.Hosts) == 0
 }
 
 // Clone ... (data.Clonable interface)

@@ -33,16 +33,10 @@ func NewSecurityGroupBond() *SecurityGroupBond {
 	return &SecurityGroupBond{}
 }
 
-// Reset ...
-func (sgb *SecurityGroupBond) Reset() *SecurityGroupBond {
-	if sgb != nil {
-		sgb.Name = ""
-		sgb.ID = ""
-		sgb.Disabled = false
-		sgb.FromSubnet = false
-		return sgb
-	}
-	return NewSecurityGroupBond()
+// IsNull ...
+// Satisfies interface data.Clonable
+func (sgb *SecurityGroupBond) IsNull() bool {
+	return sgb == nil || (sgb.Name == "" && sgb.ID == "")
 }
 
 // Clone ...

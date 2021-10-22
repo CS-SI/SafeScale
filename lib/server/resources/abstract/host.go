@@ -202,6 +202,10 @@ func NewHostEffectiveSizing() *HostEffectiveSizing {
 	return &HostEffectiveSizing{}
 }
 
+func (hse *HostEffectiveSizing) IsNull() bool {
+	return hse == nil || hse.Cores == 0
+}
+
 // HostTemplate ...
 type HostTemplate struct {
 	Cores     int     `json:"cores,omitempty"`

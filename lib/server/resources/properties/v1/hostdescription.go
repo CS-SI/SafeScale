@@ -42,14 +42,10 @@ func NewHostDescription() *HostDescription {
 	return &HostDescription{}
 }
 
-// Reset returns a blank HostDescription
-func (hd *HostDescription) Reset() {
-	*hd = HostDescription{}
-}
-
-// Content ... (data.Clonable interface)
-func (hd *HostDescription) Content() interface{} {
-	return hd
+// IsNull ...
+// satisfies interface data.Clonable
+func (hd *HostDescription) IsNull() bool {
+	return hd == nil || (hd.Created.IsZero() && hd.Tenant == "")
 }
 
 // Clone ... (data.Clonable interface)

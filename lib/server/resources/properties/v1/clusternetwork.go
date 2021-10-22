@@ -37,6 +37,12 @@ func newClusterNetwork() *ClusterNetwork {
 	return &ClusterNetwork{}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (n *ClusterNetwork) IsNull() bool {
+	return n == nil || (n.NetworkID == "" && n.GatewayID == "")
+}
+
 // Clone ...
 // satisfies interface data.Clonable
 func (n ClusterNetwork) Clone() data.Clonable {

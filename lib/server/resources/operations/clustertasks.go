@@ -2336,30 +2336,19 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 			// Disable abort signal during the clean up
 			defer task.DisarmAbortSignal()()
 
-			derr := instance.Alter(
-				func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Alter(
-						clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-							nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-							if !ok {
-								return fail.InconsistentError(
-									"'*propertiesv3.ClusterNodes' expected, '%s' provided",
-									reflect.TypeOf(clonable).String(),
-								)
-							}
+			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Alter(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
 
-							delete(nodesV3.ByNumericalID, nodeIdx)
-							return nil
-						},
-					)
-				},
-			)
+					delete(nodesV3.ByNumericalID, nodeIdx)
+					return nil
+				})
+			})
 			if derr != nil {
-				_ = ferr.AddConsequence(
-					fail.Wrap(
-						derr, "cleaning up on %s, failed to remove node from Cluster metadata", ActionFromError(ferr),
-					),
-				)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to remove node from Cluster metadata", ActionFromError(ferr)))
 			}
 		}
 	}()
@@ -2377,19 +2366,15 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	}
 
 	// -- Create the Host instance corresponding to the new node --
-	xerr = subnet.Inspect(
-		func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError(
-					"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-				)
-			}
+	xerr = subnet.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		as, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
 
-			hostReq.Subnets = []*abstract.Subnet{as}
-			return nil
-		},
-	)
+		hostReq.Subnets = []*abstract.Subnet{as}
+		return nil
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
