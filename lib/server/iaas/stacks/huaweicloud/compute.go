@@ -345,15 +345,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	}
 
-	realSubnet, _ := s.InspectSubnet("f2ce4cd9-0b52-4577-9a96-4b69eb97e50e")
-	_ = realSubnet
-
-	realSubnet, _ = s.InspectSubnet("c302cfa4-597c-4059-b0f5-a16236f87723")
-	_ = realSubnet
-
-	realSubnet, _ = s.InspectSubnetByName("", "net-vpl-boh3")
-	_ = realSubnet
-
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to provide credentials for the host")
 	}

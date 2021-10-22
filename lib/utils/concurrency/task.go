@@ -396,7 +396,7 @@ func (instance *task) Status() (TaskStatus, fail.Error) {
 	return instance.status, nil
 }
 
-// Context returns the context associated to the task
+// Context returns the context associated to the task, or context.Background() if there is no context
 func (instance *task) Context() context.Context {
 	if instance.IsNull() {
 		return context.TODO()
@@ -405,7 +405,10 @@ func (instance *task) Context() context.Context {
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.ctx
+	if instance.ctx != nil {
+		return instance.ctx
+	}
+	return context.Background()
 }
 
 // SetID allows specifying task ID. The uniqueness of the ID through all the tasks

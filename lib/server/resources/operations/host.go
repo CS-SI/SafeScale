@@ -750,8 +750,6 @@ func (instance *Host) Reload() (xerr fail.Error) {
 			hnV2.IPv6Addresses = ahf.Networking.IPv6Addresses
 			hnV2.SubnetsByID = ahf.Networking.SubnetsByID
 			hnV2.SubnetsByName = ahf.Networking.SubnetsByName
-			hnV2.PublicIPv4 = ahf.Networking.PublicIPv4
-			hnV2.PublicIPv6 = ahf.Networking.PublicIPv6
 			return nil
 		})
 		if innerXErr != nil {
