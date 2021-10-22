@@ -74,5 +74,5 @@ func (sh *SubnetHosts) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.subnet", string(subnetproperty.HostsV1), NewSubnetHosts())
+	serialize.PropertyTypeRegistry.Register("resources.subnet", subnetproperty.HostsV1, NewSubnetHosts())
 }

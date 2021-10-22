@@ -98,6 +98,7 @@ func TimeoutSelector(hard bool) func(action) fail.Error {
 	return action.loopWithSoftTimeout
 }
 
+// DefaultTimeoutSelector provides a default selector between hard and soft timeouts
 func DefaultTimeoutSelector() func(action) fail.Error {
 	if delayAlgo := os.Getenv("SAFESCALE_TIMEOUT_STYLE"); delayAlgo != "" {
 		switch delayAlgo {
@@ -113,6 +114,7 @@ func DefaultTimeoutSelector() func(action) fail.Error {
 	return TimeoutSelector(false)
 }
 
+// BackoffSelector allows change the backoff delays between retries
 func BackoffSelector() Backoff {
 	if delayAlgo := os.Getenv("SAFESCALE_ALGO_DELAY"); delayAlgo != "" {
 		switch delayAlgo {
@@ -162,6 +164,7 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 	)
 }
 
+// WhileUnsuccessfulWithLimitedRetries uses Unsuccessful and Max arbiters
 func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, timeout time.Duration, retries uint) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
@@ -277,6 +280,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 	)
 }
 
+// WhileUnsuccessfulWithAggregator allows using another ArbiterAggregator instead of the default PrevailDone
 func WhileUnsuccessfulWithAggregator(run func() error, delay time.Duration, timeout time.Duration, arb ArbiterAggregator, notify Notify) fail.Error {
 	if delay > timeout {
 		logrus.Warnf("unexpected parameters: 'delay' greater than 'timeout' ?? : (%s) > (%s)", delay, timeout)
@@ -308,6 +312,7 @@ func WhileUnsuccessfulWithAggregator(run func() error, delay time.Duration, time
 	)
 }
 
+// DefaultNotifier provides a default Notifier
 func DefaultNotifier() func(t Try, v verdict.Enum) {
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics == "" {
 		return func(t Try, v verdict.Enum) {
@@ -339,6 +344,7 @@ func DefaultNotifier() func(t Try, v verdict.Enum) {
 	}
 }
 
+// DefaultMetadataNotifier provides a default Notifier focused on metadata issues
 func DefaultMetadataNotifier(metaID string) func(t Try, v verdict.Enum) {
 	return func(t Try, v verdict.Enum) {
 		switch v {

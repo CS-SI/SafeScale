@@ -186,7 +186,10 @@ func extractPath(in string) (string, fail.Error) {
 
 func getMD5Hash(text string) string {
 	hasher := md5.New()
-	hasher.Write([]byte(text))
+	_, err := hasher.Write([]byte(text))
+	if err != nil {
+		return ""
+	}
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
@@ -338,8 +341,13 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 			if upload {
 				md5hash := ""
 				if localPath != "" {
-					if content, err := ioutil.ReadFile(localPath); err == nil {
-						md5hash = getMD5Hash(string(content))
+					content, err := ioutil.ReadFile(localPath)
+					if err != nil {
+						return err
+					}
+					md5hash = getMD5Hash(string(content))
+					if md5hash == "" {
+						return fmt.Errorf("failure getting MD5 hash")
 					}
 				}
 

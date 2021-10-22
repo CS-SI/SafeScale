@@ -1248,7 +1248,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	res, xerr := tg.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
-	if res != nil && len(res) > 0 {
+	if len(res) > 0 {
 		for _, v := range res {
 			if item, ok := v.(*propertiesv3.ClusterNode); ok {
 				nodes = append(nodes, item)
@@ -3411,6 +3411,7 @@ func (instance *Cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 	return out, nil
 }
 
+// Shrink reduces cluster size by 'count' nodes
 func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertiesv3.ClusterNode, xerr fail.Error) {
 	emptySlice := make([]*propertiesv3.ClusterNode, 0)
 	if instance == nil || instance.IsNull() {

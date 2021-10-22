@@ -188,7 +188,6 @@ func TestTaskFatherAbortionLater(t *testing.T) {
 		// something occurs after 40ms that delay channel read with select...
 		fmt.Println("Aborting...")
 		_ = overlord.Abort()
-		return
 	}()
 
 	_, xerr = overlord.WaitGroup()

@@ -536,8 +536,20 @@ func (instance *bucket) exec(ctx context.Context, host resources.Host, script st
 		return xerr
 	}
 
-	_, _, _, xerr = host.Run(ctx, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	return xerr
+	rc, stdout, stderr, rerr := host.Run(ctx, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if rerr != nil {
+		return xerr
+	}
+
+	if rc != 0 {
+		finnerXerr := fail.NewError("embedded script %s failed to run", script)
+		_ = finnerXerr.Annotate("retcode", rc)
+		_ = finnerXerr.Annotate("stdout", stdout)
+		_ = finnerXerr.Annotate("stderr", stderr)
+		return finnerXerr
+	}
+
+	return nil
 }
 
 // Return the script (embedded in a rice-box) with placeholders replaced by the values given in data

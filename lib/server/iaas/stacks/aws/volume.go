@@ -320,10 +320,10 @@ func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]
 		var suffix string
 		deviceName := aws.StringValue(v.DeviceName)
 		if strings.HasPrefix(deviceName, "/dev/sd") {
-			suffix = strings.Trim(deviceName, "/dev/sd")
+			suffix = strings.TrimPrefix(deviceName, "/dev/sd")
 			sdCount++
 		} else if strings.HasPrefix(deviceName, "/dev/xvd") {
-			suffix = strings.Trim(deviceName, "/dev/xvd")
+			suffix = strings.TrimPrefix(deviceName, "/dev/xvd")
 			xvdCount++
 		} else {
 			continue

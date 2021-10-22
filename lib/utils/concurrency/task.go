@@ -1021,7 +1021,6 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				instance.status, status = DONE, DONE
 			}
 			instance.lock.Unlock() // Note: Do not defer this, the loop continue
-			break
 
 		case ABORTED:
 			instance.lock.RLock()
@@ -1050,7 +1049,6 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				instance.status, status = DONE, DONE
 			}
 			instance.lock.Unlock() // Note: Do not defer this, the loop continue
-			break
 
 		case RUNNING:
 			instance.lock.Lock()
@@ -1066,7 +1064,6 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				instance.status, status = DONE, DONE
 			}
 			instance.lock.Unlock()
-			break
 
 		case DONE:
 			instance.lock.Lock()

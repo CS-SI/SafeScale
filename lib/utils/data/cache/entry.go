@@ -32,7 +32,6 @@ type Entry struct {
 	use         uint
 	lastUpdated time.Time
 	lock        *sync.RWMutex
-	wg          *sync.WaitGroup
 }
 
 // newEntry allocates a new cache entry

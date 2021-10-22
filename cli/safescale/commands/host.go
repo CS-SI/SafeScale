@@ -341,7 +341,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 	},
 }
 
-var hostResize = &cli.Command{
+var hostResize = &cli.Command{ // nolint
 	Name:      "resize",
 	Aliases:   []string{"upgrade"},
 	Usage:     "resizes a host",

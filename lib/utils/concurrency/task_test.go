@@ -509,6 +509,8 @@ func TestResultCheckOfAbortedTask(t *testing.T) {
 		require.NotNil(
 			t, xerr,
 		) // task not terminated, but WaitFor timed out, xerr not nil and must be a *fail.ErrTimeout
+		require.NotNil(t, res)
+
 		if !done {
 			switch xerr.(type) {
 			case *fail.ErrTimeout:
@@ -634,10 +636,12 @@ func TestTryWaitOfAbortedTask(t *testing.T) {
 	if st != DONE {
 		t.FailNow()
 	}
+	require.Nil(t, xerr)
 
 	done, res, xerr = got.TryWait()
 	require.True(t, done)
 	require.NotNil(t, xerr)
+	require.NotNil(t, res)
 
 	aborted := got.Aborted()
 	require.True(t, aborted)
@@ -698,10 +702,12 @@ func TestTryWaitOfOkTask(t *testing.T) {
 	if st != DONE {
 		t.FailNow()
 	}
+	require.Nil(t, xerr)
 
 	done, res, xerr = got.TryWait()
 	require.True(t, done)
 	require.NotNil(t, xerr)
+	require.NotNil(t, res)
 
 	aborted := got.Aborted()
 	require.True(t, aborted)
@@ -1716,6 +1722,7 @@ func TestAbortButThisTimeUsingTrueAbortChannel(t *testing.T) {
 	time.Sleep(time.Duration(200) * time.Millisecond)
 
 	xerr = single.Abort()
+	require.Nil(t, xerr)
 	trueAbort <- struct{}{}
 
 	time.Sleep(time.Duration(50) * time.Millisecond)
@@ -1770,5 +1777,6 @@ func BenchmarkTryWait(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		_, _, xerr = single.TryWait()
+		require.Nil(b, xerr)
 	}
 }

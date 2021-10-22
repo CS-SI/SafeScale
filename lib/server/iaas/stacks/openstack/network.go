@@ -389,9 +389,8 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 	}
 
 	var subnet *subnets.Subnet
-	var xerr fail.Error
 	// Execute the operation and get back a subnets.Subnet struct
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			subnet, innerErr = subnets.Create(s.NetworkClient, opts).Extract()
 			return innerErr

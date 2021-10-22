@@ -54,11 +54,15 @@ func getImages(filename string) ([]abstract.Image, error) {
 	return output.Result, nil
 }
 
-type Searcher func(iaas.Service, string) (*abstract.Image, fail.Error)
+type searcher func(bool) ([]abstract.Image, fail.Error)
 
 // just a copy of original code from iaas/service.go, but mockable (the 1st parameter of this function can be replaced by a mock),
 // the only thing that changes is the method signature, the code inside is the same (even the commented/unused lines)
 func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail.Error) {
+	var aSearcher searcher
+	aSearcher = svc.ListImages
+	_ = aSearcher
+
 	imgs, xerr := svc.ListImages(false)
 	if xerr != nil {
 		return nil, xerr
@@ -89,6 +93,10 @@ func SearchImageOriginal(svc iaas.Service, osname string) (*abstract.Image, fail
 }
 
 func SearchImageNew(svc iaas.Service, osname string) (*abstract.Image, fail.Error) {
+	var aSearcher searcher
+	aSearcher = svc.ListImages
+	_ = aSearcher
+
 	imgs, xerr := svc.ListImages(false)
 	if xerr != nil {
 		return nil, xerr
@@ -267,10 +275,10 @@ func Test_service_SearchImage_AWS_Centos7(t *testing.T) {
 		t.FailNow()
 	}
 
-	// Notice here how Jarowinkler doesn't get right the major OS version number
+	// Notice here how Jarowinkler doesn't get right the major OS version number, it messes up badly
 	expected := &abstract.Image{
-		ID:   "ami-083ffd9a223815e2c",
-		Name: "CentOS 7.4 - 12.2EE-56f0bdc8-e3e8-4b71-a1cb-0d37794843ac-ami-0c7021056b8e506d3.4",
+		ID:   "ami-0057f9b19b88b562c",
+		Name: "CentOS 8.4.2105 x86_64",
 	}
 
 	// those are the true results of a request "CentOS 7.4" using AWS on west-3
@@ -333,7 +341,7 @@ func Test_service_SearchImage_FE_Centos7(t *testing.T) {
 	}
 
 	expected := &abstract.Image{
-		ID:   "df427f70-d88d-42fc-96b2-076b5ada293",
+		ID:   "df427f70-d88d-42fc-96b2-076b5ada2930",
 		Name: "CentOS8.2",
 	}
 

@@ -381,7 +381,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (x
 		return fail.ConvertError(err)
 	}
 
-	nerr := ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json"), daOut, 0666)
+	nerr := ioutil.WriteFile(utils.AbsPathify("$HOME/.safescale/scanner/"+tenantName+"#"+template.Name+".json"), daOut, 0600)
 	if nerr != nil {
 		logrus.Warnf("tenant '%s', template '%s' : Error writing file: %v", tenantName, template.Name, nerr)
 		return fail.ConvertError(nerr)
@@ -462,7 +462,7 @@ func (handler *tenantHandler) dumpTemplates() (xerr fail.Error) {
 	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", svc.GetName())
 	f = utils.AbsPathify(f)
 
-	if err = ioutil.WriteFile(f, content, 0666); err != nil {
+	if err = ioutil.WriteFile(f, content, 0600); err != nil {
 		return fail.ConvertError(err)
 	}
 
@@ -494,7 +494,7 @@ func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
 	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", svc.GetName())
 	f = utils.AbsPathify(f)
 
-	if err := ioutil.WriteFile(f, content, 0666); err != nil {
+	if err := ioutil.WriteFile(f, content, 0600); err != nil {
 		return fail.ConvertError(err)
 	}
 

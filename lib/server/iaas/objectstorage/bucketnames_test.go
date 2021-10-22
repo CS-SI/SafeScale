@@ -17,7 +17,9 @@
 package objectstorage
 
 import (
+	"fmt"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -58,7 +60,6 @@ func TestBuildMetadataBucketName(t *testing.T) {
 			domain:  "b",
 			project: "D",
 		}, "0.safescale-39aa5fec414ff78da8c3028953851096" + suffix, false},
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -72,4 +73,11 @@ func TestBuildMetadataBucketName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTrimSurprises(t *testing.T) {
+	totr := "a/this/shoud/not/be/a/surprise/"
+
+	shifu := strings.Trim(totr, "/")
+	fmt.Println(shifu)
 }

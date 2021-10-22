@@ -385,21 +385,17 @@ minimock: begin generate
 metalint: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard --enable=dogsled --enable=funlen --enable=gochecknoglobals run ./... | grep -v _test || true
-
-metalint-mini: begin generate
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
 	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=errcheck --enable=ineffassign --enable=interfacer --enable=depguard --enable=dogsled --disable=unused --disable=varcheck run ./... | grep -v _test || true
 
 metalint-full: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(WHICH) golangci-lint > /dev/null && golangci-lint --timeout=5m --color never --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=depguard run --enable=dogsled --enable=funlen --enable=gochecknoglobals ./... | grep -v _test || true) || echo "golangci-lint not installed in your system"
+	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
+	@golangci-lint --color never --timeout=10m --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --enable=funlen --enable=gochecknoglobals --enable=depguard run  ./... | grep -v _test || true
 
 style: begin generate gofmt
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=errcheck --enable=stylecheck --enable=deadcode --enable=golint --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run || true
+	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=deadcode --enable=errcheck --enable=stylecheck --enable=golint --enable=gocritic --enable=gosimple --enable=govet --enable=ineffassign --disable=unused --disable=varcheck run || true
 
 style-full: begin generate gofmt
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

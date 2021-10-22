@@ -304,6 +304,7 @@ func TestSurprisingBehaviour(t *testing.T) {
 			t.Fail()
 			return
 		}
+		require.Nil(t, theX)
 
 		// This Entry should succeed
 		theX, xerr = nukaCola.Entry("content")

@@ -109,5 +109,5 @@ func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", string(hostproperty.SizingV2), NewHostSizing())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SizingV2, NewHostSizing())
 }

@@ -111,6 +111,6 @@ func (va *VolumeAttachments) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.volume", string(volumeproperty.DescriptionV1), NewVolumeDescription())
-	serialize.PropertyTypeRegistry.Register("resources.volume", string(volumeproperty.AttachedV1), NewVolumeAttachments())
+	serialize.PropertyTypeRegistry.Register("resources.volume", volumeproperty.DescriptionV1, NewVolumeDescription())
+	serialize.PropertyTypeRegistry.Register("resources.volume", volumeproperty.AttachedV1, NewVolumeAttachments())
 }

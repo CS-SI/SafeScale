@@ -42,7 +42,7 @@ func generateNilNewError() *errorCore {
 	return nil
 }
 
-func testAFailErrorisAnError(t *testing.T) {
+func TestAFailErrorisAnError(t *testing.T) {
 	var what error
 	tfe := NewError("ouch")
 	what = tfe
@@ -500,7 +500,6 @@ func TestRecursiveAnnotation(t *testing.T) {
 		defer wg.Done()
 		err := &ErrNotFound{nil}
 		err.Annotate("key", "value")
-		return
 	}()
 	failed := waitTimeout(&wg, 1*time.Second)
 	if failed { // It never ended
@@ -551,7 +550,6 @@ func TestNiceLoop(t *testing.T) {
 
 		broken := aerr.Error() // It works until we make the call
 		_ = broken
-		return
 	}()
 	failed := waitTimeout(&wg, 500*time.Millisecond)
 	if failed { // It never ended
@@ -561,39 +559,39 @@ func TestNiceLoop(t *testing.T) {
 
 func TestHelperCauseFunction(t *testing.T) {
 	aerr := AbortedError(fmt.Errorf("this was painful: %w", fmt.Errorf("this broke my heart")))
-	direct_cause := aerr.Cause()
-	indirect_cause := Cause(aerr)
+	directCause := aerr.Cause()
+	indirectCause := Cause(aerr)
 
-	assert.EqualValues(t, direct_cause, indirect_cause)
+	assert.EqualValues(t, directCause, indirectCause)
 }
 
 func TestHelperRootCauseFunction(t *testing.T) {
 	aerr := AbortedError(fmt.Errorf("this was painful: %w", fmt.Errorf("this broke my heart")))
-	direct_cause := aerr.RootCause()
-	indirect_cause := RootCause(aerr)
+	directCause := aerr.RootCause()
+	indirectCause := RootCause(aerr)
 
-	assert.EqualValues(t, direct_cause, indirect_cause)
+	assert.EqualValues(t, directCause, indirectCause)
 }
 
 func TestLastUnwrap(t *testing.T) {
 	aerr := AbortedError(fmt.Errorf("this was painful: %w", fmt.Errorf("this broke my heart")))
 	recovered := lastUnwrap(aerr)
-	indirect_recovered := RootCause(aerr)
+	indirectRecovered := RootCause(aerr)
 
-	assert.EqualValues(t, recovered, indirect_recovered)
+	assert.EqualValues(t, recovered, indirectRecovered)
 
 	recovered = lastUnwrapOrNil(aerr)
-	assert.EqualValues(t, recovered, indirect_recovered)
+	assert.EqualValues(t, recovered, indirectRecovered)
 }
 
 func TestLastUnwrapOrNil(t *testing.T) {
 	aerr := AbortedError(nil, "why is so complicated ?")
 	recovered := lastUnwrap(aerr)
-	indirect_recovered := RootCause(aerr)
-	assert.NotNil(t, indirect_recovered)
+	indirectRecovered := RootCause(aerr)
+	assert.NotNil(t, indirectRecovered)
 	assert.NotNil(t, recovered)
 
-	assert.EqualValues(t, recovered, indirect_recovered)
+	assert.EqualValues(t, recovered, indirectRecovered)
 
 	recovered = lastUnwrapOrNil(aerr)
 	assert.Nil(t, recovered)

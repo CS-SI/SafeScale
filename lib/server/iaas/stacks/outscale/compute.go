@@ -907,7 +907,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nil, nil, xerr
 	}
 
-	var diskSize int = tpl.DiskSize
+	var diskSize = tpl.DiskSize
 	if request.DiskSize > diskSize {
 		diskSize = request.DiskSize
 	}

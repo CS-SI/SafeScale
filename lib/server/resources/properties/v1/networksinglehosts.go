@@ -32,7 +32,7 @@ const (
 
 var (
 	// SingleHostsMaxCIDRSlotValue contains the max index usable in function lib/utils/net.NthIncludedSubnet() to build CIDR
-	SingleHostsMaxCIDRSlotValue uint = uint(math.Pow(2, SingleHostsCIDRMaskAddition) - 1)
+	SingleHostsMaxCIDRSlotValue = uint(math.Pow(2, SingleHostsCIDRMaskAddition) - 1)
 )
 
 type FreeCIDRSlot struct {
@@ -144,5 +144,5 @@ func (nsh *NetworkSingleHosts) FreeSlot(index uint) {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", string(networkproperty.SingleHostsV1), NewNetworkSingleHosts())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.SingleHostsV1, NewNetworkSingleHosts())
 }

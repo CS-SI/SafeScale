@@ -90,6 +90,7 @@ func CIDROverlap(n1, n2 net.IPNet) bool {
 	return n2.Contains(n1.IP) || n1.Contains(n2.IP)
 }
 
+// CIDRString string representing a CIDR
 type CIDRString string
 
 // Contains tells if 'cs' contains 'cidr'

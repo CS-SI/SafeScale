@@ -69,5 +69,5 @@ func (nd *NetworkSubnets) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", string(networkproperty.SubnetsV1), NewNetworkSubnets())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.SubnetsV1, NewNetworkSubnets())
 }

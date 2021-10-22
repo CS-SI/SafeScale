@@ -74,5 +74,5 @@ func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", string(networkproperty.HostsV1), NewNetworkHosts())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.HostsV1, NewNetworkHosts())
 }

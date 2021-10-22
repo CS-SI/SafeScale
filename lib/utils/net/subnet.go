@@ -45,8 +45,7 @@ func NthIncludedSubnet(base net.IPNet, maskAddition uint8, nth uint) (net.IPNet,
 		return net.IPNet{}, fail.OverflowError(nil, uint(addrLen), "insufficient address space to extend prefix of %d by %d", parentLen, maskAddition)
 	}
 
-	var maxNetNum uint64
-	maxNetNum = 1<<maskAddition - 1
+	var maxNetNum uint64 = 1<<maskAddition - 1
 	if uint64(1) > maxNetNum {
 		return net.IPNet{}, fail.OverflowError(nil, uint(maxNetNum), "prefix extension of %d does not accommodate a subnet", maskAddition)
 	}

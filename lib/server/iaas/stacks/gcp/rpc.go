@@ -1047,7 +1047,7 @@ func (s stack) rpcListMachineTypes() ([]*compute.MachineType, fail.Error) {
 		resp *compute.MachineTypeList
 	)
 	for token := ""; ; {
-		zero := []*compute.MachineType{}
+		var zero []*compute.MachineType
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.MachineTypes.List(
@@ -1124,7 +1124,7 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 		resp *compute.InstanceList
 	)
 	for token := ""; ; {
-		zero := []*compute.Instance{}
+		var zero []*compute.Instance
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Instances.List(
@@ -1813,7 +1813,7 @@ func (s stack) rpcListRegions() ([]*compute.Region, fail.Error) {
 		resp *compute.RegionList
 	)
 	for token := ""; ; {
-		zero := []*compute.Region{}
+		var zero []*compute.Region
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Regions.List(s.GcpConfig.ProjectID).PageToken(token).Do()
@@ -2011,7 +2011,7 @@ func (s stack) rpcListNetworks() (_ []*compute.Network, xerr fail.Error) {
 		resp *compute.NetworkList
 	)
 	for token := ""; ; {
-		zero := []*compute.Network{}
+		var zero []*compute.Network
 		xerr = stacks.RetryableRemoteCall(
 			func() (err error) {
 				resp, err = s.ComputeService.Networks.List(s.GcpConfig.ProjectID).PageToken(token).Do()

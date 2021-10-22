@@ -223,7 +223,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 	var pgw, sgw *protocol.Host
 	gwIDs := subnet.GetGatewayIds()
 
-	var gateways = make([]map[string]string, len(gwIDs), len(gwIDs))
+	var gateways = make([]map[string]string, len(gwIDs))
 	if len(gwIDs) > 0 {
 		pgw, err = session.Host.Inspect(gwIDs[0], temporal.GetExecutionTimeout())
 		if err != nil {
