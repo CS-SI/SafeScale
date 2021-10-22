@@ -266,3 +266,8 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 func (s *Stack) IsNull() bool {
 	return s == nil || s.Driver == nil
 }
+
+// GetStackName returns the name of the stack
+func (s Stack) GetStackName() string {
+	return "openstack"
+}

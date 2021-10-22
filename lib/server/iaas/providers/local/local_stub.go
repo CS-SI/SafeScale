@@ -229,6 +229,10 @@ func (provider *provider) DeleteVolumeAttachment(serverID, id string) fail.Error
 func (provider *provider) GetName() string {
 	return "local_disabled"
 }
+func (provider provider) GetStackName() string {
+	return "libvirt"
+}
+
 func (provider *provider) GetTenantParameters() map[string]interface{} {
 	return nil
 }

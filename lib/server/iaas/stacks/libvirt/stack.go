@@ -45,6 +45,11 @@ func (s *stack) IsNull() {
 	return s == nil || s.LibvirtService == nil
 }
 
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "libvirt"
+}
+
 // WaitHostReady ...
 func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) fail.Error {
 	return fail.NotImplementedError("WaitHostReady not implemented yet!") // FIXME: Technical debt

@@ -54,6 +54,11 @@ func (s *stack) IsNull() bool {
 	return s == nil || s.EC2Service == nil
 }
 
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "aws"
+}
+
 // GetConfigurationOptions ...
 func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 	if s.IsNull() {

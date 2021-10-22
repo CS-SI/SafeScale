@@ -48,6 +48,11 @@ func (s *stack) IsNull() bool {
 	return false
 }
 
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "libvirt"
+}
+
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
 func (s stack) HasDefaultNetwork() bool {
 	return false

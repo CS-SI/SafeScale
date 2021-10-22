@@ -49,6 +49,11 @@ func (s *stack) IsNull() bool {
 	return s == nil || s.ComputeService == nil
 }
 
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "gcp"
+}
+
 // GetConfigurationOptions ...
 func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 	if s.IsNull() || s.Config == nil {
