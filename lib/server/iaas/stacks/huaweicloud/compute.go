@@ -305,9 +305,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nullAhf, nullUdc, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"

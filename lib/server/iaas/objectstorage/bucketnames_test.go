@@ -17,9 +17,7 @@
 package objectstorage
 
 import (
-	"fmt"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -73,11 +71,4 @@ func TestBuildMetadataBucketName(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestTrimSurprises(t *testing.T) {
-	totr := "a/this/shoud/not/be/a/surprise/"
-
-	shifu := strings.Trim(totr, "/")
-	fmt.Println(shifu)
 }

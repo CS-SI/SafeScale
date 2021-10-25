@@ -252,11 +252,9 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 	}
 
 	if is.Serial || s.Serialize {
-		// logrus.Warnf("TBR: Installing %s feature serialized", is.Worker.feature.GetName())
 		return is.loopSeriallyOnHosts(task, hosts, v)
 	}
 
-	// logrus.Warnf("TBR: Installing %s feature in parallel", is.Worker.feature.GetName())
 	return is.loopConcurrentlyOnHosts(task, hosts, v)
 }
 
@@ -493,26 +491,6 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		problem := fail.Wrap(xerr, "failed to finalize installer script for step '%s'", is.Name)
 		return stepResult{err: problem}, problem
 	}
-
-	// VPL: not used anymore
-	// // If options file is defined, upload it to the remote rh
-	// if is.OptionsFileContent != "" {
-	// 	opItem := remotefile.Item{
-	// 		Remote:       utils.TempFolder + "/options.json",
-	// 		RemoteOwner:  "cladm:safescale", // FIXME: group 'safescale' must be replaced with OperatorUsername here, and why cladm is being used ?
-	// 		RemoteRights: "ug+rw-x,o-rwx",
-	// 	}
-	// 	defer func() {
-	// 		_ = os.Remove(opItem.Local)
-	// 	}()
-	// 	xerr = opItem.UploadString(task.Context(), is.OptionsFileContent, p.Host)
-	// 	xerr = debug.InjectPlannedFail(xerr)
-	// 	if xerr != nil {
-	// 		logrus.Warnf("TBR: failure uploading script: %v", xerr)
-	// 		problem := fail.Wrap(xerr, "failure uploading script")
-	// 		return stepResult{err: problem}, problem
-	// 	}
-	// }
 
 	hidesOutput := strings.Contains(command, "set +x\n")
 	if hidesOutput {

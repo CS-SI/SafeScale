@@ -2213,9 +2213,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 		return nil, fail.AbortedError(nil, "parent task killed")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	clusterName := instance.GetName()
@@ -2310,9 +2308,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.AbortedError(nil, "parent task killed")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	hostLabel := fmt.Sprintf("node #%d", p.index)
@@ -2718,9 +2714,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 		return nil, fail.AbortedError(nil, "parent task killed")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Node.Name,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Node.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", p.Index, p.Node.Name)

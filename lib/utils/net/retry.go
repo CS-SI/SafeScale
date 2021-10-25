@@ -153,7 +153,7 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
 // If the error is not a communication error, do not let a chance to retry by returning a *retry.ErrAborted error
 // containing the causing error in it
-func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) { // FIXME: Add UT to verify new and old functions behave the same way
+func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
 	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
 	defer func() {
 		if err != nil {
@@ -170,11 +170,10 @@ func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) { // FIXME: Add 
 		case *url.Error:
 			return normalizeURLError(realErr)
 		case fail.Error: // a fail.Error may contain a cause of type net.Error, being *url.Error a special subcase.
-			// FIXME: net.Error, and by extension url.Error have methods to check if the error is temporary -Temporary()-, or it's a timeout -Timeout()-, we should use the information to make decisions
+			// net.Error, and by extension url.Error have methods to check if the error is temporary -Temporary()-, or it's a timeout -Timeout()-, we should use the information to make decisions
 
 			// In this case, handle those net.Error accordingly
 			if realErr.Cause() != nil {
-				// FIXME: Cause might be nil unless using an accessor like the Cause function from v20.06, now missing in develop branch; look at cause use cases in develop branch and consider reintroducing it
 				switch cause := realErr.Cause().(type) { // nolint
 				case *url.Error:
 					return normalizeURLError(cause)
@@ -234,7 +233,7 @@ func normalizeURLError(err *url.Error) fail.Error {
 	isTemporary := err.Temporary()
 
 	if err.Err != nil {
-		switch commErr := err.Err.(type) { // FIXME: What if err.Err is nil
+		switch commErr := err.Err.(type) {
 		case *net.DNSError:
 			if isTemporary {
 				return fail.InvalidRequestError("failed to resolve by DNS: %v", commErr)

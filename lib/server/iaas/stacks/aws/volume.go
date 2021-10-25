@@ -414,7 +414,7 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 	query := ec2.DescribeVolumesInput{
 		Filters: []*ec2.Filter{
 			{
-				Name:   aws.String("attachment.instance-id"), // FIXME: What ?
+				Name:   aws.String("attachment.instance-id"),
 				Values: []*string{aws.String(serverID)},
 			},
 		},

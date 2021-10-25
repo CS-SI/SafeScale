@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -670,7 +671,9 @@ func getTenantsFromCfg() ([]map[string]interface{}, *viper.Viper, fail.Error) {
 	v := viper.New()
 	v.AddConfigPath(".")
 	v.AddConfigPath("$HOME/.safescale")
+	v.AddConfigPath(utils.AbsPathify("$HOME/.safescale"))
 	v.AddConfigPath("$HOME/.config/safescale")
+	v.AddConfigPath(utils.AbsPathify("$HOME/.config/safescale"))
 	v.AddConfigPath("/etc/safescale")
 	v.SetConfigName("tenants")
 

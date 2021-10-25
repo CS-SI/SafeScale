@@ -96,7 +96,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(
 				ctx, outs, executionTimeout,
-			) // FIXME: What if ssh never returns ?
+			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -431,9 +431,9 @@ func (s ssh) getSSHConfigFromName(name string, _ time.Duration) (*system.SSHConf
 	return converters.SSHConfigFromProtocolToSystem(sshConfig), nil
 }
 
-// Connect ...
+// Connect is the "safescale ssh connect"
 func (s ssh) Connect(hostname, username, shell string, timeout time.Duration) error {
-	sshCfg, xerr := s.getSSHConfigFromName(hostname, timeout)
+	sshCfg, xerr := s.getSSHConfigFromName(hostname, timeout) // timeout is ignored here
 	if xerr != nil {
 		return xerr
 	}

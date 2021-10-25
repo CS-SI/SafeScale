@@ -439,8 +439,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
-		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA,
-	).WithStopwatch().Entering()
+		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -693,8 +692,6 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation() fail.Error {
 }
 
 func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) (ferr fail.Error) {
-	// FIXME: review this function
-
 	svc := instance.GetService()
 	if gwSizing == nil {
 		gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
@@ -901,7 +898,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 				// Starting from here, deletes the primary gateway if exiting with error
 				defer func() {
 					if ferr != nil && !req.KeepOnFailure {
-						logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
+						logrus.Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
 						derr := primaryGateway.RelaxedDeleteHost(context.Background())
 						derr = debug.InjectPlannedFail(derr)
 						if derr != nil {
@@ -2807,8 +2804,7 @@ func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abst
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
-		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA,
-	).WithStopwatch().Entering()
+		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()

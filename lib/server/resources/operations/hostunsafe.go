@@ -246,7 +246,6 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 			}
 
 			crcCheck := func() fail.Error {
-				// logrus.Warnf("TBR: checking md5")
 				crcCtx, cancelCrc := context.WithTimeout(ctx, timeout)
 				defer cancelCrc()
 

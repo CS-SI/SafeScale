@@ -404,10 +404,9 @@ type ErrWarning struct {
 }
 
 // WarningError returns an ErrWarning instance
-// FIXME: not used
-func WarningError(cause error, msg ...interface{}) *ErrWarning {
+func WarningError(cause error, msg ...interface{}) *ErrWarning { // nolint
 	r := newError(cause, nil, msg...)
-	r.grpcCode = codes.DeadlineExceeded
+	r.grpcCode = codes.Unknown
 	return &ErrWarning{
 		errorCore: r,
 	}

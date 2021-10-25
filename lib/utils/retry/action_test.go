@@ -786,7 +786,6 @@ func TestOtherCustomActionWithTimeout(t *testing.T) {
 	}
 }
 
-// FIXME: Look at that
 func TestAwfulSimpleTaskActionWithSoftRetry(t *testing.T) {
 	single, xerr := concurrency.NewTask()
 	require.NotNil(t, single)

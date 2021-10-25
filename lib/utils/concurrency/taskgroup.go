@@ -398,7 +398,10 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			// previousErr := instance.task.err
 			// instance.task.lock.RUnlock()
 
-			results, childrenErrors := instance.waitChildren()
+			results, childrenErrors, waitingFailure := instance.waitChildren()
+			if waitingFailure != nil { // FIXME: Think how to react to that
+				logrus.Warnf(waitingFailure.Error())
+			}
 			instance.result = results
 			if len(childrenErrors) == 0 {
 				instance.children.ended = true
@@ -488,7 +491,7 @@ func (instance *taskGroup) buildErrorList(in map[string]error) fail.Error {
 }
 
 // waitChildren waits all the children to terminate
-func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
+func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error, fail.Error) {
 	instance.children.lock.RLock()
 	defer instance.children.lock.RUnlock()
 
@@ -496,38 +499,42 @@ func (instance *taskGroup) waitChildren() (TaskGroupResult, map[string]error) {
 	errorList := make(map[string]error)
 	results := make(TaskGroupResult, childrenCount)
 
-	for _, s := range instance.children.tasks {
-		for {
-			sid, err := s.task.ID()
-			if err != nil {
-				break
-			}
+	broken := false
 
-			result, err := s.task.Wait()
-			if err != nil {
-				if s.normalizeError != nil {
-					if normalizedError := s.normalizeError(err); normalizedError != nil {
-						if fail.Cause(normalizedError) == context.Canceled {
-							errorList[sid] = fail.AbortedError(normalizedError)
-						} else {
-							errorList[sid] = normalizedError
-						}
-					}
-				} else {
-					if fail.Cause(err) == context.Canceled {
-						errorList[sid] = fail.AbortedError(err)
+	for _, s := range instance.children.tasks {
+		sid, err := s.task.ID()
+		if err != nil {
+			broken = true
+			continue
+		}
+
+		result, err := s.task.Wait()
+		if err != nil {
+			if s.normalizeError != nil {
+				if normalizedError := s.normalizeError(err); normalizedError != nil {
+					if fail.Cause(normalizedError) == context.Canceled {
+						errorList[sid] = fail.AbortedError(normalizedError)
 					} else {
-						errorList[sid] = err
+						errorList[sid] = normalizedError
 					}
 				}
+			} else {
+				if fail.Cause(err) == context.Canceled {
+					errorList[sid] = fail.AbortedError(err)
+				} else {
+					errorList[sid] = err
+				}
 			}
-
-			results[sid] = result
-			break
 		}
+
+		results[sid] = result
 	}
 
-	return results, errorList
+	if broken {
+		return results, errorList, fail.NewError("We failed retrieving the ID of some children")
+	}
+
+	return results, errorList, nil
 }
 
 // TryWait executes TryWaitGroup
@@ -575,7 +582,10 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 	}
 
 	// all children terminate, now recover results and errors
-	results, childrenErrors := instance.waitChildren()
+	results, childrenErrors, waitingFailure := instance.waitChildren()
+	if waitingFailure != nil { // FIXME: Think how to react to that
+		logrus.Warnf(waitingFailure.Error())
+	}
 	instance.result = results
 	if len(childrenErrors) == 0 {
 		instance.children.ended = true

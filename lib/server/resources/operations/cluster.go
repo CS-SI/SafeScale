@@ -971,7 +971,7 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 				return innerXErr
 			}
 
-			// FIXME: if there's a problem starting things don't return, note the problem, break if needed, then abort and wait.
+			// If there's a problem starting things don't return, note the problem, break if needed, then abort and wait.
 			var problems []error
 
 			for _, n := range nodes {

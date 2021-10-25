@@ -848,9 +848,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", hostReq.ResourceName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -1175,8 +1173,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	// claiming Host is created
 	logrus.Infof("Waiting SSH availability on Host '%s' ...", instance.GetName())
 
-	// FIXME: configurable timeout here
-	status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, time.Duration(0))
+	status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, temporal.GetHostCreationTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -2832,9 +2829,7 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(cmd='%s', outs=%s)", outs.String(),
-	).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(cmd='%s', outs=%s)", outs.String()).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -2879,18 +2874,12 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(target=%s,source=%s)", target, source,
-	).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(target=%s,source=%s)", target, source).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	// FIXME: reintroduce timeout on ssh.
-	// if timeout < temporal.GetHostTimeout() {
-	// 	timeout = temporal.GetHostTimeout()
-	// }
 	var (
 		stdout, stderr string
 	)
@@ -2965,8 +2954,7 @@ func (instance *Host) Push(ctx context.Context, source, target, owner, mode stri
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner,
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner,
 		mode,
 	).Entering()
 	defer tracer.Exiting()
@@ -3570,10 +3558,8 @@ func (instance *Host) PushStringToFileWithOwnership(ctx context.Context, content
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(content, filename='%s', ownner=%s, mode=%s", filename, owner,
-		mode,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(content, filename='%s', ownner=%s, mode=%s", filename, owner,
+		mode).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -3711,9 +3697,7 @@ func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resource
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s', enable=%v", sgInstance.GetName(), enable,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s', enable=%v", sgInstance.GetName(), enable).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -3799,9 +3783,7 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 	}
 
 	sgName := sgInstance.GetName()
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -3952,9 +3934,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 	}
 
 	sgName := sg.GetName()
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sg='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -4073,9 +4053,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 	}
 
 	sgName := sgInstance.GetName()
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(sgInstance='%s')", sgName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()

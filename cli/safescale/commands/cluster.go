@@ -1420,7 +1420,7 @@ var clusterMasterInspectCommand = &cli.Command{
 }
 
 // clusterMasterStopCmd handles 'safescale cluster master stop <clustername> <mastername>'
-var clusterMasterStopCommand = &cli.Command{
+var clusterMasterStopCommand = &cli.Command{ // nolint
 	Name:      "stop",
 	Aliases:   []string{"freeze"},
 	Usage:     "master stop CLUSTERNAME MASTERNAME",
@@ -1452,7 +1452,7 @@ var clusterMasterStopCommand = &cli.Command{
 }
 
 // clusterMasterStartCmd handles 'deploy cluster <clustername> node <nodename> start'
-var clusterMasterStartCommand = &cli.Command{
+var clusterMasterStartCommand = &cli.Command{ // nolint
 	Name:      "start",
 	Aliases:   []string{"unfreeze"},
 	Usage:     "master start CLUSTERNAME MASTERNAME",
@@ -1484,7 +1484,7 @@ var clusterMasterStartCommand = &cli.Command{
 }
 
 // clusterMasterNodeStateCmd handles 'safescale cluster master state <clustername> <mastername>'
-var clusterMasterStateCommand = &cli.Command{
+var clusterMasterStateCommand = &cli.Command{ // nolint
 	Name:      "state",
 	Usage:     "master state CLUSTERNAME MASTERNAME",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",

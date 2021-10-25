@@ -61,7 +61,7 @@ func TestRealCharge(t *testing.T) {
 
 	res, err := overlord.Wait()
 	require.NotEmpty(t, res)
-	// require.Nil(t, err)
+	require.NotNil(t, err)
 
 	var abortState string
 	if abortOccurred {

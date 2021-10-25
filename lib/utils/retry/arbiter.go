@@ -109,6 +109,8 @@ func OrArbiter(arbiters ...Arbiter) Arbiter {
 
 			switch v {
 			case verdict.Done:
+				final = verdict.Done
+				lastErr = nil
 				return verdict.Done, nil
 			case verdict.Abort:
 				final = verdict.Abort

@@ -100,14 +100,6 @@ var (
 	}
 )
 
-// IsSCPRetryable tells if the retcode of a scp command may be retried
-func IsSCPRetryable(code int) bool {
-	if code == 4 || code == 5 || code == 66 || code == 67 || code == 70 || code == 74 || code == 75 || code == 76 {
-		return true
-	}
-	return false
-}
-
 // SSHConfig helper to manage ssh session
 type SSHConfig struct {
 	Hostname               string     `json:"hostname"`
@@ -269,27 +261,26 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 		defaultTmpDir = ""
 	}
 
-	f, err := ioutil.TempFile(defaultTmpDir, "") // TODO: Windows friendly
+	f, err := ioutil.TempFile(defaultTmpDir, "")
 	if err != nil {
 		return nil, fail.ExecutionError(err, "failed to create temporary file")
 	}
 	_, err = f.WriteString(content)
 	if err != nil {
-		logrus.Warnf("Error writing string: %v", err)
 		return nil, fail.ExecutionError(err, "failed to wrote string to temporary file")
 	}
 
 	err = f.Chmod(filemode)
 	if err != nil {
-		logrus.Warnf("Error changing directory: %v", err)
 		return nil, fail.ExecutionError(err, "failed to change temporary file access rights")
 	}
 
 	err = f.Close()
 	if err != nil {
-		logrus.Warnf("Error closing file: %v", err)
 		return nil, fail.ExecutionError(err, "failed to close temporary file")
 	}
+
+	logrus.Tracef("New temporary file %s", f.Name())
 
 	return f, nil
 }
@@ -337,7 +328,7 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 
 	options := sshOptions + " -oServerAliveInterval=60 -oServerAliveCountMax=10" // this survives 10 minutes without connection
 	cmdString := fmt.Sprintf(
-		"ssh -i %s -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
+		"ssh -i \"%s\" -NL 127.0.0.1:%d:%s:%d %s@%s %s -oSendEnv='IAM=%s' -p %d",
 		f.Name(),
 		localPort,
 		scfg.IPAddress,
@@ -348,6 +339,9 @@ func buildTunnel(scfg *SSHConfig) (*SSHTunnel, fail.Error) {
 		scfg.Hostname,
 		scfg.GatewayConfig.Port,
 	)
+
+	logrus.Debugf("Creating SSH tunnel with '%s'", cmdString)
+
 	cmd := exec.Command("bash", "-c", cmdString)
 	cmd.SysProcAttr = getSyscallAttrs()
 	cerr := cmd.Start()
@@ -565,9 +559,7 @@ func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, t
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("ssh"), "(%s, %v)", outs.String(), timeout).WithStopwatch().Entering()
 	tracer.Trace("host='%s', command=\n%s\n", scmd.hostname, scmd.runCmdString)
 	defer tracer.Exiting()
 
@@ -863,7 +855,7 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 	}
 
 	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", sconf.Hostname)
-	sshCmdString := fmt.Sprintf("ssh -i %s %s -p %d %s@%s", f.Name(), options, sconf.Port, sconf.User, sconf.IPAddress)
+	sshCmdString := fmt.Sprintf("ssh -i \"%s\" %s -p %d %s@%s", f.Name(), options, sconf.Port, sconf.User, sconf.IPAddress)
 
 	if shell == "" {
 		shell = "bash"
@@ -899,6 +891,8 @@ func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withT
 	if cmdString != "" {
 		sshCmdString += fmt.Sprintf(" <<'ENDSSH'\n%s\nENDSSH", cmdString)
 	}
+
+	logrus.Debugf("Created SSH command '%s'", sshCmdString)
 
 	return sshCmdString, f, nil
 }
@@ -1030,7 +1024,7 @@ func createSCPCommand(sconf *SSHConfig, localPath, remotePath string, isUpload b
 
 	options := sshOptions + " -oConnectTimeout=60 -oLogLevel=error" + fmt.Sprintf(" -oSendEnv='IAM=%s'", sconf.Hostname)
 
-	sshCmdString := fmt.Sprintf("scp -i %s %s -P %d ", f.Name(), options, sconf.Port)
+	sshCmdString := fmt.Sprintf("scp -i \"%s\" %s -P %d ", f.Name(), options, sconf.Port)
 	if isUpload {
 		sshCmdString += fmt.Sprintf("\"%s\" %s@%s:\"%s\"", localPath, sconf.User, sconf.IPAddress, remotePath)
 	} else {
@@ -1073,9 +1067,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
-	defer debug.NewTracer(
-		task, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout),
-	).Entering().Exiting()
+	defer debug.NewTracer(task, tracing.ShouldTrace("ssh"), "('%s',%s)", phase, temporal.FormatDuration(timeout)).Entering().Exiting()
 	defer fail.OnExitTraceError(
 		&xerr, "timeout waiting remote SSH phase '%s' of host '%s' for %s", phase, sconf.Hostname,
 		temporal.FormatDuration(timeout),
@@ -1227,7 +1219,7 @@ func (sconf *SSHConfig) copy(
 	return sshCommand.RunWithTimeout(ctx, outputs.COLLECT, timeout)
 }
 
-// Enter to interactive shell
+// Enter to interactive shell, aka 'safescale ssh connect'
 func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 	tunnels, sshConfig, xerr := sconf.CreateTunneling()
 	if xerr != nil {

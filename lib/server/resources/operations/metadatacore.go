@@ -691,7 +691,9 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
-			case *retry.ErrTimeout, *retry.ErrStopRetry: // FIXME: split
+			case *retry.ErrTimeout:
+				return fail.Wrap(fail.RootCause(xerr), "failed (timeout) to read %s '%s'", c.kind, name)
+			case *retry.ErrStopRetry:
 				return fail.Wrap(fail.RootCause(xerr), "failed to read %s '%s'", c.kind, name)
 			default:
 				return fail.Wrap(xerr, "failed to read %s '%s'", c.kind, name)

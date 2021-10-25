@@ -374,8 +374,8 @@ func DefaultMetadataNotifier(metaID string) func(t Try, v verdict.Enum) {
 	}
 }
 
-// DefaultNotifierWithContext FIXME: not used...
-func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum) {
+// DefaultNotifierWithContext Provides a notified based on context 'ctx'
+func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum) { // nolint
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics == "" {
 		return func(t Try, v verdict.Enum) {
 		}
@@ -383,19 +383,6 @@ func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum)
 
 	ctxID := ""
 
-	// if ctx != nil && {
-	//	if ctx != context.TODO() {
-	//		res := ctx.Value(concurrency.KeyForTaskInContext)
-	//		if res != nil {
-	//			switch rt := res.(type) {
-	//			case string:
-	//				ctxID = rt
-	//			case concurrency.TaskCore:
-	//				ctxID, _ = rt.ID()
-	//			}
-	//		}
-	//	}
-	// }
 	task, xerr := concurrency.TaskFromContext(ctx)
 	if xerr == nil {
 		ctxID, _ = task.ID()

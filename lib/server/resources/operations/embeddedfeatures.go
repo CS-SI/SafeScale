@@ -188,22 +188,6 @@ func certificateAuthorityFeature() *Feature {
 	}
 }
 
-// postgresql4platformFeature feature. ...
-func postgresql4platformFeature() *Feature {
-	name := "postgresql4platform"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
 // nVidiaDockerFeature ...
 func nVidiaDockerFeature() *Feature {
 	name := "nvidiadocker"
@@ -255,22 +239,6 @@ func helm2Feature() *Feature {
 // helm3Feature ...
 func helm3Feature() *Feature {
 	name := "helm3"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
-// sparkmaster4platformFeature ...
-func sparkmaster4platformFeature() *Feature {
-	name := "sparkmaster4platform"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
@@ -351,38 +319,6 @@ func postgres4gatewayFeature() *Feature {
 // edgeproxy4subnetFeature ...
 func edgeproxy4subnetFeature() *Feature {
 	name := "edgeproxy4subnet"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
-// keycloak4platformFeature ...
-func keycloak4platformFeature() *Feature {
-	name := "keycloak4platform"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
-// monitoring4platformFeature ...
-func monitoring4platformFeature() *Feature {
-	name := "monitoring4platform"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
