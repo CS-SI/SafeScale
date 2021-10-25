@@ -565,7 +565,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		if caps.PrivateVirtualIP {
 			logrus.Info("Driver support private Virtual IP, honoring the failover setup for gateways.")
 		} else {
-			logrus.Warning("Driver does not support private Virtual IP, cannot set up failover of Subnet default route.")
+			logrus.Warnf("Driver does not support private Virtual IP, cannot set up failover of Subnet default route.")
 			failover = false
 		}
 	}

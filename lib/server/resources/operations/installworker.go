@@ -750,7 +750,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		} else {
 			wallTimeConv, inner := strconv.Atoi(anon.(string))
 			if inner != nil {
-				logrus.Warningf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
+				logrus.Warnf("Invalid value '%s' for '%s.%s', ignored.", anon.(string), w.rootKey, yamlTimeoutKeyword)
 			} else {
 				wallTime = time.Duration(wallTimeConv) * time.Minute
 			}

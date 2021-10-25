@@ -361,10 +361,10 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if len(subtasks) != len(hosts) {
-			logrus.Errorf("TBR: no matter what, this should fail because something happened starting tasks")
+			logrus.Warningf("TBR: no matter what, this should fail because something happened starting tasks")
 		}
-		logrus.Warnf("TBR: at this point, we failed because we have [%s]", spew.Sdump(xerr))
-		logrus.Warnf("TBR: when it happened, the outcomes were:")
+		logrus.Warningf("TBR: at this point, we failed because we have [%s]", spew.Sdump(xerr))
+		logrus.Warningf("TBR: when it happened, the outcomes were:")
 		wrongs := 0
 		for _, s := range subtasks {
 			sid, _ := s.ID()
@@ -462,13 +462,13 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
 					dur := spew.Sdump(result)
 					if !strings.Contains(dur, "check_") {
-						logrus.Warningf("TBR: task result: %s", spew.Sdump(result)) // TBR, remove this later
+						logrus.Warningf("task result: %s", spew.Sdump(result))
 					}
 				}
 			}
 		}
 		if ferr != nil {
-			logrus.Warningf("TBR: task error: %v", ferr) // TBR, remove this later
+			logrus.Warningf("task error: %v", ferr)
 		}
 	}()
 
@@ -512,7 +512,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	xerr = rfcItem.UploadString(task.Context(), command, p.Host)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Warnf("TBR: failure uploading script: %v", xerr)
+		logrus.Warningf("failure uploading script: %v", xerr)
 		problem := fail.Wrap(xerr, "failure uploading script")
 		return stepResult{err: problem}, problem
 	}

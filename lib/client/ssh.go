@@ -379,7 +379,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 					}
 					if !strings.Contains(fstdout, md5hash) {
 						logrus.Warnf(
-							"TBR: WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath,
+							"WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath,
 							fstdout, fstderr, md5hash,
 						)
 						return fail.NewError("wrong md5 of '%s'", remotePath)

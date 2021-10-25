@@ -523,9 +523,6 @@ func TestErrCheckStdError(t *testing.T) {
 	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "the checking failed")
-	}
-
-	if xerr != nil {
 		t.Logf(xerr.Error())
 		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(
 			xerr.Error(), "failed 7",
@@ -546,9 +543,6 @@ func TestErrCheckStdErrorHard(t *testing.T) {
 	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "the checking failed")
-	}
-
-	if xerr != nil {
 		t.Logf(xerr.Error())
 		if !(strings.Contains(xerr.Error(), "failed 6") || strings.Contains(
 			xerr.Error(), "failed 7",
@@ -578,9 +572,6 @@ func TestErrCheckStopStdError(t *testing.T) {
 	if xerr != nil {
 		errCause = fail.RootCause(xerr)
 		xerr = fail.Wrap(xerr, "the checking failed")
-	}
-
-	if xerr != nil {
 		t.Logf(xerr.Error())
 		if !strings.Contains(xerr.Error(), "failed 4") {
 			t.FailNow()

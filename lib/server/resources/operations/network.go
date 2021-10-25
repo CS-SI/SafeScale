@@ -628,7 +628,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 			}
 
 			if maybeDeleted {
-				logrus.Warningf("TBR: The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
+				logrus.Warningf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
 			}
 			iterations := 6
 			for {
@@ -639,7 +639,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 				}
 				iterations--
 				if iterations < 0 {
-					logrus.Warningf("TBR: The network '%s' is still there", abstractNetwork.ID)
+					logrus.Warningf("The network '%s' is still there", abstractNetwork.ID)
 					break
 				}
 				time.Sleep(temporal.GetDefaultDelay())

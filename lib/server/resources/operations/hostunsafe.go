@@ -275,7 +275,7 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 					return finnerXerr
 				}
 				if !strings.Contains(fstdout, md5hash) {
-					logrus.Warnf("TBR: WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", target, fstdout, fstderr, md5hash)
+					logrus.Warnf("WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", target, fstdout, fstderr, md5hash)
 					return fail.NewError("wrong md5 of '%s'", target)
 				}
 				return nil
@@ -318,7 +318,7 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		logrus.Warnf("TBR: extra changing rights")
+		logrus.Warningf("extra changing rights")
 		iretcode, istdout, istderr, innerXerr := run(ctx, instance.sshProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {

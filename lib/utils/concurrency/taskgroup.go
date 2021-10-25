@@ -84,12 +84,12 @@ var (
 
 // NewTaskGroup ...
 func NewTaskGroup(options ...data.ImmutableKeyValue) (*taskGroup, fail.Error) { // nolint
-	return newTaskGroup(context.TODO(), nil, options...)
+	return newTaskGroup(context.TODO(), nil, options...) //nolint
 }
 
 // NewTaskGroupWithParent ...
 func NewTaskGroupWithParent(parentTask Task, options ...data.ImmutableKeyValue) (*taskGroup, fail.Error) { // nolint
-	return newTaskGroup(context.TODO(), parentTask, options...)
+	return newTaskGroup(context.TODO(), parentTask, options...) //nolint
 }
 
 // NewTaskGroupWithContext ...

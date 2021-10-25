@@ -1015,7 +1015,7 @@ func TestSingleTaskWait(t *testing.T) {
 
 func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 	funk := func(ind int, timeout int, sleep int, trigger int, errorExpected bool) {
-		ctx, cafu := context.WithTimeout(context.TODO(), time.Duration(timeout)*time.Millisecond)
+		ctx, cafu := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
 		defer cafu()
 
 		single, err := NewTaskWithContext(ctx)
@@ -1092,7 +1092,7 @@ func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
 
 func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 	funk := func(ind int, timeout uint, sleep uint, trigger uint, errorExpected bool) {
-		ctx, cafu := context.WithDeadline(context.TODO(), time.Now().Add(time.Duration(timeout)*time.Millisecond))
+		ctx, cafu := context.WithDeadline(context.Background(), time.Now().Add(time.Duration(timeout)*time.Millisecond))
 		require.NotNil(t, ctx)
 		require.NotNil(t, cafu)
 
@@ -1172,7 +1172,7 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	funk := func(ind int, sleep uint, lat uint, trigger uint, errorExpected bool) {
 		fmt.Printf("--- funk #%d ---\n", ind)
 
-		ctx, cafu := context.WithCancel(context.TODO())
+		ctx, cafu := context.WithCancel(context.Background())
 		single, xerr := NewTaskWithContext(ctx)
 		require.NotNil(t, single)
 		require.Nil(t, xerr)

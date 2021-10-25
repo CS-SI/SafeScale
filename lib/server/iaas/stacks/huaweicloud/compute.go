@@ -930,7 +930,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
 			// 1st, send delete host order
-			if resourcePresent {
+			if resourcePresent { // nolint
 				innerRetryErr := stacks.RetryableRemoteCall(
 					func() error {
 						innerErr := servers.Delete(s.Stack.ComputeClient, ahf.Core.ID).ExtractErr()

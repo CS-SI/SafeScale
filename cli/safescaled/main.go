@@ -150,10 +150,10 @@ func assembleListenString(c *cli.Context) string {
 		case 2:
 			num, err := strconv.Atoi(parts[1])
 			if err != nil || num <= 0 {
-				logrus.Warningf("Parameter 'listen' content is invalid (port cannot be '%s'): ignored.", parts[1])
+				logrus.Warnf("Parameter 'listen' content is invalid (port cannot be '%s'): ignored.", parts[1])
 			}
 		default:
-			logrus.Warningf("Parameter 'listen' content is invalid, ignored.")
+			logrus.Warnf("Parameter 'listen' content is invalid, ignored.")
 		}
 	}
 	// if listen is empty, get the port from env
@@ -161,7 +161,7 @@ func assembleListenString(c *cli.Context) string {
 		if port := os.Getenv("SAFESCALED_PORT"); port != "" {
 			num, err := strconv.Atoi(port)
 			if err != nil || num <= 0 {
-				logrus.Warningf("Environment variable 'SAFESCALED_PORT' contains invalid content ('%s'): ignored.", port)
+				logrus.Warnf("Environment variable 'SAFESCALED_PORT' contains invalid content ('%s'): ignored.", port)
 			} else {
 				listen = defaultDaemonHost + ":" + port
 			}

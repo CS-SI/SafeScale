@@ -218,7 +218,7 @@ func TestSingleTaskWF(t *testing.T) {
 
 func TestChildrenWaitingGameWithContextTimeoutsWF(t *testing.T) {
 	funk := func(ind int, timeout int, sleep int, trigger int, errorExpected bool) {
-		ctx, cafu := context.WithTimeout(context.TODO(), time.Duration(timeout)*time.Millisecond)
+		ctx, cafu := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
 		defer cafu()
 
 		single, err := NewTaskWithContext(ctx)
@@ -295,7 +295,7 @@ func TestChildrenWaitingGameWithContextTimeoutsWF(t *testing.T) {
 
 func TestChildrenWaitingGameWithContextDeadlinesWF(t *testing.T) {
 	funk := func(ind int, timeout uint, sleep uint, trigger uint, errorExpected bool) {
-		ctx, cafu := context.WithDeadline(context.TODO(), time.Now().Add(time.Duration(timeout)*time.Millisecond))
+		ctx, cafu := context.WithDeadline(context.Background(), time.Now().Add(time.Duration(timeout)*time.Millisecond))
 		require.NotNil(t, ctx)
 		require.NotNil(t, cafu)
 

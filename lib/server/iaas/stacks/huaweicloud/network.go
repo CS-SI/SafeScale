@@ -598,7 +598,7 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 				case "409":
 					logrus.Debugf("Subnet still owns host(s), retrying in %s...", temporal.GetDefaultDelay())
 				default:
-					logrus.Warningf("unexpected error: %s", spew.Sdump(t.Err))
+					logrus.Warnf("unexpected error: %s", spew.Sdump(t.Err))
 					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), temporal.GetDefaultDelay())
 				}
 			}

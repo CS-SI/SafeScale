@@ -1012,7 +1012,7 @@ func (c *MetadataCore) released() {
 // satisfies interface data.Cacheable
 func (c *MetadataCore) Destroyed() {
 	if c == nil || c.IsNull() {
-		logrus.Warningf("Destroyed called on an invalid instance")
+		logrus.Warnf("Destroyed called on an invalid instance")
 		return
 	}
 

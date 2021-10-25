@@ -931,10 +931,10 @@ func (instance *Cluster) installDocker(ctx context.Context, host resources.Host,
 			rk := r.ResultsOfKey(k)
 			if !rk.Successful() {
 				if len(rk.ErrorMessages()) == 0 {
-					logrus.Warnf("TBR: This is a false warning for %s !!: %s", k, rk.ErrorMessages())
+					logrus.Warningf("This is a false warning for %s !!: %s", k, rk.ErrorMessages())
 				} else {
 					reason = true
-					logrus.Warnf("TBR: This failed: %s with %s", k, spew.Sdump(rk))
+					logrus.Warningf("This failed: %s with %s", k, spew.Sdump(rk))
 				}
 			}
 		}

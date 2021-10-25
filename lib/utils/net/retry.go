@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
@@ -59,7 +60,7 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 		func(t retry.Try, v verdict.Enum) {
 			switch v {
 			case verdict.Retry:
-				logrus.Warningf("communication failed (%s), retrying", t.Err.Error())
+				logrus.Warnf("communication failed (%s), retrying", t.Err.Error())
 			default:
 			}
 		},
@@ -92,8 +93,9 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 		if err != nil {
 			switch err.(type) {
 			case fail.ErrInvalidRequest, *fail.ErrInvalidRequest:
-				logrus.Warning(err.Error())
+				logrus.Warnf(err.Error())
 			default:
+				debug.IgnoreError(err)
 			}
 		}
 	}()
@@ -159,8 +161,9 @@ func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
 		if err != nil {
 			switch err.(type) {
 			case fail.ErrInvalidRequest, *fail.ErrInvalidRequest:
-				logrus.Warning(err.Error())
+				logrus.Warnf(err.Error())
 			default:
+				debug.IgnoreError(err)
 			}
 		}
 	}()

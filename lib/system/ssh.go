@@ -673,10 +673,8 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 		if pipeBridgeCtrl, xerr = cli.NewPipeBridgeController(stdoutBridge, stderrBridge); xerr != nil {
 			return result, xerr
 		}
-	}
 
-	// Starts pipebridge if needed
-	if !params.collectOutputs {
+		// Starts pipebridge if needed
 		if xerr = pipeBridgeCtrl.Start(task); xerr != nil {
 			return result, xerr
 		}
@@ -1132,8 +1130,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 						return innerXErr
 					}
 				}
-			}
-			if retcode != 0 {
+
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
 				_ = fe.Annotate("retcode", retcode)
 				_ = fe.Annotate("stdout", stdout)
