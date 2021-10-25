@@ -16,6 +16,233 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestChildrenWaitingGameWithContextTimeouts(t *testing.T) {
+	funk := func(ind int, timeout int, sleep int, trigger int, errorExpected bool) {
+		ctx, cafu := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+		defer cafu()
+
+		single, err := NewTaskWithContext(ctx)
+		require.NotNil(t, single)
+		require.Nil(t, err)
+
+		begin := time.Now()
+
+		_, xerr := single.Start(taskgen(sleep, sleep, 4, 0, 0, 0, false), nil)
+		require.Nil(t, xerr)
+
+		go func() {
+			time.Sleep(time.Duration(trigger) * time.Millisecond)
+			cafu()
+		}()
+
+		_, err = single.Wait()
+		end := time.Since(begin)
+		if err != nil {
+			switch err.(type) {
+			case *fail.ErrAborted:
+			case *fail.ErrTimeout:
+			default:
+				t.Errorf("Unexpected error occurred: %s (%s)", err.Error(), reflect.TypeOf(err).String())
+			}
+		}
+
+		if !((err != nil) == errorExpected) {
+			t.Errorf(
+				"Failure in test %d (in error expected): %v, %v, %v, %t", ind, timeout, sleep, trigger, errorExpected,
+			)
+		}
+
+		tolerance := func(in float64, percent uint) float32 {
+			return float32(in * (100.0 + float64(percent)) / 100.0)
+		}
+
+		// the minimum of the 3 wins, so
+		min := math.Min(math.Min(float64(timeout), float64(sleep)), float64(trigger))
+		tolerated := time.Duration(tolerance(min, 20)) * time.Millisecond
+
+		if end > tolerated {
+			t.Logf(
+				"Failure in test %d: %v, %v, %v, %t: We waited too much! %v > %v", ind, timeout, sleep, trigger,
+				errorExpected, end, tolerated,
+			)
+		}
+	}
+
+	// No errors here, look at TestChildrenWaitingGameWithContextCancelfuncs for more information
+	// there is a performance degradation problem in Task/TaskGroup that impact the timings
+	// example:
+	// 140, 20, 50, false -> after the 20ms sleep it comes a cancel at 50ms, like twice the time later, yet we didn't finish the job
+	// that's our fault (a go function with a select listening to Done nails the ms), so the cancel hits, error is true and the test fails
+	// 140, 20, 120, false -> but if we put the cancel far enough, it works, returning a false
+	//
+	// is this critical ?, maybe not today but...
+	// big problems have small beginnings...
+
+	funk(1, 30, 50, 10, true) // canceled
+	funk(2, 10, 50, 30, true) // timeout
+	funk(3, 30, 50, 80, true) // timeout
+	funk(4, 80, 50, 10, true) // canceled
+	funk(5, 40, 20, 10, true) // canceled
+	funk(
+		6, 40, 20, 30, false,
+	) // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
+	funk(7, 140, 20, 240 /*40*/, false) // same thing here
+	funk(8, 140, 20, 100, false)        // same thing here
+	funk(9, 140, 20, 120, false)        // same thing here
+	funk(10, 140, 20, 50, false)        // same thing here
+	funk(11, 140, 50, 10, true)         // canceled
+}
+
+func TestChildrenWaitingGameWithContextTimeoutsWF(t *testing.T) {
+	funk := func(ind int, timeout int, sleep int, trigger int, errorExpected bool) {
+		ctx, cafu := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Millisecond)
+		defer cafu()
+
+		single, err := NewTaskWithContext(ctx)
+		require.NotNil(t, single)
+		require.Nil(t, err)
+
+		begin := time.Now()
+
+		_, xerr := single.Start(taskgen(sleep, sleep, 4, 0, 0, 0, false), nil)
+		require.Nil(t, xerr)
+
+		go func() {
+			time.Sleep(time.Duration(trigger) * time.Millisecond)
+			cafu()
+		}()
+
+		_, _, err = single.WaitFor(5 * time.Second)
+		end := time.Since(begin)
+		if err != nil {
+			switch err.(type) {
+			case *fail.ErrAborted:
+			case *fail.ErrTimeout:
+			default:
+				t.Errorf("Unexpected error occurred: %s (%s)", err.Error(), reflect.TypeOf(err).String())
+			}
+		}
+
+		if !((err != nil) == errorExpected) {
+			t.Errorf(
+				"Failure in test %d (in error expected): %v, %v, %v, %t", ind, timeout, sleep, trigger, errorExpected,
+			)
+		}
+
+		tolerance := func(in float64, percent uint) float32 {
+			return float32(in * (100.0 + float64(percent)) / 100.0)
+		}
+
+		// the minimum of the 3 wins, so
+		min := math.Min(math.Min(float64(timeout), float64(sleep)), float64(trigger))
+		tolerated := time.Duration(tolerance(min, 20)) * time.Millisecond
+
+		if end > tolerated {
+			t.Logf(
+				"Failure in test %d: %v, %v, %v, %t: We waited too much! %v > %v", ind, timeout, sleep, trigger,
+				errorExpected, end, tolerated,
+			)
+		}
+	}
+
+	// No errors here, look at TestChildrenWaitingGameWithContextCancelfuncs for more information
+	// there is a performance degradation problem in Task/TaskGroup that impact the timings
+	// example:
+	// 140, 20, 50, false -> after the 20ms sleep it comes a cancel at 50ms, like twice the time later, yet we didn't finish the job
+	// that's our fault (a go function with a select listening to Done nails the ms), so the cancel hits, error is true and the test fails
+	// 140, 20, 120, false -> but if we put the cancel far enough, it works, returning a false
+	//
+	// is this critical ?, maybe not today but...
+	// big problems have small beginnings...
+
+	funk(1, 30, 50, 10, true) // canceled
+	funk(2, 10, 50, 30, true) // timeout
+	funk(3, 30, 50, 80, true) // timeout
+	funk(4, 80, 50, 10, true) // canceled
+	funk(5, 40, 20, 10, true) // canceled
+	funk(
+		6, 40, 20, 30, false,
+	) // cancel is triggered AFTER we are done (in 20ms), less longer than the timeout -> so no error
+	funk(7, 140, 20, 240 /*40*/, false) // same thing here
+	funk(8, 140, 20, 100, false)        // same thing here
+	funk(9, 140, 20, 120, false)        // same thing here
+	funk(10, 140, 20, 50, false)        // same thing here
+	funk(11, 140, 50, 10, true)         // canceled
+}
+
+func TestChildrenWaitingGameWithContextDeadlinesWF(t *testing.T) {
+	funk := func(ind int, timeout uint, sleep uint, trigger uint, errorExpected bool) {
+		ctx, cafu := context.WithDeadline(context.Background(), time.Now().Add(time.Duration(timeout)*time.Millisecond))
+		require.NotNil(t, ctx)
+		require.NotNil(t, cafu)
+
+		single, xerr := NewTaskWithContext(ctx)
+		require.NotNil(t, single)
+		require.Nil(t, xerr)
+
+		singleID := fmt.Sprintf("/single-%d", ind)
+		xerr = single.SetID(singleID)
+		require.Nil(t, xerr)
+
+		begin := time.Now()
+
+		_, xerr = single.Start(taskgen(int(sleep), int(sleep), 4, 0, 0, 0, false), nil)
+		require.Nil(t, xerr)
+
+		go func() {
+			time.Sleep(time.Duration(trigger) * time.Millisecond)
+			cafu()
+		}()
+
+		_, _, xerr = single.WaitFor(5 * time.Second)
+		end := time.Since(begin)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrAborted:
+			case *fail.ErrTimeout:
+				// expected error types
+			default:
+				t.Errorf(
+					"Unexpected error occurred in test #%d: %s (%s)", ind, xerr.Error(), reflect.TypeOf(xerr).String(),
+				)
+			}
+		}
+
+		if !((xerr != nil) == errorExpected) {
+			t.Errorf("Failure in test %d: %d, %d, %d, %t, wrong error", ind, timeout, sleep, trigger, errorExpected)
+		}
+
+		ok := (xerr != nil) == errorExpected
+		if !ok {
+			t.Fail()
+		}
+
+		tolerance := func(in float64, percent uint) float32 {
+			return float32(in * (100.0 + float64(percent)) / 100.0)
+		}
+
+		// the minimum of the 3 wins, so
+		min := math.Min(math.Min(float64(timeout), float64(sleep)), float64(trigger))
+		tolerated := time.Duration(tolerance(min, 20)) * time.Millisecond
+
+		if end > tolerated {
+			t.Logf(
+				"Failure in test %d: %v, %v, %v, %t: We waited too much! %v > %v", ind, timeout, sleep, trigger,
+				errorExpected, end, tolerated,
+			)
+		}
+	}
+	funk(1, 30, 50, 10, true)   // cancel (aborted)
+	funk(2, 30, 50, 90, true)   // timeout
+	funk(3, 50, 30, 10, true)   // cancel (aborted)
+	funk(4, 50, 10, 30, false)  // terminate normally // FAIL
+	funk(5, 70, 30, 10, true)   // cancel (aborted)
+	funk(6, 40, 10, 30, false)  // terminate normally // FAIL
+	funk(7, 140, 20, 40, false) // terminate normally // FAIL
+	funk(8, 140, 40, 20, true)  // cancel (aborted)
+	funk(9, 140, 40, 10, true)  // cancel (aborted)
+}
+
 func TestChildrenWaitingGameWithContextCancelfuncsWF(t *testing.T) {
 	funk := func(ind int, sleep uint, lat uint, trigger uint, errorExpected bool) {
 		fmt.Printf("--- funk #%d ---\n", ind)

@@ -92,7 +92,7 @@ func TestStartStopDurationWithPause(t *testing.T) {
 	stowa.Stop()
 
 	res := FormatDuration(stowa.GetDuration())
-	if !strings.Contains(res, "0.03") {
+	if !(strings.Contains(res, "0.03") || strings.Contains(res, "0.04")) {
 		t.Errorf("This should be near 30 ms and it isn't: %s", res)
 	}
 }
@@ -110,7 +110,7 @@ func TestStartStopDurationWithPauseDefaultFormatting(t *testing.T) {
 	stowa.Stop()
 
 	text := fmt.Sprintf("This is %s", stowa)
-	if !strings.Contains(text, "0.03") {
+	if !(strings.Contains(text, "0.03") || strings.Contains(text, "0.04")) {
 		t.Errorf("This should be near 30 ms and it isn't: %s", text)
 	}
 }
@@ -133,7 +133,7 @@ func TestStartStopDurationWithPauseDefaultFormattingLogWithLevel(t *testing.T) {
 	stowa.Stop()
 
 	text := fmt.Sprintf("This is %s", stowa)
-	if !strings.Contains(text, "0.03") {
+	if !(strings.Contains(text, "0.03") || strings.Contains(text, "0.04")) {
 		t.Errorf("This should be near 30 ms and it isn't: %s", text)
 	}
 
