@@ -2410,6 +2410,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 			if xerr != nil {
 				return xerr
 			}
+			debug.IgnoreError(xerr)
 		default:
 			return xerr
 		}

@@ -38,7 +38,6 @@ require (
 	github.com/ovh/go-ovh v0.0.0-20181109152953-ba5adb4cf014
 	github.com/pelletier/go-toml v1.9.0 // indirect
 	github.com/pengux/check v0.0.0-20150612073650-53861b30913d
-	github.com/quasilyte/go-ruleguard/dsl v0.3.10 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sanity-io/litter v1.3.0
 	github.com/satori/go.uuid v1.2.1-0.20181028125025-b2ce2384e17b

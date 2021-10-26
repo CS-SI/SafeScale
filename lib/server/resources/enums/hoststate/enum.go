@@ -28,6 +28,7 @@ const (
 	Stopping               // Stopping when host is stopping
 	Terminated             // Terminated when a host can be enumerated, but it's already deleted
 	Any                    // Any when a valid state is received
+	Failed                 // Failed when installing something on a Started host was not a success
 
 	Error = 254 // when host is in error state
 

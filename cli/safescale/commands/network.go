@@ -206,6 +206,11 @@ var networkInspect = &cli.Command{
 					mapped["state_label"] = protocol.NetworkState_name[int32(stnum)]
 				}
 
+				staltnum, ok := mapped["subnet_state"].(float64)
+				if ok {
+					mapped["subnet_state_label"] = protocol.NetworkState_name[int32(staltnum)]
+				}
+
 				if err = queryGatewaysInformation(clientSession, subnet, mapped, false); err != nil {
 					return err
 				}
