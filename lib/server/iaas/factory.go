@@ -422,7 +422,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	if config.Region, ok = ostorage["Region"].(string); !ok {
 		config.Region, _ = compute["Region"].(string)
 		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-			return config, err
+			logrus.Warningf(err.Error())
 		}
 	}
 
@@ -610,7 +610,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 			config.Region, _ = compute["Region"].(string)
 		}
 		if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
-			return config, err
+			logrus.Warningf(err.Error())
 		}
 	}
 
