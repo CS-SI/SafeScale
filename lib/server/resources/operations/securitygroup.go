@@ -441,17 +441,16 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		})
 	}
 
-	var currentNetworkProps *serialize.JSONProperties
 	anon := ctx.Value(CurrentNetworkPropertiesContextKey)
 	if anon != nil {
-		var ok bool
-		currentNetworkProps, ok = anon.(*serialize.JSONProperties)
+		currentNetworkProps, ok := anon.(*serialize.JSONProperties)
 		if !ok {
 			return fail.InconsistentError("context value of key '%s' must be a type '*seiralize.JSONProperties'")
 		}
-	}
-	if currentNetworkProps != nil {
 		xerr = updateFunc(currentNetworkProps)
+		if xerr != nil {
+			return xerr
+		}
 	} else {
 		networkInstance, xerr := LoadNetwork(svc, networkID)
 		if xerr != nil {
@@ -462,9 +461,9 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return updateFunc(props)
 		})
-	}
-	if xerr != nil {
-		return xerr
+		if xerr != nil {
+			return xerr
+		}
 	}
 
 	logrus.Infof("Security Group '%s' created successfully", name)
@@ -675,6 +674,7 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 			if currentSubnetAbstract != nil && v == currentSubnetAbstract.ID {
 				xerr = inspectFunc(currentSubnetProps)
 			} else {
+				var subnetInstance resources.Subnet
 				subnetInstance, xerr := LoadSubnet(svc, "", v)
 				if xerr != nil {
 					switch xerr.(type) {

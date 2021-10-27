@@ -456,6 +456,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 		if !ok {
 			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+
 		ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract)
 		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)
 		return nil

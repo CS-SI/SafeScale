@@ -425,7 +425,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 	if currentInstance.GetService().GetStackName() == "gcp" {
 		stack := currentInstance.GetService().GetStack().(*gcp.Stack)
 		// delete current nat route (is it really necessary ?)
-		routeName := subnetName + "-nat-allowed"
+		routeName := networkName+"-"+subnetName + "-nat-allowed"
 		xerr = stack.RPCDeleteRoute(routeName)
 		if xerr != nil {
 			switch xerr.(type) {
