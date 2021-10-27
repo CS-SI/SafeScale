@@ -459,7 +459,14 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-			return nullAHF, xerr
+			// FIXME: Wrong, we need name, status and ID at least here
+			if server != nil {
+				ahf.Core.ID = server.ID
+				ahf.Core.Name = server.Name
+				ahf.Core.LastState = hoststate.Error
+				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong
+			}
+			return nullAHF, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong
 		default:
 			return nullAHF, xerr
 		}
@@ -682,7 +689,26 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// --- query provider for host creation ---
 
+	// Starting from here, delete host if exiting with error
+	defer func() {
+		if ferr != nil {
+			logrus.Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
+			if derr := s.DeleteHost(ahc.ID); derr != nil {
+				switch derr.(type) {
+				case *fail.ErrNotFound:
+					logrus.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
+				case *fail.ErrTimeout:
+					logrus.Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
+				default:
+					logrus.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
+				}
+				_ = fail.AddConsequence(ferr, derr)
+			}
+		}
+	}()
+
 	logrus.Debugf("Creating host resource '%s' ...", request.ResourceName)
+
 	// Retry creation until success, for 10 minutes
 	var (
 		server       *servers.Server
@@ -782,9 +808,10 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				)
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
+					// FIXME: Wrong, we need name, status and ID at least here
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
-					return fail.Wrap(innerXErr, "timeout waiting host '%s' ready", request.ResourceName)
+					return innerXErr
 				}
 			}
 			return nil
@@ -798,27 +825,18 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "timeout")
 		case *retry.ErrStopRetry:
 			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "stopping retries")
-		}
-		return nullAHF, nullUDC, xerr
-	}
-
-	// Starting from here, delete host if exiting with error
-	defer func() {
-		if ferr != nil {
-			logrus.Infof("Cleaning up on failure, deleting host '%s'", ahc.Name)
-			if derr := s.DeleteHost(ahc.ID); derr != nil {
-				switch derr.(type) {
-				case *fail.ErrNotFound:
-					logrus.Errorf("Cleaning up on failure, failed to delete host, resource not found: '%v'", derr)
-				case *fail.ErrTimeout:
-					logrus.Errorf("Cleaning up on failure, failed to delete host, timeout: '%v'", derr)
-				default:
-					logrus.Errorf("Cleaning up on failure, failed to delete host: '%v'", derr)
+		default:
+			cause := fail.Cause(xerr)
+			if _, ok := cause.(*fail.ErrNotAvailable); ok {
+				if server != nil {
+					ahc.ID = server.ID
+					ahc.Name = server.Name
+					ahc.LastState = hoststate.Error
 				}
-				_ = fail.AddConsequence(ferr, derr)
 			}
+			return nullAHF, nullUDC, xerr
 		}
-	}()
+	}
 
 	newHost, xerr := s.complementHost(ahc, *server, hostNets, hostPorts)
 	if xerr != nil {
@@ -1048,14 +1066,26 @@ func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 		return nullAHC, fail.InvalidInstanceError()
 	}
 
-	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
+	ahf, hostRef, xerr := stacks.ValidateHostParameter(hostParam)
 	if xerr != nil {
 		return nullAHC, xerr
 	}
 
 	server, xerr := s.WaitHostState(hostParam, hoststate.Started, timeout)
 	if xerr != nil {
-		return nullAHC, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			// FIXME: Wrong, we need name, status and ID at least here
+			if server != nil {
+				ahf.Core.ID = server.ID
+				ahf.Core.Name = server.Name
+				ahf.Core.LastState = hoststate.Error
+				return ahf.Core, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+			}
+			return nullAHC, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
+		default:
+			return nullAHC, xerr
+		}
 	}
 
 	ahf, xerr = s.complementHost(ahf.Core, *server, nil, nil)
@@ -1153,13 +1183,13 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 			if cause != nil {
 				retryErr = fail.ConvertError(cause)
 			}
-			return server, retryErr
+			return server, retryErr // Not available error keeps the server info, good
 		default:
 			return nullServer, retryErr
 		}
 	}
 	if server == nil {
-		return nullServer, fail.NotFoundError("failed to query Host")
+		return nullServer, fail.NotFoundError("failed to query Host '%s'", hostLabel)
 	}
 	return server, nil
 }

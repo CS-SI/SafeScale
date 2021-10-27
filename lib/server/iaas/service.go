@@ -253,7 +253,7 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 				return
 			}
 			if host.CurrentState == hoststate.Error {
-				errCh <- fail.NotAvailableError("host in error state")
+				errCh <- fail.NotAvailableError("host in error state") // FIXME: This is NOT an error
 				return
 			}
 
