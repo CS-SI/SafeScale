@@ -26,6 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
@@ -229,6 +230,13 @@ func (provider *provider) DeleteVolumeAttachment(serverID, id string) fail.Error
 func (provider *provider) GetName() string {
 	return "local_disabled"
 }
+
+// GetStack returns the Stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return nil
+}
+
 func (provider provider) GetStackName() string {
 	return "libvirt"
 }

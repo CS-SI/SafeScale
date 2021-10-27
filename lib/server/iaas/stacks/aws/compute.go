@@ -18,6 +18,7 @@ package aws
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
 	"time"
 
@@ -984,9 +985,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		return xerr
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	vm, xerr := s.rpcDescribeInstanceByID(aws.String(ahf.GetID()))
@@ -1041,11 +1040,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		// FIXME: parallelize ?
 		xerr = stacks.RetryableRemoteCall(
 			func() error {
-				_, err := s.EC2Service.DeleteVolume(
-					&ec2.DeleteVolumeInput{
-						VolumeId: aws.String(volume),
-					},
-				)
+				_, err := s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{VolumeId: aws.String(volume)})
 				return err
 			},
 			normalizeError,
@@ -1055,8 +1050,9 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			case *fail.ErrNotFound:
 				// A missing volume is considered as a successful deletion
 				debug.IgnoreError(xerr)
+				break
 			default:
-				logrus.Warnf("failed to delete volume %s", volume)
+				logrus.Warnf("failed to delete volume %s (error %s)", volume, reflect.TypeOf(xerr).String())
 			}
 		}
 	}

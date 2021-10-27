@@ -402,6 +402,9 @@ func (instance *Host) unsafePushStringToFile(ctx context.Context, content string
 func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
+	if instance.sshProfile == nil {
+		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
+	}
 	if content == "" {
 		return fail.InvalidParameterError("content", "cannot be empty string")
 	}

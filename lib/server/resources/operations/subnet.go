@@ -1421,8 +1421,8 @@ func (instance *Subnet) Browse(ctx context.Context, callback func(*abstract.Subn
 	})
 }
 
-// AdoptHost links host ID to the Subnet
-func (instance *Subnet) AdoptHost(ctx context.Context, host resources.Host) (xerr fail.Error) {
+// AttachHost links Host to the Subnet
+func (instance *Subnet) AttachHost(ctx context.Context, host resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -1487,7 +1487,51 @@ func (instance *Subnet) AdoptHost(ctx context.Context, host resources.Host) (xer
 		return xerr
 	}
 
-	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		subnetAbstract, ok := clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		if subnetAbstract.InternalSecurityGroupID != "" {
+			sgInstance, innerXErr := LoadSecurityGroup(instance.GetService(), subnetAbstract.InternalSecurityGroupID)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			innerXErr = sgInstance.BindToHost(ctx, host, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+			if innerXErr != nil {
+				return innerXErr
+			}
+		}
+
+		pubIP, innerXErr := host.GetPublicIP()
+		if innerXErr != nil {
+			switch innerXErr.(type) {
+			case *fail.ErrNotFound:
+				break
+			default:
+				return innerXErr
+			}
+		}
+
+		isGateway, innerXErr := host.IsGateway()
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		if !isGateway && pubIP != "" && subnetAbstract.PublicIPSecurityGroupID != "" {
+			sgInstance, innerXErr := LoadSecurityGroup(instance.GetService(), subnetAbstract.PublicIPSecurityGroupID)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			innerXErr = sgInstance.BindToHost(ctx, host, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+			if innerXErr != nil {
+				return innerXErr
+			}
+		}
+
 		return props.Alter(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
 			if !ok {
@@ -1502,8 +1546,8 @@ func (instance *Subnet) AdoptHost(ctx context.Context, host resources.Host) (xer
 	})
 }
 
-// AbandonHost unlinks host ID from Subnet
-func (instance *Subnet) AbandonHost(ctx context.Context, hostID string) (xerr fail.Error) {
+// DetachHost unlinks host ID from Subnet
+func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {

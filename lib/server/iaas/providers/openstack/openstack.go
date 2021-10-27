@@ -210,6 +210,12 @@ func (p *provider) GetName() string {
 	return "openstack"
 }
 
+// GetStack returns the Stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
+}
+
 // GetTenantParameters returns the tenant parameters as-is
 func (p *provider) GetTenantParameters() map[string]interface{} {
 	return p.tenantParameters

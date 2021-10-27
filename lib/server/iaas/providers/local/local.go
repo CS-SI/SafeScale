@@ -227,6 +227,12 @@ func (p provider) GetName() string {
 	return "local"
 }
 
+// GetStack returns the Stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
+}
+
 //
 // // ListImages ...
 // func (p provider) ListImages(all bool) ([]abstract.Image, error) {

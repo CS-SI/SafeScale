@@ -1727,6 +1727,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 					case *fail.ErrNotFound:
 						// continue
 						debug.IgnoreError(xerr)
+						break
 					default:
 						return fail.Wrap(xerr, "failed to request information about Elastic IP '%s'", ip)
 					}
@@ -1764,9 +1765,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		return xerr
 	}
 	if len(resp.TerminatingInstances) == 0 {
-		return fail.NotFoundError(
-			"failed to find instance %s wanted to terminate", aws.StringValue(instance.InstanceId),
-		)
+		return fail.NotFoundError("failed to find instance %s wanted to terminate", aws.StringValue(instance.InstanceId))
 	}
 
 	// Wait for effective removal of host (status terminated)
@@ -1823,8 +1822,8 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
-				// continue
 				debug.IgnoreError(xerr)
+				break
 			default:
 				return fail.Wrap(xerr, "failed to delete network interface %s from instance", aws.StringValue(v))
 			}
@@ -1833,20 +1832,6 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 
 	return nil
 }
-
-// VPL: not used anymore
-// func (s stack) rpcTerminateInstanceByID(id string) fail.Error {
-// 	if id == "" {
-// 		return fail.InvalidParameterCannotBeEmptyStringError("id")
-// 	}
-//
-// 	instance, xerr := s.rpcDescribeInstanceByID(aws.String(id))
-// 	if xerr != nil {
-// 		return xerr
-// 	}
-//
-// 	return s.rpcTerminateInstance(instance)
-// }
 
 func (s stack) rpcStartInstances(ids []*string) fail.Error {
 	if len(ids) == 0 {

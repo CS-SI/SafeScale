@@ -357,6 +357,12 @@ func (p provider) GetName() string {
 	return "ovh"
 }
 
+// GetStack returns the Stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
+}
+
 func (p provider) GetTenantParameters() map[string]interface{} {
 	if p.IsNull() {
 		return map[string]interface{}{}

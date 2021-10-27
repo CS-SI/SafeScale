@@ -217,112 +217,97 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			// when needed
 			if props.Lookup(hostproperty.NetworkV2) {
 				var primaryGatewayConfig, secondaryGatewayConfig *system.SSHConfig
-				innerXErr := props.Inspect(
-					hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-						hnV2, ok := clonable.(*propertiesv2.HostNetworking)
-						if !ok {
-							return fail.InconsistentError(
-								"'*propertiesv2.HostNetworking' expected, '%s' provided",
-								reflect.TypeOf(clonable).String(),
-							)
+				innerXErr := props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+					hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					if len(hnV2.IPv4Addresses) > 0 {
+						instance.privateIP = hnV2.IPv4Addresses[hnV2.DefaultSubnetID]
+						if instance.privateIP == "" {
+							instance.privateIP = hnV2.IPv6Addresses[hnV2.DefaultSubnetID]
+						}
+					}
+					instance.publicIP = hnV2.PublicIPv4
+					if instance.publicIP == "" {
+						instance.publicIP = hnV2.PublicIPv6
+					}
+					if instance.publicIP != "" {
+						instance.accessIP = instance.publicIP
+					} else {
+						instance.accessIP = instance.privateIP
+					}
+
+					// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
+					// Do not execute neither if Host is single or is a gateway
+					if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
+						subnetInstance, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							return xerr
 						}
 
-						if len(hnV2.IPv4Addresses) > 0 {
-							instance.privateIP = hnV2.IPv4Addresses[hnV2.DefaultSubnetID]
-							if instance.privateIP == "" {
-								instance.privateIP = hnV2.IPv6Addresses[hnV2.DefaultSubnetID]
+						rgw, xerr := subnetInstance.unsafeInspectGateway(true)
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							return xerr
+						}
+
+						gwErr := rgw.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+							gwahc, ok := clonable.(*abstract.HostCore)
+							if !ok {
+								return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 							}
+
+							ip := rgw.(*Host).accessIP
+							primaryGatewayConfig = &system.SSHConfig{
+								PrivateKey: gwahc.PrivateKey,
+								Port:       int(gwahc.SSHPort),
+								IPAddress:  ip,
+								Hostname:   gwahc.Name,
+								User:       opUser,
+							}
+							return nil
+						})
+						if gwErr != nil {
+							return gwErr
 						}
-						instance.publicIP = hnV2.PublicIPv4
-						if instance.publicIP == "" {
-							instance.publicIP = hnV2.PublicIPv6
-						}
-						if instance.publicIP != "" {
-							instance.accessIP = instance.publicIP
+
+						// Secondary gateway may not exist...
+						rgw, xerr = subnetInstance.unsafeInspectGateway(false)
+						xerr = debug.InjectPlannedFail(xerr)
+						if xerr != nil {
+							switch xerr.(type) {
+							case *fail.ErrNotFound:
+								// continue
+								debug.IgnoreError(xerr)
+							default:
+								return xerr
+							}
 						} else {
-							instance.accessIP = instance.privateIP
-						}
+							gwErr = rgw.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+								gwahc, ok := clonable.(*abstract.HostCore)
+								if !ok {
+									return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+								}
 
-						// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
-						// Do not execute neither if Host is single or is a gateway
-						if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
-							subnetInstance, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
-							xerr = debug.InjectPlannedFail(xerr)
-							if xerr != nil {
-								return xerr
-							}
-
-							rgw, xerr := subnetInstance.unsafeInspectGateway(true)
-							xerr = debug.InjectPlannedFail(xerr)
-							if xerr != nil {
-								return xerr
-							}
-
-							gwErr := rgw.Inspect(
-								func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-									gwahc, ok := clonable.(*abstract.HostCore)
-									if !ok {
-										return fail.InconsistentError(
-											"'*abstract.HostCore' expected, '%s' provided",
-											reflect.TypeOf(clonable).String(),
-										)
-									}
-
-									ip := rgw.(*Host).accessIP
-									primaryGatewayConfig = &system.SSHConfig{
-										PrivateKey: gwahc.PrivateKey,
-										Port:       int(gwahc.SSHPort),
-										IPAddress:  ip,
-										Hostname:   gwahc.Name,
-										User:       opUser,
-									}
-									return nil
-								},
-							)
+								secondaryGatewayConfig = &system.SSHConfig{
+									PrivateKey: gwahc.PrivateKey,
+									Port:       int(gwahc.SSHPort),
+									IPAddress:  rgw.(*Host).accessIP,
+									Hostname:   rgw.GetName(),
+									User:       opUser,
+								}
+								return nil
+							})
 							if gwErr != nil {
 								return gwErr
 							}
-
-							// Secondary gateway may not exist...
-							rgw, xerr = subnetInstance.unsafeInspectGateway(false)
-							xerr = debug.InjectPlannedFail(xerr)
-							if xerr != nil {
-								switch xerr.(type) {
-								case *fail.ErrNotFound:
-									// continue
-									debug.IgnoreError(xerr)
-								default:
-									return xerr
-								}
-							} else {
-								gwErr = rgw.Review(
-									func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-										gwahc, ok := clonable.(*abstract.HostCore)
-										if !ok {
-											return fail.InconsistentError(
-												"'*abstract.HostCore' expected, '%s' provided",
-												reflect.TypeOf(clonable).String(),
-											)
-										}
-
-										secondaryGatewayConfig = &system.SSHConfig{
-											PrivateKey: gwahc.PrivateKey,
-											Port:       int(gwahc.SSHPort),
-											IPAddress:  rgw.(*Host).accessIP,
-											Hostname:   rgw.GetName(),
-											User:       opUser,
-										}
-										return nil
-									},
-								)
-								if gwErr != nil {
-									return gwErr
-								}
-							}
 						}
-						return nil
-					},
-				)
+					}
+					return nil
+				})
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -339,34 +324,28 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			}
 
 			var index uint8
-			innerXErr := props.Inspect(
-				hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
-					systemV1, ok := clonable.(*propertiesv1.HostSystem)
-					if !ok {
-						logrus.Error(
-							fail.InconsistentError(
-								"'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-							),
-						)
+			innerXErr := props.Inspect(hostproperty.SystemV1, func(clonable data.Clonable) fail.Error {
+				systemV1, ok := clonable.(*propertiesv1.HostSystem)
+				if !ok {
+					logrus.Error(fail.InconsistentError("'*propertiesv1.HostSystem' expected, '%s' provided", reflect.TypeOf(clonable).String()))
+				}
+				if systemV1.Type == "linux" {
+					switch systemV1.Flavor {
+					case "centos", "redhat":
+						index++
+						instance.installMethods.Store(index, installmethod.Yum)
+					case "debian":
+						fallthrough
+					case "ubuntu":
+						index++
+						instance.installMethods.Store(index, installmethod.Apt)
+					case "fedora", "rhel":
+						index++
+						instance.installMethods.Store(index, installmethod.Dnf)
 					}
-					if systemV1.Type == "linux" {
-						switch systemV1.Flavor {
-						case "centos", "redhat":
-							index++
-							instance.installMethods.Store(index, installmethod.Yum)
-						case "debian":
-							fallthrough
-						case "ubuntu":
-							index++
-							instance.installMethods.Store(index, installmethod.Apt)
-						case "fedora", "rhel":
-							index++
-							instance.installMethods.Store(index, installmethod.Dnf)
-						}
-					}
-					return nil
-				},
-			)
+				}
+				return nil
+			})
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -376,8 +355,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 			index++
 			instance.installMethods.Store(index, installmethod.None)
 			return nil
-		},
-	)
+		})
 }
 
 func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
@@ -746,10 +724,18 @@ func (instance *Host) Reload() (xerr fail.Error) {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hnV2.IPv4Addresses = ahf.Networking.IPv4Addresses
-			hnV2.IPv6Addresses = ahf.Networking.IPv6Addresses
-			hnV2.SubnetsByID = ahf.Networking.SubnetsByID
-			hnV2.SubnetsByName = ahf.Networking.SubnetsByName
+			if len(ahf.Networking.IPv4Addresses) > 0 {
+				hnV2.IPv4Addresses = ahf.Networking.IPv4Addresses
+			}
+			if len(ahf.Networking.IPv6Addresses) > 0 {
+				hnV2.IPv6Addresses = ahf.Networking.IPv6Addresses
+			}
+			if len(ahf.Networking.SubnetsByID) > 0 {
+				hnV2.SubnetsByID = ahf.Networking.SubnetsByID
+			}
+			if len(ahf.Networking.SubnetsByName) > 0 {
+				hnV2.SubnetsByName = ahf.Networking.SubnetsByName
+			}
 			return nil
 		})
 		if innerXErr != nil {
@@ -1581,6 +1567,10 @@ func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequiremen
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
 func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration) fail.Error {
+	if instance.sshProfile == nil {
+		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
+	}
+
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1875,6 +1865,10 @@ func (instance *Host) undoUpdateSubnets(req abstract.HostRequest, errorPtr *fail
 }
 
 func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent *userdata.Content) fail.Error {
+	if instance.sshProfile == nil {
+		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
+	}
+
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1910,23 +1904,20 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	}
 
 	// Update Keypair of the Host with the final one
-	xerr = instance.Alter(
-		func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			ah, ok := clonable.(*abstract.HostCore)
-			if !ok {
-				return fail.InconsistentError(
-					"'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-				)
-			}
+	xerr = instance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		ah, ok := clonable.(*abstract.HostCore)
+		if !ok {
+			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
 
-			ah.PrivateKey = userdataContent.FinalPrivateKey
-			return nil
-		},
-	)
+		ah.PrivateKey = userdataContent.FinalPrivateKey
+		return nil
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to update Keypair")
 	}
+
 	xerr = instance.updateCachedInformation()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2494,7 +2485,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 										item.Released()
 									}(subnetInstance)
 
-									loopErr = subnetInstance.AbandonHost(ctx, hostID)
+									loopErr = subnetInstance.DetachHost(ctx, hostID)
 								}
 								if loopErr != nil {
 									logrus.Errorf(loopErr.Error())
@@ -2689,6 +2680,9 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 
 	if instance == nil || instance.IsNull() {
 		return invalid, "", "", fail.InvalidInstanceError()
+	}
+	if instance.sshProfile == nil {
+		return invalid, "", "", fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
 	}
 	if ctx == nil {
 		return invalid, "", "", fail.InvalidParameterCannotBeNilError("ctx")
