@@ -424,9 +424,16 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 	// -- GCP stack driver needs special treatment... --
 	if currentInstance.GetService().GetStackName() == "gcp" {
 		stack := currentInstance.GetService().GetStack().(*gcp.Stack)
-		// delete current nat route (is it really necessary ?)
-		routeName := networkName+"-"+subnetName + "-nat-allowed"
-		xerr = stack.RPCDeleteRoute(routeName)
+		oldRouteName := networkName + "-" + subnetName + "-nat-allowed"
+
+		// create new nat route
+		_, xerr = stack.RPCCreateRoute(networkName, subnetID, subnetName)
+		if xerr != nil {
+			return xerr
+		}
+
+		// delete old nat route
+		xerr = stack.RPCDeleteRoute(oldRouteName)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -434,12 +441,6 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			default:
 				return xerr
 			}
-		}
-
-		// create new nat route
-		_, xerr = stack.RPCCreateRoute(networkName, subnetID, subnetName)
-		if xerr != nil {
-			return xerr
 		}
 	}
 

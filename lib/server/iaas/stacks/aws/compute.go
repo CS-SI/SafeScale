@@ -975,7 +975,7 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Error
 	return hosts, nil
 }
 
-// DeleteHost deletes a IPAddress
+// DeleteHost deletes a Host
 func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -994,6 +994,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		case *fail.ErrNotFound:
 			// a host not found is considered as a successful deletion, continue
 			debug.IgnoreError(xerr)
+			vm = nil
 		default:
 			return xerr
 		}
@@ -1020,18 +1021,40 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	// Stop instance forcibly
 	xerr = s.StopHost(ahf, false)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to stop Host '%s' with id '%s'", ahf.GetName(), ahf.GetID())
+		switch xerr.(type) {
+		case *fail.ErrAborted, *fail.ErrTimeout:
+			xerr = fail.ConvertError(xerr.Cause())
+		default:
+		}
+	}
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound, *fail.ErrInvalidRequest:
+			debug.IgnoreError(xerr)
+			break
+		default:
+			return fail.Wrap(xerr, "failed to stop Host '%s' with id '%s'", ahf.GetName(), ahf.GetID())
+		}
 	}
 
 	// Terminate instance
-	xerr = s.rpcTerminateInstance(vm)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			debug.IgnoreError(xerr)
-			// continue
-		default:
-			return xerr
+	if vm != nil {
+		xerr = s.rpcTerminateInstance(vm)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrAborted, *fail.ErrTimeout:
+				xerr = fail.ConvertError(xerr.Cause())
+			default:
+			}
+		}
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				debug.IgnoreError(xerr)
+				break
+			default:
+				return xerr
+			}
 		}
 	}
 

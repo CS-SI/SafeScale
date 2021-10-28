@@ -1425,8 +1425,8 @@ func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 }
 
 // DeleteSpecificNode deletes a node identified by its ID
-func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) (outerr fail.Error) {
+	defer fail.OnPanic(&outerr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -1516,7 +1516,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 }
 
 // ListMasters lists the node instances corresponding to masters (if there is such masters in the flavor...)
-func (instance *Cluster) ListMasters(ctx context.Context) (list resources.IndexedListOfClusterNodes, xerr fail.Error) {
+func (instance *Cluster) ListMasters(ctx context.Context) (resources.IndexedListOfClusterNodes, fail.Error) {
 	emptyList := resources.IndexedListOfClusterNodes{}
 	if instance == nil || instance.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
@@ -2250,7 +2250,7 @@ func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostIn
 }
 
 // deleteMaster deletes the master specified by its ID
-func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) fail.Error {
+func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) (outerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2317,8 +2317,8 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 
 	// Starting from here, restore master in Cluster properties if exiting with error
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		outerr = debug.InjectPlannedFail(outerr)
+		if outerr != nil {
 			derr := instance.Alter(
 				func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Alter(
@@ -2341,10 +2341,10 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 				},
 			)
 			if derr != nil {
-				_ = xerr.AddConsequence(
+				_ = outerr.AddConsequence(
 					fail.Wrap(
 						derr, "cleaning up on %s, failed to restore master '%s' in Cluster metadata",
-						ActionFromError(xerr), master.Name,
+						ActionFromError(outerr), master.Name,
 					),
 				)
 			}
@@ -2368,7 +2368,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 }
 
 // deleteNode deletes a node
-func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.ClusterNode, master *Host, loadHostMethod data.ImmutableKeyValue) (xerr fail.Error) {
+func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.ClusterNode, master *Host, loadHostMethod data.ImmutableKeyValue) (outerr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2433,8 +2433,8 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 
 	// Starting from here, restore node in Cluster metadata if exiting with error
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		outerr = debug.InjectPlannedFail(outerr)
+		if outerr != nil {
 			derr := instance.Alter(
 				func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Alter(
@@ -2462,10 +2462,10 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 			)
 			if derr != nil {
 				logrus.Errorf("failed to restore node ownership in Cluster")
-				_ = xerr.AddConsequence(
+				_ = outerr.AddConsequence(
 					fail.Wrap(
 						derr, "cleaning up on %s, failed to restore node ownership in Cluster metadata",
-						ActionFromError(xerr),
+						ActionFromError(outerr),
 					),
 				)
 			}
@@ -2517,8 +2517,8 @@ func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.Clus
 }
 
 // Delete deletes the Cluster
-func (instance *Cluster) Delete(ctx context.Context, force bool) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) Delete(ctx context.Context, force bool) (outerr fail.Error) {
+	defer fail.OnPanic(&outerr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -2528,7 +2528,7 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (xerr fail.Erro
 	}
 
 	if !force {
-		xerr = instance.beingRemoved()
+		xerr := instance.beingRemoved()
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -2542,8 +2542,8 @@ func (instance *Cluster) Delete(ctx context.Context, force bool) (xerr fail.Erro
 }
 
 // delete does the work to delete Cluster
-func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) delete(ctx context.Context) (outerr fail.Error) {
+	defer fail.OnPanic(&outerr)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -2570,8 +2570,8 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		outerr = debug.InjectPlannedFail(outerr)
+		if outerr != nil {
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 					stateV1, ok := clonable.(*propertiesv1.ClusterState)
@@ -2584,7 +2584,7 @@ func (instance *Cluster) delete(ctx context.Context) (xerr fail.Error) {
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to set Cluster state to DEGRADED", ActionFromError(xerr)))
+				_ = outerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to set Cluster state to DEGRADED", ActionFromError(xerr)))
 			}
 		}
 	}()
