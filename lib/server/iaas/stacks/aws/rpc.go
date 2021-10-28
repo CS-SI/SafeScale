@@ -1821,7 +1821,14 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		xerr = s.rpcDeleteNetworkInterface(v)
 		if xerr != nil {
 			switch xerr.(type) {
-			case *fail.ErrNotFound:
+			case *fail.ErrAborted, *fail.ErrTimeout:
+				xerr = fail.ConvertError(xerr.Cause())
+			default:
+			}
+		}
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
 				debug.IgnoreError(xerr)
 				break
 			default:

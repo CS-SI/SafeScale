@@ -50,6 +50,8 @@ func normalizeError(err error) fail.Error {
 			return fail.NotFoundError("failed to find Volume")
 		case "InvalidSubnetID.NotFound":
 			return fail.NotFoundError("failed to find Subnet")
+		case "InvalidNetworkInterfaceID.NotFound":
+			return fail.NotFoundError("failed to find network interface")
 		case "InvalidParameterValue":
 			return fail.InvalidRequestError(cerr.Message())
 		case "VcpuLimitExceeded":
