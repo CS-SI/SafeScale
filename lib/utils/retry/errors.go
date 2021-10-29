@@ -73,7 +73,7 @@ func StopRetryError(err error, msg ...interface{}) fail.Error {
 		newMessage = fmt.Sprintf("stopping retries: %s", newMessage)
 	}
 	switch err.(type) {
-	case *fail.ErrAborted:  // do not embed abort inside an abort
+	case *fail.ErrAborted: // do not embed abort inside an abort
 		return fail.Wrap(err, newMessage)
 	default:
 		return fail.AbortedError(err, newMessage)
