@@ -1058,7 +1058,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		}
 	}
 
-	// Remove volumes if some remain, mark errors as warnings
+	// Remove volumes if some remain, report errors (other than not found) as warnings
 	for _, volume := range attachedVolumes {
 		// FIXME: parallelize ?
 		xerr = stacks.RetryableRemoteCall(

@@ -204,12 +204,7 @@ func (s stack) rpcCreateVpc(name, cidr *string) (_ *ec2.Vpc, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			if derr := s.rpcDeleteVpc(resp.Vpc.VpcId); derr != nil {
-				_ = ferr.AddConsequence(
-					fail.Wrap(
-						derr, "cleaning up on failure, failed to delete Network/VPC %s",
-						aws.StringValue(resp.Vpc.VpcId),
-					),
-				)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network/VPC %s", aws.StringValue(resp.Vpc.VpcId)))
 			}
 		}
 	}()
@@ -233,7 +228,8 @@ func (s stack) rpcCreateVpc(name, cidr *string) (_ *ec2.Vpc, ferr fail.Error) {
 			Value: aws.String(time.Now().Format(time.RFC3339)),
 		},
 	}
-	if xerr = s.rpcCreateTags([]*string{resp.Vpc.VpcId}, tags); xerr != nil {
+	xerr = s.rpcCreateTags([]*string{resp.Vpc.VpcId}, tags)
+	if xerr != nil {
 		return &ec2.Vpc{}, xerr
 	}
 
@@ -402,9 +398,7 @@ func (s stack) rpcDescribeSubnetByID(id *string) (*ec2.Subnet, fail.Error) {
 		return &ec2.Subnet{}, fail.NotFoundError("failed to find a Subnet with ID %s", aws.StringValue(id))
 	}
 	if len(resp) > 1 {
-		return &ec2.Subnet{}, fail.InconsistentError(
-			"provider returned more than one Subnet with id %s", aws.StringValue(id),
-		)
+		return &ec2.Subnet{}, fail.InconsistentError("provider returned more than one Subnet with id %s", aws.StringValue(id))
 	}
 
 	return resp[0], nil
@@ -444,12 +438,7 @@ func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (_ *ec2.Subnet, 
 	defer func() {
 		if ferr != nil {
 			if derr := s.rpcDeleteSubnet(resp.Subnet.SubnetId); derr != nil {
-				_ = ferr.AddConsequence(
-					fail.Wrap(
-						derr, "cleaning up on failure, failed to delete Subnet %s",
-						aws.StringValue(resp.Subnet.SubnetId),
-					),
-				)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet %s", aws.StringValue(resp.Subnet.SubnetId)))
 			}
 		}
 	}()
@@ -938,9 +927,7 @@ func (s stack) rpcDescribeAddressByIP(ip *string) (*ec2.Address, fail.Error) {
 		return nil, fail.NotFoundError("failed to find Elastic IP '%s'", aws.StringValue(ip))
 	}
 	if len(resp.Addresses) > 1 {
-		return nil, fail.InconsistentError(
-			"more than one Elastic IP '%s' returned by the Cloud Provider", aws.StringValue(ip),
-		)
+		return nil, fail.InconsistentError("more than one Elastic IP '%s' returned by the Cloud Provider", aws.StringValue(ip))
 	}
 	return resp.Addresses[0], nil
 }
@@ -999,10 +986,8 @@ func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Erro
 		for _, i := range v.Instances {
 			state, xerr := toHostState(i.State)
 			if xerr != nil {
-				logrus.Errorf(
-					"found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
-					aws.Int64Value(i.State.Code)&0xff,
-				)
+				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
+					aws.Int64Value(i.State.Code)&0xff)
 				continue
 			}
 			if state != hoststate.Terminated {
@@ -1819,13 +1804,6 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 	for _, v := range nics {
 		// Delete network interface
 		xerr = s.rpcDeleteNetworkInterface(v)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrAborted, *fail.ErrTimeout:
-				xerr = fail.ConvertError(xerr.Cause())
-			default:
-			}
-		}
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound, *fail.ErrInvalidRequest:

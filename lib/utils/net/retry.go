@@ -120,8 +120,8 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 				if thecause.Temporary() {
 					return realErr
 				}
-				return retry.StopRetryError(realErr)
-			case *fail.ErrNotAvailable, fail.ErrNotAvailable, *fail.ErrOverflow, fail.ErrOverflow, *fail.ErrOverload, fail.ErrOverload:
+				return retry.StopRetryError(thecause)
+			case *fail.ErrNotAvailable, *fail.ErrOverflow, *fail.ErrOverload, *fail.ErrAborted:
 				return realErr
 			default:
 				return retry.StopRetryError(realErr)

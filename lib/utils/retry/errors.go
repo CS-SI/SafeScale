@@ -65,12 +65,17 @@ func LimitError(err error, limit uint) *ErrLimit {
 type ErrStopRetry = fail.ErrAborted
 
 // StopRetryError ...
-func StopRetryError(err error, msg ...interface{}) *ErrStopRetry {
+func StopRetryError(err error, msg ...interface{}) fail.Error {
 	newMessage := strprocess.FormatStrings(msg...)
 	if newMessage == "" {
 		newMessage = "stopping retries"
 	} else {
 		newMessage = fmt.Sprintf("stopping retries: %s", newMessage)
 	}
-	return fail.AbortedError(err, newMessage)
+	switch err.(type) {
+	case *fail.ErrAborted:  // do not embed abort inside an abort
+		return fail.Wrap(err, newMessage)
+	default:
+		return fail.AbortedError(err, newMessage)
+	}
 }

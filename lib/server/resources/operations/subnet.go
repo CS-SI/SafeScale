@@ -1775,33 +1775,6 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	var (
-		subnetAbstract *abstract.Subnet
-		subnetHosts    *propertiesv1.SubnetHosts
-	)
-	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		var ok bool
-		subnetAbstract, ok = clonable.(*abstract.Subnet)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract)
-		ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)
-
-		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			var ok bool
-			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			return nil
-		})
-	})
-	if xerr != nil {
-		return xerr
-	}
-
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1878,13 +1851,17 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		as, ok := clonable.(*abstract.Subnet)
+		subnetAbstract, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
+		// To prevent potential deadlock, push current Subnet Instance abstract and properties in context
+		ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract)
+		ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)
+
 		// 1st delete gateway(s)
-		gwIDs, innerXErr := instance.deleteGateways(as)
+		gwIDs, innerXErr := instance.deleteGateways(subnetAbstract)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -1900,13 +1877,26 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		}
 
 		// 2nd delete VIP if needed
-		if as.VIP != nil {
-			if innerXErr := svc.DeleteVIP(as.VIP); innerXErr != nil {
+		if subnetAbstract.VIP != nil {
+			if innerXErr := svc.DeleteVIP(subnetAbstract.VIP); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to delete VIP for gateways")
 			}
 		}
 
 		// 3rd delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
+		var subnetHosts *propertiesv1.SubnetHosts
+		innerXErr = props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			var ok bool
+			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.SubnetHost' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
 		innerXErr = props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
@@ -1921,22 +1911,22 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		}
 
 		// 4th free CIDR index if the Subnet has been created for a single Host
-		if as.SingleHostCIDRIndex > 0 {
-			networkInstance, innerXErr := LoadNetwork(instance.GetService(), as.Network)
+		if subnetAbstract.SingleHostCIDRIndex > 0 {
+			networkInstance, innerXErr := LoadNetwork(instance.GetService(), subnetAbstract.Network)
 			if innerXErr != nil {
 				return innerXErr
 			}
 			defer networkInstance.Released()
 
-			innerXErr = FreeCIDRForSingleHost(networkInstance, as.SingleHostCIDRIndex)
+			innerXErr = FreeCIDRForSingleHost(networkInstance, subnetAbstract.SingleHostCIDRIndex)
 			if innerXErr != nil {
 				return innerXErr
 			}
 		}
 
 		// 5th delete Subnet on Provider side
-		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
-		if innerXErr = instance.deleteSubnetThenWaitCompletion(as.ID); innerXErr != nil {
+		logrus.Debugf("Deleting Subnet '%s'...", subnetAbstract.Name)
+		if innerXErr = instance.deleteSubnetThenWaitCompletion(subnetAbstract.ID); innerXErr != nil {
 			return innerXErr
 		}
 
@@ -1959,12 +1949,13 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			if !ok {
 				return fail.InconsistentError("'*serialize.JSONProperties' expected, '%s' provided", reflect.TypeOf(anon))
 			}
+
 			innerXErr = networkUpdateFunc(networkProps)
 			if innerXErr != nil {
 				return innerXErr
 			}
 		} else {
-			networkInstance, innerXErr := LoadNetwork(instance.GetService(), as.Network)
+			networkInstance, innerXErr := LoadNetwork(instance.GetService(), subnetAbstract.Network)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1979,7 +1970,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		}
 
 		// 7th delete Subnet's own Security Groups
-		return instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
+		return instance.deleteSecurityGroups(ctx, [3]string{subnetAbstract.GWSecurityGroupID, subnetAbstract.InternalSecurityGroupID, subnetAbstract.PublicIPSecurityGroupID})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

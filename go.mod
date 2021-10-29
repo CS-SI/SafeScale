@@ -18,6 +18,7 @@ require (
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
+	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/gojuno/minimock/v3 v3.0.10
 	github.com/golang/protobuf v1.5.2
 	github.com/gophercloud/gophercloud v0.20.0

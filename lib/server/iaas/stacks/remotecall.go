@@ -45,10 +45,13 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 			defer fail.OnPanic(&nested)
 			if innerErr := callback(); innerErr != nil {
 				captured := normalizeError(innerErr)
+				// Do not retry if it's going to fail anyway
 				switch captured.(type) { // nolint
-				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated:
 					return retry.StopRetryError(captured)
-				case *fail.ErrOverload:
+				case *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrOverload, *fail.ErrInvalidParameter:
+					return retry.StopRetryError(captured)
+				case *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrRuntimePanic:
 					return retry.StopRetryError(captured)
 				default:
 					return captured
