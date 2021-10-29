@@ -23,7 +23,7 @@ feature:
             - kubernetes
 
     parameters:
-        - Version=2.17.0
+        - Version=2.17.0ection
         - DefaultNamespace=default
 
     install:

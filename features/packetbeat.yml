@@ -36,7 +36,7 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            sfDoesDockerRunContainer docker.elastic.co/beats/packetbeat:{{ .Version }} packetbeat4safescale_agent_1 || sfFail 192
+                            sfDoesDockerRunContainer docker.elastic.co/beats/packetbeat:{{ .Version }} packetbeat4safescale-agent-1 || sfFail 192
                             sfExit
 
             add:
@@ -132,7 +132,7 @@ feature:
                             nodes: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/packetbeat4safescale/docker-compose.yml -p packetbeat4safescale up -d || sfFail 193
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/beats/packetbeat:{{ .Version }} packetbeat4safescale_agent_1" || sfFail 194
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/beats/packetbeat:{{ .Version }} packetbeat4safescale-agent-1" || sfFail 194
                             sfExit
 
             remove:

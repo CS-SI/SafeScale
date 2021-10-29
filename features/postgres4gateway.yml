@@ -39,11 +39,10 @@ feature:
                             masters: no
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1 || sfFail 192
+                            sfDoesDockerRunContainer postgres:11-alpine postgres4gateway-postgres-1 || sfFail 192
                             sfExit
 
             add:
-                # pace: config,secret,network,start
                 pace: config,start
                 steps:
                     config:
@@ -88,7 +87,7 @@ feature:
                             nodes: no
                         run: |
                             docker-compose -f ${SF_ETCDIR}/postgres4gateway/docker-compose.yml -p postgres4gateway up -d || sfFail 194
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway_postgres_1" || sfFail 195
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer postgres:11-alpine postgres4gateway-postgres-1" || sfFail 195
                             sfExit
 
             remove:

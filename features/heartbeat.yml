@@ -41,7 +41,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            sfDoesDockerRunContainer docker.elastic.co/beats/heartbeat:{{ .Version }} heartbeat4safescale_agent_1 || sfFail 192
+                            sfDoesDockerRunContainer docker.elastic.co/beats/heartbeat:{{ .Version }} heartbeat4safescale-agent-1 || sfFail 192
                             sfExit
 
             add:
@@ -134,7 +134,7 @@ feature:
                             nodes: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/heartbeat4safescale/docker-compose.yml -p heartbeat4safescale up -d || sfFail 193
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/beats/heartbeatbeat:{{ .Version }} heartbeat4safescale_agent_1" || sfFail 194
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer docker.elastic.co/beats/heartbeatbeat:{{ .Version }} heartbeat4safescale-agent-1" || sfFail 194
                             sfExit
 
             remove:

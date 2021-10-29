@@ -188,7 +188,7 @@ feature:
                             {{ else }}
                             PREFIX="elastalert"
                             {{ end -}}
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}_server_1" || sfFail 200
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer bitsensor/elastalert:{{ .Version }} ${PREFIX}-server-1" || sfFail 200
                             sfExit
 
                     ready:

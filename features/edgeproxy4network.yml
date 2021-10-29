@@ -213,7 +213,7 @@ feature:
                             gateways: all
                         run: |
                             docker-compose -f ${SF_ETCDIR}/edgeproxy4network/docker-compose.yml -p edgeproxy4network up -d || sfFail 193
-                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer edgeproxy4network:latest edgeproxy4network_proxy_1" || sfFail 194
+                            sfRetry {{.TemplateOperationTimeout}} {{.TemplateOperationDelay}} "sfDoesDockerRunContainer edgeproxy4network:latest edgeproxy4network-proxy-1" || sfFail 194
                             sfExit
 
             remove:
