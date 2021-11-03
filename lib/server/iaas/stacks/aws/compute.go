@@ -49,9 +49,7 @@ func (s stack) CreateKeyPair(name string) (_ *abstract.KeyPair, xerr fail.Error)
 		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	keypair, xerr := abstract.NewKeyPair(name)
@@ -74,12 +72,7 @@ func (s stack) ImportKeyPair(keypair *abstract.KeyPair) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("keypair")
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", keypair,
-	).
-		WithStopwatch().
-		Entering().
-		Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", keypair).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	return s.rpcImportKeyPair(aws.String(keypair.Name), []byte(keypair.PublicKey))
@@ -149,9 +142,7 @@ func (s stack) DeleteKeyPair(id string) (xerr fail.Error) {
 		return fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	return s.rpcDeleteKeyPair(aws.String(id))
@@ -164,9 +155,7 @@ func (s stack) ListAvailabilityZones() (_ map[string]bool, xerr fail.Error) {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"),
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	resp, xerr := s.rpcDescribeAvailabilityZones(nil)
@@ -194,9 +183,7 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"),
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	resp, xerr := s.rpcDescribeRegions(nil)
@@ -224,9 +211,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	resp, xerr := s.rpcDescribeImageByID(aws.String(id))
@@ -247,9 +232,7 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	resp, xerr := s.rpcDescribeInstanceTypeByID(aws.String(id))
@@ -285,7 +268,7 @@ func createFilters() []*ec2.Filter {
 		},
 	}
 
-	// FIXME: AWS CentOS AND Others
+	// FIXME: AWS CentOS AND Others, and HARCODED providers
 	owners := []*string{
 		aws.String("099720109477"), // Ubuntu
 		aws.String("013116697141"), // Fedora
@@ -312,9 +295,7 @@ func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"),
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	resp, xerr := s.rpcDescribeImages(nil)
@@ -354,9 +335,7 @@ func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Err
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"),
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	resp, xerr := s.rpcDescribeInstanceTypes(nil)
@@ -417,9 +396,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 		return nullAHC, xerr
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s, %v)", hostRef, timeout).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&xerr)
 	defer fail.OnExitTraceError(&xerr)
 
@@ -477,9 +454,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%v)", request).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 	defer fail.OnExitTraceError(&ferr)
 
@@ -756,9 +731,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 		return nullAHF, xerr
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&xerr)
 
 	var resp *ec2.Instance
@@ -900,9 +873,7 @@ func (s stack) InspectHostByName(name string) (_ *abstract.HostFull, xerr fail.E
 		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	resp, xerr := s.rpcDescribeInstanceByName(aws.String(name))
@@ -934,9 +905,7 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Error
 		return nullList, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(details=%v)", details,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(details=%v)", details).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	resp, xerr := s.rpcDescribeInstances(nil)
@@ -1107,9 +1076,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 		return xerr
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	if xerr = s.rpcStopInstances([]*string{aws.String(ahf.Core.ID)}, aws.Bool(gracefully)); xerr != nil {
@@ -1160,9 +1127,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		return xerr
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	xerr = s.rpcStartInstances([]*string{aws.String(ahf.Core.ID)})
@@ -1212,9 +1177,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		return xerr
 	}
 
-	defer debug.NewTracer(
-		nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef,
-	).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 	defer fail.OnExitTraceError(&xerr)
 
 	if xerr = s.rpcRebootInstances([]*string{aws.String(ahf.Core.ID)}); xerr != nil {

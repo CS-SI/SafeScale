@@ -64,7 +64,6 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// good, continue
-			break
 		default:
 			return nil, xerr
 		}
@@ -701,7 +700,6 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 					case *fail.ErrNotFound:
 						// missing Network is considered as a successful deletion, continue
 						debug.IgnoreError(derr)
-						break
 					default:
 						_ = xerr.AddConsequence(derr)
 					}
@@ -2061,7 +2059,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warnf("TBR: Timeouts !!")
+			logrus.Warningf("Timeouts !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to configure master(s): %s", instance.GetName(), xerr)
 		if len(loadErrors) != 0 {
@@ -2185,9 +2183,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 		return nil, fail.AbortedError(nil, "parent task killed")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	clusterName := instance.GetName()
@@ -2229,7 +2225,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warnf("TBR: Timeouts !!")
+			logrus.Warningf("Timeouts !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to create nodes(s): %s", instance.GetName(), xerr)
 		return nil, rerr
@@ -2282,9 +2278,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.AbortedError(nil, "parent task killed")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	hostLabel := fmt.Sprintf("node #%d", p.index)
@@ -2619,7 +2613,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warnf("TBR: Timeouts !!")
+			logrus.Warningf("Timeouts !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to configure nodes(s): %s", instance.GetName(), xerr)
 		if len(startErrs) > 0 {
@@ -2675,9 +2669,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 		return nil, fail.AbortedError(nil, "parent task killed")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Node.Name,
-	).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Node.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	hostLabel := fmt.Sprintf("node #%d (%s)", p.Index, p.Node.Name)

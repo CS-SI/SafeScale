@@ -1712,7 +1712,6 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 					case *fail.ErrNotFound:
 						// continue
 						debug.IgnoreError(xerr)
-						break
 					default:
 						return fail.Wrap(xerr, "failed to request information about Elastic IP '%s'", ip)
 					}
@@ -1808,7 +1807,6 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
 				debug.IgnoreError(xerr)
-				break
 			default:
 				return fail.Wrap(xerr, "failed to delete network interface %s from instance", aws.StringValue(v))
 			}

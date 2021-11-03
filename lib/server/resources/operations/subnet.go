@@ -566,7 +566,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		if caps.PrivateVirtualIP {
 			logrus.Info("Driver support private Virtual IP, honoring the failover setup for gateways.")
 		} else {
-			logrus.Warning("Driver does not support private Virtual IP, cannot set up failover of Subnet default route.")
+			logrus.Warnf("Driver does not support private Virtual IP, cannot set up failover of Subnet default route.")
 			failover = false
 		}
 	}
@@ -693,8 +693,6 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation() fail.Error {
 }
 
 func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) (ferr fail.Error) {
-	// FIXME: review this function
-
 	svc := instance.GetService()
 	if gwSizing == nil {
 		gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
@@ -901,7 +899,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 				// Starting from here, deletes the primary gateway if exiting with error
 				defer func() {
 					if ferr != nil && !req.KeepOnFailure {
-						logrus.Debugf("Cleaning up on failure, deleting gateway '%s'...", primaryGateway.GetName())
+						logrus.Warnf("Cleaning up on failure, deleting gateway '%s'... because of '%s'", primaryGateway.GetName(), ferr.Error())
 						derr := primaryGateway.RelaxedDeleteHost(context.Background())
 						derr = debug.InjectPlannedFail(derr)
 						if derr != nil {
@@ -1835,7 +1833,8 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 				} else {
 					verb = "are"
 				}
-				errorMsg = fmt.Sprintf("cannot delete Subnet '%s': %d host%s %s still attached to it: %s", as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
+				errorMsg = fmt.Sprintf("cannot delete Subnet '%s': %d host%s %s still attached to it: %s",
+					as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
 				return fail.NotAvailableError(errorMsg)
 			}
 			return nil

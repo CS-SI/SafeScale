@@ -250,7 +250,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	}
 
 	if parentTask == nil {
-		if ctx == context.TODO() { //nolint
+		if ctx == context.TODO() { // nolint
 			childContext, cancel = context.WithCancel(context.Background())
 		} else {
 			childContext, cancel = context.WithCancel(ctx)
@@ -397,7 +397,7 @@ func (instance *task) Status() (TaskStatus, fail.Error) {
 // Context returns the context associated to the task, or context.Background() if there is no context
 func (instance *task) Context() context.Context {
 	if instance.IsNull() {
-		return context.TODO() // nolint
+		return context.TODO()
 	}
 
 	instance.lock.RLock()

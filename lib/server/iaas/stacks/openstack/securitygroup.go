@@ -220,12 +220,13 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(xerr.Cause())
-		default:
-		}
-	}
-	if xerr != nil {
-		switch xerr.(type) {
+			cause := fail.ConvertError(xerr.Cause())
+			switch cause.(type) {
+			case *fail.ErrNotFound:
+				return nullASG, fail.NotFoundError("failed to query Security Group %s", asgLabel)
+			default:
+				return nullASG, cause
+			}
 		case *fail.ErrNotFound:
 			return nullASG, fail.NotFoundError("failed to query Security Group %s", asgLabel)
 		default:

@@ -1932,7 +1932,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
 	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 	defer cancelReboot()
-	_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
+	_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
@@ -1965,7 +1965,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
 		rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 		defer cancelReboot()
-		_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime)
+		_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
 		if xerr != nil {
 			logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 		}
@@ -2056,7 +2056,8 @@ func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHos
 		return nil, nil, fail.InconsistentError("missing service configuration option 'MetadataBucketName'")
 	}
 
-	networkName := fmt.Sprintf("sfnet-%s", strings.Trim(bucketName, objectstorage.BucketNamePrefix+"-"))
+	// Trim and TrimPrefix don't do the same thing
+	networkName := fmt.Sprintf("sfnet-%s", strings.TrimPrefix(bucketName, objectstorage.BucketNamePrefix+"-"))
 
 	// Create network if needed
 	networkInstance, xerr := LoadNetwork(svc, networkName)
@@ -2287,6 +2288,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 			if xerr != nil {
 				return xerr
 			}
+			debug.IgnoreError(xerr)
 		default:
 			return xerr
 		}
@@ -2754,9 +2756,7 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(target=%s,source=%s)", target, source,
-	).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(target=%s,source=%s)", target, source).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()
@@ -2840,8 +2840,7 @@ func (instance *Host) Push(ctx context.Context, source, target, owner, mode stri
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(
-		task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner,
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner,
 		mode,
 	).Entering()
 	defer tracer.Exiting()

@@ -41,7 +41,7 @@ func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("Stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return emptySlice, nil
@@ -58,7 +58,7 @@ func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules a
 		return nullASG, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	auuid, err := uuid.NewV4()
@@ -184,7 +184,7 @@ func (s Stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 		return fail.InvalidParameterError("sgParam", "must be complete")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if len(asg.Rules) > 0 {
@@ -235,7 +235,7 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 		return nullASG, fail.InvalidParameterError("sgParam", "must be complete")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if len(asg.Rules) > 0 {
@@ -276,7 +276,7 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if rule.EtherType == ipversion.IPv6 {
@@ -319,7 +319,7 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return nil, fail.NotImplementedError()
@@ -337,7 +337,7 @@ func (s Stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 		return fail.InvalidParameterError("asg", "must be complete")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	for _, v := range asg.Rules {
@@ -372,7 +372,7 @@ func (s Stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 		return fail.InvalidParameterError("asg", "must be complete")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	for _, v := range asg.Rules {

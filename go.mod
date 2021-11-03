@@ -18,7 +18,6 @@ require (
 	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
-	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/gojuno/minimock/v3 v3.0.10
 	github.com/golang/protobuf v1.5.2
 	github.com/gophercloud/gophercloud v0.20.0
@@ -61,7 +60,6 @@ require (
 	gomodules.xyz/stow v0.2.4
 	google.golang.org/api v0.30.0
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20200825200019-8632dd797987
 	google.golang.org/grpc v1.41.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/ini.v1 v1.55.0 // indirect

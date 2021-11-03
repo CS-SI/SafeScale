@@ -51,7 +51,7 @@ func (s Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume,
 		return nullAV, fail.InvalidParameterError("request.Size", "cannot be negative integer or 0")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("Stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// TODO: validate content of request
@@ -99,7 +99,7 @@ func (s Stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
 		return nullAV, fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("Stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcGetDisk(ref)
@@ -138,7 +138,7 @@ func (s Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("Stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var out []abstract.Volume
@@ -191,7 +191,7 @@ func (s Stack) DeleteVolume(ref string) fail.Error {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("Stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcDeleteDisk(ref)
@@ -209,7 +209,7 @@ func (s Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 		return "", fail.InvalidParameterCannotBeEmptyStringError("request.HostID")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("Stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "('%s')", request.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcCreateDiskAttachment(request.VolumeID, request.HostID)
@@ -232,7 +232,7 @@ func (s Stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAt
 		return nullAVA, fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("Stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", hostRef, vaID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	serverID, diskID := extractFromAttachmentID(vaID)
@@ -267,7 +267,7 @@ func (s Stack) DeleteVolumeAttachment(serverRef, vaID string) fail.Error {
 		return fail.InvalidParameterCannotBeEmptyStringError("vaID")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("Stack.gcp"), "(%s, %s)", serverRef, vaID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s, %s)", serverRef, vaID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcDeleteDiskAttachment(vaID)
@@ -283,7 +283,7 @@ func (s Stack) ListVolumeAttachments(serverRef string) ([]abstract.VolumeAttachm
 		return emptySlice, fail.InvalidParameterCannotBeEmptyStringError("serverRef")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("Stack.gcp"), "(%s)", serverRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.volume") || tracing.ShouldTrace("stack.gcp"), "(%s)", serverRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var vats []abstract.VolumeAttachment

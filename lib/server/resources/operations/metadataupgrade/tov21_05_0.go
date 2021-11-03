@@ -524,6 +524,7 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
+
 				subnetName, ok := hnV1.NetworksByID[hnV1.DefaultNetworkID]
 				if !ok {
 					return fail.InconsistentError("failed to find the default Network name")

@@ -109,12 +109,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(
-		func(str string) bool {
-			rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
-			return rxp.Match([]byte(str))
-		},
-	)
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
+		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
+		return rxp.Match([]byte(str))
+	}
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {

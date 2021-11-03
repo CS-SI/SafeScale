@@ -14,6 +14,9 @@ if [ -x ./git-hooks-env ]; then
     . ./git-hooks-env
 fi
 
+# Don't check on windows
+which where && exit 0
+
 # If we don't find make, don't fail
 which make || exit 0
 

@@ -31,6 +31,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
+const (
+	HostDefaultSecurityGroupNameSuffix = "-host-default-sg"
+)
+
 // KeyPair represents a SSH key pair
 type KeyPair struct {
 	ID         string
