@@ -83,6 +83,12 @@ func NewSubnet() *Subnet {
 	return sn
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (s *Subnet) IsNull() bool {
+	return s == nil || (s.ID == "" && s.Name == "")
+}
+
 // Clone ...
 // satisfies interface data.Clonable
 func (s Subnet) Clone() data.Clonable {
@@ -166,16 +172,23 @@ func (s *Subnet) GetID() string {
 type VirtualIP struct {
 	ID        string      `json:"id,omitempty"`
 	Name      string      `json:"name,omitempty"`
-	NetworkID string      `json:"network_id,omitempty"` // Deprecated; replaced by SubnetID
 	SubnetID  string      `json:"subnet_id,omitempty"`
 	PrivateIP string      `json:"private_ip,omitempty"`
 	PublicIP  string      `json:"public_ip,omitempty"`
 	Hosts     []*HostCore `json:"hosts,omitempty"`
+
+	NetworkID string `json:"network_id,omitempty"` // Deprecated; replaced by SubnetID
 }
 
 // NewVirtualIP ...
 func NewVirtualIP() *VirtualIP {
 	return &VirtualIP{Hosts: []*HostCore{}}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (vip *VirtualIP) IsNull() bool {
+	return vip == nil || (vip.ID == "" && vip.Name == "")
 }
 
 // Clone ...

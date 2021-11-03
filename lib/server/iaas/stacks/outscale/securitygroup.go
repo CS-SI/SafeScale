@@ -362,6 +362,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		case *fail.ErrNotFound:
 			// consider a missing rule as a successful deletion and continue
 			debug.IgnoreError(xerr)
+			break
 		default:
 			return nullASG, xerr
 		}

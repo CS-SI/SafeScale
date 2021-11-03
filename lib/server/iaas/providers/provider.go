@@ -46,8 +46,8 @@ type Provider interface {
 	// GetConfigurationOptions returns configuration options as a Config
 	GetConfigurationOptions() (Config, fail.Error)
 
-	// GetName returns the tenant name
-	GetName() string
+	GetName() string     // GetName returns the tenant name
+	GetStack() api.Stack // Returns the stack object used by the provider. Use with caution
 
 	GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp
 

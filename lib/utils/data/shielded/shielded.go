@@ -37,6 +37,12 @@ func NewShielded(witness data.Clonable) *Shielded {
 	}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (s *Shielded) IsNull() bool {
+	return s == nil || s.witness.IsNull()
+}
+
 // Clone ...
 func (instance *Shielded) Clone() *Shielded {
 	return NewShielded(instance.witness.Clone())

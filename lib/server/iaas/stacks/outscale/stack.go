@@ -100,6 +100,11 @@ func NullStack() *stack { // nolint
 	return &stack{}
 }
 
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "outscale"
+}
+
 // New creates a new stack
 func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
 	if options == nil {

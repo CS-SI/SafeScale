@@ -30,6 +30,8 @@ import (
 
 // Stack is the interface to cloud stack
 type Stack interface {
+	GetStackName() string
+
 	// ListAvailabilityZones lists the usable Availability Zones
 	ListAvailabilityZones() (map[string]bool, fail.Error)
 

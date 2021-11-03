@@ -48,6 +48,11 @@ func NewHostNetworking() *HostNetworking {
 	}
 }
 
+// IsNull tells if the HostNetworking corresponds to a null value
+func (hn *HostNetworking) IsNull() bool {
+	return hn == nil || hn.DefaultSubnetID == "" || (len(hn.IPv4Addresses) == 0 && len(hn.IPv6Addresses) == 0)
+}
+
 // Reset resets the content of the property
 func (hn *HostNetworking) Reset() {
 	*hn = HostNetworking{

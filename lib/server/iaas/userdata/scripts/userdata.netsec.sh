@@ -65,45 +65,45 @@ uptime >/opt/safescale/var/state/user_data.netsec.done
 rm -f /opt/safescale/var/state/user_data.netsec.done
 
 function reset_fw() {
-  is_network_reachable || failure 206 "failure resetting firewall because network is not reachable"
+  is_network_reachable || failure 206 "reset_fw(): failure resetting firewall because network is not reachable"
 
   case $LINUX_KIND in
   debian)
     echo "Reset firewall"
-    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 206 "failure running apt update"
+    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 207 "reset_fw(): failure running apt update"
     if [[ $(lsb_release -rs | cut -d. -f1) -eq 10 ]]; then
       codename=$(sfGetFact "linux_codename")
-      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports iptables" || failure 206 "failure installing iptables"
-      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports firewalld"  || failure 206 "failure installing firewalld"
+      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports iptables" || failure 208 "reset_fw(): failure installing iptables"
+      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports firewalld"  || failure 209 "reset_fw(): failure installing firewalld"
     else
-      sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 206 "failure installing iptables"
-      sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 206 "failure installing firewalld"
+      sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 210 "reset_fw(): failure installing iptables"
+      sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 211 "reset_fw(): failure installing firewalld"
     fi
 
     echo "Stopping ufw"
     systemctl stop ufw || true    # set to true to fix issues
     systemctl disable ufw || true # set to true to fix issues
-    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 206 "failure purging ufw"
+    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 212 "reset_fw(): failure purging ufw"
     ;;
 
   ubuntu)
     echo "Reset firewall"
-    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 206 "failure running apt update"
-    sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 206 "failure installing iptables"
-    sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 206 "failure installing firewalld"
+    sfRetryEx 3m 5 "sfApt update &>/dev/null" || failure 213 "reset_fw(): failure running apt update"
+    sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 214 "reset_fw(): failure installing iptables"
+    sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 215 "reset_fw(): failure installing firewalld"
 
     echo "Stopping ufw"
-    systemctl stop ufw || failure 206 "failure stopping ufw"
-    systemctl disable ufw || failure 206 "failure disabling ufw"
-    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 206 "failure purging ufw"
+    systemctl stop ufw || failure 216 "reset_fw(): failure stopping ufw"
+    systemctl disable ufw || failure 217 "reset_fw(): failure disabling ufw"
+    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 218 "reset_fw(): failure purging ufw"
     ;;
 
   redhat | rhel | centos | fedora)
     # firewalld may not be installed
     if ! systemctl is-active firewalld &>/dev/null; then
       if ! systemctl status firewalld &>/dev/null; then
-        is_network_reachable || failure 206 "failure installing firewalld because repositories are not reachable"
-        sfRetryEx 3m 5 "sfYum install -q -y firewalld" || failure 206 "failure installing firewalld"
+        is_network_reachable || failure 219 "reset_fw(): failure installing firewalld because repositories are not reachable"
+        sfRetryEx 3m 5 "sfYum install -q -y firewalld" || failure 220 "reset_fw(): failure installing firewalld"
       fi
     fi
     ;;
@@ -119,28 +119,28 @@ function reset_fw() {
   # Attach Internet interface or source IP to zone public if host is gateway
   [ ! -z $PU_IF ] && {
     # sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
-    firewall-offline-cmd --zone=public --add-interface=$PU_IF || failure 206 "firewall-offline-cmd failed with $? adding interfaces"
+    firewall-offline-cmd --zone=public --add-interface=$PU_IF || failure 221 "reset_fw(): firewall-offline-cmd failed with $? adding interfaces"
   }
   {{- if or .PublicIP .IsGateway }}
   [[ -z ${PU_IF} ]] && {
     # sfFirewallAdd --zone=public --add-source=${PU_IP}/32 || return 1
-    firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || failure 206 "firewall-offline-cmd failed with $? adding sources"
+    firewall-offline-cmd --zone=public --add-source=${PU_IP}/32 || failure 222 "reset_fw(): firewall-offline-cmd failed with $? adding sources"
   }
   {{- end }}
 
   # Sets the default target of packets coming from public interface to DROP
-  firewall-offline-cmd --zone=public --set-target=DROP || failure 206 "firewall-offline-cmd failed with $? dropping public zone"
+  firewall-offline-cmd --zone=public --set-target=DROP || failure 223 "reset_fw(): firewall-offline-cmd failed with $? dropping public zone"
 
   # Attach LAN interfaces to zone trusted
   [[ ! -z ${PR_IFs} ]] && {
     for i in $PR_IFs; do
       # sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
-      firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || failure 206 "firewall-offline-cmd failed with $? adding $PR_IFs to trusted"
+      firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || failure 224 "reset_fw(): firewall-offline-cmd failed with $? adding $PR_IFs to trusted"
     done
   }
   # Attach lo interface to zone trusted
   # sfFirewallAdd --zone=trusted --add-interface=lo || return 1
-  firewall-offline-cmd --zone=trusted --add-interface=lo || failure 206 "firewall-offline-cmd failed with $? adding lo to trusted"
+  firewall-offline-cmd --zone=trusted --add-interface=lo || failure 225 "reset_fw(): firewall-offline-cmd failed with $? adding lo to trusted"
 
   # Allow service ssh on public zone
   op=-1
@@ -154,17 +154,17 @@ function reset_fw() {
   fi
 
   if [[ $op -ne 0 ]]; then
-    failure 206 "firewall-offline-cmd failed with $op adding ssh service"
+    failure 226 "reset_fw(): firewall-offline-cmd failed with $op adding ssh service"
   fi
 
-  sfService enable firewalld &>/dev/null || failure 206 "service firewalld enable failed with $?"
-  sfService start firewalld &>/dev/null || failure 206 "service firewalld start failed with $?"
+  sfService enable firewalld &>/dev/null || failure 227 "reset_fw(): service firewalld enable failed with $?"
+  sfService start firewalld &>/dev/null || failure 228 "reset_fw(): service firewalld start failed with $?"
 
   sop=-1
   firewall-cmd --runtime-to-permanent && sop=$? || sop=$?
   if [[ $sop -ne 0 ]]; then
     if [[ $sop -ne 31 ]]; then
-      failure 206 "saving rules with firewall-cmd failed with $sop"
+      failure 229 "reset_fw(): saving rules with firewall-cmd failed with $sop"
     fi
   fi
 

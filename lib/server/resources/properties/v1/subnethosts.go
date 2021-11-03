@@ -36,17 +36,10 @@ func NewSubnetHosts() *SubnetHosts {
 	}
 }
 
-// Reset resets the content of the property
-func (sh *SubnetHosts) Reset() {
-	*sh = SubnetHosts{
-		ByID:   map[string]string{},
-		ByName: map[string]string{},
-	}
-}
-
-// Content ... (data.Clonable interface)
-func (sh *SubnetHosts) Content() interface{} {
-	return sh
+// IsNull
+// ... (data.Clonable interface)
+func (sh *SubnetHosts) IsNull() bool {
+	return sh == nil || len(sh.ByID) == 0
 }
 
 // Clone ... (data.Clonable interface)

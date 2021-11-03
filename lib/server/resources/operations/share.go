@@ -83,6 +83,12 @@ func (si *ShareIdentity) Deserialize(buf []byte) (xerr fail.Error) {
 	return fail.ConvertError(json.Unmarshal(buf, si))
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (si *ShareIdentity) IsNull() bool {
+	return si == nil || (si.HostID == "" && si.ShareID == "")
+}
+
 // Clone ...
 // satisfies interface data.Clonable
 func (si ShareIdentity) Clone() data.Clonable {

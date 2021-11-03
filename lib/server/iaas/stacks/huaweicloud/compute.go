@@ -305,7 +305,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nullAhf, nullUdc, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(
+		nil, tracing.ShouldTrace("stack.compute"), "(%s)", request.ResourceName,
+	).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
 	// msgFail := "failed to create Host resource: %s"
@@ -339,11 +341,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	var nets []servers.Network
 	// Add private networks
 	for _, v := range request.Subnets {
-		nets = append(
-			nets, servers.Network{
-				UUID: v.ID,
-			},
-		)
+		nets = append(nets, servers.Network{UUID: v.ID})
+
 	}
 
 	if xerr = stacks.ProvideCredentialsIfNeeded(&request); xerr != nil {
@@ -519,16 +518,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					// FIXME: Wrong, we need name, status and ID at least here
-					if server != nil {
-						ahc.ID = server.ID
-						ahc.Name = server.Name
-						ahc.LastState = hoststate.Error
-					}
-
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
-					return innerXErr
+					return fail.Wrap(innerXErr, "timeout waiting host '%s' ready", request.ResourceName)
 				}
 			}
 			return nil
@@ -658,19 +650,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 
 	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			// FIXME: Wrong, we need name, status and ID at least here
-			if server != nil {
-				ahf.Core.ID = server.ID
-				ahf.Core.Name = server.Name
-				ahf.Core.LastState = hoststate.Error
-				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
-			}
-			return nullAHF, fail.Wrap(xerr, "host '%s' is in Error state", hostRef)
-		default:
-			return nullAHF, xerr
-		}
+		return nullAHF, xerr
 	}
 
 	if server == nil {
@@ -906,12 +886,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 	_, xerr = s.InspectHost(ahf)
 	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable: // It's in ERROR state, but it's there
-			debug.IgnoreError(xerr)
-		default:
-			return xerr
-		}
+		return xerr
 	}
 
 	if s.cfgOpts.UseFloatingIP {
@@ -954,7 +929,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	outerRetryErr := retry.WhileUnsuccessful(
 		func() error {
 			// 1st, send delete host order
-			if resourcePresent { // nolint
+			if resourcePresent {
 				innerRetryErr := stacks.RetryableRemoteCall(
 					func() error {
 						innerErr := servers.Delete(s.Stack.ComputeClient, ahf.Core.ID).ExtractErr()

@@ -451,19 +451,6 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		networkAbstract, ok := clonable.(*abstract.Network)
-		if !ok {
-			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
-		ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract)
-		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)
-		return nil
-	})
-	if xerr != nil {
-		return xerr
-	}
-
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -494,6 +481,9 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
+		ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, abstractNetwork)
+		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)
+
 		svc := instance.GetService()
 
 		var subnets map[string]string
@@ -523,7 +513,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 				if k == instance.GetName() {
 					found = true
 					// the single subnet present is a subnet named like the Network, delete it first
-					rs, xerr := LoadSubnet(svc, "", v)
+					subnetInstance, xerr := LoadSubnet(svc, "", v)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						switch xerr.(type) {
@@ -536,10 +526,10 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 						}
 					}
 
-					subnetName := rs.GetName()
-					logrus.Warningf("Trying to delete subnet with name '%s'", subnetName)
+					subnetName := subnetInstance.GetName()
+					// logrus.Warningf("Trying to delete subnet with name '%s'", subnetName)
 
-					xerr = rs.Delete(ctx)
+					xerr = subnetInstance.Delete(ctx)
 					xerr = debug.InjectPlannedFail(xerr)
 					if xerr != nil {
 						return fail.Wrap(xerr, "failed to delete Subnet '%s'", subnetName)
@@ -628,7 +618,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 			}
 
 			if maybeDeleted {
-				logrus.Warningf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
+				logrus.Warningf("TBR: The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
 			}
 			iterations := 6
 			for {
@@ -639,7 +629,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 				}
 				iterations--
 				if iterations < 0 {
-					logrus.Warningf("The network '%s' is still there", abstractNetwork.ID)
+					logrus.Warningf("TBR: The network '%s' is still there", abstractNetwork.ID)
 					break
 				}
 				time.Sleep(temporal.GetDefaultDelay())

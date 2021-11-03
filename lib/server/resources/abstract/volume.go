@@ -53,8 +53,13 @@ func NewVolume() *Volume {
 	return nv
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (v *Volume) IsNull() bool {
+	return v == nil || (v.ID == "" && v.Name == "")
+}
+
 // Clone ...
-//
 // satisfies interface data.Clonable
 func (v Volume) Clone() data.Clonable {
 	return NewVolume().Replace(&v)

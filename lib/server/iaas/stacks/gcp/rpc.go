@@ -127,7 +127,7 @@ func indexOf(element string, data []string) int {
 	return -1 // not found.
 }
 
-func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation, poll time.Duration, duration time.Duration) (xerr fail.Error) {
+func (s Stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation, poll time.Duration, duration time.Duration) (xerr fail.Error) {
 	if opp == nil {
 		return fail.InvalidParameterCannotBeNilError("opp")
 	}
@@ -166,7 +166,7 @@ func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation
 	return nil
 }
 
-func (s stack) rpcGetSubnetByID(id string) (*compute.Subnetwork, fail.Error) {
+func (s Stack) rpcGetSubnetByID(id string) (*compute.Subnetwork, fail.Error) {
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -200,11 +200,11 @@ func (s stack) rpcGetSubnetByID(id string) (*compute.Subnetwork, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcGetSubnetByName(subnetName string) (*compute.Subnetwork, fail.Error) {
+func (s Stack) rpcGetSubnetByName(subnetName string) (*compute.Subnetwork, fail.Error) {
 	return s.rpcGetSubnetByNameAndRegion(subnetName, s.GcpConfig.Region)
 }
 
-func (s stack) rpcGetSubnetByNameAndRegion(subnetName, region string) (*compute.Subnetwork, fail.Error) {
+func (s Stack) rpcGetSubnetByNameAndRegion(subnetName, region string) (*compute.Subnetwork, fail.Error) {
 	if subnetName == "" {
 		return &compute.Subnetwork{}, fail.InvalidParameterError("subnetName", "cannot be empty string")
 	}
@@ -228,7 +228,7 @@ func (s stack) rpcGetSubnetByNameAndRegion(subnetName, region string) (*compute.
 	return resp[0], nil
 }
 
-func (s stack) rpcDeleteSubnetByName(name string) fail.Error {
+func (s Stack) rpcDeleteSubnetByName(name string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -263,7 +263,7 @@ func (s stack) rpcDeleteSubnetByName(name string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
 }
 
-func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.Subnetwork, fail.Error) {
+func (s Stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.Subnetwork, fail.Error) {
 	if subnetName = strings.TrimSpace(subnetName); subnetName == "" {
 		return &compute.Subnetwork{}, fail.InvalidParameterError("subnetName", "cannot be empty string")
 	}
@@ -318,7 +318,7 @@ func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.S
 	return s.rpcGetSubnetByName(subnetName)
 }
 
-func (s stack) rpcListSubnets(filter string) ([]*compute.Subnetwork, fail.Error) {
+func (s Stack) rpcListSubnets(filter string) ([]*compute.Subnetwork, fail.Error) {
 	var (
 		out  []*compute.Subnetwork
 		resp *compute.SubnetworkList
@@ -360,7 +360,7 @@ func (s stack) rpcListSubnets(filter string) ([]*compute.Subnetwork, fail.Error)
 	return out, nil
 }
 
-func (s stack) rpcGetFirewallRuleByName(name string) (*compute.Firewall, fail.Error) {
+func (s Stack) rpcGetFirewallRuleByName(name string) (*compute.Firewall, fail.Error) {
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -394,7 +394,7 @@ func (s stack) rpcGetFirewallRuleByName(name string) (*compute.Firewall, fail.Er
 	return resp, nil
 }
 
-func (s stack) rpcGetFirewallRuleByID(id string) (*compute.Firewall, fail.Error) {
+func (s Stack) rpcGetFirewallRuleByID(id string) (*compute.Firewall, fail.Error) {
 	if id == "" {
 		return nil, fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -436,7 +436,7 @@ func (s stack) rpcGetFirewallRuleByID(id string) (*compute.Firewall, fail.Error)
 	return resp.Items[0], nil
 }
 
-func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, direction string, sourcesUseGroups bool, sources []string, targetsUseGroups bool, targets []string, allowed []*compute.FirewallAllowed, denied []*compute.FirewallDenied) (*compute.Firewall, fail.Error) {
+func (s Stack) rpcCreateFirewallRule(ruleName, networkName, description, direction string, sourcesUseGroups bool, sources []string, targetsUseGroups bool, targets []string, allowed []*compute.FirewallAllowed, denied []*compute.FirewallDenied) (*compute.Firewall, fail.Error) {
 	if ruleName == "" {
 		return nil, fail.InvalidParameterError("ruleName", "cannot be empty string")
 	}
@@ -512,7 +512,7 @@ func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, directi
 	return s.rpcGetFirewallRuleByName(ruleName)
 }
 
-func (s stack) rpcListFirewallRules(networkRef string, ids []string) ([]*compute.Firewall, fail.Error) {
+func (s Stack) rpcListFirewallRules(networkRef string, ids []string) ([]*compute.Firewall, fail.Error) {
 	if networkRef == "" && len(ids) == 0 {
 		return []*compute.Firewall{}, fail.InvalidParameterError(
 			"networkRef", "cannot be empty string if 'ids' is an empty slice",
@@ -574,7 +574,7 @@ func (s stack) rpcListFirewallRules(networkRef string, ids []string) ([]*compute
 	return out, nil
 }
 
-func (s stack) rpcDeleteFirewallRuleByID(id string) fail.Error {
+func (s Stack) rpcDeleteFirewallRuleByID(id string) fail.Error {
 	if id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -609,7 +609,7 @@ func (s stack) rpcDeleteFirewallRuleByID(id string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), temporal.GetHostTimeout())
 }
 
-func (s stack) rpcEnableFirewallRuleByName(name string) fail.Error {
+func (s Stack) rpcEnableFirewallRuleByName(name string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -647,7 +647,7 @@ func (s stack) rpcEnableFirewallRuleByName(name string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 }
 
-func (s stack) rpcDisableFirewallRuleByName(name string) fail.Error {
+func (s Stack) rpcDisableFirewallRuleByName(name string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -685,7 +685,7 @@ func (s stack) rpcDisableFirewallRuleByName(name string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 }
 
-func (s stack) rpcGetNetworkByID(id string) (*compute.Network, fail.Error) {
+func (s Stack) rpcGetNetworkByID(id string) (*compute.Network, fail.Error) {
 	if id = strings.TrimSpace(id); id == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -712,7 +712,7 @@ func (s stack) rpcGetNetworkByID(id string) (*compute.Network, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcGetNetworkByName(name string) (*compute.Network, fail.Error) {
+func (s Stack) rpcGetNetworkByName(name string) (*compute.Network, fail.Error) {
 	if name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -747,7 +747,7 @@ func (s stack) rpcGetNetworkByName(name string) (*compute.Network, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
+func (s Stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	request := compute.Network{
 		Name:                  name,
 		AutoCreateSubnetworks: false,
@@ -817,7 +817,7 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcGetRouteByName(name string) (*compute.Route, fail.Error) {
+func (s Stack) RPCGetRouteByName(name string) (*compute.Route, fail.Error) {
 	if name = strings.TrimSpace(name); name == "" {
 		return nil, fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -851,7 +851,7 @@ func (s stack) rpcGetRouteByName(name string) (*compute.Route, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*compute.Route, fail.Error) {
+func (s Stack) RPCCreateRoute(networkName, subnetID, subnetName string) (*compute.Route, fail.Error) {
 	if networkName == "" {
 		return nil, fail.InvalidParameterError("networkName", "cannot be empty string")
 	}
@@ -862,7 +862,7 @@ func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*comput
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("subnetName")
 	}
 
-	routeName := fmt.Sprintf(natRouteNameFormat, subnetID)
+	routeName := fmt.Sprintf(NATRouteNameFormat, subnetID)
 
 	request := compute.Route{
 		DestRange:       "0.0.0.0/0",
@@ -870,7 +870,7 @@ func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*comput
 		Network:         fmt.Sprintf("%s/global/networks/%s", s.selfLinkPrefix, networkName),
 		NextHopInstance: fmt.Sprintf("%s/zones/%s/instances/gw-%s", s.selfLinkPrefix, s.GcpConfig.Zone, subnetName),
 		Priority:        800,
-		Tags:            []string{fmt.Sprintf(natRouteTagFormat, subnetID)},
+		Tags:            []string{fmt.Sprintf(NATRouteTagFormat, subnetID)},
 	}
 	var opp *compute.Operation
 	xerr := stacks.RetryableRemoteCall(
@@ -905,10 +905,10 @@ func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*comput
 		return nil, xerr
 	}
 
-	return s.rpcGetRouteByName(routeName)
+	return s.RPCGetRouteByName(routeName)
 }
 
-func (s stack) rpcDeleteRoute(name string) fail.Error {
+func (s Stack) RPCDeleteRoute(name string) fail.Error {
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
@@ -947,7 +947,7 @@ var imageFamilies = []string{
 	"centos-cloud", "debian-cloud", "rhel-cloud", "ubuntu-os-cloud", "suse-cloud", "rhel-sap-cloud", "suse-sap-cloud",
 }
 
-func (s stack) rpcListImages() ([]*compute.Image, fail.Error) {
+func (s Stack) rpcListImages() ([]*compute.Image, fail.Error) {
 	var (
 		out  []*compute.Image
 		resp *compute.ImageList
@@ -989,7 +989,7 @@ func (s stack) rpcListImages() ([]*compute.Image, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcGetImageByID(id string) (*compute.Image, fail.Error) {
+func (s Stack) rpcGetImageByID(id string) (*compute.Image, fail.Error) {
 	if id == "" {
 		return &compute.Image{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1041,7 +1041,7 @@ func (s stack) rpcGetImageByID(id string) (*compute.Image, fail.Error) {
 	return out[0], nil
 }
 
-func (s stack) rpcListMachineTypes() ([]*compute.MachineType, fail.Error) {
+func (s Stack) rpcListMachineTypes() ([]*compute.MachineType, fail.Error) {
 	var (
 		out  []*compute.MachineType
 		resp *compute.MachineTypeList
@@ -1083,7 +1083,7 @@ func (s stack) rpcListMachineTypes() ([]*compute.MachineType, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcGetMachineType(id string) (*compute.MachineType, fail.Error) {
+func (s Stack) rpcGetMachineType(id string) (*compute.MachineType, fail.Error) {
 	if id == "" {
 		return &compute.MachineType{}, fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -1118,7 +1118,7 @@ func (s stack) rpcGetMachineType(id string) (*compute.MachineType, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
+func (s Stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 	var (
 		out  []*compute.Instance
 		resp *compute.InstanceList
@@ -1162,7 +1162,7 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, ferr fail.Error) {
+func (s Stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, ferr fail.Error) {
 	var xerr fail.Error
 	var tags []string
 	for k := range sgs {
@@ -1172,7 +1172,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	// Add nat route name as tag to host that has a public IP
 	var publicIP *compute.Address
 	if hasPublicIP {
-		tags = append(tags, fmt.Sprintf(natRouteNameFormat, subnetID))
+		tags = append(tags, fmt.Sprintf(NATRouteNameFormat, subnetID))
 
 		// Create static regional external address
 		publicIP, xerr = s.rpcCreateExternalAddress("publicip-"+name, false)
@@ -1180,7 +1180,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 			return &compute.Instance{}, fail.Wrap(xerr, "failed to create public IP of instance")
 		}
 	} else {
-		tags = append(tags, fmt.Sprintf(natRouteTagFormat, subnetID))
+		tags = append(tags, fmt.Sprintf(NATRouteTagFormat, subnetID))
 	}
 
 	managedTag := "safescale"
@@ -1337,7 +1337,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	return resp, nil
 }
 
-func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
+func (s Stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 	var resp *compute.Instance
 	xerr := stacks.RetryableRemoteCall(
 		func() (err error) {
@@ -1405,7 +1405,7 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 	}
 	return nil
 }
-func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
+func (s Stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
 	query := compute.Address{
 		Name: name,
 	}
@@ -1509,7 +1509,7 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 	return resp, nil
 }
 
-func (s stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
+func (s Stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
 	if ref == "" {
 		return &compute.Instance{}, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -1544,7 +1544,7 @@ func (s stack) rpcGetInstance(ref string) (*compute.Instance, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcDeleteInstance(ref string) fail.Error {
+func (s Stack) rpcDeleteInstance(ref string) fail.Error {
 	// Get instance to make sure we have the hostname used to name the optional public IP (ref may be id or name)
 	instance, xerr := s.rpcGetInstance(ref)
 	if xerr != nil {
@@ -1597,7 +1597,7 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 	return nil
 }
 
-func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
+func (s Stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Address, xerr fail.Error) {
 	var resp *compute.Address
 	zero := &compute.Address{}
 	if global {
@@ -1646,7 +1646,7 @@ func (s stack) rpcGetExternalAddress(name string, global bool) (_ *compute.Addre
 	return resp, nil
 }
 
-func (s stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
+func (s Stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
 	if global {
 		xerr := stacks.RetryableRemoteCall(
 			func() (err error) {
@@ -1698,7 +1698,7 @@ func (s stack) rpcDeleteExternalAddress(name string, global bool) fail.Error {
 	return nil
 }
 
-func (s stack) rpcStopInstance(ref string) fail.Error {
+func (s Stack) rpcStopInstance(ref string) fail.Error {
 	if ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -1733,7 +1733,7 @@ func (s stack) rpcStopInstance(ref string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
 }
 
-func (s stack) rpcStartInstance(ref string) fail.Error {
+func (s Stack) rpcStartInstance(ref string) fail.Error {
 	if ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -1768,7 +1768,7 @@ func (s stack) rpcStartInstance(ref string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
 }
 
-func (s stack) rpcListZones() ([]*compute.Zone, fail.Error) {
+func (s Stack) rpcListZones() ([]*compute.Zone, fail.Error) {
 	var (
 		resp            *compute.ZoneList
 		out, emptySlice []*compute.Zone
@@ -1807,7 +1807,7 @@ func (s stack) rpcListZones() ([]*compute.Zone, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcListRegions() ([]*compute.Region, fail.Error) {
+func (s Stack) rpcListRegions() ([]*compute.Region, fail.Error) {
 	var (
 		out  []*compute.Region
 		resp *compute.RegionList
@@ -1847,7 +1847,7 @@ func (s stack) rpcListRegions() ([]*compute.Region, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
+func (s Stack) RPCAddTagsToInstance(hostID string, tags []string) fail.Error {
 	if hostID == "" {
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
 	}
@@ -1882,18 +1882,16 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 		}
 	}
 
+	present := map[string]struct{}{}
 	newTags := resp.Tags
-	for _, v := range tags {
-		// If tag is already present, do nothing
-		for _, w := range newTags.Items {
-			if v == w {
-				break
-			}
-		}
-		newTags.Items = append(newTags.Items, v)
+	for _, v := range newTags.Items {
+		present[v] = struct{}{}
 	}
-	if len(newTags.Items) == len(resp.Tags.Items) {
-		return nil
+	for _, v := range tags {
+		// If current tag is not present, add it to newTags
+		if _, ok := present[v]; !ok {
+			newTags.Items = append(newTags.Items, v)
+		}
 	}
 
 	var opp *compute.Operation
@@ -1926,7 +1924,7 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 }
 
-func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Error {
+func (s Stack) RPCRemoveTagsFromInstance(hostID string, tags []string) fail.Error {
 	if hostID == "" {
 		return fail.InvalidParameterError("hostID", "cannot be empty string")
 	}
@@ -2005,7 +2003,7 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 }
 
-func (s stack) rpcListNetworks() (_ []*compute.Network, xerr fail.Error) {
+func (s Stack) rpcListNetworks() (_ []*compute.Network, xerr fail.Error) {
 	var (
 		out  []*compute.Network
 		resp *compute.NetworkList
@@ -2047,7 +2045,7 @@ func (s stack) rpcListNetworks() (_ []*compute.Network, xerr fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcDeleteNetworkByID(id string) (xerr fail.Error) {
+func (s Stack) rpcDeleteNetworkByID(id string) (xerr fail.Error) {
 	if id = strings.TrimSpace(id); id == "" {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
@@ -2082,7 +2080,7 @@ func (s stack) rpcDeleteNetworkByID(id string) (xerr fail.Error) {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(resp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
 }
 
-func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail.Error) {
+func (s Stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail.Error) {
 	request := compute.Disk{
 		Name:   name,
 		Region: s.GcpConfig.Region,
@@ -2127,7 +2125,7 @@ func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail
 	return s.rpcGetDisk(name)
 }
 
-func (s stack) rpcGetDisk(ref string) (*compute.Disk, fail.Error) {
+func (s Stack) rpcGetDisk(ref string) (*compute.Disk, fail.Error) {
 	if ref == "" {
 		return &compute.Disk{}, fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -2165,7 +2163,7 @@ func (s stack) rpcGetDisk(ref string) (*compute.Disk, fail.Error) {
 	return resp, nil
 }
 
-func (s stack) rpcDeleteDisk(ref string) fail.Error {
+func (s Stack) rpcDeleteDisk(ref string) fail.Error {
 	if ref == "" {
 		return fail.InvalidParameterError("ref", "cannot be empty string")
 	}
@@ -2199,7 +2197,7 @@ func (s stack) rpcDeleteDisk(ref string) fail.Error {
 	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
 }
 
-func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Error) {
+func (s Stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Error) {
 	if diskRef == "" {
 		return "", fail.InvalidParameterError("diskRef", "cannot be empty string")
 	}
@@ -2260,7 +2258,7 @@ func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Er
 	return generateDiskAttachmentID(instance.Name, disk.Name), nil
 }
 
-func (s stack) rpcDeleteDiskAttachment(vaID string) fail.Error {
+func (s Stack) rpcDeleteDiskAttachment(vaID string) fail.Error {
 	if vaID == "" {
 		return fail.InvalidParameterError("vaID", "cannot be empty string")
 	}

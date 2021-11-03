@@ -40,14 +40,9 @@ func NewSecurityGroupSubnets() *SecurityGroupSubnets {
 	}
 }
 
-// Reset ...
-func (sgn *SecurityGroupSubnets) Reset() *SecurityGroupSubnets {
-	if sgn != nil {
-		sgn.ByID = map[string]*SecurityGroupBond{}
-		sgn.ByName = map[string]string{}
-		return sgn
-	}
-	return NewSecurityGroupSubnets()
+// IsNull ...
+func (sgn *SecurityGroupSubnets) IsNull() bool {
+	return sgn == nil || len(sgn.ByID) == 0
 }
 
 // Clone ...

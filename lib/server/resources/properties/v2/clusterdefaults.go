@@ -35,6 +35,12 @@ func newClusterDefaults() *ClusterDefaults {
 	return &ClusterDefaults{}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (cd *ClusterDefaults) IsNull() bool {
+	return cd == nil || (cd.GatewaySizing.IsNull() && cd.MasterSizing.IsNull() && cd.NodeSizing.IsNull())
+}
+
 // Clone ...
 // satisfies interface data.Clonable
 func (cd ClusterDefaults) Clone() data.Clonable {

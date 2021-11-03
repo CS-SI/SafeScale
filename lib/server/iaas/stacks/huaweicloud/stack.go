@@ -124,6 +124,11 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 	return &s, nil
 }
 
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "huaweicloud"
+}
+
 // initVPC initializes the instance of the Networking/VPC if one is defined in tenant
 func (s *stack) initVPC() fail.Error {
 	if s.cfgOpts.DefaultNetworkName != "" {

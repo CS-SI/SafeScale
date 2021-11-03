@@ -39,9 +39,10 @@ func NewNetworkSubnets() *NetworkSubnets {
 	}
 }
 
-// Content ... (data.Clonable interface)
-func (nd *NetworkSubnets) Content() interface{} {
-	return nd
+// IsNull
+// ... (data.Clonable interface)
+func (nd *NetworkSubnets) IsNull() bool {
+	return nd == nil || len(nd.ByID) == 0
 }
 
 // Clone ... (data.Clonable interface)

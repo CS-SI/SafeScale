@@ -35,6 +35,12 @@ func newClusterControlPlane() *ClusterControlplane {
 	return &ClusterControlplane{}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (cp *ClusterControlplane) IsNull() bool {
+	return cp == nil || cp.VirtualIP.IsNull()
+}
+
 // Clone ...
 // satisfies interface data.Clonable
 func (cp ClusterControlplane) Clone() data.Clonable {

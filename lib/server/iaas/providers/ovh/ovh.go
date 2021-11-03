@@ -100,8 +100,6 @@ func (p *provider) IsNull() bool {
 // Build build a new instance of Ovh using configuration parameters
 // Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-	var validInput bool
-
 	identityParams, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	// networkParams, _ := params["network"].(map[string]interface{})
@@ -115,27 +113,15 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		zone = "nova"
 	}
 
-	projectName, validInput := compute["ProjectName"].(string)
-	if !validInput {
-		return nil, fail.NewError("Invalid input for 'ProjectName'")
-	}
+	projectName, _ := compute["ProjectName"].(string)
 
-	val1, ok1 := identityParams["AlternateApiApplicationKey"]
+	val1, ok1 := identityParams["AlternateApiConsumerKey"]
 	val2, ok2 := identityParams["AlternateApiApplicationSecret"]
 	val3, ok3 := identityParams["AlternateApiConsumerKey"]
 	if ok1 && ok2 && ok3 {
-		alternateAPIApplicationKey, validInput = val1.(string)
-		if !validInput {
-			return nil, fail.NewError("Invalid input for 'AlternateApiApplicationKey'")
-		}
-		alternateAPIApplicationSecret, validInput = val2.(string)
-		if !validInput {
-			return nil, fail.NewError("Invalid input for 'AlternateApiApplicationSecret'")
-		}
-		alternateAPIConsumerKey, validInput = val3.(string)
-		if !validInput {
-			return nil, fail.NewError("Invalid input for 'AlternateApiConsumerKey'")
-		}
+		alternateAPIApplicationKey = val1.(string)
+		alternateAPIApplicationSecret = val2.(string)
+		alternateAPIConsumerKey = val3.(string)
 	}
 
 	operatorUsername := abstract.DefaultUser
@@ -168,10 +154,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
-		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
-		return rxp.Match([]byte(str))
-	}
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(
+		func(str string) bool {
+			rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
+			return rxp.Match([]byte(str))
+		},
+	)
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
@@ -367,6 +355,12 @@ func (p provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network,
 // GetName returns the name of the driver
 func (p provider) GetName() string {
 	return "ovh"
+}
+
+// GetStack returns the Stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
 }
 
 func (p provider) GetTenantParameters() map[string]interface{} {

@@ -35,13 +35,13 @@ import (
 
 // ListSecurityGroups lists existing security groups
 // There is no Security Group resource in GCP, so ListSecurityGroups always returns empty slice
-func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
+func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	var emptySlice []*abstract.SecurityGroup
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("stack.gcp")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.securitygroup") || tracing.ShouldTrace("Stack.gcp")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return emptySlice, nil
@@ -49,7 +49,7 @@ func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 
 // CreateSecurityGroup creates a security group
 // Actually creates GCP Firewall Rules corresponding to the Security Group rules
-func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -58,7 +58,7 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 		return nullASG, fail.InvalidParameterCannotBeEmptyStringError("name")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	auuid, err := uuid.NewV4()
@@ -173,7 +173,7 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (string, bool
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
+func (s Stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -184,7 +184,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 		return fail.InvalidParameterError("sgParam", "must be complete")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if len(asg.Rules) > 0 {
@@ -209,7 +209,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 
 // InspectSecurityGroup returns information about a security group
 // Actually there is no Security Group resource in GCP, so this function always returns a *fail.NotImplementedError error
-func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	if s.IsNull() {
 		return &abstract.SecurityGroup{}, fail.InvalidInstanceError()
 	}
@@ -222,7 +222,7 @@ func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -235,7 +235,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 		return nullASG, fail.InvalidParameterError("sgParam", "must be complete")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "(%s)", asg.ID).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if len(asg.Rules) > 0 {
@@ -260,7 +260,7 @@ func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -276,7 +276,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "(%s)", sgLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	if rule.EtherType == ipversion.IPv6 {
@@ -303,7 +303,7 @@ func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule from a security group
 // For now, this function does nothing in GCP context (have to figure out how to identify Firewall rule corresponding to abstract Security Group rule
-func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -319,14 +319,14 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 		return nullASG, fail.InvalidParameterCannotBeNilError("rule")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "(%s, %v)", sgLabel, rule).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return nil, fail.NotImplementedError()
 }
 
 // DisableSecurityGroup disables the rules of a Security Group
-func (s stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
+func (s Stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -337,7 +337,7 @@ func (s stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 		return fail.InvalidParameterError("asg", "must be complete")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	for _, v := range asg.Rules {
@@ -361,7 +361,7 @@ func (s stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 }
 
 // EnableSecurityGroup enables the rules of a Security Group
-func (s stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
+func (s Stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -372,7 +372,7 @@ func (s stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 		return fail.InvalidParameterError("asg", "must be complete")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.gcp"), "('%s')", asg.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	for _, v := range asg.Rules {
@@ -397,7 +397,7 @@ func (s stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
-func (s stack) GetDefaultSecurityGroupName() string {
+func (s Stack) GetDefaultSecurityGroupName() string {
 	if s.IsNull() {
 		return ""
 	}

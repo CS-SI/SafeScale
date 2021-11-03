@@ -109,10 +109,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
-		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
-		return rxp.Match([]byte(str))
-	}
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(
+		func(str string) bool {
+			rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
+			return rxp.Match([]byte(str))
+		},
+	)
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
@@ -207,6 +209,12 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // GetName ...
 func (p provider) GetName() string {
 	return "opentelekom"
+}
+
+// GetStack returns the Stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
 }
 
 // GetTenantParameters ...

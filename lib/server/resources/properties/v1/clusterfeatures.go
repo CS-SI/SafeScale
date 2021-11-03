@@ -41,6 +41,12 @@ func NewClusterInstalledFeature() *ClusterInstalledFeature {
 	}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (cif *ClusterInstalledFeature) IsNull() bool {
+	return cif == nil || cif.Name == ""
+}
+
 // Clone ...
 // satisfies interface data.Clonable
 func (cif ClusterInstalledFeature) Clone() data.Clonable {
@@ -82,6 +88,12 @@ func newClusterFeatures() *ClusterFeatures {
 		Installed: map[string]*ClusterInstalledFeature{},
 		Disabled:  map[string]struct{}{},
 	}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (f *ClusterFeatures) IsNull() bool {
+	return f == nil || (len(f.Installed) == 0 && len(f.Disabled) == 0)
 }
 
 // Clone ...

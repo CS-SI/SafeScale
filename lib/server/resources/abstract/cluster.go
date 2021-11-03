@@ -48,6 +48,8 @@ type ClusterRequest struct {
 
 // ClusterIdentity contains the bare minimum information about a cluster
 type ClusterIdentity struct {
+	// FIXME: Add Os and Template info here...
+
 	Name                string                 `json:"name"`           // GetName is the name of the cluster
 	Flavor              clusterflavor.Enum     `json:"flavor"`         // Flavor tells what kind of cluster it is
 	Complexity          clustercomplexity.Enum `json:"complexity"`     // Complexity is the mode of cluster

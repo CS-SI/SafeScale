@@ -36,11 +36,6 @@ func NewHostVolume() *HostVolume {
 	return &HostVolume{}
 }
 
-// Reset ...
-func (p *HostVolume) Reset() {
-	*p = HostVolume{}
-}
-
 // HostVolumes contains information about attached volumes
 // not FROZEN yet
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -62,19 +57,9 @@ func NewHostVolumes() *HostVolumes {
 	}
 }
 
-// Reset ...
-func (hv *HostVolumes) Reset() {
-	*hv = HostVolumes{
-		VolumesByID:     map[string]*HostVolume{},
-		VolumesByName:   map[string]string{},
-		VolumesByDevice: map[string]string{},
-		DevicesByID:     map[string]string{},
-	}
-}
-
-// Content ...
-func (hv *HostVolumes) Content() interface{} {
-	return hv
+// IsNull ...
+func (hv *HostVolumes) IsNull() bool {
+	return hv == nil || len(hv.VolumesByID) == 0
 }
 
 // Clone ...

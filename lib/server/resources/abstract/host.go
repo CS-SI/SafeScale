@@ -31,10 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-const (
-	HostDefaultSecurityGroupNameSuffix = "-host-default-sg"
-)
-
 // KeyPair represents a SSH key pair
 type KeyPair struct {
 	ID         string
@@ -202,6 +198,10 @@ func NewHostEffectiveSizing() *HostEffectiveSizing {
 	return &HostEffectiveSizing{}
 }
 
+func (hse *HostEffectiveSizing) IsNull() bool {
+	return hse == nil || hse.Cores == 0
+}
+
 // HostTemplate ...
 type HostTemplate struct {
 	Cores     int     `json:"cores,omitempty"`
@@ -224,7 +224,6 @@ func (ht HostTemplate) OK() bool {
 
 // HostCore contains the core information about a host
 // These information should not change over time
-// TODO: profit of immutability status of HostCore to optimize some use (like SSHConfig), avoiding provider calls
 type HostCore struct {
 	ID         string            `json:"id,omitempty"`
 	Name       string            `json:"name,omitempty"`
@@ -271,14 +270,12 @@ func (hc *HostCore) OK() bool {
 }
 
 // Clone does a deep-copy of the IPAddress
-//
 // satisfies interface data.Clonable
 func (hc HostCore) Clone() data.Clonable {
 	return NewHostCore().Replace(&hc)
 }
 
 // Replace ...
-//
 // satisfies interface data.Clonable
 func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value...

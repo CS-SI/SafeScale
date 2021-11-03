@@ -67,6 +67,12 @@ func newClusterNodes() *ClusterNodes {
 	}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (n *ClusterNodes) IsNull() bool {
+	return n == nil || (len(n.ByNumericalID) == 0 && n.GlobalLastIndex <= 10)
+}
+
 // Clone ...
 // satisfies interface data.Clonable
 func (n ClusterNodes) Clone() data.Clonable {

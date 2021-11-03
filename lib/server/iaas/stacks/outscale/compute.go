@@ -68,7 +68,9 @@ func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true, /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadImages(nil)
@@ -205,7 +207,9 @@ func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true, /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// without GPU
@@ -341,7 +345,9 @@ func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 		return nullImage, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true, /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	defer func() {
@@ -378,7 +384,9 @@ func (s stack) InspectTemplate(id string) (_ abstract.HostTemplate, xerr fail.Er
 		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", id,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.parseTemplateID(id)
@@ -519,8 +527,10 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		return nullAHC, xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)",
-		hostLabel, state.String(), timeout).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)",
+		hostLabel, state.String(), timeout,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	xerr = retry.WhileUnsuccessfulWithHardTimeout(
@@ -817,7 +827,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		)
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", request).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", request,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Get or create password
@@ -895,7 +907,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nil, nil, xerr
 	}
 
-	var diskSize = tpl.DiskSize
+	var diskSize int = tpl.DiskSize
 	if request.DiskSize > diskSize {
 		diskSize = request.DiskSize
 	}
@@ -1061,7 +1073,9 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	publicIPs, xerr := s.rpcReadPublicIPsOfVM(ahf.Core.ID)
@@ -1120,7 +1134,9 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 		return nullAHF, xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostLabel,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var vm osc.Vm
@@ -1168,7 +1184,9 @@ func (s stack) GetHostState(hostParam stacks.HostParameter) (_ hoststate.Enum, x
 	if s.IsNull() {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true, /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	ahf, _, xerr := stacks.ValidateHostParameter(hostParam)
@@ -1186,7 +1204,9 @@ func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 		return emptyList, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true, /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	resp, xerr := s.rpcReadVMs(nil)
@@ -1233,7 +1253,9 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcStopVMs([]string{ahf.Core.ID})
@@ -1249,7 +1271,9 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcStartVMs([]string{ahf.Core.ID})
@@ -1265,7 +1289,9 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		return xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s)", hostRef,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return s.rpcRebootVMs([]string{ahf.Core.ID})
@@ -1297,8 +1323,10 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, sizing abstract.HostSi
 		return nullAHF, xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %v)",
-		hostRef, sizing).WithStopwatch().Entering()
+	tracer := debug.NewTracer(
+		nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %v)",
+		hostRef, sizing,
+	).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	perf := s.perfFromFreq(sizing.MinCPUFreq)

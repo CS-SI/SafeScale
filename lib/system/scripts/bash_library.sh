@@ -777,11 +777,26 @@ function sfDoesDockerRunContainer() {
 	shift
 	local INSTANCE=
 	[ $# -ge 1 ] && INSTANCE=$1
+	# docker seems to have change .Names separator from underscore to dash in --format... May need to search for the
+	# 2 different names in docker container ls
+	local INSTANCE_2=$(echo $INSTANCE | tr -s "_" "-")
+	[ "$INSTANCE" = "$INSTANCE_2" ] && INSTANCE_2=$(echo $INSTANCE | tr -s "-" "_")
+	[ "$INSTANCE" = "$INSTANCE_2" ] && INSTANCE_2=
 
 	local LIST=$(docker container ls {{ "--format '{{.Image}}|{{.Names}}|{{.Status}}'" }})
 	[ -z "$LIST" ] && return 1
 	[ "$IMAGE" != "$(echo "$LIST" | cut -d'|' -f1 | grep "$IMAGE" | uniq)" ] && return 1
-	[ ! -z "$INSTANCE" ] && [ "$INSTANCE" != "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE" | uniq)" ] && return 1
+	if [ ! -z "$INSTANCE" ]; then
+		local FOUND=n
+		if [ "$INSTANCE" == "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE" | uniq)" ]; then
+			FOUND=yes
+		elif [ "$INSTANCE_2" != "$INSTANCE" ]; then
+			if [ "$INSTANCE_2" == "$(echo "$LIST" | cut -d'|' -f2 | grep "$INSTANCE_2" | uniq)" ]; then
+				found=y
+			fi
+		fi
+		[ "$FOUND" != "y"] && return 1
+	fi
 	echo $LIST | cut -d'|' -f3 | grep -i "^up" &>/dev/null || return 1
 	return 0
 }

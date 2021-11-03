@@ -245,6 +245,12 @@ func (p provider) GetName() string {
 	return "aws"
 }
 
+// GetStack returns the Stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
+}
+
 // ListImages overloads stack.ListImages to allow to filter the available images on the provider level
 func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	if p.IsNull() {

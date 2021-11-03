@@ -503,6 +503,7 @@ func (s stack) deleteRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.I
 			case *fail.ErrNotFound:
 				// consider a missing rule(s) as a successful deletion
 				debug.IgnoreError(xerr)
+				break
 			default:
 				return fail.Wrap(xerr, "failed to delete egress rules from Security Group '%s'", asg.Name)
 			}

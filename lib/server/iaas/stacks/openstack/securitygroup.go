@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	secrules "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -216,6 +217,13 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 		},
 		NormalizeError,
 	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			xerr = fail.ConvertError(xerr.Cause())
+		default:
+		}
+	}
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:

@@ -34,6 +34,12 @@ func newClusterComposite() *ClusterComposite {
 	}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (c *ClusterComposite) IsNull() bool {
+	return c == nil || len(c.Tenants) == 0
+}
+
 // Clone ...
 // satisfies interface data.Clonable
 func (c ClusterComposite) Clone() data.Clonable {

@@ -441,13 +441,17 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		})
 	}
 
-	currentNetworkProps, ok := ctx.Value(CurrentNetworkPropertiesContextKey).(*serialize.JSONProperties)
-	if !ok { // Is nil or is something else
-		if ctx.Value(CurrentNetworkPropertiesContextKey) != nil { // If it's something else, return inconsistent error
-			return fail.InconsistentError("wrong value of type %T stored in context value, *serialize.JSONProperties was expected instead", ctx.Value(CurrentNetworkPropertiesContextKey))
+	anon := ctx.Value(CurrentNetworkPropertiesContextKey)
+	if anon != nil {
+		currentNetworkProps, ok := anon.(*serialize.JSONProperties)
+		if !ok {
+			return fail.InconsistentError("context value of key '%s' must be a type '*seiralize.JSONProperties'")
 		}
-
-		// so it's nil...
+		xerr = updateFunc(currentNetworkProps)
+		if xerr != nil {
+			return xerr
+		}
+	} else {
 		networkInstance, xerr := LoadNetwork(svc, networkID)
 		if xerr != nil {
 			return xerr
@@ -457,20 +461,9 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return updateFunc(props)
 		})
-
-		// this error and the error defined in line 324 are NOT the same error, even if they have the same local name
 		if xerr != nil {
 			return xerr
 		}
-
-		logrus.Infof("Security Group '%s' created successfully", name)
-		return nil
-	}
-
-	// it is a *serialize.JSONProperties, (it was ok, also avoid else if possible)
-	xerr = updateFunc(currentNetworkProps)
-	if xerr != nil {
-		return xerr
 	}
 
 	logrus.Infof("Security Group '%s' created successfully", name)
@@ -658,37 +651,49 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 			return fail.Wrap(xerr, "failed to start new task group to remove security group '%s' from subnets", instance.GetName())
 		}
 
+		// recover from context the Subnet Abstract and properties (if it exists)
+		currentSubnetAbstract, _ := ctx.Value(currentSubnetAbstractContextKey).(*abstract.Subnet)
+		currentSubnetProps, _ := ctx.Value(currentSubnetPropertiesContextKey).(*serialize.JSONProperties)
+
+		var subnetHosts *propertiesv1.SubnetHosts
+		// inspectFunc will get Hosts linked to Subnet from properties
+		inspectFunc := func(props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+				var ok bool
+				subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				return nil
+			})
+		}
 		// iterate on all Subnets bound to the Security Group to unbind Security Group from Hosts attached to those subnets (in parallel)
 		svc := instance.GetService()
 		for k, v := range in.ByName {
-			subnetInstance, xerr := LoadSubnet(svc, "", v)
-			if xerr != nil {
-				switch xerr.(type) {
-				case *fail.ErrNotFound:
-					debug.IgnoreError(xerr)
-					// consider a missing subnet as a successful operation and continue the loop
-					continue
-				default:
-					return xerr
-				}
-			}
-
-			//goland:noinspection GoDeferInLoop
-			defer func(ins resources.Subnet) {
-				ins.Released()
-			}(subnetInstance)
-
-			var subnetHosts *propertiesv1.SubnetHosts
-			xerr = subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-					var ok bool
-					subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
-					if !ok {
-						return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			// If current Subnet corresponds to the Subnet found in context, uses the data from the context to prevent deadlock
+			if currentSubnetAbstract != nil && v == currentSubnetAbstract.ID {
+				xerr = inspectFunc(currentSubnetProps)
+			} else {
+				var subnetInstance resources.Subnet
+				subnetInstance, xerr := LoadSubnet(svc, "", v)
+				if xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						// consider a missing subnet as a successful operation and continue the loop
+						continue
+					default:
+						return xerr
 					}
-					return nil
+				}
+
+				defer func(in resources.Subnet) {
+					in.Released()
+				}(subnetInstance)
+
+				xerr = subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+					return inspectFunc(props)
 				})
-			})
+			}
 			if xerr != nil {
 				return xerr
 			}

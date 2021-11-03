@@ -18,9 +18,12 @@ package metadataupgrade
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
@@ -34,10 +37,13 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
+	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 )
 
@@ -72,6 +78,12 @@ func (tv toV21_05_0) Upgrade(svc iaas.Service, from string, dryRun bool) fail.Er
 	}
 
 	xerr = tv.cleanupDeprecatedMetadata(svc)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = tv.updateSecurityGroupBonds(svc)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -138,23 +150,28 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
 func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInstance resources.Network) fail.Error {
 	var (
 		networkName, subnetName, subnetID string
+		gatewayIDs                        []string
 	)
 
 	if owningInstance != nil && !owningInstance.IsNull() {
 		networkName = owningInstance.GetName()
 	}
 	subnetName = currentInstance.GetName()
+	svc := currentInstance.GetService()
 
-	xerr := currentInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) (ferr fail.Error) {
+	xerr := currentInstance.Alter(func(clonable data.Clonable, currentNetworkProps *serialize.JSONProperties) (ferr fail.Error) {
 		abstractNetwork, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		if !props.Lookup(networkproperty.SubnetsV1) {
-			logrus.Tracef("Upgrading metadata of Network '%s'", subnetName)
+		// Make sure the ID of the Network is valid (at least with FlexibleEngine, Network ID corresponds to Subnet ID in previous versions of SafeScale)
+		if owningInstance != nil && !owningInstance.IsNull() {
+			abstractNetwork.ID = owningInstance.GetID()
+		}
 
-			svc := currentInstance.GetService()
+		if !currentNetworkProps.Lookup(networkproperty.SubnetsV1) {
+			logrus.Tracef("Upgrading metadata of Network '%s'", subnetName)
 
 			// -- creates Subnet in metadata --
 			subnetInstance, innerXErr := operations.NewSubnet(svc)
@@ -204,7 +221,12 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			}
 
 			// Complement abstracted Subnet fields
-			subnetID = abstractSubnet.GetID()
+			if currentInstance.GetService().GetStackName() == "huaweicloud" {
+				// huaweicloud added a layer called "IPv4 SubnetID", which is returned as SubnetID but is not; Network is the real "OpenStack" Subnet ID
+				// FIXME: maybe huaweicloud has to be reviewed/rewritten not to use a mix of pure OpenStack API and customized Huaweicloud API?
+				abstractSubnet.ID = abstractSubnet.Network
+			}
+			subnetID = abstractSubnet.ID
 			abstractSubnet.Name = subnetName
 			abstractSubnet.Network = owningInstance.GetID()
 			abstractSubnet.IPVersion = ipversion.IPv4
@@ -212,6 +234,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			abstractSubnet.Domain = abstractNetwork.Domain
 			abstractSubnet.VIP = abstractNetwork.VIP
 			abstractSubnet.GatewayIDs = []string{abstractNetwork.GatewayID}
+			gatewayIDs = abstractSubnet.GatewayIDs
 			abstractSubnet.State = subnetstate.Ready
 			if abstractNetwork.SecondaryGatewayID != "" {
 				abstractSubnet.GatewayIDs = append(abstractSubnet.GatewayIDs, abstractNetwork.SecondaryGatewayID)
@@ -229,7 +252,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			ctx := context.Background()
 			// owningInstance may be identical to currentInstance, so we need to pass the properties of currentInstance through context,
 			// to prevent deadlock trying to alter the an instance already inside an Alter
-			ctx = context.WithValue(ctx, operations.CurrentNetworkPropertiesContextKey, props)
+			ctx = context.WithValue(ctx, operations.CurrentNetworkPropertiesContextKey, currentNetworkProps)
 			gwSG, internalSG, publicSG, innerXErr := subnetInstance.UnsafeCreateSecurityGroups(ctx, owningInstance, false)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
@@ -276,29 +299,11 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			})
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
-				sgName := gwSG.GetName()
-				derr := gwSG.Delete(context.Background(), true)
-				if derr != nil {
-					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
-				}
-
-				sgName = internalSG.GetName()
-				derr = internalSG.Delete(context.Background(), true)
-				if derr != nil {
-					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
-				}
-
-				sgName = publicSG.GetName()
-				derr = publicSG.Delete(context.Background(), true)
-				if derr != nil {
-					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", sgName))
-				}
-
 				return innerXErr
 			}
 
-			// -- transfer Hosts attached to Network to Subnet --
-			innerXErr = props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			// -- transfer Hosts previously attached to Network to Subnet --
+			innerXErr = currentNetworkProps.Inspect(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 				networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
@@ -325,8 +330,32 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				return innerXErr
 			}
 
+			// -- transfer Network description to Subnet --
+			innerXErr = currentNetworkProps.Inspect(networkproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+				networkDescriptionV1, ok := clonable.(*propertiesv1.NetworkDescription)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.NetworkDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				return subnetInstance.Alter(func(_ data.Clonable, subnetProps *serialize.JSONProperties) fail.Error {
+					return subnetProps.Alter(subnetproperty.DescriptionV1, func(clonable data.Clonable) fail.Error {
+						subnetDescriptionV1, ok := clonable.(*propertiesv1.SubnetDescription)
+						if !ok {
+							return fail.InconsistentError("'*propertiesv1.SubnetDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
+						}
+						subnetDescriptionV1.Domain = networkDescriptionV1.Domain
+						subnetDescriptionV1.Purpose = networkDescriptionV1.Purpose
+						subnetDescriptionV1.Created = networkDescriptionV1.Created
+						return nil
+					})
+				})
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
+
 			// --- Clear deprecated properties ---
-			innerXErr = props.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			innerXErr = currentNetworkProps.Alter(networkproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 				networkHostsV1, ok := clonable.(*propertiesv1.NetworkHosts)
 				if !ok {
 					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%sr' provided", reflect.TypeOf(clonable).String())
@@ -339,6 +368,23 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				return innerXErr
+			}
+
+			// -- fixed owning Network fields if needed --
+			if owningInstance != currentInstance {
+				innerXErr = owningInstance.Alter(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					owningAbstractNetwork, ok := clonable.(*abstract.Network)
+					if !ok {
+						return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					owningAbstractNetwork.Tags = abstractNetwork.Tags
+					owningAbstractNetwork.DNSServers = abstractNetwork.DNSServers
+					return nil
+				})
+				if innerXErr != nil {
+					return innerXErr
+				}
 			}
 
 			// -- finally clear deprecated field of abstractNetwork --
@@ -356,7 +402,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 		return xerr
 	}
 
-	// -- add reference to subnet in own ing Network properties --
+	// -- add reference to subnet in owning Network properties --
 	if subnetID != "" && subnetName != "" {
 		xerr = owningInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
@@ -372,6 +418,45 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
+		}
+	}
+
+	// -- GCP stack driver needs special treatment... --
+	if currentInstance.GetService().GetStackName() == "gcp" {
+		stack := currentInstance.GetService().GetStack().(*gcp.Stack)
+		oldRouteName := networkName + "-" + subnetName + "-nat-allowed"
+
+		// create new nat route
+		_, xerr = stack.RPCCreateRoute(networkName, subnetID, subnetName)
+		if xerr != nil {
+			return xerr
+		}
+
+		// delete old nat route
+		xerr = stack.RPCDeleteRoute(oldRouteName)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				break
+			default:
+				return xerr
+			}
+		}
+	}
+
+	// -- upgrade gateways (must have been migrated before migrating remaining Hosts, to have proper properties set --
+	for _, v := range gatewayIDs {
+		hostInstance, innerXErr := operations.LoadHost(svc, v)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer func(item resources.Host) {
+			item.Released()
+		}(hostInstance)
+
+		innerXErr = tv.upgradeHostMetadataIfNeeded(hostInstance.(*operations.Host))
+		if innerXErr != nil {
+			return innerXErr
 		}
 	}
 
@@ -392,11 +477,13 @@ func (tv toV21_05_0) upgradeHosts(svc iaas.Service) fail.Error {
 	}
 
 	logrus.Infof("Upgrading metadata of Hosts...")
+
 	return instance.Browse(context.Background(), func(ahc *abstract.HostCore) fail.Error {
 		hostInstance, innerXErr := operations.LoadHost(svc, ahc.Name)
 		if innerXErr != nil {
 			return innerXErr
 		}
+		defer hostInstance.Released()
 
 		return tv.upgradeHostMetadataIfNeeded(hostInstance.(*operations.Host))
 	})
@@ -416,7 +503,7 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 				abstractHostCore.SSHPort = 22
 			}
 
-			// upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2
+			// -- upgrade hostproperty.NetworkV1 to hostproperty.NetworkV2 --
 			var hnV1 *propertiesv1.HostNetwork
 			innerXErr := props.Inspect(hostproperty.NetworkV1, func(clonable data.Clonable) fail.Error {
 				var ok bool
@@ -437,7 +524,6 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-
 				subnetName, ok := hnV1.NetworksByID[hnV1.DefaultNetworkID]
 				if !ok {
 					return fail.InconsistentError("failed to find the default Network name")
@@ -553,7 +639,25 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 		return xerr
 	}
 
-	// Make sure host is referenced in Subnet
+	// -- Make sure host is referenced in Subnet --
+	var subnetInstance resources.Subnet
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) (innerXErr fail.Error) {
+			hostNetworkingV2, ok := clonable.(*propertiesv2.HostNetworking)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.HostNetworking' expectede, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			subnetInstance, innerXErr = operations.LoadSubnet(instance.GetService(), "", hostNetworkingV2.DefaultSubnetID)
+			return innerXErr
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	// -- make sure SGs are applied to Host
 	isGateway, xerr := instance.IsGateway()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -561,28 +665,88 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 	}
 
 	if !isGateway {
-		var subnetInstance resources.Subnet
-		xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) (innerXErr fail.Error) {
-				hostNetworkingV2, ok := clonable.(*propertiesv2.HostNetworking)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv2.HostNetworking' expectede, '%s' provided", reflect.TypeOf(clonable).String())
+		xerr = subnetInstance.AttachHost(context.Background(), instance)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+	} else {
+		// Subnet.AttachHost() does not work for gateways, we have to do the job manually
+		xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+			subnetAbstract, ok := clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if subnetAbstract.InternalSecurityGroupID != "" {
+				sgInstance, innerXErr := operations.LoadSecurityGroup(instance.GetService(), subnetAbstract.InternalSecurityGroupID)
+				if innerXErr != nil {
+					return innerXErr
 				}
 
-				subnetInstance, innerXErr = operations.LoadSubnet(instance.GetService(), "", hostNetworkingV2.DefaultSubnetID)
-				return innerXErr
-			})
+				innerXErr = sgInstance.BindToHost(context.Background(), instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+				if innerXErr != nil {
+					return innerXErr
+				}
+			}
+
+			if subnetAbstract.GWSecurityGroupID != "" {
+				sgInstance, innerXErr := operations.LoadSecurityGroup(instance.GetService(), subnetAbstract.GWSecurityGroupID)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				return sgInstance.BindToHost(context.Background(), instance, resources.SecurityGroupEnable, resources.KeepCurrentSecurityGroupMark)
+			}
+			return nil
 		})
-		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	// -- GCP stack driver needs special treatment --
+	if instance.GetService().GetStackName() == "gcp" {
+		networkInstance, xerr := subnetInstance.InspectNetwork()
 		if xerr != nil {
 			return xerr
 		}
 
-		xerr = subnetInstance.AdoptHost(context.Background(), instance)
-		xerr = debug.InjectPlannedFail(xerr)
+		stack := instance.GetService().GetStack().(*gcp.Stack)
+		// remove old nat route tag
+		xerr = stack.RPCRemoveTagsFromInstance(instance.GetID(), []string{"no-ip-" + subnetInstance.GetName()})
 		if xerr != nil {
 			return xerr
 		}
+
+		// add new nat route tag
+		xerr = stack.RPCAddTagsToInstance(instance.GetID(), []string{fmt.Sprintf(gcp.NATRouteTagFormat, networkInstance.GetID())})
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	// We need to update cache information of Host before remotely execute a command, so reload metadata to trigger cache update
+	xerr = instance.Reload()
+	if xerr != nil {
+		return xerr
+	}
+
+	// link file /opt/safescale/var/state/user_data.phase2.done to /opt/safescale/var/state/user_data.final.done
+	const cmdTmpl = "cd %s/state && [ ! -f user_data.final.done ] && ln -s user_data.phase2.done user_data.final.done || :"
+	retcode, stdout, stderr, xerr := instance.Run(context.Background(), fmt.Sprintf(cmdTmpl, utils.VarFolder), outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetHostTimeout())
+	if xerr != nil {
+		return xerr
+	}
+	if retcode != 0 {
+		msg := fmt.Sprintf("failed to create a link to '%s/user_data.final.done': retcode=%d", utils.VarFolder, retcode)
+		if stdout = strings.TrimSpace(stdout); stdout != "" {
+			msg += ", stdout='" + stdout + "'"
+		}
+		if stderr = strings.TrimSpace(stderr); stderr != "" {
+			msg += ", stderr='" + stderr + "'"
+		}
+		return fail.NewError(msg)
 	}
 
 	return nil
@@ -893,14 +1057,15 @@ func inspectNetworkAndSubnet(instance *operations.Cluster, networkName string) (
 	}
 
 	// determine if the Network of the Subnet has been created by cluster creation
-	var clusterCreatedNetwork bool
+	clusterCreatedNetwork := true
 	if instance.GetService().HasDefaultNetwork() {
 		defaultNetwork, xerr := instance.GetService().GetDefaultNetwork()
 		if xerr != nil {
 			return nil, nil, false, xerr
 		}
+
 		if defaultNetwork.GetName() != instance.GetName() {
-			clusterCreatedNetwork = true
+			clusterCreatedNetwork = false
 		}
 	}
 	return networkInstance, subnetInstance, clusterCreatedNetwork, nil
@@ -965,13 +1130,13 @@ func (tv toV21_05_0) cleanupDeprecatedMetadata(svc iaas.Service) fail.Error {
 }
 
 func (tv toV21_05_0) cleanupDeprecatedNetworkMetadata(svc iaas.Service) fail.Error {
-	instance, xerr := operations.NewNetwork(svc)
+	browseInstance, xerr := operations.NewNetwork(svc)
 	if xerr != nil {
 		return xerr
 	}
 
 	logrus.Infof("Cleaning up deprecated metadata of Networks...")
-	return instance.Browse(context.Background(), func(an *abstract.Network) fail.Error {
+	return browseInstance.Browse(context.Background(), func(an *abstract.Network) fail.Error {
 		networkInstance, innerXErr := operations.LoadNetwork(svc, an.ID)
 		innerXErr = debug.InjectPlannedFail(innerXErr)
 		if innerXErr != nil {
@@ -1137,5 +1302,104 @@ func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Err
 
 			return nil
 		})
+	})
+}
+
+// updateSecurityGroupBonds updates the Security Groups for each Host
+func (tv toV21_05_0) updateSecurityGroupBonds(svc iaas.Service) fail.Error {
+	subnetBrowserInstance, xerr := operations.NewSubnet(svc)
+	if xerr != nil {
+		return xerr
+	}
+
+	return subnetBrowserInstance.Browse(context.Background(), func(subnetAbstract *abstract.Subnet) fail.Error {
+		subnetInstance, innerXErr := operations.LoadSubnet(svc, "", subnetAbstract.ID)
+		innerXErr = debug.InjectPlannedFail(innerXErr)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer subnetInstance.Released()
+
+		var (
+			subnetHosts    map[string]string
+			abstractSubnet *abstract.Subnet
+		)
+		innerXErr = subnetInstance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			var ok bool
+			abstractSubnet, ok = clonable.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+				subnetHostsV1, ok := clonable.(*propertiesv1.SubnetHosts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				subnetHosts = subnetHostsV1.ByID
+				return nil
+			})
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		sgGW, innerXErr := operations.LoadSecurityGroup(svc, subnetAbstract.GWSecurityGroupID)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer sgGW.Released()
+
+		sgPubIP, innerXErr := operations.LoadSecurityGroup(svc, subnetAbstract.PublicIPSecurityGroupID)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer sgPubIP.Released()
+
+		sgLAN, innerXErr := operations.LoadSecurityGroup(svc, subnetAbstract.InternalSecurityGroupID)
+		if innerXErr != nil {
+			return innerXErr
+		}
+		defer sgLAN.Released()
+
+		// Bind gateways to appropriate Security Groups...
+		for _, v := range abstractSubnet.GatewayIDs {
+			hostInstance, innerXErr := operations.LoadHost(svc, v)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			defer func(item resources.Host) {
+				item.Released()
+			}(hostInstance)
+
+			innerXErr = hostInstance.BindSecurityGroup(context.Background(), sgLAN, true)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			innerXErr = hostInstance.BindSecurityGroup(context.Background(), sgGW, true)
+			if innerXErr != nil {
+				return innerXErr
+			}
+		}
+
+		// Bind Hosts in Subnet (except gateways) to appropriate Security Group...
+		for k := range subnetHosts {
+			hostInstance, innerXErr := operations.LoadHost(svc, k)
+			if innerXErr != nil {
+				return innerXErr
+			}
+
+			defer func(item resources.Host) {
+				item.Released()
+			}(hostInstance)
+
+			innerXErr = hostInstance.BindSecurityGroup(context.Background(), sgLAN, true)
+			if innerXErr != nil {
+				return innerXErr
+			}
+		}
+		return nil
 	})
 }
