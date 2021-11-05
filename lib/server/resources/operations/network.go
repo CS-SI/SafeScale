@@ -121,6 +121,14 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 		}
 	}()
 
+	// FIXME: The reload problem
+	/*
+		xerr = networkInstance.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
+	*/
+
 	return networkInstance, nil
 }
 
@@ -189,7 +197,7 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	// Check if subnet already exists and is managed by SafeScale
 	svc := instance.GetService()
-	if existing, xerr := LoadNetwork(svc, req.Name); xerr == nil {
+	if existing, xerr := LoadNetwork(svc, req.Name); xerr == nil { // FIXME: VERY bad practice
 		existing.Released()
 		return fail.DuplicateError("Network '%s' already exists", req.Name)
 	}
@@ -349,7 +357,7 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 
 	// Check if Network already exists and is managed by SafeScale
 	svc := instance.GetService()
-	if existing, xerr := LoadNetwork(svc, ref); xerr == nil {
+	if existing, xerr := LoadNetwork(svc, ref); xerr == nil { // FIXME: VERY bad practice
 		existing.Released()
 		return fail.DuplicateError("cannot import Network '%s': there is already such a Network in metadata", ref)
 	}
@@ -451,6 +459,19 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		networkAbstract, ok := clonable.(*abstract.Network)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract)
+		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)
+		return nil
+	})
+	if xerr != nil {
+		return xerr
+	}
+
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -480,9 +501,6 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-
-		ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, abstractNetwork)
-		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)
 
 		svc := instance.GetService()
 
@@ -527,7 +545,6 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					}
 
 					subnetName := subnetInstance.GetName()
-					// logrus.Warningf("Trying to delete subnet with name '%s'", subnetName)
 
 					xerr = subnetInstance.Delete(ctx)
 					xerr = debug.InjectPlannedFail(xerr)

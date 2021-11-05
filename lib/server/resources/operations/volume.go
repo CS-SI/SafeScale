@@ -129,6 +129,14 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 		}
 	}()
 
+	// FIXME: The reload problem
+	/*
+		xerr = rv.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
+	*/
+
 	return rv, nil
 }
 

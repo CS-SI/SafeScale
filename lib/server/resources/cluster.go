@@ -42,7 +42,6 @@ type Cluster interface {
 	cache.Cacheable
 
 	AddFeature(ctx context.Context, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)             // adds feature on cluster
-	AddNode(ctx context.Context, def abstract.HostSizingRequirements, keepOnFailure bool) (Host, fail.Error)                // adds a node
 	AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, keepOnFailure bool) ([]Host, fail.Error) // adds several nodes
 	Browse(ctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error) fail.Error                             // browse in metadata clusters and execute a callback on each entry
 	CheckFeature(ctx context.Context, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)           // checks feature on cluster

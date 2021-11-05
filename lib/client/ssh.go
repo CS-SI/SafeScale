@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -277,48 +278,53 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 				ctx, remotePath, localPath, upload, executionTimeout,
 			)
 			xerr = debug.InjectPlannedFail(xerr)
-			// logrus.Warningf("'%d', '%s', '%s', '%s'", iretcode, istdout, istderr, spew.Sdump(xerr))
+			logrus.Warningf("Copy result: '%d', '%s', '%s', '%s'", iretcode, istdout, istderr, spew.Sdump(xerr))
 			if xerr != nil {
 				return xerr
 			}
 
 			if iretcode == 1 {
-				deleteThere := func() fail.Error {
+				deleteRemoteFile := func() fail.Error {
 					crcCtx, cancelCrc := context.WithTimeout(ctx, executionTimeout)
 					defer cancelCrc()
 
-					crcCmd, finnerXerr := sshCfg.NewCommand(crcCtx, fmt.Sprintf("sudo rm %s", remotePath))
-					if finnerXerr != nil {
-						return finnerXerr
-					}
+					if upload {
+						crcCmd, finnerXerr := sshCfg.NewCommand(crcCtx, fmt.Sprintf("sudo rm %s", remotePath))
+						if finnerXerr != nil {
+							return finnerXerr
+						}
 
-					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
-						crcCtx, outputs.COLLECT, executionTimeout,
-					)
-					finnerXerr = debug.InjectPlannedFail(finnerXerr)
-					if finnerXerr != nil {
-						_ = finnerXerr.Annotate("retcode", fretcode)
-						_ = finnerXerr.Annotate("stdout", fstdout)
-						_ = finnerXerr.Annotate("stderr", fstderr)
-						return finnerXerr
-					}
-					if fretcode != 0 {
-						finnerXerr = fail.NewError("failed to remove file")
-						_ = finnerXerr.Annotate("retcode", fretcode)
-						_ = finnerXerr.Annotate("stdout", fstdout)
-						_ = finnerXerr.Annotate("stderr", fstderr)
-						return finnerXerr
+						fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
+							crcCtx, outputs.COLLECT, executionTimeout,
+						)
+						finnerXerr = debug.InjectPlannedFail(finnerXerr)
+						if finnerXerr != nil {
+							_ = finnerXerr.Annotate("retcode", fretcode)
+							_ = finnerXerr.Annotate("stdout", fstdout)
+							_ = finnerXerr.Annotate("stderr", fstderr)
+							return finnerXerr
+						}
+						if fretcode != 0 {
+							finnerXerr = fail.NewError("failed to remove file")
+							_ = finnerXerr.Annotate("retcode", fretcode)
+							_ = finnerXerr.Annotate("stdout", fstdout)
+							_ = finnerXerr.Annotate("stderr", fstderr)
+							return finnerXerr
+						}
 					}
 
 					return nil
 				}
 
 				if strings.Contains(istdout, "Permission denied") || strings.Contains(istderr, "Permission denied") {
-					derr := deleteThere()
-					if derr != nil {
-						logrus.Debugf("there was an error trying to delete the file: %s", derr)
+					if upload {
+						derr := deleteRemoteFile()
+						if derr != nil {
+							logrus.Debugf("there was an error trying to delete the file: %s", derr)
+						}
+						return fmt.Errorf("permission denied")
 					}
-					return fmt.Errorf("permission denied")
+					return retry.StopRetryError(fmt.Errorf("permission denied"))
 				}
 			}
 
@@ -474,7 +480,6 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 	sshCfg.LocalPort = localPort
 
 	return retry.WhileUnsuccessfulWithNotify(
-		// FIXME: Test if we have the timout message here
 		func() error {
 			_, _, innerErr := sshCfg.CreateTunneling()
 			return innerErr
@@ -489,6 +494,7 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 	)
 }
 
+// CloseTunnels closes a tunnel created in the machine 'name'
 func (s ssh) CloseTunnels(name string, localPort string, remotePort string, timeout time.Duration) error {
 	sshCfg, xerr := s.getSSHConfigFromName(name, timeout)
 	if xerr != nil {

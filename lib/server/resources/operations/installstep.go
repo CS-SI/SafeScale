@@ -245,10 +245,11 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 	outcomes = &unitResults{}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return outcomes, fail.AbortedError(lerr, "aborted")
+		lerr, err := task.LastError()
+		if err != nil {
+			return outcomes, fail.AbortedError(nil, "aborted")
 		}
-		return outcomes, fail.AbortedError(nil, "aborted")
+		return outcomes, fail.AbortedError(lerr, "aborted")
 	}
 
 	if is.Serial || s.Serialize {
@@ -495,9 +496,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	hidesOutput := strings.Contains(command, "set +x\n")
 	if hidesOutput {
 		command = strings.Replace(command, "set +x\n", "\n", 1)
-		if strings.Contains(command, "exec 2>&1\n") {
-			command = strings.Replace(command, "exec 2>&1\n", "exec 2>&7\n", 1)
-		}
+		command = strings.Replace(command, "exec 2>&1\n", "exec 2>&7\n", 1)
 	}
 
 	// Uploads then executes command

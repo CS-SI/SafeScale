@@ -69,7 +69,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 		return "", nil, fail.Wrap(err, "failed to read embedded feature specification file '%s'", name)
 	}
 
-	logrus.Debugf("loaded feature %s:SHA256:%s", name, getSHA256Hash(tmplString))
+	logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(tmplString))
 
 	v := viper.New()
 	v.SetConfigType("yaml")

@@ -100,14 +100,6 @@ var (
 	}
 )
 
-// IsSCPRetryable tells if the retcode of a scp command may be retried
-func IsSCPRetryable(code int) bool {
-	if code == 4 || code == 5 || code == 66 || code == 67 || code == 70 || code == 74 || code == 75 || code == 76 {
-		return true
-	}
-	return false
-}
-
 // SSHConfig helper to manage ssh session
 type SSHConfig struct {
 	Hostname               string     `json:"hostname"`
@@ -681,10 +673,8 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 		if pipeBridgeCtrl, xerr = cli.NewPipeBridgeController(stdoutBridge, stderrBridge); xerr != nil {
 			return result, xerr
 		}
-	}
 
-	// Starts pipebridge if needed
-	if !params.collectOutputs {
+		// Starts pipebridge if needed
 		if xerr = pipeBridgeCtrl.Start(task); xerr != nil {
 			return result, xerr
 		}
@@ -1034,9 +1024,9 @@ func createSCPCommand(sconf *SSHConfig, localPath, remotePath string, isUpload b
 
 	sshCmdString := fmt.Sprintf("scp -i \"%s\" %s -P %d ", f.Name(), options, sconf.Port)
 	if isUpload {
-		sshCmdString += fmt.Sprintf("\"%s\" %s@%s:\"%s\"", localPath, sconf.User, sconf.IPAddress, remotePath)
+		sshCmdString += fmt.Sprintf("\"%s\" %s@%s:%s", localPath, sconf.User, sconf.IPAddress, remotePath)
 	} else {
-		sshCmdString += fmt.Sprintf("%s@%s:\"%s\" \"%s\"", sconf.User, sconf.IPAddress, remotePath, localPath)
+		sshCmdString += fmt.Sprintf("%s@%s:%s \"%s\"", sconf.User, sconf.IPAddress, remotePath, localPath)
 	}
 
 	return sshCmdString, f, nil
@@ -1140,8 +1130,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 						return innerXErr
 					}
 				}
-			}
-			if retcode != 0 {
+
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
 				_ = fe.Annotate("retcode", retcode)
 				_ = fe.Annotate("stdout", stdout)

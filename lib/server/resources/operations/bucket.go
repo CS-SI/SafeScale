@@ -119,6 +119,14 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 	}
 	_ = cacheEntry.LockContent()
 
+	// FIXME: The reload problem
+	/*
+		xerr = b.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
+	*/
+
 	return b, nil
 }
 

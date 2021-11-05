@@ -159,6 +159,14 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 		}
 	}()
 
+	// FIXME: The reload problem
+	/*
+		xerr = sgInstance.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
+	*/
+
 	return sgInstance, nil
 }
 
@@ -441,17 +449,13 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		})
 	}
 
-	anon := ctx.Value(CurrentNetworkPropertiesContextKey)
-	if anon != nil {
-		currentNetworkProps, ok := anon.(*serialize.JSONProperties)
-		if !ok {
-			return fail.InconsistentError("context value of key '%s' must be a type '*seiralize.JSONProperties'")
+	currentNetworkProps, ok := ctx.Value(CurrentNetworkPropertiesContextKey).(*serialize.JSONProperties)
+	if !ok { // Is nil or is something else
+		if ctx.Value(CurrentNetworkPropertiesContextKey) != nil { // If it's something else, return inconsistent error
+			return fail.InconsistentError("wrong value of type %T stored in context value, *serialize.JSONProperties was expected instead", ctx.Value(CurrentNetworkPropertiesContextKey))
 		}
-		xerr = updateFunc(currentNetworkProps)
-		if xerr != nil {
-			return xerr
-		}
-	} else {
+
+		// so it's nil...
 		networkInstance, xerr := LoadNetwork(svc, networkID)
 		if xerr != nil {
 			return xerr
@@ -461,9 +465,20 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 		xerr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return updateFunc(props)
 		})
+
+		// this error and the error defined in line 324 are NOT the same error, even if they have the same local name
 		if xerr != nil {
 			return xerr
 		}
+
+		logrus.Infof("Security Group '%s' created successfully", name)
+		return nil
+	}
+
+	// it is a *serialize.JSONProperties, (it was ok, also avoid else if possible)
+	xerr = updateFunc(currentNetworkProps)
+	if xerr != nil {
+		return xerr
 	}
 
 	logrus.Infof("Security Group '%s' created successfully", name)
@@ -673,8 +688,10 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 			// If current Subnet corresponds to the Subnet found in context, uses the data from the context to prevent deadlock
 			if currentSubnetAbstract != nil && v == currentSubnetAbstract.ID {
 				xerr = inspectFunc(currentSubnetProps)
+				if xerr != nil {
+					return xerr
+				}
 			} else {
-				var subnetInstance resources.Subnet
 				subnetInstance, xerr := LoadSubnet(svc, "", v)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -693,9 +710,9 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 				xerr = subnetInstance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return inspectFunc(props)
 				})
-			}
-			if xerr != nil {
-				return xerr
+				if xerr != nil {
+					return xerr
+				}
 			}
 
 			_, xerr = tg.Start(instance.taskUnbindFromHostsAttachedToSubnet, taskUnbindFromHostsAttachedToSubnetParams{subnetName: k, subnetHosts: subnetHosts}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/subnet/%s/unbind", k)))

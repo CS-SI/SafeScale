@@ -664,10 +664,11 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "aborted")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "aborted")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	defer fail.OnExitLogError(&xerr, fmt.Sprintf("executed step '%s::%s'", w.action.String(), p.stepName))
@@ -1192,10 +1193,11 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "aborted")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "aborted")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	ruleName, xerr := p.controller.Apply(p.rule, p.variables)
@@ -1408,10 +1410,11 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 
 	for k, rule := range rules {
 		if task.Aborted() {
-			if lerr, err := task.LastError(); err == nil {
-				return fail.AbortedError(lerr, "aborted")
+			lerr, err := task.LastError()
+			if err != nil {
+				return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 			}
-			return fail.AbortedError(nil, "aborted")
+			return fail.AbortedError(lerr, "parent task killed")
 		}
 
 		r := rule.(map[interface{}]interface{})

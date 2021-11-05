@@ -168,6 +168,16 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		_ = ce.UnlockContent()
 	}()
 
+	// This is NECESSARY, also, invalidates the whole purpose of Cache...
+	// in order to reduce the number of accesses to the provider, we actually increased it 300%, intoduced locks, panics...
+	// Without this line, we have 0 accesses to the provider, and we get the WRONG result, this is
+	// we don't recover the CURRENT STATE of the provider, we recover OUR cached version of it, that might -and usually it is- out of date
+	// With the line (getting the right info from the provider), we end up doing 3 calls instead of 1...
+	xerr = hostInstance.Reload()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	return hostInstance, nil
 }
 
@@ -185,8 +195,8 @@ func onHostCacheMiss(svc iaas.Service, ref string, updateCachedInformation bool)
 
 	if updateCachedInformation {
 		hostInstance.lock.Lock()
+		defer hostInstance.lock.Unlock()
 		xerr := hostInstance.updateCachedInformation()
-		hostInstance.lock.Unlock()
 		if xerr != nil {
 			return hostInstance, xerr
 		}
@@ -859,10 +869,14 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 			// continue
 			debug.IgnoreError(xerr)
 		default:
-			return nil, fail.Wrap(xerr, "failed to check if Host resource name '%s' is already used", hostReq.ResourceName)
+			return nil, fail.Wrap(
+				xerr, "failed to check if Host resource name '%s' is already used", hostReq.ResourceName,
+			)
 		}
 	} else {
-		return nil, fail.DuplicateError("found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName)
+		return nil, fail.DuplicateError(
+			"found an existing Host named '%s' (but not managed by SafeScale)", hostReq.ResourceName,
+		)
 	}
 
 	// If TemplateID is not explicitly provided, search the appropriate template to satisfy 'hostDef'
@@ -972,7 +986,9 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 					func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 						as, ok := clonable.(*abstract.Subnet)
 						if !ok {
-							return fail.InconsistentError("*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+							return fail.InconsistentError(
+								"*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+							)
 						}
 
 						if as.PublicIPSecurityGroupID != "" {
@@ -1003,7 +1019,11 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	defer func() {
 		if ferr != nil && !hostReq.KeepOnFailure {
 			if derr := svc.DeleteHost(ahf.Core.ID); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name))
+				_ = ferr.AddConsequence(
+					fail.Wrap(
+						derr, "cleaning up on %s, failed to delete Host '%s'", ActionFromError(ferr), ahf.Core.Name,
+					),
+				)
 			}
 		}
 	}()
@@ -1025,7 +1045,10 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	defer func() {
 		if ferr != nil && !hostReq.KeepOnFailure {
 			if derr := instance.MetadataCore.Delete(); derr != nil {
-				logrus.Errorf("cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name, derr)
+				logrus.Errorf(
+					"cleaning up on %s, failed to delete Host '%s' metadata: %v", ActionFromError(ferr), ahf.Core.Name,
+					derr,
+				)
 				_ = ferr.AddConsequence(derr)
 			}
 		}
@@ -1119,8 +1142,7 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 	// claiming Host is created
 	logrus.Infof("Waiting SSH availability on Host '%s' ...", instance.GetName())
 
-	// FIXME: configurable timeout here
-	status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, time.Duration(0))
+	status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, temporal.GetHostCreationTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1129,7 +1151,9 @@ func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, 
 		default:
 			if abstract.IsProvisioningError(xerr) {
 				logrus.Errorf("%+v", xerr)
-				return nil, fail.Wrap(xerr, "error provisioning the new Host, please check safescaled logs", instance.GetName())
+				return nil, fail.Wrap(
+					xerr, "error provisioning the new Host, please check safescaled logs", instance.GetName(),
+				)
 			}
 			return nil, xerr
 		}
@@ -1235,7 +1259,9 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 		}
 	}
 	if img == nil || img.ID == "" {
-		return "", "", fail.Wrap(xerr, "failed to find image ID corresponding to '%s' to use on compute resource", imageRef)
+		return "", "", fail.Wrap(
+			xerr, "failed to find image ID corresponding to '%s' to use on compute resource", imageRef,
+		)
 	}
 
 	return imageRef, img.ID, nil
@@ -2762,10 +2788,6 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	// FIXME: reintroduce timeout on ssh.
-	// if timeout < temporal.GetHostTimeout() {
-	// 	timeout = temporal.GetHostTimeout()
-	// }
 	var (
 		stdout, stderr string
 	)
@@ -2840,9 +2862,7 @@ func (instance *Host) Push(ctx context.Context, source, target, owner, mode stri
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner,
-		mode,
-	).Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(source=%s, target=%s, owner=%s, mode=%s)", source, target, owner, mode).Entering()
 	defer tracer.Exiting()
 
 	instance.lock.RLock()

@@ -86,19 +86,24 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		if ferr != nil && !req.KeepOnFailure && !cleanFailure {
 			logrus.Debugf("Cleaning up on %s, deleting metadata of Cluster '%s'...", ActionFromError(ferr), req.Name)
 			if derr := instance.MetadataCore.Delete(); derr != nil {
-				logrus.Errorf("cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name)
+				logrus.Errorf(
+					"cleaning up on %s, failed to delete metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
+				)
 				_ = ferr.AddConsequence(derr)
 			} else {
-				logrus.Debugf("Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name)
+				logrus.Debugf(
+					"Cleaning up on %s, successfully deleted metadata of Cluster '%s'", ActionFromError(ferr), req.Name,
+				)
 			}
 		}
 	}()
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	// Obtain number of nodes to create
@@ -112,8 +117,10 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		req.InitialNodeCount = privateNodeCount
 	}
 	if req.InitialNodeCount > 0 && req.InitialNodeCount < privateNodeCount {
-		logrus.Warnf("[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')",
-			req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String())
+		logrus.Warnf(
+			"[Cluster %s] cannot create less than required minimum of workers by the Flavor (%d requested, minimum being %d for flavor '%s')",
+			req.Name, req.InitialNodeCount, privateNodeCount, req.Flavor.String(),
+		)
 		req.InitialNodeCount = privateNodeCount
 	}
 
@@ -133,22 +140,26 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		return nil, xerr
 	}
 
-	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		aci, ok := clonable.(*abstract.ClusterIdentity)
-		if !ok {
-			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
-		}
+	xerr = instance.Alter(
+		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			aci, ok := clonable.(*abstract.ClusterIdentity)
+			if !ok {
+				return fail.InconsistentError(
+					"'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+				)
+			}
 
-		// update identity
-		aci.NodesDefImage = nodesDef.Image
-		aci.NodesDefTemplate = nodesDef.Template
-		aci.MastersDefImage = nodesDef.Image
-		aci.MastersDefTemplate = nodesDef.Template
-		aci.GatewaysDefImage = gatewaysDef.Image
-		aci.GatewaysDefTemplate = gatewaysDef.Template
+			// update identity
+			aci.NodesDefImage = nodesDef.Image
+			aci.NodesDefTemplate = nodesDef.Template
+			aci.MastersDefImage = nodesDef.Image
+			aci.MastersDefTemplate = nodesDef.Template
+			aci.GatewaysDefImage = gatewaysDef.Image
+			aci.GatewaysDefTemplate = gatewaysDef.Template
 
-		return nil
-	})
+			return nil
+		},
+	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -171,15 +182,25 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 					debug.IgnoreError(derr)
 				default:
 					cleanFailure = true
-					logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
-						subnetInstance.GetName())
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
+					logrus.Errorf(
+						"Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
+						subnetInstance.GetName(),
+					)
+					_ = ferr.AddConsequence(
+						fail.Wrap(
+							derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr),
+						),
+					)
 				}
 			} else {
-				logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
-					subnetInstance.GetName())
+				logrus.Debugf(
+					"Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
+					subnetInstance.GetName(),
+				)
 				if req.NetworkID == "" {
-					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
+					logrus.Debugf(
+						"Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName(),
+					)
 					if derr := networkInstance.Delete(context.Background()); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
@@ -187,13 +208,21 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 							debug.IgnoreError(derr)
 						default:
 							cleanFailure = true
-							logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
-								networkInstance.GetName())
-							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr)))
+							logrus.Errorf(
+								"cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
+								networkInstance.GetName(),
+							)
+							_ = ferr.AddConsequence(
+								fail.Wrap(
+									derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr),
+								),
+							)
 						}
 					} else {
-						logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
-							networkInstance.GetName())
+						logrus.Debugf(
+							"Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
+							networkInstance.GetName(),
+						)
 					}
 				}
 			}
@@ -644,10 +673,11 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	var xerr fail.Error
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, nil, fail.AbortedError(nil, "parent task killed")
+		return nil, nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task)
@@ -707,33 +737,36 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 			}
 		}()
 	}
-	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(
-			clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
-				networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
-				if !ok {
-					return fail.InconsistentError(
-						"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-					)
-				}
+	xerr = instance.Alter(
+		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(
+				clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+					networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+					if !ok {
+						return fail.InconsistentError(
+							"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+						)
+					}
 
-				networkV3.NetworkID = networkInstance.GetID()
-				networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
-				networkV3.CIDR = req.CIDR
-				return nil
-			},
-		)
-	})
+					networkV3.NetworkID = networkInstance.GetID()
+					networkV3.CreatedNetwork = req.NetworkID == "" // empty NetworkID means that the Network would have to be deleted when the Cluster will be
+					networkV3.CIDR = req.CIDR
+					return nil
+				},
+			)
+		},
+	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, nil, fail.AbortedError(nil, "parent task killed")
+		return nil, nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	// Creates Subnet
@@ -806,10 +839,11 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	}()
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, nil, fail.AbortedError(nil, "parent task killed")
+		return nil, nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	// Updates again Cluster metadata, propertiesv3.ClusterNetwork, with subnet infos
@@ -887,10 +921,11 @@ func (instance *Cluster) createHostResources(
 	var xerr fail.Error
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return fail.AbortedError(nil, "parent task killed")
+		return fail.AbortedError(lerr, "parent task killed")
 	}
 
 	ctx := task.Context()
@@ -980,10 +1015,11 @@ func (instance *Cluster) createHostResources(
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return fail.AbortedError(nil, "parent task killed")
+		return fail.AbortedError(lerr, "parent task killed")
 	}
 
 	masterCount, _, _, xerr := instance.determineRequiredNodes()
@@ -993,10 +1029,11 @@ func (instance *Cluster) createHostResources(
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return fail.AbortedError(nil, "parent task killed")
+		return fail.AbortedError(lerr, "parent task killed")
 	}
 
 	gwInstallTasks, xerr := concurrency.NewTaskGroupWithParent(
@@ -1020,10 +1057,11 @@ func (instance *Cluster) createHostResources(
 	startedTasks = append(startedTasks, gwInstallTasks)
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return fail.AbortedError(nil, "parent task killed")
+		return fail.AbortedError(lerr, "parent task killed")
 	}
 
 	if haveSecondaryGateway {
@@ -1039,10 +1077,11 @@ func (instance *Cluster) createHostResources(
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return fail.AbortedError(nil, "parent task killed")
+		return fail.AbortedError(lerr, "parent task killed")
 	}
 
 	// Starting from here, delete masters if exiting with error and req.keepOnFailure is not true
@@ -1124,10 +1163,11 @@ func (instance *Cluster) createHostResources(
 	startedTasks = append(startedTasks, mastersCreateTasks)
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return fail.AbortedError(nil, "parent task killed")
+		return fail.AbortedError(lerr, "parent task killed")
 	}
 
 	// Starting from here, if exiting with error, delete nodes
@@ -1210,10 +1250,11 @@ func (instance *Cluster) createHostResources(
 	startedTasks = append(startedTasks, privateNodesCreateTasks)
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return fail.AbortedError(nil, "parent task killed")
+		return fail.AbortedError(lerr, "parent task killed")
 	}
 
 	// Step 2: awaits gateway installation end and masters installation end
@@ -1232,10 +1273,11 @@ func (instance *Cluster) createHostResources(
 	logrus.Debugf("master creation returned: %v", masterCreationResult)
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return fail.AbortedError(nil, "parent task killed")
+		return fail.AbortedError(lerr, "parent task killed")
 	}
 
 	// Step 3: start gateway configuration (needs MasterIPs so masters must be installed first)
@@ -1307,10 +1349,11 @@ func (instance *Cluster) createHostResources(
 	logrus.Debugf("private node creation returned: %v", privateNodesResult)
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return fail.AbortedError(nil, "parent task killed")
+		return fail.AbortedError(lerr, "parent task killed")
 	}
 
 	// Step 6: Starts nodes configuration, if all masters and nodes have been created and gateway has been configured with success
@@ -1394,10 +1437,11 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	id, ok := params.(string)
@@ -1434,10 +1478,11 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	id, ok := params.(string)
@@ -1485,10 +1530,11 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 	hostLabel := p.Host.GetName()
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), params).WithStopwatch().Entering()
@@ -1543,10 +1589,11 @@ func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params conc
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	// validate and convert parameters
@@ -1601,10 +1648,11 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	tracer := debug.NewTracer(tg, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
@@ -1659,7 +1707,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warnf("TBR: Timeouts !!")
+			logrus.Warningf("Timeouts !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to create master(s): %s", clusterName, xerr)
 		if len(collectedErs) != 0 {
@@ -1715,10 +1763,11 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).Entering()
@@ -1790,10 +1839,11 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}()
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	netCfg, xerr := instance.GetNetworkConfig()
@@ -1979,10 +2029,11 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	}()
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).WithStopwatch().Entering()
@@ -2115,10 +2166,11 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 	defer tracer.Exiting()
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	started := time.Now()
@@ -2177,10 +2229,11 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %v)", p.count, p.public).WithStopwatch().Entering()
@@ -2272,10 +2325,11 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d)", p.index).WithStopwatch().Entering()
@@ -2547,11 +2601,11 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 	}()
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-
-		return nil, fail.AbortedError(nil, "parent task aborted")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	clusterName := instance.GetName()
@@ -2663,10 +2717,11 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Node.Name).WithStopwatch().Entering()
@@ -2732,10 +2787,11 @@ func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params c
 	node := casted.node
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	hostInstance, xerr := LoadHost(instance.GetService(), node.ID)
@@ -2794,10 +2850,11 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	defer func() {
@@ -2853,10 +2910,11 @@ func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurre
 	}
 
 	if task.Aborted() {
-		if lerr, err := task.LastError(); err == nil {
-			return nil, fail.AbortedError(lerr, "parent task killed")
+		lerr, err := task.LastError()
+		if err != nil {
+			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
-		return nil, fail.AbortedError(nil, "parent task killed")
+		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
 	host, xerr := LoadHost(instance.GetService(), nodeName, HostLightOption)

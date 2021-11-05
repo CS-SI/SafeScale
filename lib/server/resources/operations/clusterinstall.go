@@ -496,9 +496,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	hidesOutput := strings.Contains(script, "set +x\n")
 	if hidesOutput {
 		script = strings.Replace(script, "set +x\n", "\n", 1)
-		if strings.Contains(script, "exec 2>&1\n") {
-			script = strings.Replace(script, "exec 2>&1\n", "exec 2>&7\n", 1)
-		}
+		script = strings.Replace(script, "exec 2>&1\n", "exec 2>&7\n", 1)
 	}
 
 	// Uploads the script into remote file
@@ -807,6 +805,62 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context) (ferr fail.Er
 			return fail.NewError("[Cluster %s] failed to add 'remotedesktop' failed: %s", identity.Name, msg)
 		}
 		logrus.Debugf("[Cluster %s] feature 'remotedesktop' added successfully", identity.Name)
+	}
+	return nil
+}
+
+// installAnsible installs feature ansible on all masters of the Cluster
+func (instance *Cluster) installAnsible(ctx context.Context) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	identity, xerr := instance.unsafeGetIdentity()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	disabled := false
+	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			_, disabled = featuresV1.Disabled["ansible"]
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if !disabled {
+		logrus.Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
+
+		feat, xerr := NewFeature(instance.GetService(), "ansible")
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		// Adds ansible feature on Cluster (ie masters)
+		vars := data.Map{
+			"Username": "cladm",
+			"Password": identity.AdminPassword,
+		}
+		r, xerr := feat.Add(ctx, instance, vars, resources.FeatureSettings{})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		if !r.Successful() {
+			msg := r.AllErrorMessages()
+			return fail.NewError("[Cluster %s] failed to add 'ansible' failed: %s", identity.Name, msg)
+		}
+		logrus.Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
 	}
 	return nil
 }

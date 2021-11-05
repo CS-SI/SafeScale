@@ -367,8 +367,7 @@ func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail
 	list, xerr := f.service.ListObjects(metadataBucket.Name, absPath, objectstorage.NoPrefix)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Errorf("Error browsing metadata: listing objects: %+v", xerr)
-		return xerr
+		return fail.Wrap(xerr, "Error browsing metadata: listing objects")
 	}
 
 	// If there is a single entry equals to absolute path, then there is nothing, it's an empty MetadataFolder
@@ -386,8 +385,7 @@ func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail
 		xerr = f.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", xerr)
-			return xerr
+			return fail.Wrap(xerr, "Error browsing metadata: reading from buffer")
 		}
 
 		data := buffer.Bytes()
@@ -395,14 +393,13 @@ func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail
 			data, err = crypt.Decrypt(data, f.cryptKey)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return fail.ConvertError(err)
+				return fail.Wrap(fail.ConvertError(err), "Error browsing metadata: decrypting data")
 			}
 		}
 		xerr = callback(data)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Errorf("Error browsing metadata: running callback: %+v", xerr)
-			return xerr
+			return fail.Wrap(xerr, "Error browsing metadata: running callback")
 		}
 	}
 	return nil

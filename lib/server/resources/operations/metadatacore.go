@@ -707,7 +707,7 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 	return fail.ConvertError(c.notifyObservers())
 }
 
-// BrowseFolder walks through MetadataFolder and executes a callback for each entries
+// BrowseFolder walks through MetadataFolder and executes a callback for each entry
 func (c *MetadataCore) BrowseFolder(callback func(buf []byte) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 

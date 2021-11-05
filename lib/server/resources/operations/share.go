@@ -187,6 +187,14 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 		}
 	}()
 
+	// FIXME: The reload problem
+	/*
+		xerr = rs.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
+	*/
+
 	return rs, nil
 }
 

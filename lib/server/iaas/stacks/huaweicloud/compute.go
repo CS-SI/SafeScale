@@ -1210,14 +1210,9 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						return innerRetryErr
 					}
 				}
-			}
 
-			// 2nd, check host status every 5 seconds until check failed.
-			// If check succeeds but state is Error, retry the deletion.
-			// If check fails and error isn't 'resource not found', retry
-			if resourcePresent {
 				var host *servers.Server
-				innerRetryErr := retry.WhileUnsuccessful(
+				innerRetryErr = retry.WhileUnsuccessful(
 					func() error {
 						commRetryErr := stacks.RetryableRemoteCall(
 							func() (innerErr error) {

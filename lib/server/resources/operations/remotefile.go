@@ -18,6 +18,8 @@ package operations
 
 import (
 	"context"
+	"errors"
+	"os"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -55,7 +57,11 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 	}
 	if rfc.Remote == "" {
 		return fail.InvalidInstanceContentError("rfc.Remote", "cannot be empty string")
+	}
 
+	// Check the local file exists first
+	if _, err := os.Stat(rfc.Local); errors.Is(err, os.ErrNotExist) {
+		return fail.InvalidInstanceContentError("rfc.Local", "MUST be an already existing file")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -133,7 +139,7 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	f, xerr := system.CreateTempFileFromString(content, 0600)
+	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")

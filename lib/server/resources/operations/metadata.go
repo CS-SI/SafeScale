@@ -34,8 +34,8 @@ const (
 	// FirstMetadataVersion corresponds to the first metadata format version
 	FirstMetadataVersion = "v20.06.0"
 
-	// MustUpgradeMessage  = "the current version of SafeSale binaries cannot use safely the current tenant metadata; you should consider to upgrade the metadata using the command 'safescale tenant metadata upgrade %s'. Note however previous version of binaries would not be able to read safely the newly upgraded metadata and should be upgraded everywhere to at least version %s."
-	MustUpgradeMessage  = "the current version of SafeSale binaries cannot use safely the current tenant metadata; you should consider to upgrade the metadata using the command 'safescale tenant metadata upgrade %s'."
+	// MustUpgradeMessage  = "the current version of SafeScale binaries cannot use safely the current tenant metadata; you should consider upgrading the metadata using the command 'safescale tenant metadata upgrade %s'. Note that previous version of binaries would not be able to read safely the newly upgraded metadata and should be upgraded everywhere to at least version %s."
+	MustUpgradeMessage  = "the current version of SafeScale binaries cannot use safely the current tenant metadata; you should consider upgrading the metadata using the command 'safescale tenant metadata upgrade %s'."
 	MustUpgradeBinaries = "the current version of SafeScale binaries requires the use of at least release %s to work correctly. Please upgrade your binaries"
 )
 

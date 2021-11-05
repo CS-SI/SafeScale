@@ -219,9 +219,11 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 
 	md5hash := ""
 	if source != "" {
-		if content, err := ioutil.ReadFile(source); err == nil {
-			md5hash = getMD5Hash(string(content))
+		content, err := ioutil.ReadFile(source)
+		if err != nil {
+			return invalid, "", "", fail.AbortedError(err, "aborted")
 		}
+		md5hash = getMD5Hash(string(content))
 	}
 
 	var (
@@ -246,7 +248,6 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 			}
 
 			crcCheck := func() fail.Error {
-				// logrus.Warnf("TBR: checking md5")
 				crcCtx, cancelCrc := context.WithTimeout(ctx, timeout)
 				defer cancelCrc()
 
@@ -319,7 +320,6 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		cmd += "sudo chmod " + mode + ` '` + target + `'`
 	}
 	if cmd != "" {
-		logrus.Warningf("extra changing rights")
 		iretcode, istdout, istderr, innerXerr := run(ctx, instance.sshProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
@@ -431,7 +431,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	}
 
 	hostName := instance.GetName()
-	f, xerr := system.CreateTempFileFromString(content, 0600)
+	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to create temporary file")

@@ -283,6 +283,14 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		}()
 	}
 
+	// FIXME: The reload problem
+	/*
+		xerr = subnetInstance.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
+	*/
+
 	// -- deal with instance not found and unable to create --
 	if subnetInstance == nil {
 		if networkRef != "" {
@@ -439,8 +447,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
-		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA,
-	).WithStopwatch().Entering()
+		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()
@@ -458,7 +465,7 @@ func (instance *Subnet) Create(ctx context.Context, req abstract.SubnetRequest, 
 			if derr := instance.deleteSubnetThenWaitCompletion(instance.GetID()); derr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 			} else {
-				logrus.Warningf("the subnet '%s' should be gone by now", instance.GetID())
+				logrus.Infof("the subnet '%s' should be gone by now", instance.GetID())
 			}
 		}
 	}()
@@ -1583,7 +1590,7 @@ func (instance *Subnet) DetachHost(ctx context.Context, hostID string) (xerr fai
 	// defer instance.lock.Unlock()
 
 	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return instance.unsafeDetachHost(props, hostID)
+		return instance.unsafeAbandonHost(props, hostID)
 	})
 }
 
@@ -1758,8 +1765,8 @@ func (instance *Subnet) GetGatewayPublicIPs() (_ []string, xerr fail.Error) {
 }
 
 var (
-	currentSubnetAbstractContextKey   = "current_subnet_abstract"
-	currentSubnetPropertiesContextKey = "current_subnet_properties"
+	currentSubnetAbstractContextKey   = "removing_subnet_abstract"
+	currentSubnetPropertiesContextKey = "removing_subnet_properties"
 )
 
 // Delete deletes a Subnet
@@ -1771,6 +1778,33 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+
+	var (
+		subnetAbstract *abstract.Subnet
+		subnetHosts    *propertiesv1.SubnetHosts
+	)
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		var ok bool
+		subnetAbstract, ok = clonable.(*abstract.Subnet)
+		if !ok {
+			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract)
+		ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)
+
+		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
+			var ok bool
+			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.SubnetHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
@@ -1791,7 +1825,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("operations.Subnet")).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("operations.Subnet")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Lock Subnet instance
@@ -1833,8 +1867,7 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 				} else {
 					verb = "are"
 				}
-				errorMsg = fmt.Sprintf("cannot delete Subnet '%s': %d host%s %s still attached to it: %s",
-					as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
+				errorMsg = fmt.Sprintf("cannot delete Subnet '%s': %d host%s %s still attached to it: %s", as.Name, hostsLen, strprocess.Plural(hostsLen), verb, strings.Join(hostList, ", "))
 				return fail.NotAvailableError(errorMsg)
 			}
 			return nil
@@ -1850,52 +1883,35 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-		subnetAbstract, ok := clonable.(*abstract.Subnet)
+		as, ok := clonable.(*abstract.Subnet)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		// To prevent potential deadlock, push current Subnet Instance abstract and properties in context
-		ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract)
-		ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)
-
 		// 1st delete gateway(s)
-		gwIDs, innerXErr := instance.deleteGateways(subnetAbstract)
+		gwIDs, innerXErr := instance.deleteGateways(as)
 		if innerXErr != nil {
 			return innerXErr
 		}
 
 		// FIXME: see if we can adapt relaxedDeleteHost to use context values and prevent duplicated code...
-		// 1st Unbind Host from current Subnet (not done by relaxedDeleteHost as Hosts are gateways, to avoid deadlock as Subnet instance may already be locked)
+		// Unbind Host from current Subnet (not done by relaxedDeleteHost as Hosts are gateways, to avoid deadlock as Subnet instance may already be locked)
 		if len(gwIDs) > 0 {
 			for _, v := range gwIDs {
-				if innerXErr = instance.unsafeDetachHost(props, v); innerXErr != nil {
+				if innerXErr = instance.unsafeAbandonHost(props, v); innerXErr != nil {
 					return innerXErr
 				}
 			}
 		}
 
 		// 2nd delete VIP if needed
-		if subnetAbstract.VIP != nil {
-			if innerXErr := svc.DeleteVIP(subnetAbstract.VIP); innerXErr != nil {
+		if as.VIP != nil {
+			if innerXErr := svc.DeleteVIP(as.VIP); innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to delete VIP for gateways")
 			}
 		}
 
 		// 3rd delete security groups associated to Subnet by users (do not include SG created with Subnet, they will be deleted later)
-		var subnetHosts *propertiesv1.SubnetHosts
-		innerXErr = props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
-			var ok bool
-			subnetHosts, ok = clonable.(*propertiesv1.SubnetHosts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.SubnetHost' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
-
 		innerXErr = props.Alter(subnetproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			ssgV1, ok := clonable.(*propertiesv1.SubnetSecurityGroups)
 			if !ok {
@@ -1909,67 +1925,28 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			return innerXErr
 		}
 
-		// 4th free CIDR index if the Subnet has been created for a single Host
-		if subnetAbstract.SingleHostCIDRIndex > 0 {
-			networkInstance, innerXErr := LoadNetwork(instance.GetService(), subnetAbstract.Network)
+		// 4st free CIDR index if the Subnet has been created for a single Host
+		if as.SingleHostCIDRIndex > 0 {
+			// networkInstance, innerXErr := instance.unsafeInspectNetwork()
+			networkInstance, innerXErr := instance.InspectNetwork()
 			if innerXErr != nil {
 				return innerXErr
 			}
-			defer networkInstance.Released()
 
-			innerXErr = FreeCIDRForSingleHost(networkInstance, subnetAbstract.SingleHostCIDRIndex)
+			innerXErr = FreeCIDRForSingleHost(networkInstance, as.SingleHostCIDRIndex)
 			if innerXErr != nil {
 				return innerXErr
 			}
 		}
 
-		// 5th delete Subnet on Provider side
-		logrus.Debugf("Deleting Subnet '%s'...", subnetAbstract.Name)
-		if innerXErr = instance.deleteSubnetThenWaitCompletion(subnetAbstract.ID); innerXErr != nil {
+		// finally delete Subnet
+		logrus.Debugf("Deleting Subnet '%s'...", as.Name)
+		if innerXErr = instance.deleteSubnetThenWaitCompletion(as.ID); innerXErr != nil {
 			return innerXErr
 		}
 
-		// 6th remove reference of Subnet in parent Network metadata
-		networkUpdateFunc := func(props *serialize.JSONProperties) fail.Error {
-			return props.Alter(networkproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
-				networkSubnetsV1, ok := clonable.(*propertiesv1.NetworkSubnets)
-				if !ok {
-					return fail.InconsistentError("'*propertiesv1.NetworkSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
-				delete(networkSubnetsV1.ByName, instance.GetName())
-				delete(networkSubnetsV1.ByID, instance.GetID())
-				return nil
-			})
-		}
-
-		anon := ctx.Value(CurrentNetworkPropertiesContextKey)
-		if anon != nil {
-			networkProps, ok := anon.(*serialize.JSONProperties)
-			if !ok {
-				return fail.InconsistentError("'*serialize.JSONProperties' expected, '%s' provided", reflect.TypeOf(anon))
-			}
-
-			innerXErr = networkUpdateFunc(networkProps)
-			if innerXErr != nil {
-				return innerXErr
-			}
-		} else {
-			networkInstance, innerXErr := LoadNetwork(instance.GetService(), subnetAbstract.Network)
-			if innerXErr != nil {
-				return innerXErr
-			}
-			defer networkInstance.Released()
-
-			innerXErr = networkInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-				return networkUpdateFunc(props)
-			})
-			if innerXErr != nil {
-				return innerXErr
-			}
-		}
-
-		// 7th delete Subnet's own Security Groups
-		return instance.deleteSecurityGroups(ctx, [3]string{subnetAbstract.GWSecurityGroupID, subnetAbstract.InternalSecurityGroupID, subnetAbstract.PublicIPSecurityGroupID})
+		// Delete Subnet's own Security Groups
+		return instance.deleteSecurityGroups(ctx, [3]string{as.GWSecurityGroupID, as.InternalSecurityGroupID, as.PublicIPSecurityGroupID})
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2050,7 +2027,6 @@ func (instance *Subnet) InspectNetwork() (rn resources.Network, xerr fail.Error)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-
 		return nil
 	})
 	if xerr != nil {
@@ -2878,8 +2854,7 @@ func (instance *Subnet) CreateSubnetWithoutGateway(ctx context.Context, req abst
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.subnet"),
-		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA,
-	).WithStopwatch().Entering()
+		"('%s', '%s', %s, <sizing>, '%s', %v)", req.Name, req.CIDR, req.IPVersion.String(), req.ImageRef, req.HA).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	instance.lock.Lock()

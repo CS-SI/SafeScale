@@ -434,7 +434,7 @@ func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstanc
 			}
 
 			if asg.DefaultForHost != "" {
-				return fail.InvalidRequestError("security group is already marked as default for Host %s", asg.DefaultForHost)
+				return fail.InvalidRequestError("security group is already marked as default for host %s", asg.DefaultForHost)
 			}
 
 			asg.DefaultForHost = hostInstance.GetID()

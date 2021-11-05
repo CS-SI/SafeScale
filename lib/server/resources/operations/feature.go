@@ -175,14 +175,16 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 		xerr = nil
 	}
 
-	logrus.Debugf("loaded feature '%s' (%s)", casted.GetDisplayFilename(), casted.GetFilename())
+	logrus.Tracef("loaded feature '%s' (%s)", casted.GetDisplayFilename(), casted.GetFilename())
 
 	// if we can log the sha256 of the feature, do it
 	filename := v.ConfigFileUsed()
 	if filename != "" {
-		if content, err := ioutil.ReadFile(filename); err == nil {
-			logrus.Debugf("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
+		content, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return nil, fail.ConvertError(err)
 		}
+		logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
 	}
 
 	casted.svc = svc
@@ -209,9 +211,11 @@ func NewEmbeddedFeature(svc iaas.Service, name string) (_ resources.Feature, xer
 
 	// if we can log the sha256 of the feature, do it
 	if casted.fileName != "" {
-		if content, err := ioutil.ReadFile(casted.fileName); err == nil {
-			logrus.Debugf("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
+		content, err := ioutil.ReadFile(casted.fileName)
+		if err != nil {
+			return nil, fail.ConvertError(err)
 		}
+		logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
 	}
 
 	casted.fileName += " [embedded]"
