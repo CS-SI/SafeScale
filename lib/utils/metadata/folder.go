@@ -229,6 +229,12 @@ func (f *Folder) Browse(path string, callback FolderDecoderCallback) error {
 					return err
 				}
 			}
+			if _, ok := err.(fail.ErrRuntimePanic); ok {
+				return fail.Wrap(err, "Error browsing metadata: corrupted metadata")
+			}
+			if _, ok := err.(*fail.ErrRuntimePanic); ok {
+				return fail.Wrap(err, "Error browsing metadata: corrupted metadata")
+			}
 			return fail.Wrap(err, "Error browsing metadata: running callback")
 		}
 	}
