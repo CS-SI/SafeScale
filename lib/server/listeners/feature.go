@@ -60,7 +60,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 	}
 
 	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-	//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	//		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	//	}
 
 	targetType := in.GetTargetType()
@@ -133,7 +133,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-	//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	//		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	//	}
 	targetType := in.GetTargetType()
 	switch targetType {
@@ -243,7 +243,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-	//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	//		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	//	}
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
@@ -324,7 +324,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-	//		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+	//		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	//	}
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())

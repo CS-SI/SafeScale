@@ -47,7 +47,7 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 			return nil, xerr
 		}
 
-		tenant = &operations.Tenant{Name: tenantID, Service: service}
+		tenant = &operations.Tenant{Name: tenantID, BucketName: service.GetMetadataBucket().GetName(), Service: service}
 	} else {
 		tenant = operations.CurrentTenant()
 		if tenant == nil {
@@ -107,7 +107,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	uuid := in.Uuid
@@ -144,7 +144,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	task, xerr := concurrency.NewTaskWithContext(ctx)

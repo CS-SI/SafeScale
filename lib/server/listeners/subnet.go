@@ -70,7 +70,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 	networkRef, networkLabel := srvutils.GetReference(in.GetNetwork())
@@ -163,7 +163,7 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -229,7 +229,7 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -279,7 +279,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -354,7 +354,7 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -428,7 +428,7 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -503,7 +503,7 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -569,7 +569,7 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -634,7 +634,7 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())

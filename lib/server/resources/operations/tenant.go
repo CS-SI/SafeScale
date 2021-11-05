@@ -28,14 +28,15 @@ import (
 
 // Tenant structure to handle name and GetService for a tenant
 type Tenant struct {
-	Name    string
-	Service iaas.Service
+	Name       string
+	BucketName string
+	Service    iaas.Service
 }
 
 // currentTenant contains the current tenant
 var currentTenant atomic.Value
 
-// CurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
+// CurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
 func CurrentTenant() *Tenant {
 	anon := currentTenant.Load()
 	if anon == nil {
@@ -55,7 +56,7 @@ func CurrentTenant() *Tenant {
 				return nil
 			}
 
-			currentTenant.Store(&Tenant{Name: name, Service: service})
+			currentTenant.Store(&Tenant{Name: name, BucketName: service.GetMetadataBucket().GetName(), Service: service})
 			break // nolint
 		}
 		anon = currentTenant.Load()
@@ -76,7 +77,7 @@ func SetCurrentTenant(tenantName string) error {
 		return xerr
 	}
 
-	tenant = &Tenant{Name: tenantName, Service: service}
+	tenant = &Tenant{Name: tenantName, BucketName: service.GetMetadataBucket().GetName(), Service: service}
 	currentTenant.Store(tenant)
 	return nil
 }

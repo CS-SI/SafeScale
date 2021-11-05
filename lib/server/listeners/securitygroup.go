@@ -56,7 +56,7 @@ func (s *SecurityGroupListener) List(ctx context.Context, in *protocol.SecurityG
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	job, err := PrepareJob(ctx, "", "/securitygroups/list")
@@ -100,7 +100,7 @@ func (s *SecurityGroupListener) Create(ctx context.Context, in *protocol.Securit
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	name := in.GetName()
@@ -162,7 +162,7 @@ func (s *SecurityGroupListener) Clear(ctx context.Context, in *protocol.Referenc
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -217,7 +217,7 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -270,7 +270,7 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -319,7 +319,7 @@ func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.Securit
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -371,7 +371,7 @@ func (s *SecurityGroupListener) AddRule(ctx context.Context, in *protocol.Securi
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -429,7 +429,7 @@ func (s *SecurityGroupListener) DeleteRule(ctx context.Context, in *protocol.Sec
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -488,7 +488,7 @@ func (s *SecurityGroupListener) Sanitize(ctx context.Context, in *protocol.Refer
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -531,7 +531,7 @@ func (s *SecurityGroupListener) Bonds(ctx context.Context, in *protocol.Security
 		logrus.Warnf("Error running structure validator: %v", err)
 	}
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 	// FIXME: what if err != nil ?
 

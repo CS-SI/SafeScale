@@ -61,7 +61,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkName := in.GetName()
@@ -179,7 +179,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -231,7 +231,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -279,7 +279,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -321,7 +321,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 				}
 			}
 
-			if cfg, xerr := svc.GetConfigurationOptions(); xerr == nil {
+			if cfg, xerr := svc.GetConfigurationOptions(); xerr == nil { // FIXME: Very bad practice
 				if name, found := cfg.Get("DefaultNetworkName"); found && name.(string) == abstractNetwork.Name {
 					return empty, fail.InvalidRequestError("cannot delete default Network %s because its existence is not controlled by SafeScale", refLabel)
 				}
