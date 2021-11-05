@@ -103,29 +103,9 @@ mod:
 	@($(GO) mod download &>/dev/null || true)
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Finished downloading package dependencies..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 
-libvirt:
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Libvirt driver enabled$(NO_COLOR)\n";
-	@$(WHICH) lsmod > /dev/null; if [ $$? -ne 0 ]; then \
-		@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Libvirt not available in this platform !\n"; exit 1;\
-	fi
-	@systemctl status libvirtd.service >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) libvirt is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
-	@lsmod | grep kvm >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) kvm is required but it's not installed.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
-	@grep -E '^flags.*(vmx|svm)' /proc/cpuinfo >/dev/null 2>&1 && \
-	if [ $$? -eq 0 ]; then \
-		printf "%b" "$(OK_COLOR)$(OK_STRING) Hardware acceleration is available!\n"; \
-	else \
-		printf "%b" "$(WARN_COLOR)$(WARN_STRING) Hardware acceleration is NOT available!\n"; \
-	fi
-	$(eval BUILD_TAGS = "libvirt,$(BUILD_TAGS)") \
-	@printf "%b" "$(WARN_COLOR)$(WARN_STRING) Libvirt doesn't work on develop branch right now!\n"; exit 1;
-
 debug:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'debug' flag$(NO_COLOR)\n";
 	$(eval BUILD_TAGS = "debug,$(BUILD_TAGS)")
-
-vcloud:
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'vcloud' flag$(NO_COLOR)\n";
-	$(eval BUILD_TAGS = "vcloud,$(BUILD_TAGS)")
 
 alltests:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Building with 'alltests' flag$(NO_COLOR)\n";
@@ -290,6 +270,8 @@ zipsources:
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Creating a tar.gz file safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz with the sources..., $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@(git archive --format tar.gz --output safescale-$$VERSION-$$(git rev-parse --abbrev-ref HEAD | sed 's#/#\_#g')-src.tar.gz master)
 
+pack: zipsources
+
 mrproper: clean
 	@(git clean -xdf -e .idea -e vendor -e .vscode || true)
 
@@ -391,17 +373,17 @@ minimock: begin generate
 metalint: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=errcheck --enable=ineffassign  --enable=depguard --enable=dogsled --disable=unused --disable=varcheck run ./... | grep -v _test || true
+	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v test | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=errcheck --enable=ineffassign  --enable=depguard --enable=dogsled --disable=unused --disable=varcheck run ./... | grep -v .pb. | grep -v _test || true
 
 metalint-full: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@golangci-lint --color never --timeout=10m --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --enable=funlen --enable=gochecknoglobals --enable=depguard run  ./... | grep -v _test || true
+	@golangci-lint --color never --timeout=10m --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --enable=funlen --enable=gochecknoglobals --enable=depguard run  ./... | grep -v .pb. | grep -v _test || true
 
 style: begin generate gofmt
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=deadcode --enable=errcheck --enable=stylecheck --enable=golint --enable=gocritic --enable=gosimple --enable=govet --enable=ineffassign --disable=unused --disable=varcheck run || true
+	@$(GO) list ./... | cut -c 28- | grep -v mocks | grep -v cli | xargs golangci-lint --timeout=5m --color never --enable=deadcode --enable=errcheck --enable=stylecheck --enable=golint --enable=gocritic --enable=gosimple --enable=govet --enable=ineffassign --disable=unused --disable=varcheck run | grep -v .pb. | grep -v _test || true
 
 style-full: begin generate gofmt
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
