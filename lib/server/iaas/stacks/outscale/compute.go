@@ -1074,7 +1074,7 @@ func (s *Stack) getVM(vmID string) (*osc.Vm, fail.Error) {
 		return nil, normalizeError(err)
 	}
 	if len(vm.Vms) == 0 {
-		return nil, nil
+		return nil, fail.NotFoundError(fmt.Sprintf("machine with id %s not found", vmID))
 	}
 	return &vm.Vms[0], nil
 }

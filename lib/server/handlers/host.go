@@ -1094,8 +1094,13 @@ func (handler *HostHandler) Inspect(ctx context.Context, ref string) (host *abst
 	retryErr := retryOnCommunicationFailure(
 		func() error {
 			var innerErr error
-			host, innerErr = handler.service.InspectHost(host)
-			return innerErr
+			var updatedHost *abstract.Host
+			updatedHost, innerErr = handler.service.InspectHost(host)
+			if innerErr != nil {
+				return innerErr
+			}
+			host = updatedHost
+			return nil
 		},
 		0,
 	)
