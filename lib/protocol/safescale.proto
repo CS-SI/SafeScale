@@ -55,6 +55,8 @@ message TenantList {
 
 message TenantName {
 	string name = 1;
+	string bucket_name = 2;
+	string provider = 3;
 }
 
 message TenantCleanupRequest {
