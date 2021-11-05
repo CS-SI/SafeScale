@@ -59,7 +59,7 @@ func cleanup(onAbort bool) {
 
 // *** MAIN ***
 func work(c *cli.Context) {
-	signalCh := make(chan os.Signal)
+	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-signalCh

@@ -62,5 +62,5 @@ func (nd *NetworkDescription) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.DescriptionV1, NewNetworkDescription())
+	serialize.PropertyTypeRegistry.Register("resources.network", string(networkproperty.DescriptionV1), NewNetworkDescription())
 }

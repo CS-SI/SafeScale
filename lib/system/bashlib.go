@@ -74,10 +74,10 @@ func BuildBashLibraryDefinition() (*BashLibraryDefinition, fail.Error) {
 		Content: anon.(string),
 		// Sets delays and timeouts for script
 		DefaultDelay:           uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds())),
-		DefaultTimeout:         strings.Replace((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1),
-		LongTimeout:            strings.Replace(temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1),
-		ClusterJoinTimeout:     strings.Replace(temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1),
-		DockerImagePullTimeout: strings.Replace((2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1),
+		DefaultTimeout:         strings.ReplaceAll((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", ""),
+		LongTimeout:            strings.ReplaceAll(temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", ""),
+		ClusterJoinTimeout:     strings.ReplaceAll(temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", ""),
+		DockerImagePullTimeout: strings.ReplaceAll((2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", ""),
 	}
 	return out, nil
 }

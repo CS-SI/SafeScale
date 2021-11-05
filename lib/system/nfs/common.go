@@ -141,7 +141,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	}
 
 	// Copy script to remote host with retries if needed
-	f, xerr := system.CreateTempFileFromString(content, 0600)
+	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
 		xerr.Annotate("retcode", 255)
 		return "", xerr

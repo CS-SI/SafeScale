@@ -56,7 +56,6 @@ func (hlm HostLocalMount) Clone() data.Clonable {
 }
 
 // Replace ...
-// satisfies interface data.Clonable
 func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if hlm == nil || p == nil {

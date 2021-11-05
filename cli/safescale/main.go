@@ -80,7 +80,7 @@ func main() {
 
 	mainCtx, cancelfunc := context.WithCancel(context.Background())
 
-	signalCh := make(chan os.Signal)
+	signalCh := make(chan os.Signal, 1)
 
 	app := cli.NewApp()
 	app.Writer = os.Stderr
