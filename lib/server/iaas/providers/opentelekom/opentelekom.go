@@ -154,7 +154,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	return &newP, nil
 }
 
-// ListTemplates ... ; overloads Stack.ListTemplates() to allow to filter templates to show
+// ListTemplates ... ; overloads stack.ListTemplates() to allow to filter templates to show
 // Value of all has no impact on the result
 func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	if p.IsNull() {
@@ -163,7 +163,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
 }
 
-// ListImages ... ; overloads Stack.ListImages() to allow to filter images to show
+// ListImages ... ; overloads stack.ListImages() to allow to filter images to show
 // Value of all has no impact on the result
 func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	if p.IsNull() {
@@ -209,7 +209,7 @@ func (p provider) GetName() string {
 	return "opentelekom"
 }
 
-// GetStack returns the Stack object used by the provider
+// GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
 func (p provider) GetStack() api.Stack {
 	return p.Stack

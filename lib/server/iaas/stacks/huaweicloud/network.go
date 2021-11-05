@@ -34,7 +34,6 @@ import (
 	"github.com/gophercloud/gophercloud/pagination"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -63,6 +62,14 @@ type VPC struct {
 
 type vpcCommonResult struct {
 	gophercloud.Result
+}
+
+// Router represents a router
+type Router struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+	// NetworkID is the Network ID which the router gateway is connected to.
+	NetworkID string `json:"network_id,omitempty"`
 }
 
 // Extract is a function that accepts a result and extracts a Network/VPC from FlexibleEngine response.
@@ -119,7 +126,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 		return nullAN, normalizeError(err)
 	}
 
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs" // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs" // FIXME: Hardcoded endpoint
 	resp := vpcCreateResult{}
 	opts := gophercloud.RequestOpts{
 		JSONBody:     b,
@@ -128,7 +135,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Stack.Driver.Request("POST", url, &opts)
+			_, innerErr := s.Driver.Request("POST", url, &opts)
 			return innerErr
 		},
 		normalizeError,
@@ -150,11 +157,44 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	return an, nil
 }
 
+// ListRouters lists available routers
+func (s stack) ListRouters() ([]Router, fail.Error) {
+	var emptySlice []Router
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+
+	var ns []Router
+	xerr := stacks.RetryableRemoteCall(
+		func() error {
+			return routers.List(s.NetworkClient, routers.ListOpts{}).EachPage(
+				func(page pagination.Page) (bool, error) {
+					list, err := routers.ExtractRouters(page)
+					if err != nil {
+						return false, err
+					}
+					for _, r := range list {
+						an := Router{
+							ID:        r.ID,
+							Name:      r.Name,
+							NetworkID: r.GatewayInfo.NetworkID,
+						}
+						ns = append(ns, an)
+					}
+					return true, nil
+				},
+			)
+		},
+		NormalizeError,
+	)
+	return ns, xerr
+}
+
 // findVPCBoundOpenstackNetwork finds the Openstack Network resource associated to Huaweicloud VPC
 func (s stack) findOpenStackNetworkBoundToVPC(vpcName string) (*networks.Network, fail.Error) {
-	var router *openstack.Router
+	var router *Router
 	found := false
-	routerList, xerr := s.Stack.ListRouters()
+	routerList, xerr := s.ListRouters()
 	if xerr != nil {
 		return nil, fail.Wrap(xerr, "failed to list routers")
 	}
@@ -172,7 +212,7 @@ func (s stack) findOpenStackNetworkBoundToVPC(vpcName string) (*networks.Network
 	var network *networks.Network
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			network, innerErr = networks.Get(s.Stack.NetworkClient, router.NetworkID).Extract()
+			network, innerErr = networks.Get(s.NetworkClient, router.NetworkID).Extract()
 			return innerErr
 		},
 		normalizeError,
@@ -194,7 +234,7 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	}
 
 	r := vpcGetResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -202,7 +242,7 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	var vpc *VPC
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			if _, innerErr = s.Stack.Driver.Request("GET", url, &opts); innerErr == nil {
+			if _, innerErr = s.Driver.Request("GET", url, &opts); innerErr == nil {
 				vpc, innerErr = r.Extract()
 			}
 			return innerErr
@@ -266,14 +306,14 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	}
 
 	r := vpcCommonResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs" // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs" // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Stack.Driver.Request("GET", url, &opts)
+			_, innerErr := s.Driver.Request("GET", url, &opts)
 			return innerErr
 		},
 		normalizeError,
@@ -306,7 +346,7 @@ func (s stack) DeleteNetwork(id string) fail.Error {
 	}
 
 	r := vpcCommonResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201, 204},
@@ -314,7 +354,7 @@ func (s stack) DeleteNetwork(id string) fail.Error {
 	return stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			var r *http.Response
-			r, innerErr = s.Stack.Driver.Request("DELETE", url, &opts)
+			r, innerErr = s.Driver.Request("DELETE", url, &opts)
 			_ = r
 			return innerErr
 		},
@@ -433,7 +473,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 	r := networks.GetResult{}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, r.Err = s.Stack.NetworkClient.Get(s.Stack.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
+			_, r.Err = s.NetworkClient.Get(s.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
 				OkCodes: []int{200, 203},
 			})
 			return r.Err
@@ -459,7 +499,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 			entry = s.(map[string]interface{})
 			id = entry["id"].(string)
 		}
-		return s.Stack.InspectSubnet(id)
+		return s.InspectSubnet(id)
 	}
 	return nullAS, abstract.ResourceNotFoundError("subnet", name)
 }
@@ -475,7 +515,7 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	}
 
 	r := subnetGetResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
@@ -483,7 +523,7 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	var resp *subnetEx
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Stack.Driver.Request("GET", url, &opts)
+			_, innerErr := s.Driver.Request("GET", url, &opts)
 			r.Err = innerErr
 			resp, innerErr = r.Extract()
 			return innerErr
@@ -510,12 +550,12 @@ func (s stack) ListSubnets(networkRef string) ([]*abstract.Subnet, fail.Error) {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets" // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/subnets" // FIXME: Hardcoded endpoint
 	if networkRef != "" {
 		url += "?vpc_id=" + networkRef
 	}
 
-	pager := pagination.NewPager(s.Stack.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
+	pager := pagination.NewPager(s.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
 		return subnets.SubnetPage{LinkedPageBase: pagination.LinkedPageBase{PageResult: r}}
 	})
 	var subnetList []*abstract.Subnet
@@ -570,7 +610,7 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 		}
 	}
 
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + as.Network + "/subnets/" + id // FIXME: Hardcoded endpoint
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/vpcs/" + as.Network + "/subnets/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		OkCodes: []int{204},
 	}
@@ -582,7 +622,7 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 		func() error {
 			return stacks.RetryableRemoteCall(
 				func() error {
-					_, innerErr := s.Stack.Driver.Request("DELETE", url, &opts)
+					_, innerErr := s.Driver.Request("DELETE", url, &opts)
 					return innerErr
 				},
 				normalizeError,
@@ -687,7 +727,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	}
 
 	respCreate := subnetCreateResult{}
-	url := fmt.Sprintf("%sv1/%s/subnets", s.Stack.NetworkClient.Endpoint, s.authOpts.ProjectID) // FIXME: Hardcoded endpoint
+	url := fmt.Sprintf("%sv1/%s/subnets", s.NetworkClient.Endpoint, s.authOpts.ProjectID) // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONBody:     b,
 		JSONResponse: &respCreate.Body,
@@ -695,7 +735,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Stack.Driver.Request("POST", url, &opts)
+			_, innerErr := s.Driver.Request("POST", url, &opts)
 			return innerErr
 		},
 		normalizeError,
@@ -718,7 +758,7 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
-					_, innerErr := s.Stack.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts)
+					_, innerErr := s.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts)
 					return innerErr
 				},
 				normalizeError,
@@ -781,7 +821,7 @@ func (s stack) CreateVIP(networkID, subnetID, name string, sgs []string) (*abstr
 		return nullAVIP, xerr
 	}
 
-	openstackAS, xerr := s.Stack.InspectSubnetByName(networkID, as.Name)
+	openstackAS, xerr := s.InspectSubnetByName(networkID, as.Name)
 	if xerr != nil {
 		return nullAVIP, xerr
 	}

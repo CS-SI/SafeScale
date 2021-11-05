@@ -45,7 +45,7 @@ const (
 )
 
 var (
-	awsTagNameLabel *string = aws.String(tagNameLabel)
+	awsTagNameLabel = aws.String(tagNameLabel)
 )
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)

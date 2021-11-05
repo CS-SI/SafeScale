@@ -103,7 +103,7 @@ func (s stack) CreateVolume(request abstract.VolumeRequest) (*abstract.Volume, f
 	var vol *volumes.Volume
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			vol, innerErr = volumes.Create(s.Stack.VolumeClient, opts).Extract()
+			vol, innerErr = volumes.Create(s.VolumeClient, opts).Extract()
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -135,7 +135,7 @@ func (s stack) InspectVolume(id string) (*abstract.Volume, fail.Error) {
 	var vol *volumes.Volume
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			vol, innerErr = volumes.Get(s.Stack.VolumeClient, id).Extract()
+			vol, innerErr = volumes.Get(s.VolumeClient, id).Extract()
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -169,7 +169,7 @@ func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	var vs []abstract.Volume
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := volumes.List(s.Stack.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
+			innerErr := volumes.List(s.VolumeClient, volumes.ListOpts{}).EachPage(func(page pagination.Page) (bool, error) {
 				list, err := volumes.ExtractVolumes(page)
 				if err != nil {
 					logrus.Errorf("Error listing volumes: volume extraction: %+v", err)

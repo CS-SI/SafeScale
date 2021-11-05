@@ -24,6 +24,8 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/davecgh/go-spew/spew"
+	az "github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
+	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
 	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
 
@@ -296,6 +298,116 @@ func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string
 	}
 }
 
+// ListAvailabilityZones lists the usable AvailabilityZones
+func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
+	var emptyMap map[string]bool
+	if s.IsNull() {
+		return emptyMap, fail.InvalidInstanceError()
+	}
+
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+
+	var allPages pagination.Page
+	xerr = stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			allPages, innerErr = az.List(s.ComputeClient).AllPages()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return emptyMap, xerr
+	}
+
+	content, err := az.ExtractAvailabilityZones(allPages)
+	if err != nil {
+		return emptyMap, fail.ConvertError(err)
+	}
+
+	azList := map[string]bool{}
+	for _, zone := range content {
+		if zone.ZoneState.Available {
+			azList[zone.ZoneName] = zone.ZoneState.Available
+		}
+	}
+
+	// VPL: what's the point if there ios
+	if len(azList) == 0 {
+		logrus.Warnf("no Availability Zones detected !")
+	}
+
+	return azList, nil
+}
+
+// SelectedAvailabilityZone returns the selected availability zone
+func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
+	if s.IsNull() {
+		return "", fail.InvalidInstanceError()
+	}
+
+	if s.selectedAvailabilityZone == "" {
+		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
+		if s.selectedAvailabilityZone == "" {
+			azList, xerr := s.ListAvailabilityZones()
+			if xerr != nil {
+				return "", xerr
+			}
+			var azone string
+			for azone = range azList {
+				break
+			}
+			s.selectedAvailabilityZone = azone
+		}
+		logrus.Debugf("Selected Availability Zone: '%s'", s.selectedAvailabilityZone)
+	}
+	return s.selectedAvailabilityZone, nil
+}
+
+// GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
+func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
+	if s.IsNull() {
+		return "", fail.InvalidInstanceError()
+	}
+	if serverID == "" {
+		return "", fail.InvalidParameterError("serverID", "cannot be empty string")
+	}
+
+	type ServerWithAZ struct {
+		servers.Server
+		az.ServerAvailabilityZoneExt
+	}
+
+	var (
+		allPages   pagination.Page
+		allServers []ServerWithAZ
+	)
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			allPages, innerErr = servers.List(s.ComputeClient, nil).AllPages()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return "", xerr
+	}
+
+	err := servers.ExtractServersInto(allPages, &allServers)
+	if err != nil {
+		return "", NormalizeError(err)
+	}
+
+	for _, server := range allServers {
+		if server.ID == serverID {
+			return server.AvailabilityZone, nil
+		}
+	}
+
+	return "", fail.NotFoundError("unable to find availability zone information for server '%s'", serverID)
+}
+
 // CreateHost creates a new host
 func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
@@ -452,8 +564,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() (innerErr error) {
-					_, r.Err = s.Stack.ComputeClient.Post(
-						s.Stack.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
+					_, r.Err = s.ComputeClient.Post(
+						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
 							OkCodes: []int{200, 202},
 						},
 					)
@@ -461,7 +573,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 					xerr := normalizeError(innerErr)
 					if xerr != nil {
 						if server != nil && server.ID != "" {
-							derr := servers.Delete(s.Stack.ComputeClient, server.ID).ExtractErr()
+							derr := servers.Delete(s.ComputeClient, server.ID).ExtractErr()
 							if derr != nil {
 								_ = xerr.AddConsequence(
 									fail.Wrap(
@@ -637,6 +749,39 @@ func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 	return true, nil
 }
 
+// InspectImage returns the Image referenced by id
+func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
+	nullAI := abstract.Image{}
+	if s.IsNull() {
+		return nullAI, fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	var img *images.Image
+	xerr = stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			img, innerErr = images.Get(s.ComputeClient, id).Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return nullAI, xerr
+	}
+
+	out := abstract.Image{
+		ID:       img.ID,
+		Name:     img.Name,
+		DiskSize: int64(img.MinDiskGigabytes),
+	}
+	return out, nil
+}
+
 // InspectHost updates the data inside host with the data from provider
 // Returns:
 // - *abstract.HostFull, nil if no error occurs
@@ -683,6 +828,102 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(host))
 	}
 	return host, xerr
+}
+
+// ListImages lists available OS images
+func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
+	var emptySlice []abstract.Image
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+
+	opts := images.ListOpts{
+		Status: images.ImageStatusActive,
+		Sort:   "name=asc,updated_at:desc",
+	}
+
+	// Retrieve a pager (i.e. a paginated collection)
+	pager := images.List(s.ComputeClient, opts)
+
+	// Define an anonymous function to be executed on each page's iteration
+	imgList = []abstract.Image{}
+	err := pager.EachPage(
+		func(page pagination.Page) (bool, error) {
+			imageList, err := images.ExtractImages(page)
+			if err != nil {
+				return false, err
+			}
+
+			for _, img := range imageList {
+				imgList = append(imgList, abstract.Image{ID: img.ID, Name: img.Name})
+			}
+			return true, nil
+		},
+	)
+	if err != nil {
+		return emptySlice, NormalizeError(err)
+	}
+	return imgList, nil
+}
+
+// ListTemplates lists available IPAddress templates
+// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
+func (s stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
+	var emptySlice []abstract.HostTemplate
+	if s.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	opts := flavors.ListOpts{}
+
+	var flvList []abstract.HostTemplate
+	xerr := stacks.RetryableRemoteCall(
+		func() error {
+			return flavors.ListDetail(s.ComputeClient, opts).EachPage(
+				func(page pagination.Page) (bool, error) {
+					list, err := flavors.ExtractFlavors(page)
+					if err != nil {
+						return false, err
+					}
+					flvList = make([]abstract.HostTemplate, 0, len(list))
+					for _, v := range list {
+						flvList = append(
+							flvList, abstract.HostTemplate{
+								Cores:    v.VCPUs,
+								RAMSize:  float32(v.RAM) / 1000.0,
+								DiskSize: v.Disk,
+								ID:       v.ID,
+								Name:     v.Name,
+							},
+						)
+					}
+					return true, nil
+				},
+			)
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *retry.ErrStopRetry:
+			return emptySlice, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *fail.ErrTimeout:
+			return emptySlice, fail.Wrap(fail.Cause(xerr), "timeout")
+		default:
+			return emptySlice, xerr
+		}
+	}
+	if len(flvList) == 0 {
+		logrus.Debugf("Template list empty")
+	}
+	return flvList, nil
 }
 
 // complementHost complements IPAddress data with content of server parameter
@@ -854,7 +1095,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 	var hostList abstract.HostList
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := servers.List(s.Stack.ComputeClient, servers.ListOpts{}).EachPage(
+			innerErr := servers.List(s.ComputeClient, servers.ListOpts{}).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := servers.ExtractServers(page)
 					if err != nil {
@@ -919,7 +1160,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				retryErr := stacks.RetryableRemoteCall(
 					func() error {
 						err := floatingips.DisassociateInstance(
-							s.Stack.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
+							s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
 								FloatingIP: fip.IP,
 							},
 						).ExtractErr()
@@ -934,7 +1175,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 				// then delete it.
 				retryErr = stacks.RetryableRemoteCall(
 					func() error {
-						err := floatingips.Delete(s.Stack.ComputeClient, fip.ID).ExtractErr()
+						err := floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
 						return normalizeError(err)
 					},
 					normalizeError,
@@ -954,7 +1195,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			if resourcePresent { // nolint
 				innerRetryErr := stacks.RetryableRemoteCall(
 					func() error {
-						innerErr := servers.Delete(s.Stack.ComputeClient, ahf.Core.ID).ExtractErr()
+						innerErr := servers.Delete(s.ComputeClient, ahf.Core.ID).ExtractErr()
 						return normalizeError(innerErr)
 					},
 					normalizeError,
@@ -980,7 +1221,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					func() error {
 						commRetryErr := stacks.RetryableRemoteCall(
 							func() (innerErr error) {
-								host, innerErr = servers.Get(s.Stack.ComputeClient, hostRef).Extract()
+								host, innerErr = servers.Get(s.ComputeClient, hostRef).Extract()
 								return normalizeError(innerErr)
 							},
 							normalizeError,
@@ -1043,7 +1284,7 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 	var fips []floatingips.FloatingIP
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			innerErr := floatingips.List(s.Stack.ComputeClient).EachPage(
+			innerErr := floatingips.List(s.ComputeClient).EachPage(
 				func(page pagination.Page) (bool, error) {
 					list, err := floatingips.ExtractFloatingIPs(page)
 					if err != nil {
@@ -1138,7 +1379,7 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 				},
 			}
 			opts := ports.UpdateOpts{AllowedAddressPairs: &pairs}
-			_, innerErr := ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
+			_, innerErr := ports.Update(s.NetworkClient, *portID, opts).Extract()
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -1164,7 +1405,7 @@ func (s stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
 			opts := ports.UpdateOpts{AllowedAddressPairs: nil}
-			_, innerErr := ports.Update(s.Stack.NetworkClient, *portID, opts).Extract()
+			_, innerErr := ports.Update(s.NetworkClient, *portID, opts).Extract()
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -1177,9 +1418,9 @@ func (s stack) disableHostRouterMode(host *abstract.HostFull) fail.Error {
 
 // listInterfaces returns a pager of the interfaces attached to host identified by 'serverID'
 func (s stack) listInterfaces(hostID string) pagination.Pager {
-	url := s.Stack.ComputeClient.ServiceURL("servers", hostID, "os-interface")
+	url := s.ComputeClient.ServiceURL("servers", hostID, "os-interface")
 	return pagination.NewPager(
-		s.Stack.ComputeClient, url, func(r pagination.PageResult) pagination.Page {
+		s.ComputeClient, url, func(r pagination.PageResult) pagination.Page {
 			return nics.InterfacePage{SinglePageBase: pagination.SinglePageBase(r)}
 		},
 	)

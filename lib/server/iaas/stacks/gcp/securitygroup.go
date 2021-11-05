@@ -35,7 +35,7 @@ import (
 
 // ListSecurityGroups lists existing security groups
 // There is no Security Group resource in GCP, so ListSecurityGroups always returns empty slice
-func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
+func (s stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error) {
 	var emptySlice []*abstract.SecurityGroup
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -49,7 +49,7 @@ func (s Stack) ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup,
 
 // CreateSecurityGroup creates a security group
 // Actually creates GCP Firewall Rules corresponding to the Security Group rules
-func (s Stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -173,7 +173,7 @@ func fromAbstractSecurityGroupRule(in *abstract.SecurityGroupRule) (string, bool
 }
 
 // DeleteSecurityGroup deletes a security group and its rules
-func (s Stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
+func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -209,7 +209,7 @@ func (s Stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 
 // InspectSecurityGroup returns information about a security group
 // Actually there is no Security Group resource in GCP, so this function always returns a *fail.NotImplementedError error
-func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	if s.IsNull() {
 		return &abstract.SecurityGroup{}, fail.InvalidInstanceError()
 	}
@@ -222,7 +222,7 @@ func (s Stack) InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abs
 }
 
 // ClearSecurityGroup removes all rules but keep group
-func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -260,7 +260,7 @@ func (s Stack) ClearSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstr
 }
 
 // AddRuleToSecurityGroup adds a rule to a security group
-func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -303,7 +303,7 @@ func (s Stack) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rul
 
 // DeleteRuleFromSecurityGroup deletes a rule from a security group
 // For now, this function does nothing in GCP context (have to figure out how to identify Firewall rule corresponding to abstract Security Group rule
-func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error) {
 	nullASG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullASG, fail.InvalidInstanceError()
@@ -326,7 +326,7 @@ func (s Stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 }
 
 // DisableSecurityGroup disables the rules of a Security Group
-func (s Stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
+func (s stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -361,7 +361,7 @@ func (s Stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 }
 
 // EnableSecurityGroup enables the rules of a Security Group
-func (s Stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
+func (s stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -397,7 +397,7 @@ func (s Stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to hosts
-func (s Stack) GetDefaultSecurityGroupName() string {
+func (s stack) GetDefaultSecurityGroupName() string {
 	if s.IsNull() {
 		return ""
 	}

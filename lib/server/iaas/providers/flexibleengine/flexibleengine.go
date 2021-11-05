@@ -194,7 +194,7 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 	}
 }
 
-// InspectTemplate returns the Template referenced by id; overloads Stack.InspectTemplate to inject templates with GPU
+// InspectTemplate returns the Template referenced by id; overloads stack.InspectTemplate to inject templates with GPU
 func (p *provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
 	nullAHT := abstract.HostTemplate{}
 	tpl, xerr := p.Stack.InspectTemplate(id)
@@ -295,7 +295,7 @@ func (p *provider) GetName() string {
 	return "flexibleengine"
 }
 
-// GetStack returns the Stack object used by the provider
+// GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
 func (p provider) GetStack() api.Stack {
 	return p.Stack

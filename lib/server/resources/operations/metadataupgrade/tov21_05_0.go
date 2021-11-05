@@ -23,7 +23,6 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
@@ -220,7 +219,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				networkName = abstractOwningNetwork.Name
 			}
 
-			// Complement abstracted Subnet fields
+			// Complement abstracted Subnet fields // FIXME: Split huaweicloud
 			if currentInstance.GetService().GetStackName() == "huaweicloud" {
 				// huaweicloud added a layer called "IPv4 SubnetID", which is returned as SubnetID but is not; Network is the real "OpenStack" Subnet ID
 				// FIXME: maybe huaweicloud has to be reviewed/rewritten not to use a mix of pure OpenStack API and customized Huaweicloud API?
@@ -422,25 +421,16 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 	}
 
 	// -- GCP stack driver needs special treatment... --
-	if currentInstance.GetService().GetStackName() == "gcp" {
-		stack := currentInstance.GetService().GetStack().(*gcp.Stack)
-		oldRouteName := networkName + "-" + subnetName + "-nat-allowed"
-
-		// create new nat route
-		_, xerr = stack.RPCCreateRoute(networkName, subnetID, subnetName)
+	// FIXME: Much Much better put all thase custum modifications inside a Migration() method of stack
+	{ // It only does something for gcp
+		stack := currentInstance.GetService().GetStack()
+		xerr = stack.Migrate("tags", map[string]interface{}{
+			"subnetName":  subnetName,
+			"networkName": networkName,
+			"subnetID":    subnetID,
+		})
 		if xerr != nil {
 			return xerr
-		}
-
-		// delete old nat route
-		xerr = stack.RPCDeleteRoute(oldRouteName)
-		if xerr != nil {
-			switch xerr.(type) {
-			case *fail.ErrNotFound:
-				break
-			default:
-				return xerr
-			}
 		}
 	}
 
@@ -524,7 +514,6 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-
 				subnetName, ok := hnV1.NetworksByID[hnV1.DefaultNetworkID]
 				if !ok {
 					return fail.InconsistentError("failed to find the default Network name")
@@ -707,21 +696,12 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 	}
 
 	// -- GCP stack driver needs special treatment --
-	if instance.GetService().GetStackName() == "gcp" {
-		networkInstance, xerr := subnetInstance.InspectNetwork()
-		if xerr != nil {
-			return xerr
-		}
-
-		stack := instance.GetService().GetStack().(*gcp.Stack)
-		// remove old nat route tag
-		xerr = stack.RPCRemoveTagsFromInstance(instance.GetID(), []string{"no-ip-" + subnetInstance.GetName()})
-		if xerr != nil {
-			return xerr
-		}
-
-		// add new nat route tag
-		xerr = stack.RPCAddTagsToInstance(instance.GetID(), []string{fmt.Sprintf(gcp.NATRouteTagFormat, networkInstance.GetID())})
+	{ // it only does something for gcp
+		stack := instance.GetService().GetStack()
+		xerr = stack.Migrate("removetag", map[string]interface{}{
+			"instance":       instance,
+			"subnetInstance": subnetInstance,
+		})
 		if xerr != nil {
 			return xerr
 		}

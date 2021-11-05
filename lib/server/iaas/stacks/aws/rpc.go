@@ -204,7 +204,12 @@ func (s stack) rpcCreateVpc(name, cidr *string) (_ *ec2.Vpc, ferr fail.Error) {
 	defer func() {
 		if ferr != nil {
 			if derr := s.rpcDeleteVpc(resp.Vpc.VpcId); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network/VPC %s", aws.StringValue(resp.Vpc.VpcId)))
+				_ = ferr.AddConsequence(
+					fail.Wrap(
+						derr, "cleaning up on failure, failed to delete Network/VPC %s",
+						aws.StringValue(resp.Vpc.VpcId),
+					),
+				)
 			}
 		}
 	}()
@@ -986,8 +991,10 @@ func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Erro
 		for _, i := range v.Instances {
 			state, xerr := toHostState(i.State)
 			if xerr != nil {
-				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
-					aws.Int64Value(i.State.Code)&0xff)
+				logrus.Errorf(
+					"found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
+					aws.Int64Value(i.State.Code)&0xff,
+				)
 				continue
 			}
 			if state != hoststate.Terminated {
@@ -1749,7 +1756,9 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		return xerr
 	}
 	if len(resp.TerminatingInstances) == 0 {
-		return fail.NotFoundError("failed to find instance %s wanted to terminate", aws.StringValue(instance.InstanceId))
+		return fail.NotFoundError(
+			"failed to find instance %s wanted to terminate", aws.StringValue(instance.InstanceId),
+		)
 	}
 
 	// Wait for effective removal of host (status terminated)

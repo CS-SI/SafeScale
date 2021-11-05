@@ -29,8 +29,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Stack ...
-type Stack struct {
+// stack ...
+type stack struct {
 	Config      *stacks.ConfigurationOptions
 	AuthOptions *stacks.AuthenticationOptions
 	GcpConfig   *stacks.GCPConfiguration
@@ -41,21 +41,21 @@ type Stack struct {
 }
 
 // NullStack is not exposed through API, is needed essentially by testss
-func NullStack() *Stack { // nolint
-	return &Stack{}
+func NullStack() *stack { // nolint
+	return &stack{}
 }
 
-func (s *Stack) IsNull() bool {
+func (s *stack) IsNull() bool {
 	return s == nil || s.ComputeService == nil
 }
 
-// GetStackName returns the name of the Stack
-func (s Stack) GetStackName() string {
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
 	return "gcp"
 }
 
 // GetConfigurationOptions ...
-func (s Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 	if s.IsNull() || s.Config == nil {
 		return stacks.ConfigurationOptions{}
 	}
@@ -63,7 +63,7 @@ func (s Stack) GetConfigurationOptions() stacks.ConfigurationOptions {
 }
 
 // GetAuthenticationOptions ...
-func (s Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 	if s.IsNull() || s.AuthOptions == nil {
 		return stacks.AuthenticationOptions{}
 	}
@@ -71,8 +71,8 @@ func (s Stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 }
 
 // New Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*Stack, fail.Error) { // nolint
-	gcpStack := &Stack{
+func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
+	gcpStack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
 		GcpConfig:   &localCfg,
@@ -80,17 +80,17 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 
 	d1, err := json.MarshalIndent(localCfg, "", "  ")
 	if err != nil {
-		return &Stack{}, fail.ConvertError(err)
+		return &stack{}, fail.ConvertError(err)
 	}
 
 	cred, err := google.CredentialsFromJSON(context.Background(), d1, iam.CloudPlatformScope)
 	if err != nil {
-		return &Stack{}, fail.ConvertError(err)
+		return &stack{}, fail.ConvertError(err)
 	}
 
 	gcpStack.ComputeService, err = compute.NewService(context.Background(), option.WithTokenSource(cred.TokenSource))
 	if err != nil {
-		return &Stack{}, fail.ConvertError(err)
+		return &stack{}, fail.ConvertError(err)
 	}
 
 	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID

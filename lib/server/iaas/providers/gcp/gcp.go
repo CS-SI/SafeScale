@@ -206,7 +206,7 @@ func (p provider) GetName() string {
 	return "gcp"
 }
 
-// GetStack returns the Stack object used by the provider
+// GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
 func (p provider) GetStack() api.Stack {
 	return p.Stack

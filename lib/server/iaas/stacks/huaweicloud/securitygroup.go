@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package openstack
+package huaweicloud
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"

@@ -159,6 +159,9 @@ type Stack interface {
 	ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error)
 	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(serverID, id string) fail.Error
+
+	// Migrate runs custom code without breaking Interfaces
+	Migrate(operation string, params map[string]interface{}) fail.Error
 }
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally

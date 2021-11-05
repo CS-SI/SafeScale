@@ -944,7 +944,7 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Error
 	return hosts, nil
 }
 
-// DeleteHost deletes a Host
+// DeleteHost deletes a IPAddress
 func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -992,12 +992,13 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted, *fail.ErrTimeout:
-			xerr = fail.ConvertError(xerr.Cause())
-		default:
-		}
-	}
-	if xerr != nil {
-		switch xerr.(type) {
+			cause := fail.ConvertError(xerr.Cause())
+			switch cause.(type) {
+			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
+				debug.IgnoreError(cause)
+			default:
+				return fail.Wrap(cause, "failed to stop Host '%s' with id '%s'", ahf.GetName(), ahf.GetID())
+			}
 		case *fail.ErrNotFound, *fail.ErrInvalidRequest:
 			debug.IgnoreError(xerr)
 			break
@@ -1020,7 +1021,6 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				debug.IgnoreError(xerr)
-				break
 			default:
 				return xerr
 			}
@@ -1042,7 +1042,6 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			case *fail.ErrNotFound:
 				// A missing volume is considered as a successful deletion
 				debug.IgnoreError(xerr)
-				break
 			default:
 				logrus.Warnf("failed to delete volume %s (error %s)", volume, reflect.TypeOf(xerr).String())
 			}

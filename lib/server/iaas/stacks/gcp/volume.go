@@ -22,7 +22,8 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -39,7 +40,7 @@ import (
 // - name is the name of the volume
 // - size is the size of the volume in GB
 // - volumeType is the type of volume to create, if volumeType is empty the driver use a default type
-func (s Stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) CreateVolume(request abstract.VolumeRequest) (_ *abstract.Volume, xerr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -90,7 +91,7 @@ func toAbstractVolume(in compute.Disk) (out *abstract.Volume, xerr fail.Error) {
 }
 
 // InspectVolume returns the volume identified by id
-func (s Stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
+func (s stack) InspectVolume(ref string) (_ *abstract.Volume, xerr fail.Error) {
 	nullAV := abstract.NewVolume()
 	if s.IsNull() {
 		return nullAV, fail.InvalidInstanceError()
@@ -132,7 +133,7 @@ func toAbstractVolumeState(in string) (volumestate.Enum, fail.Error) {
 }
 
 // ListVolumes return the list of all volume known on the current tenant
-func (s Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
+func (s stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	var emptySlice []abstract.Volume
 	if s.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -156,7 +157,7 @@ func (s Stack) ListVolumes() ([]abstract.Volume, fail.Error) {
 	return out, nil
 }
 
-func (s Stack) rpcListDisks() ([]*compute.Disk, fail.Error) {
+func (s stack) rpcListDisks() ([]*compute.Disk, fail.Error) {
 	var (
 		emptySlice, out []*compute.Disk
 		resp            *compute.DiskList
@@ -183,7 +184,7 @@ func (s Stack) rpcListDisks() ([]*compute.Disk, fail.Error) {
 }
 
 // DeleteVolume deletes the volume identified by id
-func (s Stack) DeleteVolume(ref string) fail.Error {
+func (s stack) DeleteVolume(ref string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -198,7 +199,7 @@ func (s Stack) DeleteVolume(ref string) fail.Error {
 }
 
 // CreateVolumeAttachment attaches a volume to an host
-func (s Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
+func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	if s.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
@@ -220,7 +221,7 @@ func (s Stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 }
 
 // InspectVolumeAttachment returns the volume attachment identified by id
-func (s Stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAttachment, fail.Error) {
+func (s stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAttachment, fail.Error) {
 	nullAVA := abstract.NewVolumeAttachment()
 	if s.IsNull() {
 		return nullAVA, fail.InvalidInstanceError()
@@ -258,8 +259,58 @@ func (s Stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAt
 	return nil, abstract.ResourceNotFoundError("attachment", vaID)
 }
 
+func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+	if operation == "tags" {
+		// delete current nat route (is it really necessary ?)
+		routeName := params["subnetName"].(string) + "-nat-allowed"
+		xerr := s.rpcDeleteRoute(routeName) // FIXME: This is a problem, the stack shouln't export ANY method
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				break
+			default:
+				return xerr
+			}
+		}
+
+		// create new nat route
+		_, xerr = s.rpcCreateRoute(params["networkName"].(string), params["subnetID"].(string), params["subnetName"].(string)) // FIXME: This is a problem, the stack shouln't export ANY method
+		if xerr != nil {
+			return xerr
+		}
+
+		return nil
+	}
+
+	if operation == "removetag" {
+		subnetInstance := params["subnetInstance"].(resources.Subnet)
+		instance := params["instance"].(*operations.Host)
+
+		networkInstance, xerr := subnetInstance.InspectNetwork()
+		if xerr != nil {
+			return xerr
+		}
+
+		// remove old nat route tag
+		xerr = s.rpcRemoveTagsFromInstance(instance.GetID(), []string{"no-ip-" + subnetInstance.GetName()})
+		if xerr != nil {
+			return xerr
+		}
+
+		// add new nat route tag
+		xerr = s.rpcAddTagsToInstance(instance.GetID(), []string{fmt.Sprintf(NATRouteTagFormat, networkInstance.GetID())})
+		if xerr != nil {
+			return xerr
+		}
+
+		return nil
+	}
+
+	return nil
+}
+
 // DeleteVolumeAttachment ...
-func (s Stack) DeleteVolumeAttachment(serverRef, vaID string) fail.Error {
+func (s stack) DeleteVolumeAttachment(serverRef, vaID string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -274,7 +325,7 @@ func (s Stack) DeleteVolumeAttachment(serverRef, vaID string) fail.Error {
 }
 
 // ListVolumeAttachments lists available volume attachment
-func (s Stack) ListVolumeAttachments(serverRef string) ([]abstract.VolumeAttachment, fail.Error) {
+func (s stack) ListVolumeAttachments(serverRef string) ([]abstract.VolumeAttachment, fail.Error) {
 	var emptySlice []abstract.VolumeAttachment
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()

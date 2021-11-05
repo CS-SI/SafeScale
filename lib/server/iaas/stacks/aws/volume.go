@@ -444,6 +444,10 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 	return vas, nil
 }
 
+func (s stack) Migrate(operation string, params map[string]interface{}) (xerr fail.Error) {
+	return nil
+}
+
 // DeleteVolumeAttachment detach from server 'serverID' the volume 'id'
 func (s stack) DeleteVolumeAttachment(serverID, id string) (xerr fail.Error) {
 	if s.IsNull() {

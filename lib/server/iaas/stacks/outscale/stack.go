@@ -82,7 +82,7 @@ type ConfigurationOptions struct {
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
 }
 
-// stack Outscale Stack to adapt outscale IaaS API
+// stack Outscale stack to adapt outscale IaaS API
 type stack struct {
 	Options              ConfigurationOptions
 	client               *osc.APIClient

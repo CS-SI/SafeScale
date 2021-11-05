@@ -52,13 +52,13 @@ import (
 )
 
 // ListRegions ...
-func (s Stack) ListRegions() (list []string, xerr fail.Error) {
+func (s stack) ListRegions() (list []string, xerr fail.Error) {
 	var emptySlice []string
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var allPages pagination.Page
 	xerr = stacks.RetryableRemoteCall(
@@ -88,13 +88,13 @@ func (s Stack) ListRegions() (list []string, xerr fail.Error) {
 }
 
 // ListAvailabilityZones lists the usable AvailabilityZones
-func (s Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
+func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 	var emptyMap map[string]bool
 	if s.IsNull() {
 		return emptyMap, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -131,7 +131,7 @@ func (s Stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 }
 
 // ListImages lists available OS images
-func (s Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -171,7 +171,7 @@ func (s Stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s Stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
+func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 	nullAI := abstract.Image{}
 	if s.IsNull() {
 		return nullAI, fail.InvalidInstanceError()
@@ -180,7 +180,7 @@ func (s Stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 		return nullAI, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	var img *images.Image
@@ -204,7 +204,7 @@ func (s Stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 }
 
 // InspectTemplate returns the Template referenced by id
-func (s Stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr fail.Error) {
+func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr fail.Error) {
 	nullAHT := abstract.HostTemplate{}
 	if s.IsNull() {
 		return nullAHT, fail.InvalidInstanceError()
@@ -213,7 +213,7 @@ func (s Stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 		return nullAHT, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Try to get template
@@ -240,13 +240,13 @@ func (s Stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 
 // ListTemplates lists available IPAddress templates
 // IPAddress templates are sorted using Dominant Resource Fairness Algorithm
-func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
+func (s stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	opts := flavors.ListOpts{}
@@ -296,7 +296,7 @@ func (s Stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 
 // CreateKeyPair TODO: replace with code to create KeyPair on provider side if it exists
 // creates and import a key pair
-func (s Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
+func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	nullAKP := &abstract.KeyPair{}
 	if s.IsNull() {
 		return nullAKP, fail.InvalidInstanceError()
@@ -305,7 +305,7 @@ func (s Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 		return nullAKP, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	return abstract.NewKeyPair(name)
@@ -313,7 +313,7 @@ func (s Stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 
 // InspectKeyPair TODO: replace with openstack code to get keypair (if it exits)
 // returns the key pair identified by id
-func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
+func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	nullAKP := &abstract.KeyPair{}
 	if s.IsNull() {
 		return nullAKP, fail.InvalidInstanceError()
@@ -322,7 +322,7 @@ func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 		return nullAKP, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	kp, err := keypairs.Get(s.ComputeClient, id, nil).Extract()
@@ -339,13 +339,13 @@ func (s Stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 
 // ListKeyPairs lists available key pairs
 // Returned list can be empty
-func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
+func (s stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 	var emptySlice []abstract.KeyPair
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	var kpList []abstract.KeyPair
 	xerr := stacks.RetryableRemoteCall(
@@ -381,7 +381,7 @@ func (s Stack) ListKeyPairs() ([]abstract.KeyPair, fail.Error) {
 }
 
 // DeleteKeyPair deletes the key pair identified by id
-func (s Stack) DeleteKeyPair(id string) fail.Error {
+func (s stack) DeleteKeyPair(id string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -389,7 +389,7 @@ func (s Stack) DeleteKeyPair(id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
@@ -404,7 +404,7 @@ func (s Stack) DeleteKeyPair(id string) fail.Error {
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
-func (s Stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing) {
+func (s stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing) {
 	hostSizing := abstract.NewHostEffectiveSizing()
 	if i, ok := flavor["id"]; ok {
 		fid, ok := i.(string)
@@ -443,7 +443,7 @@ func toHostState(status string) hoststate.Enum {
 }
 
 // InspectHost gathers host information from provider
-func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
+func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
@@ -488,7 +488,7 @@ func (s Stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 }
 
 // complementHost complements IPAddress data with content of server parameter
-func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
+func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Updates intrinsic data of host if needed
@@ -578,7 +578,7 @@ func (s Stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 }
 
 // InspectHostByName returns the host using the name passed as parameter
-func (s Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
+func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
@@ -587,7 +587,7 @@ func (s Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 		return nullAHF, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "('%s')", name).WithStopwatch().Entering().Exiting()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := servers.GetResult{}
@@ -626,7 +626,7 @@ func (s Stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 }
 
 // CreateHost creates a new host
-func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
+func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull, userData *userdata.Content, ferr fail.Error) {
 	var xerr fail.Error
 	nullAHF := abstract.NewHostFull()
 	nullUDC := userdata.NewContent()
@@ -634,7 +634,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)",
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)",
 		request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
@@ -898,7 +898,7 @@ func (s Stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 }
 
 // deletePortsInSlice deletes ports listed in slice
-func (s Stack) deletePortsInSlice(ports []string) fail.Error {
+func (s stack) deletePortsInSlice(ports []string) fail.Error {
 	var errors []error
 	for _, v := range ports {
 		if derr := s.rpcDeletePort(v); derr != nil {
@@ -919,16 +919,16 @@ func (s Stack) deletePortsInSlice(ports []string) fail.Error {
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
 // Does nothing for OpenStack, userdata cannot be updated
-func (s Stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
+func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
 }
 
-func (s Stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) {
+func (s stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) {
 	return s.rpcGetMetadataOfInstance(id)
 }
 
 // identifyOpenstackSubnetsAndPorts ...
-func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) {
+func (s stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) {
 	nets = []servers.Network{}
 	netPorts = []ports.Port{}
 	createdPorts = []string{}
@@ -992,7 +992,7 @@ func (s Stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, de
 }
 
 // GetAvailabilityZoneOfServer retrieves the availability zone of server 'serverID'
-func (s Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
+func (s stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error) {
 	if s.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1035,7 +1035,7 @@ func (s Stack) GetAvailabilityZoneOfServer(serverID string) (string, fail.Error)
 }
 
 // SelectedAvailabilityZone returns the selected availability zone
-func (s Stack) SelectedAvailabilityZone() (string, fail.Error) {
+func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 	if s.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1060,7 +1060,7 @@ func (s Stack) SelectedAvailabilityZone() (string, fail.Error) {
 
 // WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
+func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	nullAHC := abstract.NewHostCore()
 	if s.IsNull() {
 		return nullAHC, fail.InvalidInstanceError()
@@ -1098,7 +1098,7 @@ func (s Stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
 	nullServer := &servers.Server{}
 	if s.IsNull() {
 		return nullServer, fail.InvalidInstanceError()
@@ -1109,7 +1109,7 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		return nullServer, xerr
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s, %s, %v)", hostLabel,
 		state.String(), timeout).WithStopwatch().Entering().Exiting()
 
 	retryErr := retry.WhileUnsuccessful(
@@ -1196,12 +1196,12 @@ func (s Stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 
 // GetHostState returns the current state of host identified by id
 // hostParam can be a string or an instance of *abstract.HostCore; any other type will return an fail.InvalidParameterError
-func (s Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
+func (s stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fail.Error) {
 	if s.IsNull() {
 		return hoststate.Unknown, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "").WithStopwatch().Entering().Exiting()
 
 	host, xerr := s.InspectHost(hostParam)
 	if xerr != nil {
@@ -1211,7 +1211,7 @@ func (s Stack) GetHostState(hostParam stacks.HostParameter) (hoststate.Enum, fai
 }
 
 // ListHosts lists all hosts
-func (s Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
+func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 	var emptyList abstract.HostList
 	if s.IsNull() {
 		return emptyList, fail.InvalidInstanceError()
@@ -1255,7 +1255,7 @@ func (s Stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
 // By convention only one floating IP is allocated to an host
-func (s Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
+func (s stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
@@ -1293,7 +1293,7 @@ func (s Stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error
 }
 
 // DeleteHost deletes the host identified by id
-func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1449,7 +1449,7 @@ func (s Stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // rpcGetServer returns
-func (s Stack) rpcGetServer(id string) (_ *servers.Server, xerr fail.Error) {
+func (s stack) rpcGetServer(id string) (_ *servers.Server, xerr fail.Error) {
 	if id == "" {
 		return &servers.Server{}, fail.InvalidParameterCannotBeEmptyStringError("id")
 	}
@@ -1469,7 +1469,7 @@ func (s Stack) rpcGetServer(id string) (_ *servers.Server, xerr fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s Stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
+func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1489,7 +1489,7 @@ func (s Stack) StopHost(hostParam stacks.HostParameter, gracefully bool) fail.Er
 }
 
 // RebootHost reboots unconditionally the host identified by id
-func (s Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1518,7 +1518,7 @@ func (s Stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // StartHost starts the host identified by id
-func (s Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
+func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1538,7 +1538,7 @@ func (s Stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // ResizeHost ...
-func (s Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
@@ -1561,7 +1561,7 @@ func (s Stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to IPAddress, returns *fail.ErrDuplicate
-func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1588,7 +1588,7 @@ func (s Stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s Stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
