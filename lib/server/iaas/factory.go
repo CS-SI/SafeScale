@@ -228,7 +228,7 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 			}
 			found, err = metadataLocation.FindBucket(metadataLocationConfig.BucketName)
 			if err != nil {
-				return NullService(), fail.Wrap(err, "error accessing metadata location: %s")
+				return NullService(), fail.Wrap(err, "error accessing metadata location: %s", metadataLocationConfig.BucketName)
 			}
 
 			if found {
