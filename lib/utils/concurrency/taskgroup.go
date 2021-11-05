@@ -34,9 +34,9 @@ type TaskGroupResult = map[string]TaskResult
 // TaskGroupGuard is the task group interface defining method to wait the TaskGroup
 type TaskGroupGuard interface {
 	Started() (uint, fail.Error)
-	TryWaitGroup() (bool, map[string]TaskResult, fail.Error)
-	WaitGroup() (map[string]TaskResult, fail.Error)
-	WaitGroupFor(time.Duration) (bool, map[string]TaskResult, fail.Error)
+	TryWaitGroup() (bool, TaskGroupResult, fail.Error)
+	WaitGroup() (TaskGroupResult, fail.Error)
+	WaitGroupFor(time.Duration) (bool, TaskGroupResult, fail.Error)
 }
 
 //go:generate minimock -o ../mocks/mock_taskgroup.go -i github.com/CS-SI/SafeScale/lib/utils/concurrency.TaskGroup
@@ -84,12 +84,12 @@ var (
 
 // NewTaskGroup ...
 func NewTaskGroup(options ...data.ImmutableKeyValue) (*taskGroup, fail.Error) { // nolint
-	return newTaskGroup(context.TODO(), nil, options...) //nolint
+	return newTaskGroup(context.TODO(), nil, options...) // nolint
 }
 
 // NewTaskGroupWithParent ...
 func NewTaskGroupWithParent(parentTask Task, options ...data.ImmutableKeyValue) (*taskGroup, fail.Error) { // nolint
-	return newTaskGroup(context.TODO(), parentTask, options...) //nolint
+	return newTaskGroup(context.TODO(), parentTask, options...) // nolint
 }
 
 // NewTaskGroupWithContext ...

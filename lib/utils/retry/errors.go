@@ -30,7 +30,7 @@ import (
 // ErrTimeout is used when a timeout occurs.
 type ErrTimeout = fail.ErrTimeout
 
-// TimeoutError ...
+// TimeoutError creates an error of type ErrTimeout
 func TimeoutError(err error, limit time.Duration, actual time.Duration, options ...data.ImmutableKeyValue) *ErrTimeout {
 	var (
 		msg      string
@@ -56,7 +56,7 @@ func TimeoutError(err error, limit time.Duration, actual time.Duration, options 
 // ErrLimit is used when a limit is reached.
 type ErrLimit = fail.ErrOverflow
 
-// LimitError ...
+// LimitError creates an error of type ErrLimit.
 func LimitError(err error, limit uint) *ErrLimit {
 	return fail.OverflowError(err, limit, "retry limit exceeded")
 }
@@ -64,17 +64,18 @@ func LimitError(err error, limit uint) *ErrLimit {
 // ErrStopRetry is returned when the context needs to stop the retries
 type ErrStopRetry = fail.ErrAborted
 
-// StopRetryError ...
-func StopRetryError(err error, msg ...interface{}) fail.Error {
+// StopRetryError creates an error of type ErrStopRetry
+func StopRetryError(err error, msg ...interface{}) *ErrStopRetry {
 	newMessage := strprocess.FormatStrings(msg...)
 	if newMessage == "" {
 		newMessage = "stopping retries"
 	} else {
 		newMessage = fmt.Sprintf("stopping retries: %s", newMessage)
 	}
-	switch err.(type) {
+	switch ce := err.(type) {
 	case *fail.ErrAborted: // do not embed abort inside an abort
-		return fail.Wrap(err, newMessage)
+		_ = ce.Annotate("message", newMessage)
+		return ce
 	default:
 		return fail.AbortedError(err, newMessage)
 	}

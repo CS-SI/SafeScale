@@ -89,11 +89,11 @@ func TestRealCharges(t *testing.T) {
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
-		ntId, xerr := nt.ID()
+		ntID, xerr := nt.ID()
 		if xerr != nil {
 			t.Errorf("Unexpected: %v", xerr)
 		}
-		ids[ntId] = ntId
+		ids[ntID] = ntID
 
 		if randomInt(50, 250) > 200 {
 			fmt.Println("abort")

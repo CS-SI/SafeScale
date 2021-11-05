@@ -518,6 +518,7 @@ func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 					switch ferr.(type) {
 					case *fail.ErrAborted:
 						return
+					default:
 					}
 				}
 			}
@@ -625,6 +626,7 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 					switch ferr.(type) {
 					case *fail.ErrAborted:
 						return
+					default:
 					}
 				}
 			}

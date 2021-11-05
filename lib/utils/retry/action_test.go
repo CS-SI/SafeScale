@@ -82,6 +82,16 @@ func CreateSkippableError() (xerr fail.Error) {
 	return xerr
 }
 
+func CreateSkippableErrorBis() (xerr fail.Error) {
+	xerr = WhileSuccessful(
+		func() error {
+			fmt.Println("Around the world...")
+			return StopRetryError(fail.AbortedError(fail.NotFoundError("wrong place"), "indeed"), "no more")
+		}, 1*time.Second, 60*time.Millisecond,
+	)
+	return xerr
+}
+
 func CreateComplexErrorWithNConsequences(n uint) (xerr fail.Error) {
 	xerr = WhileUnsuccessful(complexSleepyFailure, time.Second, time.Duration(5)*10*time.Millisecond)
 	if xerr != nil {
@@ -179,6 +189,23 @@ func TestVerifyErrorType(t *testing.T) {
 
 func TestSkipRetries(t *testing.T) {
 	recovered := CreateSkippableError()
+	if recovered != nil {
+		if _, ok := recovered.(*ErrTimeout); ok {
+			t.Errorf("It should NOT be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
+		}
+
+		if cause := fail.Cause(recovered); cause != nil {
+			if _, ok := cause.(*fail.ErrNotFound); ok {
+				fmt.Println(cause.Error())
+			} else {
+				t.Errorf("This should be a 'fail.ErrNotFound', it's instead a '%s'", reflect.TypeOf(cause).String())
+			}
+		}
+	}
+}
+
+func TestSkipRetriesBis(t *testing.T) {
+	recovered := CreateSkippableErrorBis()
 	if recovered != nil {
 		if _, ok := recovered.(*ErrTimeout); ok {
 			t.Errorf("It should NOT be a 'ErrTimeout', it's instead a '%s'", reflect.TypeOf(recovered).String())
@@ -516,7 +543,7 @@ func TestErrCheckStdError(t *testing.T) {
 	iteration := 0
 	xerr := WhileUnsuccessful(
 		func() error {
-			iteration = iteration + 1
+			iteration++
 			return fail.NewError("It failed at iteration #%d", iteration)
 		},
 		10*time.Millisecond,
@@ -524,9 +551,6 @@ func TestErrCheckStdError(t *testing.T) {
 	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "the checking failed")
-	}
-
-	if xerr != nil {
 		t.Logf(xerr.Error())
 		if !(strings.Contains(xerr.Error(), "failed at iteration") && (strings.Contains(xerr.Error(), "#6") || strings.Contains(xerr.Error(), "#7") || strings.Contains(xerr.Error(), "#8") || strings.Contains(xerr.Error(), "#9"))) {
 			t.FailNow()
@@ -538,7 +562,7 @@ func TestErrCheckStdErrorHard(t *testing.T) {
 	iteration := 0
 	xerr := WhileUnsuccessfulWithHardTimeout(
 		func() error {
-			iteration = iteration + 1
+			iteration++
 			return fail.NewError("It failed at iteration #%d", iteration)
 		},
 		10*time.Millisecond,
@@ -546,9 +570,6 @@ func TestErrCheckStdErrorHard(t *testing.T) {
 	)
 	if xerr != nil {
 		xerr = fail.Wrap(xerr, "the checking failed")
-	}
-
-	if xerr != nil {
 		t.Logf(xerr.Error())
 		if !(strings.Contains(xerr.Error(), "failed at iteration") && (strings.Contains(xerr.Error(), "#6") || strings.Contains(xerr.Error(), "#7") || strings.Contains(xerr.Error(), "#8") || strings.Contains(xerr.Error(), "#9"))) {
 			if !strings.Contains(xerr.Error(), "desist") {
@@ -563,7 +584,7 @@ func TestErrCheckStopStdError(t *testing.T) {
 	var errCause error
 	xerr := WhileUnsuccessful(
 		func() error {
-			iteration = iteration + 1
+			iteration++
 			if iteration == 4 {
 				return StopRetryError(fail.NewError("It failed at iteration #%d", iteration), "last error before stopping retries was")
 			}
@@ -735,9 +756,7 @@ func TestRetriesHitFirst(t *testing.T) {
 func TestCustomActionWithTimeout(t *testing.T) {
 	begin := time.Now()
 	xerr := Action(
-		func() error {
-			return genHappy()
-		},
+		genHappy,
 		PrevailRetry(Successful(), Timeout(6*time.Second)),
 		Constant(1*time.Second),
 		nil, nil, nil,
@@ -761,9 +780,7 @@ func TestCustomActionWithTimeout(t *testing.T) {
 func TestOtherCustomActionWithTimeout(t *testing.T) {
 	begin := time.Now()
 	xerr := Action(
-		func() error {
-			return genHappy()
-		},
+		genHappy,
 		PrevailRetry(Unsuccessful(), Timeout(6*time.Second)),
 		Constant(1*time.Second),
 		nil, nil, nil,
