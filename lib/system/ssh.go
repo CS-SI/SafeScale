@@ -819,6 +819,8 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 
 // CreateTunneling ...
 func (sconf *SSHConfig) CreateTunneling() (_ SSHTunnels, _ *SSHConfig, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	var tunnels SSHTunnels
 	defer func() {
 		if ferr != nil {
@@ -1033,7 +1035,9 @@ func createSCPCommand(sconf *SSHConfig, localPath, remotePath string, isUpload b
 }
 
 // WaitServerReady waits until the SSH server is ready
-func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, xerr fail.Error) {
+func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	if sconf == nil {
 		return "", fail.InvalidInstanceError()
 	}
@@ -1176,7 +1180,9 @@ func (sconf *SSHConfig) copy(
 	remotePath, localPath string,
 	isUpload bool,
 	timeout time.Duration,
-) (retcode int, stdout string, stderr string, xerr fail.Error) {
+) (retcode int, stdout string, stderr string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	const invalid = -1
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1205,10 +1211,10 @@ func (sconf *SSHConfig) copy(
 	defer func() {
 		derr := sshCommand.Close()
 		if derr != nil {
-			if xerr == nil {
-				xerr = derr
+			if ferr == nil {
+				ferr = derr
 			} else {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 			}
 		}
 	}()
@@ -1217,7 +1223,9 @@ func (sconf *SSHConfig) copy(
 }
 
 // Enter to interactive shell, aka 'safescale ssh connect'
-func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
+func (sconf *SSHConfig) Enter(username, shell string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	tunnels, sshConfig, xerr := sconf.CreateTunneling()
 	if xerr != nil {
 		if len(tunnels) > 0 {
@@ -1233,10 +1241,10 @@ func (sconf *SSHConfig) Enter(username, shell string) (xerr fail.Error) {
 	defer func() {
 		derr := tunnels.Close()
 		if derr != nil {
-			if xerr == nil {
-				xerr = derr
+			if ferr == nil {
+				ferr = derr
 			} else {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
 			}
 		}
 	}()
