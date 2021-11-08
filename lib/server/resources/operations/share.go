@@ -188,6 +188,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 	}()
 
 	// FIXME: The reload problem
+	// VPL: what state of Share would you like to be updated by Reload?
 	/*
 		xerr = rs.Reload()
 		if xerr != nil {

@@ -160,6 +160,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 	}()
 
 	// FIXME: The reload problem
+	// VPL: what state of Security Group would you like to be updated by Reload?
 	/*
 		xerr = sgInstance.Reload()
 		if xerr != nil {

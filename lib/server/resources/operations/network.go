@@ -122,6 +122,7 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 	}()
 
 	// FIXME: The reload problem
+	// VPL: what state of a Network/VPC would you like to be updated by Reload?
 	/*
 		xerr = networkInstance.Reload()
 		if xerr != nil {

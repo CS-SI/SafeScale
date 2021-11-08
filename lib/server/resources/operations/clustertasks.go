@@ -1464,7 +1464,14 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 		return nil, xerr
 	}
 
-	return nil, nil
+	// -- refresh state of host --
+	hostInstance, xerr := LoadHost(instance.GetService(), id)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	_, xerr = hostInstance.ForceGetState(task.Context())
+	return nil, xerr
 }
 
 func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
@@ -1498,8 +1505,18 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 			logrus.Tracef("host duplicated, stopping considered as a success")
 			debug.IgnoreError(xerr)
 			return nil, nil
+		default:
+			return nil, xerr
 		}
 	}
+
+	// -- refresh state of host --
+	hostInstance, xerr := LoadHost(instance.GetService(), id)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	_, xerr = hostInstance.ForceGetState(task.Context())
 	return nil, xerr
 }
 

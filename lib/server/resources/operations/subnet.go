@@ -284,6 +284,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 	}
 
 	// FIXME: The reload problem
+	// VPL: what state of Subnet would you like to be updated by Reload?
 	/*
 		xerr = subnetInstance.Reload()
 		if xerr != nil {

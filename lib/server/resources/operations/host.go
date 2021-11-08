@@ -177,16 +177,13 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 	// With the line (getting the right info from the provider), we end up doing 3 calls instead of 1...
 	// VPL: what state of Host would you like to be updated by Reload?
 	//      if you need the current Host status, you have Host.ForceGetState() that should update the metadata (but does not currently, I'm fixing this)
+	//      But it should no be done systematically inside LoadHost(). The call is the responsability of the user of the returned instance.
 	/*
-	xerr = hostInstance.Reload()
-	if xerr != nil {
-		return nil, xerr
-	}
+		xerr = hostInstance.Reload()
+		if xerr != nil {
+			return nil, xerr
+		}
 	*/
-	_, xerr = hostInstance.ForceGetState(context.Background())
-	if xerr != nil {
-		return nil, xerr
-	}
 
 	return hostInstance, nil
 }
@@ -607,66 +604,56 @@ func (instance *Host) unsafeReload() (xerr fail.Error) {
 	}
 
 	// Updates the Host metadata
-	xerr = instance.Alter(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			ahc, ok := clonable.(*abstract.HostCore)
+	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		ahc, ok := clonable.(*abstract.HostCore)
+		if !ok {
+			return fail.InconsistentError(
+				"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
+			)
+		}
+
+		changed := false
+		if ahc.LastState != ahf.CurrentState {
+			ahc.LastState = ahf.CurrentState
+			changed = true
+		}
+
+		innerXErr := props.Alter(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
+			hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
 			if !ok {
-				return fail.InconsistentError(
-					"'*abstract.HostCore' expected, '%s' received", reflect.TypeOf(clonable).String(),
-				)
+				return fail.InconsistentError("'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			changed := false
-			if ahc.LastState != ahf.CurrentState {
-				ahc.LastState = ahf.CurrentState
+			allocated := converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
+			// FIXME: how to compare the 2 structs ?
+			if allocated != hostSizingV2.AllocatedSize {
+				hostSizingV2.AllocatedSize = allocated
 				changed = true
 			}
-
-			innerXErr := props.Alter(
-				hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
-					hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv2.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					allocated := converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
-					// FIXME: how to compare the 2 structs ?
-					if allocated != hostSizingV2.AllocatedSize {
-						hostSizingV2.AllocatedSize = allocated
-						changed = true
-					}
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			// Updates Host property propertiesv1.HostNetworking
-			innerXErr = props.Alter(
-				hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-					hnV2, ok := clonable.(*propertiesv2.HostNetworking)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					_ = hnV2.Replace(converters.HostNetworkingFromAbstractToPropertyV2(*ahf.Networking))
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
-			}
-			if !changed {
-				return fail.AlteredNothingError()
-			}
 			return nil
-		},
-	)
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// Updates Host property propertiesv1.HostNetworking
+		innerXErr = props.Alter(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			hnV2, ok := clonable.(*propertiesv2.HostNetworking)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			_ = hnV2.Replace(converters.HostNetworkingFromAbstractToPropertyV2(*ahf.Networking))
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+		if !changed {
+			return fail.AlteredNothingError()
+		}
+		return nil
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {

@@ -929,132 +929,120 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// Then stop it and mark it as STOPPED on success
-	return instance.Alter(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			var (
-				nodes                         []string
-				masters                       []string
-				gatewayID, secondaryGatewayID string
-			)
-			innerXErr := props.Inspect(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	return instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		var (
+			nodes                         []string
+			masters                       []string
+			gatewayID, secondaryGatewayID string
+		)
+		innerXErr := props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError(
+					"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+				)
+			}
 
-					masters = make([]string, 0, len(nodesV3.Masters))
-					for _, v := range nodesV3.Masters {
-						if node, found := nodesV3.ByNumericalID[v]; found {
-							masters = append(masters, node.ID)
-						}
-					}
-					nodes = make([]string, 0, len(nodesV3.PrivateNodes))
-					for _, v := range nodesV3.PrivateNodes {
-						if node, found := nodesV3.ByNumericalID[v]; found {
-							nodes = append(nodes, node.ID)
-						}
-					}
-					return nil
-				},
-			)
-			if innerXErr != nil {
+			masters = make([]string, 0, len(nodesV3.Masters))
+			for _, v := range nodesV3.Masters {
+				if node, found := nodesV3.ByNumericalID[v]; found {
+					masters = append(masters, node.ID)
+				}
+			}
+			nodes = make([]string, 0, len(nodesV3.PrivateNodes))
+			for _, v := range nodesV3.PrivateNodes {
+				if node, found := nodesV3.ByNumericalID[v]; found {
+					nodes = append(nodes, node.ID)
+				}
+			}
+			return nil
+		})
+		if innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to get list of hosts")
 			}
 
-			innerXErr = props.Inspect(
-				clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
-					networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+		innerXErr = props.Inspect(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
 
-					gatewayID = networkV3.GatewayID
-					secondaryGatewayID = networkV3.SecondaryGatewayID
-					return nil
-				},
-			)
-			if innerXErr != nil {
+			gatewayID = networkV3.GatewayID
+			secondaryGatewayID = networkV3.SecondaryGatewayID
+			return nil
+		})
+		if innerXErr != nil {
 				return innerXErr
 			}
 
-			// Stop nodes
-			taskGroup, innerXErr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
-			if innerXErr != nil {
+		// Stop nodes
+		taskGroup, innerXErr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
+		if innerXErr != nil {
 				return innerXErr
 			}
 
-			// If there's a problem starting things don't return, note the problem, break if needed, then abort and wait.
-			var problems []error
+		// If there's a problem starting things don't return, note the problem, break if needed, then abort and wait.
+		var problems []error
 
-			for _, n := range nodes {
-				if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
-					problems = append(problems, innerXErr)
-					abErr := taskGroup.AbortWithCause(innerXErr)
-					if abErr != nil {
-						logrus.Warnf("problem aborting taskgroup: %v", abErr)
-					}
-					break
+		for _, n := range nodes {
+			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
+				problems = append(problems, innerXErr)
+				abErr := taskGroup.AbortWithCause(innerXErr)
+				if abErr != nil {
+					logrus.Warnf("problem aborting taskgroup: %v", abErr)
 				}
+				break
 			}
-			// Stop masters
-			for _, n := range masters {
-				if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
-					problems = append(problems, innerXErr)
-					abErr := taskGroup.AbortWithCause(innerXErr)
-					if abErr != nil {
-						logrus.Warnf("problem aborting taskgroup: %v", abErr)
-					}
-					break
+		}
+		// Stop masters
+		for _, n := range masters {
+			if _, innerXErr = taskGroup.Start(instance.taskStopHost, n); innerXErr != nil {
+				problems = append(problems, innerXErr)
+				abErr := taskGroup.AbortWithCause(innerXErr)
+				if abErr != nil {
+					logrus.Warnf("problem aborting taskgroup: %v", abErr)
 				}
+				break
 			}
-			// Stop gateway(s)
-			if _, innerXErr = taskGroup.Start(instance.taskStopHost, gatewayID); innerXErr != nil {
+		}
+		// Stop gateway(s)
+		if _, innerXErr = taskGroup.Start(instance.taskStopHost, gatewayID); innerXErr != nil {
+			problems = append(problems, innerXErr)
+			abErr := taskGroup.AbortWithCause(innerXErr)
+			if abErr != nil {
+				logrus.Warnf("problem aborting taskgroup: %v", abErr)
+			}
+		}
+
+		if secondaryGatewayID != "" {
+			if _, innerXErr = taskGroup.Start(instance.taskStopHost, secondaryGatewayID); innerXErr != nil {
 				problems = append(problems, innerXErr)
 				abErr := taskGroup.AbortWithCause(innerXErr)
 				if abErr != nil {
 					logrus.Warnf("problem aborting taskgroup: %v", abErr)
 				}
 			}
+		}
 
-			if secondaryGatewayID != "" {
-				if _, innerXErr = taskGroup.Start(instance.taskStopHost, secondaryGatewayID); innerXErr != nil {
-					problems = append(problems, innerXErr)
-					abErr := taskGroup.AbortWithCause(innerXErr)
-					if abErr != nil {
-						logrus.Warnf("problem aborting taskgroup: %v", abErr)
-					}
-				}
-			}
-
-			if _, innerXErr = taskGroup.WaitGroup(); innerXErr != nil {
-				if len(problems) > 0 {
-					_ = innerXErr.AddConsequence(fail.NewErrorList(problems))
-				}
-				return innerXErr
-			}
+		if _, innerXErr = taskGroup.WaitGroup(); innerXErr != nil {
 			if len(problems) > 0 {
+				_ = innerXErr.AddConsequence(fail.NewErrorList(problems))
+			}
+			return innerXErr
+		}
+		if len(problems) > 0 {
 				return fail.NewErrorList(problems)
 			}
 
-			return props.Alter(
-				clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-					stateV1, ok := clonable.(*propertiesv1.ClusterState)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-					stateV1.State = clusterstate.Stopped
-					return nil
-				},
-			)
-		},
-	)
+		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+			stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			stateV1.State = clusterstate.Stopped
+			return nil
+		})
+	})
 }
 
 // GetState returns the current state of the Cluster
