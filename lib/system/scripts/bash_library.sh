@@ -1042,6 +1042,8 @@ export -f sfGetFact
 function waitForUserdata() {
 	while true; do
 		[ -f ${SF_VARDIR}/state/user_data.netsec.done ] && break
+		# legacy: v20.06 and before
+		[ -f ${SF_VARDIR}/state/user_data.phase2.done ] && break
 		echo "Waiting userdata completion..."
 		sleep 5
 	done

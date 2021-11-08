@@ -958,8 +958,8 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 		if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to get list of hosts")
-			}
+			return fail.Wrap(innerXErr, "failed to get list of hosts")
+		}
 
 		innerXErr = props.Inspect(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
 			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
@@ -972,14 +972,14 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 			return nil
 		})
 		if innerXErr != nil {
-				return innerXErr
-			}
+			return innerXErr
+		}
 
 		// Stop nodes
 		taskGroup, innerXErr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption)
 		if innerXErr != nil {
-				return innerXErr
-			}
+			return innerXErr
+		}
 
 		// If there's a problem starting things don't return, note the problem, break if needed, then abort and wait.
 		var problems []error
@@ -1031,8 +1031,8 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 			return innerXErr
 		}
 		if len(problems) > 0 {
-				return fail.NewErrorList(problems)
-			}
+			return fail.NewErrorList(problems)
+		}
 
 		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 			stateV1, ok := clonable.(*propertiesv1.ClusterState)
@@ -1162,14 +1162,13 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	}
 
 	for i := uint(1); i <= count; i++ {
-		_, xerr := tg.Start(
-			instance.taskCreateNode, taskCreateNodeParameters{
-				index:         i,
-				nodeDef:       nodeDef,
-				timeout:       timeout,
-				keepOnFailure: keepOnFailure,
-			}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", i)),
-		)
+		params := taskCreateNodeParameters{
+			index:         i,
+			nodeDef:       nodeDef,
+			timeout:       timeout,
+			keepOnFailure: keepOnFailure,
+		}
+		_, xerr := tg.Start(instance.taskCreateNode, params, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/host/%d/create", i)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			abErr := tg.AbortWithCause(xerr)

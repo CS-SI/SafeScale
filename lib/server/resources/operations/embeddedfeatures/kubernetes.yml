@@ -90,6 +90,7 @@ feature:
                                 sfExit
                             fi
                             sfFail 195 "master didn't join (no .joined file)"
+
                     ready:
                         targets:
                             masters: one
