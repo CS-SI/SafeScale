@@ -17,11 +17,15 @@
 package handlers
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server"
@@ -69,7 +73,7 @@ func NewSSHHandler(job server.Job) SSHHandler {
 	return &sshHandler{job: job}
 }
 
-// GetConfig creates SSHConfig to connect to an host
+// GetConfig creates SSHConfig to connect to a host
 func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig *system.SSHConfig, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -177,6 +181,12 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		if xerr != nil {
 			return nil, xerr
 		}
+		if isGateway {
+			if host.GetState() != hoststate.Started {
+				return nil, fail.NewError("cannot retrieve network properties when the gateway is not in 'started' state")
+			}
+		}
+
 		if rs == nil {
 			return nil, fail.NotFoundError("failed to find default Subnet of Host")
 		}
@@ -402,6 +412,15 @@ func extractPath(in string) (string, fail.Error) {
 	return strings.TrimSpace(parts[1]), nil
 }
 
+func getMD5Hash(text string) string {
+	hasher := md5.New()
+	_, err := hasher.Write([]byte(text))
+	if err != nil {
+		return ""
+	}
+	return hex.EncodeToString(hasher.Sum(nil))
+}
+
 // Copy copies file/directory from/to remote host
 func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, stdErr string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -496,9 +515,56 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				return problem
 			}
 
-			// FIXME: Check remote MD5
-			if upload {
-				logrus.Tracef("Checking MD5 of remote file...")
+			logrus.Debugf("Checking MD5 of remote file...")
+			crcCheck := func() fail.Error {
+				// take local md5...
+				md5hash := ""
+				if localPath != "" {
+					content, err := ioutil.ReadFile(localPath)
+					if err != nil {
+						return fail.WarningError(err, "couldn't open local file")
+					}
+					md5hash = getMD5Hash(string(content))
+				}
+
+				crcCtx := handler.job.Task().Context()
+				crcCmd, finnerXerr := ssh.NewCommand(crcCtx, fmt.Sprintf("/usr/bin/md5sum %s", remotePath))
+				if finnerXerr != nil {
+					return fail.WarningError(finnerXerr, "cannot create md5 command")
+				}
+
+				fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
+					crcCtx, outputs.COLLECT, temporal.GetLongOperationTimeout(),
+				)
+				finnerXerr = debug.InjectPlannedFail(finnerXerr)
+				if finnerXerr != nil {
+					_ = finnerXerr.Annotate("retcode", fretcode)
+					_ = finnerXerr.Annotate("stdout", fstdout)
+					_ = finnerXerr.Annotate("stderr", fstderr)
+					return fail.WarningError(finnerXerr, "error running md5 command")
+				}
+				if fretcode != 0 {
+					finnerXerr = fail.NewError("failed to check md5")
+					_ = finnerXerr.Annotate("retcode", fretcode)
+					_ = finnerXerr.Annotate("stdout", fstdout)
+					_ = finnerXerr.Annotate("stderr", fstderr)
+					return fail.WarningError(finnerXerr, "unexpected return code of md5 command")
+				}
+				if !strings.Contains(fstdout, md5hash) {
+					logrus.Warnf(
+						"WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath,
+						fstdout, fstderr, md5hash,
+					)
+					return fail.NewError("wrong md5 of '%s'", remotePath)
+				}
+				return nil
+			}
+			checksumErr := crcCheck()
+			if checksumErr != nil {
+				if _, ok := checksumErr.(*fail.ErrWarning); !ok {
+					return checksumErr
+				}
+				logrus.Warnf(checksumErr.Error())
 			}
 
 			retcode = iretcode

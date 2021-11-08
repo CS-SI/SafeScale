@@ -29,7 +29,6 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -278,11 +277,11 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 				ctx, remotePath, localPath, upload, executionTimeout,
 			)
 			xerr = debug.InjectPlannedFail(xerr)
-			logrus.Warningf("Copy result: '%d', '%s', '%s', '%s'", iretcode, istdout, istderr, spew.Sdump(xerr))
 			if xerr != nil {
 				return xerr
 			}
 
+			logrus.Debugf("Checking MD5 of remote file...")
 			if iretcode == 1 {
 				deleteRemoteFile := func() fail.Error {
 					crcCtx, cancelCrc := context.WithTimeout(ctx, executionTimeout)
@@ -326,6 +325,10 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 					}
 					return retry.StopRetryError(fmt.Errorf("permission denied"))
 				}
+
+				if strings.Contains(istdout, "No such file or directory") || strings.Contains(istderr, "No such file or directory") {
+					return retry.StopRetryError(fmt.Errorf("permission denied"))
+				}
 			}
 
 			if iretcode != 0 {
@@ -343,27 +346,26 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 				return xerr
 			}
 
-			// FIXME: Test md5
-			if upload {
-				md5hash := ""
-				if localPath != "" {
-					content, err := ioutil.ReadFile(localPath)
-					if err != nil {
-						return err
-					}
-					md5hash = getMD5Hash(string(content))
-					if md5hash == "" {
-						return fmt.Errorf("failure getting MD5 hash")
-					}
-				}
-
+			{
 				crcCheck := func() fail.Error {
+					md5hash := ""
+					if localPath != "" {
+						content, err := ioutil.ReadFile(localPath)
+						if err != nil {
+							return fail.WarningError(err, "unable ro read file %s", localPath)
+						}
+						md5hash = getMD5Hash(string(content))
+						if md5hash == "" {
+							return fail.WarningError(fmt.Errorf("failure getting MD5 hash"))
+						}
+					}
+
 					crcCtx, cancelCrc := context.WithTimeout(ctx, executionTimeout)
 					defer cancelCrc()
 
 					crcCmd, finnerXerr := sshCfg.NewCommand(crcCtx, fmt.Sprintf("/usr/bin/md5sum %s", remotePath))
 					if finnerXerr != nil {
-						return finnerXerr
+						return fail.WarningError(finnerXerr, "failure creating md5 command")
 					}
 
 					fretcode, fstdout, fstderr, finnerXerr := crcCmd.RunWithTimeout(
@@ -374,14 +376,14 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 						_ = finnerXerr.Annotate("retcode", fretcode)
 						_ = finnerXerr.Annotate("stdout", fstdout)
 						_ = finnerXerr.Annotate("stderr", fstderr)
-						return finnerXerr
+						return fail.WarningError(finnerXerr, "failure running remote md5 command")
 					}
 					if fretcode != 0 {
 						finnerXerr = fail.NewError("failed to check md5")
 						_ = finnerXerr.Annotate("retcode", fretcode)
 						_ = finnerXerr.Annotate("stdout", fstdout)
 						_ = finnerXerr.Annotate("stderr", fstderr)
-						return finnerXerr
+						return fail.WarningError(finnerXerr, "unexpected error code running remote md5 command")
 					}
 					if !strings.Contains(fstdout, md5hash) {
 						logrus.Warnf(
@@ -394,7 +396,10 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 				}
 
 				if xerr = crcCheck(); xerr != nil {
-					return xerr
+					if _, ok := xerr.(*fail.ErrWarning); !ok {
+						return xerr
+					}
+					logrus.Warnf(xerr.Error())
 				}
 			}
 
