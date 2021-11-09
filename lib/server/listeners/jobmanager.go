@@ -127,7 +127,18 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
-	return empty, server.AbortJobByID(uuid)
+	xerr = server.AbortJobByID(uuid)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If uuid is not found, it's done
+			tracer.Trace("Job '%s' already terminated.", uuid)
+			break
+		default:
+			return empty, xerr
+		}
+	}
+	return empty, nil
 }
 
 // List running process
