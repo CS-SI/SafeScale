@@ -144,7 +144,8 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 	}
 
 	// Drain pods from node
-	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
+	//cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
+	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets", node.GetName())
 	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute pod drain from node '%s'", node.GetName())
@@ -192,7 +193,15 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to execute reset of kubernetes configuration on Host '%s'", node.GetName())
 	}
-	if retcode != 0 {
+	switch retcode {
+	case 0:
+		break
+	case 1:
+		if strings.Contains(stderr, "command not found") {
+			break
+		}
+		fallthrough
+	default:
 		xerr := fail.ExecutionError(nil, "failed to reset kubernetes configuration on Host '%s'", node.GetName())
 		_ = xerr.Annotate("retcode", retcode)
 		_ = xerr.Annotate("stdout", stdout)
