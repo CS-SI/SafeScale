@@ -790,7 +790,6 @@ feature:
                             sfRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 230 "failure running k8s controller"
                             sfRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 231 "failure running k8s scheduler"
 
-                            touch /etc/kubernetes/.joined
                             echo "cpx init done"
                             sfExit
 
@@ -814,7 +813,6 @@ feature:
 
                             sfRemoteExec $MASTERIP sudo -u {{ .ClusterAdminUsername }} -i kubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 234 "failure checking tainted nodes"
 
-                            touch /etc/kubernetes/.joined
                             sfExit
 
                     join-nodes:
