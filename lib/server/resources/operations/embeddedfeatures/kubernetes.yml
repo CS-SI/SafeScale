@@ -258,7 +258,7 @@ feature:
                         run: |
                             which kubeadm &>/dev/null && {
                                 echo "sharing current Kubernetes version used..."
-                                kubeadm version -o short >${SF_ETCDIR}/kubeversion 2>/dev/null || sfExit 200 "failed to extract current Kubernetes version running on master"
+                                kubeadm version -o short | cut -dv -f2 >${SF_ETCDIR}/kubeversion 2>/dev/null || sfExit 200 "failed to extract current Kubernetes version running on master"
                                 sfDropzonePush ${SF_ETCDIR}/kubeversion || sfFail 201 "Error uploading current kubernetes version"
                                 for ip in {{range .ClusterNodeIPs}}{{.}} {{end}}; do
                                     sfDropzoneSync $ip || sfFail 202 "Error in sync"

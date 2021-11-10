@@ -723,9 +723,9 @@ func (s stack) setHostProperties(ahf *abstract.HostFull, subnets []*abstract.Sub
 	ahf.Sizing.RAMSize = vmType.RAMSize
 
 	// Updates IPAddress Property propsv1.HostNetworking
-	// subnets contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
-	// indexed on network ID. Tries to convert if possible, if we already have correspondance
-	// between network ID and network Name in IPAddress definition
+	// subnets contains network names, but IPxAddresses has to be
+	// indexed on network ID. Tries to convert if possible, if we already have correspondence
+	// between network ID and network Name in Host definition
 	subnetsByID := map[string]string{}
 	subnetsByName := map[string]string{}
 	ipv4Addresses := map[string]string{}

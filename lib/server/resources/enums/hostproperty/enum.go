@@ -28,5 +28,5 @@ const (
 	SizingV2            = "9"  // optional additional info about the sizing of the host
 	ClusterMembershipV1 = "10" // optional additional information about the cluster membership of the host
 	SecurityGroupsV1    = "11" // optional additional information about security groups binded to the host
-	NetworkV2           = "12" // NetworkV2 contains optional additional information about network of the host
+	NetworkV2           = "12" // optional additional information about network of the host
 )
