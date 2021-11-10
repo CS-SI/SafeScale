@@ -140,31 +140,6 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 		return nil, xerr
 	}
 
-	xerr = instance.Alter(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			aci, ok := clonable.(*abstract.ClusterIdentity)
-			if !ok {
-				return fail.InconsistentError(
-					"'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-				)
-			}
-
-			// update identity
-			aci.NodesDefImage = nodesDef.Image
-			aci.NodesDefTemplate = nodesDef.Template
-			aci.MastersDefImage = nodesDef.Image
-			aci.MastersDefTemplate = nodesDef.Template
-			aci.GatewaysDefImage = gatewaysDef.Image
-			aci.GatewaysDefTemplate = gatewaysDef.Template
-
-			return nil
-		},
-	)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
 	// Create the Network and Subnet
 	networkInstance, subnetInstance, xerr := instance.createNetworkingResources(task, req, gatewaysDef)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -232,9 +207,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	// FIXME: At some point clusterIdentity has to change...
 
 	// Creates and configures hosts
-	xerr = instance.createHostResources(
-		task, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, req.KeepOnFailure,
-	)
+	xerr = instance.createHostResources(task, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, req.KeepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -254,10 +227,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 						clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 							nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 							if !ok {
-								return fail.InconsistentError(
-									"'*propertiesv3.ClusterNodes' expected, '%s' provided",
-									reflect.TypeOf(clonable).String(),
-								)
+								return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 							}
 							list = nodesV3.ByNumericalID
 							return nil
@@ -320,41 +290,30 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}
 
 	// Sets nominal state of the new Cluster in metadata
-	xerr = instance.Alter(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			// update metadata about disabled default features
-			innerXErr := props.Alter(
-				clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterFeatures' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					featuresV1.Disabled = req.DisabledDefaultFeatures
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
+	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// update metadata about disabled default features
+		innerXErr := props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			return props.Alter(
-				clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-					stateV1, ok := clonable.(*propertiesv1.ClusterState)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-					stateV1.State = clusterstate.Nominal
-					return nil
-				},
-			)
-		},
-	)
+			featuresV1.Disabled = req.DisabledDefaultFeatures
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+			stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			stateV1.State = clusterstate.Nominal
+			return nil
+		})
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -445,6 +404,9 @@ func (instance *Cluster) firstLight(req abstract.ClusterRequest) fail.Error {
 					defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
 					defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
 					defaultsV2.Image = req.NodesDef.Image
+					defaultsV2.GatewayTemplateID = req.GatewaysDef.Template
+					defaultsV2.NodeTemplateID = req.NodesDef.Template
+					defaultsV2.MasterTemplateID = req.MastersDef.Template
 					return nil
 				},
 			)
@@ -477,6 +439,7 @@ func (instance *Cluster) firstLight(req abstract.ClusterRequest) fail.Error {
 			if innerXErr != nil {
 				return innerXErr
 			}
+
 			aci.Keypair = kp
 
 			// Generate needed password for account cladm

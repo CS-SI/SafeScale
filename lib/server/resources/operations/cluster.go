@@ -147,14 +147,6 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 		return nil, fail.InconsistentError("nil value found in Cluster cache for key '%s'", name)
 	}
 
-	// FIXME: The reload problem
-	/*
-		xerr = clusterInstance.Reload()
-		if xerr != nil {
-			return nil, xerr
-		}
-	*/
-
 	cacheEntry.LockContent()
 
 	return clusterInstance, nil

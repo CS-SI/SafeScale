@@ -280,7 +280,7 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 		return nil, fail.ExecutionError(err, "failed to close temporary file")
 	}
 
-	logrus.Tracef("New temporary file %s", f.Name())
+	// logrus.Tracef("New temporary file %s", f.Name())
 
 	return f, nil
 }

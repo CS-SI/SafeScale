@@ -362,7 +362,7 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 	featureName := f.GetName()
 	targetName := target.GetName()
 	targetType := strings.ToLower(target.TargetType().String())
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -497,7 +497,7 @@ func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	defer temporal.NewStopwatch().OnExitLogInfo(
@@ -596,7 +596,7 @@ func (f *Feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	featureName := f.GetName()
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 

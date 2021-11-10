@@ -25,10 +25,14 @@ import (
 // ClusterDefaults ...
 // !!! FROZEN !!!
 type ClusterDefaults struct {
-	GatewaySizing HostSizingRequirements `json:"gateway_sizing,omitempty"` // GatewaySizing keeps the default node definition
-	MasterSizing  HostSizingRequirements `json:"master_sizing,omitempty"`  // MasterSizing keeps the default node definition
-	NodeSizing    HostSizingRequirements `json:"node_sizing,omitempty"`    // NodeSizing keeps the default node definition
-	Image         string                 `json:"image,omitempty"`          // Image keeps the default Linux image to use
+	GatewaySizing     HostSizingRequirements `json:"gateway_sizing,omitempty"`      // GatewaySizing keeps the default node definition
+	GatewayTemplateID string                 `json:"gateway_template_id,omitempty"` // template id used at creation for gateways
+	MasterSizing      HostSizingRequirements `json:"master_sizing,omitempty"`       // MasterSizing keeps the default node definition
+	MasterTemplateID  string                 `json:"master_template_id,omitempty"`  // template ID used at creation for masters
+	NodeSizing        HostSizingRequirements `json:"node_sizing,omitempty"`         // NodeSizing keeps the default node definition
+	NodeTemplateID    string                 `json:"node_template_id,omitempty"`    // template ID used at creation for nodes
+	Image             string                 `json:"image,omitempty"`               // Image keeps the default Linux image name to use
+	ImageID           string                 `json:"image_id,omitempty"`            // contains the ID of the image used at creation
 }
 
 func newClusterDefaults() *ClusterDefaults {

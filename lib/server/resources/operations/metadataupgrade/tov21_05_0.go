@@ -708,24 +708,6 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 		return xerr
 	}
 
-	// VPL:
-	// // link file /opt/safescale/var/state/user_data.phase2.done to /opt/safescale/var/state/user_data.final.done
-	// const cmdTmpl = "cd %s/state && [ ! -f user_data.final.done ] && ln -s user_data.phase2.done user_data.final.done || :"
-	// retcode, stdout, stderr, xerr := instance.Run(context.Background(), fmt.Sprintf(cmdTmpl, utils.VarFolder), outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetHostTimeout())
-	// if xerr != nil {
-	// 	return xerr
-	// }
-	// if retcode != 0 {
-	// 	msg := fmt.Sprintf("failed to create a link to '%s/user_data.final.done': retcode=%d", utils.VarFolder, retcode)
-	// 	if stdout = strings.TrimSpace(stdout); stdout != "" {
-	// 		msg += ", stdout='" + stdout + "'"
-	// 	}
-	// 	if stderr = strings.TrimSpace(stderr); stderr != "" {
-	// 		msg += ", stderr='" + stderr + "'"
-	// 	}
-	// 	return fail.NewError(msg)
-	// }
-
 	return nil
 }
 

@@ -102,7 +102,7 @@ feature:
                             sfFail 197 "master didn't join (no .joined file)"
 
             add:
-                pace: ca-certs,sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
+                pace: ca-certs,sysconf,syshardening,cur-ver,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
                 steps:
                     ca-certs:
                         targets:
@@ -252,6 +252,20 @@ feature:
                             {{ end }}
                             sfExit
 
+                    cur-ver:
+                        targets:
+                            masters: one
+                        run: |
+                            which kubeadm &>/dev/null && {
+                                echo "sharing current Kubernetes version used..."
+                                kubeadm version -o short >${SF_ETCDIR}/kubeversion 2>/dev/null || sfExit 200 "failed to extract current Kubernetes version running on master"
+                                sfDropzonePush ${SF_ETCDIR}/kubeversion || sfFail 201 "Error uploading current kubernetes version"
+                                for ip in {{range .ClusterNodeIPs}}{{.}} {{end}}; do
+                                    sfDropzoneSync $ip || sfFail 202 "Error in sync"
+                                done
+                            }
+                            sfExit
+
                     common-tools:
                         targets:
                             gateways: all
@@ -260,17 +274,29 @@ feature:
                         run: |
                             [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
+                            id
+                            sfDropzonePop ${SF_TMPDIR}
+                            ls -l ${SF_TMPDIR}
+                            if [ -f ${SF_TMPDIR}/kubeversion ]; then
+                                KUBE_VERSION=$(cat ${SF_TMPDIR}/kubeversion)
+                                echo "Current Kubernetes master is running $KUBE_VERSION, installing corresponding tools"
+                            else
+                                KUBE_VERSION={{ .KubeVersion }}
+                                echo "Installing Kubernetes tools $KUBE_VERSION"
+                            fi
+                            #sfDropzoneClean
+
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
                                     curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
                                     cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
-                            {{ if .KubeVersion }}
-                                    sfApt update && sfApt install -y kubelet={{.KubeVersion}}-00 kubeadm={{.KubeVersion}}-00 kubectl={{.KubeVersion}}-00 || sfFail 199 "Error installing kubelet kubadm kubectl"
-                            {{ else }}
-                                    sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 200 "Error installing kubelet kubeadm kubectl"
-                            {{ end }}
+                                    if [ ! -x ${KUBE_VERSION} ]; then
+                                        sfApt update && sfApt install -y kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 || sfFail 203 "Error installing kubelet kubadm kubectl"
+                                    else
+                                        sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 203 "Error installing kubelet kubeadm kubectl"
+                                    fi
                                     apt-mark hold kubelet kubeadm kubectl
                                     ;;
 
@@ -286,15 +312,15 @@ feature:
                             exclude=kube*
                             EOF
 
-                            {{ if .KubeVersion }}
-                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 199 "Error installing kubelet kubeadm kubectl"
-                            {{ else }}
-                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 201 "Error installing kubelet kubeadm kubectl"
-                            {{ end }}
+                                    if [ ! -x ${KUBE_VERSION} ]; then
+                                        yum -y install kubelet-${KUBE_VERSION} kubeadm-${KUBE_VERSION} kubectl-${KUBE_VERSION} --disableexcludes=kubernetes || sfFail 203 "Error installing kubelet kubeadm kubectl"
+                                    else
+                                        yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 203 "Error installing kubelet kubeadm kubectl"
+                                    fi
                                     ;;
 
                                 *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
-                                   sfFail 202 "unsupported linux distribution '$(sfGetFact "linux_kind")'"
+                                   sfFail 204 "unsupported linux distribution '$(sfGetFact "linux_kind")'"
                             esac
                             sfService enable kubelet && sfService start kubelet
 
@@ -309,13 +335,13 @@ feature:
                             {{ if .ClusterControlplaneUsesVIP }}
                             case $(sfGetFact "linux_kind") in
                                 ubuntu|debian)
-                                    sfApt update && sfApt -y install keepalived haproxy || sfFail 203 "Error installing keepalived haproxy"
+                                    sfApt update && sfApt -y install keepalived haproxy || sfFail 205 "Error installing keepalived haproxy"
                                     ;;
                                 redhat|rhel|centos|fedora)
-                                    yum install -q -y keepalived haproxy || sfFail 204 "Error installing keepalived haproxy"
+                                    yum install -q -y keepalived haproxy || sfFail 205 "Error installing keepalived haproxy"
                                     ;;
                                 *)
-                                    sfFail 205 "Unsupported Linux distribution '$(sfGetFact "linux_kind")'!"
+                                    sfFail 206 "Unsupported Linux distribution '$(sfGetFact "linux_kind")'!"
                                     ;;
                             esac
 
@@ -378,7 +404,7 @@ feature:
                             fi
 
                             sfService enable keepalived
-                            sfService restart keepalived || sfFail 206 "Error restarting keepalived"
+                            sfService restart keepalived || sfFail 207 "Error restarting keepalived"
 
                             ## Configure haproxy as TCP load-balancer for kubernetes Control Plane
                             cat >/etc/haproxy/haproxy.cfg <<-EOF
@@ -436,7 +462,7 @@ feature:
                             EOF
                             mkdir -p /var/local/haproxy
                             sfService enable haproxy
-                            sfService restart haproxy || sfFail 207 "Error restarting haproxy"
+                            sfService restart haproxy || sfFail 208 "Error restarting haproxy"
                             {{ end }}
                             sfExit
 
