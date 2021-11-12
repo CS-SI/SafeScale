@@ -1433,6 +1433,11 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 		return nil, xerr
 	}
 
+	_, xerr = hostInstance.WaitSSHReady(task.Context(), temporal.GetHostTimeout())
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	_, xerr = hostInstance.ForceGetState(task.Context())
 	return nil, xerr
 }
