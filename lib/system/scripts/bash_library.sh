@@ -480,22 +480,17 @@ __create_dropzone() {
     mkdir -p $SF_LOGDIR || true
 
 	[[ ! -d ~cladm/.dropzone ]] && {
-		mkdir -p ~cladm/.dropzone
-		[ $? -ne 0 ] && return $?
+		mkdir -p ~cladm/.dropzone || return $?
 	}
-	chown -R cladm:cladm ~cladm/.dropzone
-	[ $? -ne 0 ] && return $?
-	chmod -R ug+s ~cladm/.dropzone
-	[ $? -ne 0 ] && return $?
+	chown -R cladm:cladm ~cladm/.dropzone || return $?
+	chmod -R ug+s ~cladm/.dropzone || return $?
 	return 0
 }
 
 function sfDownloadInDropzone() {
-	__create_dropzone &>/dev/null
-	[ $? -ne 0 ] && return $?
+	__create_dropzone &>/dev/null || return $?
 	cd ~cladm/.dropzone && {
-		sfDownload "$@"
-		[ $? -ne 0 ] && return $?
+		sfDownload "$@" || return $?
 	}
 	cd ~cladm/.dropzone || return 1
 	return 0
@@ -530,10 +525,8 @@ __cluster_admin_ssh_options__="-i ~cladm/.ssh/id_rsa -oIdentitiesOnly=yes -oStri
 # Copy content of local dropzone to remote dropzone (parameter can be IP or name)
 function sfDropzoneSync() {
 	local remote="$1"
-	__create_dropzone &>/dev/null
-	[ $? -ne 0 ] && return $?
-	scp $__cluster_admin_ssh_options__ -r ~cladm/.dropzone cladm@${remote}:~/
-	[ $? -ne 0 ] && return $?
+	__create_dropzone &>/dev/null || return $?
+	scp $__cluster_admin_ssh_options__ -r ~cladm/.dropzone cladm@${remote}:~/ || return $?
 	return 0
 }
 export -f sfDropzoneSync
@@ -551,20 +544,20 @@ function sfDropzonePop() {
 	    return $rco
 	}
 	if [ ! -d "$dest" ]; then
-        mkdir -p "$dest" >/dev/null || {
+        sudo mkdir -p "$dest" >/dev/null || {
             rco=$?
             echo "failed to create '$dest' folder (exit code $rco)"
             return $rco
         }
 	fi
 	if [ $# -eq 1 ]; then
-		mv -f ~cladm/.dropzone/* "$dest" || {
+		sudo mv -f ~cladm/.dropzone/* "$dest" || {
 		    rco=$?
 		    echo "failed to move all files in dropzone to '$dest' (exit code $rco)"
 		    return $rco
 		}
 	else
-		mv -f ~cladm/.dropzone/"$file" "$dest" || {
+		sudo mv -f ~cladm/.dropzone/"$file" "$dest" || {
 		    rco=$?
 		    echo "failed to move file '$file' in dropzone to '$dest' (exit code $rco)"
 		    return $rco
@@ -578,17 +571,14 @@ function sfDropzoneUntar() {
 	local file="$1"
 	local dest="$2"
 	shift 2
-	__create_dropzone &>/dev/null
-	[ $? -ne 0 ] && return $?
-	tar zxvf ~cladm/.dropzone/"$file" -C "$dest"
-	[ $? -ne 0 ] && return $?
+	__create_dropzone &>/dev/null || return $?
+	tar zxvf ~cladm/.dropzone/"$file" -C "$dest" || return $?
 	return 0
 }
 export -f sfDropzoneUntar
 
 function sfDropzoneClean() {
-	rm -rf ~cladm/.dropzone/* ~cladm/.dropzone/.[^.]*
-	[ $? -ne 0 ] && return $?
+	rm -rf ~cladm/.dropzone/* ~cladm/.dropzone/.[^.]* || return $?
 	return 0
 }
 export -f sfDropzoneClean
@@ -597,15 +587,13 @@ export -f sfDropzoneClean
 function sfRemoteExec() {
 	local remote=$1
 	shift
-	ssh $__cluster_admin_ssh_options__ cladm@$remote "$@"
-	[ $? -ne 0 ] && return $?
+	ssh $__cluster_admin_ssh_options__ cladm@$remote "$@" || return $?
 	return 0
 }
 export -f sfRemoteExec
 
 function sfKubectl() {
-	sudo -u cladm -i kubectl "$@"
-	[ $? -ne 0 ] && return $?
+	sudo -u cladm -i kubectl "$@" || return $?
 	return 0
 }
 export -f sfKubectl
@@ -1042,6 +1030,8 @@ export -f sfGetFact
 function waitForUserdata() {
 	while true; do
 		[ -f ${SF_VARDIR}/state/user_data.netsec.done ] && break
+		# legacy: v20.06 and before
+		[ -f ${SF_VARDIR}/state/user_data.phase2.done ] && break
 		echo "Waiting userdata completion..."
 		sleep 5
 	done

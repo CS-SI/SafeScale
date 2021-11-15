@@ -18,9 +18,7 @@ package metadataupgrade
 
 import (
 	"context"
-	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -36,13 +34,10 @@ import (
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
-	"github.com/CS-SI/SafeScale/lib/utils"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 )
 
@@ -711,23 +706,6 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 	xerr = instance.Reload()
 	if xerr != nil {
 		return xerr
-	}
-
-	// link file /opt/safescale/var/state/user_data.phase2.done to /opt/safescale/var/state/user_data.final.done
-	const cmdTmpl = "cd %s/state && [ ! -f user_data.final.done ] && ln -s user_data.phase2.done user_data.final.done || :"
-	retcode, stdout, stderr, xerr := instance.Run(context.Background(), fmt.Sprintf(cmdTmpl, utils.VarFolder), outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetHostTimeout())
-	if xerr != nil {
-		return xerr
-	}
-	if retcode != 0 {
-		msg := fmt.Sprintf("failed to create a link to '%s/user_data.final.done': retcode=%d", utils.VarFolder, retcode)
-		if stdout = strings.TrimSpace(stdout); stdout != "" {
-			msg += ", stdout='" + stdout + "'"
-		}
-		if stderr = strings.TrimSpace(stderr); stderr != "" {
-			msg += ", stderr='" + stderr + "'"
-		}
-		return fail.NewError(msg)
 	}
 
 	return nil

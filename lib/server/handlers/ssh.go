@@ -153,7 +153,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 			return nil, xerr
 		}
 	} else {
-		var rs resources.Subnet
+		var subnetInstance resources.Subnet
 		xerr = host.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			ahc, ok := clonable.(*abstract.HostCore)
 			if !ok {
@@ -168,27 +168,34 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
+				var subnetID string
 				if hnV2.DefaultSubnetID != "" {
-					var innerXErr fail.Error
-					rs, innerXErr = subnetfactory.Load(svc, "", hnV2.DefaultSubnetID)
-					if innerXErr != nil {
-						return innerXErr
+					subnetID = hnV2.DefaultSubnetID
+				} else {
+					for k := range hnV2.SubnetsByID {
+						subnetID = k
+						break
 					}
 				}
-				return nil
+				if subnetID == "" {
+					return fail.InconsistentError("no default Subnet found for Host '%s'", ahc.Name)
+				}
+
+				var innerXErr fail.Error
+				subnetInstance, innerXErr = subnetfactory.Load(svc, "", subnetID)
+				return innerXErr
 			})
 		})
 		if xerr != nil {
 			return nil, xerr
 		}
+		if subnetInstance == nil {
+			return nil, fail.NotFoundError("failed to find default Subnet of Host")
+		}
 		if isGateway {
 			if host.GetState() != hoststate.Started {
 				return nil, fail.NewError("cannot retrieve network properties when the gateway is not in 'started' state")
 			}
-		}
-
-		if rs == nil {
-			return nil, fail.NotFoundError("failed to find default Subnet of Host")
 		}
 
 		var (
@@ -197,7 +204,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		)
 
 		// gets primary gateway information
-		gw, xerr := rs.InspectGateway(true)
+		gw, xerr := subnetInstance.InspectGateway(true)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -231,7 +238,7 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		}
 
 		// gets secondary gateway information
-		gw, xerr = rs.InspectGateway(false)
+		gw, xerr = subnetInstance.InspectGateway(false)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:

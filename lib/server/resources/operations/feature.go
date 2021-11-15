@@ -20,8 +20,12 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -358,10 +362,40 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 	featureName := f.GetName()
 	targetName := target.GetName()
 	targetType := strings.ToLower(target.TargetType().String())
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
+	// -- passive check if feature is installed on target
+	switch target.(type) {
+	case resources.Host:
+		var found bool
+		xerr = target.(*Host).Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				_, found = hostFeaturesV1.Installed[f.GetName()]
+				return nil
+			})
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+		if found {
+			outcomes := &results{}
+			_ = outcomes.Add(featureName, &unitResults{
+				targetName: &stepResult{
+					completed: true,
+					success:   true,
+				},
+			})
+			return outcomes, nil
+		}
+	}
+
+	// -- fall back to active check
 	installer, xerr := f.findInstallerForTarget(target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -386,6 +420,9 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 	}
 
 	r, xerr := installer.Check(ctx, f, target, myV, s)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	// FIXME: restore Feature check using iaas.ResourceCache
 	// _ = checkCache.ForceSet(cacheKey, results)
@@ -460,7 +497,7 @@ func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	defer temporal.NewStopwatch().OnExitLogInfo(
@@ -559,7 +596,7 @@ func (f *Feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	featureName := f.GetName()
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 

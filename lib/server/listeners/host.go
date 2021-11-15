@@ -600,6 +600,10 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 
 	defer hostInstance.Released()
 
+	_, xerr = hostInstance.ForceGetState(job.Context())
+	if xerr != nil {
+		return nil, xerr
+	}
 	return hostInstance.ToProtocol()
 }
 

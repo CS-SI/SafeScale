@@ -37,10 +37,10 @@ const (
 
 // KeyPair represents a SSH key pair
 type KeyPair struct {
-	ID         string
-	Name       string
-	PrivateKey string
-	PublicKey  string
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	PrivateKey string `json:"private_key"`
+	PublicKey  string `json:"public_key"`
 }
 
 // IsNull tells if the keypair is a null value

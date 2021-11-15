@@ -48,18 +48,12 @@ type ClusterRequest struct {
 
 // ClusterIdentity contains the bare minimum information about a cluster
 type ClusterIdentity struct {
-	Name                string                 `json:"name"`           // GetName is the name of the cluster
-	Flavor              clusterflavor.Enum     `json:"flavor"`         // Flavor tells what kind of cluster it is
-	Complexity          clustercomplexity.Enum `json:"complexity"`     // Complexity is the mode of cluster
-	Keypair             *KeyPair               `json:"keypair"`        // Keypair contains the key-pair used inside the Cluster
-	AdminPassword       string                 `json:"admin_password"` // AdminPassword contains the password of 'cladm' account. This password is used to connect via Guacamole, but cannot be used with SSH (by choice)
-	Tags                map[string]string      `json:"tags,omitempty"`
-	GatewaysDefImage    string                 `json:"gateways_def_image,omitempty"`
-	GatewaysDefTemplate string                 `json:"gateways_def_template,omitempty"`
-	MastersDefImage     string                 `json:"masters_def_image,omitempty"`
-	MastersDefTemplate  string                 `json:"masters_def_template,omitempty"`
-	NodesDefImage       string                 `json:"nodes_def_image,omitempty"`
-	NodesDefTemplate    string                 `json:"nodes_def_template,omitempty"`
+	Name          string                 `json:"name"`           // Name is the name of the cluster
+	Flavor        clusterflavor.Enum     `json:"flavor"`         // Flavor tells what kind of cluster it is
+	Complexity    clustercomplexity.Enum `json:"complexity"`     // Complexity is the mode of cluster
+	Keypair       *KeyPair               `json:"keypair"`        // Keypair contains the key-pair used inside the Cluster
+	AdminPassword string                 `json:"admin_password"` // contains the password of the cladm account
+	Tags          map[string]string      `json:"tags,omitempty"`
 }
 
 // NewClusterIdentity ...
@@ -121,7 +115,7 @@ func (i ClusterIdentity) OK() bool {
 	return result
 }
 
-// Serialize serializes IPAddress instance into bytes (output json code)
+// Serialize serializes ClusterIdentity instance into bytes (output json code)
 func (i *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 	if i.IsNull() {
 		return nil, fail.InvalidInstanceError()

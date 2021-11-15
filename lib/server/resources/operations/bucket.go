@@ -120,6 +120,7 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 	_ = cacheEntry.LockContent()
 
 	// FIXME: The reload problem
+	// VPL: what state of bucket would you like to be updated by Reload?
 	/*
 		xerr = b.Reload()
 		if xerr != nil {

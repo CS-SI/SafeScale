@@ -36,7 +36,7 @@ feature:
                             hosts: yes
                             masters: all
                         run: |
-                            [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ] && sfFail 192 "Certificate not found"
+                            [ ! -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ] && sfFail 192 "Certificate not found"
                             sfExit
 
             add:
@@ -59,7 +59,7 @@ feature:
                                     ;;
                             esac
 
-                            [ -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ] && sfExit
+                            [ -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ] && sfExit
 
                             mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,newcerts,private}
                             mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,csr,newcerts,private}
@@ -190,7 +190,7 @@ feature:
                             hosts: yes
                             masters: one
                         run: |
-                            if [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ]; then
+                            if [ ! -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
                                 openssl genrsa -out ${SF_ETCDIR}/pki/ca/private/rootca.key.pem 4096 || sfFail 193
                                 chmod 0400 ${SF_ETCDIR}/pki/ca/private/rootca.key.pem || sfFail 194
 
@@ -243,7 +243,7 @@ feature:
                             sfDropzonePop ${SF_TMPDIR}
                             sfDropzoneClean
 
-                            if [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ]; then
+                            if [ ! -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
                                 tar zxvf ${SF_TMPDIR}/safescale-rootca.tar.gz -C /
                                 retcode=$?
                                 rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz

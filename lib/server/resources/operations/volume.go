@@ -130,6 +130,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 	}()
 
 	// FIXME: The reload problem
+	// VPL: what state of Volume would you like to be updated by Reload?
 	/*
 		xerr = rv.Reload()
 		if xerr != nil {

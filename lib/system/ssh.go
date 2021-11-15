@@ -280,7 +280,7 @@ func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, f
 		return nil, fail.ExecutionError(err, "failed to close temporary file")
 	}
 
-	logrus.Tracef("New temporary file %s", f.Name())
+	// logrus.Tracef("New temporary file %s", f.Name())
 
 	return f, nil
 }
@@ -1119,8 +1119,9 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 				return innerXErr
 			}
 			if retcode != 0 {
-				if phase == "final" {
-					// Before v21.05.0, final provisioning state is store in user_data.phase2.done file, so try to see if legacy file exists...
+				switch phase {
+				case "final":
+					// Before v21.05.0, final provisioning state is stored in user_data.phase2.done file, so try to see if legacy file exists...
 					sshCmd, innerXErr = sconf.NewCommand(ctx, fmt.Sprintf("sudo cat %s/state/user_data.phase2.done", utils.VarFolder))
 					if innerXErr != nil {
 						return innerXErr
@@ -1133,8 +1134,10 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 					if innerXErr != nil {
 						return innerXErr
 					}
+				default:
 				}
-
+			}
+			if retcode != 0 {
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
 				_ = fe.Annotate("retcode", retcode)
 				_ = fe.Annotate("stdout", stdout)

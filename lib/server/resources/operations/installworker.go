@@ -228,11 +228,13 @@ func (w *worker) identifyConcernedMasters(ctx context.Context) ([]resources.Host
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		concernedHosts, xerr := w.extractHostsFailingCheck(ctx, hosts)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		w.concernedMasters = concernedHosts
 	}
 	return w.concernedMasters, nil
