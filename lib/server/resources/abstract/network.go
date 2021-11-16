@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/sirupsen/logrus"
@@ -35,18 +36,20 @@ type NetworkRequest struct {
 	KeepOnFailure bool     // KeepOnFailure tells if resources have to be kept in case of failure (default behavior is to delete them)
 }
 
-// SubNetwork --DEPRECATED--
-type SubNetwork struct {
+// SubNetwork is deprecated
+type SubNetwork struct { // DEPRECATED
 	CIDR string `json:"subnetmask,omitempty"`
 	ID   string `json:"subnetid,omitempty"`
 }
 
 // Network represents a virtual network
 type Network struct {
-	ID         string   `json:"id"`                    // ID for the network (from provider)
-	Name       string   `json:"name"`                  // name of the network
-	CIDR       string   `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
-	DNSServers []string `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
+	ID         string            `json:"id"`                    // ID for the network (from provider)
+	Name       string            `json:"name"`                  // name of the network
+	CIDR       string            `json:"mask"`                  // network in CIDR notation (if it has a meaning...)
+	DNSServers []string          `json:"dns_servers,omitempty"` // list of dns servers to be used inside the Network/VPC
+	Imported   bool              `json:"imported,omitempty"`    // tells if the Network has been imported (making it not deletable by SafeScale)
+	Tags       map[string]string `json:"tags,omitempty"`
 
 	Domain             string         `json:"domain,omitempty"`               // DEPRECATED: contains the domain used to define host FQDN
 	GatewayID          string         `json:"gateway_id,omitempty"`           // DEPRECATED: contains the id of the host acting as primary gateway for the network
@@ -58,7 +61,18 @@ type Network struct {
 
 // NewNetwork initializes a new instance of Network
 func NewNetwork() *Network {
-	return &Network{}
+	nn := &Network{
+		Tags: make(map[string]string),
+	}
+	nn.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+	nn.Tags["ManagedBy"] = "safescale"
+	return nn
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (n *Network) IsNull() bool {
+	return n == nil || (n.ID == "" && n.Name == "")
 }
 
 // Clone ...

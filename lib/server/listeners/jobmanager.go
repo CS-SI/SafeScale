@@ -18,6 +18,7 @@ package listeners
 
 import (
 	"context"
+
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -46,7 +47,7 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 			return nil, xerr
 		}
 
-		tenant = &operations.Tenant{Name: tenantID, Service: service}
+		tenant = &operations.Tenant{Name: tenantID, BucketName: service.GetMetadataBucket().GetName(), Service: service}
 	} else {
 		tenant = operations.CurrentTenant()
 		if tenant == nil {
@@ -54,11 +55,11 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 		}
 	}
 	newctx, cancel := context.WithCancel(ctx)
-
 	job, xerr := server.NewJob(newctx, cancel, tenant.Service, jobDescription)
 	if xerr != nil {
 		return nil, xerr
 	}
+
 	return job, nil
 }
 
@@ -81,7 +82,12 @@ func PrepareJobWithoutService(ctx context.Context, jobDescription string) (_ ser
 }
 
 // JobManagerListener service server gRPC
-type JobManagerListener struct{}
+type JobManagerListener struct {
+	protocol.UnimplementedJobServiceServer
+}
+
+// // VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
+// func (s *JobManagerListener) mustEmbedUnimplementedJobServiceServer() {}
 
 // Stop specified process
 func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, err error) {
@@ -101,7 +107,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	uuid := in.Uuid
@@ -121,7 +127,18 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 
 	tracer.Trace("Receiving stop order for job identified by '%s'...", uuid)
 
-	return empty, server.AbortJobByID(uuid)
+	xerr = server.AbortJobByID(uuid)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If uuid is not found, it's done
+			tracer.Trace("Job '%s' already terminated.", uuid)
+			break
+		default:
+			return empty, xerr
+		}
+	}
+	return empty, nil
 }
 
 // List running process
@@ -138,7 +155,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	task, xerr := concurrency.NewTaskWithContext(ctx)
@@ -154,7 +171,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	jobMap := server.ListJobs()
 	var pbProcessList []*protocol.JobDefinition
 	for uuid, info := range jobMap {
-		status, _ := task.GetStatus()
+		status, _ := task.Status()
 		if status == concurrency.ABORTED {
 			return nil, fail.AbortedError(nil)
 		}

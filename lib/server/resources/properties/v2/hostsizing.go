@@ -19,7 +19,7 @@ package propertiesv2
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostSizingRequirements describes host sizing requirements to fulfil
@@ -34,12 +34,17 @@ type HostSizingRequirements struct {
 	MinDiskSize int     `json:"min_disk_size,omitempty"`
 	MinGPU      int     `json:"min_gpu,omitempty"`
 	MinCPUFreq  float32 `json:"min_freq,omitempty"`
-	Replaceable bool    `json:"replaceable,omitempty"` // Tells if we accept host that could be removed without notice (AWS proposes such kind of server knowned as SPOT)
+	Replaceable bool    `json:"replaceable,omitempty"` // Tells if we accept host that could be removed without notice (AWS proposes such kind of server known as SPOT)
 }
 
 // NewHostSizingRequirements ...
 func NewHostSizingRequirements() *HostSizingRequirements {
 	return &HostSizingRequirements{}
+}
+
+// IsNull tells if the struct is a null value
+func (hsr *HostSizingRequirements) IsNull() bool {
+	return hsr == nil || (hsr.MinCores == 0 && hsr.MaxCores == 0)
 }
 
 // HostEffectiveSizing represent sizing elements of an host
@@ -60,6 +65,11 @@ func NewHostEffectiveSizing() *HostEffectiveSizing {
 	return &HostEffectiveSizing{}
 }
 
+// IsNull tells if the struct is a null value
+func (hes *HostEffectiveSizing) IsNull() bool {
+	return hes == nil || hes.Cores == 0
+}
+
 // HostSizing contains sizing information about the host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
@@ -78,13 +88,10 @@ func NewHostSizing() *HostSizing {
 	}
 }
 
-// Reset ...
-func (hs *HostSizing) Reset() {
-	*hs = HostSizing{
-		RequestedSize: NewHostSizingRequirements(),
-		Template:      "",
-		AllocatedSize: NewHostEffectiveSizing(),
-	}
+// IsNull ...
+// satisfies interface data.Clonable
+func (hs *HostSizing) IsNull() bool {
+	return hs == nil || (hs.RequestedSize.IsNull() && hs.Template == "" && hs.AllocatedSize.IsNull())
 }
 
 // Clone ... (data.Clonable interface)
@@ -109,5 +116,5 @@ func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.host", string(hostproperty.SizingV2), NewHostSizing())
+	serialize.PropertyTypeRegistry.Register("resources.host", hostproperty.SizingV2, NewHostSizing())
 }

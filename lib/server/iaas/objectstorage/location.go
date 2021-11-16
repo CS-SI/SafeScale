@@ -59,6 +59,7 @@ type Config struct {
 	AvailabilityZone string
 	ProjectID        string
 	Credentials      string
+	BucketName       string
 }
 
 // Location ...
@@ -119,7 +120,8 @@ type location struct {
 }
 
 // NewLocation creates an Object Storage location based on config
-func NewLocation(conf Config) (*location, fail.Error) { //nolint
+func NewLocation(conf Config) (_ *location, xerr fail.Error) { // nolint
+	defer fail.OnPanic(&xerr)
 	l := &location{
 		config: conf,
 	}
@@ -182,8 +184,43 @@ func (l location) ObjectStorageProtocol() string {
 	return l.config.Type
 }
 
+func (l location) estimateSize(prefix string) (int, error) {
+	containerSet := make(map[string]bool) // New empty set
+	currentPageSize := 10
+
+	for {
+		err := stow.WalkContainers(
+			l.stowLocation, prefix, currentPageSize,
+			func(c stow.Container, err error) error {
+				if err != nil {
+					return err
+				}
+
+				if containerSet[c.Name()] {
+					return fail.DuplicateError(fmt.Sprintf("we found a duplicate: %s, we had %d items by then", c.Name(), len(containerSet)))
+				}
+				containerSet[c.Name()] = true
+
+				return nil
+			},
+		)
+		if err != nil {
+			if _, ok := err.(fail.ErrDuplicate); ok { // begin again with twice the capacity
+				currentPageSize = 2 * currentPageSize
+				containerSet = make(map[string]bool)
+				continue
+			}
+			return -1, err
+		}
+		break
+	}
+	return currentPageSize, nil
+}
+
 // ListBuckets ...
-func (l location) ListBuckets(prefix string) ([]string, fail.Error) {
+func (l location) ListBuckets(prefix string) (_ []string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if l.IsNull() {
 		return []string{}, fail.InvalidInstanceError()
 	}
@@ -191,7 +228,13 @@ func (l location) ListBuckets(prefix string) ([]string, fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "('%s')", prefix).Entering().Exiting()
 
 	var list []string
-	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
+
+	estimatedPageSize, err := l.estimateSize(prefix)
+	if err != nil {
+		return list, fail.ConvertError(err)
+	}
+
+	err = stow.WalkContainers(l.stowLocation, stow.NoPrefix, estimatedPageSize,
 		func(c stow.Container, err error) error {
 			if err != nil {
 				return err
@@ -209,7 +252,9 @@ func (l location) ListBuckets(prefix string) ([]string, fail.Error) {
 }
 
 // FindBucket returns true if a bucket with the name exists in stowLocation
-func (l location) FindBucket(bucketName string) (bool, fail.Error) {
+func (l location) FindBucket(bucketName string) (_ bool, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if l.IsNull() {
 		return false, fail.InvalidInstanceError()
 	}
@@ -220,7 +265,13 @@ func (l location) FindBucket(bucketName string) (bool, fail.Error) {
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage.stowLocation"), "(%s)", bucketName).Entering().Exiting()
 
 	found := false
-	err := stow.WalkContainers(l.stowLocation, stow.NoPrefix, 100,
+
+	estimatedPageSize, err := l.estimateSize(stow.NoPrefix)
+	if err != nil {
+		return false, fail.ConvertError(err)
+	}
+
+	err = stow.WalkContainers(l.stowLocation, stow.NoPrefix, estimatedPageSize,
 		func(c stow.Container, err error) error {
 			if err != nil {
 				logrus.Debugf("%v", err)
@@ -240,7 +291,9 @@ func (l location) FindBucket(bucketName string) (bool, fail.Error) {
 }
 
 // InspectBucket ...
-func (l location) InspectBucket(bucketName string) (abstract.ObjectStorageBucket, fail.Error) {
+func (l location) InspectBucket(bucketName string) (_ abstract.ObjectStorageBucket, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if l.IsNull() {
 		return abstract.ObjectStorageBucket{}, fail.InvalidInstanceError()
 	}
@@ -287,7 +340,9 @@ func (l location) inspectBucket(bucketName string) (bucket, fail.Error) {
 }
 
 // CreateBucket ...
-func (l location) CreateBucket(bucketName string) (aosb abstract.ObjectStorageBucket, _ fail.Error) {
+func (l location) CreateBucket(bucketName string) (aosb abstract.ObjectStorageBucket, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	aosb = abstract.ObjectStorageBucket{}
 	if l.IsNull() {
 		return aosb, fail.InvalidInstanceError()
@@ -310,7 +365,8 @@ func (l location) CreateBucket(bucketName string) (aosb abstract.ObjectStorageBu
 }
 
 // DeleteBucket removes a bucket from Object Storage
-func (l location) DeleteBucket(bucketName string) fail.Error {
+func (l location) DeleteBucket(bucketName string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -328,7 +384,8 @@ func (l location) DeleteBucket(bucketName string) fail.Error {
 }
 
 // InspectObject ...
-func (l location) InspectObject(bucketName string, objectName string) (aosi abstract.ObjectStorageItem, _ fail.Error) {
+func (l location) InspectObject(bucketName string, objectName string) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	aosi = abstract.ObjectStorageItem{}
 	if l.IsNull() {
 		return aosi, fail.InvalidInstanceError()
@@ -366,7 +423,8 @@ func (l location) InspectObject(bucketName string, objectName string) (aosi abst
 }
 
 // DeleteObject ...
-func (l location) DeleteObject(bucketName, objectName string) fail.Error {
+func (l location) DeleteObject(bucketName, objectName string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -387,7 +445,8 @@ func (l location) DeleteObject(bucketName, objectName string) fail.Error {
 }
 
 // ListObjects lists the objects in a GetBucket
-func (l location) ListObjects(bucketName string, path, prefix string) ([]string, fail.Error) {
+func (l location) ListObjects(bucketName string, path, prefix string) (_ []string, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if l.IsNull() {
 		return []string{}, fail.InvalidInstanceError()
 	}
@@ -405,7 +464,8 @@ func (l location) ListObjects(bucketName string, path, prefix string) ([]string,
 }
 
 // BrowseBucket walks through the objects in a GetBucket and apply callback to each object
-func (l location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) fail.Error) fail.Error {
+func (l location) BrowseBucket(bucketName string, path, prefix string, callback func(o Object) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -423,7 +483,8 @@ func (l location) BrowseBucket(bucketName string, path, prefix string, callback 
 }
 
 // ClearBucket ...
-func (l location) ClearBucket(bucketName string, path, prefix string) fail.Error {
+func (l location) ClearBucket(bucketName string, path, prefix string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -441,7 +502,8 @@ func (l location) ClearBucket(bucketName string, path, prefix string) fail.Error
 }
 
 // ReadObject reads the content of an object and put it in an io.Writer
-func (l location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) fail.Error {
+func (l location) ReadObject(bucketName, objectName string, writer io.Writer, from, to int64) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	if l.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -459,6 +521,7 @@ func (l location) ReadObject(bucketName, objectName string, writer io.Writer, fr
 		return err
 	}
 
+	objectName = strings.Trim(objectName, "/")
 	o, err := newObject(&b, objectName)
 	if err != nil {
 		return err
@@ -476,8 +539,8 @@ func (l location) WriteObject(
 	bucketName string, objectName string,
 	source io.Reader, size int64,
 	metadata abstract.ObjectStorageItemMetadata,
-) (aosi abstract.ObjectStorageItem, _ fail.Error) {
-
+) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	aosi = abstract.ObjectStorageItem{}
 	if l.IsNull() {
 		return aosi, fail.InvalidInstanceError()
@@ -523,8 +586,8 @@ func (l location) WriteMultiPartObject(
 	source io.Reader, sourceSize int64,
 	chunkSize int,
 	metadata abstract.ObjectStorageItemMetadata,
-) (aosi abstract.ObjectStorageItem, _ fail.Error) {
-
+) (aosi abstract.ObjectStorageItem, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	aosi = abstract.ObjectStorageItem{}
 	if l.IsNull() {
 		return aosi, fail.InvalidInstanceError()

@@ -92,6 +92,7 @@ func TestDefectiveCloneableImplementation(t *testing.T) {
 
 func TestValidCloneableImplementation(t *testing.T) {
 	a := NewStructWithPointersAndCorrectReplace()
+	a.content = "Let it burn"
 	a.Rumba = 9
 	a.List = []string{"death", "comes", "to", "all"}
 	a.Map = map[string]interface{}{
@@ -110,6 +111,14 @@ func TestValidCloneableImplementation(t *testing.T) {
 	assert.True(t, ieq)
 
 	a.List[1] = "despair"
+	ieq = reflect.DeepEqual(a, b)
+	assert.False(t, ieq)
+
+	a.content = "on fire"
+	ieq = reflect.DeepEqual(a, b)
+	assert.False(t, ieq)
+
+	a.content = "Let it burn"
 	ieq = reflect.DeepEqual(a, b)
 	assert.False(t, ieq)
 }

@@ -49,14 +49,17 @@ feature:
     parameters:
         - AllowPodsOnMasters=false
         - AllowPodsOnGateways=false
-        - CNI=calico
+        - CNI=flannel
+        #- CNI=calico
         - CalicoNetworking=vxlan
         - ClusterControlplaneEndpointIP
         - Dashboard=true
         - EnableAudit=false
         - ExternalLoadBalancerHostname=
         - Hardening=true
-        - KubeVersion=1.18.5
+        - KubeVersion=1.20.9
+        # - CalicoVersion=v3.19.1
+        - FlannelVersion=v0.13.0
         - OIDCClientName=default
         - OIDCGroupName=user_groups
         - OIDCRealm=
@@ -65,7 +68,7 @@ feature:
     install:
         bash:
             check:
-                pace: nodes,kube
+                pace: nodes,kube,ready
                 steps:
                     nodes:
                         targets:
@@ -83,21 +86,53 @@ feature:
                             masters: one
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
-                                [ $(sfKubectl get nodes -A | wc -l) -gt 1 ] || sfFail 194
+                                [ $(sfKubectl get nodes -A | wc -l) -gt 1 ] || sfFail 194 "no nodes joined yet"
                                 sfExit
                             fi
-                            sfFail 196
+                            sfFail 195 "master didn't join (no .joined file)"
+
+                    ready:
+                        targets:
+                            masters: one
+                        run: |
+                            if [ -f /etc/kubernetes/.joined ]; then
+                                [ $(sfKubectl get nodes -A | grep -v VERSION | grep -v Ready | wc -l) -eq 0 ] || sfFail 196 "not all nodes ready"
+                                sfExit
+                            fi
+                            sfFail 197 "master didn't join (no .joined file)"
 
             add:
-                pace: sysconf,syshardening,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,final
+                pace: ca-certs,sysconf,syshardening,cur-ver,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
                 steps:
+                    ca-certs:
+                        targets:
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            # Fixes Let's Encrypt root certificate expiration error with wget occurring 09/30/21
+                            case $LINUX_KIND in
+                                debian|ubuntu)
+                                    sfWaitForApt
+                                    sfRetry sfApt install -y ca-certificates || sfFail 192
+                                    ;;
+                                redhat|rhel|fedora|centos)
+                                    sfRetry yum install -y ca-certificates || sfFail 193
+                                    ;;
+                                *)
+                                    echo "Unmanaged Linux distribution '$LINUX_KIND'"
+                                    sfFail 194
+                                    ;;
+                            esac
+                            sfExit
+
                     sysconf:
                         targets:
                             gateways: all
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             # Enabling kernel modules required by Kubernetes
                             for i in ip_vs ip_vs_rr ip_vs_wrr ip_vs_sh br_netfilter; do
@@ -117,10 +152,10 @@ feature:
                             case $LINUX_KIND in
                                 debian|ubuntu)
                                     sfWaitForApt
-                                    sfStandardRetry sfApt install -y ebtables socat || sfFail 193
+                                    sfRetry sfApt install -y ebtables socat || sfFail 193 "Error installing etables and socat"
                                     ;;
                                 redhat|rhel|fedora|centos)
-                                    sfStandardRetry yum install -y ebtables socat || sfFail 194
+                                    sfRetry yum install -y ebtables socat || sfFail 194 "Error installing etables and socat"
 
                                     cat >/etc/sysctl.d/kubernetes.conf <<-'EOF'
                             net.bridge.bridge-nf-call-ip6tables = 1
@@ -142,7 +177,7 @@ feature:
                                     ;;
                                 *)
                                     echo "Unmanaged Linux distribution '$LINUX_KIND'"
-                                    sfFail 195
+                                    sfFail 195 "Unmanaged Linux distribution '$LINUX_KIND'"
                                     ;;
                             esac
 
@@ -169,23 +204,24 @@ feature:
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             {{ if eq .Hardening "true" }}
                                 {{ if eq .EnableAudit "true" }}
                                 case $(sfGetFact "linux_kind") in
                                     debian|ubuntu)
                                         sfApt update
-                                        sfStandardRetry sfApt install -y auditd quota quotatool || sfFail 196
+                                        sfRetry sfApt install -y auditd quota quotatool || sfFail 196 "Error installing auditd quota quotatool"
                                         ;;
 
                                     centos|fedora|redhat|rhel)
-                                        sfStandardRetry yum -y install audit audit-libs quota || sfFail 197
+                                        sfRetry yum -y install audit audit-libs quota || sfFail 197 "Error installing audit audit-libs quota"
                                         ;;
 
-                                    *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
-                                    sfFail 198
-                                    ;;
+                                    *)
+                                        echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
+                                        sfFail 198 "unsupported linux distribution '$(sfGetFact "linux_kind")'"
+                                        ;;
                                 esac
 
                                 ## Configures ulimit - not compatible with a host on which a user graphical system is used - like remote desktop...
@@ -216,13 +252,39 @@ feature:
                             {{ end }}
                             sfExit
 
+                    cur-ver:
+                        targets:
+                            masters: one
+                        run: |
+                            which kubeadm &>/dev/null && {
+                                echo "sharing current Kubernetes version used..."
+                                kubeadm version -o short | cut -dv -f2 >${SF_ETCDIR}/kubeversion 2>/dev/null || sfExit 200 "failed to extract current Kubernetes version running on master"
+                                sfDropzonePush ${SF_ETCDIR}/kubeversion || sfFail 201 "Error uploading current kubernetes version"
+                                for ip in {{range .ClusterNodeIPs}}{{.}} {{end}}; do
+                                    sfDropzoneSync $ip || sfFail 202 "Error in sync"
+                                done
+                            }
+                            sfExit
+
                     common-tools:
                         targets:
                             gateways: all
                             masters: all
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
+
+                            id
+                            sfDropzonePop ${SF_TMPDIR}
+                            ls -l ${SF_TMPDIR}
+                            if [ -f ${SF_TMPDIR}/kubeversion ]; then
+                                KUBE_VERSION=$(cat ${SF_TMPDIR}/kubeversion)
+                                echo "Current Kubernetes master is running $KUBE_VERSION, installing corresponding tools"
+                            else
+                                KUBE_VERSION={{ .KubeVersion }}
+                                echo "Installing Kubernetes tools $KUBE_VERSION"
+                            fi
+                            #sfDropzoneClean
 
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
@@ -230,11 +292,11 @@ feature:
                                     cat >/etc/apt/sources.list.d/kubernetes.list <<-EOF
                             deb https://apt.kubernetes.io/ kubernetes-xenial main
                             EOF
-                            {{ if .KubeVersion }}
-                                    sfApt update && sfApt install -y kubelet={{.KubeVersion}}-00 kubeadm={{.KubeVersion}}-00 kubectl={{.KubeVersion}}-00 || sfFail 199
-                            {{ else }}
-                                    sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 200
-                            {{ end }}
+                                    if [ ! -x ${KUBE_VERSION} ]; then
+                                        sfApt update && sfApt install -y kubelet=${KUBE_VERSION}-00 kubeadm=${KUBE_VERSION}-00 kubectl=${KUBE_VERSION}-00 || sfFail 203 "Error installing kubelet kubadm kubectl"
+                                    else
+                                        sfApt update && sfApt install -y kubelet kubeadm kubectl || sfFail 203 "Error installing kubelet kubeadm kubectl"
+                                    fi
                                     apt-mark hold kubelet kubeadm kubectl
                                     ;;
 
@@ -250,15 +312,15 @@ feature:
                             exclude=kube*
                             EOF
 
-                            {{ if .KubeVersion }}
-                                    yum -y install kubelet-{{.KubeVersion}} kubeadm-{{.KubeVersion}} kubectl-{{.KubeVersion}} --disableexcludes=kubernetes || sfFail 199
-                            {{ else }}
-                                    yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 201
-                            {{ end }}
+                                    if [ ! -x ${KUBE_VERSION} ]; then
+                                        yum -y install kubelet-${KUBE_VERSION} kubeadm-${KUBE_VERSION} kubectl-${KUBE_VERSION} --disableexcludes=kubernetes || sfFail 203 "Error installing kubelet kubeadm kubectl"
+                                    else
+                                        yum -y install kubelet kubeadm kubectl --disableexcludes=kubernetes || sfFail 203 "Error installing kubelet kubeadm kubectl"
+                                    fi
                                     ;;
 
-                                *) echo "unsupported linux distribution ''"
-                                   sfFail 202
+                                *) echo "unsupported linux distribution '$(sfGetFact "linux_kind")'"
+                                   sfFail 204 "unsupported linux distribution '$(sfGetFact "linux_kind")'"
                             esac
                             sfService enable kubelet && sfService start kubelet
 
@@ -268,18 +330,18 @@ feature:
                         targets:
                             masters: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             {{ if .ClusterControlplaneUsesVIP }}
                             case $(sfGetFact "linux_kind") in
                                 ubuntu|debian)
-                                    sfApt update && sfApt -y install keepalived haproxy || sfFail 203
+                                    sfApt update && sfApt -y install keepalived haproxy || sfFail 205 "Error installing keepalived haproxy"
                                     ;;
                                 redhat|rhel|centos|fedora)
-                                    yum install -q -y keepalived haproxy || sfFail 204
+                                    yum install -q -y keepalived haproxy || sfFail 205 "Error installing keepalived haproxy"
                                     ;;
                                 *)
-                                    sfFail 205 "Unsupported Linux distribution '$(sfGetFact "linux_kind")'!"
+                                    sfFail 206 "Unsupported Linux distribution '$(sfGetFact "linux_kind")'!"
                                     ;;
                             esac
 
@@ -342,7 +404,7 @@ feature:
                             fi
 
                             sfService enable keepalived
-                            sfService restart keepalived || sfFail 206
+                            sfService restart keepalived || sfFail 207 "Error restarting keepalived"
 
                             ## Configure haproxy as TCP load-balancer for kubernetes Control Plane
                             cat >/etc/haproxy/haproxy.cfg <<-EOF
@@ -400,7 +462,7 @@ feature:
                             EOF
                             mkdir -p /var/local/haproxy
                             sfService enable haproxy
-                            sfService restart haproxy || sfFail 207
+                            sfService restart haproxy || sfFail 208 "Error restarting haproxy"
                             {{ end }}
                             sfExit
 
@@ -408,7 +470,7 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             mkdir -p /etc/kubernetes/pki
                             if [ -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
@@ -424,7 +486,7 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             mkdir -p /etc/kubernetes/kubeadm
 
@@ -517,10 +579,10 @@ feature:
                             metricsBindAddress: 0.0.0.0:10249
                             EOF
 
-                            sfRetry $(sfDockerImagePullTimeout) $(sfDefaultDelay) kubeadm config images pull || sfFail 208
-                            sudo kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 209
-                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 210
-                            cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -n 1) || sfFail 211
+                            sfRetryEx {{ or .reserved_DockerImagePullTimeout "10m" }} {{ or .reserved_DefaultDelay 10 }} kubeadm config images pull || sfFail 208 "Kubeadm error pulling images"
+                            sudo kubeadm init --config=/etc/kubernetes/kubeadm/kubeadm-config.yaml || sfFail 209 "Kubeadm error init config"
+                            cp_join_cmd=$(kubeadm token create --ttl 10m --print-join-command) || sfFail 210 "Kubeadm error creating tokens"
+                            cert_key=$(kubeadm init phase upload-certs --upload-certs | tail -n 1) || sfFail 211 "Kubeadm error uploading certs"
 
                             cat >${SF_TMPDIR}/init_cluster_admin_kube.sh <<-'EOF'
                             mkdir -p ~{{.ClusterAdminUsername}}/.kube
@@ -536,7 +598,7 @@ feature:
                             EOF
 
                             # execute init_cluster_admin_kube.sh on the current master
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 212
+                            bash -x ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 212 "Kubeadm error initializing cluster"
                             # Starting from here, any kubectl command must be changed to sfKubectl
 
                             # Push control-plane join command to all the other masters
@@ -544,11 +606,11 @@ feature:
                             kubeadm reset --force
                             $cp_join_cmd --control-plane --certificate-key $cert_key --apiserver-bind-port $LOCAL_PORT
                             EOF
-                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || sFail 213
-                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 214
+                            sfDropzonePush ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 213 "Error uploading cp_join_cmd.sh"
+                            sfDropzonePush ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 214 "Error uploading init_cluster_admin_kube.sh"
                             for ip in {{range .ClusterMasterIPs}}{{.}} {{end}}; do
                                 [ "$ip" = "{{.HostIP}}" ] && continue
-                                sfDropzoneSync $ip || sfFail 215
+                                sfDropzoneSync $ip || sfFail 215 "Error in sync"
                             done
                             rm ${SF_TMPDIR}/cp_join_cmd.sh ${SF_TMPDIR}/init_cluster_admin_kube.sh
                             sfDropzoneClean
@@ -679,33 +741,34 @@ feature:
                               resourceNames: ['privileged']
                             EOF
 
-                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 216
-                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 217
+                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-default.yaml || sfFail 216 "failure applying psp-default.yaml"
+                            sfKubectl apply -f /etc/kubernetes/kubeadm/psp-privileged.yaml || sfFail 217 "failure applying psp-privileged.yaml"
                             {{ end }}
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 218
-                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 219
-                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 220
+                            sfRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 218 "failure checking apiserver"
+                            sfRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 219 "failure checking controller"
+                            sfRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 220 "failure checking scheduler"
 
                             echo "cp1 init done"
+                            touch /etc/kubernetes/.cp1
                             sfExit
 
                     cni:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             case {{ .CNI }} in
                                 flannel)
                                     # Apply Flannel yaml
-                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/v0.12.0/Documentation/kube-flannel.yml || sfFail 221
+                                    sfKubectl apply -f https://raw.githubusercontent.com/coreos/flannel/{{.FlannelVersion}}/Documentation/kube-flannel.yml || sfFail 221 "Error applying flannel"
                                     ;;
                                 calico)
                                     # Download Calico yaml
-                                    wget https://docs.projectcalico.org/archive/v3.15/manifests/calico.yaml -P ${SF_TMPDIR} || sfFail 222
+                                    wget https://docs.projectcalico.org/manifests/calico.yaml -P ${SF_TMPDIR} || sfFail 222 "Error downloading calico yaml"
 
                                     # Configure Pods subnet
                                     sed -i 's/# - name: CALICO_IPV4POOL_CIDR/- name: CALICO_IPV4POOL_CIDR/g' ${SF_TMPDIR}/calico.yaml
@@ -716,41 +779,43 @@ feature:
                                     sed -i '/.*- name: CALICO_IPV4POOL_IPIP/,//s/.*value: "Always"/              value: "Never"/' ${SF_TMPDIR}/calico.yaml
                                     # Enable VXLAN
                                     sed -i '/.*- name: CALICO_IPV4POOL_VXLAN/,//s/.*value: "Never"/              value: "Always"/' ${SF_TMPDIR}/calico.yaml
+                                    # change calico backend
+                                    sed -i 's/calico_backend: "bird"/calico_backend: "vxlan"/' ${SF_TMPDIR}/calico.yaml
+                                    # update liveness and readyness
+                                    sed -i '/.*- -bird-live/d' ${SF_TMPDIR}/calico.yaml
+                                    sed -i '/.*- -bird-ready/d' ${SF_TMPDIR}/calico.yaml
                                     {{ end }}
 
                                     # Apply Calico yaml
-                                    sfKubectl apply -f ${SF_TMPDIR}/calico.yaml || sfFail 223
-                                    rm ${SF_TMPDIR}/calico.yaml
+                                    sfKubectl apply -f ${SF_TMPDIR}/calico.yaml || sfFail 223 "Error applying calico yaml"
+                                    #rm ${SF_TMPDIR}/calico.yaml
                                     ;;
                             esac
 
-                            touch /etc/kubernetes/.joined
                             sfExit 0
 
                     cpx-init:
                         targets:
                             masters: all
-                        serialized: true
                         run: |
-                            # Don't try to init a kubernetes cluster already running
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
+                            [ -f /etc/kubernetes/.cp1 ] && sfExit
 
-                            sfDropzonePop ${SF_TMPDIR} || sfFail 224
-                            sfDropzoneClean
+                            sfDropzonePop ${SF_TMPDIR} || sfFail 224 "failure creating drop zone"
+                            sfDropzoneClean || sfFail 224 "failure cleaning drop zone"
 
-                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 225
+                            [ -f ${SF_TMPDIR}/cp_join_cmd.sh ] || sfFail 225 "failure due to missing cp_join_cmd.sh"
                             # sometimes, etcd cluster appears to be unhealthy when calling this... So retries!
-                            sfRetry $(sfClusterJoinTimeout) $(sfDefaultDelay) bash ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 226
-                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 227
-                            bash ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 228
+                            sfRetryEx {{ or .reserved_ClusterJoinTimeout "14m" }} {{ or .reserved_DefaultDelay 10 }} bash -x ${SF_TMPDIR}/cp_join_cmd.sh || sfFail 226 "failure running cp_join_cmd.sh"
+                            [ -f ${SF_TMPDIR}/init_cluster_admin_kube.sh ] || sfFail 227 "failure due to missing init_cluster_admin_kube.sh"
+                            bash -x ${SF_TMPDIR}/init_cluster_admin_kube.sh || sfFail 228 "failure running init_cluster_admin_kube.sh"
 
                             # waits availability of key pods
                             set -u -o pipefail
-                            sfStandardRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 229
-                            sfStandardRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 230
-                            sfStandardRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 231
+                            sfRetry sfIsPodRunning kube-apiserver-{{.Hostname}}@kube-system || sfFail 229 "failure running k8s apiserver"
+                            sfRetry sfIsPodRunning kube-controller-manager-{{.Hostname}}@kube-system || sfFail 230 "failure running k8s controller"
+                            sfRetry sfIsPodRunning kube-scheduler-{{.Hostname}}@kube-system || sfFail 231 "failure running k8s scheduler"
 
-                            touch /etc/kubernetes/.joined
                             echo "cpx init done"
                             sfExit
 
@@ -758,7 +823,7 @@ feature:
                         targets:
                             gateways: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             MASTERIP=
                             for m in {{ range .ClusterMasterIPs }}{{.}} {{ end -}}; do
@@ -769,19 +834,18 @@ feature:
                                 MASTERIP=$m
                                 break
                             done
-                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 232
-                            eval $NODE_JOIN_CMD || sfFail 233
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 232 "failed to find available master to register with. Aborted."
+                            eval $NODE_JOIN_CMD || sfFail 233 "failed joining nodes"
 
-                            sfRemoteExec $MASTERIP sudo -u {{ .ClusterAdminUsername }} -i kubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 234
+                            sfRemoteExec $MASTERIP sudo -u {{ .ClusterAdminUsername }} -i kubectl taint nodes {{ .Hostname }} key=value:NoSchedule || sfFail 234 "failure checking tainted nodes"
 
-                            touch /etc/kubernetes/.joined
                             sfExit
 
                     join-nodes:
                         targets:
                             nodes: all
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             MASTERIP=
                             for m in {{ range .ClusterMasterIPs }}{{.}} {{ end -}}; do
@@ -792,17 +856,38 @@ feature:
                                 MASTERIP=$m
                                 break
                             done
-                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 235
-                            eval $NODE_JOIN_CMD || sfFail 236
+                            [ -z "$MASTERIP" ] && echo "failed to find available master to register with. Aborted." && sfFail 235 "failed to find available master to register with. Aborted."
+                            eval $NODE_JOIN_CMD || sfFail 236 "failure joining nodes"
 
-                            touch /etc/kubernetes/.joined
                             sfExit
 
-                    final:
+                    fw:
+                        targets:
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
+
+                            # add interfaces to trusted zone of the firewall
+                            case {{.CNI}} in
+                                flannel)
+                                    sfFirewall --zone=trusted --add-interface=cni0 --permanent || sfFail 224 "failed to add cni0 interface to firewalld trusted zone"
+                                    sfFirewall --zone=trusted --add-interface={{.CNI}}.1 --permanent || sfFail 225 "failed to add {{.CNI}}.1 interface to firewalld trusted zone"
+                                    ;;
+                                calico)
+                                    sfFirewall --zone=trusted --add-interface=vxlan.calico --permanent || sfFail 225 "failed to add vxlan.calico interface to firewalld trusted zone"
+                                    ;;
+                            esac
+                            sfFirewallReload || sfFail 226 "failed to reload firewalld configuration for cni driver {{.CNI}}"
+
+                            sfExit
+
+                    supplemental:
                         targets:
                             masters: one
                         run: |
-                            [ -f /etc/kubernetes/.joined ] && sfExit
+                            [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
                             # Allows pods to start on master if there is only one master or if it's explicitely requested
                             if [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ]; then
@@ -816,13 +901,22 @@ feature:
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then
                                 if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                    sfStandardRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 237 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
+                                    sfRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 237 "Unable to install kubernetes dashboard version $(sfGithubLastRelease)"
                                 else
                                     if curl --output /dev/null --silent --head --fail "https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml"; then
-                                        sfStandardRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 238 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
+                                        sfRetry sfKubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/$(sfGithubLastNotBetaRelease kubernetes dashboard)/src/deploy/recommended/kubernetes-dashboard.yaml || sfFail 238 "Unable to install kubernetes dashboard version $(sfGithubLastNotBetaRelease)"
                                     fi
                                 fi
                             fi
+                            sfExit
+
+                    final:
+                        targets:
+                            gateways: all
+                            masters: all
+                            nodes: all
+                        run: |
+                            [ ! -f /etc/kubernetes/.joined ] && touch /etc/kubernetes/.joined
                             sfExit
 
             remove:

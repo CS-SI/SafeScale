@@ -19,9 +19,8 @@ package flexibleengine
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -30,6 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	imagefilters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/images"
@@ -38,6 +38,8 @@ import (
 )
 
 const (
+	flexibleEngineDefaultImage = "Ubuntu 20.04"
+
 	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com/v3"
 )
 
@@ -114,6 +116,16 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = flexibleEngineDefaultImage
+	}
+
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -125,10 +137,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
 		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
 		return rxp.Match([]byte(str))
-	})
+	}
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
@@ -155,10 +167,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		DefaultSecurityGroupName: "default",
 		DefaultNetworkName:       vpcName,
 		DefaultNetworkCIDR:       vpcCIDR,
+		DefaultImage:             defaultImage,
 		// WhitelistTemplateRegexp: whitelistTemplatePattern,
 		// BlacklistTemplateRegexp: blacklistTemplatePattern,
 		// WhitelistImageRegexp:    whitelistImagePattern,
 		// BlacklistImageRegexp:    blacklistImagePattern,
+		MaxLifeTime: maxLifeTime,
 	}
 
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
@@ -180,13 +194,14 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 	}
 }
 
-// InspectTemplate returns the Template referenced by id; overloads Stack.InspectTemplate to inject templates with GPU
+// InspectTemplate returns the Template referenced by id; overloads stack.InspectTemplate to inject templates with GPU
 func (p *provider) InspectTemplate(id string) (abstract.HostTemplate, fail.Error) {
 	nullAHT := abstract.HostTemplate{}
 	tpl, xerr := p.Stack.InspectTemplate(id)
 	if xerr != nil {
 		return nullAHT, xerr
 	}
+
 	addGPUCfg(&tpl)
 	return tpl, nil
 }
@@ -201,6 +216,15 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 
 	var tpls []abstract.HostTemplate
 	for _, tpl := range allTemplates {
+		// Ignore templates containing ".mcs."
+		if strings.Contains(tpl.Name, ".mcs.") {
+			continue
+		}
+		// Ignore template starting with "physical."
+		if strings.HasPrefix(tpl.Name, "physical.") {
+			continue
+		}
+
 		addGPUCfg(&tpl)
 		tpls = append(tpls, tpl)
 	}
@@ -260,6 +284,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("DefaultNetworkName", opts.DefaultNetworkName)
 	cfg.Set("DefaultNetworkCIDR", opts.DefaultNetworkCIDR)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 	// cfg.Set("Customizations", opts.Customizations)
 
 	return cfg, nil
@@ -268,6 +293,12 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // GetName returns the providerName
 func (p *provider) GetName() string {
 	return "flexibleengine"
+}
+
+// GetStack returns the stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
 }
 
 // GetTenantParameters returns the tenant parameters as-is

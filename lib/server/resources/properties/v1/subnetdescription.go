@@ -22,11 +22,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // SubnetDescription contains additional information describing the subnet, in V1
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type SubnetDescription struct {
@@ -40,14 +40,15 @@ func NewSubnetDescription() *SubnetDescription {
 	return &SubnetDescription{}
 }
 
-// Content ... (data.Clonable interface)
-func (sd *SubnetDescription) Content() interface{} {
-	return sd
+// IsNull ...
+// (data.Clonable interface)
+func (sd *SubnetDescription) IsNull() bool {
+	return sd == nil || (sd.Created.IsZero() && sd.Purpose == "")
 }
 
 // Clone ... (data.Clonable interface)
 func (sd SubnetDescription) Clone() data.Clonable {
-	return NewNetworkDescription().Replace(&sd)
+	return NewSubnetDescription().Replace(&sd)
 }
 
 // Replace ... (data.Clonable interface)
@@ -62,5 +63,5 @@ func (sd *SubnetDescription) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.subnet", string(subnetproperty.DescriptionV1), NewSubnetDescription())
+	serialize.PropertyTypeRegistry.Register("resources.subnet", subnetproperty.DescriptionV1, NewSubnetDescription())
 }

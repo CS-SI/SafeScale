@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"regexp"
+	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -28,6 +29,10 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+)
+
+const (
+	gcpDefaultImage = "Ubuntu 20.04"
 )
 
 // provider is the provider implementation of the Gcp provider
@@ -108,6 +113,14 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	projectName, _ := computeCfg["ProjectName"].(string)
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = gcpDefaultImage
+	}
+
+	maxLifeTime := 0
+	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
+	}
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
@@ -143,6 +156,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		OperatorUsername: operatorUsername,
 		UseNATService:    true,
 		ProviderName:     providerName,
+		MaxLifeTime:      maxLifeTime,
 	}
 
 	gcpStack, xerr := gcp.New(authOptions, gcpConf, cfgOptions)
@@ -183,12 +197,19 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 	return cfg, nil
 }
 
 // GetName returns the providerName
 func (p provider) GetName() string {
 	return "gcp"
+}
+
+// GetStack returns the stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
 }
 
 // ListImages ...

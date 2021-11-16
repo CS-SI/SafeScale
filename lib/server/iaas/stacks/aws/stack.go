@@ -45,13 +45,18 @@ type stack struct {
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
-func NullStack() *stack { //nolint
+func NullStack() *stack { // nolint
 	return &stack{}
 }
 
 // IsNull tells if the instance represents a null value
 func (s *stack) IsNull() bool {
 	return s == nil || s.EC2Service == nil
+}
+
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "aws"
 }
 
 // GetConfigurationOptions ...

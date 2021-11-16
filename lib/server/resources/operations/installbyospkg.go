@@ -17,18 +17,17 @@
 package operations
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
-
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installaction"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -81,9 +80,9 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 	r, xerr = worker.Proceed(ctx, v, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to check if Feature '%s' is installed on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+		return r, fail.Wrap(xerr, "failed to check if Feature '%s' is installed on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
-	return r, xerr
+	return r, nil
 }
 
 // Add installs the Feature using apt
@@ -126,9 +125,9 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 	r, xerr = worker.Proceed(ctx, v, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+		return r, fail.Wrap(xerr, "failed to add Feature '%s' on %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
-	return r, xerr
+	return r, nil
 }
 
 // Remove uninstalls the Feature using the RemoveScript script
@@ -169,9 +168,9 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 	r, xerr = worker.Proceed(ctx, v, s)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		xerr = fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
+		return r, fail.Wrap(xerr, "failed to remove Feature '%s' from %s '%s'", f.GetName(), t.TargetType(), t.GetName())
 	}
-	return r, xerr
+	return r, nil
 }
 
 // aptInstaller is an installer using script to add and remove a Feature

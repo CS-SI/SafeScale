@@ -117,7 +117,7 @@ type createResult struct {
 	commonResult
 }
 
-// GetResult represents the result of a get operation. Call its Extract
+// Result represents the result of a get operation. Call its Extract
 // method to interpret it as a FloatingIP.
 type getResult struct {
 	commonResult
@@ -133,8 +133,8 @@ func (s stack) ListFloatingIPs() pagination.Pager {
 		return pagination.Pager{}
 	}
 
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips"
-	return pagination.NewPager(s.Stack.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
+	return pagination.NewPager(s.NetworkClient, url, func(r pagination.PageResult) pagination.Page {
 		return floatingIPPage{pagination.LinkedPageBase{PageResult: r}}
 	})
 }
@@ -146,14 +146,14 @@ func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 	}
 
 	r := getResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.Stack.Driver.Request("GET", url, &opts)
+			_, err := s.Driver.Request("GET", url, &opts)
 			r.Err = err
 			return normalizeError(err)
 		},
@@ -208,9 +208,12 @@ func (s stack) FindFloatingIPByIP(ipAddress string) (*FloatingIP, error) {
 }
 
 // CreateFloatingIP creates a floating IP
-func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
+func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
 	if s.IsNull() {
 		return &FloatingIP{}, fail.InvalidInstanceError()
+	}
+	if host == nil {
+		return &FloatingIP{}, fail.InvalidParameterCannotBeNilError("host")
 	}
 
 	ipOpts := ipCreateOpts{
@@ -220,8 +223,9 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
 	bandwidthOpts := bandwidthCreateOpts{
-		Name:      "bandwidth-" + s.vpc.Name,
+		Name:      "bandwidth-" + host.Networking.SubnetsByID[host.Networking.DefaultSubnetID],
 		Size:      1000,
 		ShareType: "PER",
 	}
@@ -229,13 +233,14 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
 	// Merger bi in bb
 	for k, v := range bi {
 		bb[k] = v
 	}
 
 	r := createResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips"
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips" // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONBody:     bb,
 		JSONResponse: &r.Body,
@@ -243,7 +248,7 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Stack.Driver.Request("POST", url, &opts)
+			_, innerErr := s.Driver.Request("POST", url, &opts)
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -255,6 +260,7 @@ func (s stack) CreateFloatingIP() (*FloatingIP, fail.Error) {
 	if err != nil {
 		return nil, normalizeError(err)
 	}
+
 	return fip, nil
 }
 
@@ -265,14 +271,14 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 	}
 
 	r := deleteResult{}
-	url := s.Stack.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id
+	url := s.NetworkClient.Endpoint + "v1/" + s.authOpts.ProjectID + "/publicips/" + id // FIXME: Hardcoded endpoint
 	opts := gophercloud.RequestOpts{
 		JSONResponse: &r.Body,
 		OkCodes:      []int{200, 201},
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, r.Err = s.Stack.Driver.Request("DELETE", url, &opts)
+			_, r.Err = s.Driver.Request("DELETE", url, &opts)
 			err := r.ExtractErr()
 			return normalizeError(err)
 		},
@@ -300,7 +306,7 @@ func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Erro
 	return stacks.RetryableRemoteCall(
 		func() error {
 			r := servers.ActionResult{}
-			_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
+			_, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 			return normalizeError(r.ExtractErr())
 		},
 		normalizeError,
@@ -327,7 +333,7 @@ func (s stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Err
 	return stacks.RetryableRemoteCall(
 		func() error {
 			r := servers.ActionResult{}
-			_, r.Err = s.Stack.ComputeClient.Post(s.Stack.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
+			_, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
 			return normalizeError(r.ExtractErr())
 		},
 		normalizeError,

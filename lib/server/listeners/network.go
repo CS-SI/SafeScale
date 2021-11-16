@@ -40,12 +40,14 @@ const (
 )
 
 // NetworkListener network service server grpc
-type NetworkListener struct{}
+type NetworkListener struct {
+	protocol.UnimplementedNetworkServiceServer
+}
 
 // Create a new network
-func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err, "cannot create network")
+func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreateRequest) (_ *protocol.Network, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitLogError(&ferr, "cannot create network")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -58,10 +60,8 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err == nil && !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkName := in.GetName()
@@ -69,15 +69,14 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		return nil, fail.InvalidRequestError("network name cannot be empty string")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("network create '%s'", networkName))
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/create", networkName))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	svc := job.Service()
 
-	tracer := debug.NewTracer(task, true, "('%s')", networkName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true, "('%s')", networkName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -92,21 +91,21 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		DNSServers:    in.GetDnsServers(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 	}
-	rn, xerr := networkfactory.New(svc)
+	networkInstance, xerr := networkfactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if xerr = rn.Create(job.GetContext(), req); xerr != nil {
+	if xerr = networkInstance.Create(job.Context(), req); xerr != nil {
 		return nil, xerr
 	}
 
 	defer func() {
-		if err != nil && !in.GetKeepOnFailure() {
-			defer task.DisarmAbortSignal()()
-
-			if derr := rn.Delete(job.GetContext()); derr != nil {
-				_ = fail.ConvertError(err).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
+		if ferr != nil && !in.GetKeepOnFailure() {
+			// VPL: using context.Background() instead of job.Context() disables the cancellation
+			// defer job.Task().DisarmAbortSignal()()
+			if dferr := networkInstance.Delete(context.Background()); dferr != nil {
+				_ = fail.ConvertError(ferr).AddConsequence(fail.Wrap(dferr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
 			}
 		}
 	}()
@@ -134,27 +133,32 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 		if sizing == nil {
 			sizing = &abstract.HostSizingRequirements{MinGPU: -1}
 		}
-		sizing.Image = in.GetGateway().GetImageId()
 
-		rs, xerr := subnetfactory.New(svc)
+		subnetInstance, xerr := subnetfactory.New(svc)
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		req := abstract.SubnetRequest{
-			NetworkID:      rn.GetID(),
+			NetworkID:      networkInstance.GetID(),
 			Name:           in.GetName(),
 			CIDR:           subnetNet.String(),
 			KeepOnFailure:  in.GetKeepOnFailure(),
 			DefaultSSHPort: in.GetGateway().GetSshPort(),
+			ImageRef:       in.GetGateway().GetImageId(),
 		}
-		xerr = rs.Create(job.GetContext(), req, in.GetGateway().GetName(), sizing)
+		xerr = subnetInstance.Create(job.Context(), req, in.GetGateway().GetName(), sizing)
 		if xerr != nil {
 			return nil, fail.Wrap(xerr, "failed to create subnet '%s'", req.Name)
 		}
+
+		subnetInstance.Released()
 	}
 
+	networkInstance.Released()
+
 	tracer.Trace("Network '%s' successfully created.", networkName)
-	return rn.ToProtocol()
+	return networkInstance.ToProtocol()
 }
 
 // List existing networks
@@ -175,19 +179,18 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "network list")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/networks/list")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	svc := job.Service()
 
-	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.network")*/).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -195,7 +198,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	if in.GetAll() {
 		list, xerr = svc.ListNetworks()
 	} else {
-		list, xerr = networkfactory.List(job.GetContext(), svc)
+		list, xerr = networkfactory.List(job.Context(), svc)
 	}
 	if xerr != nil {
 		return nil, xerr
@@ -228,7 +231,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -237,21 +240,22 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "networkInstance inspect")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.networkInstance")*/, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.networkInstance")*/, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	networkInstance, xerr := networkfactory.Load(job.GetService(), ref)
+	networkInstance, xerr := networkfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	defer networkInstance.Released()
 
 	return networkInstance.ToProtocol()
 }
@@ -275,7 +279,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -284,41 +288,41 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "delete network")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/network/%s/delete", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
+	svc := job.Service()
 
-	tracer := debug.NewTracer(task, true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true /*tracing.ShouldTrace("listeners.network")*/, "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rn, xerr := networkfactory.Load(svc, ref)
+	networkInstance, xerr := networkfactory.Load(svc, ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			an, xerr := svc.InspectNetworkByName(ref)
+			abstractNetwork, xerr := svc.InspectNetworkByName(ref)
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					an, xerr = svc.InspectNetwork(ref)
+					abstractNetwork, xerr = svc.InspectNetwork(ref)
+					if xerr != nil {
+						switch xerr.(type) {
+						case *fail.ErrNotFound:
+							return empty, fail.NotFoundError("failed to find Network %s", refLabel)
+						default:
+							return empty, xerr
+						}
+					}
 				default:
 					return empty, xerr
 				}
 			}
-			if xerr != nil {
-				switch xerr.(type) { //nolint
-				case *fail.ErrNotFound:
-					return empty, fail.NotFoundError("failed to find Network %s", refLabel)
-				}
-				return empty, xerr
-			}
 
-			if cfg, xerr := svc.GetConfigurationOptions(); xerr == nil {
-				if name, found := cfg.Get("DefaultNetworkName"); found && name.(string) == an.Name {
+			if cfg, xerr := svc.GetConfigurationOptions(); xerr == nil { // FIXME: Very bad practice
+				if name, found := cfg.Get("DefaultNetworkName"); found && name.(string) == abstractNetwork.Name {
 					return empty, fail.InvalidRequestError("cannot delete default Network %s because its existence is not controlled by SafeScale", refLabel)
 				}
 			}
@@ -327,7 +331,9 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 			return empty, xerr
 		}
 	}
-	if xerr = rn.Delete(job.GetContext()); xerr != nil {
+
+	xerr = networkInstance.Delete(job.Context())
+	if xerr != nil {
 		return empty, xerr
 	}
 

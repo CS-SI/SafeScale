@@ -19,13 +19,13 @@ package aws
 import (
 	"fmt"
 	"regexp"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
@@ -117,7 +117,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	username, ok := identityCfg["Username"].(string)
 	if !ok || username == "" {
-		username, _ = identityCfg["User"].(string)
+		username, _ = identityCfg["Username"].(string)
 	}
 	password, _ := identityCfg["Password"].(string)
 
@@ -142,6 +142,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	projectName, _ := computeCfg["ProjectName"].(string)
 	projectID, _ := computeCfg["ProjectID"].(string)
 	defaultImage, _ := computeCfg["DefaultImage"].(string)
+
+	maxLifeTime := 0
+	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
+	}
 
 	operatorUsername, _ := computeCfg["OperatorUsername"].(string)
 	if operatorUsername == "" {
@@ -182,6 +187,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		ProviderName:     providerName,
 		// BuildSubnets:     false, // FIXME: AWS by default don't build subnetworks
 		DefaultSecurityGroupName: "default",
+		MaxLifeTime:              maxLifeTime,
 	}
 
 	awsStack, err := aws.New(authOptions, awsConf, cfgOptions)
@@ -229,6 +235,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("BuildSubnets", opts.BuildSubnets)
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }
@@ -236,6 +243,12 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // GetName returns the providerName
 func (p provider) GetName() string {
 	return "aws"
+}
+
+// GetStack returns the stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
 }
 
 // ListImages overloads stack.ListImages to allow to filter the available images on the provider level

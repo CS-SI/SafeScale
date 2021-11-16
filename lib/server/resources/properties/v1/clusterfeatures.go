@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterInstalledFeature ...
@@ -27,8 +27,10 @@ import (
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type ClusterInstalledFeature struct {
+	Name       string              `json:"name"`                  // contains the name of the feature
+	FileName   string              `json:"filename"`              // contains name of file used
 	RequiredBy map[string]struct{} `json:"required_by,omitempty"` // tells what feature(s) needs this one
-	Requires   map[string]struct{} `json:"requires,omitempty"`
+	Requires   map[string]struct{} `json:"requires,omitempty"`    // tells what feature(s) is(are) required by this one
 }
 
 // NewClusterInstalledFeature ...
@@ -37,6 +39,12 @@ func NewClusterInstalledFeature() *ClusterInstalledFeature {
 		RequiredBy: map[string]struct{}{},
 		Requires:   map[string]struct{}{},
 	}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (cif *ClusterInstalledFeature) IsNull() bool {
+	return cif == nil || cif.Name == ""
 }
 
 // Clone ...
@@ -80,6 +88,12 @@ func newClusterFeatures() *ClusterFeatures {
 		Installed: map[string]*ClusterInstalledFeature{},
 		Disabled:  map[string]struct{}{},
 	}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (f *ClusterFeatures) IsNull() bool {
+	return f == nil || (len(f.Installed) == 0 && len(f.Disabled) == 0)
 }
 
 // Clone ...

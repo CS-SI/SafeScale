@@ -19,7 +19,6 @@ package iaas
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"regexp"
 	"sort"
@@ -27,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	scribble "github.com/nanobox-io/golang-scribble"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -52,12 +52,10 @@ import (
 // Service consolidates Provider and ObjectStorage.Location interfaces in a single interface
 // completed with higher-level methods
 type Service interface {
-	// --- from service ---
 	CreateHostWithKeyPair(abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error)
 	FilterImages(string) ([]abstract.Image, fail.Error)
 	FindTemplateBySizing(abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
 	FindTemplateByName(string) (*abstract.HostTemplate, fail.Error)
-	GetName() string
 	GetProviderName() string
 	GetMetadataBucket() abstract.ObjectStorageBucket
 	GetMetadataKey() (*crypt.Key, fail.Error)
@@ -127,7 +125,7 @@ func (a ByRankDRF) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByRankDRF) Less(i, j int) bool { return RankDRF(a[i]) < RankDRF(a[j]) }
 
 // NullService creates a service instance corresponding to null value
-func NullService() *service { //nolint
+func NullService() *service { // nolint
 	return &service{}
 }
 
@@ -218,8 +216,8 @@ func (svc *service) ChangeProvider(provider providers.Provider) fail.Error {
 	return nil
 }
 
-// WaitHostState waits an host achieve state
-// If host in error state, returns utils.ErrNotAvailable
+// WaitHostState waits until a host achieves state 'state'
+// If host is in error state, returns utils.ErrNotAvailable
 // If timeout is reached, returns utils.ErrTimeout
 func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout time.Duration) (rerr fail.Error) {
 	if svc.IsNull() {
@@ -232,23 +230,52 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 	timer := time.After(timeout)
 	host := abstract.NewHostFull()
 	host.Core.ID = hostID
-	for {
-		host, rerr = svc.InspectHost(host)
-		if rerr != nil {
-			return rerr
+
+	errCh := make(chan fail.Error)
+	done := make(chan struct{})
+	defer close(errCh)
+
+	go func() {
+		for {
+			select {
+			case <-done: // only when it's closed
+				return
+			default:
+			}
+
+			host, rerr = svc.InspectHost(host) // FIXME: all service functions should accept ctx in order to be cancelled
+			if rerr != nil {
+				errCh <- rerr
+				return
+			}
+			if host.CurrentState == state {
+				errCh <- nil
+				return
+			}
+			if host.CurrentState == hoststate.Error {
+				errCh <- fail.NotAvailableError("host in error state") // FIXME: This is NOT an error
+				return
+			}
+
+			select {
+			case <-done: // only when it's closed
+				return
+			default:
+				time.Sleep(temporal.GetMinDelay())
+			}
 		}
-		if host.CurrentState == state {
-			return nil
+	}()
+
+	select {
+	case <-timer:
+		close(done)
+		return fail.TimeoutError(nil, timeout, "Wait state timeout")
+	case rErr := <-errCh:
+		close(done)
+		if rErr != nil {
+			return rErr
 		}
-		if host.CurrentState == hoststate.Error {
-			return fail.NotAvailableError("host in error state")
-		}
-		select {
-		case <-timer:
-			return fail.TimeoutError(nil, timeout, "Wait volume state timeout")
-		default:
-			time.Sleep(1 * time.Second)
-		}
+		return nil
 	}
 }
 
@@ -335,6 +362,7 @@ func (svc service) FindTemplateByName(name string) (*abstract.HostTemplate, fail
 		return nil, err
 	}
 	for _, i := range allTemplates {
+		i := i
 		if i.Name == name {
 			return &i, nil
 		}
@@ -353,7 +381,10 @@ func (svc service) FindTemplateBySizing(sizing abstract.HostSizingRequirements) 
 	var template *abstract.HostTemplate
 	if len(templates) > 0 {
 		template = templates[0]
-		msg := fmt.Sprintf("Selected host template: '%s' (%d core%s", template.Name, template.Cores, strprocess.Plural(uint(template.Cores)))
+		msg := fmt.Sprintf(
+			"Selected host template: '%s' (%d core%s", template.Name, template.Cores,
+			strprocess.Plural(uint(template.Cores)),
+		)
 		if template.CPUFreq > 0 {
 			msg += fmt.Sprintf(" at %.01f GHz", template.CPUFreq)
 		}
@@ -428,13 +459,22 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 		if err != nil {
 			if force {
-				logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+				logrus.Warnf(
+					"Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v",
+					err,
+				)
 			} else {
 				var noHostError string
 				if sizing.MinCPUFreq <= 0 {
-					noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
+					noHostError = fmt.Sprintf(
+						"unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU,
+						err,
+					)
 				} else {
-					noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
+					noHostError = fmt.Sprintf(
+						"unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v",
+						sizing.MinGPU, sizing.MinCPUFreq, err,
+					)
 				}
 				return nil, fail.NewError(noHostError)
 			}
@@ -454,13 +494,22 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 			imageList, err := db.ReadAll(folder)
 			if err != nil {
 				if force {
-					logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
+					logrus.Warnf(
+						"Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v",
+						err,
+					)
 				} else {
 					var noHostError string
 					if sizing.MinCPUFreq <= 0 {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
+						noHostError = fmt.Sprintf(
+							"Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v",
+							sizing.MinGPU, err,
+						)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
+						noHostError = fmt.Sprintf(
+							"Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v",
+							sizing.MinGPU, sizing.MinCPUFreq, err,
+						)
 					}
 					logrus.Error(noHostError)
 					return nil, fail.NewError(noHostError)
@@ -492,9 +541,14 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 				if !force && (len(images) == 0) {
 					var noHostError string
 					if sizing.MinCPUFreq <= 0 {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, no images matching requirements", sizing.MinGPU)
+						noHostError = fmt.Sprintf(
+							"Unable to create a host with '%d' GPUs, no images matching requirements", sizing.MinGPU,
+						)
 					} else {
-						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements", sizing.MinGPU, sizing.MinCPUFreq)
+						noHostError = fmt.Sprintf(
+							"Unable to create a host with '%d' GPUs and a CPU clock frequencyof '%.01f MHz', no images matching requirements",
+							sizing.MinGPU, sizing.MinCPUFreq,
+						)
 					}
 					logrus.Error(noHostError)
 					return nil, fail.NewError(noHostError)
@@ -544,11 +598,18 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 		if sizing.MinGPU >= 0 {
 			gpuMsg = fmt.Sprintf("%d GPU%s", sizing.MinGPU, strprocess.Plural(uint(sizing.MinGPU)))
 		}
-		logrus.Debugf(fmt.Sprintf("Looking for a host template with: %s cores, %s RAM, %s%s", coreMsg, ramMsg, gpuMsg, diskMsg))
+		logrus.Debugf(
+			fmt.Sprintf(
+				"Looking for a host template with: %s cores, %s RAM, %s%s", coreMsg, ramMsg, gpuMsg, diskMsg,
+			),
+		)
 	}
 
 	for _, t := range reducedTmpls {
-		msg := fmt.Sprintf("Discarded host template '%s' with %d cores, %.01f GB of RAM, %d GPU and %d GB of Disk:", t.Name, t.Cores, t.RAMSize, t.GPUNumber, t.DiskSize)
+		msg := fmt.Sprintf(
+			"Discarded host template '%s' with %d cores, %.01f GB of RAM, %d GPU and %d GB of Disk:", t.Name, t.Cores,
+			t.RAMSize, t.GPUNumber, t.DiskSize,
+		)
 		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
 			logrus.Debugf(msg, "not enough cores")
@@ -619,10 +680,12 @@ func (svc service) FilterImages(filter string) ([]abstract.Image, fail.Error) {
 		// score := matchScore(fields, strings.ToUpper(img.Name))
 		// score := SimilarityScore(filter, img.Name)
 		if score > 0.5 {
-			simgs = append(simgs, scoredImage{
-				Image: img,
-				score: score,
-			})
+			simgs = append(
+				simgs, scoredImage{
+					Image: img,
+					score: score,
+				},
+			)
 		}
 
 	}
@@ -686,34 +749,76 @@ func (svc service) SearchImage(osname string) (*abstract.Image, fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
+	if osname == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("osname")
+	}
 
 	imgs, xerr := svc.ListImages(false)
 	if xerr != nil {
 		return nil, xerr
 	}
-
-	maxscore := 0.0
-	maxi := -1
-	// fields := strings.Split(strings.ToUpper(osname), " ")
-	for i, img := range imgs {
-		// score := 1 / float64(smetrics.WagnerFischer(strings.ToUpper(img.Name), strings.ToUpper(osname), 1, 1, 2))
-		score := smetrics.JaroWinkler(strings.ToUpper(img.Name), strings.ToUpper(osname), 0.7, 5)
-		// score := matchScore(fields, strings.ToUpper(img.Name))
-		// score := SimilarityScore(osname, img.Name)
-		if score > maxscore {
-			maxscore = score
-			maxi = i
-		}
-	}
-
-	// fmt.Println(fields, len(fields))
-	// fmt.Println(len(fields))
-	if maxscore < 0.5 || maxi < 0 || len(imgs) == 0 {
+	if len(imgs) == 0 {
 		return nil, fail.NotFoundError("unable to find an image matching '%s'", osname)
 	}
 
-	logrus.Infof("Selected image: '%s' (ID='%s')", imgs[maxi].Name, imgs[maxi].ID)
-	return &imgs[maxi], nil
+	// reg, err := regexp.Compile("[^A-Z0-9.]")
+	reg, err := regexp.Compile("[^A-Z0-9]")
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+
+	var maxLength int
+	for _, img := range imgs {
+		length := len(img.Name)
+		if maxLength < length {
+			maxLength = length
+		}
+	}
+
+	normalizedOSName := normalizeString(osname, reg)
+	paddedNormalizedOSName := addPadding(normalizedOSName, maxLength)
+
+	minWFScore := -1
+	wfSelect := -1
+	for i, entry := range imgs {
+		normalizedImageName := normalizeString(entry.Name, reg)
+		normalizedImageName = addPadding(normalizedImageName, maxLength)
+		if strings.Contains(normalizedImageName, normalizedOSName) {
+			wfScore := smetrics.WagnerFischer(paddedNormalizedOSName, normalizedImageName, 1, 1, 2)
+			logrus.Tracef("%*s (%s): WagnerFischerScore:%4d", maxLength, entry.Name, normalizedImageName, wfScore)
+
+			if minWFScore == -1 || wfScore < minWFScore {
+				minWFScore = wfScore
+				wfSelect = i
+			}
+		}
+	}
+
+	if wfSelect < 0 {
+		return nil, fail.NotFoundError("unable to find an image matching '%s'", osname)
+	}
+
+	logrus.Infof("Selected image: '%s' (ID='%s')", imgs[wfSelect].Name, imgs[wfSelect].ID)
+	return &imgs[wfSelect], nil
+}
+
+func normalizeString(in string, reg *regexp.Regexp) string {
+	in = strings.ToUpper(in)
+	in = reg.ReplaceAllString(in, "")
+	return in
+}
+
+func addPadding(in string, maxLength int) string {
+	if maxLength <= 0 {
+		return in
+	}
+
+	length := len(in)
+	if length < maxLength {
+		paddingRight := maxLength - length
+		in += strings.Repeat(" ", paddingRight)
+	}
+	return in
 }
 
 // CreateHostWithKeyPair creates an host
@@ -746,6 +851,7 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 		ResourceName:   request.ResourceName,
 		HostName:       request.HostName,
 		ImageID:        request.ImageID,
+		ImageRef:       request.ImageID,
 		KeyPair:        kp,
 		PublicIP:       request.PublicIP,
 		Subnets:        request.Subnets,
@@ -784,107 +890,8 @@ func (svc service) TenantCleanup(force bool) fail.Error {
 	if svc.IsNull() {
 		return fail.InvalidInstanceError()
 	}
+
 	return fail.NotImplementedError("service.TenantCleanup() not yet implemented")
-}
-
-func runeIndexes(s string, r rune) []int {
-	var positions []int
-	for i, l := range s {
-		if l == r {
-			positions = append(positions, i)
-		}
-	}
-	return positions
-
-}
-
-func runesIndexes(ref string, s string) [][]int {
-	var positions [][]int
-	uref := strings.ToUpper(ref)
-	us := strings.ToUpper(s)
-	for _, r := range uref {
-		if r != ' ' {
-			positions = append(positions, runeIndexes(us, r))
-		}
-	}
-	return positions
-}
-
-func recPossiblePathes(positions [][]int, level int) [][]int {
-	var newPathes [][]int
-	if level >= len(positions) {
-		return [][]int{
-			{},
-		}
-	}
-	pathes := recPossiblePathes(positions, level+1)
-	if len(positions[level]) == 0 {
-		for _, path := range pathes {
-			newPathes = append(newPathes, append([]int{-1}, path...))
-		}
-	} else {
-		for _, idx := range positions[level] {
-			for _, path := range pathes {
-				newPathes = append(newPathes, append([]int{idx}, path...))
-			}
-		}
-	}
-
-	return newPathes
-}
-
-func possiblePathes(positions [][]int) [][]int {
-	return recPossiblePathes(positions, 0)
-}
-
-func bestPath(pathes [][]int, size int) (int, int) {
-	if len(pathes) == 0 {
-		return -1, 10000
-	}
-	minD := distance(pathes[0], size)
-	bestI := 0
-	for i, p := range pathes {
-		d := distance(p, size)
-		if d < minD {
-			minD = d
-			bestI = i
-		}
-	}
-	return bestI, minD
-}
-
-func distance(path []int, size int) int {
-	d := 0
-	previous := path[0]
-	for _, index := range path {
-		if index < 0 {
-			d += size
-		} else {
-			di := index - previous
-			d += di
-			if di < 0 {
-				d += di + size
-			}
-		}
-		previous = index
-	}
-	return d
-}
-
-func score(d int, rsize int) float64 {
-	return float64(rsize-1) / float64(d)
-}
-
-// SimilarityScore computes a similarity score between 2 strings
-func SimilarityScore(ref string, s string) float64 {
-	size := len(s)
-	rsize := len(ref)
-	if rsize > size {
-		return SimilarityScore(s, ref)
-	}
-	_, d := bestPath(possiblePathes(runesIndexes(ref, s)), size)
-	ds := math.Abs(float64(size-rsize)) / float64(rsize)
-	return score(d, len(ref)) / (math.Log10(10 * (1. + ds)))
 }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules

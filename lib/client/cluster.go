@@ -17,11 +17,15 @@
 package client
 
 import (
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
+	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // var sshCfgCache = cache.NewMapCache()
@@ -136,7 +140,7 @@ func (c cluster) Create(def *protocol.ClusterCreateRequest, timeout time.Duratio
 }
 
 // Delete deletes a cluster
-func (c cluster) Delete(clusterName string, timeout time.Duration) error {
+func (c cluster) Delete(clusterName string, force bool, timeout time.Duration) error {
 	if clusterName == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
@@ -150,7 +154,11 @@ func (c cluster) Delete(clusterName string, timeout time.Duration) error {
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	_, err := service.Delete(ctx, &protocol.ClusterDeleteRequest{Name: clusterName})
+	req := &protocol.ClusterDeleteRequest{
+		Name:  clusterName,
+		Force: force,
+	}
+	_, err := service.Delete(ctx, req)
 	return err
 }
 
@@ -325,6 +333,171 @@ func (c cluster) FindAvailableMaster(clusterName string, duration time.Duration)
 	return host, nil
 }
 
+// ListNodes ...
+func (c cluster) ListNodes(clusterName string, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
+	if clusterName == "" {
+		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	list, err := service.ListNodes(ctx, &protocol.Reference{Name: clusterName})
+	if err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// InspectNode ...
+func (c cluster) InspectNode(clusterName string, nodeRef string, duration time.Duration) (*protocol.Host, error) {
+	if clusterName == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+	if nodeRef == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	return service.InspectNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+}
+
+// DeleteNode ...
+func (c cluster) DeleteNode(clusterName string, nodes []string, duration time.Duration) error {
+	if clusterName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+	if len(nodes) == 0 {
+		return fail.InvalidParameterError("nodes", "cannot be an empty slice")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+
+	var (
+		mutex sync.Mutex
+		wg    sync.WaitGroup
+		errs  []string
+	)
+
+	nodeDeleter := func(ref string) {
+		defer wg.Done()
+
+		if _, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: ref}}); err != nil {
+			mutex.Lock()
+			errs = append(errs, err.Error())
+			mutex.Unlock()
+		}
+	}
+
+	if len(nodes) > 1 {
+		// We want to check first if tenant is set when there are more than 1 node, to avoid multiple message claiming there is no tenant set...
+		tenantService := protocol.NewTenantServiceClient(c.session.connection)
+		_, err := tenantService.Get(ctx, &googleprotobuf.Empty{})
+		if err != nil {
+			return err
+		}
+	}
+
+	wg.Add(len(nodes))
+	for _, target := range nodes {
+		go nodeDeleter(target)
+	}
+	wg.Wait()
+
+	if len(errs) > 0 {
+		return clitools.ExitOnRPC(strings.Join(errs, ", "))
+	}
+
+	return nil
+}
+
+// StartNode ...
+func (c cluster) StartNode(clusterName string, nodeRef string, duration time.Duration) error {
+	if clusterName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+	if nodeRef == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	_, err := service.StartNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	return err
+}
+
+// StopNode ...
+func (c cluster) StopNode(clusterName string, nodeRef string, duration time.Duration) error {
+	if clusterName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+	if nodeRef == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	_, err := service.StopNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+	return err
+}
+
+// StateNode ...
+func (c cluster) StateNode(clusterName string, nodeRef string, duration time.Duration) (*protocol.HostStatus, error) {
+	if clusterName == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+	if nodeRef == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("nodeRef")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	return service.StateNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: nodeRef}})
+}
+
 // ListMasters ...
 func (c cluster) ListMasters(clusterName string, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
 	if clusterName == "" {
@@ -347,10 +520,13 @@ func (c cluster) ListMasters(clusterName string, duration time.Duration) (*proto
 	return list, nil
 }
 
-// ListNodes ...
-func (c cluster) ListNodes(clusterName string, duration time.Duration) (*protocol.ClusterNodeListResponse, error) {
+// InspectMaster ...
+func (c cluster) InspectMaster(clusterName string, masterRef string, duration time.Duration) (*protocol.Host, error) {
 	if clusterName == "" {
-		return nil, fail.InvalidParameterError("clusterName", "cannot be empty string")
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+	if masterRef == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("masterRef")
 	}
 
 	c.session.Connect()
@@ -362,9 +538,70 @@ func (c cluster) ListNodes(clusterName string, duration time.Duration) (*protoco
 	}
 
 	service := protocol.NewClusterServiceClient(c.session.connection)
-	list, err := service.ListNodes(ctx, &protocol.Reference{Name: clusterName})
-	if err != nil {
-		return nil, err
+	return service.InspectMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+}
+
+// StartMaster ...
+func (c cluster) StartMaster(clusterName string, masterRef string, duration time.Duration) error {
+	if clusterName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
 	}
-	return list, nil
+	if masterRef == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("masterRef")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	_, err := service.StartMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	return err
+}
+
+// StopMaster ...
+func (c cluster) StopMaster(clusterName string, masterRef string, duration time.Duration) error {
+	if clusterName == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+	if masterRef == "" {
+		return fail.InvalidParameterCannotBeEmptyStringError("masterRef")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	_, err := service.StopMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
+	return err
+}
+
+// StateMaster ...
+func (c cluster) StateMaster(clusterName string, masterRef string, duration time.Duration) (*protocol.HostStatus, error) {
+	if clusterName == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("clusterName")
+	}
+	if masterRef == "" {
+		return nil, fail.InvalidParameterCannotBeEmptyStringError("masterRef")
+	}
+
+	c.session.Connect()
+	defer c.session.Disconnect()
+
+	ctx, xerr := utils.GetContext(true)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	service := protocol.NewClusterServiceClient(c.session.connection)
+	return service.StateMaster(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: masterRef}})
 }

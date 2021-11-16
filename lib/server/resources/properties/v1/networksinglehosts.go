@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 const (
@@ -32,7 +32,7 @@ const (
 
 var (
 	// SingleHostsMaxCIDRSlotValue contains the max index usable in function lib/utils/net.NthIncludedSubnet() to build CIDR
-	SingleHostsMaxCIDRSlotValue uint = uint(math.Pow(2, SingleHostsCIDRMaskAddition) - 1)
+	SingleHostsMaxCIDRSlotValue = uint(math.Pow(2, SingleHostsCIDRMaskAddition) - 1)
 )
 
 type FreeCIDRSlot struct {
@@ -45,7 +45,7 @@ type FreeCIDRSlot struct {
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
 type NetworkSingleHosts struct {
-	FreeSlots []FreeCIDRSlot `json:"free_slots,omitempty"` // contains a list of FreeCIDRSlot of free CIDR in Network for single Hosts
+	FreeSlots []FreeCIDRSlot `json:"free_slots,omitempty"` // contains a list of free CIDR in Network for single Hosts
 }
 
 // NewNetworkSingleHosts ...
@@ -53,9 +53,10 @@ func NewNetworkSingleHosts() *NetworkSingleHosts {
 	return &NetworkSingleHosts{}
 }
 
-// Content ... (data.Clonable interface)
-func (nsh *NetworkSingleHosts) Content() interface{} {
-	return nsh
+// IsNull ...
+// (data.Clonable interface)
+func (nsh *NetworkSingleHosts) IsNull() bool {
+	return nsh == nil || len(nsh.FreeSlots) == 0
 }
 
 // Clone ... (data.Clonable interface)
@@ -144,5 +145,5 @@ func (nsh *NetworkSingleHosts) FreeSlot(index uint) {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", string(networkproperty.SingleHostsV1), NewNetworkSingleHosts())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.SingleHostsV1, NewNetworkSingleHosts())
 }

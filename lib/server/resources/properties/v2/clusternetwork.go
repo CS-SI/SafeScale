@@ -20,7 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterNetwork contains network information relative to cluster
@@ -44,6 +44,12 @@ func newClusterNetwork() *ClusterNetwork {
 	return &ClusterNetwork{
 		NetworkState: subnetstate.Unknown,
 	}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (n *ClusterNetwork) IsNull() bool {
+	return n == nil || (n.NetworkID == "" && n.CIDR == "" && n.GatewayID == "")
 }
 
 // Clone ...

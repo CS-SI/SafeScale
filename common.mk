@@ -1,4 +1,4 @@
-VERSION=21.05.0-rc1
+VERSION=21.05.0-rc4
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
@@ -32,6 +32,12 @@ ifeq (, $(GOOS))
 ifneq (, $(GOARCH))
 $(error "Cross compilation requires both GOOS and GOARCH to be specified. Stopping build.")
 endif
+endif
+
+ifneq (, $(GOTESTTAGS))
+GO_TEST_TAGS=-tags $GOTESTTAGS
+else
+GO_TEST_TAGS=
 endif
 
 ifeq (, $(GOOS))
@@ -91,6 +97,12 @@ endif
 endif
 
 ifeq ($(OS),Windows_NT)
+ifeq (, $(shell $(WHICH) make))
+MAKE=mingw32-make.exe
+else
+MAKE=make.exe
+endif
+else
 MAKE=make
 endif
 
@@ -108,12 +120,6 @@ else
 RACE_CHECK=
 RACE_CHECK_TEST=
 endif
-endif
-
-ifneq ($(OS),Windows_NT)
-STRICT=$(shell $(GO) version | egrep -c "15.10 |15.9 ")
-else
-STRICT=1
 endif
 
 ifeq (, $(shell $(WHICH) git))
@@ -160,12 +166,6 @@ endif
 
 ifneq ($(OS),Windows_NT)
 PATH = $(HOME)/.local/bin:/go/bin:$(shell printenv PATH)
-endif
-
-ifneq ($(OS),Windows_NT)
-ifneq ($(findstring $(GOBIN),$(PATH)),$(GOBIN))
-$(error "Your 'GOBIN' directory [$(GOBIN)] must be included in your 'PATH' [$(PATH)]")
-endif
 endif
 
 # Life is better with colors

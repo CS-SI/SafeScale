@@ -139,7 +139,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d || sfFail 195
+                            echo "docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 195
                             sfExit
 
                     running:
@@ -153,7 +154,7 @@ feature:
                             {{ else }}
                             PREFIX="elasticsearch"
                             {{ end }}
-                            sfStandardRetry "sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} ${PREFIX}_server_1"
+                            sfRetry "sfDoesDockerRunContainer docker.elastic.co/elasticsearch/elasticsearch:{{ .Version }} ${PREFIX}_server_1"
 
                     ready:
                         targets:
@@ -166,7 +167,7 @@ feature:
                             {{ else }}
                             URL="http://{{.HostIP}}:9200/_cat/health"
                             {{ end }}
-                            sfStandardRetry "curl -k ${URL} &>/dev/null" || sfFail 196
+                            sfRetry "curl -k ${URL} &>/dev/null" || sfFail 196
                             sfExit
 
             remove:
@@ -184,7 +185,8 @@ feature:
                                 {{ else }}
                                 OPTIONS=
                                 {{ end }}
-                                docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 197
+                                echo "docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                                sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/elasticsearch/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 197
                             fi
                             sfExit
 

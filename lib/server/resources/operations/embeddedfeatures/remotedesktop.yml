@@ -71,20 +71,20 @@ feature:
                             case $LINUX_KIND in
                                 centos|redhat|rhel)
                                     if [[ -n $(which dnf) ]]; then
-                                        sfRetry 3m 5 "dnf install -y epel-release" || sfFail 192
-                                        sfRetry 3m 5 "dnf makecache -y" || sfFail 192
+                                        sfRetryEx 3m 5 "dnf install -y epel-release" || sfFail 192
+                                        sfRetryEx 3m 5 "dnf makecache -y" || sfFail 192
                                         dnf install --enablerepo=epel -y --skip-broken xfce4* && \
                                         dnf install --enablerepo=epel -y --skip-broken xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     else
-                                        sfRetry 3m 5 "yum install -y epel-release" || sfFail 192
-                                        sfRetry 3m 5 "yum makecache fast" || sfFail 192
+                                        sfRetryEx 3m 5 "yum install -y epel-release" || sfFail 192
+                                        sfRetryEx 3m 5 "yum makecache fast" || sfFail 192
                                         yum groupinstall -y -t "X Window system" --skip-broken && \
                                         yum groupinstall -y -t Xfce --skip-broken && \
                                         yum install -y -t xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     fi
                                     ;;
                                 fedora)
-                                    sfRetry 3m 5 "dnf makecache -y" || sfFail 192
+                                    sfRetryEx 3m 5 "dnf makecache -y" || sfFail 192
                                     dnf install -y --skip-broken xfce4* && \
                                     dnf install -y --skip-broken xorg-x11-fonts-Type1 urw-fonts wget firefox perl || sfFail 192
                                     ;;
@@ -107,7 +107,7 @@ feature:
                         run: |
                             URL="https://sourceforge.net/projects/tigervnc/files/stable/1.10.1/tigervnc-1.10.1.x86_64.tar.gz/download"
                             sfDownload "$URL" ${SF_TMPDIR}/tigervnc.tgz 3m 5 || sfFail 194
-                            tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || sfFail 195
+                            tar --strip-components=1 -zxvf ${SF_TMPDIR}/tigervnc.tgz -C / || sfFail 195 "failed to extract tigervnc archive"
                             rm -rf ${SF_TMPDIR}/tigervnc.tgz
 
                             [ ! -d ~{{ .Username }} ] && sfFail 196 "Homedir of user {{ .Username }} not found"
@@ -377,8 +377,8 @@ feature:
                             cat >${SF_ETCDIR}/remotedesktop/build/user-mapping.xml <<'EOF'
                             <user-mapping>
                                 <authorize
-                                    username="{{ .Username }}"
-                                    password="{{ .Password }}">
+                                    username="{{ .ClusterAdminUsername }}"
+                                    password="{{ .ClusterAdminPassword }}">
 
                                     <!-- First authorized connection -->
                                     <connection name="{{ .Hostname }}">
@@ -498,7 +498,7 @@ feature:
                             EOF
 
                             # build image
-                            docker build --network=host -t safescale/remotedesktop:latest ${SF_ETCDIR}/remotedesktop/build || sfFail 202
+                            sfRetryEx 15m 5 docker build --network=host -t safescale/remotedesktop:latest ${SF_ETCDIR}/remotedesktop/build || sfFail 202
                             sfExit
 
                     start:
@@ -544,25 +544,25 @@ feature:
                                 <short>Drop any connection to SafeScale remote desktop</short>
                             </zone>
                             EOF
-                            sfFirewallReload || sfFail 204 "Firewall problem"
 
                             # Allow only gateway(s) to connect to port {{ .GuacamolePort }}
-                            sfFirewall --zone=sf_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-service=safescale_remotedesktop_guacd || sfFail 204 "Firewall problem adding service"
                             {{ if .DefaultRouteIP }}
-                            sfFirewall --zone=sf_remotedesktop --add-source={{ .DefaultRouteIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .DefaultRouteIP }} || sfFail 205 "Firewall problem adding default route as source"
                             {{ end }}
                             {{ if .SecondaryGatewayIP }}
                             {{ if .PrimaryGatewayIP }}
-                            sfFirewall --zone=sf_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .PrimaryGatewayIP }} || sfFail 206 "Firewall problem adding primary gateway as source"
                             {{ end }}
-                            sfFirewall --zone=sf_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 204 "Firewall problem"
+                            sfFirewall --zone=sf_remotedesktop --add-source={{ .SecondaryGatewayIP }} || sfFail 207 "Firewall problem adding secondary gateway as source"
                             {{ end }}
-                            sfFirewallReload || sfFail 204 "Firewall problem"
+                            sfFirewallReload || sfFail 208 "Firewall problem"
 
                             ###########################################################
                             # Starts remotedesktop container                          #
                             ###########################################################
-                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d || sfFail 203
+                            echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail
                             sfExit
 
             remove:
@@ -573,7 +573,8 @@ feature:
                             hosts: yes
                             masters: all
                         run: |
-                            docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force || sfFail 192
+                            echo "docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/remotedesktop/docker-compose.yml -p safescale/remotedesktop rm --stop --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
                             docker image rm -f safescale/remotedesktop:latest || sfFail 193
                             rm -rf ${SF_ETCDIR}/remotedesktop
                             sfExit

@@ -78,13 +78,15 @@ func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
 
 	var images []abstract.Image
 	for _, omi := range resp {
-		images = append(images, abstract.Image{
-			Description: omi.Description,
-			ID:          omi.ImageId,
-			Name:        normalizeImageName(omi.ImageName),
-			URL:         omi.FileLocation,
-			StorageType: omi.RootDeviceType,
-		})
+		images = append(
+			images, abstract.Image{
+				Description: omi.Description,
+				ID:          omi.ImageId,
+				Name:        normalizeImageName(omi.ImageName),
+				URL:         omi.FileLocation,
+				StorageType: omi.RootDeviceType,
+			},
+		)
 	}
 	return images, nil
 }
@@ -115,9 +117,11 @@ func (s stack) cpuFreq(perf int) float32 {
 }
 
 func parseSizing(s string) (cpus, ram, perf int, xerr fail.Error) {
-	tokens := strings.FieldsFunc(s, func(r rune) bool {
-		return r == 'c' || r == 'r' || r == 'p' || r == 'g'
-	})
+	tokens := strings.FieldsFunc(
+		s, func(r rune) bool {
+			return r == 'c' || r == 'r' || r == 'p' || r == 'g'
+		},
+	)
 
 	if len(tokens) < 2 {
 		return 0, 0, 0, fail.InconsistentError("error parsing sizing string")
@@ -145,9 +149,11 @@ func parseSizing(s string) (cpus, ram, perf int, xerr fail.Error) {
 }
 
 func parseGPU(s string) (gpus int, gpuType string, xerr fail.Error) {
-	tokens := strings.FieldsFunc(s, func(r rune) bool {
-		return r == 'g' || r == 't'
-	})
+	tokens := strings.FieldsFunc(
+		s, func(r rune) bool {
+			return r == 'g' || r == 't'
+		},
+	)
 	if len(tokens) < 2 {
 		return 0, "", fail.InvalidParameterError("id", "malformed id")
 	}
@@ -216,16 +222,18 @@ func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
 					break
 				}
 				name := gpuTemplateName(0, cpu, ram, perf, 0, "")
-				templates = append(templates, abstract.HostTemplate{
-					DiskSize: 0,
-					Name:     name,
-					Cores:    cpu,
-					RAMSize:  float32(ram),
-					ID:       name,
+				templates = append(
+					templates, abstract.HostTemplate{
+						DiskSize: 0,
+						Name:     name,
+						Cores:    cpu,
+						RAMSize:  float32(ram),
+						ID:       name,
 
-					CPUFreq:   s.cpuFreq(perf),
-					GPUNumber: 0,
-				})
+						CPUFreq:   s.cpuFreq(perf),
+						GPUNumber: 0,
+					},
+				)
 			}
 
 		}
@@ -244,16 +252,18 @@ func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
 					}
 					//
 					name := gpuTemplateName(3, cpu, ram, perf, gpu, "nvidia-k2")
-					templates = append(templates, abstract.HostTemplate{
-						DiskSize:  0,
-						Name:      name,
-						Cores:     cpu,
-						RAMSize:   float32(ram),
-						CPUFreq:   s.cpuFreq(perf),
-						ID:        name,
-						GPUNumber: gpu,
-						GPUType:   "nvidia-k2",
-					})
+					templates = append(
+						templates, abstract.HostTemplate{
+							DiskSize:  0,
+							Name:      name,
+							Cores:     cpu,
+							RAMSize:   float32(ram),
+							CPUFreq:   s.cpuFreq(perf),
+							ID:        name,
+							GPUNumber: gpu,
+							GPUType:   "nvidia-k2",
+						},
+					)
 				}
 
 			}
@@ -272,16 +282,18 @@ func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
 					}
 					//
 					name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p6")
-					templates = append(templates, abstract.HostTemplate{
-						DiskSize:  0,
-						Name:      name,
-						Cores:     cpu,
-						RAMSize:   float32(ram),
-						CPUFreq:   s.cpuFreq(perf),
-						ID:        name,
-						GPUNumber: gpu,
-						GPUType:   "nvidia-p6",
-					})
+					templates = append(
+						templates, abstract.HostTemplate{
+							DiskSize:  0,
+							Name:      name,
+							Cores:     cpu,
+							RAMSize:   float32(ram),
+							CPUFreq:   s.cpuFreq(perf),
+							ID:        name,
+							GPUNumber: gpu,
+							GPUType:   "nvidia-p6",
+						},
+					)
 				}
 			}
 		}
@@ -299,16 +311,18 @@ func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
 					}
 					//
 					name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p100")
-					templates = append(templates, abstract.HostTemplate{
-						DiskSize:  0,
-						Name:      name,
-						Cores:     cpu,
-						RAMSize:   float32(ram),
-						CPUFreq:   s.cpuFreq(perf),
-						ID:        name,
-						GPUNumber: gpu,
-						GPUType:   "nvidia-p100",
-					})
+					templates = append(
+						templates, abstract.HostTemplate{
+							DiskSize:  0,
+							Name:      name,
+							Cores:     cpu,
+							RAMSize:   float32(ram),
+							CPUFreq:   s.cpuFreq(perf),
+							ID:        name,
+							GPUNumber: gpu,
+							GPUType:   "nvidia-p100",
+						},
+					)
 				}
 			}
 		}
@@ -318,7 +332,7 @@ func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
 }
 
 // InspectImage returns the Image referenced by id
-func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
+func (s stack) InspectImage(id string) (_ abstract.Image, ferr fail.Error) {
 	nullImage := abstract.Image{}
 	if s.IsNull() {
 		return nullImage, fail.InvalidInstanceError()
@@ -331,8 +345,8 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 	defer tracer.Exiting()
 
 	defer func() {
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, fmt.Sprintf("failed to get image '%s'", id))
+		if ferr != nil {
+			ferr = fail.Wrap(ferr, fmt.Sprintf("failed to get image '%s'", id))
 		}
 	}()
 
@@ -492,7 +506,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 // WaitHostState wait for host to be in the specified state
 // On exit, xerr may be of type:
 // - *retry.ErrTimeout: when the timeout is reached
-// - *retry.ErrStopRetry: when a breaking error arises; xerr.Cause() contains the real error encountered
+// - *retry.ErrStopRetry: when a breaking error arises; fail.Cause(xerr) contains the real error encountered
 // - fail.Error: any other errors
 func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAHC := abstract.NewHostCore()
@@ -505,10 +519,11 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 		return nullAHC, xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)", hostLabel, state.String(), timeout).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %s, %v)",
+		hostLabel, state.String(), timeout).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	xerr = retry.WhileUnsuccessfulDelay5SecondsTimeout(
+	xerr = retry.WhileUnsuccessfulWithHardTimeout(
 		func() error {
 			st, innerXErr := s.hostState(ahf.Core.ID)
 			if innerXErr != nil {
@@ -518,6 +533,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 					if state != hoststate.Terminated {
 						return innerXErr
 					}
+					debug.IgnoreError(innerXErr)
 					st = hoststate.Terminated
 				default:
 					return innerXErr
@@ -531,17 +547,18 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				ahf.CurrentState, ahf.Core.LastState = st, st
 				return nil
 			default:
-				return fail.NewError("wrong state")
+				return fail.NewError("wrong state: %s", st)
 			}
 		},
+		temporal.GetDefaultDelay(),
 		timeout,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
-		case *retry.ErrTimeout:
-			return nullAHC, fail.ConvertError(xerr.Cause())
+		case *fail.ErrTimeout:
+			return nullAHC, fail.Wrap(fail.Cause(xerr), "timeout")
 		case *retry.ErrStopRetry:
-			return nullAHC, fail.NotFoundError("failed to find Host %s", hostLabel)
+			return nullAHC, fail.Wrap(fail.Cause(xerr), "stopping retries")
 		default:
 			return nullAHC, xerr
 		}
@@ -611,43 +628,53 @@ func (s stack) addGPUs(request *abstract.HostRequest, tpl abstract.HostTemplate,
 	return createErr
 }
 
-func (s stack) addVolume(request *abstract.HostRequest, vmID string) (xerr fail.Error) {
+func (s stack) addVolume(request *abstract.HostRequest, vmID string) (ferr fail.Error) {
 	if request.DiskSize == 0 {
 		return nil
 	}
 
-	v, xerr := s.CreateVolume(abstract.VolumeRequest{
-		Name:  fmt.Sprintf("vol-%s", request.HostName),
-		Size:  request.DiskSize,
-		Speed: s.Options.Compute.DefaultVolumeSpeed,
-	})
+	v, xerr := s.CreateVolume(
+		abstract.VolumeRequest{
+			Name:  fmt.Sprintf("vol-%s", request.HostName),
+			Size:  request.DiskSize,
+			Speed: s.Options.Compute.DefaultVolumeSpeed,
+		},
+	)
 	if xerr != nil {
 		return xerr
 	}
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := s.DeleteVolume(v.ID)
 			if derr != nil {
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
 
-	_, xerr = s.rpcCreateTags(v.ID, map[string]string{
-		"DeleteWithVM": "true",
-	})
+	_, xerr = s.rpcCreateTags(
+		v.ID, map[string]string{
+			"DeleteWithVM":     "true",
+			"name":             fmt.Sprintf("vol-%s", request.HostName),
+			"ManagedBy":        "safescale",
+			"DeclaredInBucket": s.configurationOptions.MetadataBucket,
+			"CreationDate":     time.Now().Format(time.RFC3339),
+		},
+	)
 	if xerr != nil {
 		return xerr
 	}
 
-	_, xerr = s.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{
-		HostID:   vmID,
-		VolumeID: v.ID,
-	})
+	_, xerr = s.CreateVolumeAttachment(
+		abstract.VolumeAttachmentRequest{
+			HostID:   vmID,
+			VolumeID: v.ID,
+		},
+	)
 	return xerr
 }
 
-func (s stack) addPublicIP(nic osc.Nic) (osc.PublicIp, fail.Error) {
+func (s stack) addPublicIP(nic osc.Nic) (_ osc.PublicIp, ferr fail.Error) {
 	// Allocate public IP
 	resp, xerr := s.rpcCreatePublicIP()
 	if xerr != nil {
@@ -655,9 +682,13 @@ func (s stack) addPublicIP(nic osc.Nic) (osc.PublicIp, fail.Error) {
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeletePublicIPByID(resp.PublicIpId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete public IP with ID %s", resp.PublicIpId))
+				_ = ferr.AddConsequence(
+					fail.Wrap(
+						derr, "cleaning up on failure, failed to delete public IP with ID %s", resp.PublicIpId,
+					),
+				)
 			}
 		}
 	}()
@@ -692,9 +723,9 @@ func (s stack) setHostProperties(ahf *abstract.HostFull, subnets []*abstract.Sub
 	ahf.Sizing.RAMSize = vmType.RAMSize
 
 	// Updates IPAddress Property propsv1.HostNetworking
-	// subnets contains network names, but hostproperty.NetworkV1.IPxAddresses has to be
-	// indexed on network ID. Tries to convert if possible, if we already have correspondance
-	// between network ID and network Name in IPAddress definition
+	// subnets contains network names, but IPxAddresses has to be
+	// indexed on network ID. Tries to convert if possible, if we already have correspondence
+	// between network ID and network Name in Host definition
 	subnetsByID := map[string]string{}
 	subnetsByName := map[string]string{}
 	ipv4Addresses := map[string]string{}
@@ -781,7 +812,9 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, fail.InvalidInstanceError()
 	}
 	if len(request.Subnets) == 0 && !request.PublicIP {
-		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError("host creation", "cannot create a host without public IP or without attached subnet")
+		return nullAHF, nullUDC, abstract.ResourceInvalidRequestError(
+			"host creation", "cannot create a host without public IP or without attached subnet",
+		)
 	}
 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%v)", request).WithStopwatch().Entering()
@@ -820,7 +853,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
-	defer func() {
+	defer func() { // FIXME: This should trigger a failure
 		if derr := s.DeleteKeyPair(creationKeyPair.Name); derr != nil {
 			logrus.Errorf("Cleaning up on failure, failed to delete creation keypair: %v", derr)
 		}
@@ -862,7 +895,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nil, nil, xerr
 	}
 
-	var diskSize int = tpl.DiskSize
+	var diskSize = tpl.DiskSize
 	if request.DiskSize > diskSize {
 		diskSize = request.DiskSize
 	}
@@ -884,15 +917,16 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 
 	var vm osc.Vm
-	xerr = retry.WhileUnsuccessfulDelay5Seconds(
-		func() error {
+	xerr = retry.WhileUnsuccessful(
+		func() (ferr error) {
 			resp, innerXErr := s.rpcCreateVMs(vmsRequest)
 			if innerXErr != nil {
-				switch innerXErr.(type) {
-				case *fail.ErrOverload:
-					return retry.StopRetryError(innerXErr)
+				casted := normalizeError(innerXErr)
+				switch casted.(type) {
+				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
+					return retry.StopRetryError(casted)
 				default:
-					return innerXErr
+					return casted
 				}
 			}
 
@@ -903,32 +937,33 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 			// Delete instance if created to be in good shape to retry in case of error
 			defer func() {
-				if innerXErr != nil {
+				if ferr != nil {
 					logrus.Debugf("Cleaning up on failure, deleting Host '%s'", request.HostName)
 					if derr := s.DeleteHost(vm.VmId); derr != nil {
 						msg := fmt.Sprintf("cleaning up on failure, failed to delete Host '%s'", request.HostName)
 						logrus.Errorf(strprocess.Capitalize(msg))
-						_ = innerXErr.AddConsequence(fail.Wrap(derr, msg))
-					} else {
-						logrus.Debugf("Cleaning up on failure, deleted Host '%s' successfully.", request.HostName)
+						ferr = fail.AddConsequence(ferr, fail.Wrap(derr, msg))
+						return
 					}
+					logrus.Debugf("Cleaning up on failure, deleted Host '%s' successfully.", request.HostName)
 				}
 			}()
 
 			_, innerXErr = s.WaitHostState(vm.VmId, hoststate.Started, temporal.GetHostTimeout())
 			return innerXErr
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetLongOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(xerr.Cause())
+			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout:
+			return nullAHF, nullUDC, fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
+			return nullAHF, nullUDC, xerr
 		}
-	}
-	if xerr != nil {
-		return nullAHF, nullUDC, xerr
 	}
 
 	// -- Retrieve default Nic use to create public ip --
@@ -958,9 +993,16 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	if xerr = s.addGPUs(&request, tpl, vm.VmId); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
-	_, xerr = s.rpcCreateTags(vm.VmId, map[string]string{
-		"name": request.ResourceName,
-	})
+	_, xerr = s.rpcCreateTags(
+		vm.VmId, map[string]string{
+			"name":             request.ResourceName,
+			"ManagedBy":        "safescale",
+			"DeclaredInBucket": s.configurationOptions.MetadataBucket,
+			"CreationDate":     time.Now().Format(time.RFC3339),
+			"Template":         vm.VmType,
+			"Image":            vm.ImageId,
+		},
+	)
 	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
@@ -974,7 +1016,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Core.Name = request.ResourceName
 	ahf.Core.Password = request.Password
 	ahf.Core.PrivateKey = udc.FirstPrivateKey
-	// ahf.CurrentState, ahf.Core.LastState = hoststate.Started, hoststate.Started
+	ahf.CurrentState, ahf.Core.LastState = hoststate.Started, hoststate.Started
+
+	ahf.Core.Tags["Template"] = vm.VmType
+	ahf.Core.Tags["Image"] = vm.ImageId
+
 	nics = append(nics, defaultNic)
 	xerr = s.setHostProperties(ahf, request.Subnets, vm, nics)
 	return ahf, udc, xerr
@@ -984,7 +1030,11 @@ func (s stack) getDefaultSubnetID(request abstract.HostRequest) (string, fail.Er
 	if len(request.Subnets) == 0 {
 		return "", nil
 	}
-	return request.Subnets[0].ID, nil
+	if request.Subnets[0] != nil {
+		return request.Subnets[0].ID, nil
+	}
+
+	return "", fail.InconsistentError("Invalid request: %v", request)
 }
 
 func (s stack) deleteHost(id string) fail.Error {
@@ -1089,15 +1139,22 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (ahf *abstract.HostFu
 func (s stack) complementHost(ahf *abstract.HostFull, vm osc.Vm) fail.Error {
 	ahf.Core.ID = vm.VmId
 
+	tags, xerr := s.rpcReadTagsOfResource(vm.VmId)
+	if xerr != nil {
+		return xerr
+	}
+
 	if ahf.Core.Name == "" {
-		tags, xerr := s.rpcReadTagsOfResource(vm.VmId)
-		if xerr != nil {
-			return xerr
-		}
 		if tag, ok := tags["name"]; ok {
 			ahf.Core.Name = tag
 		}
 	}
+
+	// refresh tags
+	for k, v := range tags {
+		ahf.Core.Tags[k] = v
+	}
+
 	subnets, nics, xerr := s.listSubnetsByHost(vm.VmId)
 	if xerr != nil {
 		return xerr
@@ -1167,7 +1224,7 @@ func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 }
 
 // StopHost stops the host identified by id
-func (s stack) StopHost(hostParam stacks.HostParameter) (xerr fail.Error) {
+func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1240,7 +1297,8 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, sizing abstract.HostSi
 		return nullAHF, xerr
 	}
 
-	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %v)", hostRef, sizing).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/, "(%s, %v)",
+		hostRef, sizing).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	perf := s.perfFromFreq(sizing.MinCPUFreq)
@@ -1317,6 +1375,7 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// if host is not found, consider operation as a success; continue
+			debug.IgnoreError(xerr)
 			return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)
 		default:
 			return fail.Wrap(xerr, "failed to query information of Host %s", hostLabel)

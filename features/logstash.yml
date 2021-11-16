@@ -50,7 +50,7 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            docker pull logstash:7.1.1
+                            sfRetryEx 5m 5 docker pull logstash:7.1.1
 
                     config:
                         targets:
@@ -143,7 +143,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d
+                            echo "docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS up -d >> ${SF_LOGDIR}/docker.log 2>&1
 
                     ready:
                         targets:
@@ -156,7 +157,7 @@ feature:
                             {{ else }}
                             PREFIX="logstash"
                             {{ end }}
-                            sfStandardRetry docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running || sfFail 192
+                            sfRetry docker inspect {{ "--format='{{.State.Status}}'" }} ${PREFIX}_server_1 | grep -i running || sfFail 192
                             sfExit
 
             remove:
@@ -173,7 +174,8 @@ feature:
                             {{ else }}
                             OPTIONS=
                             {{ end }}
-                            docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force || sfFail 192
+                            echo "docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            sfRetryEx 10m 5 docker-compose -f ${SF_ETCDIR}/logstash/docker-compose.yml $OPTIONS rm --stop -v --force >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 192
                             sfExit
 
                     remove:

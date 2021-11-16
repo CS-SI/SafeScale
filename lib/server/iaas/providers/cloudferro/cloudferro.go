@@ -18,16 +18,16 @@ package cloudferro
 
 import (
 	"regexp"
+	"strconv"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
@@ -42,7 +42,7 @@ var (
 
 // provider is the implementation of the CloudFerro provider
 type provider struct {
-	api.Stack /**openstack.Stack*/
+	api.Stack /**openstack.stack*/
 
 	tenantParameters map[string]interface{}
 	templatesWithGPU []string
@@ -81,6 +81,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	if defaultImage == "" {
 		defaultImage = cloudferroDefaultImage
 	}
+
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
@@ -111,10 +117,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
 		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
 		return rxp.Match([]byte(str))
-	})
+	}
 
 	if _, err := govalidator.ValidateStruct(authOptions); err != nil {
 		return nil, fail.ConvertError(err)
@@ -135,11 +141,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			"Hdd": volumespeed.Hdd,
 			"Ssd": volumespeed.Ssd,
 		},
-		MetadataBucket:   metadataBucketName,
-		DNSList:          cloudferroDNSServers,
-		DefaultImage:     defaultImage,
-		OperatorUsername: operatorUsername,
-		ProviderName:     providerName,
+		MetadataBucket:           metadataBucketName,
+		DNSList:                  cloudferroDNSServers,
+		DefaultImage:             defaultImage,
+		OperatorUsername:         operatorUsername,
+		ProviderName:             providerName,
+		DefaultSecurityGroupName: "default",
+		MaxLifeTime:              maxLifeTime,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -186,6 +194,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }
@@ -221,6 +230,12 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 // GetName returns the providerName
 func (p provider) GetName() string {
 	return "cloudferro"
+}
+
+// GetStack returns the stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
 }
 
 // GetTenantParameters returns the tenant parameters as-is

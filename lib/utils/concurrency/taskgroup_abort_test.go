@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-func problemsHappens(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
+func problemsHappen(t Task, parameters TaskParameters) (result TaskResult, xerr fail.Error) {
 	return heavyDutyTaskThatFails(40*time.Millisecond, true, true)
 }
 
@@ -42,14 +43,14 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 	var iRes int
 
 	defer func(err *fail.Error) {
-		if st, _ := t.GetStatus(); st == ABORTED {
+		if t.Aborted() {
 			if iRes > 1 {
 				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
 		}
 	}(&xerr)
 
-	if st, _ := t.GetStatus(); st == ABORTED {
+	if t.Aborted() {
 		fmt.Println("Exiting before real execution")
 		return iRes, nil
 	}
@@ -60,7 +61,7 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 	}
 	iRes++
 
-	if st, _ := t.GetStatus(); st == ABORTED {
+	if t.Aborted() {
 		fmt.Println("Exiting before 2nd execution")
 		return iRes, nil
 	}
@@ -71,7 +72,7 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 	}
 	iRes++
 
-	if st, _ := t.GetStatus(); st == ABORTED {
+	if t.Aborted() {
 		fmt.Println("Exiting before 3rd execution")
 		return iRes, nil
 	}
@@ -82,7 +83,7 @@ func goodTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult
 	}
 	iRes++
 
-	if st, _ := t.GetStatus(); st == ABORTED {
+	if t.Aborted() {
 		fmt.Println("Exiting before function return")
 		return iRes, nil
 	}
@@ -95,7 +96,7 @@ func badTaskActionCitizen(t Task, parameters TaskParameters) (result TaskResult,
 	var iRes int
 
 	defer func(err *fail.Error) {
-		if st, _ := t.GetStatus(); st == ABORTED {
+		if st, _ := t.Status(); st == ABORTED {
 			if iRes > 1 {
 				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
@@ -128,7 +129,7 @@ func horribleTaskActionCitizen(t Task, parameters TaskParameters) (result TaskRe
 	var iRes int
 
 	defer func(err *fail.Error) {
-		if st, _ := t.GetStatus(); st == ABORTED {
+		if t.Aborted() {
 			if iRes > 1 {
 				*err = fail.NewError("failure: the action must check the status from time to time")
 			}
@@ -160,7 +161,7 @@ func heavyDutyTaskThatFails(duration time.Duration, wantedResult bool, withError
 }
 
 func TestSomethingFails(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -177,11 +178,11 @@ func TestSomethingFails(t *testing.T) {
 			t.Errorf("Unexpected: %s", xerr)
 		}
 	}
-	_, xerr = overlord.Start(problemsHappens, nil)
+	_, xerr = overlord.Start(problemsHappen, nil)
 	if xerr != nil {
 		t.Errorf("Unexpected: %s", xerr)
 	}
-	_, xerr = overlord.Start(problemsHappens, nil)
+	_, xerr = overlord.Start(problemsHappen, nil)
 	if xerr != nil {
 		t.Errorf("Unexpected: %s", xerr)
 	}
@@ -189,25 +190,19 @@ func TestSomethingFails(t *testing.T) {
 	_, xerr = overlord.WaitGroup()
 	require.NotNil(t, xerr)
 	if xerr != nil {
-		if eab, ok := xerr.(*fail.ErrAborted); ok {
-			cause := eab.Cause()
-			if causes, ok := cause.(*fail.ErrorList); ok {
-				errList := causes.ToErrorSlice()
-
-				if len(errList) != 2 {
-					t.Fail()
-				}
-			} else {
-				t.FailNow()
+		switch cerr := xerr.(type) {
+		case *fail.ErrorList:
+			if len(cerr.ToErrorSlice()) != 2 {
+				t.Fail()
 			}
-		} else {
-			t.FailNow()
+		default:
+			t.Errorf("Unexpected error %s (%s)", xerr.Error(), reflect.TypeOf(xerr).String())
 		}
 	}
 }
 
 func TestGoodTaskActionCitizen(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -222,6 +217,7 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 		_, xerr := overlord.Start(goodTaskActionCitizen, nil)
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
+			t.FailNow()
 		}
 	}
 
@@ -229,7 +225,8 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 	time.Sleep(12 * time.Millisecond)
 	xerr = overlord.Abort()
 	if xerr != nil {
-		t.Fail()
+		t.Errorf("Unable to abort")
+		t.FailNow()
 	}
 
 	end := time.Since(begin)
@@ -250,11 +247,8 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 				}
 
 				if errFound {
-					t.Fail()
-				}
-
-				if len(errList) != 1 {
-					t.Fail()
+					t.Errorf("There should be NO errors")
+					t.FailNow()
 				}
 			}
 		}
@@ -268,7 +262,7 @@ func TestGoodTaskActionCitizen(t *testing.T) {
 }
 
 func TestBadTaskActionCitizen(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -330,12 +324,13 @@ func TestBadTaskActionCitizen(t *testing.T) {
 	}
 }
 
+// VPL: as coded, this test never stop... There is no way to kill the goroutines
 func TestAwfulTaskActionCitizen(t *testing.T) {
 	rescueStdout := os.Stdout
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -363,9 +358,19 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 
 	time.Sleep(60 * time.Millisecond)
 
-	_, xerr = overlord.WaitGroup()
+	// VPL: waiting on a taskgroup running task that cannot end will deadlock... As expected...
+	ended, _, xerr := overlord.WaitGroupFor(5 * time.Second)
 	if xerr == nil { // It should fail because it's an aborted task...
 		t.Fail()
+	}
+	if !ended {
+		t.Logf("TaskGroup hasn't ended after 5s")
+	}
+	switch xerr.(type) {
+	case *fail.ErrTimeout:
+		t.Logf("timeout occurred as expected, TaskGroup cannot end because of the way TaskActions have been coded")
+	default:
+		t.Errorf("unexpected error occurred: %v", xerr)
 	}
 
 	time.Sleep(1000 * time.Millisecond)
@@ -379,5 +384,31 @@ func TestAwfulTaskActionCitizen(t *testing.T) {
 	count := len(stCh)
 	if count < 5 {
 		t.Fail()
+	}
+}
+
+func TestAwfulSimpleTaskActionCitizen(t *testing.T) {
+	single, xerr := NewTask()
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	stCh := make(chan string, 100)
+	_, xerr = single.StartWithTimeout(horribleTaskActionCitizen, stCh, 4*time.Second)
+	if xerr != nil {
+		t.Logf("The task is just starting.., it shouldn't fail")
+		t.Fail()
+	}
+
+	_, _, xerr = single.WaitFor(4 * time.Second)
+	if xerr == nil { // It should fail with a timeout
+		t.Logf("This should have failed with a timeout")
+		t.Fail()
+	}
+
+	switch xerr.(type) {
+	case *fail.ErrTimeout:
+		t.Logf("timeout occurred as expected, Task cannot end the goroutine never returns and also ignores the timeout parameter")
+	default:
+		t.Errorf("unexpected error occurred: %v", xerr)
 	}
 }

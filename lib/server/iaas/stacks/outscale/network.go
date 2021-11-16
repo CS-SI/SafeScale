@@ -17,6 +17,7 @@
 package outscale
 
 import (
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/outscale/osc-sdk-go/osc"
@@ -51,7 +52,7 @@ func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 }
 
 // CreateNetwork creates a network named name (in OutScale terminology, a Network corresponds to a VPC)
-func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network, xerr fail.Error) {
+func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network, ferr fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if s.IsNull() {
 		return nullAN, fail.InvalidInstanceError()
@@ -68,9 +69,9 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.DeleteNetwork(resp.NetId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", req.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network '%s'", req.Name))
 			}
 		}
 	}()
@@ -97,7 +98,7 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (an *abstract.Network,
 	return toAbstractNetwork(resp), nil
 }
 
-func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fail.Error {
+func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) (ferr fail.Error) {
 	if len(req.DNSServers) == 0 {
 		return nil
 	}
@@ -113,9 +114,9 @@ func (s stack) createDHCPOptionSet(req abstract.NetworkRequest, net osc.Net) fai
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := s.deleteDhcpOptions(net, false)
-			_ = xerr.AddConsequence(derr)
+			_ = ferr.AddConsequence(derr)
 		}
 	}()
 
@@ -319,12 +320,13 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
-			// if no nics found, consider as a success and continue
+			// if no nics found, considered as a success and continue
+			debug.IgnoreError(xerr)
 		default:
 			return xerr
 		}
 	} else if len(resp) > 0 { // Delete remaining nics (may happen when something goes wrong during VM deletions)
-		if xerr = s.deleteNICs(resp); xerr == nil {
+		if xerr = s.deleteNICs(resp); xerr == nil { // FIXME: VERY bad practice
 			return xerr
 		}
 	}
@@ -334,6 +336,7 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// no Internet Gateway, consider the deletion successful and continue
+			debug.IgnoreError(xerr)
 		default:
 			return xerr
 		}
@@ -344,7 +347,7 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 }
 
 // CreateSubnet creates a Subnet
-func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xerr fail.Error) {
+func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
@@ -374,9 +377,9 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (as *abstract.Subnet, xe
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.rpcDeleteSubnet(resp.SubnetId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet"))
 			}
 		}
 	}()
@@ -437,13 +440,14 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(networkRef)
+			if xerr != nil {
+				return nil, xerr
+			}
 		default:
 			return nil, xerr
 		}
 	}
-	if xerr != nil {
-		return nil, xerr
-	}
+
 	networkID = an.ID
 
 	resp, xerr := s.rpcReadSubnets(networkID, nil)
@@ -502,9 +506,9 @@ func (s stack) ListSubnets(networkRef string) (_ []*abstract.Subnet, xerr fail.E
 
 	if networkRef == "" {
 		networkRef = s.Options.Network.DefaultNetworkName
-	}
-	if networkRef == "" {
-		return nil, fail.InvalidParameterError("networkRef", "cannot be empty string if tenant does not set keyword 'VPCNAME' or 'DefaultNetworkName'")
+		if networkRef == "" {
+			return nil, fail.InvalidParameterError("networkRef", "cannot be empty string if tenant does not set keyword 'VPCNAME' or 'DefaultNetworkName'")
+		}
 	}
 
 	an, xerr := s.InspectNetwork(networkRef)
@@ -539,9 +543,10 @@ func (s stack) listSubnetsByHost(hostID string) ([]*abstract.Subnet, []osc.Nic, 
 
 	resp, xerr := s.rpcReadNics("", hostID)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
-			// No nics found, consider as successful and returns empty slices
+			// No nics found, considered as a success and returns empty slices
+			debug.IgnoreError(xerr)
 			return emptySubnetSlice, emptyNicSlice, nil
 		}
 		return emptySubnetSlice, emptyNicSlice, xerr
@@ -586,7 +591,7 @@ func (s stack) DeleteSubnet(id string) (xerr fail.Error) {
 
 	if len(resp) > 0 {
 		// Remove should succeed only when something goes wrong when deleting VMs
-		logrus.Warnf("found orphan Nics to delete, check if nothing goes wrong deleting Hosts...")
+		logrus.Warnf("found orphan Nics to delete (%s), check if nothing goes wrong deleting Hosts...", spew.Sdump(resp))
 		if xerr = s.deleteNICs(resp); xerr != nil {
 			return xerr
 		}

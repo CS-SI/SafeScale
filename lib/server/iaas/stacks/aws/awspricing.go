@@ -155,10 +155,9 @@ func (p Price) GetDiskSize() float64 {
 	return p.parseStorage(p.Product.Attributes.Storage)
 }
 
-// TODO: comment
 // parseMemory ...
 func (p Price) parseFloat(str string) float64 {
-	r, err := regexp.Compile(`([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`) //nolint
+	r, err := regexp.Compile(`([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`) // nolint
 	if err != nil {
 		return 0.0
 	}
@@ -175,10 +174,9 @@ func (p Price) parseFloat(str string) float64 {
 	return size
 }
 
-// TODO: comment
 // parseStorage ...
 func (p Price) parseStorage(str string) float64 {
-	r, err := regexp.Compile(`([0-9]*) x ([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`) //nolint
+	r, err := regexp.Compile(`([0-9]*) x ([0-9]*(\\.|,)?[0-9]*) ?([a-z A-Z]*)?`) // nolint
 	if err != nil {
 		return 0.0
 	}
@@ -204,7 +202,6 @@ func (p Price) parseStorage(str string) float64 {
 	return factor * size
 }
 
-// TODO: comment
 // parseNumber ...
 func (p Price) parseInt(str string, failureValue int) int {
 	result := failureValue

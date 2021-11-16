@@ -69,8 +69,19 @@ func extractHostArgument(c *cli.Context, hostnamePos int) error {
 		// fmt.Printf("%s\n", err.Error()
 		return clitools.ExitOnRPC(err.Error())
 	}
+
 	if hostInstance == nil {
 		return clitools.ExitOnErrorWithMessage(exitcode.NotFound, fmt.Sprintf("Host '%s' not found", hostName))
+	}
+
+	return nil
+}
+
+// Use the 'nodePos'th argument of the command as a node reference and init hostName with it
+func extractNodeArgument(c *cli.Context, nodePos int) error {
+	hostName = c.Args().Get(nodePos)
+	if hostName == "" {
+		return clitools.ExitOnInvalidArgument("argument HOSTNAME invalid")
 	}
 
 	return nil

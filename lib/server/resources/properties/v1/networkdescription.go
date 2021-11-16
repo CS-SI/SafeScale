@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // NetworkDescription contains additional information describing the network, in V1
@@ -39,9 +39,10 @@ func NewNetworkDescription() *NetworkDescription {
 	return &NetworkDescription{}
 }
 
-// Content ... (data.Clonable interface)
-func (nd *NetworkDescription) Content() interface{} {
-	return nd
+// IsNull ...
+// (data.Clonable interface)
+func (nd *NetworkDescription) IsNull() bool {
+	return nd == nil || (nd.Created.IsZero() && nd.Purpose == "")
 }
 
 // Clone ... (data.Clonable interface)
@@ -55,6 +56,7 @@ func (nd *NetworkDescription) Replace(p data.Clonable) data.Clonable {
 	if nd == nil || p == nil {
 		return nd
 	}
+
 	*nd = *p.(*NetworkDescription)
 	return nd
 }

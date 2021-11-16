@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Instal s3ql
-# TODO move this installation in a dedicated go executable which will be eanble to handle different linux flavor (apt, yum, ...)
+# Install s3ql
+# TODO move this installation in a dedicated go executable which will handle different linux flavors (apt, yum, ...)
 apt-get update && apt-get install -y s3ql && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 mkdir -p /etc/s3ql

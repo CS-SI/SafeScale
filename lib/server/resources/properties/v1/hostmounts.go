@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostLocalMount stores information about a device (as an attached volume) mount
@@ -43,7 +43,14 @@ func (hlm *HostLocalMount) Reset() {
 	*hlm = HostLocalMount{}
 }
 
+// IsNull ...
+// satisfies interface data.Clonable
+func (hlm *HostLocalMount) IsNull() bool {
+	return hlm == nil || (hlm.Device == "" && hlm.Path == "" && hlm.FileSystem == "")
+}
+
 // Clone ...
+// satisfies interface data.Clonable
 func (hlm HostLocalMount) Clone() data.Clonable {
 	return NewHostLocalMount().Replace(&hlm)
 }
@@ -80,6 +87,11 @@ func NewHostRemoteMount() *HostRemoteMount {
 // Reset ...
 func (hrm *HostRemoteMount) Reset() {
 	*hrm = HostRemoteMount{}
+}
+
+// IsNull ...
+func (hrm *HostRemoteMount) IsNull() bool {
+	return hrm == nil || (hrm.ShareID == "" && hrm.Export == "" && hrm.Path == "")
 }
 
 // Clone ...
@@ -136,6 +148,12 @@ func (hm *HostMounts) Reset() {
 // Content ...  (data.Clonable interface)
 func (hm *HostMounts) Content() interface{} {
 	return hm
+}
+
+// IsNull ...
+// (data.Clonable interface)
+func (hm *HostMounts) IsNull() bool {
+	return hm == nil || (len(hm.LocalMountsByPath) == 0 && len(hm.RemoteMountsByPath) == 0)
 }
 
 // Clone ...  (data.Clonable interface)

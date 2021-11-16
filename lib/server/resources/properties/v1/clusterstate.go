@@ -22,19 +22,24 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
-// ClusterState contains the bare minimum information about a cluster
+// ClusterState contains the bare minimum information about the state of a cluster
 type ClusterState struct {
-	// getState of the cluster
-	State clusterstate.Enum `json:"state,omitempty"`
-	// StateCollectInterval in seconds
-	StateCollectInterval time.Duration `json:"state_collect_interval,omitempty"`
+	State                clusterstate.Enum `json:"state,omitempty"`                  // State of the cluster
+	StateCollectInterval time.Duration     `json:"state_collect_interval,omitempty"` // in seconds
+
 }
 
 func newClusterState() *ClusterState {
 	return &ClusterState{}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (s *ClusterState) IsNull() bool {
+	return s == nil || s.StateCollectInterval == 0
 }
 
 // Clone ...

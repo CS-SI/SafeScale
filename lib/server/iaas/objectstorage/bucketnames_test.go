@@ -58,7 +58,6 @@ func TestBuildMetadataBucketName(t *testing.T) {
 			domain:  "b",
 			project: "D",
 		}, "0.safescale-39aa5fec414ff78da8c3028953851096" + suffix, false},
-		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

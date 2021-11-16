@@ -1685,21 +1685,22 @@ The following actions are proposed:
     Get info about a volume.<br><br>
     example:
     <pre>$ safescale volume inspect myvolume</pre>
-    response on success:
+    response on success: REVIEW_ME
     <pre>
 {
   "result": {
-    "Device": "03f6d07b-f0b1-47f5-9dce-6063ed0865da",
-    "Format": "nfs",
-    "Host": "myhost",
-    "ID": "4463647d-035b-4e16-8ea9-b3c29acd1887",
-    "MountPath": "/data/myvolume",
-    "Name": "myvolume",
-    "Size": 10,
-    "Speed": "HDD"
+    "device_uuid": "cc3bbc5c-bc99-409d-90be-265bcdc5b506",
+    "format": "nfs",
+    "host": "i-086512601f6606319",
+    "id": "vol-02b5a3740f249d2b2",
+    "mount_path": "/data/my-volume",
+    "name": "my-volume",
+    "size": 200,
+    "speed": "VS_HDD"
   },
   "status": "success"
 }
+
     </pre>
     response on failure:
     <pre>

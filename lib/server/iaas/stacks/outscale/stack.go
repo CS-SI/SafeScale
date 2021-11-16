@@ -82,7 +82,7 @@ type ConfigurationOptions struct {
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
 }
 
-// stack Outscale Stack to adapt outscale IaaS API
+// stack Outscale stack to adapt outscale IaaS API
 type stack struct {
 	Options              ConfigurationOptions
 	client               *osc.APIClient
@@ -96,12 +96,17 @@ type stack struct {
 }
 
 // NullStack returns a null value of the stack
-func NullStack() *stack { //nolint
+func NullStack() *stack { // nolint
 	return &stack{}
 }
 
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "outscale"
+}
+
 // New creates a new stack
-func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { //nolint
+func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
 	if options == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("options")
 	}
@@ -109,7 +114,10 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { //nolint
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	client := osc.NewAPIClient(osc.NewConfiguration())
+	config := osc.NewConfiguration()
+	config.BasePath = options.Compute.URL
+	config.Scheme = "https"
+	client := osc.NewAPIClient(config)
 	auth := context.WithValue(context.Background(), osc.ContextAWSv4, osc.AWSv4{
 		AccessKey: options.Identity.AccessKey,
 		SecretKey: options.Identity.SecretKey,
@@ -173,13 +181,14 @@ func (s *stack) initDefaultNetwork() fail.Error {
 					CIDR: s.Options.Network.DefaultNetworkCIDR,
 				}
 				an, xerr = s.CreateNetwork(req)
+				if xerr != nil {
+					return fail.Wrap(xerr, "failed to initialize default Network '%s'", s.Options.Network.DefaultNetworkName)
+				}
 			default:
 				return xerr
 			}
 		}
-		if xerr != nil {
-			return fail.Wrap(xerr, "failed to initialize default Network '%s'", s.Options.Network.DefaultNetworkName)
-		}
+
 		s.vpc = an
 	}
 	return nil

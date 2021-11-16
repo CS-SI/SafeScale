@@ -55,25 +55,26 @@ type Router struct {
 	NetworkID string `json:"network_id,omitempty"`
 }
 
-// HasDefaultNetwork returns true if the Stack as a default network set (coming from tenants file)
-func (s Stack) HasDefaultNetwork() bool {
+// HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
+func (s stack) HasDefaultNetwork() bool {
 	return false
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
-func (s Stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
+func (s stack) GetDefaultNetwork() (*abstract.Network, fail.Error) {
 	// FIXME: support default network
-	return nil, fail.NotFoundError("no default network in Stack")
+	return nil, fail.NotFoundError("no default network in stack")
 }
 
 // CreateNetwork creates a network named name
-func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, xerr fail.Error) {
+func (s stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Network, ferr fail.Error) {
+	var xerr fail.Error
 	nullAN := abstract.NewNetwork()
 	if s.IsNull() {
 		return nullAN, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Checks if CIDR is valid...
@@ -110,7 +111,7 @@ func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 
 	// Starting from here, delete network if exit with error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := stacks.RetryableRemoteCall(
 				func() error {
 					return networks.Delete(s.NetworkClient, network.ID).ExtractErr()
@@ -119,7 +120,7 @@ func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 			)
 			if derr != nil {
 				logrus.Errorf("failed to delete Network '%s': %v", req.Name, derr)
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
@@ -132,7 +133,7 @@ func (s Stack) CreateNetwork(req abstract.NetworkRequest) (newNet *abstract.Netw
 }
 
 // InspectNetworkByName ...
-func (s Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
+func (s stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if s.IsNull() {
 		return nullAN, fail.InvalidInstanceError()
@@ -141,7 +142,7 @@ func (s Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 		return nullAN, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
 	// Gophercloud doesn't propose the way to get a host by name, but OpenStack knows how to do it...
 	r := networks.GetResult{}
@@ -179,7 +180,7 @@ func (s Stack) InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 }
 
 // InspectNetwork returns the network identified by id
-func (s Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
+func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	nullAN := abstract.NewNetwork()
 	if s.IsNull() {
 		return nullAN, fail.InvalidInstanceError()
@@ -188,7 +189,7 @@ func (s Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 		return nullAN, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	// If not found, we look for any network from provider
 	// 1st try with id
@@ -204,6 +205,7 @@ func (s Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
+			debug.IgnoreError(xerr)
 		default:
 			return nullAN, xerr
 		}
@@ -222,13 +224,13 @@ func (s Stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 }
 
 // ListNetworks lists available networks
-func (s Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
+func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	var emptySlice []*abstract.Network
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "").WithStopwatch().Entering().Exiting()
 
 	// Retrieve a pager (i.e. a paginated collection)
 	var netList []*abstract.Network
@@ -267,7 +269,7 @@ func (s Stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 }
 
 // DeleteNetwork deletes the network identified by id
-func (s Stack) DeleteNetwork(id string) fail.Error {
+func (s stack) DeleteNetwork(id string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -275,7 +277,7 @@ func (s Stack) DeleteNetwork(id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	var network *networks.Network
 	xerr := stacks.RetryableRemoteCall(
@@ -342,13 +344,13 @@ func ToAbstractIPVersion(v int) ipversion.Enum {
 }
 
 // CreateSubnet creates a subnet
-func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet, xerr fail.Error) {
+func (s stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet, ferr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
 	}
 
-	tracer := debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", req.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	// Checks if CIDR is valid...
@@ -388,7 +390,7 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 
 	var subnet *subnets.Subnet
 	// Execute the operation and get back a subnets.Subnet struct
-	xerr = stacks.RetryableRemoteCall(
+	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			subnet, innerErr = subnets.Create(s.NetworkClient, opts).Extract()
 			return innerErr
@@ -401,12 +403,12 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 
 	// Starting from here, delete subnet if exit with error
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			derr := s.DeleteSubnet(subnet.ID)
 			if derr != nil {
 				wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet '%s'", subnet.Name)
 				logrus.Error(wrapErr.Error())
-				_ = xerr.AddConsequence(wrapErr)
+				_ = ferr.AddConsequence(wrapErr)
 			}
 		}
 	}()
@@ -449,7 +451,7 @@ func (s Stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 	return out, nil
 }
 
-func (s Stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {
+func (s stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Network) fail.Error {
 	_, _ /*subnetDesc*/, err := net.ParseCIDR(req.CIDR)
 	if err != nil {
 		return fail.Wrap(err, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
@@ -458,7 +460,7 @@ func (s Stack) validateCIDR(req abstract.SubnetRequest, network *abstract.Networ
 }
 
 // InspectSubnet returns the subnet identified by id
-func (s Stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
+func (s stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
@@ -467,7 +469,7 @@ func (s Stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 		return nullAS, fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
 
 	as := abstract.NewSubnet()
 	var sn *subnets.Subnet
@@ -493,7 +495,7 @@ func (s Stack) InspectSubnet(id string) (_ *abstract.Subnet, xerr fail.Error) {
 }
 
 // InspectSubnetByName ...
-func (s Stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Subnet, xerr fail.Error) {
+func (s stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Subnet, xerr fail.Error) {
 	nullAS := abstract.NewSubnet()
 	if s.IsNull() {
 		return nullAS, fail.InvalidInstanceError()
@@ -502,7 +504,7 @@ func (s Stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 		return nullAS, fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", name).WithStopwatch().Entering().Exiting()
 
 	listOpts := subnets.ListOpts{
 		Name: name,
@@ -511,14 +513,17 @@ func (s Stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 	if networkRef != "" {
 		an, xerr = s.InspectNetwork(networkRef)
 		if xerr != nil {
-			switch xerr.(type) { //nolint
+			switch xerr.(type) { // nolint
 			case *fail.ErrNotFound:
 				an, xerr = s.InspectNetworkByName(networkRef)
+				if xerr != nil {
+					return nullAS, xerr
+				}
+			default:
+				return nullAS, xerr
 			}
 		}
-		if xerr != nil {
-			return nullAS, xerr
-		}
+
 		listOpts.NetworkID = an.ID
 	}
 
@@ -566,13 +571,13 @@ func (s Stack) InspectSubnetByName(networkRef, name string) (subnet *abstract.Su
 }
 
 // ListSubnets lists available subnets in a network
-func (s Stack) ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error) {
+func (s stack) ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error) {
 	var emptySlice []*abstract.Subnet
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("Stack.network"), "").WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "").WithStopwatch().Entering().Exiting()
 
 	listOpts := subnets.ListOpts{}
 	if networkID != "" {
@@ -608,7 +613,7 @@ func (s Stack) ListSubnets(networkID string) ([]*abstract.Subnet, fail.Error) {
 }
 
 // DeleteSubnet deletes the network identified by id
-func (s Stack) DeleteSubnet(id string) fail.Error {
+func (s stack) DeleteSubnet(id string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -616,10 +621,11 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 		return fail.InvalidParameterError("id", "cannot be empty string")
 	}
 
-	defer debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("Stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stacks.network") || tracing.ShouldTrace("stack.openstack"), "(%s)", id).WithStopwatch().Entering().Exiting()
 	routerList, _ := s.ListRouters()
 	var router *Router
 	for _, r := range routerList {
+		r := r
 		if r.Name == id {
 			router = &r
 			break
@@ -634,7 +640,7 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 		}
 	}
 
-	retryErr := retry.WhileUnsuccessfulDelay5Seconds(
+	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
@@ -644,24 +650,27 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
-				case *fail.ErrInvalidRequest:
+				case *fail.ErrInvalidRequest, *fail.ErrDuplicate:
 					msg := "hosts or services are still attached"
-					logrus.Warnf(strprocess.Capitalize(msg))
-					return retry.StopRetryError(abstract.ResourceNotAvailableError("subnet", id), msg)
+					return retry.StopRetryError(fail.Wrap(innerXErr, msg))
+				case *fail.ErrNotFound:
+					// consider a missing Subnet as a successful deletion
+					debug.IgnoreError(innerXErr)
 				default:
 					return innerXErr
 				}
 			}
 			return nil
 		},
+		temporal.GetDefaultDelay(),
 		temporal.GetContextTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
 		case *retry.ErrTimeout:
-			return abstract.ResourceTimeoutError("network", id, temporal.GetContextTimeout())
+			return fail.Wrap(fail.Cause(retryErr), "timeout")
 		case *retry.ErrStopRetry:
-			return fail.Wrap(retryErr.Cause(), "failed to delete subnet after %v", temporal.GetContextTimeout())
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		default:
 			return retryErr
 		}
@@ -670,7 +679,7 @@ func (s Stack) DeleteSubnet(id string) fail.Error {
 }
 
 // createRouter creates a router satisfying req
-func (s Stack) createRouter(req RouterRequest) (*Router, fail.Error) {
+func (s stack) createRouter(req RouterRequest) (*Router, fail.Error) {
 	// Create a router to connect external Provider network
 	gi := routers.GatewayInfo{
 		NetworkID: req.NetworkID,
@@ -702,7 +711,7 @@ func (s Stack) createRouter(req RouterRequest) (*Router, fail.Error) {
 }
 
 // ListRouters lists available routers
-func (s Stack) ListRouters() ([]Router, fail.Error) {
+func (s stack) ListRouters() ([]Router, fail.Error) {
 	var emptySlice []Router
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -735,7 +744,7 @@ func (s Stack) ListRouters() ([]Router, fail.Error) {
 }
 
 // deleteRouter deletes the router identified by id
-func (s Stack) deleteRouter(id string) fail.Error {
+func (s stack) deleteRouter(id string) fail.Error {
 	return stacks.RetryableRemoteCall(
 		func() error {
 			return routers.Delete(s.NetworkClient, id).ExtractErr()
@@ -745,7 +754,7 @@ func (s Stack) deleteRouter(id string) fail.Error {
 }
 
 // addSubnetToRouter attaches subnet to router
-func (s Stack) addSubnetToRouter(routerID string, subnetID string) fail.Error {
+func (s stack) addSubnetToRouter(routerID string, subnetID string) fail.Error {
 	return stacks.RetryableRemoteCall(
 		func() error {
 			_, innerErr := routers.AddInterface(s.NetworkClient, routerID, routers.AddInterfaceOpts{
@@ -758,7 +767,7 @@ func (s Stack) addSubnetToRouter(routerID string, subnetID string) fail.Error {
 }
 
 // removeSubnetFromRouter detaches a subnet from router interface
-func (s Stack) removeSubnetFromRouter(routerID string, subnetID string) fail.Error {
+func (s stack) removeSubnetFromRouter(routerID string, subnetID string) fail.Error {
 	return stacks.RetryableRemoteCall(
 		func() error {
 			_, innerErr := routers.RemoveInterface(s.NetworkClient, routerID, routers.RemoveInterfaceOpts{
@@ -771,7 +780,7 @@ func (s Stack) removeSubnetFromRouter(routerID string, subnetID string) fail.Err
 }
 
 // BindSecurityGroupToSubnet binds a security group to a subnet
-func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+func (s stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -790,7 +799,7 @@ func (s Stack) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, 
 }
 
 // UnbindSecurityGroupFromSubnet unbinds a security group from a subnet
-func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
+func (s stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -810,7 +819,7 @@ func (s Stack) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParamet
 
 // CreateVIP creates a private virtual IP
 // If public is set to true,
-func (s Stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
+func (s stack) CreateVIP(networkID, subnetID, name string, securityGroups []string) (*abstract.VirtualIP, fail.Error) {
 	nullAVIP := abstract.NewVirtualIP()
 	if s.IsNull() {
 		return nullAVIP, fail.InvalidInstanceError()
@@ -851,7 +860,7 @@ func (s Stack) CreateVIP(networkID, subnetID, name string, securityGroups []stri
 }
 
 // AddPublicIPToVIP adds a public IP to VIP
-func (s Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
+func (s stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -860,7 +869,7 @@ func (s Stack) AddPublicIPToVIP(vip *abstract.VirtualIP) fail.Error {
 }
 
 // BindHostToVIP makes the host passed as parameter an allowed "target" of the VIP
-func (s Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+func (s stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -894,6 +903,7 @@ func (s Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 		IPAddress:  vip.PrivateIP,
 	}
 	for _, p := range hostPorts {
+		p := p
 		p.AllowedAddressPairs = append(p.AllowedAddressPairs, addressPair)
 		xerr = stacks.RetryableRemoteCall(
 			func() error {
@@ -910,7 +920,7 @@ func (s Stack) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error 
 }
 
 // UnbindHostFromVIP removes the bind between the VIP and a host
-func (s Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
+func (s stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -961,7 +971,7 @@ func (s Stack) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Er
 }
 
 // DeleteVIP deletes the port corresponding to the VIP
-func (s Stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
+func (s stack) DeleteVIP(vip *abstract.VirtualIP) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}

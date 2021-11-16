@@ -95,7 +95,7 @@ func reinterpretGophercloudErrorCode(gopherErr error, success []int64, transpare
 	return gopherErr
 }
 
-func defaultErrorInterpreter(inErr error) error {
+func defaultErrorInterpreter(inErr error) error { // nolint
 	return reinterpretGophercloudErrorCode(
 		inErr, nil, []int64{408, 409, 425, 429, 500, 503, 504}, nil, func(ferr error) error {
 			if IsServiceUnavailableError(ferr) {

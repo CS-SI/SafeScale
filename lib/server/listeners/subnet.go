@@ -45,7 +45,11 @@ import (
 // safescale network subnet inspect net1 subnet-1
 
 // SubnetListener subnet service server gRPC
-type SubnetListener struct{}
+type SubnetListener struct {
+	protocol.UnimplementedSubnetServiceServer
+}
+
+// VPL: workaround to make SafeScale compile with recent gRPC changes, before understanding the scope of these changes
 
 // Create a new subnet
 func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRequest) (_ *protocol.Subnet, err error) {
@@ -66,7 +70,7 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 	networkRef, networkLabel := srvutils.GetReference(in.GetNetwork())
@@ -74,15 +78,13 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		return nil, fail.InvalidParameterError("in.Network", "must contain an ID or a Name")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("subnet create '%s'", networkRef))
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/subnet/%s/create", networkRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, '%s')", networkLabel, in.GetName()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -105,13 +107,20 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 	}
 	sizing.Image = in.GetGateway().GetImageId()
 
-	rn, xerr := networkfactory.Load(svc, networkRef)
+	networkInstance, xerr := networkfactory.Load(job.Service(), networkRef)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	defer networkInstance.Released()
+
+	subnetInstance, xerr := subnetfactory.New(job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	req := abstract.SubnetRequest{
-		NetworkID:      rn.GetID(),
+		NetworkID:      networkInstance.GetID(),
 		Name:           in.GetName(),
 		CIDR:           in.GetCidr(),
 		Domain:         in.GetDomain(),
@@ -119,20 +128,20 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 		DefaultSSHPort: in.GetGateway().GetSshPort(),
 		KeepOnFailure:  in.GetKeepOnFailure(),
 	}
-	rs, xerr := subnetfactory.New(svc)
+	xerr = subnetInstance.Create(job.Context(), req, gwName, sizing)
 	if xerr != nil {
 		return nil, xerr
 	}
-	if xerr = rs.Create(task.GetContext(), req, gwName, sizing); xerr != nil {
-		return nil, xerr
-	}
 
-	if xerr = rn.AdoptSubnet(task.GetContext(), rs); xerr != nil {
+	defer subnetInstance.Released()
+
+	xerr = networkInstance.AdoptSubnet(job.Context(), subnetInstance)
+	if xerr != nil {
 		return nil, xerr
 	}
 
 	tracer.Trace("Subnet '%s' successfully created.", req.Name)
-	return rs.ToProtocol()
+	return subnetInstance.ToProtocol()
 }
 
 // List existing networks
@@ -154,38 +163,39 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network list")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "/subnets/list")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%v, %v)", in.Network, in.All).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%v, %v)", in.Network, in.All).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var networkID string
 	networkRef, _ := srvutils.GetReference(in.Network)
 	if networkRef == "" {
-		if svc.HasDefaultNetwork() {
-			if an, xerr := svc.GetDefaultNetwork(); xerr == nil {
+		if job.Service().HasDefaultNetwork() {
+			an, xerr := job.Service().GetDefaultNetwork()
+			if xerr == nil {
 				networkID = an.ID
 			}
 		}
 	} else {
-		rn, xerr := networkfactory.Load(svc, networkRef)
+		networkInstance, xerr := networkfactory.Load(job.Service(), networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}
-		networkID = rn.GetID()
+
+		networkID = networkInstance.GetID()
+		networkInstance.Released()
 	}
-	list, xerr := subnetfactory.List(task.GetContext(), svc, networkID, in.GetAll())
+	list, xerr := subnetfactory.List(job.Context(), job.Service(), networkID, in.GetAll())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -219,7 +229,7 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -229,23 +239,24 @@ func (s *SubnetListener) Inspect(ctx context.Context, in *protocol.SubnetInspect
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet inspect")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnetInstance/%s/inspect", networkRef, subnetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	task := job.GetTask()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnetInstance"), "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	subnet, xerr := subnetfactory.Load(job.GetService(), networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return subnet.ToProtocol()
+	defer subnetInstance.Released()
+
+	return subnetInstance.ToProtocol()
 }
 
 // Delete a/many subnet/s
@@ -268,7 +279,7 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 		}
 	}
 
@@ -279,40 +290,44 @@ func (s *SubnetListener) Delete(ctx context.Context, in *protocol.SubnetInspectR
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet delete")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/delete", networkRef, subnetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(task, true, "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true, "(%s, %s)", networkRefLabel, subnetRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var (
-		rn       resources.Network
-		rs       resources.Subnet
-		subnetID string
+		networkInstance resources.Network
+		subnetInstance  resources.Subnet
+		subnetID        string
 	)
-	if rs, xerr = subnetfactory.Load(svc, networkRef, subnetRef); xerr == nil {
-		subnetID = rs.GetID()
-		if rn, xerr = rs.InspectNetwork(); xerr == nil {
-			xerr = rs.Delete(task.GetContext())
+	subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, subnetRef)
+	if xerr == nil {
+		subnetID = subnetInstance.GetID()
+		networkInstance, xerr = subnetInstance.InspectNetwork()
+		if xerr == nil {
+			xerr = subnetInstance.Delete(job.Context())
 		}
 	}
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// consider a Subnet not found as a successful deletion
+			debug.IgnoreError(xerr)
 		default:
 			return empty, fail.Wrap(xerr, "failed to delete Subnet '%s' in Network '%s'", subnetRef, networkRef)
 		}
 	}
 
-	if rn != nil {
-		if xerr = rn.AbandonSubnet(task.GetContext(), subnetID); xerr != nil {
+	if networkInstance != nil {
+		defer networkInstance.Released()
+
+		xerr = networkInstance.AbandonSubnet(job.Context(), subnetID)
+		if xerr != nil {
 			return empty, xerr
 		}
 	}
@@ -339,7 +354,7 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -354,26 +369,29 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group bind")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/bind", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRef, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRef, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := subnetfactory.Load(svc, networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	sg, xerr := securitygroupfactory.Load(svc, sgRef)
+
+	defer subnetInstance.Released()
+
+	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
+
+	defer sgInstance.Released()
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -383,7 +401,8 @@ func (s *SubnetListener) BindSecurityGroup(ctx context.Context, in *protocol.Sec
 		enable = resources.SecurityGroupEnable
 	}
 
-	if xerr = rs.BindSecurityGroup(task.GetContext(), sg, enable); xerr != nil {
+	xerr = subnetInstance.BindSecurityGroup(job.Context(), sgInstance, enable)
+	if xerr != nil {
 		return empty, xerr
 	}
 
@@ -409,7 +428,7 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -427,33 +446,36 @@ func (s *SubnetListener) UnbindSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group unbind")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/unbind", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	var sg resources.SecurityGroup
-	sg, xerr = securitygroupfactory.Load(svc, sgRef)
+	var sgInstance resources.SecurityGroup
+	sgInstance, xerr = securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	var rs resources.Subnet
-	if rs, xerr = subnetfactory.Load(svc, networkRef, subnetRef); xerr == nil {
-		xerr = rs.UnbindSecurityGroup(task.GetContext(), sg)
+	defer sgInstance.Released()
+
+	var subnetInstance resources.Subnet
+	subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, subnetRef)
+	if xerr == nil {
+		defer subnetInstance.Released()
+		xerr = subnetInstance.UnbindSecurityGroup(job.Context(), sgInstance)
 	}
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// If Subnet does not exist, try to see if there is metadata in Security Group to clean up
-			if xerr = sg.UnbindFromSubnetByReference(task.GetContext(), subnetRef); xerr != nil {
+			xerr = sgInstance.UnbindFromSubnetByReference(job.Context(), subnetRef)
+			if xerr != nil {
 				return empty, xerr
 			}
 		default:
@@ -481,7 +503,7 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -496,27 +518,32 @@ func (s *SubnetListener) EnableSecurityGroup(ctx context.Context, in *protocol.S
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group enable")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/enable", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s, %s)", networkRefLabel, subnetRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := subnetfactory.Load(svc, networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	sg, xerr := securitygroupfactory.Load(svc, sgRef)
+
+	defer subnetInstance.Released()
+
+	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.EnableSecurityGroup(task.GetContext(), sg); xerr != nil {
+
+	defer sgInstance.Released()
+
+	xerr = subnetInstance.EnableSecurityGroup(job.Context(), sgInstance)
+	if xerr != nil {
 		return empty, xerr
 	}
 
@@ -542,7 +569,7 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -557,29 +584,35 @@ func (s *SubnetListener) DisableSecurityGroup(ctx context.Context, in *protocol.
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group disable")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("/network/%s/subnet/%s/securitygroup/%s/disable", networkRef, subnetRef, sgRef))
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s, %s)", networkRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rs, xerr := subnetfactory.Load(svc, networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	sg, xerr := securitygroupfactory.Load(svc, sgRef)
+
+	defer subnetInstance.Released()
+
+	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rs.DisableSecurityGroup(task.GetContext(), sg); xerr != nil {
+
+	defer sgInstance.Released()
+
+	xerr = subnetInstance.DisableSecurityGroup(job.Context(), sgInstance)
+	if xerr != nil {
 		return empty, xerr
 	}
+
 	return empty, nil
 }
 
@@ -601,7 +634,7 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	networkRef, networkRefLabel := srvutils.GetReference(in.GetNetwork())
@@ -611,26 +644,26 @@ func (s *SubnetListener) ListSecurityGroups(ctx context.Context, in *protocol.Se
 		return nil, fail.InvalidRequestError("neither name nor id given as reference for Subnet")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), "network subnet security group list")
+	job, xerr := PrepareJob(ctx, in.GetNetwork().GetTenantId(), fmt.Sprintf("network/%s/subnet/%s/securitygroups/list", networkRef, subnetRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.subnet"), "(%s)", networkRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.subnet"), "(%s)", networkRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	state := securitygroupstate.Enum(in.GetState())
 
-	rs, xerr := subnetfactory.Load(svc, networkRef, subnetRef)
+	subnetInstance, xerr := subnetfactory.Load(job.Service(), networkRef, subnetRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	bonds, xerr := rs.ListSecurityGroups(task.GetContext(), state)
+	defer subnetInstance.Released()
+
+	bonds, xerr := subnetInstance.ListSecurityGroups(job.Context(), state)
 	if xerr != nil {
 		return nil, xerr
 	}

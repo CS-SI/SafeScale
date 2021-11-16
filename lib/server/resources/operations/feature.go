@@ -20,8 +20,12 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"reflect"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 
@@ -105,7 +109,7 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 			yamlKey := "feature.suitableFor.cluster"
 			if feat.Specs().IsSet(yamlKey) {
 				values := strings.Split(strings.ToLower(feat.Specs().GetString(yamlKey)), ",")
-				if values[0] == "all" || values[0] == "dcos" || values[0] == "k8s" || values[0] == "boh" || values[0] == "swarm" || values[0] == "ohpc" {
+				if values[0] == "all" || values[0] == "k8s" || values[0] == "boh" {
 					cfg := struct {
 						FeatureName    string   `json:"feature"`
 						ClusterFlavors []string `json:"available-cluster-flavors"`
@@ -139,6 +143,8 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 
 	v := viper.New()
 	v.AddConfigPath(".")
+	v.AddConfigPath("./features")
+	v.AddConfigPath("./.safescale/features")
 	v.AddConfigPath("$HOME/.safescale/features")
 	v.AddConfigPath("$HOME/.config/safescale/features")
 	v.AddConfigPath("/etc/safescale/features")
@@ -173,12 +179,16 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 		xerr = nil
 	}
 
+	logrus.Tracef("loaded feature '%s' (%s)", casted.GetDisplayFilename(), casted.GetFilename())
+
 	// if we can log the sha256 of the feature, do it
 	filename := v.ConfigFileUsed()
 	if filename != "" {
-		if content, err := ioutil.ReadFile(filename); err == nil {
-			logrus.Debugf("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
+		content, err := ioutil.ReadFile(filename)
+		if err != nil {
+			return nil, fail.ConvertError(err)
 		}
+		logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
 	}
 
 	casted.svc = svc
@@ -205,9 +215,11 @@ func NewEmbeddedFeature(svc iaas.Service, name string) (_ resources.Feature, xer
 
 	// if we can log the sha256 of the feature, do it
 	if casted.fileName != "" {
-		if content, err := ioutil.ReadFile(casted.fileName); err == nil {
-			logrus.Debugf("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
+		content, err := ioutil.ReadFile(casted.fileName)
+		if err != nil {
+			return nil, fail.ConvertError(err)
 		}
+		logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(string(content)))
 	}
 
 	casted.fileName += " [embedded]"
@@ -336,16 +348,54 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
+		default:
+			return nil, xerr
+		}
 	}
 
 	featureName := f.GetName()
 	targetName := target.GetName()
 	targetType := strings.ToLower(target.TargetType().String())
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
+	// -- passive check if feature is installed on target
+	switch target.(type) {
+	case resources.Host:
+		var found bool
+		xerr = target.(*Host).Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				_, found = hostFeaturesV1.Installed[f.GetName()]
+				return nil
+			})
+		})
+		if xerr != nil {
+			return nil, xerr
+		}
+		if found {
+			outcomes := &results{}
+			_ = outcomes.Add(featureName, &unitResults{
+				targetName: &stepResult{
+					completed: true,
+					success:   true,
+				},
+			})
+			return outcomes, nil
+		}
+	}
+
+	// -- fall back to active check
 	installer, xerr := f.findInstallerForTarget(target, "check")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -370,6 +420,9 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 	}
 
 	r, xerr := installer.Check(ctx, f, target, myV, s)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	// FIXME: restore Feature check using iaas.ResourceCache
 	// _ = checkCache.ForceSet(cacheKey, results)
@@ -413,8 +466,8 @@ func checkParameters(f Feature, v data.Map) fail.Error {
 
 // Add installs the Feature on the target
 // Installs succeeds if error == nil and Results.Successful() is true
-func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.Map, s resources.FeatureSettings) (_ resources.Results, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if f.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -429,14 +482,22 @@ func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.M
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
+		default:
+			return nil, xerr
+		}
 	}
 
 	featureName := f.GetName()
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
 	defer temporal.NewStopwatch().OnExitLogInfo(
@@ -521,13 +582,21 @@ func (f *Feature) Remove(ctx context.Context, target resources.Targetable, v dat
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return nil, xerr
+			}
+		default:
+			return nil, xerr
+		}
 	}
 
 	featureName := f.GetName()
 	targetName := target.GetName()
 	targetType := target.TargetType().String()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.features"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.feature"), "(): '%s' on %s '%s'", featureName, targetType, targetName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
@@ -659,8 +728,11 @@ func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targe
 		for _, k := range results.Keys() {
 			r := results.ResultsOfKey(k)
 			for _, l := range r.Keys() {
-				if s := r.ResultOfKey(l); s.Successful() {
-					successfulHosts[l] = struct{}{}
+				s := r.ResultOfKey(l)
+				if s != nil {
+					if s.Successful() {
+						successfulHosts[l] = struct{}{}
+					}
 				}
 			}
 		}
@@ -685,8 +757,11 @@ func unregisterOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Tar
 		for _, k := range results.Keys() {
 			r := results.ResultsOfKey(k)
 			for _, l := range r.Keys() {
-				if s := r.ResultOfKey(l); s.Successful() {
-					successfulHosts[l] = struct{}{}
+				s := r.ResultOfKey(l)
+				if s != nil {
+					if s.Successful() {
+						successfulHosts[l] = struct{}{}
+					}
 				}
 			}
 		}

@@ -23,6 +23,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -45,7 +47,8 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 	}
 
 	xerr := retry.Action(
-		func() error {
+		func() (nested error) {
+			defer fail.OnPanic(&nested)
 			callbackErr := callback()
 			actionErr := normalizeErrorAndCheckIfRetriable(callbackErr)
 			return actionErr
@@ -57,7 +60,7 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 		func(t retry.Try, v verdict.Enum) {
 			switch v {
 			case verdict.Retry:
-				logrus.Warningf("communication failed (%s), retrying", t.Err.Error())
+				logrus.Warnf("communication failed (%s), retrying", t.Err.Error())
 			default:
 			}
 		},
@@ -65,18 +68,20 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 	if xerr != nil {
 		switch realErr := xerr.(type) {
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(realErr.Cause())
+			return fail.Wrap(fail.Cause(realErr), "stopping retries")
 		case *retry.ErrTimeout:
-			xerr = fail.ConvertError(realErr.Cause())
+			return fail.Wrap(fail.Cause(realErr), "timeout")
+		default:
+			return xerr
 		}
 	}
-	return xerr
+	return nil
 }
 
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),
 // waiting 1 second between each try, with a limit of 'timeout'
 func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessfulButRetryable(callback, retry.Constant(1*time.Second), timeout)
+	return WhileUnsuccessfulButRetryable(callback, retry.Constant(temporal.GetMinDelay()), timeout)
 }
 
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
@@ -88,8 +93,77 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 		if err != nil {
 			switch err.(type) {
 			case fail.ErrInvalidRequest, *fail.ErrInvalidRequest:
-				logrus.Warning(err.Error())
+				logrus.Warnf(err.Error())
 			default:
+				debug.IgnoreError(err)
+			}
+		}
+	}()
+
+	if in != nil {
+		switch realErr := in.(type) {
+		case *url.Error:
+			if realErr.Temporary() {
+				return realErr
+			}
+			return normalizeURLError(realErr)
+		case net.Error:
+			if realErr.Temporary() {
+				return realErr
+			}
+			return retry.StopRetryError(realErr)
+		case fail.Error, fail.ErrNotAvailable, fail.ErrOverflow, fail.ErrOverload: // a fail.Error may contain a cause of type net.Error, being *url.Error a special subcase.
+			// net.Error, and by extension url.Error have methods to check if the error is temporary -Temporary()-, or it's a timeout -Timeout()-, we should use the information to make decisions
+			// In this case, handle those net.Error accordingly
+			cause := fail.Cause(realErr)
+			switch thecause := cause.(type) {
+			case *url.Error:
+				return normalizeURLError(thecause)
+			case net.Error:
+				if thecause.Temporary() {
+					return realErr
+				}
+				return retry.StopRetryError(realErr)
+			case *fail.ErrNotAvailable, fail.ErrNotAvailable, *fail.ErrOverflow, fail.ErrOverflow, *fail.ErrOverload, fail.ErrOverload:
+				return realErr
+			default:
+				return retry.StopRetryError(realErr)
+			}
+		default:
+			// doing something based on error's Error() method is always dangerous, so a little log here might help finding problems later
+			logrus.Tracef("trying to normalize based on Error() string of: (%s): %v", reflect.TypeOf(in).String(), in)
+			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
+			str := in.Error()
+			switch str {
+			case "not found": // stow may return that error message if it does not find something
+				return fail.NotFoundError("not found")
+			default: // stow may return an error containing "dial tcp:" for some HTTP errors
+				if strings.Contains(str, "dial tcp:") {
+					return fail.NotAvailableError(str)
+				}
+				if strings.Contains(str, "EOF") { // stow may return that error message if comm fails
+					return fail.NotAvailableError("encountered end-of-file")
+				}
+				// In any other case, the error should explain the retry has to stop
+				return retry.StopRetryError(in)
+			}
+		}
+	}
+	return nil
+}
+
+// normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
+// If the error is not a communication error, do not let a chance to retry by returning a *retry.ErrAborted error
+// containing the causing error in it
+func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
+	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
+	defer func() {
+		if err != nil {
+			switch err.(type) {
+			case fail.ErrInvalidRequest, *fail.ErrInvalidRequest:
+				logrus.Warnf(err.Error())
+			default:
+				debug.IgnoreError(err)
 			}
 		}
 	}()
@@ -99,11 +173,10 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 		case *url.Error:
 			return normalizeURLError(realErr)
 		case fail.Error: // a fail.Error may contain a cause of type net.Error, being *url.Error a special subcase.
-			// FIXME: net.Error, and by extension url.Error have methods to check if the error is temporary -Temporary()-, or it's a timeout -Timeout()-, we should use the information to make decisions
+			// net.Error, and by extension url.Error have methods to check if the error is temporary -Temporary()-, or it's a timeout -Timeout()-, we should use the information to make decisions
 
 			// In this case, handle those net.Error accordingly
 			if realErr.Cause() != nil {
-				// FIXME: Cause might be nil unless using an accessor like the Cause function from v20.06, now missing in develop branch; look at cause use cases in develop branch and consider reintroducing it
 				switch cause := realErr.Cause().(type) { // nolint
 				case *url.Error:
 					return normalizeURLError(cause)
@@ -156,10 +229,29 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 }
 
 func normalizeURLError(err *url.Error) fail.Error {
-	switch commErr := err.Err.(type) {
-	case *net.DNSError:
-		return fail.InvalidRequestError("failed to resolve by DNS: %v", commErr)
-	default:
-		return fail.InvalidRequestError("failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), commErr)
+	if err == nil {
+		return nil
 	}
+
+	isTemporary := err.Temporary()
+
+	if err.Err != nil {
+		switch commErr := err.Err.(type) {
+		case *net.DNSError:
+			if isTemporary {
+				return fail.InvalidRequestError("failed to resolve by DNS: %v", commErr)
+			}
+			return retry.StopRetryError(commErr, "failed to resolve by DNS")
+		default:
+			if isTemporary {
+				if commErr != nil {
+					return fail.InvalidRequestError("failed to communicate (error type: %s): %v", reflect.TypeOf(commErr).String(), commErr)
+				}
+				return fail.InvalidRequestError("failed to communicate: %v", commErr)
+			}
+			return retry.StopRetryError(err)
+		}
+	}
+
+	return retry.StopRetryError(err)
 }

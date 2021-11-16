@@ -17,18 +17,20 @@
 package fail
 
 import (
-	"encoding/json"
 	"fmt"
 	"os/exec"
+	"sync"
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
+
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 // consequencer is the interface exposing the methods manipulating consequences
@@ -53,10 +55,7 @@ type Error interface {
 
 	UnformattedError() string
 
-	AnnotationFormatter(func(data.Annotations) string)
-
-	ForceSetCause(error) Error // set the cause of the error
-	TrySetCause(error) bool    // set the cause of the error if not already set
+	SetAnnotationFormatter(func(data.Annotations) string)
 
 	GRPCCode() codes.Code
 	ToGRPCStatus() error
@@ -73,21 +72,33 @@ type errorCore struct {
 	annotationFormatter func(data.Annotations) string
 	consequences        []error
 	grpcCode            codes.Code
+	lock                *sync.RWMutex
+}
+
+// ErrUnqualified is a generic Error type that has no particulaur signification
+type ErrUnqualified struct {
+	*errorCore
 }
 
 // NewError creates a new failure report
 func NewError(msg ...interface{}) Error {
-	return newError(nil, nil, msg...)
+	return &ErrUnqualified{
+		errorCore: newError(nil, nil, msg...),
+	}
 }
 
 // NewErrorWithCause creates a new failure report with a cause
 func NewErrorWithCause(cause error, msg ...interface{}) Error {
-	return newError(cause, nil, msg...)
+	return &ErrUnqualified{
+		errorCore: newError(cause, nil, msg...),
+	}
 }
 
 // NewErrorWithCauseAndConsequences creates a new failure report with a cause and a list of teardown problems 'consequences'
 func NewErrorWithCauseAndConsequences(cause error, consequences []error, msg ...interface{}) Error {
-	return newError(cause, consequences, msg...)
+	return &ErrUnqualified{
+		errorCore: newError(cause, consequences, msg...),
+	}
 }
 
 // newError creates a new failure report with a message 'message', a causer error 'causer' and a list of teardown problems 'consequences'
@@ -103,6 +114,7 @@ func newError(cause error, consequences []error, msg ...interface{}) *errorCore 
 		grpcCode:            codes.Unknown,
 		causeFormatter:      defaultCauseFormatter,
 		annotationFormatter: defaultAnnotationFormatter,
+		lock:                &sync.RWMutex{},
 	}
 	return &r
 }
@@ -112,6 +124,14 @@ func (e *errorCore) IsNull() bool {
 	if e == nil {
 		return true
 	}
+
+	if e.lock == nil {
+		return true
+	}
+
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	// if there is no message, no cause and causeFormatter is nil, this is not a correctly initialized 'errorCore', so called a null value of 'errorCore'
 	if e.message == "" && e.cause == nil && e.causeFormatter == nil && e.annotationFormatter == nil {
 		return true
@@ -128,56 +148,48 @@ func defaultCauseFormatter(e Error) string {
 
 	msgFinal := ""
 
-	errCore := e.(*errorCore)
+	errCore, ok := e.(*errorCore)
+	if !ok {
+		return e.UnformattedError()
+	}
+
+	errCore.lock.RLock()
 	if errCore.cause != nil {
-		msgFinal += ": "
 		switch cerr := errCore.cause.(type) {
 		case Error:
-			msgFinal += cerr.UnformattedError()
+			errCore.lock.RUnlock()
+			raw := cerr.UnformattedError()
+			errCore.lock.RLock()
+			if raw != "" {
+				msgFinal += ": " + raw
+			}
 		default:
-			msgFinal += cerr.Error()
+			raw := cerr.Error()
+			if raw != "" {
+				msgFinal += ": " + raw
+			}
 		}
-		// msgFinal += errCore.cause.Error()
 	}
 
 	lenConseq := uint(len(errCore.consequences))
 	if lenConseq > 0 {
 		msgFinal += fmt.Sprintf("\nwith consequence%s:\n", strprocess.Plural(lenConseq))
 		for ind, con := range errCore.consequences {
-			msgFinal += "- " + con.(Error).UnformattedError()
-			if uint(ind+1) < lenConseq {
-				msgFinal += "\n"
+			if _, ok := con.(Error); ok {
+				msgFinal += "- " + con.(Error).UnformattedError()
+				if uint(ind+1) < lenConseq {
+					msgFinal += "\n"
+				}
+			} else {
+				msgFinal += "- " + con.Error()
+				if uint(ind+1) < lenConseq {
+					msgFinal += "\n"
+				}
 			}
 		}
 	}
-
+	errCore.lock.RUnlock()
 	return msgFinal
-}
-
-// ForceSetCause sets the cause error even if already set
-func (e *errorCore) ForceSetCause(err error) Error {
-	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.ForceSetCause", "from null value", 0))
-		return ConvertError(err)
-	}
-	e.cause = err
-	return e
-}
-
-// TrySetCause sets the cause error if not already set
-// Returns true if cause has been successfully set, false if cause was already set
-func (e *errorCore) TrySetCause(err error) bool {
-	if e.IsNull() {
-		return false
-	}
-	if err == nil {
-		return e.cause == nil
-	}
-	if e.cause != nil {
-		return false
-	}
-	e.cause = err
-	return true
 }
 
 // CauseFormatter defines the func uses to format cause to string
@@ -190,15 +202,26 @@ func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 		logrus.Errorf("invalid nil pointer for parameter 'formatter'")
 		return
 	}
+
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	e.causeFormatter = formatter
 }
 
+// Unwrap implements the Wrapper interface
 func (e errorCore) Unwrap() error {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return e.cause
 }
 
 // Cause is just an accessor for internal e.cause
 func (e errorCore) Cause() error {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return e.cause
 }
 
@@ -224,11 +247,17 @@ func defaultAnnotationFormatter(a data.Annotations) string {
 
 // Annotations ...
 func (e errorCore) Annotations() data.Annotations {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return e.annotations
 }
 
 // Annotation ...
 func (e errorCore) Annotation(key string) (data.Annotation, bool) {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	r, ok := e.annotations[key]
 	return r, ok
 }
@@ -241,6 +270,9 @@ func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable
 		return e
 	}
 
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	if e.annotations == nil {
 		e.annotations = make(data.Annotations)
 	}
@@ -249,26 +281,36 @@ func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable
 	return e
 }
 
-// AnnotationFormatter defines the func to use to format annotations
-func (e *errorCore) AnnotationFormatter(formatter func(data.Annotations) string) {
+// SetAnnotationFormatter defines the func to use to format annotations
+func (e *errorCore) SetAnnotationFormatter(formatter func(data.Annotations) string) {
 	if e.IsNull() {
-		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AnnotationFormatter()", "from null value", 0))
+		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.SetAnnotationFormatter()", "from null value", 0))
 		return
 	}
 	if formatter == nil {
 		logrus.Errorf("invalid nil value for parameter 'formatter'")
 		return
 	}
+
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	e.annotationFormatter = formatter
 }
 
 // AddConsequence adds an error 'err' to the list of consequences
 func (e *errorCore) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null value", 0))
 		return e
 	}
 	if err != nil {
+		e.lock.Lock()
+		defer e.lock.Unlock()
+
 		if e.consequences == nil {
 			e.consequences = []error{}
 		}
@@ -279,12 +321,18 @@ func (e *errorCore) AddConsequence(err error) Error {
 
 // Consequences returns the consequences of current error (detected teardown problems)
 func (e errorCore) Consequences() []error {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return e.consequences
 }
 
 // Error returns a human-friendly error explanation
 // satisfies interface error
 func (e *errorCore) Error() string {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	msgFinal := e.message
 
 	if e.causeFormatter != nil {
@@ -302,6 +350,15 @@ func (e *errorCore) Error() string {
 // UnformattedError returns a human-friendly error explanation
 // satisfies interface error
 func (e *errorCore) UnformattedError() string {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
+	return e.unsafeUnformattedError()
+}
+
+// unsafeUnformattedError returns a human-friendly error explanation
+// must be applying wisely, no errCore locking inside
+func (e *errorCore) unsafeUnformattedError() string {
 	msgFinal := e.message
 
 	if len(e.annotations) > 0 {
@@ -314,19 +371,30 @@ func (e *errorCore) UnformattedError() string {
 
 // GRPCCode returns the appropriate error code to use with gRPC
 func (e errorCore) GRPCCode() codes.Code {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
 	return e.grpcCode
 }
 
 // ToGRPCStatus returns a grpcstatus struct from error
 func (e errorCore) ToGRPCStatus() error {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
 	return grpcstatus.Errorf(e.GRPCCode(), e.Error())
 }
 
+// prependToMessage adds 'msg' as prefix to current message of 'e'
+// Note: do not call prependTomessage with an already set lock, it will deadlock
 func (e *errorCore) prependToMessage(msg string) {
 	if e.IsNull() {
-		logrus.Errorf("invalid call of errorCore.updateMessage() from null instance")
+		logrus.Errorf("invalid call of errorCore.prependToMessage() from null instance")
 		return
 	}
+
+	e.lock.Lock()
+	defer e.lock.Unlock()
+
 	e.message = msg + ": " + e.message
 }
 
@@ -336,9 +404,9 @@ type ErrWarning struct {
 }
 
 // WarningError returns an ErrWarning instance
-func WarningError(cause error, msg ...interface{}) *ErrWarning {
+func WarningError(cause error, msg ...interface{}) *ErrWarning { // nolint
 	r := newError(cause, nil, msg...)
-	r.grpcCode = codes.DeadlineExceeded
+	r.grpcCode = codes.Unknown
 	return &ErrWarning{
 		errorCore: r,
 	}
@@ -351,6 +419,9 @@ func (e *ErrWarning) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrWarning) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null instance", 0))
 		return &ErrWarning{}
@@ -369,6 +440,7 @@ func (e *ErrWarning) Annotate(key string, value data.Annotation) data.Annotatabl
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrWarning) UnformattedError() string {
 	return e.Error()
 }
@@ -381,7 +453,16 @@ type ErrTimeout struct {
 
 // TimeoutError returns an ErrTimeout instance
 func TimeoutError(cause error, dur time.Duration, msg ...interface{}) *ErrTimeout {
-	r := newError(cause, nil, msg...)
+	message := strprocess.FormatStrings(msg...)
+	if dur > 0 {
+		limitMsg := fmt.Sprintf("(timeout: %s)", dur)
+		if message != "" {
+			message += " "
+		}
+		message += limitMsg
+	}
+
+	r := newError(cause, nil, message)
 	r.grpcCode = codes.DeadlineExceeded
 	return &ErrTimeout{
 		errorCore: r,
@@ -396,6 +477,9 @@ func (e *ErrTimeout) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrTimeout) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.AddConsequence()", "from null instance", 0))
 		return &ErrTimeout{}
@@ -414,6 +498,7 @@ func (e *ErrTimeout) Annotate(key string, value data.Annotation) data.Annotatabl
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrTimeout) UnformattedError() string {
 	return e.Error()
 }
@@ -443,6 +528,9 @@ func (e *ErrNotFound) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrNotFound) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotFound.AddConsequence()", "from null instance", 0))
 		return e
@@ -461,6 +549,7 @@ func (e *ErrNotFound) Annotate(key string, value data.Annotation) data.Annotatab
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotFound) UnformattedError() string {
 	return e.Error()
 }
@@ -490,6 +579,9 @@ func (e *ErrNotAvailable) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrNotAvailable) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAvailable.AddConsequence()", "from null instance", 0))
 		return e
@@ -508,6 +600,7 @@ func (e *ErrNotAvailable) Annotate(key string, value data.Annotation) data.Annot
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotAvailable) UnformattedError() string {
 	return e.Error()
 }
@@ -524,6 +617,12 @@ func DuplicateError(msg ...interface{}) *ErrDuplicate {
 	return &ErrDuplicate{r}
 }
 
+func DuplicateErrorWithCause(cause error, msg ...interface{}) *ErrDuplicate {
+	r := newError(cause, nil, msg...)
+	r.grpcCode = codes.AlreadyExists
+	return &ErrDuplicate{r}
+}
+
 // IsNull tells if the instance is null
 func (e *ErrDuplicate) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
@@ -531,6 +630,9 @@ func (e *ErrDuplicate) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrDuplicate) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.AddConsequence()", "from null instance", 0))
 		return e
@@ -539,6 +641,7 @@ func (e *ErrDuplicate) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrDuplicate) UnformattedError() string {
 	return e.Error()
 }
@@ -573,6 +676,9 @@ func (e *ErrInvalidRequest) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidRequest) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.AddConsequence()", "from null instance", 0))
 		return e
@@ -581,6 +687,7 @@ func (e *ErrInvalidRequest) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidRequest) UnformattedError() string {
 	return e.Error()
 }
@@ -621,6 +728,9 @@ func (e *ErrSyntax) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrSyntax) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.AddConsequence()", "from null instance", 0))
 		return e
@@ -629,6 +739,7 @@ func (e *ErrSyntax) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrSyntax) UnformattedError() string {
 	return e.Error()
 }
@@ -662,6 +773,9 @@ func (e *ErrNotAuthenticated) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.AddConsequence()", "from null instance", 0))
 		return e
@@ -670,6 +784,7 @@ func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotAuthenticated) UnformattedError() string {
 	return e.Error()
 }
@@ -703,6 +818,9 @@ func (e *ErrForbidden) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrForbidden) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.AddConsequence()", "from null instance", 0))
 		return e
@@ -711,6 +829,7 @@ func (e *ErrForbidden) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrForbidden) UnformattedError() string {
 	return e.Error()
 }
@@ -751,6 +870,9 @@ func (e *ErrAborted) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrAborted) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.AddConsequence()", "from null instance", 0))
 		return e
@@ -759,6 +881,7 @@ func (e *ErrAborted) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrAborted) UnformattedError() string {
 	return e.Error()
 }
@@ -804,6 +927,9 @@ func (e *ErrOverflow) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrOverflow) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.AddConsequence()", "from null instance", 0))
 		return e
@@ -812,6 +938,7 @@ func (e *ErrOverflow) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrOverflow) UnformattedError() string {
 	return e.Error()
 }
@@ -845,6 +972,9 @@ func (e *ErrOverload) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrOverload) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverload.AddConsequence()", "from null instance", 0))
 		return e
@@ -853,6 +983,7 @@ func (e *ErrOverload) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrOverload) UnformattedError() string {
 	return e.Error()
 }
@@ -893,6 +1024,9 @@ func NotImplementedErrorWithReason(what string, why string) Error {
 
 // AddConsequence ...
 func (e *ErrNotImplemented) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotImplemented.AddConsequence()", "from null instance", 0))
 		return e
@@ -901,6 +1035,7 @@ func (e *ErrNotImplemented) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrNotImplemented) UnformattedError() string {
 	return e.Error()
 }
@@ -936,6 +1071,9 @@ func (e *ErrRuntimePanic) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrRuntimePanic) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrRuntimePanic.AddConsequence()", "from null instance", 0))
 		return e
@@ -944,6 +1082,7 @@ func (e *ErrRuntimePanic) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrRuntimePanic) UnformattedError() string {
 	return e.Error()
 }
@@ -979,6 +1118,9 @@ func (e *ErrInvalidInstance) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidInstance) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstance.AddConsequence()", "from null instance", 0))
 		return e
@@ -987,6 +1129,7 @@ func (e *ErrInvalidInstance) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidInstance) UnformattedError() string {
 	return e.Error()
 }
@@ -1036,6 +1179,9 @@ func (e *ErrInvalidParameter) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidParameter) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidParameter.AddConsequence()", "from null instance", 0))
 		return e
@@ -1044,6 +1190,7 @@ func (e *ErrInvalidParameter) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidParameter) UnformattedError() string {
 	return e.Error()
 }
@@ -1079,6 +1226,9 @@ func (e *ErrInvalidInstanceContent) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstanceContent.AddConsequence()", "from null instance", 0))
 		return e
@@ -1087,6 +1237,7 @@ func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInvalidInstanceContent) UnformattedError() string {
 	return e.Error()
 }
@@ -1120,6 +1271,9 @@ func (e *ErrInconsistent) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInconsistent) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInconsistent.AddConsequence()", "from null instance", 0))
 		return e
@@ -1128,6 +1282,7 @@ func (e *ErrInconsistent) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrInconsistent) UnformattedError() string {
 	return e.Error()
 }
@@ -1178,6 +1333,9 @@ func (e *ErrExecution) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrExecution) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrExecution.AddConsequence()", "from null instance", 0))
 		return e
@@ -1186,6 +1344,7 @@ func (e *ErrExecution) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrExecution) UnformattedError() string {
 	return e.Error()
 }
@@ -1219,6 +1378,9 @@ func (e *ErrAlteredNothing) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrAlteredNothing) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAlteredNothing.AddConsequence()", "from null instance", 0))
 		return e
@@ -1227,6 +1389,7 @@ func (e *ErrAlteredNothing) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrAlteredNothing) UnformattedError() string {
 	return e.Error()
 }
@@ -1260,6 +1423,9 @@ func (e *ErrUnknown) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrUnknown) AddConsequence(err error) Error {
+	if e == err { // do nothing
+		return e
+	}
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrUnknown.AddConsequence()", "from null instance", 0))
 		return e
@@ -1268,6 +1434,7 @@ func (e *ErrUnknown) AddConsequence(err error) Error {
 	return e
 }
 
+// UnformattedError returns Error() without any extra formatting applied
 func (e *ErrUnknown) UnformattedError() string {
 	return e.Error()
 }

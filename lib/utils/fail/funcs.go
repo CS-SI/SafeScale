@@ -17,11 +17,10 @@
 package fail
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
-
-	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
 // AddConsequence adds an error 'err' to the list of consequences
@@ -90,7 +89,8 @@ func FromGRPCStatus(err error) Error {
 
 	message := grpcstatus.Convert(err).Message()
 	code := grpcstatus.Code(err)
-	common := &errorCore{message: message, grpcCode: code}
+	common := newError(nil, nil, message)
+	common.grpcCode = code
 	switch code {
 	case codes.DeadlineExceeded:
 		return &ErrTimeout{errorCore: common, dur: 0}
@@ -127,6 +127,7 @@ func ToGRPCStatus(err error) error {
 	if casted, ok := err.(Error); ok {
 		return casted.ToGRPCStatus()
 	}
+
 	return grpcstatus.Errorf(codes.Unknown, err.Error())
 }
 
@@ -140,12 +141,34 @@ func Wrap(cause error, msg ...interface{}) Error {
 	case *ErrorList:
 		rerr.prependToMessage(strprocess.FormatStrings(msg...))
 		return rerr
+
 	case Error:
 		rerr.prependToMessage(strprocess.FormatStrings(msg...))
 		return rerr
+
 	default:
 		return newError(cause, nil, msg...)
 	}
+}
+
+func lastUnwrapOrNil(in error) (err error) {
+	if in == nil {
+		return nil
+	}
+
+	last := in
+	for {
+		err = last
+		u, ok := last.(interface {
+			Unwrap() error
+		})
+		if !ok {
+			break
+		}
+		last = u.Unwrap()
+	}
+
+	return err
 }
 
 func lastUnwrap(in error) (err error) {
@@ -178,17 +201,18 @@ func RootCause(err error) (resp error) {
 	return lastUnwrap(err)
 }
 
-// Cause returns the first immediate cause of an error, or nil if there no cause
+// Cause returns the direct cause of an error if it implements the causer interface and that cause is not-nil
+// in any other case, returns the unmodified error 'err'
 func Cause(err error) (resp error) {
-	resp = err
-	core, ok := err.(Error)
-	if ok {
-		err = core.Cause()
-		if err != nil {
-			resp = err
+	if ci, ok := err.(causer); ok {
+		cau := ci.Cause()
+		if cau != nil {
+			return cau
 		}
+
+		return err
 	}
-	return resp
+	return err
 }
 
 // ConvertError converts an error to a fail.Error

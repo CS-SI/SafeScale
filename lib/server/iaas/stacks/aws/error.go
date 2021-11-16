@@ -35,7 +35,7 @@ func normalizeError(err error) fail.Error {
 		return nil
 	}
 
-	switch cerr := err.(type) { //nolint
+	switch cerr := err.(type) { // nolint
 	case awserr.Error:
 		switch cerr.Code() {
 		case "InvalidGroupId.Malformed":
@@ -50,6 +50,8 @@ func normalizeError(err error) fail.Error {
 			return fail.NotFoundError("failed to find Volume")
 		case "InvalidSubnetID.NotFound":
 			return fail.NotFoundError("failed to find Subnet")
+		case "InvalidNetworkInterfaceID.NotFound":
+			return fail.NotFoundError("failed to find network interface")
 		case "InvalidParameterValue":
 			return fail.InvalidRequestError(cerr.Message())
 		case "VcpuLimitExceeded":

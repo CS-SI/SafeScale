@@ -63,17 +63,17 @@ feature:
 
                             # create share data for managers to join
                             echo "$MANAGER_TOKEN" >${SF_TMPDIR}/docker-swarm.manager.token
-                            sfDropzonePush ${SF_TMPDIR}/docker-swarm.manager.token || sFail 195
+                            sfDropzonePush ${SF_TMPDIR}/docker-swarm.manager.token || sfFail 195
                             rm -f ${SF_TMPDIR}/docker-swarm.manager.token
 
                             # create shared data for workers to join
                             echo "$WORKER_TOKEN" >${SF_TMPDIR}/docker-swarm.worker.token
-                            sfDropzonePush ${SF_TMPDIR}/docker-swarm.worker.token || sFail 196
+                            sfDropzonePush ${SF_TMPDIR}/docker-swarm.worker.token || sfFail 196
                             rm -f ${SF_TMPDIR}/docker-swarm.worker.token
 
                             # create shared data for managers and workers to join
                             echo "{{ .HostIP }}" >${SF_TMPDIR}/docker-swarm.manager.first
-                            sfDropzonePush ${SF_TMPDIR}/docker-swarm.manager.first || sFail 197
+                            sfDropzonePush ${SF_TMPDIR}/docker-swarm.manager.first || sfFail 197
                             rm -f ${SF_TMPDIR}/docker-swarm.manager.first
 
                             for ip in {{ range .ClusterMasterIPs }}{{.}} {{end}} {{ range .ClusterNodeIPs }}{{.}} {{end}}; do

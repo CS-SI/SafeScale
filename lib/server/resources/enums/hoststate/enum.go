@@ -18,7 +18,7 @@ package hoststate
 
 //go:generate stringer -type=Enum
 
-// Enum represents the state of an host
+// Enum represents the state of a host
 type Enum int
 
 const (
@@ -27,6 +27,9 @@ const (
 	Started                // Started when host is started
 	Stopping               // Stopping when host is stopping
 	Terminated             // Terminated when a host can be enumerated, but it's already deleted
+	Any                    // Any when a valid state is received
+	Failed                 // Failed when installing something on a Started host was not a success
+	Deleted                // Deleted when it's not there anymore
 
 	Error = 254 // when host is in error state
 

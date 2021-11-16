@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -32,7 +33,7 @@ const (
 )
 
 // Upgrade realizes the metadata upgrade from version 'from' to version 'to'
-func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
+func Upgrade(svc iaas.Service, from, to string, dryRun, doNotBackup bool) fail.Error {
 	if from == "" {
 		from = FirstMetadataVersion
 	}
@@ -57,7 +58,7 @@ func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
 		fromVersionList []string
 	)
 	for {
-		fn, next, xerr := GetMutatorFor(from)
+		fn, next, xerr := MutatorForVersion(from)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -79,8 +80,9 @@ func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
 		from = next
 	}
 
+	// Executes steps to reach the target version...
 	for k, fn := range mutatorList {
-		xerr := fn.Upgrade(svc, fromVersionList[k])
+		xerr := fn.Upgrade(svc, fromVersionList[k], dryRun)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr)
@@ -104,9 +106,13 @@ func Upgrade(svc iaas.Service, from, to string, doNotBackup bool) fail.Error {
 
 // BackupMetadata creates a tar.gz archive of svc metadata content, with current date/time in name
 func BackupMetadata(svc iaas.Service, filename string) fail.Error {
-	if filename == "" {
-		filename = fmt.Sprintf("safescale.%s-metadata.backup", svc.GetName())
+	targetFilename := filename
+
+	if targetFilename == "" {
+		targetFilename = fmt.Sprintf("safescale.%s-metadata.backup", svc.GetName())
 	}
+
+	logrus.Warnf("trying to backup metadata into %s", targetFilename)
 
 	return fail.NotImplementedError()
 }

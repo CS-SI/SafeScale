@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/aws"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/gcp"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
-	libvirt "github.com/CS-SI/SafeScale/lib/server/iaas/stacks/libvirt"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/outscale"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -46,7 +45,6 @@ import (
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/cloudferro"     // Imported to initialize tenant ovh
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/flexibleengine" // Imported to initialize tenant flexibleengine
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/gcp"            // Imported to initialize tenant gcp
-	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/local"          // Imported to initialize tenant local
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/opentelekom"    // Imported to initialize tenant opentelekom
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/outscale"       // Imported to initialize tenant outscale
 	_ "github.com/CS-SI/SafeScale/lib/server/iaas/providers/ovh"            // Imported to initialize tenant ovh
@@ -64,7 +62,6 @@ func (tester *ServiceTester) VerifyStacks(t *testing.T) {
 	stack = aws.NullStack()         // nolint
 	stack = gcp.NullStack()         // nolint
 	stack = huaweicloud.NullStack() // nolint
-	stack = libvirt.NullStack()     // nolint
 	stack = openstack.NullStack()   // nolint
 	stack = outscale.NullStack()    // nolint
 
@@ -276,8 +273,8 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 	return nil
 }
 
-//// CreateNetworkTest test
-//func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
+// // CreateNetworkTest test
+// func (tester *ServiceTester) CreateNetworkTest(t *testing.T) {
 //	// Get initial number of networks
 //	nets, err := tester.Service.ListNetworks()
 //	require.Nil(t, err)
@@ -309,7 +306,7 @@ func (tester *ServiceTester) CreateGW(t *testing.T, subnet *abstract.Subnet) fai
 //	require.Nil(t, err)
 //
 //	require.True(t, networkFound)
-//}
+// }
 
 // Networks test
 func (tester *ServiceTester) Networks(t *testing.T) {
@@ -372,8 +369,8 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 	assert.Equal(t, n1.Name, network1.Name)
 }
 
-//// CreateSubnetTest test
-//func (tester *ServiceTester) CreateSubnetTest(t *testing.T) {
+// // CreateSubnetTest test
+// func (tester *ServiceTester) CreateSubnetTest(t *testing.T) {
 //	// Get initial number of subnets
 //	subnets, err := tester.Service.ListSubnets(networkID)
 //	require.Nil(t, err)
@@ -405,7 +402,7 @@ func (tester *ServiceTester) Networks(t *testing.T) {
 //	defer func() {
 //		_ = tester.Service.DeleteSubnet(subnet1.ID)
 //	}()
-//}
+// }
 
 // Subnets test
 func (tester *ServiceTester) Subnets(t *testing.T) {
@@ -585,7 +582,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, host)
 	{
-		err := tester.Service.StopHost(host.Core.ID)
+		err := tester.Service.StopHost(host.Core.ID, true)
 		require.Nil(t, err)
 		start := time.Now()
 		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Stopped, temporal.GetBigDelay())

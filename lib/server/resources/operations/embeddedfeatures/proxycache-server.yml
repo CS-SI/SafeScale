@@ -160,10 +160,11 @@ feature:
                                     tty: true
                             EOF
 
-                            sfRetry 5m 5 docker build --rm --no-cache -t proxycache:latest --network=host . && \
+                            sfRetryEx 15m 5 docker build --rm --no-cache -t proxycache:latest --network=host . && \
                             cd ${SF_TMPDIR} && rm -rf proxycache.image || sfFail 192
 
-                            docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml -p proxycache up -d || sfFail 514
+                            echo "docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml -p proxycache up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            sfRetryEx 10m 5 docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml -p proxycache up -d >> ${SF_LOGDIR}/docker.log 2>&1 || sfFail 514
 
             remove:
                 pace: container
@@ -172,21 +173,26 @@ feature:
                         targets:
                             host: yes
                         run: |
-                            docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml rm -f
+                            echo "docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml rm -f" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+                            sfRetryEx 10m 5 docker-compose -f ${SF_VARDIR}/run/proxycache.compose.yml rm -f >> ${SF_LOGDIR}/docker.log 2>&1
                             docker image rm -f proxycache:latest
 
     service:
         start: |
-            docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml up -d
+            echo "docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml up -d" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+            sfRetryEx 10m 5 docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml up -d >> ${SF_LOGDIR}/docker.log 2>&1
 
         stop: |
-            docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml down
+            echo "docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml down" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+            sfRetryEx 10m 5 docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml down >> ${SF_LOGDIR}/docker.log 2>&1
 
         pause: |
-            docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml pause
+            echo "docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml pause" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+            sfRetryEx 10m 5 docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml pause >> ${SF_LOGDIR}/docker.log 2>&1
 
         unpause: |
-            docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml unpause
+            echo "docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml unpause" >> ${SF_LOGDIR}/docker.log 2>&1 || true
+            sfRetryEx 10m 5 docker-compose -f ${SF_VARDIR}/run/proxycache.feature.yml unpause >> ${SF_LOGDIR}/docker.log 2>&1
 
         state: |
             docker ps | grep proxycache &>/dev/null

@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // SubnetHosts contains information about hosts attached to the subnet
@@ -36,17 +36,10 @@ func NewSubnetHosts() *SubnetHosts {
 	}
 }
 
-// Reset resets the content of the property
-func (sh *SubnetHosts) Reset() {
-	*sh = SubnetHosts{
-		ByID:   map[string]string{},
-		ByName: map[string]string{},
-	}
-}
-
-// Content ... (data.Clonable interface)
-func (sh *SubnetHosts) Content() interface{} {
-	return sh
+// IsNull
+// ... (data.Clonable interface)
+func (sh *SubnetHosts) IsNull() bool {
+	return sh == nil || len(sh.ByID) == 0
 }
 
 // Clone ... (data.Clonable interface)
@@ -74,5 +67,5 @@ func (sh *SubnetHosts) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.subnet", string(subnetproperty.HostsV1), NewSubnetHosts())
+	serialize.PropertyTypeRegistry.Register("resources.subnet", subnetproperty.HostsV1, NewSubnetHosts())
 }

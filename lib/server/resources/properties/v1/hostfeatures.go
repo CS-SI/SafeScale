@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostInstalledFeature ...
@@ -40,12 +40,10 @@ func NewHostInstalledFeature() *HostInstalledFeature {
 	}
 }
 
-// Reset resets the content of the property
-func (hif *HostInstalledFeature) Reset() {
-	*hif = HostInstalledFeature{
-		RequiredBy: map[string]struct{}{},
-		Requires:   map[string]struct{}{},
-	}
+// IsNull ...
+// satisfies interface data.Clonable
+func (hif *HostInstalledFeature) IsNull() bool {
+	return hif == nil || (len(hif.RequiredBy) == 0 && len(hif.Requires) == 0)
 }
 
 // Clone ...
@@ -95,6 +93,12 @@ func (hf *HostFeatures) Reset() {
 	*hf = HostFeatures{
 		Installed: map[string]*HostInstalledFeature{},
 	}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (hf *HostFeatures) IsNull() bool {
+	return hf == nil || len(hf.Installed) == 0
 }
 
 // Clone ...  (data.Clonable interface)

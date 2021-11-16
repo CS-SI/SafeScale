@@ -20,7 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterDefaults contains default information used by the cluster after initial creation
@@ -39,6 +39,12 @@ type ClusterDefaults struct {
 
 func newClusterDefaults() *ClusterDefaults {
 	return &ClusterDefaults{}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (d *ClusterDefaults) IsNull() bool {
+	return d == nil || (d.GatewaySizing.IsNull() && d.MasterSizing.IsNull() && d.NodeSizing.IsNull())
 }
 
 // Clone ... (data.Clonable interface)

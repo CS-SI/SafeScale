@@ -120,7 +120,7 @@ func (t tenant) Scan(name string, dryRun bool, templates []string, timeout time.
 }
 
 // Upgrade ...
-func (t tenant) Upgrade(name string, timeout time.Duration) ([]string, error) {
+func (t tenant) Upgrade(name string, dryRun bool, timeout time.Duration) ([]string, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()
 
@@ -130,8 +130,8 @@ func (t tenant) Upgrade(name string, timeout time.Duration) ([]string, error) {
 	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)
-	results, err := service.Upgrade(ctx, &protocol.TenantUpgradeRequest{Name: name, Force: false})
-	if results == nil && len(results.Actions) > 0 {
+	results, err := service.Upgrade(ctx, &protocol.TenantUpgradeRequest{Name: name, DryRun: dryRun, Force: false})
+	if results != nil && len(results.Actions) > 0 {
 		return results.Actions, err
 	}
 	return nil, err

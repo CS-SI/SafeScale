@@ -31,10 +31,10 @@ import (
 	volumefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/volume"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 )
 
@@ -50,7 +50,7 @@ type VolumeHandler interface {
 	Detach(volume string, host string) fail.Error
 }
 
-// TODO: At service level, ve need to log before returning, because it's the last chance to track the real issue in server side
+// NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
 // FIXME: ROBUSTNESS All functions MUST propagate context
 
@@ -66,6 +66,8 @@ func NewVolumeHandler(job server.Job) VolumeHandler {
 
 // List returns the network list
 func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -73,17 +75,17 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, xerr f
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	objv, xerr := volumefactory.New(handler.job.GetService())
+	objv, xerr := volumefactory.New(handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
-	xerr = objv.Browse(task.GetContext(), func(volume *abstract.Volume) fail.Error {
-		rv, innerXErr := volumefactory.Load(handler.job.GetService(), volume.ID)
+	xerr = objv.Browse(task.Context(), func(volume *abstract.Volume) fail.Error {
+		rv, innerXErr := volumefactory.Load(handler.job.Service(), volume.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -98,6 +100,8 @@ func (handler *volumeHandler) List(all bool) (volumes []resources.Volume, xerr f
 
 // Delete deletes volume referenced by ref
 func (handler *volumeHandler) Delete(ref string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -108,13 +112,12 @@ func (handler *volumeHandler) Delete(ref string) (xerr fail.Error) {
 		return fail.InvalidParameterCannotBeEmptyStringError("ref")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "(%s)", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
 
-	volumeInstance, xerr := volumefactory.Load(handler.job.GetService(), ref)
+	volumeInstance, xerr := volumefactory.Load(handler.job.Service(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -147,11 +150,13 @@ func (handler *volumeHandler) Delete(ref string) (xerr fail.Error) {
 		return xerr
 	}
 
-	return volumeInstance.Delete(task.GetContext())
+	return volumeInstance.Delete(task.Context())
 }
 
 // Inspect returns the volume identified by ref and its attachment (if any)
 func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -162,13 +167,12 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, xerr
 		return nil, fail.InvalidParameterError("ref", "cannot be empty!")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('"+ref+"')").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
 
-	objv, xerr := volumefactory.Load(handler.job.GetService(), ref)
+	objv, xerr := volumefactory.Load(handler.job.Service(), ref)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); ok {
 			return nil, abstract.ResourceNotFoundError("volume", ref)
@@ -180,6 +184,8 @@ func (handler *volumeHandler) Inspect(ref string) (volume resources.Volume, xerr
 
 // Create a volume
 func (handler *volumeHandler) Create(name string, size int, speed volumespeed.Enum) (objv resources.Volume, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -190,12 +196,11 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 		return nil, fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	task := handler.job.GetTask()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.volume"), "('%s', %d, %s)", name, size, speed.String()).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
 
-	objv, xerr = volumefactory.New(handler.job.GetService())
+	objv, xerr = volumefactory.New(handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -204,7 +209,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 		Size:  size,
 		Speed: speed,
 	}
-	if xerr = objv.Create(task.GetContext(), request); xerr != nil {
+	if xerr = objv.Create(handler.job.Context(), request); xerr != nil {
 		return nil, xerr
 	}
 	return objv, nil
@@ -212,6 +217,8 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 
 // Attach a volume to an host
 func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, doNotFormat bool) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -231,28 +238,28 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 		return fail.InvalidParameterCannotBeEmptyStringError("format")
 	}
 
-	task := handler.job.GetTask()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s', '%s', '%s', %v)", volumeRef, hostRef, path, format, doNotFormat)
 	defer tracer.WithStopwatch().Entering().Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
 
-	svc := handler.job.GetService()
-	rv, xerr := volumefactory.Load(svc, volumeRef)
+	svc := handler.job.Service()
+	volumeInstance, xerr := volumefactory.Load(svc, volumeRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	rh, xerr := hostfactory.Load(svc, hostRef)
+	hostInstance, xerr := hostfactory.Load(svc, hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	return rv.Attach(task.GetContext(), rh, path, format, doNotFormat)
+	return volumeInstance.Attach(handler.job.Context(), hostInstance, path, format, doNotFormat)
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
 func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -266,14 +273,12 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 		return fail.InvalidParameterCannotBeEmptyStringError("hostRef")
 	}
 
-	task := handler.job.GetTask()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.volume"), "('%s', '%s')", volumeRef, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
-	defer fail.OnPanic(&xerr)
 
 	// Load volume data
-	rv, xerr := volumefactory.Load(handler.job.GetService(), volumeRef)
+	rv, xerr := volumefactory.Load(handler.job.Service(), volumeRef)
 	if xerr != nil {
 		if _, ok := xerr.(*fail.ErrNotFound); !ok {
 			return xerr
@@ -284,10 +289,10 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 	// mountPath := ""
 
 	// Load rh data
-	rh, xerr := hostfactory.Load(handler.job.GetService(), hostRef)
+	rh, xerr := hostfactory.Load(handler.job.Service(), hostRef)
 	if xerr != nil {
 		return xerr
 	}
 
-	return rv.Detach(task.GetContext(), rh)
+	return rv.Detach(handler.job.Context(), rh)
 }

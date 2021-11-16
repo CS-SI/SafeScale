@@ -17,8 +17,9 @@
 package abstract
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	uuid "github.com/satori/go.uuid"
@@ -26,6 +27,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/crypt"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -35,10 +37,10 @@ const (
 
 // KeyPair represents a SSH key pair
 type KeyPair struct {
-	ID         string
-	Name       string
-	PrivateKey string
-	PublicKey  string
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	PrivateKey string `json:"private_key"`
+	PublicKey  string `json:"public_key"`
 }
 
 // IsNull tells if the keypair is a null value
@@ -83,6 +85,10 @@ type HostSizingRequirements struct {
 	Template    string // if != "", describes the template to use and disables the use of other fields
 }
 
+func almostEqual(a, b float32) bool {
+	return math.Abs(float64(a-b)) <= 1e-3
+}
+
 func (hsr HostSizingRequirements) Equals(in HostSizingRequirements) bool {
 	if hsr.MinCores != in.MinCores {
 		return false
@@ -90,10 +96,10 @@ func (hsr HostSizingRequirements) Equals(in HostSizingRequirements) bool {
 	if hsr.MaxCores != in.MaxCores {
 		return false
 	}
-	if hsr.MinRAMSize != in.MinRAMSize {
+	if !almostEqual(hsr.MinRAMSize, in.MinRAMSize) {
 		return false
 	}
-	if hsr.MaxRAMSize != in.MaxRAMSize {
+	if !almostEqual(hsr.MaxRAMSize, in.MaxRAMSize) {
 		return false
 	}
 	if hsr.MinDiskSize != in.MinDiskSize {
@@ -102,7 +108,7 @@ func (hsr HostSizingRequirements) Equals(in HostSizingRequirements) bool {
 	if hsr.MinGPU != in.MinGPU {
 		return false
 	}
-	if hsr.MinCPUFreq != in.MinCPUFreq {
+	if !almostEqual(hsr.MinCPUFreq, in.MinCPUFreq) {
 		return false
 	}
 	return true
@@ -162,8 +168,10 @@ type HostRequest struct {
 	HostName         string              // HostName contains the hostname on the system (if empty, will use ResourceName)
 	Subnets          []*Subnet           // lists the Subnets the host must be connected to
 	DefaultRouteIP   string              // DefaultRouteIP is the IP used as default route
-	TemplateID       string              // TemplateID is the UUID of the template used to size the host (see SelectTemplates)
-	ImageID          string              // ImageID is the UUID of the image that contains the server's OS and initial state.
+	TemplateID       string              // TemplateID is ID of the template used to size the host (see SelectTemplates)
+	TemplateRef      string              // TemplateRef is the name or ID of the template used to size the host (see SelectTemplates)
+	ImageID          string              // ImageID is the ID of the image that contains the server's OS and initial state.
+	ImageRef         string              // ImageRef is the original reference of the image requested
 	KeyPair          *KeyPair            // KeyPair is the (optional) specific KeyPair to use (if not provided, a new KeyPair will be generated)
 	SSHPort          uint32              // contains the port to use for SSH
 	Password         string              // Password contains the password of OperatorUsername account, usable on host console only
@@ -194,6 +202,10 @@ func NewHostEffectiveSizing() *HostEffectiveSizing {
 	return &HostEffectiveSizing{}
 }
 
+func (hse *HostEffectiveSizing) IsNull() bool {
+	return hse == nil || hse.Cores == 0
+}
+
 // HostTemplate ...
 type HostTemplate struct {
 	Cores     int     `json:"cores,omitempty"`
@@ -216,19 +228,26 @@ func (ht HostTemplate) OK() bool {
 
 // HostCore contains the core information about a host
 // These information should not change over time
-// TODO: profit of immutability status of HostCore to optimize some use (like SSHConfig), avoiding provider calls
 type HostCore struct {
-	ID         string         `json:"id,omitempty"`
-	Name       string         `json:"name,omitempty"`
-	PrivateKey string         `json:"private_key,omitempty"`
-	SSHPort    uint32         `json:"ssh_port,omitempty"`
-	Password   string         `json:"password,omitempty"`
-	LastState  hoststate.Enum `json:"last_state,omitempty"`
+	ID         string            `json:"id,omitempty"`
+	Name       string            `json:"name,omitempty"`
+	PrivateKey string            `json:"private_key,omitempty"`
+	SSHPort    uint32            `json:"ssh_port,omitempty"`
+	Password   string            `json:"password,omitempty"`
+	LastState  hoststate.Enum    `json:"last_state,omitempty"`
+	Tags       map[string]string `json:"tags,omitempty"`
 }
 
 // NewHostCore ...
 func NewHostCore() *HostCore {
-	return &HostCore{SSHPort: 22}
+	hc := &HostCore{
+		SSHPort: 22,
+		Tags:    make(map[string]string),
+	}
+
+	hc.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+	hc.Tags["ManagedBy"] = "safescale"
+	return hc
 }
 
 // IsNull tells if the instance should be considered as a null value
@@ -255,14 +274,12 @@ func (hc *HostCore) OK() bool {
 }
 
 // Clone does a deep-copy of the IPAddress
-//
 // satisfies interface data.Clonable
 func (hc HostCore) Clone() data.Clonable {
 	return NewHostCore().Replace(&hc)
 }
 
 // Replace ...
-//
 // satisfies interface data.Clonable
 func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value...
@@ -288,7 +305,7 @@ func (hc *HostCore) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates an IPAddress
-func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
+func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 	if hc == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -296,7 +313,7 @@ func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			xerr = fail.ConvertError(panicErr) // If panic occured, transforms err to a fail.Error if needed
+			ferr = fail.ConvertError(panicErr) // If panic occurred, transforms err to a fail.Error if needed
 		}
 	}()
 	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
@@ -304,7 +321,7 @@ func (hc *HostCore) Deserialize(buf []byte) (xerr fail.Error) {
 	jserr := json.Unmarshal(buf, hc)
 	if jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			return fail.NewError(jserr.Error())

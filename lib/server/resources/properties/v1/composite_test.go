@@ -23,7 +23,7 @@ import (
 	"github.com/magiconair/properties/assert"
 )
 
-func TestClusterComposite_Clone(t *testing.T) {
+func TestClusterCompositeV1_Clone(t *testing.T) {
 	ct := newClusterComposite()
 	ct.Tenants = append(ct.Tenants, "google")
 	ct.Tenants = append(ct.Tenants, "amazon")

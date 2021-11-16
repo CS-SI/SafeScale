@@ -41,13 +41,13 @@ func List(ctx context.Context, svc iaas.Service, all bool) (abstract.HostList, f
 		return svc.ListHosts(all)
 	}
 
-	rh, xerr := New(svc)
+	hostInstance, xerr := New(svc)
 	if xerr != nil {
 		return nullList, xerr
 	}
 
 	hosts := nullList
-	xerr = rh.Browse(ctx, func(hc *abstract.HostCore) fail.Error {
+	xerr = hostInstance.Browse(ctx, func(hc *abstract.HostCore) fail.Error {
 		hf := converters.HostCoreToHostFull(*hc)
 		hosts = append(hosts, hf)
 		return nil

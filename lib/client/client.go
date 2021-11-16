@@ -27,7 +27,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
@@ -51,8 +50,6 @@ type Session struct {
 
 	server     string
 	connection *grpc.ClientConn
-
-	tenantName string
 
 	task concurrency.Task
 }
@@ -83,22 +80,24 @@ func New(server string) (_ *Session, xerr fail.Error) {
 			logrus.Warnf("Content of environment variable SAFESCALED_LISTEN is invalid, ignoring.")
 			server = ""
 		}
-	}
-	// LEGACY: if server is empty, host will be localhost, try to see if env SAFESCALED_PORT is set
-	if server == "" {
-		if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
-			logrus.Warnf("SAFESCALED_PORT is deprecated and will be soon ignored, use SAFESCALED_LISTEN instead.")
-			num, err := strconv.Atoi(portCandidate)
-			if err != nil || num <= 0 {
-				logrus.Warnf("Content of environment variable SAFESCALED_PORT is invalid, must be an int")
-			} else {
-				server = defaultServerHost + ":" + portCandidate
+
+		// LEGACY: if server is empty, host will be localhost, try to see if env SAFESCALED_PORT is set
+		if server == "" {
+			if portCandidate := os.Getenv("SAFESCALED_PORT"); portCandidate != "" {
+				logrus.Warnf("SAFESCALED_PORT is deprecated and will be soon ignored, use SAFESCALED_LISTEN instead.")
+				num, err := strconv.Atoi(portCandidate)
+				if err != nil || num <= 0 {
+					logrus.Warnf("Content of environment variable SAFESCALED_PORT is invalid, must be an int")
+				} else {
+					server = defaultServerHost + ":" + portCandidate
+				}
+			}
+
+			if server == "" {
+				// empty string, so default value to server
+				server = defaultServerHost + ":" + defaultServerPort
 			}
 		}
-	}
-	if server == "" {
-		// empty string, so default value to server
-		server = defaultServerHost + ":" + defaultServerPort
 	}
 
 	s := &Session{server: server}
@@ -153,8 +152,18 @@ func validateServerString(server string) (string, fail.Error) {
 // Connect establishes connection with safescaled
 func (s *Session) Connect() {
 	if s.connection == nil {
-		s.connection = utils.GetConnection(s.server)
+		s.connection = dial(s.server)
 	}
+}
+
+// dial returns a connection to GRPC server
+func dial(server string) *grpc.ClientConn {
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(server, grpc.WithInsecure())
+	if err != nil {
+		logrus.Fatalf("failed to connect to safescaled (%s): %v", server, err)
+	}
+	return conn
 }
 
 // Disconnect cuts the connection with safescaled

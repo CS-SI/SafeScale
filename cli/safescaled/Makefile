@@ -21,18 +21,36 @@ vet:
 
 all: clean gensrc
 ifeq ($(BUILD_TAGS),)
-	@$(GO) build $(RACE_CHECK) -o $(EXEC)
+ifeq ($(OS),Windows_NT)
+	@CGO_ENABLED=1 $(GO) build $(RACE_CHECK) -o $(EXEC)
 else
-	@$(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
+	@CGO_ENABLED=0 $(GO) build $(RACE_CHECK) -o $(EXEC)
+endif
+else
+ifeq ($(OS),Windows_NT)
+	@CGO_ENABLED=1 $(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
+else
+	@CGO_ENABLED=0 $(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
+endif
 endif
 
 allcover: clean gensrc
 ifeq ($(BUILD_TAGS),)
-	@$(GO) build $(RACE_CHECK) -o $(EXEC)
-	@$(GO) test -o $(EXEC-COVER) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
+ifeq ($(OS),Windows_NT)
+	@CGO_ENABLED=1 $(GO) build $(RACE_CHECK) -o $(EXEC)
+	@CGO_ENABLED=1 $(GO) test -o $(EXEC-COVER) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
 else
-	@$(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
-	@$(GO) test -o $(EXEC-COVER) -tags $(BUILD_TAGS) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
+	@CGO_ENABLED=0 $(GO) build $(RACE_CHECK) -o $(EXEC)
+	@CGO_ENABLED=0 $(GO) test -o $(EXEC-COVER) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
+endif
+else
+ifeq ($(OS),Windows_NT)
+	@CGO_ENABLED=1 $(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
+	@CGO_ENABLED=1 $(GO) test -o $(EXEC-COVER) -tags $(BUILD_TAGS) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
+else
+	@CGO_ENABLED=0 $(GO) build $(RACE_CHECK) -o $(EXEC) -tags $(BUILD_TAGS)
+	@CGO_ENABLED=0 $(GO) test -o $(EXEC-COVER) -tags $(BUILD_TAGS) -covermode=count -coverpkg=github.com/CS-SI/SafeScale/... >/dev/null 2>&1
+endif
 endif
 
 clean:
@@ -47,8 +65,9 @@ gensrc:
 	@echo "package main" > $(VERSIONFILE)
 	@echo "// Build constants" >> $(VERSIONFILE)
 	@echo "const (" >> $(VERSIONFILE)
-	@echo "    Version = \"$(VERSION)\"" >> $(VERSIONFILE)
+	@echo "    Version   = \"$(VERSION)\"" >> $(VERSIONFILE)
 	@echo "    BuildDate = \"$(BUILD_DATE)\"" >> $(VERSIONFILE)
-	@echo "    Revision = \"$(REV)\"" >> $(VERSIONFILE)
-	@echo "    Tags = \"$(BUILD_TAGS)\"" >> $(VERSIONFILE)
+	@echo "    Revision  = \"$(REV)\"" >> $(VERSIONFILE)
+	@echo "    Tags      = \"$(BUILD_TAGS)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
+	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1

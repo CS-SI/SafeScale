@@ -17,17 +17,17 @@
 package stacks
 
 import (
-	"time"
-
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// RetryableRemoteCall calls a remote API with communication failure tolerance
+// RetryableRemoteCall calls a remote API with tolerance to communication failures
 // Remote API is done inside 'callback' parameter and returns remote error if necessary that 'convertError' function convert to SafeScale error
-func RetryableRemoteCall(callback func() error, convertError func(error) fail.Error) fail.Error {
+func RetryableRemoteCall(callback func() error, convertError func(error) fail.Error) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
 	}
@@ -40,34 +40,31 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 	}
 
 	// Execute the remote call with tolerance for transient communication failure
-	// xerr := netutils.WhileCommunicationUnsuccessfulDelay1Second(
-	xerr := netutils.WhileUnsuccessfulButRetryable(
-		func() error {
+	xerr = netutils.WhileUnsuccessfulButRetryable(
+		func() (nested error) {
+			defer fail.OnPanic(&nested)
 			if innerErr := callback(); innerErr != nil {
 				captured := normalizeError(innerErr)
-				switch captured.(type) { //nolint
-				case *fail.ErrNotFound:
+				switch captured.(type) { // nolint
+				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
 					return retry.StopRetryError(captured)
+				case *fail.ErrOverload:
+					return retry.StopRetryError(captured)
+				default:
+					return captured
 				}
-				return captured
 			}
 			return nil
 		},
-		retry.Fibonacci(1*time.Second), // waiting time between retries follows Fibonacci numbers x 1s
+		retry.Fibonacci(temporal.GetMinDelay()), // waiting time between retries follows Fibonacci numbers x 1s
 		temporal.GetCommunicationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // On StopRetry, the real error is the cause
-			if xerr.Cause() != nil {
-				return fail.ConvertError(xerr.Cause())
-			}
-			return fail.ConvertError(xerr)
-		case *retry.ErrTimeout: // On timeout, raise a NotFound error with the cause as message
-			if xerr.Cause() != nil {
-				return fail.NotFoundError(xerr.Cause().Error())
-			}
-			return fail.NotFoundError(xerr.Error())
+			return fail.Wrap(fail.Cause(xerr), "stopping retries")
+		case *retry.ErrTimeout: // On timeout, we keep the last error as cause
+			return fail.Wrap(fail.Cause(xerr), "timeout")
 		default:
 			return xerr
 		}

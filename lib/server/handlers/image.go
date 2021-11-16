@@ -49,6 +49,8 @@ func NewImageHandler(job server.Job) ImageHandler {
 
 // List returns the image list
 func (handler *imageHandler) List(all bool) (images []abstract.Image, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -56,19 +58,23 @@ func (handler *imageHandler) List(all bool) (images []abstract.Image, xerr fail.
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	tracer := debug.NewTracer(handler.job.GetTask(), tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.image"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	return handler.job.GetService().ListImages(all)
+	return handler.job.Service().ListImages(all)
 }
 
 // Select selects the image that best fits osname
 func (handler *imageHandler) Select(osname string) (image *abstract.Image, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	return nil, fail.NotImplementedError("ImageHandler.Select() not yet implemented")
 }
 
 // Filter filters the images that do not fit osname
 func (handler *imageHandler) Filter(osname string) (image []abstract.Image, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	return nil, fail.NotImplementedError("ImageHandler.Filter() not yet implemented")
 }

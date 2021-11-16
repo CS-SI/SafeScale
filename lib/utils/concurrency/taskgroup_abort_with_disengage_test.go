@@ -50,7 +50,7 @@ func doTheDefferedReengage(t *testing.T, overlord *taskGroup) {
 }
 
 func TestDeferredReengage(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -73,9 +73,10 @@ func TestDeferredReengage(t *testing.T) {
 }
 
 func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
+	_ = overlord.SetID("/taskgroup")
 
 	theID, xerr := overlord.GetID()
 	require.Nil(t, xerr)
@@ -87,7 +88,7 @@ func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
 
 	numChild := 10
 	for ind := 0; ind < numChild; ind++ {
-		_, xerr := overlord.Start(goodTaskActionCitizen, nil)
+		_, xerr := overlord.Start(goodTaskActionCitizen, nil, InheritParentIDOption, AmendID(fmt.Sprintf("/child-%d", ind)))
 		if xerr != nil {
 			t.Errorf("Unexpected: %s", xerr)
 		}
@@ -122,7 +123,7 @@ func TestGoodTaskActionCitizenDisengaged(t *testing.T) {
 }
 
 func TestBadTaskActionCitizenDisengaged(t *testing.T) {
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -174,7 +175,7 @@ func TestAwfulTaskActionCitizenDisengaged(t *testing.T) {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 
-	overlord, xerr := NewTaskGroup(nil)
+	overlord, xerr := NewTaskGroup()
 	require.NotNil(t, overlord)
 	require.Nil(t, xerr)
 
@@ -211,7 +212,7 @@ func TestAwfulTaskActionCitizenDisengaged(t *testing.T) {
 	time.Sleep(60 * time.Millisecond)
 
 	// task cannot be aborted, subtasks never return, a WaitGroup here would wait forever
-	ended, _, xerr := overlord.WaitGroupFor(3 * time.Second)
+	ended, _, xerr := overlord.WaitGroupFor(2 * time.Second)
 	if xerr == nil { // It should fail because it's an aborted task...
 		t.FailNow()
 	}
@@ -219,7 +220,7 @@ func TestAwfulTaskActionCitizenDisengaged(t *testing.T) {
 		t.FailNow()
 	}
 
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(500 * time.Millisecond)
 
 	_ = w.Close()
 

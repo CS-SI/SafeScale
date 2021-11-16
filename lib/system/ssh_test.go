@@ -51,7 +51,7 @@ func Test_Command(t *testing.T) {
 	voidtask, err := concurrency.NewTask()
 	assert.Nil(t, err)
 	{
-		sshCmd, err := sshConf.NewCommand(voidtask.GetContext(), "whoami")
+		sshCmd, err := sshConf.NewCommand(voidtask.Context(), "whoami")
 		assert.Nil(t, err)
 		out, err := sshCmd.Output() // FIXME: Correct this test
 		defer func() { _ = sshCmd.Close() }()
@@ -65,7 +65,7 @@ func Test_Command(t *testing.T) {
 
 	if !utils.IsEmpty(gateway) {
 		sshConf.GatewayConfig = &gateway
-		cmd, err := sshConf.NewCommand(voidtask.GetContext(), "bash -c whoami")
+		cmd, err := sshConf.NewCommand(voidtask.Context(), "bash -c whoami")
 		assert.Nil(t, err)
 		defer func() { _ = cmd.Close() }()
 		out, err := cmd.Output()
@@ -76,7 +76,7 @@ func Test_Command(t *testing.T) {
 	if !utils.IsEmpty(gateway) {
 		gw := gateway
 		sshConf.GatewayConfig.GatewayConfig = &gw
-		cmd, err := sshConf.NewCommand(voidtask.GetContext(), "bash -c whoami")
+		cmd, err := sshConf.NewCommand(voidtask.Context(), "bash -c whoami")
 		assert.Nil(t, err)
 		defer func() { _ = cmd.Close() }()
 		out, err := cmd.Output()

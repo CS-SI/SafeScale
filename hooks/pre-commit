@@ -1,0 +1,35 @@
+#!/bin/sh
+
+if [ "$NO_VERIFY" ]; then
+    echo 'pre-commit hook skipped' 1>&2
+    exit 0
+fi
+
+(git rev-parse -q --verify MERGE_HEAD) && {
+	echo 'we are merging, pre-commit hook skipped' 1>&2
+	exit 0
+}
+
+if [ -x ./git-hooks-env ]; then
+    . ./git-hooks-env
+fi
+
+# Don't check on windows
+which where && exit 0
+
+# If we don't find make, don't fail
+which make || exit 0
+
+# Make sure format and build are OK
+make gofmt checkbuild
+RESULT=$?
+
+[ $RESULT -ne 0 ] && exit 1
+
+# Run UT before commit
+make precommittest
+RESULT=$?
+
+[ $RESULT -ne 0 ] && exit 1
+
+exit 0

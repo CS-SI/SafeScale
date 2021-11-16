@@ -17,6 +17,7 @@
 package concurrency
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -50,7 +51,7 @@ const (
 // newTracer creates a new tracer instance
 func newTracer(task Task, enabled bool) *tracer {
 	t := tracer{
-		taskSig: task.GetSignature(),
+		taskSig: task.Signature(),
 		enabled: enabled,
 	}
 
@@ -101,7 +102,7 @@ func (t *tracer) exiting() *tracer {
 
 // buildMessage builds the message with available information from stack trace
 func (t *tracer) buildMessage() string {
-	if t.isNull() {
+	if t == nil || t.isNull() {
 		return ""
 	}
 
@@ -115,7 +116,7 @@ func (t *tracer) buildMessage() string {
 // Trace traces a message
 func (t *tracer) trace(msg ...interface{}) *tracer {
 	if !t.isNull() && t.enabled {
-		logrus.Tracef(messagePrefix + t.buildMessage() + ": " + strprocess.FormatStrings(msg...))
+		fmt.Println(messagePrefix + t.buildMessage() + ": " + strprocess.FormatStrings(msg...))
 	}
 	return t
 }

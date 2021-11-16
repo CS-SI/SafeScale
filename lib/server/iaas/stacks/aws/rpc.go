@@ -18,8 +18,13 @@ package aws
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
+	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -173,7 +178,7 @@ func (s stack) rpcDescribeVpcByName(name *string) (*ec2.Vpc, fail.Error) {
 	return resp.Vpcs[0], nil
 }
 
-func (s stack) rpcCreateVpc(name, cidr *string) (*ec2.Vpc, fail.Error) {
+func (s stack) rpcCreateVpc(name, cidr *string) (_ *ec2.Vpc, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return &ec2.Vpc{}, xerr
 	}
@@ -197,9 +202,14 @@ func (s stack) rpcCreateVpc(name, cidr *string) (*ec2.Vpc, fail.Error) {
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteVpc(resp.Vpc.VpcId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Network/VPC %s", aws.StringValue(resp.Vpc.VpcId)))
+				_ = ferr.AddConsequence(
+					fail.Wrap(
+						derr, "cleaning up on failure, failed to delete Network/VPC %s",
+						aws.StringValue(resp.Vpc.VpcId),
+					),
+				)
 			}
 		}
 	}()
@@ -210,8 +220,21 @@ func (s stack) rpcCreateVpc(name, cidr *string) (*ec2.Vpc, fail.Error) {
 			Key:   awsTagNameLabel,
 			Value: name,
 		},
+		{
+			Key:   aws.String("ManagedBy"),
+			Value: aws.String("safescale"),
+		},
+		{
+			Key:   aws.String("DeclaredInBucket"),
+			Value: aws.String(s.Config.MetadataBucket),
+		},
+		{
+			Key:   aws.String("CreationDate"),
+			Value: aws.String(time.Now().Format(time.RFC3339)),
+		},
 	}
-	if xerr = s.rpcCreateTags([]*string{resp.Vpc.VpcId}, tags); xerr != nil {
+	xerr = s.rpcCreateTags([]*string{resp.Vpc.VpcId}, tags)
+	if xerr != nil {
 		return &ec2.Vpc{}, xerr
 	}
 
@@ -335,16 +358,20 @@ func (s stack) rpcDeleteInternetGateway(id *string) fail.Error {
 func (s stack) rpcDescribeInternetGateways(vpcID *string, ids []*string) ([]*ec2.InternetGateway, fail.Error) {
 	var filters []*ec2.Filter
 	if vpcID != nil && aws.StringValue(vpcID) != "" {
-		filters = append(filters, &ec2.Filter{
-			Name:   aws.String("attachment.vpc-id"),
-			Values: []*string{vpcID},
-		})
+		filters = append(
+			filters, &ec2.Filter{
+				Name:   aws.String("attachment.vpc-id"),
+				Values: []*string{vpcID},
+			},
+		)
 	}
 	if len(ids) > 0 {
-		filters = append(filters, &ec2.Filter{
-			Name:   aws.String("internet-gateway-id"),
-			Values: ids,
-		})
+		filters = append(
+			filters, &ec2.Filter{
+				Name:   aws.String("internet-gateway-id"),
+				Values: ids,
+			},
+		)
 	}
 	request := ec2.DescribeInternetGatewaysInput{
 		Filters: filters,
@@ -382,7 +409,7 @@ func (s stack) rpcDescribeSubnetByID(id *string) (*ec2.Subnet, fail.Error) {
 	return resp[0], nil
 }
 
-func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (*ec2.Subnet, fail.Error) {
+func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (_ *ec2.Subnet, ferr fail.Error) {
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return &ec2.Subnet{}, xerr
 	}
@@ -414,9 +441,9 @@ func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (*ec2.Subnet, fa
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteSubnet(resp.Subnet.SubnetId); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet %s", aws.StringValue(resp.Subnet.SubnetId)))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Subnet %s", aws.StringValue(resp.Subnet.SubnetId)))
 			}
 		}
 	}()
@@ -425,6 +452,18 @@ func (s stack) rpcCreateSubnet(name, vpcID, azID, cidr *string) (*ec2.Subnet, fa
 		{
 			Key:   awsTagNameLabel,
 			Value: name,
+		},
+		{
+			Key:   aws.String("ManagedBy"),
+			Value: aws.String("safescale"),
+		},
+		{
+			Key:   aws.String("DeclaredInBucket"),
+			Value: aws.String(s.Config.MetadataBucket),
+		},
+		{
+			Key:   aws.String("CreationDate"),
+			Value: aws.String(time.Now().Format(time.RFC3339)),
 		},
 	}
 	if xerr = s.rpcCreateTags([]*string{resp.Subnet.SubnetId}, tags); xerr != nil {
@@ -607,10 +646,14 @@ func (s stack) rpcDescribeSecurityGroupByID(id *string) (*ec2.SecurityGroup, fai
 		return &ec2.SecurityGroup{}, xerr
 	}
 	if len(resp) == 0 {
-		return &ec2.SecurityGroup{}, fail.NotFoundError("failed to find a Security Group with ID %s", aws.StringValue(id))
+		return &ec2.SecurityGroup{}, fail.NotFoundError(
+			"failed to find a Security Group with ID %s", aws.StringValue(id),
+		)
 	}
 	if len(resp) > 1 {
-		return &ec2.SecurityGroup{}, fail.InconsistentError("found more than one Security Group with ID %s", aws.StringValue(id))
+		return &ec2.SecurityGroup{}, fail.InconsistentError(
+			"found more than one Security Group with ID %s", aws.StringValue(id),
+		)
 	}
 	return resp[0], nil
 }
@@ -650,10 +693,16 @@ func (s stack) rpcDescribeSecurityGroupByName(networkID, name *string) (*ec2.Sec
 		return &ec2.SecurityGroup{}, fail.NotFoundError("failed to find Security Groups")
 	}
 	if len(resp.SecurityGroups) == 0 {
-		return &ec2.SecurityGroup{}, fail.NotFoundError("failed to find a Security Group named '%s' in Network %s", aws.StringValue(name), aws.StringValue(networkID))
+		return &ec2.SecurityGroup{}, fail.NotFoundError(
+			"failed to find a Security Group named '%s' in Network %s", aws.StringValue(name),
+			aws.StringValue(networkID),
+		)
 	}
 	if len(resp.SecurityGroups) > 1 {
-		return &ec2.SecurityGroup{}, fail.InconsistentError("found more than one Security Group named '%s' in Network %s", aws.StringValue(name), aws.StringValue(networkID))
+		return &ec2.SecurityGroup{}, fail.InconsistentError(
+			"found more than one Security Group named '%s' in Network %s", aws.StringValue(name),
+			aws.StringValue(networkID),
+		)
 	}
 	return resp.SecurityGroups[0], nil
 }
@@ -742,20 +791,56 @@ func (s stack) rpcAuthorizeSecurityGroupEgress(id *string, egress []*ec2.IpPermi
 	)
 }
 
-func (s stack) rpcDisassociateAddress(id *string) fail.Error { // nolint
-	if xerr := validateAWSString(id, "id", true); xerr != nil {
-		return xerr
+func (s stack) rpcAllocateAddress(description string) (allocID *string, publicIP *string, ferr fail.Error) {
+	request := ec2.AllocateAddressInput{}
+	var resp *ec2.AllocateAddressOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			resp, innerErr = s.EC2Service.AllocateAddress(&request)
+			return innerErr
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+	if resp == nil {
+		return nil, nil, fail.InconsistentError("nil response received from Cloud Provider")
 	}
 
-	request := ec2.DisassociateAddressInput{
-		AssociationId: id,
+	defer func() {
+		if ferr != nil {
+			derr := s.rpcReleaseAddress(resp.AllocationId)
+			if derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to release Elastic IP"))
+			}
+		}
+	}()
+
+	tags := []*ec2.Tag{
+		{
+			Key:   aws.String("Name"),
+			Value: aws.String(description),
+		},
+		{
+			Key:   aws.String("ManagedBy"),
+			Value: aws.String("safescale"),
+		},
+		{
+			Key:   aws.String("DeclaredInBucket"),
+			Value: aws.String(s.Config.MetadataBucket),
+		},
+		{
+			Key:   aws.String("CreationDate"),
+			Value: aws.String(time.Now().Format(time.RFC3339)),
+		},
 	}
-	return stacks.RetryableRemoteCall(
-		func() error {
-			_, err := s.EC2Service.DisassociateAddress(&request)
-			return err
-		}, normalizeError,
-	)
+	xerr = s.rpcCreateTags([]*string{resp.AllocationId}, tags)
+	if xerr != nil {
+		return nil, nil, fail.Wrap(xerr, "failed to name Elastic IP")
+	}
+
+	return resp.AllocationId, resp.PublicIp, nil
 }
 
 func (s stack) rpcReleaseAddress(id *string) fail.Error {
@@ -773,6 +858,83 @@ func (s stack) rpcReleaseAddress(id *string) fail.Error {
 		},
 		normalizeError,
 	)
+}
+
+func (s stack) rpcAssociateAddress(nicID, addressID *string) (*string, fail.Error) { // nolint
+	if xerr := validateAWSString(nicID, "nicID", true); xerr != nil {
+		return nil, xerr
+	}
+	if xerr := validateAWSString(addressID, "addressIDÒ", true); xerr != nil {
+		return nil, xerr
+	}
+
+	request := ec2.AssociateAddressInput{
+		AllocationId:       addressID,
+		NetworkInterfaceId: nicID,
+	}
+	var resp *ec2.AssociateAddressOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.AssociateAddress(&request)
+			return err
+		}, normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if resp == nil || resp.AssociationId == nil || aws.StringValue(resp.AssociationId) == "" {
+		return nil, fail.InconsistentError("invalid empty response from Cloud Provider")
+	}
+	return resp.AssociationId, nil
+}
+
+func (s stack) rpcDisassociateAddress(id *string) fail.Error { // nolint
+	if xerr := validateAWSString(id, "id", true); xerr != nil {
+		return xerr
+	}
+
+	request := ec2.DisassociateAddressInput{
+		AssociationId: id,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.DisassociateAddress(&request)
+			return err
+		}, normalizeError,
+	)
+}
+
+func (s stack) rpcDescribeAddressByIP(ip *string) (*ec2.Address, fail.Error) {
+	if xerr := validateAWSString(ip, "ip", true); xerr != nil {
+		return nil, xerr
+	}
+
+	request := ec2.DescribeAddressesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("public-ip"),
+				Values: []*string{ip},
+			},
+		},
+	}
+	var resp *ec2.DescribeAddressesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeAddresses(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if len(resp.Addresses) == 0 {
+		return nil, fail.NotFoundError("failed to find Elastic IP '%s'", aws.StringValue(ip))
+	}
+	if len(resp.Addresses) > 1 {
+		return nil, fail.InconsistentError("more than one Elastic IP '%s' returned by the Cloud Provider", aws.StringValue(ip))
+	}
+	return resp.Addresses[0], nil
 }
 
 func (s stack) rpcDescribeInstanceByID(id *string) (*ec2.Instance, fail.Error) {
@@ -829,7 +991,10 @@ func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Erro
 		for _, i := range v.Instances {
 			state, xerr := toHostState(i.State)
 			if xerr != nil {
-				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId), aws.Int64Value(i.State.Code)&0xff)
+				logrus.Errorf(
+					"found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
+					aws.Int64Value(i.State.Code)&0xff,
+				)
 				continue
 			}
 			if state != hoststate.Terminated {
@@ -847,31 +1012,16 @@ func (s stack) rpcDescribeInstanceByName(name *string) (*ec2.Instance, fail.Erro
 	return instance, nil
 }
 
-func (s stack) rpcTerminateInstance(id *string) fail.Error {
-	if xerr := validateAWSString(id, "id", true); xerr != nil {
-		return xerr
-	}
-
-	request := ec2.TerminateInstancesInput{
-		InstanceIds: []*string{id},
-	}
-	return stacks.RetryableRemoteCall(
-		func() error {
-			_, err := s.EC2Service.TerminateInstances(&request)
-			return err
-		},
-		normalizeError,
-	)
-}
-
 func (s stack) rpcDescribeAddresses(ids []*string) ([]*ec2.Address, fail.Error) {
 	var request ec2.DescribeAddressesInput
 	if len(ids) > 0 {
 		for _, v := range ids {
-			request.Filters = append(request.Filters, &ec2.Filter{
-				Name:   aws.String("instance-id"),
-				Values: []*string{v},
-			})
+			request.Filters = append(
+				request.Filters, &ec2.Filter{
+					Name:   aws.String("instance-id"),
+					Values: []*string{v},
+				},
+			)
 		}
 	}
 	var resp *ec2.DescribeAddressesOutput
@@ -915,7 +1065,10 @@ func (s stack) rpcDescribeInstances(ids []*string) ([]*ec2.Instance, fail.Error)
 			_ = ec2.InstanceState{}
 			state, xerr := toHostState(i.State)
 			if xerr != nil {
-				logrus.Errorf("found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId), aws.Int64Value(i.State.Code)&0xff)
+				logrus.Errorf(
+					"found instance '%s' with unmanaged state '%d', ignoring", aws.StringValue(i.InstanceId),
+					aws.Int64Value(i.State.Code)&0xff,
+				)
 				continue
 			}
 			if state != hoststate.Terminated {
@@ -1009,13 +1162,13 @@ func (s stack) rpcDescribeKeyPairByName(name *string) (*ec2.KeyPairInfo, fail.Er
 	return resp.KeyPairs[0], nil
 }
 
-func (s stack) rpcDeleteKeyPair(id *string) fail.Error {
-	if xerr := validateAWSString(id, "id", true); xerr != nil {
+func (s stack) rpcDeleteKeyPair(name *string) fail.Error {
+	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return xerr
 	}
 
 	request := ec2.DeleteKeyPairInput{
-		KeyName: id,
+		KeyName: name,
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
@@ -1139,20 +1292,24 @@ func (s stack) rpcModifyInstanceSecurityGroups(id *string, sgIDs []*string) fail
 func (s stack) rpcGetProducts(ids []*string) ([]aws.JSONValue, fail.Error) {
 	var emptySlice []aws.JSONValue
 	filters := make([]*pricing.Filter, 0, 2+len(ids))
-	filters = append(filters, []*pricing.Filter{
-		{
-			Field: aws.String("operatingSystem"),
-			Type:  aws.String("TERM_MATCH"),
-			Value: aws.String("Linux"),
-		},
-	}...)
+	filters = append(
+		filters, []*pricing.Filter{
+			{
+				Field: aws.String("operatingSystem"),
+				Type:  aws.String("TERM_MATCH"),
+				Value: aws.String("Linux"),
+			},
+		}...,
+	)
 	if len(ids) > 0 {
 		for _, v := range ids {
-			filters = append(filters, &pricing.Filter{
-				Field: aws.String("instanceType"),
-				Type:  aws.String("TERM_MATCH"),
-				Value: v,
-			})
+			filters = append(
+				filters, &pricing.Filter{
+					Field: aws.String("instanceType"),
+					Type:  aws.String("TERM_MATCH"),
+					Value: v,
+				},
+			)
 		}
 	}
 	request := pricing.GetProductsInput{
@@ -1204,11 +1361,13 @@ func (s stack) rpcDescribeInstanceTypes(ids []*string) ([]*ec2.InstanceTypeInfo,
 		request.InstanceTypes = ids
 	} else {
 		request.Filters = []*ec2.Filter{
-			{ // keep only x86_64 processor architecture
+			{
+				// keep only x86_64 processor architecture
 				Name:   aws.String("processor-info.supported-architecture"),
 				Values: []*string{aws.String("x86_64")},
 			},
-			{ // filter instances that are burstable, stable performance are preferred
+			{
+				// filter instances that are burstable, stable performance are preferred
 				Name:   aws.String("burstable-performance-supported"),
 				Values: []*string{aws.String("false")},
 			},
@@ -1262,7 +1421,9 @@ func (s stack) rpcDescribeInstanceTypeByID(id *string) (*ec2.InstanceTypeInfo, f
 		return &ec2.InstanceTypeInfo{}, xerr
 	}
 	if len(resp) > 1 {
-		return &ec2.InstanceTypeInfo{}, fail.InconsistentError("found more than one instance type with ID %s", aws.StringValue(id))
+		return &ec2.InstanceTypeInfo{}, fail.InconsistentError(
+			"found more than one instance type with ID %s", aws.StringValue(id),
+		)
 	}
 	return resp[0], nil
 }
@@ -1354,7 +1515,7 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (*ec2.Instance, fail.Error) {
+func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
 	nullInstance := &ec2.Instance{}
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nullInstance, xerr
@@ -1378,6 +1539,67 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 		publicIP = aws.Bool(false)
 	}
 
+	// Create Network Interface
+	description := aws.StringValue(name) + " network interface"
+	nic, xerr := s.rpcCreateNetworkInterface(subnetID, description)
+	if xerr != nil {
+		return nil, fail.Wrap(xerr, "failed to create network interface for instance '%s'", aws.StringValue(name))
+	}
+
+	defer func() {
+		if ferr != nil {
+			derr := s.rpcDeleteNetworkInterface(nic.NetworkInterfaceId)
+			if derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete network interface"))
+			}
+		}
+	}()
+
+	// If PublicIP is requested, satisfy the request
+	if aws.BoolValue(publicIP) {
+		// Allocate Elastic IP
+		description := fmt.Sprintf(
+			"elasticip--%s--%s", aws.StringValue(nic.NetworkInterfaceId), aws.StringValue(name),
+		) // Make each description unique
+		addrAllocID, _, xerr := s.rpcAllocateAddress(description)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to allocate Elastic IP")
+		}
+
+		defer func() {
+			if xerr != nil {
+				derr := s.rpcReleaseAddress(addrAllocID)
+				if derr != nil {
+					_ = xerr.AddConsequence(
+						fail.Wrap(
+							derr, "cleaning up on failure, failed to release Elastic IP %s", addrAllocID,
+						),
+					)
+				}
+			}
+		}()
+
+		// Attach the Elastic IP to the NetworkInterface
+		attachID, xerr := s.rpcAssociateAddress(nic.NetworkInterfaceId, addrAllocID)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "failed to attach Elastic IP to network interface")
+		}
+
+		defer func() {
+			if xerr != nil {
+				derr := s.rpcDisassociateAddress(attachID)
+				if derr != nil {
+					_ = xerr.AddConsequence(
+						fail.Wrap(
+							derr, "cleaning up on failure, failed to detach Elastic IP from network interface",
+						),
+					)
+				}
+			}
+		}()
+	}
+
+	// Request now the creation and start of new instance with the previously created interface
 	request := ec2.RunInstancesInput{
 		ImageId:      imageID,
 		InstanceType: templateID,
@@ -1389,9 +1611,9 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 		},
 		NetworkInterfaces: []*ec2.InstanceNetworkInterfaceSpecification{
 			{
-				DeviceIndex:              aws.Int64(int64(0)),
-				SubnetId:                 subnetID,
-				AssociatePublicIpAddress: publicIP,
+				NetworkInterfaceId:  nic.NetworkInterfaceId,
+				DeviceIndex:         aws.Int64(int64(0)),
+				DeleteOnTermination: aws.Bool(false),
 			},
 		},
 		TagSpecifications: []*ec2.TagSpecification{
@@ -1402,13 +1624,33 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 						Key:   awsTagNameLabel,
 						Value: name,
 					},
+					{
+						Key:   aws.String("ManagedBy"),
+						Value: aws.String("safescale"),
+					},
+					{
+						Key:   aws.String("DeclaredInBucket"),
+						Value: aws.String(s.Config.MetadataBucket),
+					},
+					{
+						Key:   aws.String("Image"),
+						Value: imageID,
+					},
+					{
+						Key:   aws.String("Template"),
+						Value: templateID,
+					},
+					{
+						Key:   aws.String("CreationDate"),
+						Value: aws.String(time.Now().Format(time.RFC3339)),
+					},
 				},
 			},
 		},
 		UserData: aws.String(base64.StdEncoding.EncodeToString(userdata)),
 	}
 	var resp *ec2.Reservation
-	xerr := stacks.RetryableRemoteCall(
+	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {
 			resp, err = s.EC2Service.RunInstances(&request)
 			return err
@@ -1419,32 +1661,37 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 		return nullInstance, xerr
 	}
 	if len(resp.Instances) == 0 {
-		return nullInstance, nil
+		return nullInstance, fail.InconsistentError("invalid empty response from Cloud Provider")
 	}
 
 	defer func() {
-		if xerr != nil {
-			ids := make([]*string, 0, len(resp.Instances))
+		if ferr != nil {
 			for _, v := range resp.Instances {
-				ids = append(ids, v.InstanceId)
-			}
-			if _, derr := s.rpcTerminateInstances(ids); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete instances"))
+				derr := s.rpcTerminateInstance(v)
+				if derr != nil {
+					_ = ferr.AddConsequence(
+						fail.Wrap(
+							derr, "cleaning up on failure, failed to delete instance %s", v.InstanceId,
+						),
+					)
+				}
 			}
 		}
 	}()
 
 	if len(resp.Instances) > 1 {
-		return nullInstance, fail.InconsistentError("created more than one instance")
+		return nullInstance, fail.InconsistentError("more than one instance has been created by Cloud Provider")
 	}
 
 	instance := resp.Instances[0]
 	xerr = stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.EC2Service.ModifyInstanceAttribute(&ec2.ModifyInstanceAttributeInput{
-				InstanceId:      instance.InstanceId,
-				SourceDestCheck: &ec2.AttributeBooleanValue{Value: aws.Bool(false)},
-			})
+			_, err := s.EC2Service.ModifyInstanceAttribute(
+				&ec2.ModifyInstanceAttributeInput{
+					InstanceId:      instance.InstanceId,
+					SourceDestCheck: &ec2.AttributeBooleanValue{Value: aws.Bool(false)},
+				},
+			)
 			return err
 		},
 		normalizeError,
@@ -1456,33 +1703,126 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 	return instance, nil
 }
 
-func (s stack) rpcTerminateInstances(ids []*string) ([]*ec2.InstanceStateChange, fail.Error) {
-	var emptySlice []*ec2.InstanceStateChange
-	if len(ids) == 0 {
-		return emptySlice, fail.InvalidParameterError("ids", "cannot be empty slice")
+func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
+	if instance == nil {
+		return fail.InvalidParameterCannotBeNilError("instance")
 	}
 
+	var nics []*string
+	for _, v := range instance.NetworkInterfaces {
+		// Detach and release Elastic IP from the network interface if needed
+		if v.Association != nil {
+			if ip := aws.StringValue(v.Association.PublicIp); ip != "" {
+				address, xerr := s.rpcDescribeAddressByIP(v.Association.PublicIp)
+				if xerr != nil {
+					switch xerr.(type) {
+					case *fail.ErrNotFound:
+						// continue
+						debug.IgnoreError(xerr)
+					default:
+						return fail.Wrap(xerr, "failed to request information about Elastic IP '%s'", ip)
+					}
+				} else {
+					xerr = s.rpcDisassociateAddress(address.AssociationId)
+					if xerr != nil {
+						return fail.Wrap(xerr, "failed to disassociate Elastic IP '%s' from interface", ip)
+					}
+
+					xerr = s.rpcReleaseAddress(address.AllocationId)
+					if xerr != nil {
+						return fail.Wrap(xerr, "failed to release Elastic IP '%s'", ip)
+					}
+				}
+			}
+		}
+
+		// inventory network interface to delete eventually
+		nics = append(nics, v.NetworkInterfaceId)
+	}
+
+	// now request to delete instance
 	request := ec2.TerminateInstancesInput{
-		InstanceIds: ids,
+		InstanceIds: []*string{instance.InstanceId},
 	}
 	var resp *ec2.TerminateInstancesOutput
 	xerr := stacks.RetryableRemoteCall(
-		func() (err error) {
-			resp, err = s.EC2Service.TerminateInstances(&request)
-			return err
+		func() (innerErr error) {
+			resp, innerErr = s.EC2Service.TerminateInstances(&request)
+			return innerErr
 		},
 		normalizeError,
 	)
 	if xerr != nil {
-		return emptySlice, xerr
+		return xerr
 	}
 	if len(resp.TerminatingInstances) == 0 {
-		if len(ids) > 0 {
-			return emptySlice, fail.NotFoundError("failed to find instances to terminate")
-		}
-		return emptySlice, nil
+		return fail.NotFoundError(
+			"failed to find instance %s wanted to terminate", aws.StringValue(instance.InstanceId),
+		)
 	}
-	return resp.TerminatingInstances, nil
+
+	// Wait for effective removal of host (status terminated)
+	retryErr := retry.WhileUnsuccessful(
+		func() error {
+			resp, innerXErr := s.rpcDescribeInstances([]*string{instance.InstanceId})
+			if innerXErr != nil {
+				switch innerXErr.(type) {
+				case *fail.ErrNotFound:
+					// if Host is not found, consider operation as successful
+					return nil
+				default:
+					return innerXErr
+				}
+			}
+			if len(resp) == 0 {
+				return nil
+			}
+			if len(resp) > 1 {
+				return retry.StopRetryError(fail.InconsistentError("more than one instance has been stopped"))
+			}
+
+			state, xerr := toHostState(resp[0].State)
+			if xerr != nil {
+				return fail.NewError("failed to convert instance state")
+			}
+
+			if state != hoststate.Terminated {
+				return fail.NewError(innerXErr, "not in terminated state (current state: %s)", state.String())
+			}
+
+			return nil
+		},
+		temporal.GetDefaultDelay(),
+		temporal.GetHostCleanupTimeout(),
+	)
+	if retryErr != nil {
+		switch retryErr.(type) {
+		case *retry.ErrStopRetry:
+			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
+		case *retry.ErrTimeout:
+			return fail.Wrap(
+				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId,
+				temporal.GetHostCleanupTimeout(),
+			)
+		default:
+			return retryErr
+		}
+	}
+
+	for _, v := range nics {
+		// Delete network interface
+		xerr = s.rpcDeleteNetworkInterface(v)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound, *fail.ErrInvalidRequest:
+				debug.IgnoreError(xerr)
+			default:
+				return fail.Wrap(xerr, "failed to delete network interface %s from instance", aws.StringValue(v))
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s stack) rpcStartInstances(ids []*string) fail.Error {
@@ -1562,14 +1902,15 @@ func (s stack) rpcDescribeSubnets(ids []*string) ([]*ec2.Subnet, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcStopInstances(ids []*string, force *bool) fail.Error {
+func (s stack) rpcStopInstances(ids []*string, gracefully *bool) fail.Error {
 	if len(ids) == 0 {
 		return fail.InvalidParameterError("ids", "cannot be empty slice")
 	}
-	if force == nil {
-		force = aws.Bool(false)
+	if gracefully == nil {
+		gracefully = aws.Bool(true)
 	}
 
+	force := aws.Bool(!aws.BoolValue(gracefully))
 	request := ec2.StopInstancesInput{
 		Force:       force,
 		InstanceIds: ids,
@@ -1583,7 +1924,7 @@ func (s stack) rpcStopInstances(ids []*string, force *bool) fail.Error {
 	)
 }
 
-func (s stack) rpcDescribeNetworkInterfacesOfVM(id *string) ([]*ec2.NetworkInterface, fail.Error) {
+func (s stack) rpcDescribeNetworkInterfacesOfInstance(id *string) ([]*ec2.NetworkInterface, fail.Error) {
 	var emptySlice []*ec2.NetworkInterface
 	request := ec2.DescribeNetworkInterfacesInput{
 		Filters: []*ec2.Filter{
@@ -1614,6 +1955,7 @@ func (s stack) rpcModifySecurityGroupsOfNetworkInterface(id *string, sgs []*stri
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr
 	}
+
 	request := ec2.ModifyNetworkInterfaceAttributeInput{
 		NetworkInterfaceId: id,
 		Groups:             sgs,
@@ -1629,4 +1971,279 @@ func (s stack) rpcModifySecurityGroupsOfNetworkInterface(id *string, sgs []*stri
 		return xerr
 	}
 	return nil
+}
+
+func (s stack) rpcCreateNetworkInterface(subnetID *string, description string) (*ec2.NetworkInterface, fail.Error) {
+	if xerr := validateAWSString(subnetID, "subnetID", true); xerr != nil {
+		return nil, xerr
+	}
+
+	request := ec2.CreateNetworkInterfaceInput{
+		Description: aws.String(description),
+		SubnetId:    subnetID,
+	}
+	var resp *ec2.CreateNetworkInterfaceOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			resp, innerErr = s.EC2Service.CreateNetworkInterface(&request)
+			return innerErr
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if resp == nil {
+		return nil, fail.InconsistentError("nil response received from Cloud Provider")
+	}
+	return resp.NetworkInterface, nil
+}
+
+func (s stack) rpcDeleteNetworkInterface(nicID *string) fail.Error {
+	if xerr := validateAWSString(nicID, "nicID", true); xerr != nil {
+		return xerr
+	}
+
+	request := ec2.DeleteNetworkInterfaceInput{
+		NetworkInterfaceId: nicID,
+	}
+	return stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			_, innerErr = s.EC2Service.DeleteNetworkInterface(&request)
+			return innerErr
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcAttachNetworkInterface(instanceID, nicID *string) (*string, fail.Error) {
+	if xerr := validateAWSString(instanceID, "instanceID", true); xerr != nil {
+		return nil, xerr
+	}
+	if xerr := validateAWSString(nicID, "nicID", true); xerr != nil {
+		return nil, xerr
+	}
+
+	request := ec2.AttachNetworkInterfaceInput{
+		InstanceId:         instanceID,
+		NetworkInterfaceId: nicID,
+	}
+	var resp *ec2.AttachNetworkInterfaceOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			resp, innerErr = s.EC2Service.AttachNetworkInterface(&request)
+			return innerErr
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if resp == nil || resp.AttachmentId == nil || aws.StringValue(resp.AttachmentId) == "" {
+		return nil, fail.NewError("inconsistent response from Cloud Provider")
+	}
+	return resp.AttachmentId, nil
+}
+
+func (s stack) rpcDetachNetworkInterface(attachmentID *string) fail.Error {
+	if xerr := validateAWSString(attachmentID, "attachmentID", true); xerr != nil {
+		return xerr
+	}
+
+	request := ec2.DetachNetworkInterfaceInput{
+		AttachmentId: attachmentID,
+	}
+	return stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			_, innerErr = s.EC2Service.DetachNetworkInterface(&request)
+			return innerErr
+		},
+		normalizeError,
+	)
+}
+
+func (s stack) rpcDescribeNetworkInterface(nicID *string) (*ec2.NetworkInterface, fail.Error) {
+	request := ec2.DescribeNetworkInterfacesInput{
+		NetworkInterfaceIds: []*string{nicID},
+	}
+	var resp *ec2.DescribeNetworkInterfacesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeNetworkInterfaces(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if len(resp.NetworkInterfaces) == 0 {
+		return nil, fail.NotFoundError("failed to find Network Interface with id %s", aws.StringValue(nicID))
+	}
+	if len(resp.NetworkInterfaces) > 1 {
+		return nil, fail.InconsistentError("failed several Network Interface with id %s", aws.StringValue(nicID))
+	}
+	return resp.NetworkInterfaces[0], nil
+}
+
+func (s stack) rpcDescribeVolumes(ids []*string) ([]*ec2.Volume, fail.Error) {
+	var request ec2.DescribeVolumesInput
+	if len(ids) > 0 {
+		request.VolumeIds = ids
+	}
+	var resp *ec2.DescribeVolumesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeVolumes(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return []*ec2.Volume{}, xerr
+	}
+	if len(resp.Volumes) == 0 {
+		return []*ec2.Volume{}, nil
+	}
+	return resp.Volumes, nil
+}
+
+func (s stack) rpcDescribeVolumeByID(id *string) (*ec2.Volume, fail.Error) {
+	if id == nil {
+		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("id")
+	}
+	if aws.StringValue(id) == "" {
+		return &ec2.Volume{}, fail.InvalidParameterError("id", "cannot be empty AWS String")
+	}
+
+	resp, xerr := s.rpcDescribeVolumes([]*string{id})
+	if xerr != nil {
+		return &ec2.Volume{}, xerr
+	}
+	if len(resp) == 0 {
+		return &ec2.Volume{}, fail.NotFoundError("failed to find a Volume with ID %s", aws.StringValue(id))
+	}
+	if len(resp) > 1 {
+		return &ec2.Volume{}, fail.InconsistentError("found more than one Volume with ID %s", aws.StringValue(id))
+	}
+
+	return resp[0], nil
+}
+
+// rpcDescribeVolumeByName returns information about a volume identified by its name
+func (s stack) rpcDescribeVolumeByName(name *string) (*ec2.Volume, fail.Error) {
+	if name == nil {
+		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("name")
+	}
+	if aws.StringValue(name) == "" {
+		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be empty AWS String")
+	}
+	request := ec2.DescribeVolumesInput{
+		Filters: []*ec2.Filter{
+			{
+				Name:   aws.String("tag:Name"),
+				Values: []*string{name},
+			},
+		},
+	}
+	var resp *ec2.DescribeVolumesOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.DescribeVolumes(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+	if len(resp.Volumes) == 0 {
+		return nil, fail.NotFoundError("failed to find a volume with name '%s'", aws.StringValue(name))
+	}
+	if len(resp.Volumes) > 1 {
+		return &ec2.Volume{}, fail.InconsistentError("found more than one Volume with name '%s'", aws.StringValue(name))
+	}
+
+	return resp.Volumes[0], nil
+}
+
+func (s stack) rpcCreateVolume(name *string, size int64, speed string) (_ *ec2.Volume, ferr fail.Error) {
+	if name == nil {
+		return &ec2.Volume{}, fail.InvalidParameterCannotBeNilError("name")
+	}
+	if aws.StringValue(name) == "" {
+		return &ec2.Volume{}, fail.InvalidParameterError("name", "cannot be empty AWS String")
+	}
+	if size <= 0 {
+		return &ec2.Volume{}, fail.InvalidParameterError("size", "cannot be negative or 0 integer")
+	}
+
+	request := ec2.CreateVolumeInput{
+		Size:             aws.Int64(size),
+		VolumeType:       aws.String(speed),
+		AvailabilityZone: aws.String(s.AwsConfig.Zone),
+	}
+	var resp *ec2.Volume
+	xerr := stacks.RetryableRemoteCall(
+		func() (err error) {
+			resp, err = s.EC2Service.CreateVolume(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return &ec2.Volume{}, xerr
+	}
+
+	defer func() {
+		if ferr != nil {
+			if derr := s.rpcDeleteVolume(resp.VolumeId); derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Volume '%s'", name))
+			}
+		}
+	}()
+
+	tags := []*ec2.Tag{
+		{
+			Key:   awsTagNameLabel,
+			Value: name,
+		},
+		{
+			Key:   aws.String("ManagedBy"),
+			Value: aws.String("safescale"),
+		},
+		{
+			Key:   aws.String("DeclaredInBucket"),
+			Value: aws.String(s.Config.MetadataBucket),
+		},
+		{
+			Key:   aws.String("CreationDate"),
+			Value: aws.String(time.Now().Format(time.RFC3339)),
+		},
+	}
+	if xerr := s.rpcCreateTags([]*string{resp.VolumeId}, tags); xerr != nil {
+		return nil, xerr
+	}
+
+	return resp, nil
+}
+
+func (s stack) rpcDeleteVolume(id *string) fail.Error {
+	if id == nil {
+		return fail.InvalidParameterCannotBeNilError("id")
+	}
+	if *id == "" {
+		return fail.InvalidParameterError("id", "cannot be empty AWS String")
+	}
+
+	request := ec2.DeleteVolumeInput{
+		VolumeId: id,
+	}
+	return stacks.RetryableRemoteCall(
+		func() error {
+			_, err := s.EC2Service.DeleteVolume(&request)
+			return err
+		},
+		normalizeError,
+	)
 }

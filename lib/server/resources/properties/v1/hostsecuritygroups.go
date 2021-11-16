@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostSecurityGroups contains a list of security groups bound to the host
@@ -40,12 +40,9 @@ func NewHostSecurityGroups() *HostSecurityGroups {
 	}
 }
 
-// Reset ...
-func (hsg *HostSecurityGroups) Reset() {
-	*hsg = HostSecurityGroups{
-		ByID:   map[string]*SecurityGroupBond{},
-		ByName: map[string]string{},
-	}
+// IsNull ...
+func (hsg *HostSecurityGroups) IsNull() bool {
+	return hsg == nil || len(hsg.ByID) == 0
 }
 
 // Clone ...

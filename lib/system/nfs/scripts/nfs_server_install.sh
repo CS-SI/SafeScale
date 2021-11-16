@@ -53,7 +53,7 @@ case $LINUX_KIND in
         chgrp utmp /var/log/lastlog
         chmod 664 /var/log/lastlog
         sfApt update
-        sfApt install -qqy nfs-common nfs-kernel-server
+        sfApt install -qqy --force-yes nfs-common nfs-kernel-server
         ;;
 
     rhel|centos)

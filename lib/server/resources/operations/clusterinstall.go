@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -29,6 +28,7 @@ import (
 	"time"
 
 	rice "github.com/GeertJohan/go.rice"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -37,16 +37,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/featuretargettype"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/installmethod"
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/remotefile"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
@@ -83,7 +82,7 @@ func (instance *Cluster) TargetType() featuretargettype.Enum {
 	return featuretargettype.Cluster
 }
 
-// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
 func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 	if instance == nil || instance.IsNull() {
@@ -91,16 +90,42 @@ func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 		return nil
 	}
 
-	return instance.installMethods
+	out := make(map[uint8]installmethod.Enum)
+	instance.installMethods.Range(func(k, v interface{}) bool {
+		out[k.(uint8)] = v.(installmethod.Enum)
+		return true
+	})
+	return out
 }
 
 // InstalledFeatures returns a list of installed features
 func (instance *Cluster) InstalledFeatures() []string {
-	var list []string
-	return list
+	if instance == nil {
+		return []string{}
+	}
+
+	var out []string
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			for k := range featuresV1.Installed {
+				out = append(out, k)
+			}
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		logrus.Error(xerr.Error())
+		return []string{}
+	}
+	return out
 }
 
-// ComplementFeatureParameters FIXME: include the Cluster part of setImplicitParameters() from feature
 // ComplementFeatureParameters configures parameters that are implicitly defined, based on target
 // satisfies interface resources.Targetable
 func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error {
@@ -133,10 +158,8 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	v["GatewayIP"] = v["DefaultRouteIP"] // legacy ...
 	v["PrimaryPublicIP"] = networkCfg.PrimaryPublicIP
 	v["NetworkUsesVIP"] = networkCfg.SecondaryGatewayIP != ""
-	if networkCfg.SecondaryGatewayIP != "" {
-		v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
-		v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
-	}
+	v["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
+	v["SecondaryPublicIP"] = networkCfg.SecondaryPublicIP
 	v["EndpointIP"] = networkCfg.EndpointIP
 	v["PublicIP"] = v["EndpointIP"] // legacy ...
 	if _, ok := v["IPRanges"]; !ok {
@@ -233,8 +256,8 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, _ bool) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, _ bool) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -258,8 +281,10 @@ func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 				}
 
 				item = propertiesv1.NewClusterInstalledFeature()
+				item.Name = feat.GetName()
+				item.FileName = feat.GetDisplayFilename()
 				item.Requires = requirements
-				featuresV1.Installed[feat.GetName()] = item
+				featuresV1.Installed[item.Name] = item
 			}
 			if rf, ok := requiredBy.(*Feature); ok && rf != nil && !rf.IsNull() {
 				item.RequiredBy[rf.GetName()] = struct{}{}
@@ -271,8 +296,8 @@ func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy reso
 
 // UnregisterFeature unregisters a Feature from Cluster metadata
 // satisfies interface resources.Targetable
-func (instance *Cluster) UnregisterFeature(feat string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) UnregisterFeature(feat string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -298,7 +323,10 @@ func (instance *Cluster) UnregisterFeature(feat string) (xerr fail.Error) {
 }
 
 // ListInstalledFeatures returns a slice of installed features
-func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, xerr fail.Error) {
+func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
+
 	var emptySlice []resources.Feature
 	if instance == nil || instance.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -326,7 +354,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 
 	out := make([]resources.Feature, 0, len(list))
 	for k := range list {
-		item, xerr := NewFeature( /*ctx, */ instance.GetService(), k)
+		item, xerr := NewFeature(instance.GetService(), k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return emptySlice, xerr
@@ -401,23 +429,32 @@ func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars da
 }
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, data map[string]interface{}, host resources.Host) (_ int, _ string, _ string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, variables data.Map, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	const invalid = -1
 
 	if instance == nil || instance.IsNull() {
-		return -1, "", "", fail.InvalidInstanceError()
+		return invalid, "", "", fail.InvalidInstanceError()
 	}
 	if tmplName == "" {
-		return -1, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
+		return invalid, "", "", fail.InvalidParameterError("tmplName", "cannot be empty string")
 	}
 	if host == nil {
-		return -1, "", "", fail.InvalidParameterCannotBeNilError("host")
+		return invalid, "", "", fail.InvalidParameterCannotBeNilError("host")
 	}
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return -1, "", "", xerr
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return invalid, "", "", xerr
+			}
+		default:
+			return invalid, "", "", xerr
+		}
 	}
 
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "('%s')", host.GetName()).Entering()
@@ -427,67 +464,93 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, dat
 	box, err := getTemplateBox()
 	err = debug.InjectPlannedError(err)
 	if err != nil {
-		return -1, "", "", fail.ConvertError(err)
+		return invalid, "", "", fail.ConvertError(err)
 	}
 
 	// Configures reserved_BashLibrary template var
-	bashLibrary, xerr := system.GetBashLibrary()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", xerr
 	}
-	data["reserved_BashLibrary"] = bashLibrary
 
-	// Sets delays and timeouts for script
-	data["reserved_DefaultDelay"] = uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds()))
-	data["reserved_DefaultTimeout"] = strings.Replace(
-		(temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_LongTimeout"] = strings.Replace(
-		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_ClusterJoinTimeout"] = strings.Replace(
-		temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", "", -1,
-	)
-	data["reserved_DockerImagePullTimeout"] = strings.Replace(
-		(2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", "", -1,
-	)
+	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+	if xerr != nil {
+		return invalid, "", "", xerr
+	}
 
-	script, path, xerr := realizeTemplate(box, tmplName, data, tmplName)
+	finalVariables := make(data.Map, len(variables)+len(bashLibraryVariables))
+	for k, v := range variables {
+		finalVariables[k] = v
+	}
+	for k, v := range bashLibraryVariables {
+		finalVariables[k] = v
+	}
+	variables["Revision"] = system.REV
+	script, path, xerr := realizeTemplate(box, tmplName, finalVariables, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return -1, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)
+		return invalid, "", "", fail.Wrap(xerr, "failed to realize template '%s'", tmplName)
 	}
 
 	hidesOutput := strings.Contains(script, "set +x\n")
 	if hidesOutput {
 		script = strings.Replace(script, "set +x\n", "\n", 1)
-		if strings.Contains(script, "exec 2>&1\n") {
-			script = strings.Replace(script, "exec 2>&1\n", "exec 2>&7\n", 1)
-		}
+		script = strings.Replace(script, "exec 2>&1\n", "exec 2>&7\n", 1)
 	}
 
 	// Uploads the script into remote file
-	rfcItem := remotefile.Item{Remote: path}
-	xerr = rfcItem.UploadString(task.GetContext(), script, host)
+	rfcItem := Item{Remote: path}
+	xerr = rfcItem.UploadString(task.Context(), script, host)
 	_ = os.Remove(rfcItem.Local)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return -1, "", "", xerr
+		return invalid, "", "", fail.Wrap(xerr, "failed to upload %s to %s", tmplName, host.GetName())
 	}
 
 	// executes remote file
 	var cmd string
 	if hidesOutput {
-		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
+		cmd = fmt.Sprintf("sudo -- bash -c 'sync; chmod u+rx %s; captf=$(mktemp); bash -c \"BASH_XTRACEFD=7 %s 7>$captf 2>&7\"; rc=${PIPESTATUS}; cat $captf; rm $captf; exit ${rc}'", path, path)
 	} else {
-		cmd = fmt.Sprintf("sudo -- bash -c 'chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
+		cmd = fmt.Sprintf("sudo -- bash -c 'sync; chmod u+rx %s; bash -c %s; exit ${PIPESTATUS}'", path, path)
 	}
-	return host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 2*temporal.GetLongOperationTimeout())
+
+	// If is 126, try again 6 times, if not return the error
+	rounds := 10
+	for {
+		rc, stdout, stderr, err := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetLongOperationTimeout())
+		if rc == 126 {
+			logrus.Debugf("Text busy happened")
+		}
+
+		if rc != 126 || rounds == 0 {
+			if rc == 126 {
+				logrus.Warnf("Text busy killed the script")
+			}
+			return rc, stdout, stderr, err
+		}
+
+		if !(strings.Contains(stdout, "bad interpreter") || strings.Contains(stderr, "bad interpreter")) {
+			if err == nil {
+				return rc, stdout, stderr, nil
+			}
+
+			if !strings.Contains(err.Error(), "bad interpreter") {
+				return rc, stdout, stderr, err
+			}
+		}
+
+		rounds--
+		time.Sleep(temporal.GetMinDelay())
+	}
 }
 
 // installNodeRequirements ...
-func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (xerr fail.Error) {
+func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
+
 	netCfg, xerr := instance.GetNetworkConfig()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -519,7 +582,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 		_, _ = binaryDir, path
 		/* FIXME: VPL: disable binaries upload until proper solution (does not work with different architectures between client and remote),
-				               probaly a feature safescale-binaries to build SafeScale from source...
+		               probably a feature safescale-binaries to build SafeScale from source...
 				// Uploads safescale binary
 				if binaryDir != "" {
 					path = binaryDir + "/safescale"
@@ -593,6 +656,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 		}
 	}
 
+	// FIXME: reuse ComplementFeatureParameters?
 	var dnsServers []string
 	cfg, xerr := instance.GetService().GetConfigurationOptions()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -637,8 +701,8 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 }
 
 // Installs reverseproxy
-func (instance *Cluster) installReverseProxy(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) installReverseProxy(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	identity, xerr := instance.unsafeGetIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -690,8 +754,8 @@ func (instance *Cluster) installReverseProxy(ctx context.Context) (xerr fail.Err
 }
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the Cluster
-func (instance *Cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) installRemoteDesktop(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	identity, xerr := instance.unsafeGetIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -745,9 +809,66 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context) (xerr fail.Er
 	return nil
 }
 
-// install proxycache-client feature if not disabled
-func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
+// installAnsible installs feature ansible on all masters of the Cluster
+func (instance *Cluster) installAnsible(ctx context.Context) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
+
+	identity, xerr := instance.unsafeGetIdentity()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	disabled := false
+	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			_, disabled = featuresV1.Disabled["ansible"]
+			return nil
+		})
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	if !disabled {
+		logrus.Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
+
+		feat, xerr := NewFeature(instance.GetService(), "ansible")
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		// Adds ansible feature on Cluster (ie masters)
+		vars := data.Map{
+			"Username": "cladm",
+			"Password": identity.AdminPassword,
+		}
+		r, xerr := feat.Add(ctx, instance, vars, resources.FeatureSettings{})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		if !r.Successful() {
+			msg := r.AllErrorMessages()
+			return fail.NewError("[Cluster %s] failed to add 'ansible' failed: %s", identity.Name, msg)
+		}
+		logrus.Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
+	}
+	return nil
+}
+
+// install proxycache-client feature if not disabled
+func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
@@ -779,6 +900,7 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 		}
 
 		r, xerr := feat.Add(ctx, host, data.Map{}, resources.FeatureSettings{})
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
 		}
@@ -792,8 +914,9 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 }
 
 // install proxycache-server feature if not disabled
-func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	var xerr fail.Error
 
 	if host == nil {
 		return fail.InvalidParameterCannotBeNilError("host")
@@ -839,9 +962,11 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 	return nil
 }
 
-// intallDocker installs docker and docker-compose
-func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (xerr fail.Error) {
-	// uses NewFeature() to let a chance to the user to use it's own docker feature
+// installDocker installs docker and docker-compose
+func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	// uses NewFeature() to let a chance to the user to use its own docker feature
 	feat, xerr := NewFeature(instance.GetService(), "docker")
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -854,10 +979,23 @@ func (instance *Cluster) installDocker(ctx context.Context, host resources.Host,
 		return xerr
 	}
 
+	reason := false
 	if !r.Successful() {
-		msg := r.AllErrorMessages()
-		logrus.Errorf("[%s] failed to add feature 'docker': %s", hostLabel, msg)
-		return fail.NewError("failed to add feature 'docker': %s", host.GetName(), msg)
+		for _, k := range r.Keys() {
+			rk := r.ResultsOfKey(k)
+			if !rk.Successful() {
+				if len(rk.ErrorMessages()) == 0 {
+					logrus.Warningf("This is a false warning for %s !!: %s", k, rk.ErrorMessages())
+				} else {
+					reason = true
+					logrus.Warningf("This failed: %s with %s", k, spew.Sdump(rk))
+				}
+			}
+		}
+
+		if reason {
+			return fail.NewError("[%s] failed to add feature 'docker' on host '%s': %s", hostLabel, host.GetName(), r.AllErrorMessages())
+		}
 	}
 	logrus.Debugf("[%s] feature 'docker' addition successful.", hostLabel)
 	return nil

@@ -17,9 +17,10 @@
 package abstract
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -87,7 +88,7 @@ func (osb *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
 }
 
 // Deserialize reads json code and reinstantiates an ObjectStorageItem
-func (osb *ObjectStorageBucket) Deserialize(buf []byte) (xerr fail.Error) {
+func (osb *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 	if osb.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -95,14 +96,14 @@ func (osb *ObjectStorageBucket) Deserialize(buf []byte) (xerr fail.Error) {
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			xerr = fail.ConvertError(panicErr) // If panic occured, transforms err to a fail.Error if needed
+			ferr = fail.ConvertError(panicErr) // If panic occured, transforms err to a fail.Error if needed
 		}
 	}()
 	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic
 
 	if jserr := json.Unmarshal(buf, osb); jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			return fail.NewError(jserr.Error())

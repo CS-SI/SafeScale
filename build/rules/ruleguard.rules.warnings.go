@@ -1,3 +1,4 @@
+//go:build ignore
 // +build ignore
 
 /*
@@ -24,8 +25,8 @@ import "github.com/quasilyte/go-ruleguard/dsl"
 
 func isNullIsDeprecated(m dsl.Matcher) {
 	m.Match(`if $x.isNull() { return $*_ }`).Where(m["x"].Text != "instance").
-		Report("isNull is DANGEROUS when called upon something that is NOT a struct, if the code is valid rename the acceptor to 'instance' to disable this warning, if not, consider using instead 'if $x == nil || ($x != nil && $x.isNull()) {'").
-		Suggest("if $x == nil || ($x != nil && $x.isNull()) {")
+		Report("isNull is DANGEROUS when called upon something that is NOT a struct, if the code is valid rename the acceptor to 'instance' to disable this warning, if not, consider using instead 'if $x == nil || $x.isNull() {'").
+		Suggest("if $x == nil || $x.isNull() {")
 }
 
 func dangerousNegatives(m dsl.Matcher) {

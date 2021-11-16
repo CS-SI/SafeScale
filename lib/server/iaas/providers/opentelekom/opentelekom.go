@@ -19,8 +19,7 @@ package opentelekom
 import (
 	"fmt"
 	"regexp"
-
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"strconv"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -29,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/huaweicloud"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
@@ -36,6 +36,8 @@ import (
 )
 
 const (
+	opentelekomDefaultImage = "Ubuntu 20.04"
+
 	identityEndpointTemplate string = "https://iam.%s.otc.t-systems.com"
 )
 
@@ -86,6 +88,16 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
+	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = opentelekomDefaultImage
+	}
+
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
 	authOptions := stacks.AuthenticationOptions{
 		IdentityEndpoint: identityEndpoint,
 		Username:         username,
@@ -97,10 +109,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
 		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
 		return rxp.Match([]byte(str))
-	})
+	}
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
@@ -127,6 +139,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		ProviderName:       providerName,
 		DefaultNetworkName: vpcName,
 		DefaultNetworkCIDR: vpcCIDR,
+		DefaultImage:       defaultImage,
+		MaxLifeTime:        maxLifeTime,
 	}
 	stack, xerr := huaweicloud.New(authOptions, cfgOptions)
 	if xerr != nil {
@@ -140,7 +154,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	return &newP, nil
 }
 
-// ListTemplates ... ; overloads Stack.ListTemplates() to allow to filter templates to show
+// ListTemplates ... ; overloads stack.ListTemplates() to allow to filter templates to show
 // Value of all has no impact on the result
 func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	if p.IsNull() {
@@ -149,7 +163,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
 }
 
-// ListImages ... ; overloads Stack.ListImages() to allow to filter images to show
+// ListImages ... ; overloads stack.ListImages() to allow to filter images to show
 // Value of all has no impact on the result
 func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	if p.IsNull() {
@@ -185,6 +199,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }
@@ -192,6 +207,12 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 // GetName ...
 func (p provider) GetName() string {
 	return "opentelekom"
+}
+
+// GetStack returns the stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
 }
 
 // GetTenantParameters ...

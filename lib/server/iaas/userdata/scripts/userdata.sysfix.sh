@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 #
 # Copyright 2018-2021, CS Systemes d'Information, http://csgroup.eu
 #
@@ -15,41 +15,64 @@
 # limitations under the License.
 
 #{{.Revision}}
+# Script customized for {{.ProviderName}} driver
 
 {{.Header}}
 
 function print_error() {
-    read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file:" "{"`sed "${line}q;d" "$file"`"}" >&2
-    {{.ExitOnError}}
+	read -r line file <<<"$(caller)"
+	echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
+	{{.ExitOnError}}
 }
 trap print_error ERR
 
 function fail() {
-    echo "PROVISIONING_ERROR: $1"
-    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.sysfix.done
-    (sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
-    exit $1
+	MYIP="$(ip -br a | grep UP | awk '{print $3}') | head -n 1"
+	if [ $# -eq 1 ]; then
+		echo "PROVISIONING_ERROR: $1"
+		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" >/opt/safescale/var/state/user_data.sysfix.done
+		(
+			sync
+			echo 3 >/proc/sys/vm/drop_caches
+			sleep 2
+		) || true
+		exit $1
+	elif [ $# -eq 2 -a $1 -ne 0 ]; then
+		echo "PROVISIONING_ERROR: $1, $2"
+		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$2" >/opt/safescale/var/state/user_data.sysfix.done
+		(
+			sync
+			echo 3 >/proc/sys/vm/drop_caches
+			sleep 2
+		) || true
+		exit $1
+	fi
 }
+export -f fail
 
 # Redirects outputs to /opt/safescale/var/log/user_data.sysfix.log
 LOGFILE=/opt/safescale/var/log/user_data.sysfix.log
 
 ### All output to one file and all output to the screen
-exec > >(tee ${LOGFILE} /var/log/ss.log) 2>&1
+exec > >(tee ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'sysfix' is already done (otherwise will deadlock)
->/opt/safescale/var/state/user_data.sysfix.done
+uptime >/opt/safescale/var/state/user_data.sysfix.done
+
 # Includes the BashLibrary
-{{ .BashLibrary }}
+{{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.sysfix.done
 
 # ---- Main
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.sysfix.done
 
-(sync; echo 3 > /proc/sys/vm/drop_caches; sleep 2) || true
+(
+	sync
+	echo 3 >/proc/sys/vm/drop_caches
+	sleep 2
+) || true
 
 set +x
 exit 0

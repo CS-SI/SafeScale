@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 
@@ -27,8 +28,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Stack contains the needs to operate on Stack OpenStack
-type Stack struct {
+// stack contains the needs to operate on stack OpenStack
+type stack struct {
 	ComputeClient  *gophercloud.ServiceClient
 	NetworkClient  *gophercloud.ServiceClient
 	VolumeClient   *gophercloud.ServiceClient
@@ -54,12 +55,12 @@ type Stack struct {
 }
 
 // NullStack returns a null value of the stack
-func NullStack() *Stack { //nolint
-	return &Stack{}
+func NullStack() *stack { // nolint
+	return &stack{}
 }
 
-// New authenticates and returns a Stack pointer
-func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*Stack, fail.Error) {
+// New authenticates and returns a stack pointer
+func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) {
 	if auth.DomainName == "" && auth.DomainID == "" {
 		auth.DomainName = "Default"
 	}
@@ -81,7 +82,7 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		cfg.DefaultSecurityGroupName = defaultSecurityGroupName
 	}
 
-	s := Stack{
+	s := stack{
 		DefaultSecurityGroupName: cfg.DefaultSecurityGroupName,
 
 		authOpts: auth,
@@ -208,32 +209,13 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		}
 	}
 
-	validRegions, xerr := s.ListRegions()
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotFound:
-			// continue
-		default:
-			return nil, xerr
-		}
-	} else if len(validRegions) != 0 {
-		regionIsValidInput := false
-		for _, vr := range validRegions {
-			if auth.Region == vr {
-				regionIsValidInput = true
-			}
-		}
-		if !regionIsValidInput {
-			return nil, fail.InvalidRequestError("invalid Region '%s'", auth.Region)
-		}
-
-	}
-
+	// FIXME: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
 	validAvailabilityZones, xerr := s.ListAvailabilityZones()
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			// continue
+			debug.IgnoreError(xerr)
 		default:
 			return nil, xerr
 		}
@@ -258,6 +240,11 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 }
 
 // IsNull ...
-func (s *Stack) IsNull() bool {
+func (s *stack) IsNull() bool {
 	return s == nil || s.Driver == nil
+}
+
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "openstack"
 }

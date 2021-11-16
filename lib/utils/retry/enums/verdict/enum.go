@@ -28,4 +28,6 @@ const (
 	Retry
 	// Abort tells the arbiter decided something wrong occurred; the Action must stop with error
 	Abort
+	// Undecided tells the arbiter to skip this opinion
+	Undecided
 )

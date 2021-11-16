@@ -10,6 +10,12 @@ all: nfs generate
 vet:
 	@$(GO) vet ./...
 
+test:
+	@(cd scripts && $(MAKE) $(@))
+
+bashtest:
+	@(cd scripts && $(MAKE) $(@))
+
 nfs:
 	@(cd nfs && $(MAKE) all)
 
@@ -25,6 +31,7 @@ gensrc:
 	@echo "  REV = \"$(REV)\"" >> $(VERSIONFILE)
 	@echo "  Tags = \"$(BUILD_TAGS)\"" >> $(VERSIONFILE)
 	@echo ")" >> $(VERSIONFILE)
+	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1
 
 clean:
 	@(cd nfs && $(MAKE) $(@))

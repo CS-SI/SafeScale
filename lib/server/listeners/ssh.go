@@ -39,7 +39,9 @@ import (
 // safescale ssh copy host1:/file/test.txt /tmp
 
 // SSHListener SSH service server grpc
-type SSHListener struct{}
+type SSHListener struct {
+	protocol.UnimplementedSshServiceServer
+}
 
 // Run executes an ssh command an an host
 func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {
@@ -58,37 +60,40 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	hostRef := in.GetHost().GetName()
 	if hostRef == "" {
 		hostRef = in.GetHost().GetId()
-	}
-	if hostRef == "" {
-		return nil, fail.InvalidParameterError("in.Host", "host reference is missing")
+		if hostRef == "" {
+			return nil, fail.InvalidParameterError("in.Host", "host reference is missing")
+		}
 	}
 
 	command := in.GetCommand()
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "ssh run")
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/ssh/run/host/%s", hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	task := job.GetTask()
-	tracer := debug.NewTracer(task, true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true, "('%s', <command>)", hostRef).WithStopwatch().Entering()
 	tracer.Trace(fmt.Sprintf("<command>=[%s]", command))
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(job.GetService(), hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	retcode, stdout, stderr, xerr := rh.Run(task.GetContext(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	defer hostInstance.Released()
+
+	retcode, stdout, stderr, xerr := hostInstance.Run(
+		job.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout(),
+	)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -100,7 +105,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	}, nil
 }
 
-// Copy copy file from/to an host
+// Copy copies file from/to an host
 func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot copy by ssh")
@@ -117,21 +122,8 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
-
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "ssh copy")
-	if xerr != nil {
-		return nil, xerr
-	}
-	defer job.Close()
-	task := job.GetTask()
-
-	source := in.Source
-	dest := in.Destination
-	tracer := debug.NewTracer(task, true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	var (
 		pull                bool
@@ -140,6 +132,9 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		retcode             int
 		stdout, stderr      string
 	)
+
+	source := in.Source
+	dest := in.Destination
 
 	// If source contains remote host, we pull
 	parts := strings.Split(source, ":")
@@ -166,14 +161,31 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 		localPath = dest
 	}
 
-	rh, xerr := hostfactory.Load(job.GetService(), hostRef)
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/ssh/copy/host/%s", hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
+	defer job.Close()
+
+	tracer := debug.NewTracer(job.Task(), true, "('%s', '%s')", source, dest).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+
+	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	defer hostInstance.Released()
+
 	if pull {
-		retcode, stdout, stderr, xerr = rh.Pull(task.GetContext(), hostPath, localPath, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = hostInstance.Pull(
+			job.Context(), hostPath, localPath, temporal.GetLongOperationTimeout(),
+		)
 	} else {
-		retcode, stdout, stderr, xerr = rh.Push(task.GetContext(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout())
+		retcode, stdout, stderr, xerr = hostInstance.Push(
+			job.Context(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout(),
+		)
 	}
 	if xerr != nil {
 		return nil, xerr

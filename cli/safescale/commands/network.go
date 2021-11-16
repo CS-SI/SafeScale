@@ -63,7 +63,8 @@ var networkList = &cli.Command{
 			Name:    "provider",
 			Aliases: []string{"all", "a"},
 			Usage:   "Lists all Networks available on tenant (not only those created by SafeScale)",
-		}},
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
 
@@ -75,7 +76,15 @@ var networkList = &cli.Command{
 		networks, err := clientSession.Network.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of networks", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "list of networks", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(networks.GetNetworks())
 	},
@@ -107,7 +116,15 @@ var networkDelete = &cli.Command{
 		err := clientSession.Network.Delete(networkList, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of network", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "deletion of network", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -133,7 +150,15 @@ var networkInspect = &cli.Command{
 		network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "inspection of network", false,
+						).Error(),
+					),
+				),
+			)
 		}
 
 		// Convert struct to map using struct to json then json to map
@@ -147,25 +172,49 @@ var networkInspect = &cli.Command{
 				subnet, err := clientSession.Subnet.Inspect(network.Id, network.Name, temporal.GetExecutionTimeout())
 				if err != nil {
 					err = fail.FromGRPCStatus(err)
-					return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of network", false).Error())))
+					return clitools.FailureResponse(
+						clitools.ExitOnRPC(
+							strprocess.Capitalize(
+								client.DecorateTimeoutError(
+									err, "inspection of network", false,
+								).Error(),
+							),
+						),
+					)
 				}
 
 				subnetMapped := map[string]interface{}{}
 				jsoned, _ := json.Marshal(subnet)
 				_ = json.Unmarshal(jsoned, &subnetMapped)
 
-				mapped["network_id"] = mapped["id"]
-				mapped["network_cidr"] = mapped["cidr"]
-				delete(mapped, "cidr")
 				for k, v := range subnetMapped {
+					switch k {
+					case "name":
+						k = "subnet_name"
+					case "id":
+						k = "subnet_id"
+					case "cidr":
+						k = "subnet_cidr"
+					case "state":
+						k = "subnet_state"
+					}
 					mapped[k] = v
 				}
 
-				if err = queryGatewaysInformation(clientSession, subnet, mapped); err != nil {
+				stnum, ok := mapped["state"].(float64)
+				if ok {
+					mapped["state_label"] = protocol.NetworkState_name[int32(stnum)]
+				}
+
+				staltnum, ok := mapped["subnet_state"].(float64)
+				if ok {
+					mapped["subnet_state_label"] = protocol.NetworkState_name[int32(staltnum)]
+				}
+
+				if err = queryGatewaysInformation(clientSession, subnet, mapped, false); err != nil {
 					return err
 				}
 
-				// Remove entry 'subnets'
 				delete(mapped, "subnets")
 			}
 		}
@@ -175,11 +224,11 @@ var networkInspect = &cli.Command{
 }
 
 // Get gateway(s) information
-func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, mapped map[string]interface{}) (err error) {
+func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, mapped map[string]interface{}, subnetContext bool) (err error) {
 	var pgw, sgw *protocol.Host
 	gwIDs := subnet.GetGatewayIds()
 
-	var gateways = make([]string, 0, len(gwIDs))
+	var gateways = make([]map[string]string, len(gwIDs))
 	if len(gwIDs) > 0 {
 		pgw, err = session.Host.Inspect(gwIDs[0], temporal.GetExecutionTimeout())
 		if err != nil {
@@ -191,8 +240,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 			xerr := fail.Wrap(err, fmt.Sprintf("failed to inspect network: cannot inspect %sgateway", what))
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
 		}
-		mapped["gateway_name"] = pgw.Name
-		gateways = append(gateways, pgw.Name)
+		gateways[0] = map[string]string{pgw.Name: pgw.Id}
 	}
 	if len(gwIDs) > 1 {
 		sgw, err = session.Host.Inspect(gwIDs[1], temporal.GetExecutionTimeout())
@@ -201,12 +249,17 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 			xerr := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(xerr.Error())))
 		}
-		mapped["secondary_gateway_name"] = sgw.Name
-		gateways = append(gateways, sgw.Name)
+		gateways[1] = map[string]string{sgw.Name: sgw.Id}
 	}
 	if len(gateways) > 0 {
-		mapped["gateways"] = gateways
+		switch subnetContext {
+		case true:
+			mapped["gateways"] = gateways
+		case false:
+			mapped["subnet_gateways"] = gateways
+		}
 	}
+	delete(mapped, "gateway_ids")
 
 	// Remove entry 'virtual_ip' if empty
 	if _, ok := mapped["virtual_ip"]; ok && len(mapped["virtual_ip"].(map[string]interface{})) == 0 {
@@ -240,8 +293,8 @@ var networkCreate = &cli.Command{
 			Usage:   "If used, the resource(s) is(are) not deleted on failure (default: not set)",
 		},
 		&cli.StringFlag{
-			Name:  "os",
-			Value: "Ubuntu 20.04",
+			Name: "os",
+			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the gateway",
 		},
 		&cli.StringFlag{
@@ -319,7 +372,15 @@ var networkCreate = &cli.Command{
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of network", true).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "creation of network", true,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(network)
 	},
@@ -360,9 +421,13 @@ var networkSecurityGroupList = &cli.Command{
 			Name:    "all",
 			Aliases: []string{"a"},
 			Usage:   "List all Security Groups on tenant (not only those created by SafeScale)",
-		}},
+		},
+	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		// networkRef := c.Args().First()
 
@@ -374,14 +439,26 @@ var networkSecurityGroupList = &cli.Command{
 		list, err := clientSession.SecurityGroup.List(c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "list of Security Groups", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		if len(list.SecurityGroups) > 0 {
 			var resp []interface{}
 			for _, v := range list.SecurityGroups {
 				item, xerr := reformatSecurityGroup(v, false)
 				if xerr != nil {
-					return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+					return clitools.FailureResponse(
+						clitools.ExitOnErrorWithMessage(
+							exitcode.Run, strprocess.Capitalize(xerr.Error()),
+						),
+					)
 				}
 				resp = append(resp, item)
 			}
@@ -397,7 +474,10 @@ var networkSecurityGroupInspect = &cli.Command{
 	Usage:     "Shows details of Security Group",
 	ArgsUsage: "NETWORKREF GROUPREF",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -418,7 +498,7 @@ var networkSecurityGroupInspect = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
-		formatted, err := reformatSecurityGroup(resp, false)
+		formatted, err := reformatSecurityGroup(resp, true)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -455,7 +535,7 @@ func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (
 				item["ether_type_label"] = strings.ToLower(ipversion.Enum(etherType).String())
 			}
 		} else {
-			out["rules"] = nil
+			out["rules"] = struct{}{}
 		}
 	}
 
@@ -475,7 +555,10 @@ var networkSecurityGroupCreate = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -498,7 +581,15 @@ var networkSecurityGroupCreate = &cli.Command{
 		resp, err := clientSession.SecurityGroup.Create(c.Args().First(), req, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of security-group", true).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "creation of security-group", true,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(resp)
 	},
@@ -511,7 +602,10 @@ var networkSecurityGroupClear = &cli.Command{
 	Usage:     "deletes all rules of a Security Group",
 	ArgsUsage: "NETWORKREF GROUPREF",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -530,7 +624,15 @@ var networkSecurityGroupClear = &cli.Command{
 		err := clientSession.SecurityGroup.Clear(c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "reset of a security-group", true).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "reset of a security-group", true,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -549,7 +651,10 @@ var networkSecurityGroupDelete = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%v'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%v'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -568,7 +673,15 @@ var networkSecurityGroupDelete = &cli.Command{
 		err := clientSession.SecurityGroup.Delete(c.Args().Tail(), c.Bool("force"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of security-group", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "deletion of security-group", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -587,7 +700,10 @@ var networkSecurityGroupBonds = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -608,7 +724,15 @@ var networkSecurityGroupBonds = &cli.Command{
 		list, err := clientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of Security Groups", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "list of Security Groups", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		result := map[string]interface{}{}
 		if len(list.Hosts) > 0 {
@@ -616,18 +740,34 @@ var networkSecurityGroupBonds = &cli.Command{
 			jsoned, _ := json.Marshal(list.Hosts)
 			err = json.Unmarshal(jsoned, &hosts)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+				return clitools.FailureResponse(
+					clitools.ExitOnErrorWithMessage(
+						exitcode.Run, strprocess.Capitalize(
+							client.DecorateTimeoutError(
+								err, "list of security-groups", false,
+							).Error(),
+						),
+					),
+				)
 			}
 			result["hosts"] = hosts
 		}
 		if len(list.Subnets) > 0 {
-			networks := make([]map[string]interface{}, len(list.Subnets))
+			subnets := make([]map[string]interface{}, len(list.Subnets))
 			jsoned, _ := json.Marshal(list.Subnets)
-			err = json.Unmarshal(jsoned, &networks)
+			err = json.Unmarshal(jsoned, &subnets)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
+				return clitools.FailureResponse(
+					clitools.ExitOnErrorWithMessage(
+						exitcode.Run, strprocess.Capitalize(
+							client.DecorateTimeoutError(
+								err, "list of security-groups", false,
+							).Error(),
+						),
+					),
+				)
 			}
-			result["networks"] = networks
+			result["subnets"] = subnets
 		}
 		if len(result) > 0 {
 			return clitools.SuccessResponse(result)
@@ -694,7 +834,10 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -729,10 +872,26 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 			PortTo:      int32(c.Int("port-to")),
 			Targets:     c.StringSlice("cidr"),
 		}
+		switch rule.Direction {
+		case securitygroupruledirection.Ingress:
+			rule.Sources = c.StringSlice("cidr")
+		case securitygroupruledirection.Egress:
+			rule.Targets = c.StringSlice("cidr")
+		}
 
-		if err := clientSession.SecurityGroup.AddRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout()); err != nil {
+		if err := clientSession.SecurityGroup.AddRule(
+			c.Args().Get(1), rule, temporal.GetExecutionTimeout(),
+		); err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "addition of a rule to a security-group", true).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "addition of a rule to a security-group", true,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -779,7 +938,10 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -811,12 +973,26 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			Protocol:  c.String("protocol"),
 			PortFrom:  int32(c.Int("port-from")),
 			PortTo:    int32(c.Int("port-to")),
-			Targets:   c.StringSlice("cidr"),
 		}
+		switch rule.Direction {
+		case securitygroupruledirection.Ingress:
+			rule.Sources = c.StringSlice("cidr")
+		case securitygroupruledirection.Egress:
+			rule.Targets = c.StringSlice("cidr")
+		}
+
 		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of a rule from a security-group", true).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "deletion of a rule from a security-group", true,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -851,7 +1027,9 @@ var subnetList = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args %q", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s with args %q", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -871,17 +1049,41 @@ var subnetList = &cli.Command{
 		resp, err := clientSession.Subnet.List(networkRef, c.Bool("all"), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "list of subnets", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		var result []map[string]interface{}
 		subnets := resp.GetSubnets()
 		if len(subnets) > 0 {
 			jsoned, err := json.Marshal(subnets)
 			if err != nil {
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
+				return clitools.FailureResponse(
+					clitools.ExitOnRPC(
+						strprocess.Capitalize(
+							client.DecorateTimeoutError(
+								err, "list of subnets", false,
+							).Error(),
+						),
+					),
+				)
 			}
 			if err != json.Unmarshal(jsoned, &result) {
-				return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of subnets", false).Error())))
+				return clitools.FailureResponse(
+					clitools.ExitOnRPC(
+						strprocess.Capitalize(
+							client.DecorateTimeoutError(
+								err, "list of subnets", false,
+							).Error(),
+						),
+					),
+				)
 			}
 			for _, v := range result {
 				delete(v, "gateway_ids")
@@ -905,7 +1107,9 @@ var subnetDelete = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -931,7 +1135,15 @@ var subnetDelete = &cli.Command{
 		err := clientSession.Subnet.Delete(networkRef, list, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "deletion of subnet", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "deletion of subnet", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -943,7 +1155,9 @@ var subnetInspect = &cli.Command{
 	Usage:     "Show details of a subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -966,7 +1180,15 @@ var subnetInspect = &cli.Command{
 		subnet, err := clientSession.Subnet.Inspect(networkRef, c.Args().Get(1), temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "inspection of subnet", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "inspection of subnet", false,
+						).Error(),
+					),
+				),
+			)
 		}
 
 		// Convert struct to map using struct to json then json to map
@@ -975,7 +1197,7 @@ var subnetInspect = &cli.Command{
 		jsoned, _ := json.Marshal(subnet)
 		_ = json.Unmarshal(jsoned, &mapped)
 
-		if err = queryGatewaysInformation(clientSession, subnet, mapped); err != nil {
+		if err = queryGatewaysInformation(clientSession, subnet, mapped, true); err != nil {
 			return err
 		}
 		return clitools.SuccessResponse(mapped)
@@ -995,8 +1217,8 @@ var subnetCreate = &cli.Command{
 			Usage:   "cidr of the network",
 		},
 		&cli.StringFlag{
-			Name:  "os",
-			Value: "Ubuntu 20.04",
+			Name: "os",
+			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the gateway",
 		},
 		&cli.StringFlag{
@@ -1044,7 +1266,9 @@ var subnetCreate = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1077,7 +1301,15 @@ var subnetCreate = &cli.Command{
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "creation of subnet", true).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "creation of subnet", true,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(network)
 	},
@@ -1108,7 +1340,10 @@ var subnetVIPCreateCommand = &cli.Command{
 		If NETWORKREF == -, SUBNETREF must be a Subnet ID`,
 	ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1122,7 +1357,11 @@ var subnetVIPCreateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "creation of subnet VIP not yet implemented"))
+		return clitools.FailureResponse(
+			clitools.ExitOnErrorWithMessage(
+				exitcode.NotImplemented, "creation of subnet VIP not yet implemented",
+			),
+		)
 	},
 }
 
@@ -1139,7 +1378,10 @@ var subnetVIPInspectCommand = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1153,7 +1395,11 @@ var subnetVIPInspectCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "inspection of subnet VIP not yet implemented"))
+		return clitools.FailureResponse(
+			clitools.ExitOnErrorWithMessage(
+				exitcode.NotImplemented, "inspection of subnet VIP not yet implemented",
+			),
+		)
 
 	},
 }
@@ -1171,7 +1417,10 @@ var subnetVIPDeleteCommand = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1185,7 +1434,11 @@ var subnetVIPDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument VIPNAME."))
 		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "deletion of subnet VIP not yet implemented"))
+		return clitools.FailureResponse(
+			clitools.ExitOnErrorWithMessage(
+				exitcode.NotImplemented, "deletion of subnet VIP not yet implemented",
+			),
+		)
 	},
 }
 
@@ -1202,7 +1455,10 @@ var subnetVIPBindCommand = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1219,7 +1475,11 @@ var subnetVIPBindCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
 		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "bind host to subnet VIP not yet implemented"))
+		return clitools.FailureResponse(
+			clitools.ExitOnErrorWithMessage(
+				exitcode.NotImplemented, "bind host to subnet VIP not yet implemented",
+			),
+		)
 	},
 }
 
@@ -1236,7 +1496,10 @@ var subnetVIPUnbindCommand = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
+			c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1253,7 +1516,11 @@ var subnetVIPUnbindCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOSTNAME."))
 		}
 
-		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "unbind host from subnet VIP not yet implemented"))
+		return clitools.FailureResponse(
+			clitools.ExitOnErrorWithMessage(
+				exitcode.NotImplemented, "unbind host from subnet VIP not yet implemented",
+			),
+		)
 	},
 }
 
@@ -1297,7 +1564,10 @@ var subnetSecurityGroupAddCommand = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
+			groupCmdLabel, c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1320,10 +1590,20 @@ var subnetSecurityGroupAddCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.BindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), c.Bool("disabled"), temporal.GetExecutionTimeout())
+		err := clientSession.Subnet.BindSecurityGroup(
+			networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), temporal.GetExecutionTimeout(),
+		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "adding security group to network", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "adding security group to network", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -1335,7 +1615,10 @@ var subnetSecurityGroupRemoveCommand = &cli.Command{
 	Usage:     "removes a security group from a subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
+			groupCmdLabel, c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1358,10 +1641,20 @@ var subnetSecurityGroupRemoveCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.UnbindSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), temporal.GetExecutionTimeout())
+		err := clientSession.Subnet.UnbindSecurityGroup(
+			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.GetExecutionTimeout(),
+		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "removing security group from network", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "removing security group from network", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -1369,7 +1662,7 @@ var subnetSecurityGroupRemoveCommand = &cli.Command{
 
 var subnetSecurityGroupListCommand = &cli.Command{
 	Name:      "list",
-	Aliases:   []string{"show"},
+	Aliases:   []string{"show", "ls"},
 	Usage:     "lists security groups bound to subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF",
 	Flags: []cli.Flag{
@@ -1386,7 +1679,10 @@ var subnetSecurityGroupListCommand = &cli.Command{
 		},
 	},
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%v'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s %s with args '%v'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
+			groupCmdLabel, c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1413,10 +1709,20 @@ var subnetSecurityGroupListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		list, err := clientSession.Subnet.ListSecurityGroups(networkRef, c.Args().Get(1), state, temporal.GetExecutionTimeout())
+		list, err := clientSession.Subnet.ListSecurityGroups(
+			networkRef, c.Args().Get(1), state, temporal.GetExecutionTimeout(),
+		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "listing bound security groups of subnet", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "listing bound security groups of subnet", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(list.Subnets)
 	},
@@ -1428,7 +1734,10 @@ var subnetSecurityGroupEnableCommand = &cli.Command{
 	Usage:     "Enables a security group on a subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
+			groupCmdLabel, c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1451,10 +1760,20 @@ var subnetSecurityGroupEnableCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.EnableSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), temporal.GetExecutionTimeout())
+		err := clientSession.Subnet.EnableSecurityGroup(
+			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.GetExecutionTimeout(),
+		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "enabling security group on network", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "enabling security group on network", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},
@@ -1466,7 +1785,10 @@ var subnetSecurityGroupDisableCommand = &cli.Command{
 	Usage:     "disable SUBNETREF GROUPREF",
 	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
 	Action: func(c *cli.Context) error {
-		logrus.Tracef("SafeScale command: %s %s %s %s %s with args '%s'", hostCmdLabel, subnetCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
+		logrus.Tracef(
+			"SafeScale command: %s %s %s %s %s with args '%s'", hostCmdLabel, subnetCmdLabel, securityCmdLabel,
+			groupCmdLabel, c.Command.Name, c.Args(),
+		)
 
 		switch c.NArg() {
 		case 0:
@@ -1489,10 +1811,20 @@ var subnetSecurityGroupDisableCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.DisableSecurityGroup(networkRef, c.Args().Get(1), c.Args().Get(2), temporal.GetExecutionTimeout())
+		err := clientSession.Subnet.DisableSecurityGroup(
+			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.GetExecutionTimeout(),
+		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "disabling bound security group on network", false).Error())))
+			return clitools.FailureResponse(
+				clitools.ExitOnRPC(
+					strprocess.Capitalize(
+						client.DecorateTimeoutError(
+							err, "disabling bound security group on network", false,
+						).Error(),
+					),
+				),
+			)
 		}
 		return clitools.SuccessResponse(nil)
 	},

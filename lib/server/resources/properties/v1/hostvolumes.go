@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostVolume contains information about attached volume
@@ -34,11 +34,6 @@ type HostVolume struct {
 // NewHostVolume ...
 func NewHostVolume() *HostVolume {
 	return &HostVolume{}
-}
-
-// Reset ...
-func (p *HostVolume) Reset() {
-	*p = HostVolume{}
 }
 
 // HostVolumes contains information about attached volumes
@@ -62,19 +57,9 @@ func NewHostVolumes() *HostVolumes {
 	}
 }
 
-// Reset ...
-func (hv *HostVolumes) Reset() {
-	*hv = HostVolumes{
-		VolumesByID:     map[string]*HostVolume{},
-		VolumesByName:   map[string]string{},
-		VolumesByDevice: map[string]string{},
-		DevicesByID:     map[string]string{},
-	}
-}
-
-// Content ...
-func (hv *HostVolumes) Content() interface{} {
-	return hv
+// IsNull ...
+func (hv *HostVolumes) IsNull() bool {
+	return hv == nil || len(hv.VolumesByID) == 0
 }
 
 // Clone ...

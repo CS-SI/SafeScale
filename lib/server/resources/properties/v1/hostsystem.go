@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostSystem contains information about the operating system
@@ -38,9 +38,9 @@ func NewHostSystem() *HostSystem {
 	return &HostSystem{}
 }
 
-// Reset ...
-func (hs *HostSystem) Reset() {
-	*hs = HostSystem{}
+// IsNull ...
+func (hs *HostSystem) IsNull() bool {
+	return hs == nil || (hs.Type == "" && hs.Flavor == "" && hs.Image == "" && hs.HostName == "")
 }
 
 // Clone ...

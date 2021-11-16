@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostClusterMembership ...
@@ -39,6 +39,12 @@ func NewHostClusterMembership() *HostClusterMembership {
 // Reset resets the content of the property
 func (hcm *HostClusterMembership) Reset() {
 	*hcm = HostClusterMembership{}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (hcm *HostClusterMembership) IsNull() bool {
+	return hcm == nil || hcm.Cluster == ""
 }
 
 // Clone ...

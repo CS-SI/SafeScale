@@ -51,9 +51,7 @@ func (s subnet) List(networkRef string, all bool, timeout time.Duration) (*proto
 	})
 }
 
-// Delete TODO: concurent access if deleting multiple networks
-// FIXME: use concurrency.Task ?
-// deletes several networks at the same time in goroutines
+// Delete deletes several networks at the same time in goroutines
 func (s subnet) Delete(networkRef string, names []string, timeout time.Duration) error {
 	s.session.Connect()
 	defer s.session.Disconnect()
@@ -140,7 +138,7 @@ func (s subnet) Create(
 		Gateway: &protocol.GatewayDefinition{
 			ImageId:        os,
 			Name:           gwname,
-			SshPort:        uint32(gwport),
+			SshPort:        gwport,
 			SizingAsString: sizing,
 		},
 		KeepOnFailure: keepOnFailure,

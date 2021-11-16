@@ -32,7 +32,9 @@ import (
 // safescale image list --all=false
 
 // ImageListener image service server grpc
-type ImageListener struct{}
+type ImageListener struct {
+	protocol.UnimplementedImageServiceServer
+}
 
 // List available images
 func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest) (_ *protocol.ImageList, err error) {
@@ -50,19 +52,17 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	}
 
 	ok, err := govalidator.ValidateStruct(in)
-	if err == nil {
-		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
-		}
+	if err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "image list")
+	job, err := PrepareJob(ctx, in.GetTenantId(), "/images/list")
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.GetTask(), true, "").WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -73,10 +73,10 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 	}
 
 	// Build response mapping abstract.Image to protocol.Image
-	var pbImages []*protocol.Image
-	for _, image := range images {
-		pbImages = append(pbImages, converters.ImageFromAbstractToProtocol(&image))
+	pbImages := make([]*protocol.Image, len(images))
+	for k, image := range images {
+		pbImages[k] = converters.ImageFromAbstractToProtocol(&image)
 	}
-	rv := &protocol.ImageList{Images: pbImages}
-	return rv, nil
+	out := &protocol.ImageList{Images: pbImages}
+	return out, nil
 }

@@ -42,54 +42,12 @@ func generateNilNewError() *errorCore {
 	return nil
 }
 
-func TestInternalUsage(t *testing.T) {
-	e := newError(nil, nil, "nothing to see")
-	e.CauseFormatter(
-		func(e Error) string {
-			return "toto"
-		})
-	origin := fmt.Errorf("whatever")
-	done := e.TrySetCause(origin)
-	if e.Cause() != origin {
-		t.Fail()
-	}
-	if !done {
-		t.Fail()
-	}
-}
-
-func TestInternalUsageWithNilCheck(t *testing.T) {
-	defer func() {
-		if x := recover(); x != nil {
-			t.Fail()
-		}
-	}()
-	e := generateNilNewError()
-	e.CauseFormatter(
-		func(e Error) string {
-			return "toto"
-		})
-	done := e.TrySetCause(fmt.Errorf("whatever")) // it's a nil, cannot be done
-	if done {
-		t.Fail()
-	}
-}
-
-func TestInternalUsageWithoutNilCheck(t *testing.T) {
-	defer func() {
-		if x := recover(); x != nil {
-			t.Fail()
-		}
-	}()
-	e := generateNilNewError()
-	e.CauseFormatter(
-		func(e Error) string {
-			return "toto"
-		})
-	e.TrySetCause(fmt.Errorf("whatever"))
-	forced := e.ForceSetCause(fmt.Errorf("it takes"))
-	if forced == nil {
-		t.Fail()
+func TestAFailErrorisAnError(t *testing.T) {
+	var what error
+	tfe := NewError("ouch")
+	what = tfe
+	if what == nil {
+		t.Errorf("Cannot be")
 	}
 }
 
@@ -181,15 +139,6 @@ func TestFromPointerUsage(t *testing.T) {
 			func(e Error) string {
 				return "toto"
 			})
-	}
-}
-
-func TestForceSetCause(t *testing.T) {
-	av := generateErrTimeout()
-	_ = av.ForceSetCause(fmt.Errorf("the cause"))
-	_ = av.ForceSetCause(fmt.Errorf("the strange cause"))
-	if !strings.Contains(av.Cause().Error(), "strange") {
-		t.Fail()
 	}
 }
 
@@ -551,7 +500,6 @@ func TestRecursiveAnnotation(t *testing.T) {
 		defer wg.Done()
 		err := &ErrNotFound{nil}
 		err.Annotate("key", "value")
-		return
 	}()
 	failed := waitTimeout(&wg, 1*time.Second)
 	if failed { // It never ended
@@ -588,5 +536,91 @@ func TestNotUncategorizedError(t *testing.T) {
 	}
 	if !strings.Contains(tk, "something") {
 		t.Fail()
+	}
+}
+
+// typos adding consequences -> infinite loops
+func TestNiceLoop(t *testing.T) {
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		aerr := AbortedError(fmt.Errorf("this broke my heart"))
+		_ = aerr.AddConsequence(aerr)
+
+		broken := aerr.Error() // It works until we make the call
+		_ = broken
+	}()
+	failed := waitTimeout(&wg, 500*time.Millisecond)
+	if failed { // It never ended
+		t.FailNow()
+	}
+}
+
+func TestHelperCauseFunction(t *testing.T) {
+	aerr := AbortedError(fmt.Errorf("this was painful: %w", fmt.Errorf("this broke my heart")))
+	directCause := aerr.Cause()
+	indirectCause := Cause(aerr)
+
+	assert.EqualValues(t, directCause, indirectCause)
+}
+
+func TestHelperRootCauseFunction(t *testing.T) {
+	aerr := AbortedError(fmt.Errorf("this was painful: %w", fmt.Errorf("this broke my heart")))
+	directCause := aerr.RootCause()
+	indirectCause := RootCause(aerr)
+
+	assert.EqualValues(t, directCause, indirectCause)
+}
+
+func TestLastUnwrap(t *testing.T) {
+	aerr := AbortedError(fmt.Errorf("this was painful: %w", fmt.Errorf("this broke my heart")))
+	recovered := lastUnwrap(aerr)
+	indirectRecovered := RootCause(aerr)
+
+	assert.EqualValues(t, recovered, indirectRecovered)
+
+	recovered = lastUnwrapOrNil(aerr)
+	assert.EqualValues(t, recovered, indirectRecovered)
+}
+
+func TestLastUnwrapOrNil(t *testing.T) {
+	aerr := AbortedError(nil, "why is so complicated ?")
+	recovered := lastUnwrap(aerr)
+	indirectRecovered := RootCause(aerr)
+	assert.NotNil(t, indirectRecovered)
+	assert.NotNil(t, recovered)
+
+	assert.EqualValues(t, recovered, indirectRecovered)
+
+	recovered = lastUnwrapOrNil(aerr)
+	assert.Nil(t, recovered)
+}
+
+func TestPrettyPrintChainOfWrappedErrors(t *testing.T) {
+	origin := NewError("It was DNS")
+	toe := TimeoutError(origin, 100*time.Millisecond, "we tried to connect to google and we failed")
+	dbe := Wrap(toe, "we failed internet connection (aka ping google) check")
+	dba := Wrap(dbe, "the database failed some health checks")
+	_ = dba.AddConsequence(NewError("The app failed to start"))
+
+	formatted := dba.Error()
+	if !strings.Contains(formatted, "the database failed some health checks: we failed internet connection (aka ping google) check: we tried to connect to google and we failed (timeout: 100ms): It was DNS") {
+		t.Error("the formatting is wrong")
+	}
+	if !strings.Contains(formatted, "The app failed to start") {
+		t.Error("the consequence formatting is wrong")
+	}
+}
+
+func TestPrettyPrintErrorWithExtraInformation(t *testing.T) {
+	origin := NewError("It was DNS")
+	toe := TimeoutError(origin, 100*time.Millisecond, "we tried to connect to google and we failed")
+	formatted := toe.Error()
+	if !strings.Contains(formatted, "we tried to connect to google and we failed (timeout: 100ms): It was DNS") {
+		t.Errorf("the formatting is wrong: %s", formatted)
+	}
+	if !strings.Contains(formatted, "100") {
+		t.Errorf("we just lost information: %s", formatted)
 	}
 }

@@ -30,6 +30,8 @@ import (
 
 // Stack is the interface to cloud stack
 type Stack interface {
+	GetStackName() string
+
 	// ListAvailabilityZones lists the usable Availability Zones
 	ListAvailabilityZones() (map[string]bool, fail.Error)
 
@@ -126,7 +128,7 @@ type Stack interface {
 	// DeleteHost deletes the host identified by id
 	DeleteHost(stacks.HostParameter) fail.Error
 	// StopHost stops the host identified by id
-	StopHost(stacks.HostParameter) fail.Error
+	StopHost(host stacks.HostParameter, gracefully bool) fail.Error
 	// StartHost starts the host identified by id
 	StartHost(stacks.HostParameter) fail.Error
 	// RebootHost reboots a host
@@ -157,6 +159,9 @@ type Stack interface {
 	ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachment, fail.Error)
 	// DeleteVolumeAttachment deletes the volume attachment identified by id
 	DeleteVolumeAttachment(serverID, id string) fail.Error
+
+	// Migrate runs custom code without breaking Interfaces
+	Migrate(operation string, params map[string]interface{}) fail.Error
 }
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally

@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	datadef "github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -109,22 +109,27 @@ func (f MetadataFolder) Path() string {
 	return f.path
 }
 
-// absolutePath returns the fullpath to reach the 'path'+'name' starting from the MetadataFolder path
+// absolutePath returns the full path to reach the 'path'+'name' starting from the MetadataFolder path
 func (f MetadataFolder) absolutePath(path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
 	}
 	var relativePath string
 	for _, item := range path {
-		if item != "" {
+		if item != "" && item != "/" {
 			relativePath += "/" + item
 		}
 	}
 	relativePath = strings.Trim(relativePath, "/")
-	if f.path != "" {
-		return strings.Join([]string{f.path, relativePath}, "/")
+	if relativePath != "" {
+		absolutePath := strings.Replace(relativePath, "//", "/", -1)
+		if f.path != "" {
+			absolutePath = f.path + "/" + relativePath
+			absolutePath = strings.Replace(absolutePath, "//", "/", -1)
+		}
+		return absolutePath
 	}
-	return relativePath
+	return f.path
 }
 
 // Lookup tells if the object named 'name' is inside the ObjectStorage MetadataFolder
@@ -168,9 +173,9 @@ func (f MetadataFolder) Delete(path string, name string) fail.Error {
 
 // Read loads the content of the object stored in metadata bucket
 // returns true, nil if the object has been found
-// returns false, fail.Error if an error occured (including object not found)
+// returns false, fail.Error if an error occurred (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...data.ImmutableKeyValue) fail.Error {
+func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -190,7 +195,14 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.NotFoundError("failed to read '%s/%s' in Metadata Storage: %v", path, name, xerr)
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "timeout")
+		case *retry.ErrStopRetry:
+			return fail.Wrap(xerr.Cause(), "stopping retries")
+		default:
+			return fail.Wrap(xerr, "failed to read '%s/%s' in Metadata Storage", path, name)
+		}
 	}
 
 	doCrypt := f.crypt
@@ -214,17 +226,17 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 		default:
 		}
 	}
-	data := buffer.Bytes()
+	datas := buffer.Bytes()
 	if doCrypt {
 		var err error
-		data, err = crypt.Decrypt(data, f.cryptKey)
+		datas, err = crypt.Decrypt(datas, f.cryptKey)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return fail.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
 		}
 	}
 
-	xerr = callback(data)
+	xerr = callback(datas)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.NotFoundError("failed to decode metadata '%s/%s': %v", path, name, xerr)
@@ -237,7 +249,7 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 // Returns nil on success (with assurance the write has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (f MetadataFolder) Write(path string, name string, content []byte, options ...data.ImmutableKeyValue) fail.Error {
+func (f MetadataFolder) Write(path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -297,30 +309,34 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 					return nil
 				},
 				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
-				retry.Fibonacci(1*time.Second),
+				retry.Fibonacci(temporal.GetMinDelay()),
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
-					switch v { //nolint
+					switch v { // nolint
 					case verdict.Retry:
 						logrus.Warnf("metadata '%s:%s' write not yet acknowledged: %s; retrying check...", bucketName, absolutePath, t.Err.Error())
 					}
 				},
 			)
 			if innerXErr != nil {
-				switch innerXErr.(type) { //nolint
+				switch innerXErr.(type) {
+				case *retry.ErrStopRetry:
+					return fail.Wrap(innerXErr.Cause(), "stopping retries")
 				case *retry.ErrTimeout:
-					innerXErr = fail.Wrap(innerXErr.Cause(), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
+					return fail.Wrap(innerXErr.Cause(), "failed to acknowledge metadata '%s:%s' write after %s", bucketName, absolutePath, temporal.FormatDuration(timeout))
+				default:
+					return innerXErr
 				}
 			}
-			return innerXErr
+			return nil
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
-		retry.Constant(1*time.Second),
+		retry.Constant(temporal.GetMinDelay()),
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
-			switch v { //nolint
+			switch v { // nolint
 			case verdict.Retry:
 				logrus.Warnf("metadata '%s:%s' write not acknowledged after %s; considering write lost, retrying...", bucketName, absolutePath, temporal.FormatDuration(timeout+30*time.Second))
 			}
@@ -328,12 +344,16 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
+		case *retry.ErrTimeout:
+			return fail.Wrap(xerr.Cause(), "timeout")
 		case *retry.ErrStopRetry:
-			xerr = fail.ConvertError(fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath))
+			return fail.Wrap(xerr.Cause(), "failed to acknowledge metadata '%s:%s'", bucketName, absolutePath)
+		default:
+			return xerr
 		}
 	}
-	return xerr
+	return nil
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'callback' on each entry
@@ -347,23 +367,25 @@ func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail
 	list, xerr := f.service.ListObjects(metadataBucket.Name, absPath, objectstorage.NoPrefix)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Errorf("Error browsing metadata: listing objects: %+v", xerr)
-		return xerr
+		return fail.Wrap(xerr, "Error browsing metadata: listing objects")
 	}
 
 	// If there is a single entry equals to absolute path, then there is nothing, it's an empty MetadataFolder
-	if len(list) == 1 && list[0] == absPath {
+	if len(list) == 1 && strings.Trim(list[0], "/") == absPath {
 		return nil
 	}
 
 	var err error
 	for _, i := range list {
+		i = strings.Trim(i, "/")
+		if i == absPath {
+			continue
+		}
 		var buffer bytes.Buffer
 		xerr = f.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Errorf("Error browsing metadata: reading from buffer: %+v", xerr)
-			return xerr
+			return fail.Wrap(xerr, "Error browsing metadata: reading from buffer")
 		}
 
 		data := buffer.Bytes()
@@ -371,14 +393,13 @@ func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail
 			data, err = crypt.Decrypt(data, f.cryptKey)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
-				return fail.ConvertError(err)
+				return fail.Wrap(fail.ConvertError(err), "Error browsing metadata: decrypting data")
 			}
 		}
 		xerr = callback(data)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			logrus.Errorf("Error browsing metadata: running callback: %+v", xerr)
-			return xerr
+			return fail.Wrap(xerr, "Error browsing metadata: running callback")
 		}
 	}
 	return nil

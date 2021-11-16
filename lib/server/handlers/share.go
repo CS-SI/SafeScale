@@ -27,15 +27,15 @@ import (
 	sharefactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/share"
 	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 //go:generate minimock -o ../mocks/mock_nasapi.go -i github.com/CS-SI/SafeScale/lib/server/handlers.ShareHandler
 
-// TODO: At service level, we need to log before returning, because it's the last chance to track the real issue in server side
+// NOTICE: At service level, we need to log before returning, because it's the last chance to track the real issue in server side, so we should catch panics here
 
 // ShareHandler defines API to manipulate Shares
 type ShareHandler interface {
@@ -57,7 +57,7 @@ func NewShareHandler(job server.Job) ShareHandler {
 	return &shareHandler{job: job}
 }
 
-func sanitize(in string) (string, fail.Error) { //nolint
+func sanitize(in string) (string, fail.Error) { // nolint
 	sanitized := path.Clean(in)
 	if !path.IsAbs(sanitized) {
 		return "", fail.InvalidRequestError("exposed path must be absolute")
@@ -70,6 +70,8 @@ func (handler *shareHandler) Create(
 	shareName, hostName, path string, options string, /*securityModes []string,
 	readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
 ) (share resources.Share, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -86,27 +88,28 @@ func (handler *shareHandler) Create(
 		return nil, fail.InvalidParameterError("path", "cannot be empty")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.share"), "(%s)", shareName).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
-	objs, xerr := sharefactory.New(handler.job.GetService())
+	objs, xerr := sharefactory.New(handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	objh, xerr := hostfactory.Load(handler.job.GetService(), hostName)
+	objh, xerr := hostfactory.Load(handler.job.Service(), hostName)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	return objs, objs.Create(task.GetContext(), shareName, objh, path, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
+	return objs, objs.Create(task.Context(), shareName, objh, path, options /*securityModes, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck*/)
 }
 
 // Delete a share from host
 func (handler *shareHandler) Delete(name string) (xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -117,17 +120,16 @@ func (handler *shareHandler) Delete(name string) (xerr fail.Error) {
 		return fail.InvalidParameterError("name", "cannot be empty!")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.share"), "(%s)", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
-	defer fail.OnPanic(&xerr)
 
-	objs, xerr := sharefactory.Load(handler.job.GetService(), name)
+	objs, xerr := sharefactory.Load(handler.job.Service(), name)
 	if xerr != nil {
 		return xerr
 	}
-	return objs.Delete(task.GetContext())
+	return objs.Delete(task.Context())
 }
 
 // List return the list of all shares from all servers
@@ -141,18 +143,18 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.share"), "").WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 	objs, xerr := sharefactory.New(svc)
 	if xerr != nil {
 		return nil, xerr
 	}
 	var servers []string
-	xerr = objs.Browse(task.GetContext(), func(hostName string, shareID string) fail.Error {
+	xerr = objs.Browse(task.Context(), func(hostName string, shareID string) fail.Error {
 		servers = append(servers, hostName)
 		return nil
 	})
@@ -209,13 +211,13 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 		return nil, fail.InvalidParameterError("hostName", "cannot be empty string")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareName, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	// Retrieve info about the share
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 	shareInstance, xerr := sharefactory.Load(svc, shareName)
 	if xerr != nil {
 		return nil, xerr
@@ -226,7 +228,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 		return nil, xerr
 	}
 
-	return shareInstance.Mount(task.GetContext(), target, path, withCache)
+	return shareInstance.Mount(task.Context(), target, path, withCache)
 }
 
 // Unmount a share from local directory of an host
@@ -246,12 +248,12 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 		return fail.InvalidParameterError("hostRef", "cannot be empty string")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.share"), "('%s', '%s')", shareRef, hostRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	svc := handler.job.GetService()
+	svc := handler.job.Service()
 	objs, xerr := sharefactory.Load(svc, shareRef)
 	if xerr != nil {
 		return xerr
@@ -262,7 +264,7 @@ func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error)
 		return xerr
 	}
 
-	return objs.Unmount(task.GetContext(), target)
+	return objs.Unmount(task.Context(), target)
 }
 
 // Inspect returns the host and share corresponding to 'shareName'
@@ -280,10 +282,10 @@ func (handler *shareHandler) Inspect(shareRef string) (share resources.Share, xe
 		return nil, fail.InvalidParameterError("shareName", "cannot be empty string")
 	}
 
-	task := handler.job.GetTask()
+	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.share"), "(%s)", shareRef).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
-	return sharefactory.Load(handler.job.GetService(), shareRef)
+	return sharefactory.Load(handler.job.Service(), shareRef)
 }

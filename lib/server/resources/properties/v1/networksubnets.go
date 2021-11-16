@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // NetworkSubnets contains additional information describing the subnets in a network, in V1
@@ -39,9 +39,10 @@ func NewNetworkSubnets() *NetworkSubnets {
 	}
 }
 
-// Content ... (data.Clonable interface)
-func (nd *NetworkSubnets) Content() interface{} {
-	return nd
+// IsNull
+// ... (data.Clonable interface)
+func (nd *NetworkSubnets) IsNull() bool {
+	return nd == nil || len(nd.ByID) == 0
 }
 
 // Clone ... (data.Clonable interface)
@@ -69,5 +70,5 @@ func (nd *NetworkSubnets) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", string(networkproperty.SubnetsV1), NewNetworkSubnets())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.SubnetsV1, NewNetworkSubnets())
 }

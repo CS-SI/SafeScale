@@ -17,17 +17,20 @@
 package k8s
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/clusterflavors"
-	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/consts"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var (
@@ -41,7 +44,8 @@ var (
 		DefaultImage:           defaultImage,
 		// GetGlobalSystemRequirements: flavors.GetGlobalSystemRequirements,
 		// GetNodeInstallationScript: getNodeInstallationScript,
-		ConfigureCluster: configureCluster,
+		ConfigureCluster:     configureCluster,
+		LeaveNodeFromCluster: leaveNodeFromCluster,
 	}
 )
 
@@ -87,14 +91,14 @@ func nodeSizing(_ resources.Cluster) abstract.HostSizingRequirements {
 }
 
 func defaultImage(_ resources.Cluster) string {
-	return "Ubuntu 20.04"
+	return consts.DEFAULTOS
 }
 
 func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
-	results, xerr := c.AddFeature(ctx, "kubernetes", data.Map{}, resources.FeatureSettings{})
+	results, xerr := c.AddFeature(ctx, "kubernetes", map[string]interface{}{}, resources.FeatureSettings{})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
 	}
@@ -105,7 +109,7 @@ func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 		return xerr
 	}
 
-	results, xerr = c.AddFeature(ctx, "helm3", data.Map{}, resources.FeatureSettings{})
+	results, xerr = c.AddFeature(ctx, "helm3", map[string]interface{}{}, resources.FeatureSettings{})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'helm3'", clusterName)
 	}
@@ -117,6 +121,93 @@ func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 	}
 
 	logrus.Infof("[cluster %s] feature 'kubernetes' addition successful.", clusterName)
+
+	return nil
+}
+
+// This function is called to remove a node from a Cluster
+func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster, node resources.Host, selectedMaster resources.Host) (xerr fail.Error) {
+	if clusterInstance == nil {
+		return fail.InvalidParameterCannotBeNilError("clusterInstance")
+	}
+	if node == nil {
+		return fail.InvalidParameterCannotBeNilError("node")
+	}
+
+	if selectedMaster == nil {
+		selectedMaster, xerr = clusterInstance.FindAvailableMaster(ctx)
+		if xerr != nil {
+			return xerr
+		}
+
+		defer selectedMaster.Released()
+	}
+
+	// Drain pods from node
+	//cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
+	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets", node.GetName())
+	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to execute pod drain from node '%s'", node.GetName())
+	}
+	switch retcode {
+	case 0:
+		break
+	case 1:
+		if strings.Contains(stderr, "(NotFound)") {
+			break
+		}
+		fallthrough
+	default:
+		xerr := fail.ExecutionError(nil, "failed to drain pods from node '%s'", node.GetName())
+		_ = xerr.Annotate("retcode", retcode)
+		_ = xerr.Annotate("stdout", stdout)
+		_ = xerr.Annotate("stderr", stderr)
+		return xerr
+	}
+
+	// delete node from Kubernetes
+	cmd = fmt.Sprintf("sudo -u cladm -i kubectl delete node %s", node.GetName())
+	retcode, stdout, stderr, xerr = selectedMaster.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to execute node deletion '%s' from cluster '%s'", node.GetName(), clusterInstance.GetName())
+	}
+	switch retcode {
+	case 0:
+		break
+	case 1:
+		if strings.Contains(stderr, "(NotFound)") {
+			break
+		}
+		fallthrough
+	default:
+		xerr := fail.ExecutionError(nil, "failed to delete node '%s' from cluster '%s'", node.GetName(), clusterInstance.GetName())
+		_ = xerr.Annotate("retcode", retcode)
+		_ = xerr.Annotate("stdout", stdout)
+		_ = xerr.Annotate("stderr", stderr)
+		return xerr
+	}
+
+	// Finally, reset kubernetes configuration of node
+	retcode, stdout, stderr, xerr = node.Run(ctx, "sudo kubeadm reset -f", outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	if xerr != nil {
+		return fail.Wrap(xerr, "failed to execute reset of kubernetes configuration on Host '%s'", node.GetName())
+	}
+	switch retcode {
+	case 0:
+		break
+	case 1:
+		if strings.Contains(stderr, "command not found") {
+			break
+		}
+		fallthrough
+	default:
+		xerr := fail.ExecutionError(nil, "failed to reset kubernetes configuration on Host '%s'", node.GetName())
+		_ = xerr.Annotate("retcode", retcode)
+		_ = xerr.Annotate("stdout", stdout)
+		_ = xerr.Annotate("stderr", stderr)
+		return xerr
+	}
 
 	return nil
 }

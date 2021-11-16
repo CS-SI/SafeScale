@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // NetworkHosts contains information about hosts connected to the network
@@ -44,9 +44,9 @@ func (nh *NetworkHosts) Reset() {
 	}
 }
 
-// Content ... (data.Clonable interface)
-func (nh *NetworkHosts) Content() interface{} {
-	return nh
+// IsNull ... (data.Clonable interface)
+func (nh *NetworkHosts) IsNull() bool {
+	return nh == nil || len(nh.ByID) == 0
 }
 
 // Clone ... (data.Clonable interface)

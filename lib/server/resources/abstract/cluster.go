@@ -17,11 +17,13 @@
 package abstract
 
 import (
-	"encoding/json"
+	stdjson "encoding/json"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -46,17 +48,22 @@ type ClusterRequest struct {
 
 // ClusterIdentity contains the bare minimum information about a cluster
 type ClusterIdentity struct {
-	Name       string                 `json:"name"`       // GetName is the name of the cluster
-	Flavor     clusterflavor.Enum     `json:"flavor"`     // Flavor tells what kind of cluster it is
-	Complexity clustercomplexity.Enum `json:"complexity"` // Complexity is the mode of cluster
-	Keypair    *KeyPair               `json:"keypair"`    // Keypair contains the key-pair used inside the Cluster
-	// AdminPassword contains the password of 'cladm' account. This password is used to connect via Guacamole, but cannot be used with SSH (by choice)
-	AdminPassword string `json:"admin_password"`
+	Name          string                 `json:"name"`           // Name is the name of the cluster
+	Flavor        clusterflavor.Enum     `json:"flavor"`         // Flavor tells what kind of cluster it is
+	Complexity    clustercomplexity.Enum `json:"complexity"`     // Complexity is the mode of cluster
+	Keypair       *KeyPair               `json:"keypair"`        // Keypair contains the key-pair used inside the Cluster
+	AdminPassword string                 `json:"admin_password"` // contains the password of the cladm account
+	Tags          map[string]string      `json:"tags,omitempty"`
 }
 
 // NewClusterIdentity ...
 func NewClusterIdentity() *ClusterIdentity {
-	return &ClusterIdentity{}
+	ci := &ClusterIdentity{
+		Tags: make(map[string]string),
+	}
+	ci.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+	ci.Tags["ManagedBy"] = "safescale"
+	return ci
 }
 
 // IsNull ...
@@ -108,7 +115,7 @@ func (i ClusterIdentity) OK() bool {
 	return result
 }
 
-// Serialize serializes IPAddress instance into bytes (output json code)
+// Serialize serializes ClusterIdentity instance into bytes (output json code)
 func (i *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 	if i.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -133,7 +140,7 @@ func (i *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
 	jserr := json.Unmarshal(buf, i)
 	if jserr != nil {
 		switch jserr.(type) {
-		case *json.SyntaxError:
+		case *stdjson.SyntaxError:
 			return fail.SyntaxError(jserr.Error())
 		default:
 			return fail.NewError(jserr.Error())

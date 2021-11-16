@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+release=develop
+folder="$HOME/Documents/Projects/SafeScale/${release}"
+
+if [ ! -d ${folder} ]; then
+    echo "release '$release' ($folder) not found"
+    return 2
+fi
+
+folder="${folder}/go"
+sources="${folder}/src/github.com/CS-SI/SafeScale"
+if [ ! -d "${sources}" ]; then
+    echo "no source found in folder '$sources'"
+    return 3
+fi
+
+case "$release" in 
+    "develop")
+	export GOROOT=/opt/homebrew/opt/go@1.16/libexec
+	;;
+    *)
+	export GOROOT=/opt/homebrew/opt/go@1.17/libexec
+	;;
+esac
+
+export GOBIN="${folder}/bin:~/go/bin:/usr/local/bin"
+export GOPATH="${folder}"
+export GOCACHE="${folder}/cache"
+export PATH=$folder/bin:$GOROOT/bin:$HOME/go/bin:$PATH
+

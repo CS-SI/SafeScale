@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc/codes"
@@ -162,6 +164,7 @@ var hostList = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
+
 		jsoned, _ := json.Marshal(hosts.GetHosts())
 		var result []map[string]interface{}
 		err = json.Unmarshal(jsoned, &result)
@@ -204,7 +207,8 @@ var hostInspect = &cli.Command{
 }
 
 var hostStatus = &cli.Command{
-	Name:      "status",
+	Name:      "state",
+	Aliases:   []string{"status"},
 	Usage:     "status Host",
 	ArgsUsage: "<Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
@@ -224,7 +228,12 @@ var hostStatus = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "status of host", false).Error())))
 		}
-		return clitools.SuccessResponse(resp)
+		formatted := make(map[string]interface{})
+		formatted["name"] = resp.Name
+		converted := converters.HostStateFromProtocolToEnum(resp.Status)
+		formatted["status_code"] = converted
+		formatted["status_label"] = converted.String()
+		return clitools.SuccessResponse(formatted)
 	},
 }
 
@@ -248,8 +257,8 @@ If subnet id is provided, '--network' is superfluous.
 May be used multiple times, the first occurrence becoming the default subnet by design`,
 		},
 		&cli.StringFlag{
-			Name:  "os",
-			Value: "Ubuntu 20.04",
+			Name: "os",
+			// Value: "Ubuntu 20.04",
 			Usage: "Image name for the host",
 		},
 		&cli.BoolFlag{
@@ -332,7 +341,7 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 	},
 }
 
-var hostResize = &cli.Command{
+var hostResize = &cli.Command{ // nolint
 	Name:      "resize",
 	Aliases:   []string{"upgrade"},
 	Usage:     "resizes a host",
@@ -447,8 +456,35 @@ var hostSSH = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
-		return clitools.SuccessResponse(resp)
+
+		out, xerr := formatSSHConfig(*resp)
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(xerr.Error())))
+		}
+		return clitools.SuccessResponse(out)
 	},
+}
+
+func formatSSHConfig(in system.SSHConfig) (map[string]interface{}, fail.Error) {
+	jsoned, err := json.Marshal(&in)
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+	out := map[string]interface{}{}
+	err = json.Unmarshal(jsoned, &out)
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+	if anon, ok := out["primary_gateway_config"]; ok && anon == nil {
+		delete(out, "primary_gateway_config")
+	}
+	if anon, ok := out["secondary_gateway_config"]; ok && anon == nil {
+		delete(out, "secondary_gateway_config")
+	}
+	if anon, ok := out["port"]; ok && anon.(float64) == 0 {
+		out["port"] = 22
+	}
+	return out, nil
 }
 
 // hostListFeaturesCommand handles 'safescale host list-features'
@@ -647,8 +683,26 @@ var hostSecurityGroupListCommand = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "ssh config of host", false).Error())))
 		}
-		return clitools.SuccessResponse(resp)
+
+		out, err := reformatHostGroups(resp.Hosts)
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "formatting of result", false).Error())))
+		}
+		return clitools.SuccessResponse(out)
 	},
+}
+
+func reformatHostGroups(in []*protocol.SecurityGroupBond) ([]interface{}, fail.Error) {
+	out := make([]interface{}, 0, len(in))
+	jsoned, err := json.Marshal(in)
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+	err = json.Unmarshal(jsoned, &out)
+	if err != nil {
+		return nil, fail.ConvertError(err)
+	}
+	return out, nil
 }
 
 var hostSecurityGroupEnableCommand = &cli.Command{

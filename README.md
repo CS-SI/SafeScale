@@ -5,7 +5,7 @@ SafeScale is an Infrastructure and Platform as a Code tool.
 ## Table of content
   - [Description](#description)
     - [SafeScale Infra](#safescale-safescale)
-    - [SafeScale Perform](#safescale-perform)
+    - [SafeScale Platform](#safescale-platform)
     - [SafeScale Security](#safescale-security)
   - [Currently available features](#currently-available-features)
   - [Contributing](#contributing)
@@ -14,8 +14,8 @@ SafeScale is an Infrastructure and Platform as a Code tool.
 ## Description
 SafeScale offers an APIs and a CLI tools to deploy versatile computing clusters that span multiple Clouds. These APIs and CLIs are divided in 3 service layers:
 
-- SafeScale Infra to manage Cloud infrastructure
-- SafeScale Perform to manage Cloud computing platforms
+- SafeScale Infra to manage Cloud infrastructure (IaaS - Infrastructure as a Service)
+- SafeScale Platform to manage Cloud computing platforms (PaaS - Platform as a Service)
 - SafeScale Security to secure user environments
 
 ![SafeScale](doc/img/SafeScale.png "SafeScale")
@@ -86,7 +86,7 @@ SafeScale Security relies on Kong, an open source generic proxy to be put in bet
 - Dynamic SSL plugin to encrypt traffic between the user and the service protected
 - Open ID plugin to connect the Identity and Access Management server, KeyCloak
 - UDP Log plugin to connect the Log management system, Logstash
-The design of a SafeScale Security gateway can be depicted as bellow:
+The design of a SafeScale Security gateway can be depicted as below:
 ![SafeScale Security](doc/img/SafeScale_Security.png "SafeScale Security")
 
 ## Currently available abilities
@@ -103,23 +103,21 @@ SafeScale is currently under active development and does not yet offer all the a
   - SafeScale Platform:
     - Create / Destroy clusters composed of a network, servers and services
       currently supported:
-        - Swarm cluster
         - BOH = Bunch Of Hosts (without any cluster management layer)
-      coming soon:
-        - DCOS (with or without Kubernetes)
         - Kubernetes
-        - OHPC
     - Add / Remove "features" on host and clusters
 
- - Support Cloud providers:
+
+ - Supported Cloud providers:
     - OVH Public Cloud
     - FlexibleEngine
     - OpenTelekom
-    - CloudWatt
     - CloudFerro
     - Generic OpenStack
     - local provider (unstable, not compiled by default)
-    - AWS: under development
+    - AWS
+    - GCP (Google Cloud Platform)
+    - Outscale
 
 
 ## Contributing

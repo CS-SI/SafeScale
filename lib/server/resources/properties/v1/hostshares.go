@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostShare describes a filesystem exported from the host
@@ -46,12 +46,9 @@ func NewHostShare() *HostShare {
 	}
 }
 
-// Reset resets an HostShare
-func (hs *HostShare) Reset() {
-	*hs = HostShare{
-		ClientsByID:   map[string]string{},
-		ClientsByName: map[string]string{},
-	}
+// IsNull ...
+func (hs *HostShare) IsNull() bool {
+	return hs == nil || len(hs.ClientsByID) == 0
 }
 
 // Clone ...
@@ -96,17 +93,9 @@ func NewHostShares() *HostShares {
 	}
 }
 
-// Reset ...
-func (hs *HostShares) Reset() {
-	*hs = HostShares{
-		ByID:   map[string]*HostShare{},
-		ByName: map[string]string{},
-	}
-}
-
-// Content ...
-func (hs *HostShares) Content() interface{} {
-	return hs
+// IsNull ...
+func (hs *HostShares) IsNull() bool {
+	return hs == nil || len(hs.ByID) == 0
 }
 
 // Clone ...

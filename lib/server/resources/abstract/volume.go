@@ -18,6 +18,7 @@ package abstract
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
@@ -34,20 +35,31 @@ type VolumeRequest struct {
 
 // Volume represents a block volume
 type Volume struct {
-	ID    string           `json:"id,omitempty"`
-	Name  string           `json:"name,omitempty"`
-	Size  int              `json:"size,omitempty"`
-	Speed volumespeed.Enum `json:"speed,omitempty"`
-	State volumestate.Enum `json:"state,omitempty"`
+	ID    string            `json:"id,omitempty"`
+	Name  string            `json:"name,omitempty"`
+	Size  int               `json:"size,omitempty"`
+	Speed volumespeed.Enum  `json:"speed,omitempty"`
+	State volumestate.Enum  `json:"state,omitempty"`
+	Tags  map[string]string `json:"tags,omitempty"`
 }
 
 // NewVolume ...
 func NewVolume() *Volume {
-	return &Volume{}
+	nv := &Volume{
+		Tags: make(map[string]string),
+	}
+	nv.Tags["CreationDate"] = time.Now().Format(time.RFC3339)
+	nv.Tags["ManagedBy"] = "safescale"
+	return nv
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (v *Volume) IsNull() bool {
+	return v == nil || (v.ID == "" && v.Name == "")
 }
 
 // Clone ...
-//
 // satisfies interface data.Clonable
 func (v Volume) Clone() data.Clonable {
 	return NewVolume().Replace(&v)

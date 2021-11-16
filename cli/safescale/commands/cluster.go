@@ -33,6 +33,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/exitcode"
@@ -114,7 +115,6 @@ var clusterListCommand = &cli.Command{
 
 // formatClusterConfig removes unneeded entry from config
 func formatClusterConfig(config map[string]interface{}, detailed bool) map[string]interface{} {
-	delete(config, "keypair")
 	if !detailed {
 		delete(config, "admin_login")
 		delete(config, "admin_password")
@@ -125,14 +125,14 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		delete(config, "secondary_gateway_ip")
 		delete(config, "network_id")
 		delete(config, "nodes")
-		delete(config, "ssh_private_key")
-		delete(config, "last_state")
+		delete(config, "last_state") // FIXME: Some of the information is not properly updated
+		delete(config, "last_state_label")
 	} else {
 		remotedesktopInstalled := true
-		disabledFeatures, ok := config["disabled_features"].(map[string]struct{})
+		disabledFeatures, ok := config["disabled_features"].(*protocol.FeatureListResponse)
 		if ok {
-			for k := range disabledFeatures {
-				if k == "remotedesktop" {
+			for _, v := range disabledFeatures.Features {
+				if v.Name == "remotedesktop" {
 					remotedesktopInstalled = false
 					break
 				}
@@ -140,10 +140,10 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		}
 		if !remotedesktopInstalled {
 			remotedesktopInstalled = false
-			installedFeatures, ok := config["installed_features"].(map[string]interface{})
+			installedFeatures, ok := config["installed_features"].(*protocol.FeatureListResponse)
 			if ok {
-				for k := range installedFeatures {
-					if k == "remotedesktop" {
+				for _, v := range installedFeatures.Features {
+					if v.Name == "remotedesktop" {
 						remotedesktopInstalled = true
 						break
 					}
@@ -159,13 +159,10 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 				for _, v := range masters {
 					urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
 				}
-				config["remotedesktop"] = urls
-			} else {
-				remotedesktopInstalled = false
+				config["remote_desktop"] = urls
 			}
-		}
-		if !remotedesktopInstalled {
-			config["remotedesktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
+		} else {
+			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
 		}
 	}
 	return config
@@ -223,8 +220,8 @@ func outputClusterConfig(cluster *protocol.ClusterResponse) (map[string]interfac
 	if xerr != nil {
 		return nil, xerr
 	}
-	formatted := formatClusterConfig(toFormat, true)
 
+	formatted := formatClusterConfig(toFormat, true)
 	return formatted, nil
 }
 
@@ -242,30 +239,31 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 		"admin_login":      "cladm",
 		"admin_password":   c.GetIdentity().GetAdminPassword(),
 		// "keypair":        c.GetIdentity().GetSshConfig().GetPrivateKey(),
-		"ssh_private_key": c.GetIdentity().GetPrivateKey(),
+		// "ssh_private_key": c.GetIdentity().GetPrivateKey(),
 	}
 
 	if c.Composite != nil && len(c.Composite.Tenants) > 0 {
-		result["tenant"] = c.Composite.Tenants[0]
+		result["tenants"] = strings.Join(c.Composite.Tenants, ", ")
 	}
 
 	if c.Controlplane != nil {
 		if c.Controlplane.Vip != nil {
-			result["controplane_vip"] = c.Controlplane.Vip.PrivateIp
+			result["controlplane_vip"] = c.Controlplane.Vip.PrivateIp
 		}
 	}
 
 	var sgwpubip string
 	if c.Network != nil {
 		result["network_id"] = c.Network.NetworkId
+		result["subnet_id"] = c.Network.SubnetId
 		result["cidr"] = c.Network.Cidr
 		result["default_route_ip"] = c.Network.DefaultRouteIp
 		result["primary_gateway_ip"] = c.Network.GatewayIp
 		result["endpoint_ip"] = c.Network.EndpointIp
 		result["primary_public_ip"] = c.Network.EndpointIp
 		if sgwpubip = c.Network.SecondaryPublicIp; sgwpubip != "" {
-			result["secondary_gateway_ip"] = sgwpubip
 			result["secondary_public_ip"] = sgwpubip
+			result["secondary_gateway_ip"] = c.Network.SecondaryGatewayIp
 		}
 	}
 
@@ -295,37 +293,8 @@ func convertToMap(c *protocol.ClusterResponse) (map[string]interface{}, fail.Err
 	}
 
 	result["last_state"] = c.State
+	result["last_state_label"] = c.State.String()
 	result["admin_login"] = "cladm"
-
-	// Add information not directly in cluster GetConfig()
-	// TODO: replace use of !Disabled["remotedesktop"] with use of Installed["remotedesktop"] (not yet implemented)
-	found := false
-	if c.DisabledFeatures != nil && len(c.DisabledFeatures.Features) > 0 {
-		for _, v := range c.DisabledFeatures.Features {
-			if v.Name == "remotedesktop" {
-				found = true
-				break
-			}
-		}
-		if !found {
-			remoteDesktops := map[string][]string{}
-			const urlFmt = "https://%s/_platform/remotedesktop/%s/"
-			for _, v := range nodes["masters"] {
-				urls := []string{fmt.Sprintf(urlFmt, result["EndpointIP"], v.Name)}
-				if sgwpubip != "" {
-					// VPL: no public VIP IP yet, so don't repeat primary gateway public IP
-					// urls = append(urls, fmt.Sprintf(+urlFmt, netCfg.PrimaryPublicIP, host.Name))
-					urls = append(urls, fmt.Sprintf(urlFmt, sgwpubip, v.Name))
-				}
-				remoteDesktops[v.Name] = urls
-			}
-			result["remote_desktop"] = remoteDesktops
-		}
-	}
-	if found {
-		result["remote_desktop"] = fmt.Sprintf("Remote Desktop not installed. To install it, execute 'safescale cluster add-feature %s remotedesktop'.",
-			clusterName)
-	}
 
 	return result, nil
 }
@@ -352,7 +321,7 @@ var clusterCreateCommand = &cli.Command{
 			Name:    "flavor",
 			Aliases: []string{"F"},
 			Value:   "K8S",
-			Usage: `Defines the type of the cluster; can be BOH, SWARM, OHPC, DCOS, K8S
+			Usage: `Defines the type of the cluster; can be BOH, K8S
 	Default sizing for each cluster type is:
 		BOH: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[2-4], ram=[15-32], disk=[80])
 		K8S: gws(cpu=[2-4], ram=[7-16], disk=[50]), masters(cpu=[4-8], ram=[15-32], disk=[100]), nodes(cpu=[4-8], ram=[15-32], disk=[80])
@@ -512,8 +481,6 @@ var clusterCreateCommand = &cli.Command{
 
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			// msg := fmt.Sprintf("failed to create cluster: %s", err.Error())
-			// return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, msg))
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
 		if res == nil {
@@ -572,7 +539,7 @@ var clusterDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.Delete(clusterName, temporal.GetLongOperationTimeout())
+		err = clientSession.Cluster.Delete(clusterName, force, temporal.GetLongOperationTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -692,6 +659,11 @@ var clusterExpandCommand = &cli.Command{
 	<operator> can be =,<,> (except for disk where valid operators are only = or >)
 	<value> can be an integer (for cpu and disk) or a float (for ram) or an including interval "[<lower value>-<upper value>]"`,
 		},
+		&cli.BoolFlag{
+			Name:    "keep-on-failure",
+			Aliases: []string{"k"},
+			Usage:   `do not delete resources on failure`,
+		},
 	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
@@ -705,6 +677,7 @@ var clusterExpandCommand = &cli.Command{
 			count = 1
 		}
 		los := c.String("os")
+		keepOnFailure := c.Bool("keep-on-failure")
 
 		var (
 			nodesDef   string
@@ -719,10 +692,11 @@ var clusterExpandCommand = &cli.Command{
 		}
 
 		req := protocol.ClusterResizeRequest{
-			Name:       clusterName,
-			Count:      int32(count),
-			NodeSizing: nodesDef,
-			ImageId:    los,
+			Name:          clusterName,
+			Count:         int32(count),
+			NodeSizing:    nodesDef,
+			ImageId:       los,
+			KeepOnFailure: keepOnFailure,
 		}
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -906,7 +880,7 @@ var clusterHelmCommand = &cli.Command{
 		}
 
 		clientID := GenerateClientIdentity()
-		useTLS := " --tls"
+		// useTLS := " --tls"
 		var filteredArgs []string
 		args := c.Args().Tail()
 		ignoreNext := false
@@ -919,16 +893,16 @@ var clusterHelmCommand = &cli.Command{
 			}
 			ignore := false
 			switch arg {
-			case "--help":
-				useTLS = ""
+			//case "--help":
+			//	useTLS = ""
 			case "init":
 				if idx == 0 {
 					return cli.NewExitError("helm init is forbidden", int(exitcode.InvalidArgument))
 				}
-			case "search", "repo", "help":
-				if idx == 0 {
-					useTLS = ""
-				}
+			//case "search", "repo", "help", "install", "uninstall":
+			//	if idx == 0 {
+			//		useTLS = ""
+			//	}
 			case "--":
 				ignore = true
 			case "-f", "--values":
@@ -982,7 +956,7 @@ var clusterHelmCommand = &cli.Command{
 				filteredArgs = append(filteredArgs, arg)
 			}
 		}
-		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") + useTLS
+		cmdStr := `sudo -u cladm -i helm ` + strings.Join(filteredArgs, " ") // + useTLS
 
 		clientSession, xerr := client.New(c.String("server"))
 		if xerr != nil {
@@ -1047,11 +1021,11 @@ var clusterListFeaturesCommand = &cli.Command{
 	ArgsUsage: "",
 
 	Flags: []cli.Flag{
-		//&cli.StringSliceFlag{
+		// &cli.StringSliceFlag{
 		//	Name:    "param",
 		//	Aliases: []string{"p"},
 		//	Usage:   "Allow to define content of feature parameters",
-		//},
+		// },
 		&cli.BoolFlag{
 			Name:    "all",
 			Aliases: []string{"a"},
@@ -1126,11 +1100,11 @@ var clusterNodeCommands = &cli.Command{
 
 	Subcommands: []*cli.Command{
 		clusterNodeListCommand,
-		// clusterNodeInspectCommand,
-		// clusterNodeStartCommand,
-		// clusterNodeStopCommand,
-		// clusterNodeStateCommand,
-		// clusterNodeDeleteCommand,
+		clusterNodeInspectCommand,
+		clusterNodeStartCommand,
+		clusterNodeStopCommand,
+		clusterNodeStateCommand,
+		clusterNodeDeleteCommand,
 	},
 }
 
@@ -1170,148 +1144,198 @@ var clusterNodeListCommand = &cli.Command{
 	},
 }
 
-// // clusterNodeInspectCmd handles 'deploy cluster <clustername> inspect'
-// var clusterNodeInspectCommand = &cli.Command{
-// 	Name:      "inspect",
-// 	Usage:     "Show details about a cluster node",
-// 	ArgsUsage: "CLUSTERNAME HOSTNAME",
-//
-// 	Action: func(c *cli.Context) error {
-// 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
-// 		err := extractClusterName(c)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-// 		err = extractHostArgument(c, 1)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-//
-// 		clientSession, xerr := client.New(c.String("server"))
-// 		if xerr != nil {
-// 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-// 		}
-//
-// 		host, err := clientSession.Host.Inspect(hostName, temporal.GetExecutionTimeout())
-// 		if err != nil {
-// 			err = fail.FromGRPCStatus(err)
-// 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-// 		}
-// 		return clitools.SuccessResponse(host)
-// 	},
-// }
-//
-// // clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
-// var clusterNodeDeleteCommand = &cli.Command{
-// 	Name:    "delete",
-// 	Aliases: []string{"destroy", "remove", "rm"},
-//
-// 	Flags: []cli.Flag{
-// 		&cli.BoolFlag{
-// 			Name:    "assume-yes",
-// 			Aliases: []string{"yes", "y"},
-// 			Usage:   "If set, respond automatically yes to all questions",
-// 		},
-// 		&cli.BoolFlag{
-// 			Name:    "force",
-// 			Aliases: []string{"f"},
-// 			Usage:   "If set, force node deletion no matter what (ie. metadata inconsistency)",
-// 		},
-// 	},
-//
-// 	Action: func(c *cli.Context) error {
-// 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
-// 		err := extractClusterName(c)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-// 		err = extractHostArgument(c, 1)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-//
-// 		yes := c.Bool("yes")
-// 		force := c.Bool("force")
-//
-// 		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node '%s' of the cluster '%s'", hostName, clusterName)) {
-// 			return clitools.SuccessResponse("Aborted")
-// 		}
-// 		if force {
-// 			logrus.Println("'-f,--force' does nothing yet")
-// 		}
-//
-// 		clientSession, xerr := client.New(c.String("server"))
-// 		if xerr != nil {
-// 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
-// 		}
-//
-// 		err = clientSession.Cluster.DeleteNode(clusterName, 0)
-// 		if err != nil {
-// 			err = fail.FromGRPCStatus(err)
-// 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
-// 		}
-// 		return clitools.SuccessResponse(nil)
-// 	},
-// }
-//
-// // clusterNodeStopCmd handles 'deploy cluster <clustername> node <nodename> stop'
-// var clusterNodeStopCommand = &cli.Command{
-// 	Name:      "stop",
-// 	Aliases:   []string{"freeze"},
-// 	Usage:     "node stop CLUSTERNAME HOSTNAME",
-// 	ArgsUsage: "CLUSTERNAME HOSTNAME",
-// 	Action: func(c *cli.Context) error {
-// 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
-// 		err := extractClusterName(c)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-// 		err = extractHostArgument(c, 1)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-// 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
-// 	},
-// }
-//
-// // clusterNodeStartCmd handles 'deploy cluster <clustername> node <nodename> start'
-// var clusterNodeStartCommand = &cli.Command{
-// 	Name:      "start",
-// 	Aliases:   []string{"unfreeze"},
-// 	Usage:     "node start CLUSTERNAME HOSTNAME",
-// 	ArgsUsage: "CLUSTERNAME NODENAME",
-// 	Action: func(c *cli.Context) error {
-// 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
-// 		err := extractClusterName(c)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-// 		err = extractHostArgument(c, 1)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-// 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
-// 	},
-// }
-//
-// // clusterNodeStateCmd handles 'deploy cluster <clustername> state'
-// var clusterNodeStateCommand = &cli.Command{
-// 	Name:      "state",
-// 	Usage:     "node state CLUSTERNAME HOSTNAME",
-// 	ArgsUsage: "CLUSTERNAME NODENAME",
-// 	Action: func(c *cli.Context) error {
-// 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
-// 		err := extractClusterName(c)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-// 		err = extractHostArgument(c, 1)
-// 		if err != nil {
-// 			return clitools.FailureResponse(err)
-// 		}
-// 		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.NotImplemented, "Not yet implemented"))
-// 	},
-// }
+// clusterNodeInspectCmd handles 'deploy cluster <clustername> inspect'
+var clusterNodeInspectCommand = &cli.Command{
+	Name:      "inspect",
+	Usage:     "Show details about a cluster node",
+	ArgsUsage: "CLUSTERNAME HOSTNAME",
+
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		err = extractNodeArgument(c, 1)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		host, err := clientSession.Cluster.InspectNode(clusterName, hostName, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		return clitools.SuccessResponse(host)
+	},
+}
+
+// clusterNodeDeleteCmd handles 'deploy cluster <clustername> delete'
+var clusterNodeDeleteCommand = &cli.Command{
+	Name:    "delete",
+	Aliases: []string{"destroy", "remove", "rm"},
+
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "yes",
+			Aliases: []string{"y"},
+			Usage:   "If set, respond automatically yes to all questions",
+		},
+		&cli.BoolFlag{
+			Name:    "force",
+			Aliases: []string{"f"},
+			Usage:   "If set, force node deletion no matter what (ie. metadata inconsistency)",
+		},
+	},
+
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		nodeList := c.Args().Tail()
+		yes := c.Bool("yes")
+		force := c.Bool("force")
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		_, err = clientSession.Cluster.Inspect(clusterName, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
+		}
+
+		if len(nodeList) == 0 {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.InvalidArgument, "missing nodes"))
+		}
+
+		if !yes && !utils.UserConfirmed(fmt.Sprintf("Are you sure you want to delete the node%s '%s' of the cluster '%s'", strprocess.Plural(uint(len(nodeList))), strings.Join(nodeList, ","), clusterName)) {
+			return clitools.SuccessResponse("Aborted")
+		}
+		if force {
+			logrus.Println("'-f,--force' does nothing yet")
+		}
+
+		err = clientSession.Cluster.DeleteNode(clusterName, nodeList, 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+// clusterNodeStopCmd handles 'deploy cluster <clustername> node <nodename> stop'
+var clusterNodeStopCommand = &cli.Command{
+	Name:      "stop",
+	Aliases:   []string{"freeze"},
+	Usage:     "node stop CLUSTERNAME HOSTNAME",
+	ArgsUsage: "CLUSTERNAME HOSTNAME",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		err = extractNodeArgument(c, 1)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err = clientSession.Cluster.StopNode(clusterName, hostName, 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+// clusterNodeStartCmd handles 'deploy cluster <clustername> node <nodename> start'
+var clusterNodeStartCommand = &cli.Command{
+	Name:      "start",
+	Aliases:   []string{"unfreeze"},
+	Usage:     "node start CLUSTERNAME HOSTNAME",
+	ArgsUsage: "CLUSTERNAME NODENAME",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		err = extractNodeArgument(c, 1)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err = clientSession.Cluster.StartNode(clusterName, hostName, 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+// clusterNodeStateCmd handles 'deploy cluster <clustername> state'
+var clusterNodeStateCommand = &cli.Command{
+	Name:      "state",
+	Usage:     "node state CLUSTERNAME HOSTNAME",
+	ArgsUsage: "CLUSTERNAME NODENAME",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		err = extractNodeArgument(c, 1)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		resp, err := clientSession.Cluster.StateNode(clusterName, hostName, 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+
+		formatted := make(map[string]interface{})
+		formatted["name"] = resp.Name
+		converted := converters.HostStateFromProtocolToEnum(resp.Status)
+		formatted["status_code"] = converted
+		formatted["status_label"] = converted.String()
+		return clitools.SuccessResponse(formatted)
+	},
+}
 
 const clusterMasterCmdLabel = "master"
 
@@ -1323,6 +1347,7 @@ var clusterMasterCommands = &cli.Command{
 
 	Subcommands: []*cli.Command{
 		clusterMasterListCommand,
+		clusterMasterInspectCommand,
 	},
 }
 
@@ -1359,6 +1384,139 @@ var clusterMasterListCommand = &cli.Command{
 				"id":   host.GetId(),
 			})
 		}
+		return clitools.SuccessResponse(formatted)
+	},
+}
+
+// clusterMasterInspectCmd handles 'cluster master inspect <clustername> <masterref>'
+var clusterMasterInspectCommand = &cli.Command{
+	Name:      "inspect",
+	Usage:     "Show details about a Cluster master",
+	ArgsUsage: "CLUSTERNAME MASTERNAME",
+
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		err = extractNodeArgument(c, 1)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		host, err := clientSession.Cluster.InspectNode(clusterName, hostName, temporal.GetExecutionTimeout())
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		return clitools.SuccessResponse(host)
+	},
+}
+
+// clusterMasterStopCmd handles 'safescale cluster master stop <clustername> <mastername>'
+var clusterMasterStopCommand = &cli.Command{ // nolint
+	Name:      "stop",
+	Aliases:   []string{"freeze"},
+	Usage:     "master stop CLUSTERNAME MASTERNAME",
+	ArgsUsage: "CLUSTERNAME MASTERNAME",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		err = extractNodeArgument(c, 1)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err = clientSession.Cluster.StopMaster(clusterName, hostName, 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+// clusterMasterStartCmd handles 'deploy cluster <clustername> node <nodename> start'
+var clusterMasterStartCommand = &cli.Command{ // nolint
+	Name:      "start",
+	Aliases:   []string{"unfreeze"},
+	Usage:     "master start CLUSTERNAME MASTERNAME",
+	ArgsUsage: "CLUSTERNAME MASTERNAME",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		err = extractNodeArgument(c, 1)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		err = clientSession.Cluster.StartMaster(clusterName, hostName, 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+		return clitools.SuccessResponse(nil)
+	},
+}
+
+// clusterMasterNodeStateCmd handles 'safescale cluster master state <clustername> <mastername>'
+var clusterMasterStateCommand = &cli.Command{ // nolint
+	Name:      "state",
+	Usage:     "master state CLUSTERNAME MASTERNAME",
+	ArgsUsage: "CLUSTERNAME MASTERNAME",
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		err = extractNodeArgument(c, 1)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		resp, err := clientSession.Cluster.StateMaster(clusterName, hostName, 0)
+		if err != nil {
+			err = fail.FromGRPCStatus(err)
+			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+		}
+
+		formatted := make(map[string]interface{})
+		formatted["name"] = resp.Name
+		converted := converters.HostStateFromProtocolToEnum(resp.Status)
+		formatted["status_code"] = converted
+		formatted["status_label"] = converted.String()
 		return clitools.SuccessResponse(formatted)
 	},
 }

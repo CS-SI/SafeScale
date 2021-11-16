@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterComposite ...
@@ -32,6 +32,12 @@ func newClusterComposite() *ClusterComposite {
 	return &ClusterComposite{
 		Tenants: []string{},
 	}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (c *ClusterComposite) IsNull() bool {
+	return c == nil || len(c.Tenants) == 0
 }
 
 // Clone ...

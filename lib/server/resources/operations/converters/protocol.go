@@ -21,14 +21,14 @@ package converters
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -164,6 +164,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 	}
 
 	out := abstract.ClusterRequest{
+		Tenant:                  in.GetTenantId(),
 		Name:                    in.Name,
 		CIDR:                    in.Cidr,
 		Domain:                  in.Domain,
@@ -235,4 +236,23 @@ func SecurityGroupFromProtocolToAbstract(in *protocol.SecurityGroupResponse) (*a
 		Rules:       rules,
 	}
 	return out, nil
+}
+
+// HostStateFromProtocolToEnum converts a protocol.HostState to hoststate.Enum
+func HostStateFromProtocolToEnum(in protocol.HostState) hoststate.Enum {
+	switch in {
+	case protocol.HostState_HS_STOPPED:
+		return hoststate.Stopped
+	case protocol.HostState_HS_STARTING:
+		return hoststate.Starting
+	case protocol.HostState_HS_STARTED:
+		return hoststate.Started
+	case protocol.HostState_HS_STOPPING:
+		return hoststate.Stopping
+	case protocol.HostState_HS_ERROR:
+		return hoststate.Error
+	case protocol.HostState_HS_TERMINATED:
+		return hoststate.Terminated
+	}
+	return hoststate.Unknown
 }

@@ -36,7 +36,7 @@ feature:
                             hosts: yes
                             masters: all
                         run: |
-                            [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ] && sfFail 192 "Certificate not found"
+                            [ ! -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ] && sfFail 192 "Certificate not found"
                             sfExit
 
             add:
@@ -59,7 +59,7 @@ feature:
                                     ;;
                             esac
 
-                            [ -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ] && sfExit
+                            [ -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ] && sfExit
 
                             mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,newcerts,private}
                             mkdir -p ${SF_ETCDIR}/pki/ca/{certs,crl,csr,newcerts,private}
@@ -190,7 +190,7 @@ feature:
                             hosts: yes
                             masters: one
                         run: |
-                            if [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ]; then
+                            if [ ! -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
                                 openssl genrsa -out ${SF_ETCDIR}/pki/ca/private/rootca.key.pem 4096 || sfFail 193
                                 chmod 0400 ${SF_ETCDIR}/pki/ca/private/rootca.key.pem || sfFail 194
 
@@ -217,8 +217,9 @@ feature:
                             fi
 
                             {{ if .ClusterFlavor }}
-                            tar zcvf ${SF_TMPDIR}/safescale-rootca.tar.gz ${SF_ETCDIR}/pki/ca && \
-                            sfDropzonePush ${SF_TMPDIR}/safescale-rootca.tar.gz && rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz || sfFail 196
+                            tar zcvf ${SF_TMPDIR}/safescale-rootca.tar.gz ${SF_ETCDIR}/pki/ca || sfFail 196 "failure unzipping safescale-rootca"
+                            sfDropzonePush ${SF_TMPDIR}/safescale-rootca.tar.gz || sfFail 196 "failure running dropzonepush"
+                            rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz || true
                             sfDropzoneSync {{ .PrimaryGatewayIP }}
                             {{ if .SecondaryGatewayIP }} sfDropzoneSync {{ .SecondaryGatewayIP }} {{ end }}
                             for i in {{ range .ClusterNodeIPs }}{{ . }} {{ end }}; do
@@ -242,7 +243,7 @@ feature:
                             sfDropzonePop ${SF_TMPDIR}
                             sfDropzoneClean
 
-                            if [ ! -f ${SF_ETCDIR}/pki/ca/signca/certs/rootca.cert.pem ]; then
+                            if [ ! -f ${SF_ETCDIR}/pki/ca/certs/rootca.cert.pem ]; then
                                 tar zxvf ${SF_TMPDIR}/safescale-rootca.tar.gz -C /
                                 retcode=$?
                                 rm -f ${SF_TMPDIR}/safescale-rootca.tar.gz

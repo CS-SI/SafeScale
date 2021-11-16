@@ -27,7 +27,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/dlespiau/covertool/pkg/exit"
+	"github.com/makholm/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
@@ -59,7 +59,7 @@ func cleanup(onAbort bool) {
 
 // *** MAIN ***
 func work(c *cli.Context) {
-	signalCh := make(chan os.Signal)
+	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-signalCh
@@ -68,7 +68,8 @@ func work(c *cli.Context) {
 
 	// NOTE: is it the good behavior ? Shouldn't we fail ?
 	// If trace settings cannot be registered, report it but do not fail
-	err := tracing.RegisterTraceSettings(appTrace)
+	// FIXME: introduce use of configuration file with autoreload on change
+	err := tracing.RegisterTraceSettings(appTrace())
 	if err != nil {
 		logrus.Errorf(err.Error())
 	}
@@ -149,10 +150,10 @@ func assembleListenString(c *cli.Context) string {
 		case 2:
 			num, err := strconv.Atoi(parts[1])
 			if err != nil || num <= 0 {
-				logrus.Warningf("Parameter 'listen' content is invalid (port cannot be '%s'): ignored.", parts[1])
+				logrus.Warnf("Parameter 'listen' content is invalid (port cannot be '%s'): ignored.", parts[1])
 			}
 		default:
-			logrus.Warningf("Parameter 'listen' content is invalid, ignored.")
+			logrus.Warnf("Parameter 'listen' content is invalid, ignored.")
 		}
 	}
 	// if listen is empty, get the port from env
@@ -160,16 +161,18 @@ func assembleListenString(c *cli.Context) string {
 		if port := os.Getenv("SAFESCALED_PORT"); port != "" {
 			num, err := strconv.Atoi(port)
 			if err != nil || num <= 0 {
-				logrus.Warningf("Environment variable 'SAFESCALED_PORT' contains invalid content ('%s'): ignored.", port)
+				logrus.Warnf("Environment variable 'SAFESCALED_PORT' contains invalid content ('%s'): ignored.", port)
 			} else {
 				listen = defaultDaemonHost + ":" + port
 			}
 		}
+
+		// At last, if listen is empty, build it from defaults
+		if listen == "" {
+			listen = defaultDaemonHost + ":" + defaultDaemonPort
+		}
 	}
-	// At last, if listen is empty, build it from defaults
-	if listen == "" {
-		listen = defaultDaemonHost + ":" + defaultDaemonPort
-	}
+
 	return listen
 }
 

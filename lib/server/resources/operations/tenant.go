@@ -19,24 +19,24 @@ package operations
 import (
 	"sync/atomic"
 
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // Tenant structure to handle name and GetService for a tenant
 type Tenant struct {
-	Name    string
-	Service iaas.Service
+	Name       string
+	BucketName string
+	Service    iaas.Service
 }
 
 // currentTenant contains the current tenant
 var currentTenant atomic.Value
 
-// CurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
+// CurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
 func CurrentTenant() *Tenant {
 	anon := currentTenant.Load()
 	if anon == nil {
@@ -47,8 +47,8 @@ func CurrentTenant() *Tenant {
 
 		// Set unique tenant as selected
 		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
-		for _, anon := range tenants {
-			name := anon.(string)
+		for _, tenant := range tenants {
+			name := tenant["name"].(string)
 
 			service, xerr := loadTenant(name)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -56,7 +56,7 @@ func CurrentTenant() *Tenant {
 				return nil
 			}
 
-			currentTenant.Store(&Tenant{Name: name, Service: service})
+			currentTenant.Store(&Tenant{Name: name, BucketName: service.GetMetadataBucket().GetName(), Service: service})
 			break // nolint
 		}
 		anon = currentTenant.Load()
@@ -77,7 +77,7 @@ func SetCurrentTenant(tenantName string) error {
 		return xerr
 	}
 
-	tenant = &Tenant{Name: tenantName, Service: service}
+	tenant = &Tenant{Name: tenantName, BucketName: service.GetMetadataBucket().GetName(), Service: service}
 	currentTenant.Store(tenant)
 	return nil
 }

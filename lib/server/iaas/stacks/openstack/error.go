@@ -43,6 +43,12 @@ func NormalizeError(err error) fail.Error {
 
 	switch e := err.(type) {
 	case fail.Error:
+		// Note: must check if the cause is a gophercloud error...
+		cause := e.Cause()
+		if cause != nil {
+			tracer.Trace("received 'fail.Error' with a cause, normalizing on this cause...")
+			return NormalizeError(cause)
+		}
 		tracer.Trace("received 'fail.Error', throwing it as-is")
 		return e
 	case gophercloud.ErrDefault400: // bad request
@@ -192,9 +198,10 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 				if m, ok = lvl1["message"].(string); ok {
 					msg = m
 					// This switch exists only to return another kind of fail.Error if the errorName does not comply with the real Neutron error (not seen yet)
-					switch t { // nolint
+					switch t {
 					// FIXME: What about *fail.ErrDuplicate ?
 					case "SecurityGroupRuleExists": // return a *fail.ErrDuplicate
+					default:
 					}
 				}
 			}
@@ -227,11 +234,15 @@ func qualifyGophercloudResponseCode(err *gophercloud.ErrUnexpectedResponseCode) 
 		newError = &gophercloud.ErrDefault408{ErrUnexpectedResponseCode: *err}
 	case 409:
 		newError = &gophercloud.ErrDefault409{ErrUnexpectedResponseCode: *err}
+	case 425: // to early, mapped to 429
+		newError = &gophercloud.ErrDefault429{ErrUnexpectedResponseCode: *err}
 	case 429:
 		newError = &gophercloud.ErrDefault429{ErrUnexpectedResponseCode: *err}
 	case 500:
 		newError = &gophercloud.ErrDefault500{ErrUnexpectedResponseCode: *err}
 	case 503:
+		newError = &gophercloud.ErrDefault503{ErrUnexpectedResponseCode: *err}
+	case 504: // Map also 504 to 503
 		newError = &gophercloud.ErrDefault503{ErrUnexpectedResponseCode: *err}
 	}
 
@@ -241,7 +252,7 @@ func qualifyGophercloudResponseCode(err *gophercloud.ErrUnexpectedResponseCode) 
 	return fail.NewError("unexpected response code: code: %d, reason: %s", err.Actual, string(err.Body))
 }
 
-// errorMeansServiceUnavailable tells of err contains "service unavailable" (lower/upper/mixed case)
+// errorMeansServiceUnavailable tells if err contains "service unavailable" (lower/upper/mixed case)
 func errorMeansServiceUnavailable(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "service unavailable")
 }

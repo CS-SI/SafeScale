@@ -41,12 +41,17 @@ type stack struct {
 }
 
 // NullStack is not exposed through API, is needed essentially by testss
-func NullStack() *stack { //nolint
+func NullStack() *stack { // nolint
 	return &stack{}
 }
 
 func (s *stack) IsNull() bool {
 	return s == nil || s.ComputeService == nil
+}
+
+// GetStackName returns the name of the stack
+func (s stack) GetStackName() string {
+	return "gcp"
 }
 
 // GetConfigurationOptions ...
@@ -66,7 +71,7 @@ func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
 }
 
 // New Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { //nolint
+func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	gcpStack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,

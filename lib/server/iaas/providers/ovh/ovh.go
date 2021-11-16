@@ -19,23 +19,26 @@ package ovh
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"github.com/asaskevich/govalidator"
-
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	filters "github.com/CS-SI/SafeScale/lib/server/resources/abstract/filters/templates"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+)
+
+const (
+	ovhDefaultImage = "Ubuntu 20.04"
 )
 
 type gpuCfg struct {
@@ -97,6 +100,8 @@ func (p *provider) IsNull() bool {
 // Build build a new instance of Ovh using configuration parameters
 // Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
+	var validInput bool
+
 	identityParams, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	// networkParams, _ := params["network"].(map[string]interface{})
@@ -110,15 +115,27 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		zone = "nova"
 	}
 
-	projectName, _ := compute["ProjectName"].(string)
+	projectName, validInput := compute["ProjectName"].(string)
+	if !validInput {
+		return nil, fail.NewError("Invalid input for 'ProjectName'")
+	}
 
-	val1, ok1 := identityParams["AlternateApiConsumerKey"]
+	val1, ok1 := identityParams["AlternateApiApplicationKey"]
 	val2, ok2 := identityParams["AlternateApiApplicationSecret"]
 	val3, ok3 := identityParams["AlternateApiConsumerKey"]
 	if ok1 && ok2 && ok3 {
-		alternateAPIApplicationKey = val1.(string)
-		alternateAPIApplicationSecret = val2.(string)
-		alternateAPIConsumerKey = val3.(string)
+		alternateAPIApplicationKey, validInput = val1.(string)
+		if !validInput {
+			return nil, fail.NewError("Invalid input for 'AlternateApiApplicationKey'")
+		}
+		alternateAPIApplicationSecret, validInput = val2.(string)
+		if !validInput {
+			return nil, fail.NewError("Invalid input for 'AlternateApiApplicationSecret'")
+		}
+		alternateAPIConsumerKey, validInput = val3.(string)
+		if !validInput {
+			return nil, fail.NewError("Invalid input for 'AlternateApiConsumerKey'")
+		}
 	}
 
 	operatorUsername := abstract.DefaultUser
@@ -128,6 +145,16 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
 			operatorUsername = abstract.DefaultUser
 		}
+	}
+
+	defaultImage, ok := compute["DefaultImage"].(string)
+	if !ok {
+		defaultImage = ovhDefaultImage
+	}
+
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 
 	authOptions := stacks.AuthenticationOptions{
@@ -141,10 +168,10 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		AllowReauth:      true,
 	}
 
-	govalidator.TagMap["alphanumwithdashesandunderscores"] = govalidator.Validator(func(str string) bool {
+	govalidator.TagMap["alphanumwithdashesandunderscores"] = func(str string) bool {
 		rxp := regexp.MustCompile(stacks.AlphanumericWithDashesAndUnderscores)
 		return rxp.Match([]byte(str))
-	})
+	}
 
 	_, err := govalidator.ValidateStruct(authOptions)
 	if err != nil {
@@ -171,9 +198,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		OperatorUsername:         operatorUsername,
 		ProviderName:             providerName,
 		DefaultSecurityGroupName: "default",
+		DefaultImage:             defaultImage,
+		MaxLifeTime:              maxLifeTime,
 	}
 
-	serviceVersions := map[string]string{"volume": "v1"}
+	serviceVersions := map[string]string{"volume": "v2"}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, serviceVersions)
 	if xerr != nil {
@@ -184,6 +213,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		Stack:            stack,
 		tenantParameters: params,
 	}
+
 	return newP, nil
 }
 
@@ -224,6 +254,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }
@@ -336,6 +367,12 @@ func (p provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network,
 // GetName returns the name of the driver
 func (p provider) GetName() string {
 	return "ovh"
+}
+
+// GetStack returns the stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
 }
 
 func (p provider) GetTenantParameters() map[string]interface{} {

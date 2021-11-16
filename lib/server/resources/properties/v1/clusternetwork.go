@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterNetwork contains network information relative to cluster
@@ -35,6 +35,12 @@ type ClusterNetwork struct {
 
 func newClusterNetwork() *ClusterNetwork {
 	return &ClusterNetwork{}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (n *ClusterNetwork) IsNull() bool {
+	return n == nil || (n.NetworkID == "" && n.GatewayID == "")
 }
 
 // Clone ...

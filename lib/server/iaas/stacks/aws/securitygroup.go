@@ -57,7 +57,7 @@ func (s stack) ListSecurityGroups(networkID string) ([]*abstract.SecurityGroup, 
 
 // CreateSecurityGroup creates a security group
 // Note: parameter 'networkRef' is used in AWS, Security Groups scope is Network/VPC-wide.
-func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error) {
+func (s stack) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	nullSG := abstract.NewSecurityGroup()
 	if s.IsNull() {
 		return nullSG, fail.InvalidInstanceError()
@@ -81,9 +81,9 @@ func (s stack) CreateSecurityGroup(networkRef, name, description string, rules a
 	}
 
 	defer func() {
-		if xerr != nil {
+		if ferr != nil {
 			if derr := s.rpcDeleteSecurityGroup(resp); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Security Group '%s'", name))
 			}
 		}
 	}()
@@ -344,13 +344,15 @@ func (s stack) InspectSecurityGroupByName(networkRef, name string) (_ *abstract.
 
 	an, xerr := s.InspectNetwork(networkRef)
 	if xerr != nil {
-		switch xerr.(type) { //nolint
+		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			an, xerr = s.InspectNetworkByName(networkRef)
+			if xerr != nil {
+				return nullASG, xerr
+			}
+		default:
+			return nullASG, xerr
 		}
-	}
-	if xerr != nil {
-		return nullASG, xerr
 	}
 
 	resp, xerr := s.rpcDescribeSecurityGroupByName(aws.String(an.ID), aws.String(name))
@@ -495,8 +497,15 @@ func (s stack) deleteRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.I
 	}
 
 	if len(egress) > 0 {
-		if xerr := s.rpcRevokeSecurityGroupEgress(aws.String(asg.ID), egress); xerr != nil {
-			return fail.Wrap(xerr, "failed to delete egress rules from Security Group '%s'", asg.Name)
+		xerr := s.rpcRevokeSecurityGroupEgress(aws.String(asg.ID), egress)
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				// consider a missing rule(s) as a successful deletion
+				debug.IgnoreError(xerr)
+			default:
+				return fail.Wrap(xerr, "failed to delete egress rules from Security Group '%s'", asg.Name)
+			}
 		}
 	}
 

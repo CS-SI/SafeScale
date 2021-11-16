@@ -22,7 +22,8 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-
+	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"google.golang.org/api/compute/v1"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -256,6 +257,56 @@ func (s stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAt
 	}
 
 	return nil, abstract.ResourceNotFoundError("attachment", vaID)
+}
+
+func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+	if operation == "tags" {
+		// delete current nat route (is it really necessary ?)
+		routeName := params["subnetName"].(string) + "-nat-allowed"
+		xerr := s.rpcDeleteRoute(routeName) // FIXME: This is a problem, the stack shouln't export ANY method
+		if xerr != nil {
+			switch xerr.(type) {
+			case *fail.ErrNotFound:
+				break
+			default:
+				return xerr
+			}
+		}
+
+		// create new nat route
+		_, xerr = s.rpcCreateRoute(params["networkName"].(string), params["subnetID"].(string), params["subnetName"].(string)) // FIXME: This is a problem, the stack shouln't export ANY method
+		if xerr != nil {
+			return xerr
+		}
+
+		return nil
+	}
+
+	if operation == "removetag" {
+		subnetInstance := params["subnetInstance"].(resources.Subnet)
+		instance := params["instance"].(*operations.Host)
+
+		networkInstance, xerr := subnetInstance.InspectNetwork()
+		if xerr != nil {
+			return xerr
+		}
+
+		// remove old nat route tag
+		xerr = s.rpcRemoveTagsFromInstance(instance.GetID(), []string{"no-ip-" + subnetInstance.GetName()})
+		if xerr != nil {
+			return xerr
+		}
+
+		// add new nat route tag
+		xerr = s.rpcAddTagsToInstance(instance.GetID(), []string{fmt.Sprintf(NATRouteTagFormat, networkInstance.GetID())})
+		if xerr != nil {
+			return xerr
+		}
+
+		return nil
+	}
+
+	return nil
 }
 
 // DeleteVolumeAttachment ...

@@ -8,7 +8,7 @@ $ ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/maste
 ```
 
 ## Install go
-Should be at least `go` version 1.12; at the time this doc is written, it's 1.14.3.
+Should be at least `go` version 1.16; at the time this doc is written, it's 1.16.8.
 ```bash
 $ brew update
 $ brew install golang
@@ -31,7 +31,7 @@ $ export PATH=$PATH:$GOROOT/bin
 You may want to put these commands in ~/.bashrc or ~/.zshrc to keep them after logout/restart.
  
 ## Build
-```bash 
+```bash
 # Prepare directory
 $ mkdir -p ${GOPATH:-$HOME}/src/github.com/CS-SI
 
@@ -42,6 +42,8 @@ $ git clone https://github.com/CS-SI/SafeScale
 $ cd SafeScale
 $ git checkout -b develop -t origin/develop
 
+$ go mod tidy
+ 
 # Show help
 $ make
 

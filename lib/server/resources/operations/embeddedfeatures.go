@@ -18,7 +18,6 @@ package operations
 
 import (
 	"bytes"
-	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
 
@@ -44,15 +43,12 @@ var (
 	allEmbeddedFeatures          []*Feature
 )
 
-func getMD5Hash(text string) string {
-	hasher := md5.New()
-	hasher.Write([]byte(text))
-	return hex.EncodeToString(hasher.Sum(nil))
-}
-
 func getSHA256Hash(text string) string {
 	hasher := sha256.New()
-	hasher.Write([]byte(text))
+	_, err := hasher.Write([]byte(text))
+	if err != nil {
+		return ""
+	}
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
@@ -73,7 +69,7 @@ func loadSpecFile(name string) (string, *viper.Viper, error) {
 		return "", nil, fail.Wrap(err, "failed to read embedded feature specification file '%s'", name)
 	}
 
-	logrus.Debugf("loaded feature %s:SHA256:%s", name, getSHA256Hash(tmplString))
+	logrus.Tracef("loaded feature %s:SHA256:%s", name, getSHA256Hash(tmplString))
 
 	v := viper.New()
 	v.SetConfigType("yaml")
@@ -192,22 +188,6 @@ func certificateAuthorityFeature() *Feature {
 	}
 }
 
-// postgresql4platformFeature feature. ...
-func postgresql4platformFeature() *Feature {
-	name := "postgresql4platform"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
 // nVidiaDockerFeature ...
 func nVidiaDockerFeature() *Feature {
 	name := "nvidiadocker"
@@ -259,22 +239,6 @@ func helm2Feature() *Feature {
 // helm3Feature ...
 func helm3Feature() *Feature {
 	name := "helm3"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
-// sparkmaster4platformFeature ...
-func sparkmaster4platformFeature() *Feature {
-	name := "sparkmaster4platform"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
@@ -355,38 +319,6 @@ func postgres4gatewayFeature() *Feature {
 // edgeproxy4subnetFeature ...
 func edgeproxy4subnetFeature() *Feature {
 	name := "edgeproxy4subnet"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
-// keycloak4platformFeature ...
-func keycloak4platformFeature() *Feature {
-	name := "keycloak4platform"
-	filename, specs, err := loadSpecFile(name)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		panic(err.Error())
-	}
-	return &Feature{
-		displayName: name,
-		fileName:    filename,
-		embedded:    true,
-		specs:       specs,
-	}
-}
-
-// monitoring4platformFeature ...
-func monitoring4platformFeature() *Feature {
-	name := "monitoring4platform"
 	filename, specs, err := loadSpecFile(name)
 	err = debug.InjectPlannedError(err)
 	if err != nil {

@@ -29,6 +29,10 @@ func NewStructWithoutPointers() *StructWithoutPointers {
 	return &StructWithoutPointers{}
 }
 
+func (m *StructWithoutPointers) IsNull() bool {
+	return m == nil || (m.Content == "" && m.Rumba == 0)
+}
+
 func (m StructWithoutPointers) Clone() data.Clonable {
 	return NewStructWithoutPointers().Replace(&m)
 }
@@ -47,6 +51,10 @@ type StructWithPointersAndDefectiveReplace struct {
 
 func NewStructWithPointersAndDefectiveReplace() *StructWithPointersAndDefectiveReplace {
 	return &StructWithPointersAndDefectiveReplace{}
+}
+
+func (m *StructWithPointersAndDefectiveReplace) IsNull() bool {
+	return m == nil || (m.Content == "" && m.Rumba == 0 && len(m.List) == 0 && len(m.Map) == 0)
 }
 
 func (m StructWithPointersAndDefectiveReplace) Clone() data.Clonable {
@@ -69,6 +77,10 @@ type StructWithPointersAndCorrectReplace struct {
 
 func NewStructWithPointersAndCorrectReplace() *StructWithPointersAndCorrectReplace {
 	return &StructWithPointersAndCorrectReplace{}
+}
+
+func (m *StructWithPointersAndCorrectReplace) IsNull() bool {
+	return m == nil || (m.content == "" && m.Rumba == 0 && len(m.List) == 0 && len(m.Map) == 0)
 }
 
 func (m StructWithPointersAndCorrectReplace) Clone() data.Clonable {

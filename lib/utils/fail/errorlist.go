@@ -48,6 +48,9 @@ func (el ErrorList) ToGRPCStatus() error {
 
 // AddConsequence ...
 func (el *ErrorList) AddConsequence(err error) Error {
+	if el == err { // do nothing
+		return el
+	}
 	if el.IsNull() {
 		logrus.Errorf("invalid call of ErrorList.AddConsequence() from null instance")
 		return el
@@ -84,7 +87,7 @@ func (el *ErrorList) Error() string {
 	return r
 }
 
-// FIXME: All other errors MUST also override UnformattedError
+// UnformattedError returns Error() without any extra formatting applied
 func (el *ErrorList) UnformattedError() string {
 	return el.Error()
 }

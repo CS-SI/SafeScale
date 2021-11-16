@@ -48,15 +48,23 @@ func BuildMetadataBucketName(driver, region, domain, project string) (name strin
 	name = BucketNamePrefix + "-" + hashed
 
 	nameLen := len(name)
-	if suffix, ok := os.LookupEnv(suffixEnvName); ok {
+	if suffix, ok := os.LookupEnv(suffixEnvName); ok && suffix != "" {
 		name += "." + suffix
 		if len(name) > maxBucketNameLength {
-			return "", fail.OverflowError(nil, maxBucketNameLength, "suffix is too long, max allowed: %d characters", maxBucketNameLength-nameLen-1)
+			return "", fail.OverflowError(nil, maxBucketNameLength, "suffix '%s' is too long, max allowed: %d characters", suffix, maxBucketNameLength-nameLen-1)
 		}
+	}
+	if len(name) > maxBucketNameLength {
+		return "", fail.OverflowError(nil, maxBucketNameLength, "name '%s' is too long, max allowed: %d characters", name, maxBucketNameLength-1)
 	}
 
 	// FIXME: GCP, Remove specific driver code
 	if driver == "gcp" {
+		name = strings.Replace(name, ".", "-", -1)
+	}
+
+	// FIXME: AWS, Remove specific driver code
+	if driver == "aws" {
 		name = strings.Replace(name, ".", "-", -1)
 	}
 

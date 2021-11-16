@@ -19,7 +19,7 @@ package propertiesv2
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // HostNetworking contains network information related to IPAddress
@@ -46,6 +46,11 @@ func NewHostNetworking() *HostNetworking {
 		IPv4Addresses: map[string]string{},
 		IPv6Addresses: map[string]string{},
 	}
+}
+
+// IsNull tells if the HostNetworking corresponds to a null value
+func (hn *HostNetworking) IsNull() bool {
+	return hn == nil || hn.DefaultSubnetID == "" || (len(hn.IPv4Addresses) == 0 && len(hn.IPv6Addresses) == 0)
 }
 
 // Reset resets the content of the property

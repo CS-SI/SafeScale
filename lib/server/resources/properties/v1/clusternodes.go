@@ -19,7 +19,7 @@ package propertiesv1
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterNode ...
@@ -46,6 +46,12 @@ func newClusterNodes() *ClusterNodes {
 		PublicNodes:  []*ClusterNode{},
 		PrivateNodes: []*ClusterNode{},
 	}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (n *ClusterNodes) IsNull() bool {
+	return n == nil || (len(n.Masters) == 0 && len(n.PublicNodes) == 0 && len(n.PrivateNodes) == 0)
 }
 
 // Clone ... (data.Clonable interface)

@@ -17,9 +17,8 @@
 package openstack
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
-
 	"regexp"
+	"strconv"
 
 	"github.com/sirupsen/logrus"
 
@@ -29,10 +28,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/providers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+)
+
+const (
+	openstackDefaultImage = "Ubuntu 20.04"
 )
 
 // provider is the provider implementation of the openstack provider respecting api.Provider
@@ -81,6 +85,15 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		floatingIPPool = providerNetwork
 	}
 	defaultImage, _ := compute["DefaultImage"].(string)
+	if defaultImage == "" {
+		defaultImage = openstackDefaultImage
+	}
+
+	maxLifeTime := 0
+	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
+	}
+
 	dnsServers, _ := network["DNSServers"].([]string)
 	if len(dnsServers) == 0 {
 		dnsServers = []string{"8.8.8.8", "1.1.1.1"}
@@ -126,6 +139,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 			"standard":   volumespeed.Cold,
 			"performant": volumespeed.Hdd,
 		},
+		MaxLifeTime: maxLifeTime,
 	}
 
 	stack, xerr := openstack.New(authOptions, nil, cfgOptions, nil)
@@ -168,6 +182,7 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
 	cfg.Set("ProviderName", p.GetName())
 	cfg.Set("UseNATService", opts.UseNATService)
+	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
 	return cfg, nil
 }
@@ -193,6 +208,12 @@ func (p *provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 // GetName returns the providerName
 func (p *provider) GetName() string {
 	return "openstack"
+}
+
+// GetStack returns the stack object used by the provider
+// Note: use with caution, last resort option
+func (p provider) GetStack() api.Stack {
+	return p.Stack
 }
 
 // GetTenantParameters returns the tenant parameters as-is

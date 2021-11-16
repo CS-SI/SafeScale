@@ -156,10 +156,11 @@ func (pbc *PipeBridgeController) Start(task concurrency.Task) fail.Error {
 	}
 
 	// ... then starts the "pipe readers"
-	taskGroup, xerr := concurrency.NewTaskGroup(task)
+	taskGroup, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/pipebridges"))
 	if xerr != nil {
 		return xerr
 	}
+
 	for _, v := range pbc.bridges {
 		if _, xerr = taskGroup.Start(taskRead, taskReadParameters{bridge: v, ch: pbc.displayCh}); xerr != nil {
 			return xerr
@@ -186,8 +187,8 @@ type taskReadParameters struct {
 }
 
 // taskRead reads data from pipe and sends it to the goroutine in charge of displaying it on the right "file descriptor" (stdout or stderr)
-func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if task.Aborted() {
 		return nil, fail.AbortedError(nil, "aborted")
@@ -209,7 +210,7 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			xerr = fail.ConvertError(panicErr)
+			ferr = fail.ConvertError(panicErr)
 		}
 	}()
 	defer fail.OnPanic(&panicErr)
@@ -240,7 +241,7 @@ func taskRead(task concurrency.Task, p concurrency.TaskParameters) (_ concurrenc
 		if err == io.EOF {
 			err = nil
 		} else {
-			switch err.(type) { //nolint
+			switch err.(type) { // nolint
 			// case fail.ErrAborted, *os.PathError:
 			case *os.PathError:
 				err = nil
@@ -322,6 +323,7 @@ func (pbc *PipeBridgeController) Stop() fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrAborted:
 				// do nothing
+				debug.IgnoreError(xerr)
 			default:
 				return xerr
 			}

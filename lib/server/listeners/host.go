@@ -18,13 +18,9 @@ package listeners
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
-
-	"github.com/CS-SI/SafeScale/lib/server/resources"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
-	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
-	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
@@ -34,21 +30,27 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
+	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupstate"
 	hostfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/host"
 	securitygroupfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/securitygroup"
 	subnetfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/subnet"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations/converters"
+	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
 )
 
 // HostListener host service server grpc
-type HostListener struct{}
+type HostListener struct {
+	protocol.UnimplementedHostServiceServer
+}
 
 // StoredCPUInfo ...
 type StoredCPUInfo struct {
@@ -92,25 +94,28 @@ func (s *HostListener) Start(ctx context.Context, in *protocol.Reference) (empty
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host start")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/start", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(job.GetService(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
-	if xerr = rh.Start(task.GetContext()); xerr != nil {
+
+	defer hostInstance.Released()
+
+	xerr = hostInstance.Start(job.Context())
+	if xerr != nil {
 		return empty, xerr
 	}
 
@@ -139,26 +144,27 @@ func (s *HostListener) Stop(ctx context.Context, in *protocol.Reference) (empty 
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host stop")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/stop", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(job.GetService(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.Stop(task.GetContext()); xerr != nil {
+	defer hostInstance.Released()
+
+	if xerr = hostInstance.Stop(job.Context()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -185,26 +191,27 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host reboot")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host%s/reboot", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(job.GetService(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.Reboot(task.GetContext()); xerr != nil {
+	defer hostInstance.Released()
+
+	if xerr = hostInstance.Reboot(job.Context()); xerr != nil {
 		return empty, xerr
 	}
 
@@ -226,35 +233,34 @@ func (s *HostListener) List(ctx context.Context, in *protocol.HostListRequest) (
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host list")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/hosts/list")
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
 
 	all := in.GetAll()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%v)", all).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	// handler := handlers.NewHostHandler(job)
 	// hosts, xerr := handler.List(all)
-	hosts, xerr := hostfactory.List(task.GetContext(), job.GetService(), all)
+	hosts, xerr := hostfactory.List(job.Context(), job.Service(), all)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// build response mapping abstract.IPAddress to protocol.IPAddress
-	var pbhost []*protocol.Host
-	for _, host := range hosts {
-		pbhost = append(pbhost, converters.HostFullFromAbstractToProtocol(host))
+	pbhost := make([]*protocol.Host, len(hosts))
+	for k, host := range hosts {
+		pbhost[k] = converters.HostFullFromAbstractToProtocol(host)
 	}
-	rv := &protocol.HostList{Hosts: pbhost}
-	return rv, nil
+	out := &protocol.HostList{Hosts: pbhost}
+	return out, nil
 }
 
 // Create creates a new host
@@ -274,18 +280,17 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host create")
+	name := in.GetName()
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/create", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
 
-	name := in.GetName()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.home"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -301,7 +306,6 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	if sizing == nil {
 		sizing = &abstract.HostSizingRequirements{MinGPU: -1}
 	}
-	sizing.Image = in.GetImageId()
 
 	// Determine if the Subnet(s) to use exist
 	// Because of legacy, the subnet can be fully identified by network+subnet, or can be identified by network+network,
@@ -316,42 +320,55 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	}
 	if len(in.GetSubnets()) > 0 {
 		for _, v := range in.GetSubnets() {
-			subnetInstance, xerr = subnetfactory.Load(job.GetService(), networkRef, v)
+			subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, v)
 			if xerr != nil {
 				return nil, xerr
 			}
-			defer subnetInstance.Released()
 
-			xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-				as, ok := clonable.(*abstract.Subnet)
-				if !ok {
-					return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-				}
+			//goland:noinspection GoDeferInLoop
+			defer func(instance resources.Subnet) { // nolint
+				instance.Released()
+			}(subnetInstance)
 
-				subnets = append(subnets, as)
-				return nil
-			})
+			xerr = subnetInstance.Review(
+				func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+					as, ok := clonable.(*abstract.Subnet)
+					if !ok {
+						return fail.InconsistentError(
+							"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+						)
+					}
+
+					subnets = append(subnets, as)
+					return nil
+				},
+			)
 			if xerr != nil {
 				return nil, xerr
 			}
 		}
 	}
 	if len(subnets) == 0 && networkRef != "" {
-		subnetInstance, xerr = subnetfactory.Load(job.GetService(), networkRef, networkRef)
+		subnetInstance, xerr = subnetfactory.Load(job.Service(), networkRef, networkRef)
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		defer subnetInstance.Released()
 
-		xerr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
-			as, ok := clonable.(*abstract.Subnet)
-			if !ok {
-				return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+		xerr = subnetInstance.Review(
+			func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				as, ok := clonable.(*abstract.Subnet)
+				if !ok {
+					return fail.InconsistentError(
+						"'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
 
-			subnets = append(subnets, as)
-			return nil
-		})
+				subnets = append(subnets, as)
+				return nil
+			},
+		)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -372,16 +389,20 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		Single:        in.GetSingle(),
 		KeepOnFailure: in.GetKeepOnFailure(),
 		Subnets:       subnets,
+		ImageRef:      in.GetImageId(),
 	}
 
-	hostInstance, xerr := hostfactory.New(job.GetService())
+	hostInstance, xerr := hostfactory.New(job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	if _, xerr = hostInstance.Create(task.GetContext(), hostReq, *sizing); xerr != nil {
+	_, xerr = hostInstance.Create(job.Context(), hostReq, *sizing)
+	if xerr != nil {
 		return nil, xerr
 	}
+
+	defer hostInstance.Released()
 
 	// logrus.Infof("Host '%s' created", name)
 	return hostInstance.ToProtocol()
@@ -404,18 +425,17 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host resize")
+	name := in.GetName()
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/resize", name))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
 
-	name := in.GetName()
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "('%s')", name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -427,27 +447,35 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		MinCPUFreq:  in.GetCpuFreq(),
 	}
 
-	rh, xerr := hostfactory.Load(job.GetService(), name)
+	hostInstance, xerr := hostfactory.Load(job.Service(), name)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	reduce := false
-	xerr = rh.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
-			nhs, ok := clonable.(*propertiesv2.HostSizing)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+	defer hostInstance.Released()
 
-			reduce = reduce || (sizing.MinCores < nhs.RequestedSize.MinCores)
-			reduce = reduce || (sizing.MinRAMSize < nhs.RequestedSize.MinRAMSize)
-			reduce = reduce || (sizing.MinGPU < nhs.RequestedSize.MinGPU)
-			reduce = reduce || (sizing.MinCPUFreq < nhs.RequestedSize.MinCPUFreq)
-			reduce = reduce || (sizing.MinDiskSize < nhs.RequestedSize.MinDiskSize)
-			return nil
-		})
-	})
+	reduce := false
+	xerr = hostInstance.Inspect(
+		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Inspect(
+				hostproperty.SizingV2, func(clonable data.Clonable) fail.Error {
+					hostSizingV2, ok := clonable.(*propertiesv2.HostSizing)
+					if !ok {
+						return fail.InconsistentError(
+							"'*propertiesv1.HostSizing' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+						)
+					}
+
+					reduce = reduce || (sizing.MinCores < hostSizingV2.RequestedSize.MinCores)
+					reduce = reduce || (sizing.MinRAMSize < hostSizingV2.RequestedSize.MinRAMSize)
+					reduce = reduce || (sizing.MinGPU < hostSizingV2.RequestedSize.MinGPU)
+					reduce = reduce || (sizing.MinCPUFreq < hostSizingV2.RequestedSize.MinCPUFreq)
+					reduce = reduce || (sizing.MinDiskSize < hostSizingV2.RequestedSize.MinDiskSize)
+					return nil
+				},
+			)
+		},
+	)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -455,12 +483,12 @@ func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) 
 		logrus.Warn("Asking for less resource... is not going to happen")
 	}
 
-	if xerr = rh.Resize(task.GetContext(), sizing); xerr != nil {
+	if xerr = hostInstance.Resize(job.Context(), sizing); xerr != nil {
 		return nil, xerr
 	}
 
 	tracer.Trace("Host '%s' successfully resized", name)
-	return rh.ToProtocol()
+	return hostInstance.ToProtocol()
 }
 
 // Status returns the status of a host (running or stopped mainly)
@@ -480,7 +508,7 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	ref, refLabel := srvutils.GetReference(in)
@@ -488,18 +516,17 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		return nil, fail.InvalidRequestError("neither name nor id given as reference").ToGRPCStatus()
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "host state")
+	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/state", ref))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(job.GetService(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -509,10 +536,24 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 		}
 	}
 
-	return converters.HostStatusFromAbstractToProtocol(rh.GetName(), rh.GetState()), nil
+	defer hostInstance.Released()
+
+	// Data sync
+	xerr = hostInstance.Reload()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	// Gather host state from Cloud Provider
+	state, xerr := hostInstance.ForceGetState(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return converters.HostStatusFromAbstractToProtocol(hostInstance.GetName(), state), nil
 }
 
-// Inspect an host
+// Inspect a host
 func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect host")
@@ -529,7 +570,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	ref, refLabel := srvutils.GetReference(in)
@@ -537,18 +578,17 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host inspect")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/inspect", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(job.GetService(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
@@ -558,7 +598,13 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		}
 	}
 
-	return rh.ToProtocol()
+	defer hostInstance.Released()
+
+	_, xerr = hostInstance.ForceGetState(job.Context())
+	if xerr != nil {
+		return nil, xerr
+	}
+	return hostInstance.ToProtocol()
 }
 
 // Delete an host
@@ -579,7 +625,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	ref, refLabel := srvutils.GetReference(in)
@@ -587,23 +633,24 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 		return empty, status.Errorf(codes.FailedPrecondition, "neither name nor id given as reference")
 	}
 
-	job, err := PrepareJob(ctx, in.GetTenantId(), "host delete")
+	job, err := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/delete", ref))
 	if err != nil {
 		return nil, err
 	}
 	defer job.Close()
-	task := job.GetTask()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(job.GetService(), ref)
+	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.Delete(task.GetContext()); xerr != nil {
+	xerr = hostInstance.Delete(job.Context())
+	if xerr != nil {
+		hostInstance.Released()
 		return empty, xerr
 	}
 
@@ -611,7 +658,7 @@ func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empt
 	return empty, nil
 }
 
-// SSH returns ssh parameters to access an host
+// SSH returns ssh parameters to access a host
 func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *protocol.SshConfig, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot get host SSH information")
@@ -628,7 +675,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	ref, refLabel := srvutils.GetReference(in)
@@ -636,13 +683,13 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetTenantId(), "host ssh")
+	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/host/%s/sshconfig", ref))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
@@ -656,7 +703,7 @@ func (s *HostListener) SSH(ctx context.Context, in *protocol.Reference) (sc *pro
 	return converters.SSHConfigFromAbstractToProtocol(*sshConfig), nil
 }
 
-// BindSecurityGroup attaches a Security Group to an host
+// BindSecurityGroup attaches a Security Group to a host
 func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot bind Security Group to Host")
@@ -674,39 +721,44 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Host")
 	}
+
 	sgRef, sgRefLabel := srvutils.GetReference(in.GetGroup())
 	if hostRef == "" {
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host security-group bind")
+	job, xerr := PrepareJob(
+		ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/bind", hostRef, sgRef),
+	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(svc, hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	sg, xerr := securitygroupfactory.Load(svc, sgRef)
+	defer hostInstance.Released()
+
+	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
+
+	defer sgInstance.Released()
 
 	var enable resources.SecurityGroupActivation
 	switch in.GetState() {
@@ -716,13 +768,13 @@ func (s *HostListener) BindSecurityGroup(ctx context.Context, in *protocol.Secur
 		enable = resources.SecurityGroupEnable
 	}
 
-	if xerr = rh.BindSecurityGroup(task.GetContext(), sg, enable); xerr != nil {
+	if xerr = hostInstance.BindSecurityGroup(job.Context(), sgInstance, enable); xerr != nil {
 		return empty, xerr
 	}
 	return empty, nil
 }
 
-// UnbindSecurityGroup detaches a Security Group from an host
+// UnbindSecurityGroup detaches a Security Group from a host
 func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.SecurityGroupHostBindRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot unbind Security Group from Host")
@@ -740,7 +792,7 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -753,33 +805,33 @@ func (s *HostListener) UnbindSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetGroup().GetTenantId(), "host unbind-security-group")
+	job, xerr := PrepareJob(
+		ctx, in.GetGroup().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/unbind", hostRef, sgRef),
+	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(svc, hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	sg, xerr := securitygroupfactory.Load(svc, sgRef)
+	defer hostInstance.Released()
+
+	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.UnbindSecurityGroup(task.GetContext(), sg); xerr != nil {
-		return empty, xerr
-	}
+	defer sgInstance.Released()
 
-	return empty, nil
+	return empty, hostInstance.UnbindSecurityGroup(job.Context(), sgInstance)
 }
 
 // EnableSecurityGroup applies a Security Group already attached (if not already applied)
@@ -800,7 +852,7 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -813,29 +865,33 @@ func (s *HostListener) EnableSecurityGroup(ctx context.Context, in *protocol.Sec
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "host security-group enable")
+	job, xerr := PrepareJob(
+		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/enable", hostRef, sgRef),
+	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(svc, hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	sg, xerr := securitygroupfactory.Load(svc, sgRef)
+	defer hostInstance.Released()
+
+	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
 		return empty, xerr
 	}
 
-	if xerr = rh.EnableSecurityGroup(task.GetContext(), sg); xerr != nil {
+	defer sgInstance.Released()
+
+	if xerr = hostInstance.EnableSecurityGroup(job.Context(), sgInstance); xerr != nil {
 		return empty, xerr
 	}
 
@@ -860,7 +916,7 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -873,30 +929,55 @@ func (s *HostListener) DisableSecurityGroup(ctx context.Context, in *protocol.Se
 		return empty, fail.InvalidRequestError("neither name nor id given as reference of Security Group")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "host security-group enable")
+	job, xerr := PrepareJob(
+		ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroup/%s/disable", hostRef, sgRef),
+	)
 	if xerr != nil {
 		return empty, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(job.GetTask(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s, %s)", hostRefLabel, sgRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(svc, hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
-		return empty, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// considered as a success
+			debug.IgnoreError(xerr)
+			return empty, nil
+		default:
+			return empty, xerr
+		}
 	}
 
-	sg, xerr := securitygroupfactory.Load(svc, sgRef)
+	defer hostInstance.Released()
+
+	sgInstance, xerr := securitygroupfactory.Load(job.Service(), sgRef)
 	if xerr != nil {
-		return empty, xerr
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// considered as a success
+			debug.IgnoreError(xerr)
+			return empty, nil
+		default:
+			return empty, xerr
+		}
 	}
 
-	if xerr = rh.DisableSecurityGroup(task.GetContext(), sg); xerr != nil {
-		return empty, xerr
+	defer sgInstance.Released()
+
+	if xerr = hostInstance.DisableSecurityGroup(job.Context(), sgInstance); xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// considered as a success
+			debug.IgnoreError(xerr)
+			return empty, nil
+		default:
+			return empty, xerr
+		}
 	}
 
 	return empty, nil
@@ -919,7 +1000,7 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // FIXME: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
 	}
 
 	hostRef, hostRefLabel := srvutils.GetReference(in.GetHost())
@@ -927,29 +1008,28 @@ func (s *HostListener) ListSecurityGroups(ctx context.Context, in *protocol.Secu
 		return nil, fail.InvalidRequestError("neither name nor id given as reference of Host")
 	}
 
-	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), "host security-group list")
+	job, xerr := PrepareJob(ctx, in.GetHost().GetTenantId(), fmt.Sprintf("/host/%s/securitygroups/list", hostRef))
 	if xerr != nil {
 		return nil, xerr
 	}
 	defer job.Close()
-	task := job.GetTask()
-	svc := job.GetService()
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("listeners.host"), "(%s)", hostRefLabel).WithStopwatch().Entering()
+	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", hostRefLabel).WithStopwatch().Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	rh, xerr := hostfactory.Load(svc, hostRef)
+	hostInstance, xerr := hostfactory.Load(job.Service(), hostRef)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	bonds, xerr := rh.ListSecurityGroups(securitygroupstate.All)
+	defer hostInstance.Released()
+
+	bonds, xerr := hostInstance.ListSecurityGroups(securitygroupstate.All)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	resp := converters.SecurityGroupBondsFromPropertyToProtocol(bonds, "hosts")
-
 	return resp, nil
 }

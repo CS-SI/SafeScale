@@ -19,7 +19,7 @@ package propertiesv3
 import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterNode describes a node in the cluster
@@ -65,6 +65,12 @@ func newClusterNodes() *ClusterNodes {
 		ByNumericalID:     map[uint]*ClusterNode{},
 		GlobalLastIndex:   10, // Keep some places for special cases, like gateways NumericalID
 	}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (n *ClusterNodes) IsNull() bool {
+	return n == nil || (len(n.ByNumericalID) == 0 && n.GlobalLastIndex <= 10)
 }
 
 // Clone ...
@@ -120,5 +126,5 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.cluster", string(clusterproperty.NodesV3), newClusterNodes())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.NodesV3, newClusterNodes())
 }

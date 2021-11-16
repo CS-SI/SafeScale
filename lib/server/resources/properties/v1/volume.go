@@ -21,7 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumeproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // VolumeDescription contains additional information describing the volume, in V1
@@ -40,9 +40,9 @@ func NewVolumeDescription() *VolumeDescription {
 	return &VolumeDescription{}
 }
 
-// Content ...
-func (vd *VolumeDescription) Content() interface{} {
-	return vd
+// IsNull ...
+func (vd *VolumeDescription) IsNull() bool {
+	return vd == nil || (vd.Created.IsZero() && vd.Purpose == "")
 }
 
 // Clone ...
@@ -77,16 +77,10 @@ func NewVolumeAttachments() *VolumeAttachments {
 	}
 }
 
-// Reset resets the content of the property
-func (va *VolumeAttachments) Reset() {
-	*va = VolumeAttachments{
-		Hosts: map[string]string{},
-	}
-}
-
-// Content ... (data.Clonable interface)
-func (va *VolumeAttachments) Content() interface{} {
-	return va
+// IsNull ...
+// (data.Clonable interface)
+func (va *VolumeAttachments) IsNull() bool {
+	return va == nil || len(va.Hosts) == 0
 }
 
 // Clone ... (data.Clonable interface)
@@ -111,6 +105,6 @@ func (va *VolumeAttachments) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.volume", string(volumeproperty.DescriptionV1), NewVolumeDescription())
-	serialize.PropertyTypeRegistry.Register("resources.volume", string(volumeproperty.AttachedV1), NewVolumeAttachments())
+	serialize.PropertyTypeRegistry.Register("resources.volume", volumeproperty.DescriptionV1, NewVolumeDescription())
+	serialize.PropertyTypeRegistry.Register("resources.volume", volumeproperty.AttachedV1, NewVolumeAttachments())
 }

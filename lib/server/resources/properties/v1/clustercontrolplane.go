@@ -20,7 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
-	"github.com/CS-SI/SafeScale/lib/utils/serialize"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
 // ClusterControlplane contains information used by cluster control plane (when there is one)
@@ -33,6 +33,12 @@ type ClusterControlplane struct {
 
 func newClusterControlPlane() *ClusterControlplane {
 	return &ClusterControlplane{}
+}
+
+// IsNull ...
+// satisfies interface data.Clonable
+func (cp *ClusterControlplane) IsNull() bool {
+	return cp == nil || cp.VirtualIP.IsNull()
 }
 
 // Clone ...

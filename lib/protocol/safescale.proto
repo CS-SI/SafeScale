@@ -55,6 +55,8 @@ message TenantList {
 
 message TenantName {
 	string name = 1;
+	string bucket_name = 2;
+	string provider = 3;
 }
 
 message TenantCleanupRequest {
@@ -65,6 +67,7 @@ message TenantCleanupRequest {
 message TenantUpgradeRequest {
 	string name = 1;
 	bool force = 2;
+	bool dry_run = 3;
 }
 
 message TenantScanRequest {
@@ -359,14 +362,13 @@ message HostDefinition {
 }
 
 enum HostState {
-	HS_STOPPED = 0; 	// host is stopped
-	HS_STARTING = 1; 	// host is starting
-	HS_STARTED = 2; 	// host is started
-	HS_STOPPING = 3; 	// host is stopping
-	HS_ERROR = 4; 	    // host is in error state
+	HS_STOPPED = 0; 		// host is stopped
+	HS_STARTING = 1; 		// host is starting
+	HS_STARTED = 2; 		// host is started
+	HS_STOPPING = 3; 		// host is stopping
+	HS_ERROR = 4; 			// host is in error state
 	HS_TERMINATED = 5; 	// host is terminated (in AWS, it's like DELETED)
-	HS_UNKNOWN = 6; 	// status is unknown
-
+	HS_UNKNOWN = 6; 		// status is unknown
 }
 
 message Host {
@@ -384,11 +386,13 @@ message Host {
 	repeated string attached_volume_names = 12;
 	string password = 13;
 	int32 ssh_port = 14;
+	string state_label = 15;
+	string creation_date = 16;
 }
 
 message HostStatus {
 	string name = 1;
-	string status = 2;
+	HostState status = 2;
 }
 
 message HostList {
@@ -772,6 +776,7 @@ message ClusterResizeRequest {
 	string image_id = 4;
 	bool dry_run = 5;
 	string tenant_id = 6;
+	bool keep_on_failure = 7;
 }
 
 message ClusterDeleteRequest  {
@@ -827,6 +832,7 @@ message ClusterNetwork {
 	string endpoint_ip = 11;
 	//ClusterNetworkState network_state = 12;      // ???
 	// repeated Host gateways = 13; // To allow less limited number of gateways in the future ?
+	string subnet_id = 14;
 }
 
 message ClusterResponse {
@@ -866,10 +872,13 @@ service ClusterService {
 	rpc DeleteNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
 	rpc StopNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
 	rpc StartNode(ClusterNodeRequest) returns (google.protobuf.Empty){}
-	rpc StateNode(ClusterNodeRequest) returns (ClusterStateResponse){}
+	rpc StateNode(ClusterNodeRequest) returns (HostStatus){}
 	rpc ListMasters(Reference) returns (ClusterNodeListResponse){}
-	rpc FindAvailableMaster(Reference) returns (Host){}
 	rpc InspectMaster(ClusterNodeRequest) returns (Host){}
+	rpc StopMaster(ClusterNodeRequest) returns (google.protobuf.Empty){}
+	rpc StartMaster(ClusterNodeRequest) returns (google.protobuf.Empty){}
+	rpc StateMaster(ClusterNodeRequest) returns (HostStatus){}
+	rpc FindAvailableMaster(Reference) returns (Host){}
 }
 
 // Feature services
@@ -889,6 +898,8 @@ message FeatureListRequest {
 message FeatureResponse {
 	string name = 1;
 	string file_name = 3;
+	repeated string required_by = 4;
+	repeated string requires = 5;
 }
 
 message FeatureListResponse {
