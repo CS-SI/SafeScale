@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/metadatamaintenance/upgrade"
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -29,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
-	// "github.com/CS-SI/SafeScale/lib/server/resources/operations/metadataupgrade"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/metadatamaintenance/upgrade"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -304,7 +303,7 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 		}
 	}
 
-	xerr = upgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false, false)
+	xerr = metadataupgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
