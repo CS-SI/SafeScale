@@ -602,7 +602,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 			}
 		}
 		return nil
-	case clusterstate.Stopped:
+	case clusterstate.Stopped, clusterstate.Degraded:
 		// continue
 	default:
 		return fail.NotAvailableError("failed to start Cluster because of it's current state: %s", prevState.String())
@@ -631,7 +631,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 		gatewayID, secondaryGatewayID string
 	)
 
-	// Then start it and mark it as STARTED on success
+	// Then start it and mark it as NOMINAL on success
 	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		innerXErr := props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
@@ -767,25 +767,37 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 	}
 
 	if len(problems) > 0 {
-		return fail.NewErrorList(problems)
+		// Mark Cluster as state Degraded
+		xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+				stateV1, ok := clonable.(*propertiesv1.ClusterState)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				stateV1.State = clusterstate.Degraded
+				return nil
+			})
+		})
+		outerr := fail.NewErrorList(problems)
+		if xerr != nil {
+			_ = outerr.AddConsequence(xerr)
+		}
+		return outerr
 	}
 
-	return instance.Alter(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Alter(
-				clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-					stateV1, ok := clonable.(*propertiesv1.ClusterState)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-					stateV1.State = clusterstate.Nominal
-					return nil
-				},
-			)
-		},
-	)
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+			stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			if !ok {
+				return fail.InconsistentError(
+					"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+				)
+			}
+			stateV1.State = clusterstate.Nominal
+			return nil
+		})
+	})
 }
 
 // Stop stops the Cluster

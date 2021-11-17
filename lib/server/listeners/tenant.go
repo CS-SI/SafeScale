@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/operations/metadataupgrade"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations/metadatamaintenance/upgrade"
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -304,7 +304,7 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 		}
 	}
 
-	xerr = metadataupgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false, false)
+	xerr = upgrade.Upgrade(svc, currentVersion, operations.MinimumMetadataVersion, false, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

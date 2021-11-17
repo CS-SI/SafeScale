@@ -23,7 +23,9 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/networkproperty"
@@ -755,7 +757,170 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 
 	xerr = tv.upgradeClusterDefaultsPropertyIfNeeded(instance)
 	xerr = debug.InjectPlannedFail(xerr)
-	return xerr
+	if xerr != nil {
+		return xerr
+	}
+
+	if flavor, xerr := instance.GetFlavor(); xerr == nil && flavor == clusterflavor.K8S {
+		var (
+			featName string
+			feat     resources.Feature
+			requires map[string]struct{}
+		)
+		xerr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(clusterproperty.FeaturesV1, func(clonable data.Clonable) (innerXErr fail.Error) {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.Features' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				if len(featuresV1.Installed) == 0 {
+					featuresV1.Installed = make(map[string]*propertiesv1.ClusterInstalledFeature)
+				}
+				featName = "kubernetes"
+				feat, innerXErr = operations.NewFeature(instance.GetService(), featName)
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				requires, innerXErr = feat.GetRequirements()
+				if innerXErr != nil {
+					return innerXErr
+				}
+
+				featuresV1.Installed[featName] = &propertiesv1.ClusterInstalledFeature{
+					Name:     featName,
+					FileName: feat.GetFilename(),
+					Requires: requires,
+				}
+				return nil
+			})
+		})
+		if xerr != nil {
+			return xerr
+		}
+
+		// Now add reference to kubernetes in cluster hosts properties
+		masters, xerr := instance.ListMasterIDs(context.Background())
+		if xerr != nil {
+			return xerr
+		}
+		xerr = tv.addFeatureInProperties(feat, instance.GetService(), masters)
+		if xerr != nil {
+			return xerr
+		}
+
+		nodes, xerr := instance.ListNodeIDs(context.Background())
+		if xerr != nil {
+			return xerr
+		}
+		xerr = tv.addFeatureInProperties(feat, instance.GetService(), nodes)
+		if xerr != nil {
+			return xerr
+		}
+
+		netconf, xerr := instance.GetNetworkConfig()
+		if xerr != nil {
+			return xerr
+		}
+
+		gws := data.IndexedListOfStrings{}
+		if netconf.GatewayID != "" {
+			gws[0] = netconf.GatewayID
+		}
+		if netconf.SecondaryGatewayID != "" {
+			gws[1] = netconf.SecondaryGatewayID
+		}
+		if len(gws) > 0 {
+			xerr = tv.addFeatureInProperties(feat, instance.GetService(), gws)
+			if xerr != nil {
+				return xerr
+			}
+		}
+	}
+
+	// Fixed Cluster status if it's stuck to Starting (bug from v20.06?)
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+			stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if stateV1.State == clusterstate.Starting {
+				stateV1.State = clusterstate.Nominal
+				return nil
+			}
+
+			return fail.AlteredNothingError()
+		})
+	})
+}
+
+func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Service, hosts data.IndexedListOfStrings) fail.Error {
+	requires, xerr := feat.GetRequirements()
+	if xerr != nil {
+		return xerr
+	}
+	featName := feat.GetName()
+
+	requirementDependencies := make(map[string]map[string]struct{})
+	for name := range requires {
+		f, xerr := operations.NewFeature(svc, name)
+		if xerr != nil {
+			logrus.Error(xerr.Error())
+			continue
+		}
+
+		req, xerr := f.GetRequirements()
+		if xerr != nil {
+			logrus.Error(xerr.Error())
+			continue
+		}
+
+		requirementDependencies[name] = req
+	}
+
+	for _, id := range hosts {
+		host, xerr := operations.LoadHost(svc, id)
+		if xerr != nil {
+			return xerr
+		}
+		defer func(item resources.Host) { //nolint
+			item.Released()
+		}(host)
+
+		xerr = host.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+			return props.Alter(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.HostFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.HostFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+
+				if len(featuresV1.Installed) == 0 {
+					featuresV1.Installed = make(map[string]*propertiesv1.HostInstalledFeature)
+				}
+
+				// register feature and direct requirements in installed features for Host
+				featuresV1.Installed[featName] = &propertiesv1.HostInstalledFeature{
+					HostContext: false,
+					Requires:    requires,
+				}
+				for name, req := range requirementDependencies {
+					featuresV1.Installed[name] = &propertiesv1.HostInstalledFeature{
+						HostContext: false,
+						Requires:    req,
+					}
+				}
+				return nil
+			})
+		})
+		if xerr != nil {
+			return xerr
+		}
+	}
+
+	return nil
 }
 
 // upgradeClusterNodesPropertyIfNeeded upgrades current Nodes property to last Nodes property (currently NodesV2)
