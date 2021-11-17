@@ -1270,6 +1270,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 			if err != nil {
 				return err
 			}
+
 			if op != nil {
 				if op.HTTPStatusCode != 200 {
 					logrus.Tracef("received http error code %d", op.HTTPStatusCode)

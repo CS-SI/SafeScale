@@ -1026,16 +1026,16 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group inspect &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Get information about a <code>SecurityGroup</code><br><br>
+  <td>Get information about a <code>SecurityGroup</code><br><br>
       example:
-      <pre>$ safescale network security group inspect example_network safescale-sg_subnet_publicip.example_network.example_network</pre>
+      <pre>$ safescale network security group inspect example-net safescale-sg_subnet_publicip.example-net.example-net</pre>
       response on success:
       <pre>
 {
   "result": {
-    "description": "SG for hosts with public IP in Subnet vpl-cluster of Network vpl-cluster",
+    "description": "SG for hosts with public IP in Subnet example-net of Network example-net",
     "id": "d1eaabcd-765b-49e9-883a-2f34d273bec0",
-    "name": "safescale-sg_subnet_publicip.example_network.example_network"
+    "name": "safescale-sg_subnet_publicip.example-net.example-net"
   },
   "status": "success"
 }
@@ -1045,7 +1045,7 @@ The following actions are proposed:
 {
   "error": {
     "exitcode": 6,
-    "message": "cannot inspect security group: failed to find Security Group 'safescale-sg_subnet_publicip.example_network.example_network'"
+    "message": "cannot inspect security group: failed to find Security Group 'safescale-sg_subnet_publicip.example-net.example-net'"
   },
   "result": null,
   "status": "failure"
@@ -1057,7 +1057,7 @@ The following actions are proposed:
   <td valign="top"><code>safescale network security group delete &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
   <td>REVIEW_ME: Deletes a Security Group<br><br>
       example:
-      <pre>$ safescale network security group delete example_network sg-example-hosts</pre>
+      <pre>$ safescale network security group delete example-net sg-example-hosts</pre>
       response on success:
       <pre>
 {
@@ -1075,7 +1075,7 @@ The following actions are proposed:
   <td valign="top"><code>safescale network security group clear &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
   <td>REVIEW_ME: Removes rules from a Security Group<br><br>
       example:
-      <pre>$ safescale network security group clear example_network sg-example-hosts</pre>
+      <pre>$ safescale network security group clear example-net sg-example-hosts</pre>
       response on success:
       <pre>
 {
@@ -1093,7 +1093,7 @@ The following actions are proposed:
   <td valign="top"><code>safescale network security group bonds &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
   <td>REVIEW_ME: Lists Security Groups bonds<br><br>
       example:
-      <pre>$ safescale network security group bonds example_network sg-example-hosts</pre>
+      <pre>$ safescale network security group bonds example-net sg-example-hosts</pre>
       response on success:
       <pre>
 {"result":
@@ -1124,7 +1124,7 @@ The following actions are proposed:
         <li><code>--description &lt;text&gt;</code> Sets a description to the rule (optional)
       </ul>
       example:
-      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example_network sg-for-some-hosts</pre>
+      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example-net sg-for-some-hosts</pre>
       response on success:
       <pre>
 {
@@ -1158,7 +1158,7 @@ The following actions are proposed:
         </li>
       </ul>
       example:
-      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example_network sg-for-some-hosts</pre>
+      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example-net sg-for-some-hosts</pre>
       response on success:
       <pre>
 {
@@ -1176,7 +1176,7 @@ The following actions are proposed:
 </tbody>
 </table>
 
-Note: if <code>&lt;subnet_name_or_id&gt;</code> or <code>&lt;security_group_name_od_id&gt;</code> contain an ID, value can be empty string ("" or CHECK_THIS:`-`); the ID is sufficient to locate what resource is concerned.
+Note: if <code>&lt;subnet_name_or_id&gt;</code> or <code>&lt;security_group_name_or_id&gt;</code> contain an ID, value can be empty string ("" or `-`); the ID is sufficient to locate what resource is concerned.
 
 <br><br>
 

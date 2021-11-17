@@ -285,9 +285,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUD, xerr
 	}
 
-	// FIXME: if host is single, we need to create firewall rules for the net-safescale network. But should they be
-	//        created here, as they won't have associated metadata ?
-
 	// --- query provider for Host creation ---
 
 	logrus.Debugf("requesting host '%s' resource creation...", request.ResourceName)
@@ -296,10 +293,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
-			if ahf, innerXErr = s.buildGcpMachine(
-				request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1),
-				hostMustHavePublicIP, request.SecurityGroupIDs,
-			); innerXErr != nil {
+			ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs)
+			if innerXErr != nil {
 				captured := normalizeError(innerXErr)
 				switch captured.(type) {
 				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
@@ -421,10 +416,7 @@ func (s stack) buildGcpMachine(
 ) (*abstract.HostFull, fail.Error) {
 
 	nullAHF := abstract.NewHostFull()
-	resp, xerr := s.rpcCreateInstance(
-		instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata,
-		isPublic, securityGroups,
-	)
+	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata, isPublic, securityGroups)
 	if xerr != nil {
 		return nullAHF, xerr
 	}
