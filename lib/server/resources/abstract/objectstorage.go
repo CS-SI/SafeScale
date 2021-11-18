@@ -87,7 +87,7 @@ func (osb *ObjectStorageBucket) Serialize() ([]byte, fail.Error) {
 	return r, nil
 }
 
-// Deserialize reads json code and reinstantiates an ObjectStorageItem
+// Deserialize reads json code and instantiates an ObjectStorageItem
 func (osb *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 	if osb.IsNull() {
 		return fail.InvalidInstanceError()
@@ -96,7 +96,7 @@ func (osb *ObjectStorageBucket) Deserialize(buf []byte) (ferr fail.Error) {
 	var panicErr error
 	defer func() {
 		if panicErr != nil {
-			ferr = fail.ConvertError(panicErr) // If panic occured, transforms err to a fail.Error if needed
+			ferr = fail.ConvertError(panicErr) // If panic occurred, transforms err to a fail.Error if needed
 		}
 	}()
 	defer fail.OnPanic(&panicErr) // json.Unmarshal may panic

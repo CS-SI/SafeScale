@@ -1567,10 +1567,10 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 		}
 
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				derr := s.rpcReleaseAddress(addrAllocID)
 				if derr != nil {
-					_ = xerr.AddConsequence(
+					_ = ferr.AddConsequence(
 						fail.Wrap(
 							derr, "cleaning up on failure, failed to release Elastic IP %s", addrAllocID,
 						),
@@ -1586,10 +1586,10 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 		}
 
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				derr := s.rpcDisassociateAddress(attachID)
 				if derr != nil {
-					_ = xerr.AddConsequence(
+					_ = ferr.AddConsequence(
 						fail.Wrap(
 							derr, "cleaning up on failure, failed to detach Elastic IP from network interface",
 						),

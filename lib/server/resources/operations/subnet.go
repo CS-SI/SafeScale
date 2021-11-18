@@ -164,8 +164,8 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, xerr fail.Error) {
 }
 
 // LoadSubnet loads the metadata of a Subnet
-func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance *Subnet, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance *Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -179,6 +179,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		subnetID        string
 		networkInstance resources.Network
 	)
+	var xerr fail.Error
 	networkRef = strings.TrimSpace(networkRef)
 	switch networkRef {
 	case "":
@@ -281,8 +282,8 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		}
 		_ = cacheEntry.LockContent()
 		defer func() {
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil {
 				_ = cacheEntry.UnlockContent()
 			}
 		}()
@@ -1372,10 +1373,10 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 
 // unbindHostFromVIP unbinds a VIP from IPAddress
 // Actually does nothing in aws for now
-func (instance *Subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	xerr = instance.GetService().UnbindHostFromVIP(vip, host.GetID())
+	xerr := instance.GetService().UnbindHostFromVIP(vip, host.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "cleaning up on %s, failed to unbind gateway '%s' from VIP", ActionFromError(xerr), host.GetName())

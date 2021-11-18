@@ -115,9 +115,9 @@ func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup, xerr fail.Error) {
+func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup, ferr fail.Error) {
 	// Note: do not log error from here; caller has the responsibility to log if needed
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
@@ -153,8 +153,8 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
 	}()
@@ -196,7 +196,7 @@ func (instance *SecurityGroup) IsNull() bool {
 }
 
 // Carry overloads rv.core.Carry() to add Volume to service cache
-func (instance *SecurityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *SecurityGroup) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -223,10 +223,10 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
 	}()
@@ -401,10 +401,10 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	asg.Network = networkID
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := svc.DeleteSecurityGroup(asg); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(xerr), name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), name))
 			}
 		}
 	}()
@@ -417,13 +417,13 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			// Disable abort signal during clean up
 			defer task.DisarmAbortSignal()()
 
 			if derr := instance.MetadataCore.Delete(); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(xerr)))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
 			}
 		}
 	}()

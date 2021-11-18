@@ -268,7 +268,7 @@ func createFilters() []*ec2.Filter {
 		},
 	}
 
-	// FIXME: AWS CentOS AND Others, and HARCODED providers
+	// FIXME: AWS CentOS AND Others, and HARDCODED providers
 	owners := []*string{
 		aws.String("099720109477"), // Ubuntu
 		aws.String("013116697141"), // Fedora
@@ -635,11 +635,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
-		if xerr != nil && !request.KeepOnFailure { // FIXME: Handle error groups
+		if ferr != nil && !request.KeepOnFailure {
 			logrus.Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
 			if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
-				logrus.Warnf("Error deleting ahf: %v", derr)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
+				logrus.Warnf("Error deleting host in cleanup: %v", derr)
 			}
 		}
 	}()
@@ -714,7 +714,6 @@ func (s stack) buildAwsMachine(
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-// FIXME: see if anything is needed (does nothing for now)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
 }

@@ -169,15 +169,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 	}()
 
 	// FIXME: The reload problem
-	// VPL: I do not agree with this:
-	// This is NECESSARY, also, invalidates the whole purpose of Cache...
-	// in order to reduce the number of accesses to the provider, we actually increased it 300%, introduced locks, panics...
-	// Without this line, we have 0 accesses to the provider, and we get the WRONG result, this is
-	// we don't recover the CURRENT STATE of the provider, we recover OUR cached version of it, that might -and usually it is- out of date
-	// With the line (getting the right info from the provider), we end up doing 3 calls instead of 1...
-	// VPL: what state of Host would you like to be updated by Reload?
-	//      if you need the current Host status, you have Host.ForceGetState() that should update the metadata (but does not currently, I'm fixing this)
-	//      But it should no be done systematically inside LoadHost(). The call is the responsability of the user of the returned instance.
+	// VPL: what state of bucket would you like to be updated by Reload?
 	/*
 		xerr = hostInstance.Reload()
 		if xerr != nil {

@@ -127,7 +127,7 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(svc, name) },
 		temporal.GetMetadataTimeout(),
 	)
-	cacheEntry, xerr := clusterCache.Get(name, options...) // FIXME: It fails
+	cacheEntry, xerr := clusterCache.Get(name, options...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -3594,7 +3594,7 @@ func (instance *Cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 }
 
 // Shrink reduces cluster size by 'count' nodes
-func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertiesv3.ClusterNode, xerr fail.Error) {
+func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
 	emptySlice := make([]*propertiesv3.ClusterNode, 0)
 	if instance == nil || instance.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -3680,8 +3680,8 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			derr := instance.Alter(
 				func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 					return props.Alter(
@@ -3706,9 +3706,9 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 				},
 			)
 			if derr != nil {
-				_ = xerr.AddConsequence(
+				_ = ferr.AddConsequence(
 					fail.Wrap(
-						derr, "cleaning up on %s, failed to restore Cluster nodes metadata", ActionFromError(xerr),
+						derr, "cleaning up on %s, failed to restore Cluster nodes metadata", ActionFromError(ferr),
 					),
 				)
 			}

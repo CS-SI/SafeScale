@@ -703,11 +703,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				derr := s.DeleteFloatingIP(fip.ID)
 				if derr != nil {
 					logrus.Errorf("Error deleting Floating IP: %v", derr)
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 				}
 			}
 		}()

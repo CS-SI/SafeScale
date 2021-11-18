@@ -146,7 +146,8 @@ func (o *object) reloadFromItem(item stow.Item) fail.Error {
 }
 
 // Read reads the content of the object from Object Storage and writes it in 'target'
-func (o *object) Read(target io.Writer, from, to int64) fail.Error {
+func (o *object) Read(target io.Writer, from, to int64) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	if o.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -190,7 +191,10 @@ func (o *object) Read(target io.Writer, from, to int64) fail.Error {
 	}
 	defer func() {
 		if clerr := source.Close(); clerr != nil {
-			logrus.Error("error closing item")
+			if ferr != nil {
+				_ = ferr.AddConsequence(clerr)
+			}
+			logrus.Warningf("error closing item")
 		}
 	}()
 

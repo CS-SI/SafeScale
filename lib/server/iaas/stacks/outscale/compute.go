@@ -804,8 +804,10 @@ func (s stack) addPublicIPs(primaryNIC osc.Nic, otherNICs []osc.Nic) (osc.Public
 	return ip, nil
 }
 
-// CreateHost creates an host that fulfils the request
-func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, xerr fail.Error) {
+// CreateHost creates a host that fulfils the request
+func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	nullAHF := abstract.NewHostFull()
 	nullUDC := userdata.NewContent()
 	if s.IsNull() {
@@ -853,9 +855,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
-	defer func() { // FIXME: This should trigger a failure
+	defer func() {
 		if derr := s.DeleteKeyPair(creationKeyPair.Name); derr != nil {
 			logrus.Errorf("Cleaning up on failure, failed to delete creation keypair: %v", derr)
+			if ferr != nil {
+				_ = ferr.AddConsequence(derr)
+			}
 		}
 	}()
 

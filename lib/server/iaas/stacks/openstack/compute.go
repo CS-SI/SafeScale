@@ -858,11 +858,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				logrus.Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
 				if derr := s.rpcDeleteFloatingIP(ip.ID); derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 					logrus.Error(derr.Error())
 					return
 				}

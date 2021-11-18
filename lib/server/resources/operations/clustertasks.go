@@ -689,7 +689,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		}
 
 		defer func() {
-			if xerr != nil && !req.KeepOnFailure {
+			if ferr != nil && !req.KeepOnFailure {
 				// Using context.Background() here disables abort
 				if derr := networkInstance.Delete(context.Background()); derr != nil {
 					switch derr.(type) {
@@ -697,7 +697,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 						// missing Network is considered as a successful deletion, continue
 						debug.IgnoreError(derr)
 					default:
-						_ = xerr.AddConsequence(derr)
+						_ = ferr.AddConsequence(derr)
 					}
 				}
 			}
@@ -2846,9 +2846,9 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			ferr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
 		}
 	}()
 

@@ -253,7 +253,7 @@ func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 	return providers.Capabilities{
 		PublicVirtualIP: false,
-		// TODO: not tested, corresponding code inside stack is commented
+		// FIXME: not tested, corresponding code inside stack is commented
 		// PrivateVirtualIP: true,
 		PrivateVirtualIP: false,
 		Layer3Networking: false,
@@ -292,7 +292,6 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) 
 	return out, nil
 }
 
-// TODO: init when finished
 func init() {
 	iaas.Register("outscale", &provider{})
 }

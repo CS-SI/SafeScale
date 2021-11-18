@@ -304,7 +304,7 @@ func (hc *HostCore) Serialize() ([]byte, fail.Error) {
 	return r, nil
 }
 
-// Deserialize reads json code and reinstantiates an IPAddress
+// Deserialize reads json code and instantiates an IPAddress
 func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 	if hc == nil {
 		return fail.InvalidInstanceError()

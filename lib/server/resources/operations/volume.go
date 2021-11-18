@@ -86,8 +86,8 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return VolumeNullValue(), fail.InvalidParameterCannotBeNilError("svc")
@@ -123,8 +123,8 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
 	}()
@@ -162,7 +162,7 @@ func (instance *volume) IsNull() bool {
 }
 
 // carry overloads rv.core.Carry() to add Volume to service cache
-func (instance *volume) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -189,10 +189,10 @@ func (instance *volume) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
 	}()
@@ -420,8 +420,8 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 }
 
 // Create a volume
-func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
@@ -514,10 +514,10 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 
 	// Starting from here, remove volume if exiting with error
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := svc.DeleteVolume(av.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", ActionFromError(xerr), req.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", ActionFromError(ferr), req.Name))
 			}
 		}
 	}()
@@ -531,8 +531,8 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 }
 
 // Attach a volume to an host
-func (instance *volume) Attach(ctx context.Context, host resources.Host, path, format string, doNotFormat bool) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) Attach(ctx context.Context, host resources.Host, path, format string, doNotFormat bool) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -714,10 +714,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 	// Starting from here, remove volume attachment if exiting with error
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := svc.DeleteVolumeAttachment(targetID, vaID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(xerr), volumeName, targetName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 			}
 		}
 	}()
@@ -823,7 +823,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 		defer func() {
 			if innerXErr != nil {
-				// Disable abort signal during the clean up
+				// Disable abort signal during the cleanup
 				defer task.DisarmAbortSignal()()
 
 				if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
@@ -832,7 +832,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			}
 		}()
 
-		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -848,6 +848,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 			return nil
 		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -855,10 +859,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(xerr), volumeName, targetName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 			}
 			derr := host.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
@@ -888,7 +892,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to update metadata of host '%s'", ActionFromError(xerr), targetName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to update metadata of host '%s'", ActionFromError(ferr), targetName))
 			}
 		}
 	}()

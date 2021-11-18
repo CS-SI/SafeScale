@@ -144,8 +144,8 @@ func NewShare(svc iaas.Service) (resources.Share, fail.Error) {
 //        If error is fail.ErrNotFound return this error
 //        In case of any other error, abort the retry to propagate the error
 //        If retry times out, return fail.ErrTimeout
-func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return ShareNullValue(), fail.InvalidParameterCannotBeNilError("svc")
@@ -181,8 +181,8 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, xerr fail.Erro
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
 	}()
@@ -220,7 +220,7 @@ func (instance *Share) IsNull() bool {
 }
 
 // carry creates metadata and add Volume to service cache
-func (instance *Share) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -247,10 +247,10 @@ func (instance *Share) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 
 		}
@@ -337,9 +337,8 @@ func (instance *Share) Create(
 	server resources.Host, path string,
 	options string,
 	/*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool,*/
-) (xerr fail.Error) {
-
-	defer fail.OnPanic(&xerr)
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
@@ -510,13 +509,13 @@ func (instance *Share) Create(
 
 	// Starting from here, remove Share from host if exiting with error
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			// Disable abort signal during clean up
 			defer task.DisarmAbortSignal()()
 
 			if derr := nfsServer.RemoveShare(ctx, sharePath); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Share '%s' from Host", sharePath))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to remove Share '%s' from Host", sharePath))
 			}
 		}
 	}()
@@ -554,8 +553,8 @@ func (instance *Share) Create(
 
 	// Starting from here, delete Share reference in server if exiting with error
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			derr := server.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					serverSharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -570,7 +569,7 @@ func (instance *Share) Create(
 			})
 			if derr != nil {
 				logrus.Errorf("After failure, cleanup failed to update metadata of host '%s'", server.GetName())
-				_ = xerr.AddConsequence(derr)
+				_ = ferr.AddConsequence(derr)
 			}
 		}
 	}()
@@ -628,8 +627,8 @@ func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 
 // Mount mounts a Share on a local directory of an host
 // returns a clone of the propertiesv1.HostRemoteMount created on success
-func (instance *Share) Mount(ctx context.Context, target resources.Host, path string, withCache bool) (_ *propertiesv1.HostRemoteMount, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Share) Mount(ctx context.Context, target resources.Host, path string, withCache bool) (_ *propertiesv1.HostRemoteMount, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
@@ -834,8 +833,8 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 
 	// Starting from here, remove Share mount from server Share when exiting with error
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			derr := rhServer.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
 					hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
@@ -855,7 +854,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 				}
 			}
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Share"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Share"))
 			}
 		}
 	}()
