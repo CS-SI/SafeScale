@@ -19,6 +19,7 @@ package resources
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
@@ -32,6 +33,7 @@ type Bucket interface {
 	cache.Cacheable
 	observer.Observable
 
+	Browse(ctx context.Context, callback func(bucket *abstract.ObjectStorageBucket) fail.Error) fail.Error
 	GetHost(ctx context.Context) (string, fail.Error)
 	GetMountPoint(ctx context.Context) (string, fail.Error)
 	Create(ctx context.Context, name string) fail.Error

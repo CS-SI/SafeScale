@@ -53,12 +53,12 @@ var VolumeCommand = &cli.Command{
 var volumeList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available volumes",
+	Usage:   "List available volumes",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:    "all",
 			Aliases: []string{"a"},
-			Usage:   "ErrorList all Volumes on tenant (not only those created by SafeScale)",
+			Usage:   "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())

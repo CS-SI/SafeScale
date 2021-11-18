@@ -21,8 +21,6 @@ import (
 	"sync"
 	"time"
 
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/utils"
 	clitools "github.com/CS-SI/SafeScale/lib/utils/cli"
@@ -35,7 +33,7 @@ type bucket struct {
 }
 
 // List ...
-func (c bucket) List(timeout time.Duration) (*protocol.BucketList, error) {
+func (c bucket) List(all bool, timeout time.Duration) (*protocol.BucketListResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
@@ -44,7 +42,7 @@ func (c bucket) List(timeout time.Duration) (*protocol.BucketList, error) {
 		return nil, xerr
 	}
 
-	r, err := service.List(ctx, &googleprotobuf.Empty{})
+	r, err := service.List(ctx, &protocol.BucketListRequest{All: all})
 	if err != nil {
 		return nil, err
 	}

@@ -144,13 +144,14 @@ var hostReboot = &cli.Command{
 var hostList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available hosts (created by SafeScale)",
+	Usage:   "List available hosts (created by SafeScale)",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:    "all",
 			Aliases: []string{"a"},
-			Usage:   "ErrorList all hosts on tenant (not only those created by SafeScale)",
-		}},
+			Usage:   "List all hosts on tenant (not only those created by SafeScale)",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 

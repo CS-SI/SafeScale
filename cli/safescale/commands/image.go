@@ -42,11 +42,11 @@ var ImageCommand = &cli.Command{
 var imageList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available images",
+	Usage:   "List available images",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:  "all",
-			Usage: "ErrorList all available images in tenant (without any filter)",
+			Usage: "List all available images in tenant (without any filter)",
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", imageCmdName, c.Command.Name, c.Args())

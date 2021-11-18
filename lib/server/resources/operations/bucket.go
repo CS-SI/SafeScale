@@ -23,8 +23,10 @@ import (
 	"context"
 	"reflect"
 	"regexp"
+	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
@@ -73,7 +75,7 @@ func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	return instance, nil
 }
 
-// LoadBucket instanciates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
+// LoadBucket instantiates a bucket struct and fill it with Provider metadata of Object Storage ObjectStorageBucket
 func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -88,21 +90,11 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 		return nil, xerr
 	}
 
-	options := []data.ImmutableKeyValue{
-		data.NewImmutableKeyValue("onMiss", func() (cache.Cacheable, fail.Error) {
-			b, innerXErr := NewBucket(svc)
-			if innerXErr != nil {
-				return nil, innerXErr
-			}
-
-			// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
-			if innerXErr = b.Read(name); innerXErr != nil {
-				return nil, innerXErr
-			}
-			return b, nil
-		}),
-	}
-	cacheEntry, xerr := bucketCache.Get(name, options...)
+	cacheOptions := iaas.CacheMissOption(
+		func() (cache.Cacheable, fail.Error) { return onBucketCacheMiss(svc, name) },
+		temporal.GetMetadataTimeout(),
+	)
+	cacheEntry, xerr := bucketCache.Get(name, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -119,16 +111,21 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 	}
 	_ = cacheEntry.LockContent()
 
-	// FIXME: The reload problem
-	// VPL: what state of bucket would you like to be updated by Reload?
-	/*
-		xerr = b.Reload()
-		if xerr != nil {
-			return nil, xerr
-		}
-	*/
-
 	return b, nil
+}
+
+func onBucketCacheMiss(svc iaas.Service, ref string) (cache.Cacheable, fail.Error) {
+	bucketInstance, innerXErr := NewBucket(svc)
+	if innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	// TODO: core.ReadByID() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement by rclone)
+	if innerXErr = bucketInstance.Read(ref); innerXErr != nil {
+		return nil, innerXErr
+	}
+
+	return bucketInstance, nil
 }
 
 // IsNull tells if the instance corresponds to null value
@@ -188,6 +185,61 @@ func (instance *bucket) carry(clonable data.Clonable) (xerr fail.Error) {
 	cacheEntry.LockContent()
 
 	return nil
+}
+
+// Browse walks through Bucket metadata folder and executes a callback for each entries
+func (instance *bucket) Browse(ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error) (outerr fail.Error) {
+	defer fail.OnPanic(&outerr)
+
+	// Note: Do not test with Isnull here, as Browse may be used from null value
+	if instance == nil {
+		return fail.InvalidInstanceError()
+	}
+	if ctx == nil {
+		return fail.InvalidParameterCannotBeNilError("ctx")
+	}
+	if callback == nil {
+		return fail.InvalidParameterCannotBeNilError("callback")
+	}
+
+	task, xerr := concurrency.TaskFromContext(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotAvailable:
+			task, xerr = concurrency.VoidTask()
+			if xerr != nil {
+				return xerr
+			}
+		default:
+			return xerr
+		}
+	}
+
+	if task.Aborted() {
+		return fail.AbortedError(nil, "aborted")
+	}
+
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.bucket")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	return instance.MetadataCore.BrowseFolder(
+		func(buf []byte) (innerXErr fail.Error) {
+			if task.Aborted() {
+				return fail.AbortedError(nil, "aborted")
+			}
+
+			ab := abstract.NewObjectStorageBucket()
+			if innerXErr = ab.Deserialize(buf); innerXErr != nil {
+				return innerXErr
+			}
+
+			return callback(ab)
+		},
+	)
 }
 
 // GetHost ...
@@ -331,10 +383,38 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	ab, xerr := instance.GetService().InspectBucket(name)
+	svc := instance.GetService()
+
+	// -- check if bucket already exist in SafeScale
+	bucketInstance, xerr := LoadBucket(svc, name)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// no bucket with this name managed by SafeScale, continue
+			debug.IgnoreError(xerr)
+			break
+		default:
+			return xerr
+		}
+	}
+	if bucketInstance != nil {
+		bucketInstance.Released()
+		return abstract.ResourceDuplicateError("bucket", name)
+	}
+
+	// -- check if bucket already exist on provider side
+	ab, xerr := svc.InspectBucket(name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
+			break
+		default:
+			if strings.Contains(xerr.Error(), "not found") {
+				debug.IgnoreError(xerr)
+				break
+			}
 			return xerr
 		}
 	}
@@ -342,12 +422,14 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		return abstract.ResourceDuplicateError("bucket", name)
 	}
 
-	ab, xerr = instance.GetService().CreateBucket(name)
+	// -- create bucket
+	ab, xerr = svc.CreateBucket(name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
+	// -- write metadata
 	return instance.carry(&ab)
 }
 
@@ -378,7 +460,17 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.GetService().DeleteBucket(instance.GetName())
+	// -- delete Bucket
+	xerr = instance.GetService().DeleteBucket(instance.GetName())
+	if xerr != nil {
+		if strings.Contains(xerr.Error(), "not found") {
+			return fail.NotFoundError("failed to find Bucket '%s'", instance.GetName())
+		}
+		return xerr
+	}
+
+	// -- delete metadata
+	return instance.MetadataCore.Delete()
 }
 
 // Mount a bucket on an host on the given mount point
@@ -422,7 +514,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 	defer instance.lock.Unlock()
 
 	// Get Host data
-	rh, xerr := LoadHost(instance.GetService(), hostName)
+	hostInstance, xerr := LoadHost(instance.GetService(), hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
@@ -434,7 +526,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 		mountPoint = abstract.DefaultBucketMountPoint + instance.GetName()
 	}
 
-	authOpts, _ := instance.GetService().GetAuthenticationOptions()
+	svc := instance.GetService()
+	authOpts, _ := svc.GetAuthenticationOptions()
 	authurlCfg, _ := authOpts.Config("AuthUrl")
 	authurl := authurlCfg.(string)
 	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
@@ -447,9 +540,12 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 	regionCfg, _ := authOpts.Config("Region")
 	region := regionCfg.(string)
 
-	objStorageProtocol := instance.GetService().ObjectStorageProtocol()
+	objStorageProtocol := svc.ObjectStorageProtocol()
 	if objStorageProtocol == "swift" {
 		objStorageProtocol = "swiftks"
+	}
+	if objStorageProtocol == "google" {
+		objStorageProtocol = "gs"
 	}
 
 	d := struct {
@@ -472,7 +568,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 		Protocol:   objStorageProtocol,
 	}
 
-	err := instance.exec(ctx, rh, "mount_object_storage.sh", d)
+	err := instance.exec(ctx, hostInstance, "mount_object_storage.sh", d)
 	return fail.ConvertError(err)
 }
 
@@ -513,15 +609,20 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	// Check bucket existence
-	_, xerr = instance.GetService().InspectBucket(instance.GetName())
+	svc := instance.GetService()
+
+	// -- Check bucket existence
+	_, xerr = svc.InspectBucket(instance.GetName())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
+		if strings.Contains(xerr.Error(), "not found") {
+			return fail.NotFoundError("failed to find Bucket '%s'", instance.GetName())
+		}
 		return xerr
 	}
 
 	// Get Host
-	rh, xerr := LoadHost(instance.GetService(), hostName)
+	hostInstance, xerr := LoadHost(svc, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -533,7 +634,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 		Bucket: instance.GetName(),
 	}
 
-	err := instance.exec(ctx, rh, "umount_object_storage.sh", dataBu)
+	err := instance.exec(ctx, hostInstance, "umount_object_storage.sh", dataBu)
 	return fail.ConvertError(err)
 }
 
@@ -545,7 +646,7 @@ func (instance *bucket) exec(ctx context.Context, host resources.Host, script st
 		return xerr
 	}
 
-	rc, stdout, stderr, rerr := host.Run(ctx, `sudo `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	rc, stdout, stderr, rerr := host.Run(ctx, `sudo bash `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if rerr != nil {
 		return xerr
 	}

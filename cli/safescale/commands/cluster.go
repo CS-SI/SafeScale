@@ -84,7 +84,7 @@ var ClusterCommand = &cli.Command{
 var clusterListCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available clusters",
+	Usage:   "List available clusters",
 
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())

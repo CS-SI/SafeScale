@@ -47,7 +47,14 @@ var BucketCommand = &cli.Command{
 var bucketList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList buckets",
+	Usage:   "List buckets",
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "all",
+			Aliases: []string{"a"},
+			Usage:   "List all Buckets on tenant (not only those created by SafeScale)",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 
@@ -56,7 +63,7 @@ var bucketList = &cli.Command{
 			return clitools.FailureResponse(xerr)
 		}
 
-		resp, err := clientSession.Bucket.List(0)
+		resp, err := clientSession.Bucket.List(c.Bool("all"), 0)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of buckets", false).Error())))
@@ -69,12 +76,12 @@ var bucketCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
 	Usage:     "Creates a bucket",
-	ArgsUsage: "<Bucket_name>",
+	ArgsUsage: "BUCKET_NAME",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
 		}
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -95,12 +102,12 @@ var bucketDelete = &cli.Command{
 	Name:      "delete",
 	Aliases:   []string{"remove", "rm"},
 	Usage:     "Remove a bucket",
-	ArgsUsage: "<Bucket_name> [<Bucket_name>...]",
+	ArgsUsage: "BUCKET_NAME [BUCKET_NAME...]",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
 		}
 
 		var bucketList []string
@@ -125,12 +132,12 @@ var bucketInspect = &cli.Command{
 	Name:      "inspect",
 	Aliases:   []string{"show", "detail"},
 	Usage:     "Inspect a bucket",
-	ArgsUsage: "<Bucket_name>",
+	ArgsUsage: "BUCKET_NAME",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name>."))
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME."))
 		}
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -150,7 +157,7 @@ var bucketInspect = &cli.Command{
 var bucketMount = &cli.Command{
 	Name:      "mount",
 	Usage:     "Mount a bucket on the filesystem of an host",
-	ArgsUsage: "<Bucket_name> <Host_name>",
+	ArgsUsage: "BUCKET_NAME HOST_REF",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "path",
@@ -160,9 +167,14 @@ var bucketMount = &cli.Command{
 	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() != 2 {
+		switch c.NArg() {
+		case 0:
 			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
+		default:
 		}
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -182,13 +194,18 @@ var bucketMount = &cli.Command{
 var bucketUnmount = &cli.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
-	Usage:     "Unmount a bucket from the filesystem of an host",
-	ArgsUsage: "<Bucket_name> <Host_name>",
+	Usage:     "Unmount a Bucket from the filesystem of an Host",
+	ArgsUsage: "BUCKET_NAME HOST_REF",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
-		if c.NArg() != 2 {
+		switch c.NArg() {
+		case 0:
 			_ = cli.ShowSubcommandHelp(c)
-			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <Bucket_name> and/or <Host_name>."))
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument BUCKET_NAME and HOST_REF."))
+		case 1:
+			_ = cli.ShowSubcommandHelp(c)
+			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument HOST_REF."))
+		default:
 		}
 
 		clientSession, xerr := client.New(c.String("server"))

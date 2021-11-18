@@ -168,7 +168,7 @@ var shareDelete = &cli.Command{
 var shareList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList all created shared",
+	Usage:   "List all created shared",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())
 

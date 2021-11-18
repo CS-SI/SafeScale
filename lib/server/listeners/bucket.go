@@ -40,15 +40,15 @@ import (
 // safescale bucket list
 // safescale bucket inspect C1
 
-// BucketListener is the bucket service grpc server
+// BucketListener is the bucket service gRPC server
 type BucketListener struct {
 	protocol.UnimplementedBucketServiceServer
 }
 
 // List available buckets
-func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl *protocol.BucketList, err error) {
+func (s *BucketListener) List(ctx context.Context, in *protocol.BucketListRequest) (bl *protocol.BucketListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list buckets")
+	defer fail.OnExitWrapError(&err, "cannot list Buckets")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -73,12 +73,12 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	buckets, xerr := handler.List()
+	bucketList, xerr := handler.List(in.GetAll())
 	if err != nil {
 		return nil, xerr
 	}
 
-	return converters.BucketListFromAbstractToProtocol(buckets), nil
+	return converters.BucketListFromAbstractToProtocol(bucketList), nil
 }
 
 // Create a new bucket

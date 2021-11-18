@@ -32,13 +32,13 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// BucketListToProtocol convert a list of string into a *ContainerLsit
-func BucketListToProtocol(in []string) *protocol.BucketList {
+// BucketListToProtocol convert a list of string into a *protocol.BucketListResponse
+func BucketListToProtocol(in []string) *protocol.BucketListResponse {
 	var buckets []*protocol.Bucket
 	for _, name := range in {
 		buckets = append(buckets, &protocol.Bucket{Name: name})
 	}
-	return &protocol.BucketList{
+	return &protocol.BucketListResponse{
 		Buckets: buckets,
 	}
 }

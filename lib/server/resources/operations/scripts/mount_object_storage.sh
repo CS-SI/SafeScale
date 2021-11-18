@@ -15,18 +15,18 @@
 # limitations under the License.
 
 # Install s3ql
-# TODO move this installation in a dedicated go executable which will handle different linux flavors (apt, yum, ...)
+# FIXME: move this installation in a dedicated go executable which will handle different linux flavors (apt, yum, ...)
 apt-get update && apt-get install -y s3ql && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 mkdir -p /etc/s3ql
 
 # Create auth file
-cat <<- EOF > /etc/s3ql/auth.{{.Bucket}}
+cat <<- EOF >/etc/s3ql/auth.{{.Bucket}}
 [swift]
 backend-login: {{.Tenant}}:{{.Login}}
 backend-password: {{.Password}}
 storage-url: {{.Protocol}}://{{.AuthURL}}/{{.Region}}:{{.Bucket}}
-fs-passpharse: {{.Password}}
+fs-passphrase: {{.Password}}
 EOF
 
 chmod 0600 /etc/s3ql/auth.{{.Bucket}}
@@ -38,9 +38,9 @@ echo "{{.Password}}"| mkfs.s3ql --authfile /etc/s3ql/auth.{{.Bucket}} --quiet {{
 mkdir -p {{.MountPoint}}
 
 # Create script to mount container
-cat <<- FOE > /usr/local/bin/mount-{{.Bucket}}
+cat <<- FOE >/usr/local/bin/mount-{{.Bucket}}
 sudo /bin/bash << EOF
-echo "{{.Password}}" |mount.s3ql --allow-other --authfile /etc/s3ql/auth.{{.Bucket}} {{.Protocol}}://{{.AuthURL}}/{{.Region}}:{{.Bucket}} {{.MountPoint}}
+echo "{{.Password}}" | mount.s3ql --allow-other --authfile /etc/s3ql/auth.{{.Bucket}} {{.Protocol}}://{{.AuthURL}}/{{.Region}}:{{.Bucket}} {{.MountPoint}}
 EOF
 FOE
 chmod +x /usr/local/bin/mount-{{.Bucket}}
@@ -48,7 +48,7 @@ chmod +x /usr/local/bin/mount-{{.Bucket}}
 # Create script to umount container
 cat <<- FOE > /usr/local/bin/umount-{{.Bucket}}
 sudo /bin/bash << EOF
-echo "{{.Password}}" |umount.s3ql {{.MountPoint}}
+echo "{{.Password}}" | umount.s3ql {{.MountPoint}}
 EOF
 FOE
 chmod +x /usr/local/bin/umount-{{.Bucket}}

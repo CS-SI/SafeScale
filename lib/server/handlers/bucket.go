@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	bucketfactory "github.com/CS-SI/SafeScale/lib/server/resources/factories/bucket"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
@@ -30,7 +31,7 @@ import (
 
 // BucketHandler defines interface to manipulate buckets
 type BucketHandler interface {
-	List() ([]string, fail.Error)
+	List(bool) ([]string, fail.Error)
 	Create(string) fail.Error
 	Delete(string) fail.Error
 	Inspect(string) (resources.Bucket, fail.Error)
@@ -49,21 +50,35 @@ func NewBucketHandler(job server.Job) BucketHandler {
 }
 
 // List retrieves all available buckets
-func (handler *bucketHandler) List() (rv []string, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (handler *bucketHandler) List(all bool) (_ []string, outerr fail.Error) {
+	defer fail.OnPanic(&outerr)
 	if handler == nil {
 		return nil, fail.InvalidInstanceError()
 	}
 
 	tracer := debug.NewTracer(handler.job.Task(), true, "").WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&outerr, tracer.TraceMessage(""))
 
-	r, xerr := handler.job.Service().ListBuckets(objectstorage.RootPath)
+	if all {
+		return handler.job.Service().ListBuckets(objectstorage.RootPath)
+	}
+
+	bucketBrowser, xerr := bucketfactory.New(handler.job.Service())
 	if xerr != nil {
 		return nil, xerr
 	}
-	return r, nil
+
+	var bucketList []string
+	xerr = bucketBrowser.Browse(handler.job.Context(), func(bucket *abstract.ObjectStorageBucket) fail.Error {
+		bucketList = append(bucketList, bucket.Name)
+		return nil
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return bucketList, nil
 }
 
 // Create a bucket
@@ -89,7 +104,7 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 		}
 	}
 	if rb != nil {
-		return fail.DuplicateError("bucket '%s' does already exist", name)
+		return fail.DuplicateError("bucket '%s' already exist", name)
 	}
 
 	rb, xerr = bucketfactory.New(svc)
@@ -144,8 +159,8 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fa
 }
 
 // Mount a bucket on an host on the given mount point
-func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fail.Error) {
-	defer fail.OnPanic(&ferr)
+func (handler *bucketHandler) Mount(bucketName, hostName, path string) (outerr fail.Error) {
+	defer fail.OnPanic(&outerr)
 	if handler == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -159,21 +174,21 @@ func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fai
 	task := handler.job.Task()
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("handlers.bucket"), "('%s', '%s', '%s')", bucketName, hostName, path).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&ferr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&outerr, tracer.TraceMessage(""))
 
 	defer func() {
-		if ferr != nil {
-			ferr = fail.Wrap(ferr, "failed to mount bucket '%s' on '%s:%s'", bucketName, hostName, path)
+		if outerr != nil {
+			outerr = fail.Wrap(outerr, "failed to mount bucket '%s' on '%s:%s'", bucketName, hostName, path)
 		}
 	}()
 
 	// Check bucket existence
-	rb, xerr := bucketfactory.Load(handler.job.Service(), bucketName)
+	bucketInstance, xerr := bucketfactory.Load(handler.job.Service(), bucketName)
 	if xerr != nil {
 		return xerr
 	}
 
-	return rb.Mount(task.Context(), hostName, path)
+	return bucketInstance.Mount(task.Context(), hostName, path)
 }
 
 // Unmount a bucket

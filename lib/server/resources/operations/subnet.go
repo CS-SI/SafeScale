@@ -2232,8 +2232,8 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	}
 
 	// RLock is needed because unsafeInspectGateway needs such a lock
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	var (
 		gw  resources.Host

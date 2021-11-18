@@ -16,9 +16,9 @@
 
 /usr/local/bin/umount-{{.Bucket}}
 echo "umount: $?" >/tmp/umount.log
-rm /etc/s3ql/auth.{{.Bucket}}
+rm -f /etc/s3ql/auth.{{.Bucket}}
 echo "rm auth: $?" >>/tmp/umount.log
-rm /usr/local/bin/mount-{{.Bucket}}
+rm -f /usr/local/bin/mount-{{.Bucket}}
 echo "rm mount: $?" >>/tmp/umount.log
-rm /usr/local/bin/umount-{{.Bucket}}
+rm -f /usr/local/bin/umount-{{.Bucket}}
 echo "rm umount: $?" >>/tmp/umount.log

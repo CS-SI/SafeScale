@@ -3445,8 +3445,8 @@ func (instance *Cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 	}
 
 	// make sure no other parallel actions interferes
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	xerr = instance.beingRemoved()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3455,148 +3455,114 @@ func (instance *Cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 	}
 
 	out := &protocol.ClusterResponse{}
-	xerr = instance.Inspect(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			ci, ok := clonable.(*abstract.ClusterIdentity)
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		ci, ok := clonable.(*abstract.ClusterIdentity)
+		if !ok {
+			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+		out.Identity = converters.ClusterIdentityFromAbstractToProtocol(*ci)
+
+		innerXErr := props.Inspect(clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
+			controlplaneV1, ok := clonable.(*propertiesv1.ClusterControlplane)
 			if !ok {
-				return fail.InconsistentError(
-					"'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-				)
+				return fail.InconsistentError("'*propertiesv1.ClusterControlplane' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			out.Identity = converters.ClusterIdentityFromAbstractToProtocol(*ci)
+			out.Controlplane = converters.ClusterControlplaneFromPropertyToProtocol(*controlplaneV1)
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
 
-			innerXErr := props.Inspect(
-				clusterproperty.ControlPlaneV1, func(clonable data.Clonable) fail.Error {
-					controlplaneV1, ok := clonable.(*propertiesv1.ClusterControlplane)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterControlplane' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
-					out.Controlplane = converters.ClusterControlplaneFromPropertyToProtocol(*controlplaneV1)
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
+		innerXErr = props.Inspect(clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
+			compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterComposite' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			out.Composite = converters.ClusterCompositeFromPropertyToProtocol(*compositeV1)
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
 
-			innerXErr = props.Inspect(
-				clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
-					compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterComposite' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
-					out.Composite = converters.ClusterCompositeFromPropertyToProtocol(*compositeV1)
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
+		innerXErr = props.Inspect(clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
+			defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			out.Defaults = converters.ClusterDefaultsFromPropertyToProtocol(*defaultsV2)
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
 
-			innerXErr = props.Inspect(
-				clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
-					defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv2.ClusterDefaults' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
-					out.Defaults = converters.ClusterDefaultsFromPropertyToProtocol(*defaultsV2)
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
+		innerXErr = props.Inspect(clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
+			networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			out.Network = converters.ClusterNetworkFromPropertyToProtocol(*networkV3)
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		innerXErr = props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			innerXErr = props.Inspect(
-				clusterproperty.NetworkV3, func(clonable data.Clonable) fail.Error {
-					networkV3, ok := clonable.(*propertiesv3.ClusterNetwork)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-					out.Network = converters.ClusterNetworkFromPropertyToProtocol(*networkV3)
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
-			}
-
-			innerXErr = props.Inspect(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					convertClusterNodes := func(in []uint) []*protocol.Host {
-						list := make([]*protocol.Host, 0, len(in))
-						for _, v := range in {
-							if node, found := nodesV3.ByNumericalID[v]; found {
-								ph := &protocol.Host{
-									Name:      node.Name,
-									Id:        node.ID,
-									PublicIp:  node.PublicIP,
-									PrivateIp: node.PrivateIP,
-								}
-								list = append(list, ph)
-							}
+			convertClusterNodes := func(in []uint) []*protocol.Host {
+				list := make([]*protocol.Host, 0, len(in))
+				for _, v := range in {
+					if node, found := nodesV3.ByNumericalID[v]; found {
+						ph := &protocol.Host{
+							Name:      node.Name,
+							Id:        node.ID,
+							PublicIp:  node.PublicIP,
+							PrivateIp: node.PrivateIP,
 						}
-						return list
+						list = append(list, ph)
 					}
-
-					out.Nodes = convertClusterNodes(nodesV3.PrivateNodes)
-					out.Masters = convertClusterNodes(nodesV3.Masters)
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
+				}
+				return list
 			}
 
-			innerXErr = props.Inspect(
-				clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-					featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterFeatures' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
-					out.InstalledFeatures, out.DisabledFeatures = converters.ClusterFeaturesFromPropertyToProtocol(*featuresV1)
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
-			}
+			out.Nodes = convertClusterNodes(nodesV3.PrivateNodes)
+			out.Masters = convertClusterNodes(nodesV3.Masters)
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
 
-			return props.Inspect(
-				clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
-					stateV1, ok := clonable.(*propertiesv1.ClusterState)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-					out.State = protocol.ClusterState(stateV1.State)
-					return nil
-				},
-			)
-		},
-	)
+		innerXErr = props.Inspect(
+			clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+				featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				out.InstalledFeatures, out.DisabledFeatures = converters.ClusterFeaturesFromPropertyToProtocol(*featuresV1)
+				return nil
+			},
+		)
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		return props.Inspect(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
+			stateV1, ok := clonable.(*propertiesv1.ClusterState)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterState' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			out.State = protocol.ClusterState(stateV1.State)
+			return nil
+		})
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

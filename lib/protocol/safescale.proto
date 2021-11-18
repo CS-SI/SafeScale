@@ -595,7 +595,11 @@ message Bucket {
 	string name = 1;
 }
 
-message BucketList {
+message BucketListRequest {
+	bool all = 1;
+}
+
+message BucketListResponse {
 	repeated Bucket buckets = 1;
 }
 
@@ -610,7 +614,7 @@ service BucketService {
 	rpc Mount(BucketMountingPoint) returns (google.protobuf.Empty){}
 	rpc Unmount(BucketMountingPoint) returns (google.protobuf.Empty){}
 	rpc Delete(Bucket) returns (google.protobuf.Empty){}
-	rpc List(google.protobuf.Empty) returns (BucketList){}
+	rpc List(BucketListRequest) returns (BucketListResponse){}
 	rpc Inspect(Bucket) returns (BucketMountingPoint){}
 }
 
