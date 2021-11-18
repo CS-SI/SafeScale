@@ -646,7 +646,10 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task)
 
 	// Determine if getGateway Failover must be set
-	caps := instance.GetService().GetCapabilities()
+	caps, xerr := instance.GetService().GetCapabilities()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
 	gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
 	for k := range req.DisabledDefaultFeatures {
 		if k == "gateway-failover" {

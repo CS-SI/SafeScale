@@ -67,12 +67,16 @@ func CheckMetadataVersion(svc iaas.Service) (string, fail.Error) {
 		currentMetadataVersion = FirstMetadataVersion
 	}
 
-	// If version read is different than MetadataVersion, error
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return currentMetadataVersion, xerr
+	}
+
+	// If version read is different from MetadataVersion, error
 	result := strings.Compare(currentMetadataVersion, MinimumMetadataVersion)
 	switch result {
 	case -1:
-		// return currentMetadataVersion, fail.ForbiddenError(MustUpgradeMessage, svc.GetName(), MinimumMetadataVersion)
-		return currentMetadataVersion, fail.ForbiddenError(MustUpgradeMessage, svc.GetName())
+		return currentMetadataVersion, fail.ForbiddenError(MustUpgradeMessage, svcName)
 	case 1:
 		return currentMetadataVersion, fail.ForbiddenError(MustUpgradeBinaries, MinimumMetadataVersion)
 	}

@@ -1562,7 +1562,11 @@ func (instance *Host) undoSetSecurityGroups(errorPtr *fail.Error, keepOnFailure 
 // UnbindDefaultSecurityGroupIfNeeded unbinds "default" Security Group from Host if it is bound
 func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.Error {
 	svc := instance.GetService()
-	if sgName := svc.GetDefaultSecurityGroupName(); sgName != "" {
+	sgName, err := svc.GetDefaultSecurityGroupName()
+	if err != nil {
+		return err
+	}
+	if sgName != "" {
 		adsg, innerXErr := svc.InspectSecurityGroupByName(networkID, sgName)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
@@ -3818,7 +3822,11 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, instance.GetID())
 			}
 
-			if svc.GetCapabilities().CanDisableSecurityGroup {
+			caps, xerr := svc.GetCapabilities()
+			if xerr != nil {
+				return xerr
+			}
+			if caps.CanDisableSecurityGroup {
 				xerr = svc.EnableSecurityGroup(asg)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -3923,7 +3931,11 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgInstance.GetID())
 			}
 
-			if svc.GetCapabilities().CanDisableSecurityGroup {
+			caps, xerr := svc.GetCapabilities()
+			if xerr != nil {
+				return xerr
+			}
+			if caps.CanDisableSecurityGroup {
 				xerr = svc.DisableSecurityGroup(asg)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {

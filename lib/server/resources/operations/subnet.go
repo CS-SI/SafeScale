@@ -197,6 +197,11 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 			}
 		}
 
+		withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+		if err != nil {
+			return nil, err
+		}
+
 		if networkInstance != nil { // nolint
 			// Network metadata loaded, find the ID of the Subnet (subnetRef may be ID or Name)
 			xerr = networkInstance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -224,7 +229,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 			if xerr != nil {
 				return nil, xerr
 			}
-		} else if svc.HasDefaultNetwork() {
+		} else if withDefaultSubnetwork {
 			// No Network Metadata, try to use the default Network if there is one
 			an, xerr := svc.GetDefaultNetwork()
 			xerr = debug.InjectPlannedFail(xerr)
@@ -568,7 +573,10 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		}
 	}()
 
-	caps := svc.GetCapabilities()
+	caps, xerr := svc.GetCapabilities()
+	if xerr != nil {
+		return xerr
+	}
 	failover := req.HA
 	if failover {
 		if caps.PrivateVirtualIP {
@@ -1338,7 +1346,12 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 		rn = nil
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
-			if !svc.HasDefaultNetwork() {
+			withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			if !withDefaultSubnetwork {
 				return nil, nil, xerr
 			}
 			an, xerr = svc.GetDefaultNetwork()
@@ -2627,7 +2640,11 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 			}
 
 			// Do security group stuff to enable it
-			if svc.GetCapabilities().CanDisableSecurityGroup {
+			caps, xerr := svc.GetCapabilities()
+			if xerr != nil {
+				return xerr
+			}
+			if caps.CanDisableSecurityGroup {
 				if innerXErr = svc.EnableSecurityGroup(asg); innerXErr != nil {
 					return innerXErr
 				}
@@ -2732,7 +2749,11 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sg resources.S
 				return fail.NotFoundError("security group '%s' is not bound to Subnet '%s'", sg.GetName(), instance.GetID())
 			}
 
-			if svc.GetCapabilities().CanDisableSecurityGroup {
+			caps, xerr := svc.GetCapabilities()
+			if xerr != nil {
+				return xerr
+			}
+			if caps.CanDisableSecurityGroup {
 				if innerXErr = svc.DisableSecurityGroup(abstractSG); innerXErr != nil {
 					return innerXErr
 				}

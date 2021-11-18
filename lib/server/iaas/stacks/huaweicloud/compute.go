@@ -348,7 +348,11 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
+		cfg, err := s.GetRawAuthenticationOptions()
+		if err != nil {
+			return "", err
+		}
+		s.selectedAvailabilityZone = cfg.AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
 			azList, xerr := s.ListAvailabilityZones()
 			if xerr != nil {
@@ -831,7 +835,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -872,7 +876,7 @@ func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 
 // ListTemplates lists available IPAddress templates
 // IPAddress templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
+func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()

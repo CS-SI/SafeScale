@@ -40,7 +40,7 @@ type stack struct {
 	selfLinkPrefix string
 }
 
-// NullStack is not exposed through API, is needed essentially by testss
+// NullStack is not exposed through API, is needed essentially by tests
 func NullStack() *stack { // nolint
 	return &stack{}
 }
@@ -50,24 +50,24 @@ func (s *stack) IsNull() bool {
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() string {
-	return "gcp"
+func (s stack) GetStackName() (string, fail.Error) {
+	return "gcp", nil
 }
 
 // GetConfigurationOptions ...
-func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
 	if s.IsNull() || s.Config == nil {
-		return stacks.ConfigurationOptions{}
+		return stacks.ConfigurationOptions{}, nil
 	}
-	return *s.Config
+	return *s.Config, nil
 }
 
 // GetAuthenticationOptions ...
-func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
+func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
 	if s.IsNull() || s.AuthOptions == nil {
-		return stacks.AuthenticationOptions{}
+		return stacks.AuthenticationOptions{}, nil
 	}
-	return *s.AuthOptions
+	return *s.AuthOptions, nil
 }
 
 // New Create and initialize a ClientAPI

@@ -62,7 +62,7 @@ func normalizeImageName(name string) string {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (_ []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -199,7 +199,7 @@ func (s stack) parseTemplateID(id string) (abstract.HostTemplate, fail.Error) {
 
 // ListTemplates lists available host templates
 // IPAddress templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
+func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, xerr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()

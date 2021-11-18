@@ -42,8 +42,8 @@ const (
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
 // No default network settings supported by GCP
-func (s stack) HasDefaultNetwork() bool {
-	return false
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
+	return false, nil
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network

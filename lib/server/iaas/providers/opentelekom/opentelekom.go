@@ -59,7 +59,7 @@ func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
 
-// Build build a new Client from configuration parameter
+// Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
@@ -147,11 +147,22 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	wrapped := api.StackProxy{
+		InnerStack: stack,
+		Name:       "opentelekomm",
+	}
+
 	newP := provider{
-		Stack:            stack,
+		Stack:            wrapped,
 		tenantParameters: params,
 	}
-	return &newP, nil
+
+	wp := providers.ProviderProxy{
+		InnerProvider: &newP,
+		Name:          wrapped.Name,
+	}
+
+	return wp, nil
 }
 
 // ListTemplates ... ; overloads stack.ListTemplates() to allow to filter templates to show
@@ -160,7 +171,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	if p.IsNull() {
 		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
-	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 }
 
 // ListImages ... ; overloads stack.ListImages() to allow to filter images to show
@@ -169,14 +180,17 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	if p.IsNull() {
 		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
-	return p.Stack.(api.ReservedForProviderUse).ListImages()
+	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }
 
 // GetAuthenticationOptions returns the auth options
 func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	if err != nil {
+		return nil, err
+	}
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
@@ -190,14 +204,23 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg := providers.ConfigMap{}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	provName, xerr := p.GetName()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
-	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("ProviderName", provName)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
@@ -205,33 +228,33 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 }
 
 // GetName ...
-func (p provider) GetName() string {
-	return "opentelekom"
+func (p provider) GetName() (string, fail.Error) {
+	return "opentelekom", nil
 }
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() api.Stack {
-	return p.Stack
+func (p provider) GetStack() (api.Stack, fail.Error) {
+	return p.Stack, nil
 }
 
 // GetTenantParameters ...
-func (p provider) GetTenantParameters() map[string]interface{} {
-	return p.tenantParameters
+func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
+	return p.tenantParameters, nil
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p provider) GetCapabilities() providers.Capabilities {
+func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
-	}
+	}, nil
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
-func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
 	if p.IsNull() {
-		return emptySlice
+		return emptySlice, nil
 	}
 
 	var (
@@ -240,12 +263,12 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice
+			return emptySlice, nil
 		}
 		out = append(out, re)
 	}
 
-	return out
+	return out, nil
 }
 
 // init registers the opentelekom provider

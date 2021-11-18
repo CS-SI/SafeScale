@@ -145,10 +145,10 @@ func (s *SubnetListener) Create(ctx context.Context, in *protocol.SubnetCreateRe
 }
 
 // List existing networks
-func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListRequest) (_ *protocol.SubnetList, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitLogError(&err)
-	defer fail.OnExitWrapError(&err, "cannot list Subnets")
+func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListRequest) (_ *protocol.SubnetList, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitLogError(&ferr)
+	defer fail.OnExitWrapError(&ferr, "cannot list Subnets")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -180,7 +180,11 @@ func (s *SubnetListener) List(ctx context.Context, in *protocol.SubnetListReques
 	var networkID string
 	networkRef, _ := srvutils.GetReference(in.Network)
 	if networkRef == "" {
-		if job.Service().HasDefaultNetwork() {
+		withDefaultNetwork, err := job.Service().HasDefaultNetwork()
+		if err != nil {
+			return nil, err
+		}
+		if withDefaultNetwork {
 			an, xerr := job.Service().GetDefaultNetwork()
 			if xerr == nil {
 				networkID = an.ID

@@ -289,7 +289,7 @@ func createFilters() []*ec2.Filter {
 }
 
 // ListImages lists available image
-func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (_ []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -329,7 +329,7 @@ func toAbstractImage(in ec2.Image) abstract.Image {
 }
 
 // ListTemplates lists templates stored in AWS
-func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
+func (s stack) ListTemplates(bool) (templates []abstract.HostTemplate, xerr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -1319,7 +1319,11 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	// If there is one last Security Group bound to IPAddress, restore bond to default SecurityGroup before removing
 	if len(resp.SecurityGroups) == 1 && aws.StringValue(resp.SecurityGroups[0].GroupId) == asg.ID {
 		defaultSG := abstract.NewSecurityGroup()
-		defaultSG.Name = s.GetDefaultSecurityGroupName()
+		var err fail.Error
+		defaultSG.Name, err = s.GetDefaultSecurityGroupName()
+		if err != nil {
+			return err
+		}
 		defaultSG.Network = asg.Network
 		defaultSG, xerr := s.InspectSecurityGroup(defaultSG)
 		if xerr != nil {

@@ -47,7 +47,12 @@ func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ 
 			return nil, xerr
 		}
 
-		tenant = &operations.Tenant{Name: tenantID, BucketName: service.GetMetadataBucket().GetName(), Service: service}
+		bucket, ierr := service.GetMetadataBucket()
+		if ierr != nil {
+			return nil, ierr
+		}
+
+		tenant = &operations.Tenant{Name: tenantID, BucketName: bucket.GetName(), Service: service}
 	} else {
 		tenant = operations.CurrentTenant()
 		if tenant == nil {

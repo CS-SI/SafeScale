@@ -84,7 +84,13 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 	if !ok {
 		return nil, fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
 	}
-	folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
+
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	folder := fmt.Sprintf("images/%s/%s", svcName, region)
 
 	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 	if err != nil {
@@ -226,7 +232,13 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 	if !ok {
 		return nil, fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
 	}
-	folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
+
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	folder := fmt.Sprintf("images/%s/%s", svcName, region)
 
 	db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 	if err != nil {

@@ -97,8 +97,7 @@ func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
 
-// Build ...
-// Can be called from nil
+// Build builds a new Client from configuration parameter
 func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr fail.Error) {
 	identity := remap(opt["identity"])
 	compute := remap(opt["compute"])
@@ -165,9 +164,21 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
-	p.Stack = stack
+
+	wrapped := api.StackProxy{
+		InnerStack: stack,
+		Name:       "outscale",
+	}
+
+	p.Stack = wrapped
 	p.tenantParameters = opt
-	return p, nil
+
+	wp := providers.ProviderProxy{
+		InnerProvider: p,
+		Name:          wrapped.Name,
+	}
+
+	return wp, nil
 }
 
 // GetAuthenticationOptions returns authentication parameters
@@ -176,7 +187,10 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	if err != nil {
+		return nil, err
+	}
 	cfg := providers.ConfigMap{}
 	cfg.Set("AccessKey", opts.AccessKeyID)
 	cfg.Set("SecretKey", opts.SecretAccessKey)
@@ -191,7 +205,16 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	provName, xerr := p.GetName()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	cfg := providers.ConfigMap{}
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", true)
@@ -199,7 +222,7 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
-	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("ProviderName", provName)
 	cfg.Set("BuildSubnets", false)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
@@ -208,50 +231,50 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 }
 
 // GetName returns the provider name
-func (p provider) GetName() string {
-	return "outscale"
+func (p provider) GetName() (string, fail.Error) {
+	return "outscale", nil
 }
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() api.Stack {
-	return p.Stack
+func (p provider) GetStack() (api.Stack, fail.Error) {
+	return p.Stack, nil
 }
 
 // GetTenantParameters returns the tenant parameters as-is
-func (p provider) GetTenantParameters() map[string]interface{} {
+func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 	if p.IsNull() {
-		return map[string]interface{}{}
+		return map[string]interface{}{}, nil
 	}
-	return p.tenantParameters
+	return p.tenantParameters, nil
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p provider) GetCapabilities() providers.Capabilities {
+func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 	return providers.Capabilities{
 		PublicVirtualIP: false,
 		// TODO: not tested, corresponding code inside stack is commented
 		// PrivateVirtualIP: true,
 		PrivateVirtualIP: false,
 		Layer3Networking: false,
-	}
+	}, nil
 }
 
 // ListImages ...
 func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
-	return p.Stack.(api.ReservedForProviderUse).ListImages()
+	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }
 
 // ListTemplates ...
 func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
-	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
-func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
 	if p.IsNull() {
-		return emptySlice
+		return emptySlice, nil
 	}
 
 	var (
@@ -261,12 +284,12 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice
+			return emptySlice, nil
 		}
 		out = append(out, re)
 	}
 
-	return out
+	return out, nil
 }
 
 // TODO: init when finished

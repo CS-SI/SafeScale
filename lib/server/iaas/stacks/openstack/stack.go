@@ -245,6 +245,6 @@ func (s *stack) IsNull() bool {
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() string {
-	return "openstack"
+func (s stack) GetStackName() (string, fail.Error) {
+	return "openstack", nil
 }

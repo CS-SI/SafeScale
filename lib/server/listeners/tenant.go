@@ -100,10 +100,15 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 		return nil, fail.NotFoundError("no tenant set")
 	}
 
+	prvName, xerr := currentTenant.Service.GetProviderName()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	return &protocol.TenantName{
 		Name:       currentTenant.Name,
 		BucketName: currentTenant.BucketName,
-		Provider:   currentTenant.Service.GetProviderName(),
+		Provider:   prvName,
 	}, nil
 }
 
