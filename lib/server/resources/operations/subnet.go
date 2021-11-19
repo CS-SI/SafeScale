@@ -192,6 +192,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
+				debug.IgnoreError(xerr)
 				// Network metadata can be missing if it's the default Network, so continue
 			default:
 				return nil, xerr
@@ -288,6 +289,11 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 			}
 		}()
 	}
+	/*
+		else {
+			return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
+		}
+	*/
 
 	// FIXME: The reload problem
 	// VPL: what state of Subnet would you like to be updated by Reload?

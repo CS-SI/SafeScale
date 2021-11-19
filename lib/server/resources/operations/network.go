@@ -103,6 +103,7 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nil, fail.NotFoundError("failed to find Network '%s'", ref)
 		default:

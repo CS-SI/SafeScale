@@ -959,6 +959,7 @@ func (instance *Cluster) createHostResources(
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// It's a valid state not to have a secondary gateway, so continue
 			haveSecondaryGateway = false
 		default:

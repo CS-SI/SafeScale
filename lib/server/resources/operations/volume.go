@@ -111,6 +111,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
 			return VolumeNullValue(), fail.NotFoundError("failed to find Volume '%s'", ref)
 		default:

@@ -169,6 +169,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
 			return ShareNullValue(), fail.NotFoundError("failed to find a Share '%s'", ref)
 		default:

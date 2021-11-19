@@ -132,6 +132,7 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nil, fail.NotFoundError("failed to find Cluster '%s'", name)
 		default:
