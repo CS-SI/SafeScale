@@ -220,16 +220,20 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				networkName = abstractOwningNetwork.Name
 			}
 
-			// Complement abstracted Subnet fields // FIXME: Split huaweicloud
-			stackName, err := currentInstance.GetService().GetStackName()
-			if err != nil {
-				return err
+			// -- huaweicloud stack driver needs special treatment here ... --
+			{ // It only does something for huaweicloud
+				stack, xerr := currentInstance.GetService().GetStack()
+				if xerr != nil {
+					return xerr
+				}
+				xerr = stack.Migrate("networklayers", map[string]interface{}{
+					"layer": abstractNetwork,
+				})
+				if xerr != nil {
+					return xerr
+				}
 			}
-			if stackName == "huaweicloud" {
-				// huaweicloud added a layer called "IPv4 SubnetID", which is returned as SubnetID but is not; Network is the real "OpenStack" Subnet ID
-				// FIXME: maybe huaweicloud has to be reviewed/rewritten not to use a mix of pure OpenStack API and customized Huaweicloud API?
-				abstractSubnet.ID = abstractSubnet.Network
-			}
+
 			subnetID = abstractSubnet.ID
 			abstractSubnet.Name = subnetName
 			abstractSubnet.Network = owningInstance.GetID()
@@ -255,7 +259,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			// -- create Security groups --
 			ctx := context.Background()
 			// owningInstance may be identical to currentInstance, so we need to pass the properties of currentInstance through context,
-			// to prevent deadlock trying to alter the an instance already inside an Alter
+			// to prevent deadlock trying to alter an instance already inside an Alter
 			ctx = context.WithValue(ctx, operations.CurrentNetworkPropertiesContextKey, currentNetworkProps)
 			gwSG, internalSG, publicSG, innerXErr := subnetInstance.UnsafeCreateSecurityGroups(ctx, owningInstance, false)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
