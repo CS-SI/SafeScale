@@ -1013,11 +1013,12 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrAborted, *fail.ErrTimeout:
 				xerr = fail.ConvertError(xerr.Cause())
-			default:
-			}
-		}
-		if xerr != nil {
-			switch xerr.(type) {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreError(xerr)
+				default:
+					return xerr
+				}
 			case *fail.ErrNotFound:
 				debug.IgnoreError(xerr)
 			default:
@@ -1028,7 +1029,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 	// Remove volumes if some remain, report errors (other than not found) as warnings
 	for _, volume := range attachedVolumes {
-		// FIXME: parallelize ?
+		// TODO: parallelize ?
 		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				_, err := s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{VolumeId: aws.String(volume)})

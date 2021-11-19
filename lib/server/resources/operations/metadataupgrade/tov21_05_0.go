@@ -546,9 +546,10 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 					_, ok = hnV1.IPv4Addresses[hnV1.DefaultNetworkID]
 					if ok {
 						previousID = hnV1.DefaultNetworkID
+						if previousID == "" {
+							return fail.InconsistentError("failed to find ID corresponding to the previous default Network IP Address")
+						}
 					}
-				}
-				if previousID == "" {
 					return fail.InconsistentError("failed to find ID corresponding to the previous default Network IP Address")
 				}
 

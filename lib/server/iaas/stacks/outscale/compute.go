@@ -450,7 +450,7 @@ func (s stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]o
 
 func (s stack) deleteNICs(nics []osc.Nic) fail.Error {
 	for _, nic := range nics {
-		// FIXME: parallelize ?
+		// TODO: parallelize ?
 		if xerr := s.rpcDeleteNic(nic.NicId); xerr != nil {
 			return xerr
 		}
