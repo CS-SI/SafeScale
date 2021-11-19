@@ -198,7 +198,7 @@ func (s stack) DeleteVolume(ref string) fail.Error {
 	return s.rpcDeleteDisk(ref)
 }
 
-// CreateVolumeAttachment attaches a volume to an host
+// CreateVolumeAttachment attaches a volume to a host
 func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	if s.IsNull() {
 		return "", fail.InvalidInstanceError()

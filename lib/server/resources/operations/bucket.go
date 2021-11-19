@@ -382,7 +382,7 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	return instance.GetService().DeleteBucket(instance.GetName())
 }
 
-// Mount a bucket on an host on the given mount point
+// Mount a bucket on a host on the given mount point
 func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr fail.Error) {
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()

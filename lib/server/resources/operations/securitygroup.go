@@ -1161,7 +1161,7 @@ func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance reso
 	return instance.unsafeBindToHost(ctx, hostInstance, enable, mark)
 }
 
-// UnbindFromHost unbinds the security group from an host
+// UnbindFromHost unbinds the security group from a host
 func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -1223,7 +1223,7 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 	})
 }
 
-// UnbindFromHostByReference unbinds the security group from an host identified by reference (id or name)
+// UnbindFromHostByReference unbinds the security group from a host identified by reference (id or name)
 func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, hostRef string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 

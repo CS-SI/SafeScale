@@ -52,7 +52,7 @@ var ShareCommand = &cli.Command{
 var shareCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
-	Usage:     "Create a nfs server on an host and exports a directory",
+	Usage:     "Create a nfs server on a host and exports a directory",
 	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{

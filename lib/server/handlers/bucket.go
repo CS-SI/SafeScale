@@ -143,7 +143,7 @@ func (handler *bucketHandler) Inspect(name string) (rb resources.Bucket, xerr fa
 	return rb, nil
 }
 
-// Mount a bucket on an host on the given mount point
+// Mount a bucket on a host on the given mount point
 func (handler *bucketHandler) Mount(bucketName, hostName, path string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	if handler == nil {

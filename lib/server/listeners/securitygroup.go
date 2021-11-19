@@ -252,7 +252,7 @@ func (s *SecurityGroupListener) Reset(ctx context.Context, in *protocol.Referenc
 	return empty, nil
 }
 
-// Inspect an host
+// Inspect a host
 func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Reference) (_ *protocol.SecurityGroupResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect security group")
@@ -300,7 +300,7 @@ func (s *SecurityGroupListener) Inspect(ctx context.Context, in *protocol.Refere
 	return sgInstance.ToProtocol()
 }
 
-// Delete an host
+// Delete a host
 func (s *SecurityGroupListener) Delete(ctx context.Context, in *protocol.SecurityGroupDeleteRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete Security Group")

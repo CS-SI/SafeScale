@@ -1258,7 +1258,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 }
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
-// By convention only one floating IP is allocated to an host
+// By convention only one floating IP is allocated to a host
 func (s stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(

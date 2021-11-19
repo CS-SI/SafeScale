@@ -142,7 +142,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 	return rv.ToProtocol()
 }
 
-// Attach a volume to an host and create a mount point
+// Attach a volume to a host and create a mount point
 func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot attach volume")
@@ -202,7 +202,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	return empty, nil
 }
 
-// Detach a volume from an host. It umount associated mountpoint
+// Detach a volume from a host. It umount associated mountpoint
 func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot detach volume")

@@ -189,7 +189,7 @@ var volumeCreate = &cli.Command{
 var volumeAttach = &cli.Command{
 	Name:      "attach",
 	Aliases:   []string{"bind"},
-	Usage:     "Attach a volume to an host",
+	Usage:     "Attach a volume to a host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -238,7 +238,7 @@ var volumeAttach = &cli.Command{
 var volumeDetach = &cli.Command{
 	Name:      "detach",
 	Aliases:   []string{"unbind"},
-	Usage:     "Detach a volume from an host",
+	Usage:     "Detach a volume from a host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())

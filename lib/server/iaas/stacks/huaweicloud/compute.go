@@ -731,7 +731,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	return host, userData, nil
 }
 
-// validateHostname validates the name of an host based on known FlexibleEngine requirements
+// validateHostname validates the name of a host based on known FlexibleEngine requirements
 func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 	s := check.Struct{
 		"ResourceName": check.Composite{
@@ -1278,7 +1278,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
-// By convention only one floating IP is allocated to an host
+// By convention only one floating IP is allocated to a host
 func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	commRetryErr := stacks.RetryableRemoteCall(
@@ -1317,7 +1317,7 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 	return &fips[0], nil
 }
 
-// attachFloatingIP creates a Floating IP and attaches it to an host
+// attachFloatingIP creates a Floating IP and attaches it to a host
 func (s stack) attachFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
 	fip, xerr := s.CreateFloatingIP(host)
 	if xerr != nil {

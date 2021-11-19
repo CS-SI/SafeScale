@@ -671,7 +671,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	return nil
 }
 
-// ResizeHost change the template used by an host
+// ResizeHost change the template used by a host
 func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }

@@ -531,7 +531,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	return instance.carry(av)
 }
 
-// Attach a volume to an host
+// Attach a volume to a host
 func (instance *volume) Attach(ctx context.Context, host resources.Host, path, format string, doNotFormat bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

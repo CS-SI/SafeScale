@@ -408,7 +408,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 	return hostInstance.ToProtocol()
 }
 
-// Resize an host
+// Resize a host
 func (s *HostListener) Resize(ctx context.Context, in *protocol.HostDefinition) (_ *protocol.Host, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot resize host")
@@ -607,7 +607,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	return hostInstance.ToProtocol()
 }
 
-// Delete an host
+// Delete a host
 func (s *HostListener) Delete(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete host")

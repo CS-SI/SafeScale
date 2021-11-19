@@ -626,7 +626,7 @@ func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 	return server, nil
 }
 
-// Mount mounts a Share on a local directory of an host
+// Mount mounts a Share on a local directory of a host
 // returns a clone of the propertiesv1.HostRemoteMount created on success
 func (instance *Share) Mount(ctx context.Context, target resources.Host, path string, withCache bool) (_ *propertiesv1.HostRemoteMount, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -897,7 +897,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 	return mount.Clone().(*propertiesv1.HostRemoteMount), nil
 }
 
-// Unmount unmounts a Share from local directory of an host
+// Unmount unmounts a Share from local directory of a host
 func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 

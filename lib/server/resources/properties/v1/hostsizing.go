@@ -45,7 +45,7 @@ func (hsr *HostSizingRequirements) IsNull() bool {
 	return hsr == nil || hsr.Cores == 0
 }
 
-// HostEffectiveSizing represent sizing elements of an host
+// HostEffectiveSizing represent sizing elements of a host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields

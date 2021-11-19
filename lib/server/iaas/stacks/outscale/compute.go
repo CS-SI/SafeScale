@@ -493,7 +493,7 @@ func (s stack) hostState(id string) (hoststate.Enum, fail.Error) {
 	return hostState(vm.State), nil
 }
 
-// WaitHostReady waits an host achieve ready state
+// WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	if s.IsNull() {

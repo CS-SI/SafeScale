@@ -108,7 +108,7 @@ const (
 	DiskDRFWeight float32 = 1.0 / 16.0
 )
 
-// RankDRF computes the Dominant Resource Fairness Rank of an host template
+// RankDRF computes the Dominant Resource Fairness Rank of a host template
 func RankDRF(t *abstract.HostTemplate) float32 {
 	fc := float32(t.Cores)
 	fr := t.RAMSize
@@ -274,7 +274,7 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 	}
 }
 
-// WaitVolumeState waits an host achieve state
+// WaitVolumeState waits a host achieve state
 // If timeout is reached, returns utils.ErrTimeout
 func (svc service) WaitVolumeState(volumeID string, state volumestate.Enum, timeout time.Duration) (*abstract.Volume, fail.Error) {
 	if svc.IsNull() {
@@ -825,7 +825,7 @@ func addPadding(in string, maxLength int) string {
 	return in
 }
 
-// CreateHostWithKeyPair creates an host
+// CreateHostWithKeyPair creates a host
 func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
 	if svc.IsNull() {
 		return nil, nil, nil, fail.InvalidInstanceError()

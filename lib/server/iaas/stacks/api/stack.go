@@ -133,7 +133,7 @@ type Stack interface {
 	StartHost(stacks.HostParameter) fail.Error
 	// RebootHost reboots a host
 	RebootHost(stacks.HostParameter) fail.Error
-	// ResizeHost resizes an host
+	// ResizeHost resizes a host
 	ResizeHost(stacks.HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
 	WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
