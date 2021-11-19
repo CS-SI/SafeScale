@@ -288,12 +288,9 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 				_ = cacheEntry.UnlockContent()
 			}
 		}()
+	} else {
+		return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 	}
-	/*
-		else {
-			return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
-		}
-	*/
 
 	// FIXME: The reload problem
 	// VPL: what state of Subnet would you like to be updated by Reload?
