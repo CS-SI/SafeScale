@@ -181,16 +181,19 @@ func (p *provider) GetName() string {
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
+func (p *provider) ListImages(all bool) (_ []abstract.Image, ferr error) {
+	defer fail.OnPanic(&ferr)
 	return p.Stack.ListImages()
 }
 
 // ListTemplates ...
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) (_ []abstract.HostTemplate, ferr error) {
+	defer fail.OnPanic(&ferr)
 	return p.Stack.ListTemplates()
 }
 
-func (p *provider) ListAvailabilityZones() (map[string]bool, error) {
+func (p *provider) ListAvailabilityZones() (_ map[string]bool, ferr error) {
+	defer fail.OnPanic(&ferr)
 	return p.Stack.ListAvailabilityZones()
 }
 

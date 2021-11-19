@@ -89,7 +89,8 @@ func New() apiprovider.Provider {
 }
 
 // Build build a new instance of Ovh using configuration parameters
-func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (_ apiprovider.Provider, ferr error) {
+	defer fail.OnPanic(&ferr)
 	identityParams, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	// networkParams, _ := params["network"].(map[string]interface{})
@@ -237,7 +238,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -255,7 +257,8 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
@@ -270,7 +273,8 @@ func (p *provider) GetConfigurationOptions() (providers.Config, error) {
 }
 
 // GetTemplate overload OpenStack GetTemplate method to add GPU configuration
-func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
+func (p *provider) GetTemplate(id string) (_ *abstract.HostTemplate, ferr error) {
+	defer fail.OnPanic(&ferr)
 	tpl, err := p.Stack.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
@@ -286,12 +290,14 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // ListImages overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
+func (p *provider) ListImages(all bool) (_ []abstract.Image, ferr error) {
+	defer fail.OnPanic(&ferr)
 	return p.Stack.ListImages()
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) (_ []abstract.HostTemplate, ferr error) {
+	defer fail.OnPanic(&ferr)
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -353,7 +359,8 @@ func isFlexTemplate(t abstract.HostTemplate) bool {
 }
 
 // CreateNetwork is overloaded to handle specific OVH situation
-func (p *provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, error) {
+func (p *provider) CreateNetwork(req abstract.NetworkRequest) (_ *abstract.Network, ferr error) {
+	defer fail.OnPanic(&ferr)
 	// Special treatment for OVH : no dnsServers means __NO__ DNS servers, not default ones
 	// The way to do so, accordingly to OVH support, is to set DNS servers to 0.0.0.0
 	if len(req.DNSServers) == 0 {
@@ -377,7 +384,7 @@ func (p *provider) GetCapabilities() providers.Capabilities {
 	}
 }
 
-// BindHostToVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+// BindHostToVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	if p == nil {
 		return fail.InvalidInstanceError()
@@ -392,7 +399,7 @@ func (p *provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) error {
 	return nil
 }
 
-// UnbindHostFromVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+// UnbindHostFromVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p *provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) error {
 	if p == nil {
 		return fail.InvalidInstanceError()

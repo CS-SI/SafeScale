@@ -86,7 +86,8 @@ func volumeSpeed(s string) volumespeed.Enum {
 
 }
 
-func (p *provider) Build(opt map[string]interface{}) (apiprovider.Provider, error) {
+func (p *provider) Build(opt map[string]interface{}) (_ apiprovider.Provider, ferr error) {
+	defer fail.OnPanic(&ferr)
 	if p == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -175,7 +176,8 @@ func (p *provider) Build(opt map[string]interface{}) (apiprovider.Provider, erro
 }
 
 // GetAuthenticationOptions returns authentication parameters
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	if p == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -189,7 +191,8 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetConfigurationOptions returns configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	if p == nil {
 		return nil, fail.InvalidInstanceError()
 	}

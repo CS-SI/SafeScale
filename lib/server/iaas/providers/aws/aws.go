@@ -66,8 +66,8 @@ func New() apiprovider.Provider {
 }
 
 // Build build a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
-	// tenantName, _ := params["name"].(string)
+func (p *provider) Build(params map[string]interface{}) (_ apiprovider.Provider, ferr error) {
+	defer fail.OnPanic(&ferr)
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
@@ -208,7 +208,9 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (_ providers.Config, err error) {
+	defer fail.OnPanic(&err)
+
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -221,7 +223,8 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (_ providers.Config, err error) {
+	defer fail.OnPanic(&err)
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()
@@ -242,11 +245,13 @@ func (p *provider) GetName() string {
 }
 
 // ListImages ...
-func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
+func (p *provider) ListImages(all bool) (_ []abstract.Image, err error) {
+	defer fail.OnPanic(&err)
 	return p.Stack.ListImages()
 }
 
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) (_ []abstract.HostTemplate, err error) {
+	defer fail.OnPanic(&err)
 	return p.Stack.ListTemplates()
 }
 

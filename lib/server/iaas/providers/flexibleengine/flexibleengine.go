@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
@@ -74,7 +75,8 @@ func New() apiprovider.Provider {
 }
 
 // Build initializes a new FlexibleEngine instance from parameters
-func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (_ apiprovider.Provider, ferr error) {
+	defer fail.OnPanic(&ferr)
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	network, _ := params["network"].(map[string]interface{})
@@ -226,7 +228,8 @@ func addGPUCfg(tpl *abstract.HostTemplate) {
 }
 
 // GetTemplate returns the Template referenced by id
-func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
+func (p *provider) GetTemplate(id string) (_ *abstract.HostTemplate, ferr error) {
+	defer fail.OnPanic(&ferr)
 	tpl, err := p.Stack.GetTemplate(id)
 	if tpl != nil {
 		addGPUCfg(tpl)
@@ -284,7 +287,8 @@ func (p *provider) GetTemplate(id string) (*abstract.HostTemplate, error) {
 
 // ListTemplates lists available host templates
 // Host templates are sorted using Dominant Resource Fairness Algorithm
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) (_ []abstract.HostTemplate, ferr error) {
+	defer fail.OnPanic(&ferr)
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -317,7 +321,8 @@ func isBMSImage(image abstract.Image) bool {
 }
 
 // ListImages lists available OS images
-func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
+func (p *provider) ListImages(all bool) (_ []abstract.Image, ferr error) {
+	defer fail.OnPanic(&ferr)
 	images, err := p.Stack.ListImages()
 	if err != nil {
 		return nil, err
@@ -331,7 +336,8 @@ func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -346,7 +352,8 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()

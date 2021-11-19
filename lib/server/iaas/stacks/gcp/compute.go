@@ -100,6 +100,7 @@ func (s *Stack) GetImage(id string) (*abstract.Image, fail.Error) {
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
 func (s *Stack) ListTemplates(all bool) (templates []abstract.HostTemplate, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
 	compuService := s.ComputeService
 
 	templates = []abstract.HostTemplate{}

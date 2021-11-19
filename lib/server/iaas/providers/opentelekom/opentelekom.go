@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
@@ -50,7 +51,8 @@ func New() apiprovider.Provider {
 }
 
 // Build build a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (_ apiprovider.Provider, ferr error) {
+	defer fail.OnPanic(&ferr)
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	network, _ := params["network"].(map[string]interface{})
@@ -194,7 +196,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 
 // ListTemplates ...
 // Value of all has no impact on the result
-func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
+func (p *provider) ListTemplates(all bool) (_ []abstract.HostTemplate, ferr error) {
+	defer fail.OnPanic(&ferr)
 	allTemplates, err := p.Stack.ListTemplates()
 	if err != nil {
 		return nil, err
@@ -204,7 +207,8 @@ func (p *provider) ListTemplates(all bool) ([]abstract.HostTemplate, error) {
 
 // ListImages ...
 // Value of all has no impact on the result
-func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
+func (p *provider) ListImages(all bool) (_ []abstract.Image, ferr error) {
+	defer fail.OnPanic(&ferr)
 	allImages, err := p.Stack.ListImages()
 	if err != nil {
 		return nil, err
@@ -213,7 +217,8 @@ func (p *provider) ListImages(all bool) ([]abstract.Image, error) {
 }
 
 // GetAuthenticationOptions returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetAuthenticationOptions()
@@ -227,7 +232,8 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetConfigurationOptions return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	cfg := providers.ConfigMap{}
 
 	opts := p.Stack.GetConfigurationOptions()

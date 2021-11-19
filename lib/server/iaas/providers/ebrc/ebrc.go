@@ -26,6 +26,7 @@ import (
 	apiprovider "github.com/CS-SI/SafeScale/lib/server/iaas/providers/api"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/ebrc"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
 // provider is the provider implementation of the Ebrc provider
@@ -36,7 +37,8 @@ type provider struct {
 }
 
 // Build build a new Client from configuration parameter
-func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, error) {
+func (p *provider) Build(params map[string]interface{}) (_ apiprovider.Provider, ferr error) {
+	defer fail.OnPanic(&ferr)
 	identity, _ := params["identity"].(map[string]interface{})
 	compute, _ := params["compute"].(map[string]interface{})
 	metadata, _ := params["metadata"].(map[string]interface{})
@@ -110,7 +112,8 @@ func (p *provider) Build(params map[string]interface{}) (apiprovider.Provider, e
 }
 
 // GetAuthOpts returns the auth options
-func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
+func (p *provider) GetAuthenticationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	cfg := providers.ConfigMap{}
 	opts := p.StackEbrc.GetAuthenticationOptions()
 
@@ -126,7 +129,8 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, error) {
 }
 
 // GetCfgOpts return configuration parameters
-func (p *provider) GetConfigurationOptions() (providers.Config, error) {
+func (p *provider) GetConfigurationOptions() (_ providers.Config, ferr error) {
+	defer fail.OnPanic(&ferr)
 	cfg := providers.ConfigMap{}
 	opts := p.StackEbrc.GetConfigurationOptions()
 
