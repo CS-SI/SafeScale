@@ -139,7 +139,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 			case hostOptionLightKeyword:
 				updateCachedInformation = !v.Value().(bool)
 			default:
-				logrus.Warningf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
 			}
 		}
 	}

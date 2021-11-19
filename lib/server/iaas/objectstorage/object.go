@@ -194,7 +194,7 @@ func (o *object) Read(target io.Writer, from, to int64) (ferr fail.Error) {
 			if ferr != nil {
 				_ = ferr.AddConsequence(clerr)
 			}
-			logrus.Warningf("error closing item")
+			logrus.Warnf("error closing item")
 		}
 	}()
 

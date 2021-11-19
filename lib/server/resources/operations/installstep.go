@@ -511,7 +511,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	xerr = rfcItem.UploadString(task.Context(), command, p.Host)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Warningf("failure uploading script: %v", xerr)
+		logrus.Warnf("failure uploading script: %v", xerr)
 		problem := fail.Wrap(xerr, "failure uploading script")
 		return stepResult{err: problem}, problem
 	}
