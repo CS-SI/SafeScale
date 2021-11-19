@@ -112,7 +112,7 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	uuid := in.Uuid
@@ -160,7 +160,7 @@ func (s *JobManagerListener) List(ctx context.Context, in *googleprotobuf.Empty)
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	task, xerr := concurrency.NewTaskWithContext(ctx)

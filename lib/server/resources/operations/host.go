@@ -1955,7 +1955,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 
 	logrus.Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
 
-	waitingTime := 4 * time.Minute // FIXME: Hardcoded time
+	waitingTime := temporal.MaxTimeout(4*time.Minute, temporal.GetHostCreationTimeout())
 
 	// Reboot Host
 	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
@@ -2810,8 +2810,6 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 				_ = problem.Annotate("retcode", iretcode)
 				return problem
 			}
-
-			// FIXME: Add md5 (download)
 
 			retcode = iretcode
 			stdout = istdout

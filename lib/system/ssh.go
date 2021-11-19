@@ -959,7 +959,7 @@ func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTt
 	return &sshCommand, nil
 }
 
-// newCopyCommand does the same thing than newCommand for SCP actions
+// newCopyCommand does the same thing as newCommand for SCP actions
 func (sconf *SSHConfig) newCopyCommand(ctx context.Context, localPath, remotePath string, isUpload bool) (*SSHCommand, fail.Error) {
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
