@@ -42,6 +42,7 @@ type IPInSubnet struct {
 	PublicIP string
 }
 
+// IsOperation
 func IsOperation(op interface{}, name string, fieldType reflect.Type) bool {
 	val := reflect.Indirect(reflect.ValueOf(op))
 

@@ -35,12 +35,12 @@ func (s stack) GetAuthOpts() (providers.Config, error) {
 	return cfg, nil
 }
 
-// GetConfigurationOptions ...
+// GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
 	return s.cfgOpts, nil
 }
 
-// GetAuthenticationOptions ...
+// GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
 	return s.authOpts, nil
 }

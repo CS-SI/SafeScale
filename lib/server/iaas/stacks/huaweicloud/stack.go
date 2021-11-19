@@ -1145,6 +1145,7 @@ func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 	)
 }
 
+// Migrate
 func (s stack) Migrate(operation string, params map[string]interface{}) fail.Error {
 	if operation == "networklayers" {
 		abstractSubnet := params["layer"].(*abstract.Subnet)

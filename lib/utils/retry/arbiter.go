@@ -99,6 +99,7 @@ func Unsuccessful() Arbiter {
 	}
 }
 
+// OrArbiter
 func OrArbiter(arbiters ...Arbiter) Arbiter {
 	return func(t Try) (verdict.Enum, fail.Error) {
 		final := verdict.Retry

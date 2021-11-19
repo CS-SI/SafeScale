@@ -54,7 +54,7 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "gcp", nil
 }
 
-// GetConfigurationOptions ...
+// GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
 	if s.IsNull() || s.Config == nil {
 		return stacks.ConfigurationOptions{}, nil
@@ -62,7 +62,7 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 	return *s.Config, nil
 }
 
-// GetAuthenticationOptions ...
+// GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
 	if s.IsNull() || s.AuthOptions == nil {
 		return stacks.AuthenticationOptions{}, nil

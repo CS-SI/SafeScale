@@ -19,6 +19,7 @@ package commands
 
 import (
 	"fmt"
+
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 
 	"github.com/sirupsen/logrus"

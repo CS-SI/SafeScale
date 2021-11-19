@@ -21,12 +21,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// GetConfigurationOptions ...
+// GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
 	return s.cfgOpts, nil
 }
 
-// GetAuthenticationOptions ...
+// GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
 	return s.authOpts, nil
 }

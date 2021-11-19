@@ -21,7 +21,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// GetConfigurationOptions ...
+// GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
 	return stacks.ConfigurationOptions{
 		DNSList:          s.Options.Compute.DNSList,
@@ -30,7 +30,7 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 	}, nil
 }
 
-// GetAuthenticationOptions ...
+// GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
 	return stacks.AuthenticationOptions{
 		AccessKeyID:      s.Options.Identity.AccessKey,
