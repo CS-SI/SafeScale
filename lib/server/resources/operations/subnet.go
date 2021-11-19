@@ -1296,7 +1296,10 @@ func (instance *Subnet) validateCIDR(req *abstract.SubnetRequest, network abstra
 // TODO: there is room for optimization here, 'allSubnets' is walked through at each call...
 func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
 	for _, s := range allSubnets {
-		_, sDesc, _ := net.ParseCIDR(s.CIDR)
+		_, sDesc, xerr := net.ParseCIDR(s.CIDR)
+		if xerr != nil {
+			return fail.ConvertError(xerr)
+		}
 		if netutils.CIDROverlap(subnet, *sDesc) {
 			return fail.OverloadError("would intersect with '%s (%s)'", s.Name, s.CIDR)
 		}
@@ -2060,7 +2063,7 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 
 	ids = []string{}
 	if len(subnet.GatewayIDs) > 0 {
-		// FIXME: parallelize
+		// TODO: parallelize
 		for _, v := range subnet.GatewayIDs {
 			hostInstance, xerr := LoadHost(svc, v)
 			xerr = debug.InjectPlannedFail(xerr)
