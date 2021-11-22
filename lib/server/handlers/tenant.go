@@ -309,17 +309,24 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 
 	scanWaitGroup.Wait()
 
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return nil, xerr
+	}
 	if err := handler.collect(); err != nil {
-		return nil, fail.Wrap(err, "failed to save scanned info for tenant '%s'", svc.GetName())
+		return nil, fail.Wrap(err, "failed to save scanned info for tenant '%s'", svcName)
 	}
 	return &protocol.ScanResultList{Results: scanResultList}, nil
 }
 
-func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (xerr fail.Error) {
+func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (ferr fail.Error) {
 
 	svc := handler.job.Service()
 	task := handler.job.Task()
-	tenantName := svc.GetName()
+	tenantName, xerr := svc.GetName()
+	if xerr != nil {
+		return xerr
+	}
 
 	hostName := scannedHostPrefix + template.Name
 	host, xerr := hostfactory.New(svc)
@@ -424,7 +431,10 @@ func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.
 func (handler *tenantHandler) checkScannable() (isScannable bool, xerr fail.Error) {
 	svc := handler.job.Service()
 
-	params := svc.GetTenantParameters()
+	params, xerr := svc.GetTenantParameters()
+	if xerr != nil {
+		return false, xerr
+	}
 
 	compute, ok1 := params["compute"].(map[string]interface{})
 	isScannable, ok2 := compute["Scannable"].(bool)
@@ -459,7 +469,11 @@ func (handler *tenantHandler) dumpTemplates() (xerr fail.Error) {
 		return fail.ConvertError(err)
 	}
 
-	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", svc.GetName())
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return xerr
+	}
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", svcName)
 	f = utils.AbsPathify(f)
 
 	if err = ioutil.WriteFile(f, content, 0600); err != nil {
@@ -491,7 +505,12 @@ func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
 		return fail.ConvertError(err)
 	}
 
-	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", svc.GetName())
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return xerr
+	}
+
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", svcName)
 	f = utils.AbsPathify(f)
 
 	if err := ioutil.WriteFile(f, content, 0600); err != nil {
@@ -649,7 +668,11 @@ func (handler *tenantHandler) collect() (xerr fail.Error) {
 		return fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
 	}
 
-	folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return xerr
+	}
+	folder := fmt.Sprintf("images/%s/%s", svcName, region)
 
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
 		return fail.ConvertError(err)
@@ -668,7 +691,13 @@ func (handler *tenantHandler) collect() (xerr fail.Error) {
 	for _, file := range files {
 		acpu := StoredCPUInfo{}
 		theFile := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/scanner/%s", file.Name()))
-		if strings.Contains(file.Name(), svc.GetName()+"#") {
+
+		svcName, xerr := svc.GetName()
+		if xerr != nil {
+			return xerr
+		}
+
+		if strings.Contains(file.Name(), svcName+"#") {
 			logrus.Infof("Storing: %s", file.Name())
 
 			byteValue, err := ioutil.ReadFile(theFile)

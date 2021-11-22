@@ -348,7 +348,11 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
+		cfg, err := s.GetRawAuthenticationOptions()
+		if err != nil {
+			return "", err
+		}
+		s.selectedAvailabilityZone = cfg.AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
 			azList, xerr := s.ListAvailabilityZones()
 			if xerr != nil {
@@ -699,11 +703,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				derr := s.DeleteFloatingIP(fip.ID)
 				if derr != nil {
 					logrus.Errorf("Error deleting Floating IP: %v", derr)
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 				}
 			}
 		}()
@@ -727,7 +731,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	return host, userData, nil
 }
 
-// validateHostname validates the name of an host based on known FlexibleEngine requirements
+// validateHostname validates the name of a host based on known FlexibleEngine requirements
 func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 	s := check.Struct{
 		"ResourceName": check.Composite{
@@ -831,7 +835,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -872,7 +876,7 @@ func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 
 // ListTemplates lists available IPAddress templates
 // IPAddress templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
+func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -1274,7 +1278,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
-// By convention only one floating IP is allocated to an host
+// By convention only one floating IP is allocated to a host
 func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	commRetryErr := stacks.RetryableRemoteCall(
@@ -1313,7 +1317,7 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 	return &fips[0], nil
 }
 
-// attachFloatingIP creates a Floating IP and attaches it to an host
+// attachFloatingIP creates a Floating IP and attaches it to a host
 func (s stack) attachFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
 	fip, xerr := s.CreateFloatingIP(host)
 	if xerr != nil {

@@ -18,7 +18,7 @@ In the following, each reference to this bucket name will be simplified to `<SAF
 
 The hosts informations are stored in folder `<SAFESCALE>/hosts`.
 
-Inside this folder, the metadata of an host is stored in object named with its ID in subfolder ``byID``,
+Inside this folder, the metadata of a host is stored in object named with its ID in subfolder ``byID``,
 and in object named with its name in subfolder ``byName``.
 
 ### SafeScale Networks

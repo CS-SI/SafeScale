@@ -153,7 +153,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		}
 	}()
 
-	// FIXME: This is not Windows friendly
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
@@ -166,8 +165,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 				_ = innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 				return innerXErr
 			}
-
-			// FIXME: Add crc
 
 			return nil
 		},

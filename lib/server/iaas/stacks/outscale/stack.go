@@ -101,8 +101,8 @@ func NullStack() *stack { // nolint
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() string {
-	return "outscale"
+func (s stack) GetStackName() (string, fail.Error) {
+	return "outscale", nil
 }
 
 // New creates a new stack

@@ -139,7 +139,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 			case hostOptionLightKeyword:
 				updateCachedInformation = !v.Value().(bool)
 			default:
-				logrus.Warningf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
+				logrus.Warnf("In operations.LoadHost(): unknown options '%s', ignored", v.Key())
 			}
 		}
 	}
@@ -152,6 +152,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata message
 			return nil, fail.NotFoundError("failed to find Host '%s'", ref)
 		default:
@@ -169,15 +170,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 	}()
 
 	// FIXME: The reload problem
-	// VPL: I do not agree with this:
-	// This is NECESSARY, also, invalidates the whole purpose of Cache...
-	// in order to reduce the number of accesses to the provider, we actually increased it 300%, introduced locks, panics...
-	// Without this line, we have 0 accesses to the provider, and we get the WRONG result, this is
-	// we don't recover the CURRENT STATE of the provider, we recover OUR cached version of it, that might -and usually it is- out of date
-	// With the line (getting the right info from the provider), we end up doing 3 calls instead of 1...
-	// VPL: what state of Host would you like to be updated by Reload?
-	//      if you need the current Host status, you have Host.ForceGetState() that should update the metadata (but does not currently, I'm fixing this)
-	//      But it should no be done systematically inside LoadHost(). The call is the responsability of the user of the returned instance.
+	// VPL: what state of bucket would you like to be updated by Reload?
 	/*
 		xerr = hostInstance.Reload()
 		if xerr != nil {
@@ -1562,7 +1555,11 @@ func (instance *Host) undoSetSecurityGroups(errorPtr *fail.Error, keepOnFailure 
 // UnbindDefaultSecurityGroupIfNeeded unbinds "default" Security Group from Host if it is bound
 func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.Error {
 	svc := instance.GetService()
-	if sgName := svc.GetDefaultSecurityGroupName(); sgName != "" {
+	sgName, err := svc.GetDefaultSecurityGroupName()
+	if err != nil {
+		return err
+	}
+	if sgName != "" {
 		adsg, innerXErr := svc.InspectSecurityGroupByName(networkID, sgName)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
@@ -1958,7 +1955,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 
 	logrus.Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
 
-	waitingTime := 4 * time.Minute // FIXME: Hardcoded time
+	waitingTime := temporal.MaxTimeout(4*time.Minute, temporal.GetHostCreationTimeout())
 
 	// Reboot Host
 	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
@@ -2813,8 +2810,6 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 				_ = problem.Annotate("retcode", iretcode)
 				return problem
 			}
-
-			// FIXME: Add md5 (download)
 
 			retcode = iretcode
 			stdout = istdout
@@ -3818,7 +3813,11 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, instance.GetID())
 			}
 
-			if svc.GetCapabilities().CanDisableSecurityGroup {
+			caps, xerr := svc.GetCapabilities()
+			if xerr != nil {
+				return xerr
+			}
+			if caps.CanDisableSecurityGroup {
 				xerr = svc.EnableSecurityGroup(asg)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -3923,7 +3922,11 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 				return fail.NotFoundError("security group '%s' is not bound to Host '%s'", sgName, sgInstance.GetID())
 			}
 
-			if svc.GetCapabilities().CanDisableSecurityGroup {
+			caps, xerr := svc.GetCapabilities()
+			if xerr != nil {
+				return xerr
+			}
+			if caps.CanDisableSecurityGroup {
 				xerr = svc.DisableSecurityGroup(asg)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -3952,7 +3955,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 }
 
 // ReserveCIDRForSingleHost returns the first available CIDR and its index inside the Network 'network'
-func ReserveCIDRForSingleHost(networkInstance resources.Network) (_ string, _ uint, outerr fail.Error) {
+func ReserveCIDRForSingleHost(networkInstance resources.Network) (_ string, _ uint, ferr fail.Error) {
 	var index uint
 	xerr := networkInstance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(networkproperty.SingleHostsV1, func(clonable data.Clonable) fail.Error {
@@ -3973,10 +3976,10 @@ func ReserveCIDRForSingleHost(networkInstance resources.Network) (_ string, _ ui
 	}
 
 	defer func() {
-		if outerr != nil {
+		if ferr != nil {
 			derr := FreeCIDRForSingleHost(networkInstance, index)
 			if derr != nil {
-				_ = outerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, networkInstance.GetName()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free CIDR slot '%d' in Network '%s'", index, networkInstance.GetName()))
 			}
 		}
 	}()

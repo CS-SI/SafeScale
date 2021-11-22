@@ -1445,7 +1445,7 @@ var subnetVIPDeleteCommand = &cli.Command{
 var subnetVIPBindCommand = &cli.Command{
 	Name:      "bind",
 	Aliases:   []string{"attach"},
-	Usage:     "Attach a VIP to an host",
+	Usage:     "Attach a VIP to a host",
 	ArgsUsage: "NETWORKREF SUBNETREF VIPNAME HOSTNAME",
 	Flags: []cli.Flag{
 		&cli.StringFlag{

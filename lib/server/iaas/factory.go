@@ -187,13 +187,12 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
 		}
 
-		// Initializes Metadata Object Storage (may be different than the Object Storage)
+		// Initializes Metadata Object Storage (maybe different from the Object Storage)
 		var (
 			metadataBucket   abstract.ObjectStorageBucket
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {
-			// FIXME: This requires tuning too
 			metadataLocationConfig, err := initMetadataLocationConfig(authOpts, tenant)
 			if err != nil {
 				return NullService(), err

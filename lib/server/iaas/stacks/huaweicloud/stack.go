@@ -43,7 +43,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
@@ -82,11 +81,11 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and return interface stack
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (api.Stack, fail.Error) {
+func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (stack, fail.Error) {
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
-		return nil, fail.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
+		return stack{}, fail.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
 	}
 
 	if auth.DomainName == "" && auth.DomainID == "" {
@@ -143,9 +142,9 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAuthenticated:
-			return nil, fail.NotAuthenticatedError("authentication failed")
+			return stack{}, fail.NotAuthenticatedError("authentication failed")
 		default:
-			return nil, xerr
+			return stack{}, xerr
 		}
 	}
 
@@ -160,7 +159,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 		NormalizeError,
 	)
 	if xerr != nil {
-		return nil, xerr
+		return stack{}, xerr
 	}
 
 	// Compute API
@@ -175,10 +174,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
+		return stack{}, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
 	}
 	if xerr != nil {
-		return nil, xerr
+		return stack{}, xerr
 	}
 
 	// Network API
@@ -193,10 +192,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
+		return stack{}, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if xerr != nil {
-		return nil, xerr
+		return stack{}, xerr
 	}
 
 	// Volume API
@@ -220,10 +219,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 			NormalizeError,
 		)
 	default:
-		return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
+		return stack{}, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
 	}
 	if xerr != nil {
-		return nil, xerr
+		return stack{}, xerr
 	}
 
 	// Get provider network ID from network service
@@ -237,7 +236,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 			NormalizeError,
 		)
 		if xerr != nil {
-			return nil, xerr
+			return stack{}, xerr
 		}
 	}
 
@@ -249,7 +248,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 			// continue
 			debug.IgnoreError(xerr)
 		default:
-			return nil, xerr
+			return stack{}, xerr
 		}
 	} else if len(validAvailabilityZones) != 0 {
 		var validZones []string
@@ -263,7 +262,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 			}
 		}
 		if !zoneIsValidInput {
-			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
+			return stack{}, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
 		}
 
 	}
@@ -278,7 +277,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return nil, commRetryErr
+		return stack{}, commRetryErr
 	}
 
 	// Recover Project ID of region
@@ -299,12 +298,12 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return nil, commRetryErr
+		return stack{}, commRetryErr
 	}
 	if len(allProjects) > 0 {
 		authOptions.ProjectID = allProjects[0].ID
 	} else {
-		return nil, fail.NewError("failed to found project ID corresponding to region '%s'", authOptions.Region)
+		return stack{}, fail.NewError("failed to found project ID corresponding to region '%s'", authOptions.Region)
 	}
 
 	s.authOpts = auth
@@ -315,10 +314,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (ap
 	// Initializes the VPC
 	xerr = s.initVPC()
 	if xerr != nil {
-		return nil, xerr
+		return stack{}, xerr
 	}
 
-	return &s, nil
+	return s, nil
 }
 
 // ListRegions ...
@@ -1018,7 +1017,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 	return nil
 }
 
-// CreateVolumeAttachment attaches a volume to an host
+// CreateVolumeAttachment attaches a volume to a host
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
@@ -1146,7 +1145,15 @@ func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 	)
 }
 
+// Migrate
 func (s stack) Migrate(operation string, params map[string]interface{}) fail.Error {
+	if operation == "networklayers" {
+		abstractSubnet := params["layer"].(*abstract.Subnet)
+		// huaweicloud added a layer called "IPv4 SubnetID", which is returned as SubnetID but is not; Network is the real "OpenStack" Subnet ID
+		// FIXME: maybe huaweicloud has to be reviewed/rewritten not to use a mix of pure OpenStack API and customized Huaweicloud API?
+		abstractSubnet.ID = abstractSubnet.Network
+	}
+
 	return nil
 }
 
@@ -1156,8 +1163,8 @@ func (s *stack) IsNull() bool {
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() string {
-	return "huaweicloud"
+func (s stack) GetStackName() (string, fail.Error) {
+	return "huaweicloud", nil
 }
 
 // initVPC initializes the instance of the Networking/VPC if one is defined in tenant

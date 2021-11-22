@@ -89,16 +89,26 @@ func (f MetadataFolder) GetService() iaas.Service {
 }
 
 // GetBucket returns the bucket used by the MetadataFolder to store Object Storage
-func (f MetadataFolder) GetBucket() abstract.ObjectStorageBucket {
+func (f MetadataFolder) GetBucket() (abstract.ObjectStorageBucket, fail.Error) {
 	if f.IsNull() {
-		return abstract.ObjectStorageBucket{}
+		return abstract.ObjectStorageBucket{}, nil
 	}
-	return f.service.GetMetadataBucket()
+
+	bucket, xerr := f.service.GetMetadataBucket()
+	if xerr != nil {
+		return abstract.ObjectStorageBucket{}, xerr
+	}
+
+	return bucket, nil
 }
 
-// getBucket is the same than GetBucket without instance validation (for internal use)
-func (f MetadataFolder) getBucket() abstract.ObjectStorageBucket {
-	return f.service.GetMetadataBucket()
+// getBucket is the same as GetBucket without instance validation (for internal use)
+func (f MetadataFolder) getBucket() (abstract.ObjectStorageBucket, fail.Error) {
+	bucket, xerr := f.service.GetMetadataBucket()
+	if xerr != nil {
+		return abstract.ObjectStorageBucket{}, xerr
+	}
+	return bucket, nil
 }
 
 // Path returns the base path of the MetadataFolder
@@ -139,7 +149,12 @@ func (f MetadataFolder) Lookup(path string, name string) fail.Error {
 	}
 
 	absPath := strings.Trim(f.absolutePath(path), "/")
-	list, xerr := f.service.ListObjects(f.getBucket().Name, absPath, objectstorage.NoPrefix)
+	bucket, xerr := f.getBucket()
+	if xerr != nil {
+		return xerr
+	}
+
+	list, xerr := f.service.ListObjects(bucket.Name, absPath, objectstorage.NoPrefix)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -163,7 +178,12 @@ func (f MetadataFolder) Delete(path string, name string) fail.Error {
 		return fail.InvalidInstanceError()
 	}
 
-	xerr := f.service.DeleteObject(f.getBucket().Name, f.absolutePath(path, name))
+	bucket, xerr := f.getBucket()
+	if xerr != nil {
+		return xerr
+	}
+
+	xerr = f.service.DeleteObject(bucket.Name, f.absolutePath(path, name))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
@@ -189,7 +209,11 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 	var buffer bytes.Buffer
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
-			return f.service.ReadObject(f.getBucket().Name, f.absolutePath(path, name), &buffer, 0, 0)
+			bucket, iErr := f.getBucket()
+			if iErr != nil {
+				return iErr
+			}
+			return f.service.ReadObject(bucket.Name, f.absolutePath(path, name), &buffer, 0, 0)
 		},
 		temporal.GetCommunicationTimeout(),
 	)
@@ -277,12 +301,17 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 		data = content
 	}
 
-	bucketName := f.getBucket().Name
+	bucket, xerr := f.getBucket()
+	if xerr != nil {
+		return xerr
+	}
+
+	bucketName := bucket.Name
 	absolutePath := f.absolutePath(path, name)
 	timeout := temporal.GetMetadataReadAfterWriteTimeout()
 
 	// Outer retry will write the metadata at most 3 times
-	xerr := retry.Action(
+	xerr = retry.Action(
 		func() error {
 			var innerXErr fail.Error
 			source := bytes.NewBuffer(data)
@@ -363,7 +392,11 @@ func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail
 	}
 
 	absPath := f.absolutePath(path)
-	metadataBucket := f.getBucket()
+	metadataBucket, xerr := f.getBucket()
+	if xerr != nil {
+		return xerr
+	}
+
 	list, xerr := f.service.ListObjects(metadataBucket.Name, absPath, objectstorage.NoPrefix)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

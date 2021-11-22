@@ -646,7 +646,10 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task)
 
 	// Determine if getGateway Failover must be set
-	caps := instance.GetService().GetCapabilities()
+	caps, xerr := instance.GetService().GetCapabilities()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
 	gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
 	for k := range req.DisabledDefaultFeatures {
 		if k == "gateway-failover" {
@@ -686,7 +689,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		}
 
 		defer func() {
-			if xerr != nil && !req.KeepOnFailure {
+			if ferr != nil && !req.KeepOnFailure {
 				// Using context.Background() here disables abort
 				if derr := networkInstance.Delete(context.Background()); derr != nil {
 					switch derr.(type) {
@@ -694,7 +697,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 						// missing Network is considered as a successful deletion, continue
 						debug.IgnoreError(derr)
 					default:
-						_ = xerr.AddConsequence(derr)
+						_ = ferr.AddConsequence(derr)
 					}
 				}
 			}
@@ -956,6 +959,7 @@ func (instance *Cluster) createHostResources(
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// It's a valid state not to have a secondary gateway, so continue
 			haveSecondaryGateway = false
 		default:
@@ -2843,9 +2847,9 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			ferr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
 		}
 	}()
 

@@ -191,7 +191,7 @@ func (handler *shareHandler) List() (shares map[string]map[string]*propertiesv1.
 	return shares, nil
 }
 
-// Mount a share on a local directory of an host
+// Mount a share on a local directory of a host
 func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bool) (mount *propertiesv1.HostRemoteMount, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -231,7 +231,7 @@ func (handler *shareHandler) Mount(shareName, hostRef, path string, withCache bo
 	return shareInstance.Mount(task.Context(), target, path, withCache)
 }
 
-// Unmount a share from local directory of an host
+// Unmount a share from local directory of a host
 func (handler *shareHandler) Unmount(shareRef, hostRef string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 

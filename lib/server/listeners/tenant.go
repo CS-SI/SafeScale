@@ -55,7 +55,7 @@ func (s *TenantListener) List(ctx context.Context, in *googleprotobuf.Empty) (_ 
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -89,7 +89,7 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -99,10 +99,15 @@ func (s *TenantListener) Get(ctx context.Context, in *googleprotobuf.Empty) (_ *
 		return nil, fail.NotFoundError("no tenant set")
 	}
 
+	prvName, xerr := currentTenant.Service.GetProviderName()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	return &protocol.TenantName{
 		Name:       currentTenant.Name,
 		BucketName: currentTenant.BucketName,
-		Provider:   currentTenant.Service.GetProviderName(),
+		Provider:   prvName,
 	}, nil
 }
 
@@ -125,7 +130,7 @@ func (s *TenantListener) Set(ctx context.Context, in *protocol.TenantName) (empt
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	defer fail.OnExitLogError(&err)
@@ -156,7 +161,7 @@ func (s *TenantListener) Cleanup(ctx context.Context, in *protocol.TenantCleanup
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -232,7 +237,7 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -266,7 +271,7 @@ func (s *TenantListener) Upgrade(ctx context.Context, in *protocol.TenantUpgrade
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()

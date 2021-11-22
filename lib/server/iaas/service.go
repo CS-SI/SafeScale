@@ -56,8 +56,8 @@ type Service interface {
 	FilterImages(string) ([]abstract.Image, fail.Error)
 	FindTemplateBySizing(abstract.HostSizingRequirements) (*abstract.HostTemplate, fail.Error)
 	FindTemplateByName(string) (*abstract.HostTemplate, fail.Error)
-	GetProviderName() string
-	GetMetadataBucket() abstract.ObjectStorageBucket
+	GetProviderName() (string, fail.Error)
+	GetMetadataBucket() (abstract.ObjectStorageBucket, fail.Error)
 	GetMetadataKey() (*crypt.Key, fail.Error)
 	InspectHostByName(string) (*abstract.HostFull, fail.Error)
 	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
@@ -108,7 +108,7 @@ const (
 	DiskDRFWeight float32 = 1.0 / 16.0
 )
 
-// RankDRF computes the Dominant Resource Fairness Rank of an host template
+// RankDRF computes the Dominant Resource Fairness Rank of a host template
 func RankDRF(t *abstract.HostTemplate) float32 {
 	fc := float32(t.Cores)
 	fr := t.RAMSize
@@ -135,30 +135,25 @@ func (svc *service) IsNull() bool {
 }
 
 // GetProviderName ...
-func (svc service) GetProviderName() string {
+func (svc service) GetProviderName() (string, fail.Error) {
 	if svc.IsNull() {
-		return ""
+		return "", nil
 	}
-	return svc.Provider.GetName()
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return "", xerr
+	}
+	return svcName, nil
 }
 
 // GetName ...
 // Satisfies interface data.Identifiable
-func (svc service) GetName() string {
+func (svc service) GetName() (string, fail.Error) {
 	if svc.IsNull() {
-		return ""
+		return "", nil
 	}
 
-	return svc.tenantName
-}
-
-// GetID ...
-// Satisfies interface data.Identifiable
-func (svc service) GetID() string {
-	if svc.IsNull() {
-		return ""
-	}
-	return svc.GetName()
+	return svc.tenantName, nil
 }
 
 // GetCache returns the data.Cache instance corresponding to the name passed as parameter
@@ -186,11 +181,11 @@ func (svc *service) GetCache(name string) (_ *ResourceCache, xerr fail.Error) {
 }
 
 // GetMetadataBucket returns the bucket instance describing metadata bucket
-func (svc service) GetMetadataBucket() abstract.ObjectStorageBucket {
+func (svc service) GetMetadataBucket() (abstract.ObjectStorageBucket, fail.Error) {
 	if svc.IsNull() {
-		return abstract.ObjectStorageBucket{}
+		return abstract.ObjectStorageBucket{}, nil
 	}
-	return svc.metadataBucket
+	return svc.metadataBucket, nil
 }
 
 // GetMetadataKey returns the key used to crypt data in metadata bucket
@@ -279,7 +274,7 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 	}
 }
 
-// WaitVolumeState waits an host achieve state
+// WaitVolumeState waits a host achieve state
 // If timeout is reached, returns utils.ErrTimeout
 func (svc service) WaitVolumeState(volumeID string, state volumestate.Enum, timeout time.Duration) (*abstract.Volume, fail.Error) {
 	if svc.IsNull() {
@@ -489,7 +484,12 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 				return nil, fail.SyntaxError("region value unset")
 			}
 
-			folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
+			svcName, xerr := svc.GetName()
+			if xerr != nil {
+				return nil, xerr
+			}
+
+			folder := fmt.Sprintf("images/%s/%s", svcName, region)
 
 			imageList, err := db.ReadAll(folder)
 			if err != nil {
@@ -564,7 +564,11 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 	reducedTmpls := svc.reduceTemplates(allTpls, svc.whitelistTemplateREs, svc.blacklistTemplateREs)
 	if sizing.MinGPU < 1 {
 		// Force filtering of known templates with GPU from template list whensizing explicitely wants no GPU
-		reducedTmpls = svc.reduceTemplates(reducedTmpls, nil, svc.GetRegexpsOfTemplatesWithGPU())
+		gpus, xerr := svc.GetRegexpsOfTemplatesWithGPU()
+		if xerr != nil {
+			return nil, xerr
+		}
+		reducedTmpls = svc.reduceTemplates(reducedTmpls, nil, gpus)
 	}
 
 	if sizing.MinCores == 0 && sizing.MaxCores == 0 && sizing.MinRAMSize == 0 && sizing.MaxRAMSize == 0 {
@@ -821,7 +825,7 @@ func addPadding(in string, maxLength int) string {
 	return in
 }
 
-// CreateHostWithKeyPair creates an host
+// CreateHostWithKeyPair creates a host
 func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, *abstract.KeyPair, fail.Error) {
 	if svc.IsNull() {
 		return nil, nil, nil, fail.InvalidInstanceError()

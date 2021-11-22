@@ -92,11 +92,11 @@ type vpcDeleteResult struct { // nolint
 }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork() bool {
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 	if s.IsNull() {
-		return false
+		return false, nil
 	}
-	return s.vpc != nil
+	return s.vpc != nil, nil
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network

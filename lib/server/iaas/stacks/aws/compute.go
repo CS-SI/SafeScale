@@ -268,7 +268,7 @@ func createFilters() []*ec2.Filter {
 		},
 	}
 
-	// FIXME: AWS CentOS AND Others, and HARCODED providers
+	// FIXME: AWS CentOS AND Others, and HARDCODED providers
 	owners := []*string{
 		aws.String("099720109477"), // Ubuntu
 		aws.String("013116697141"), // Fedora
@@ -289,7 +289,7 @@ func createFilters() []*ec2.Filter {
 }
 
 // ListImages lists available image
-func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (_ []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -329,7 +329,7 @@ func toAbstractImage(in ec2.Image) abstract.Image {
 }
 
 // ListTemplates lists templates stored in AWS
-func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
+func (s stack) ListTemplates(bool) (templates []abstract.HostTemplate, xerr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -635,11 +635,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
-		if xerr != nil && !request.KeepOnFailure { // FIXME: Handle error groups
+		if ferr != nil && !request.KeepOnFailure {
 			logrus.Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
 			if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
-				logrus.Warnf("Error deleting ahf: %v", derr)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
+				logrus.Warnf("Error deleting host in cleanup: %v", derr)
 			}
 		}
 	}()
@@ -714,7 +714,6 @@ func (s stack) buildAwsMachine(
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-// FIXME: see if anything is needed (does nothing for now)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
 }
@@ -1014,11 +1013,12 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrAborted, *fail.ErrTimeout:
 				xerr = fail.ConvertError(xerr.Cause())
-			default:
-			}
-		}
-		if xerr != nil {
-			switch xerr.(type) {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreError(xerr)
+				default:
+					return xerr
+				}
 			case *fail.ErrNotFound:
 				debug.IgnoreError(xerr)
 			default:
@@ -1029,7 +1029,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 	// Remove volumes if some remain, report errors (other than not found) as warnings
 	for _, volume := range attachedVolumes {
-		// FIXME: parallelize ?
+		// TODO: parallelize ?
 		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				_, err := s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{VolumeId: aws.String(volume)})
@@ -1319,7 +1319,11 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 	// If there is one last Security Group bound to IPAddress, restore bond to default SecurityGroup before removing
 	if len(resp.SecurityGroups) == 1 && aws.StringValue(resp.SecurityGroups[0].GroupId) == asg.ID {
 		defaultSG := abstract.NewSecurityGroup()
-		defaultSG.Name = s.GetDefaultSecurityGroupName()
+		var err fail.Error
+		defaultSG.Name, err = s.GetDefaultSecurityGroupName()
+		if err != nil {
+			return err
+		}
 		defaultSG.Network = asg.Network
 		defaultSG, xerr := s.InspectSecurityGroup(defaultSG)
 		if xerr != nil {

@@ -43,7 +43,7 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s stack) ListImages() (out []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (out []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -96,7 +96,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
+func (s stack) ListTemplates(bool) (templates []abstract.HostTemplate, xerr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -663,7 +663,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	return nil
 }
 
-// ResizeHost change the template used by an host
+// ResizeHost change the template used by a host
 func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }

@@ -18,7 +18,7 @@ package featuretargettype
 
 //go:generate stringer -type=Enum
 
-// Enum represents the state of an host
+// Enum represents the state of a host
 type Enum uint
 
 const (

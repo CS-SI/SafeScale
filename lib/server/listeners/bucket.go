@@ -59,7 +59,7 @@ func (s *BucketListener) List(ctx context.Context, in *protocol.BucketListReques
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, "", "/buckets/list")
@@ -99,7 +99,7 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetName()
@@ -139,7 +139,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetName()
@@ -173,7 +173,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetName()
@@ -219,7 +219,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetBucket()
@@ -255,7 +255,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetBucket()

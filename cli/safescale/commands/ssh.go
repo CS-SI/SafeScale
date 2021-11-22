@@ -106,7 +106,7 @@ func normalizeFileName(fileName string) string {
 
 var sshCopy = &cli.Command{
 	Name:      "copy",
-	Usage:     "Copy a local file/directory to an host or copy from host to local",
+	Usage:     "Copy a local file/directory to a host or copy from host to local",
 	ArgsUsage: "from to  Ex: /my/local/file.txt host1:/remote/path/",
 	Flags: []cli.Flag{
 		&cli.StringFlag{

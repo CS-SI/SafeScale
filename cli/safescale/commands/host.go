@@ -809,7 +809,7 @@ func hostFeatureListAction(c *cli.Context) error {
 var hostFeatureAddCommand = &cli.Command{
 	Name:      "add",
 	Aliases:   []string{"install"},
-	Usage:     "Installs a feature to an host",
+	Usage:     "Installs a feature to a host",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{

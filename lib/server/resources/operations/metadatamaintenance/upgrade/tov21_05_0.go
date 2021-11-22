@@ -95,7 +95,13 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
 		abstractOwningNetwork *abstract.Network
 		owningInstance        resources.Network
 	)
-	if svc.HasDefaultNetwork() {
+
+	withDefaultNetwork, err := svc.HasDefaultNetwork()
+	if err != nil {
+		return err
+	}
+
+	if withDefaultNetwork {
 		// If there is a default Network/VPC, uses it as owning network for all defined networks in metadata to convert to Subnets
 		abstractOwningNetwork, xerr = svc.GetDefaultNetwork()
 		if xerr != nil {
@@ -228,12 +234,20 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 				networkName = abstractOwningNetwork.Name
 			}
 
-			// Complement abstracted Subnet fields // FIXME: Split huaweicloud
-			if currentInstance.GetService().GetStackName() == "huaweicloud" {
-				// huaweicloud added a layer called "IPv4 SubnetID", which is returned as SubnetID but is not; Network is the real "OpenStack" Subnet ID
-				// FIXME: maybe huaweicloud has to be reviewed/rewritten not to use a mix of pure OpenStack API and customized Huaweicloud API?
-				abstractSubnet.ID = abstractSubnet.Network
+			// -- huaweicloud stack driver needs special treatment here ... --
+			{ // It only does something for huaweicloud
+				stack, xerr := currentInstance.GetService().GetStack()
+				if xerr != nil {
+					return xerr
+				}
+				xerr = stack.Migrate("networklayers", map[string]interface{}{
+					"layer": abstractNetwork,
+				})
+				if xerr != nil {
+					return xerr
+				}
 			}
+
 			subnetID = abstractSubnet.ID
 			abstractSubnet.Name = subnetName
 			abstractSubnet.Network = owningInstance.GetID()
@@ -259,7 +273,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			// -- create Security groups --
 			ctx := context.Background()
 			// owningInstance may be identical to currentInstance, so we need to pass the properties of currentInstance through context,
-			// to prevent deadlock trying to alter the an instance already inside an Alter
+			// to prevent deadlock trying to alter an instance already inside an Alter
 			ctx = context.WithValue(ctx, operations.CurrentNetworkPropertiesContextKey, currentNetworkProps)
 			gwSG, internalSG, publicSG, innerXErr := subnetInstance.UnsafeCreateSecurityGroups(ctx, owningInstance, false)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -430,19 +444,21 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			}
 		}
 
-		// -- GCP stack driver needs special treatment... --
-		// FIXME: Much Much better put all thase custom modifications inside a Migration() method of stack
-		{ // It only does something for gcp
-			stack := currentInstance.GetService().GetStack()
-			xerr = stack.Migrate("tags", map[string]interface{}{
-				"subnetName":  subnetName,
-				"networkName": networkName,
-				"subnetID":    subnetID,
-			})
-			if xerr != nil {
-				return xerr
-			}
+	// -- GCP stack driver needs special treatment... --
+	{ // It only does something for gcp
+		stack, xerr := currentInstance.GetService().GetStack()
+		if xerr != nil {
+			return xerr
 		}
+		xerr = stack.Migrate("tags", map[string]interface{}{
+			"subnetName":  subnetName,
+			"networkName": networkName,
+			"subnetID":    subnetID,
+		})
+		if xerr != nil {
+			return xerr
+		}
+	}
 
 		// -- upgrade gateways (must have been migrated before migrating remaining Hosts, to have proper properties set --
 		for _, v := range gatewayIDs {
@@ -546,9 +562,10 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 					_, ok = hnV1.IPv4Addresses[hnV1.DefaultNetworkID]
 					if ok {
 						previousID = hnV1.DefaultNetworkID
+						if previousID == "" {
+							return fail.InconsistentError("failed to find ID corresponding to the previous default Network IP Address")
+						}
 					}
-				}
-				if previousID == "" {
 					return fail.InconsistentError("failed to find ID corresponding to the previous default Network IP Address")
 				}
 
@@ -621,7 +638,11 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 					return fail.InconsistentError("'*propertiesv1.HostDescription' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				hostDescV1.Tenant = instance.GetService().GetName()
+				var iErr fail.Error
+				hostDescV1.Tenant, iErr = instance.GetService().GetName()
+				if iErr != nil {
+					return iErr
+				}
 				return nil
 			})
 			innerXErr = debug.InjectPlannedFail(innerXErr)
@@ -708,7 +729,10 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 
 	// -- GCP stack driver needs special treatment --
 	{ // it only does something for gcp
-		stack := instance.GetService().GetStack()
+		stack, xerr := instance.GetService().GetStack()
+		if xerr != nil {
+			return xerr
+		}
 		xerr = stack.Migrate("removetag", map[string]interface{}{
 			"instance":       instance,
 			"subnetInstance": subnetInstance,
@@ -1221,7 +1245,11 @@ func inspectNetworkAndSubnet(instance *operations.Cluster, networkName string) (
 
 	// determine if the Network of the Subnet has been created by cluster creation
 	clusterCreatedNetwork := true
-	if instance.GetService().HasDefaultNetwork() {
+	withDefaultNetwork, err := instance.GetService().HasDefaultNetwork()
+	if err != nil {
+		return nil, nil, false, err
+	}
+	if withDefaultNetwork {
 		defaultNetwork, xerr := instance.GetService().GetDefaultNetwork()
 		if xerr != nil {
 			return nil, nil, false, xerr

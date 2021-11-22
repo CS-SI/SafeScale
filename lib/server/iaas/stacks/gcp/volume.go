@@ -198,7 +198,7 @@ func (s stack) DeleteVolume(ref string) fail.Error {
 	return s.rpcDeleteDisk(ref)
 }
 
-// CreateVolumeAttachment attaches a volume to an host
+// CreateVolumeAttachment attaches a volume to a host
 func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error) {
 	if s.IsNull() {
 		return "", fail.InvalidInstanceError()
@@ -259,11 +259,14 @@ func (s stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAt
 	return nil, abstract.ResourceNotFoundError("attachment", vaID)
 }
 
+// Migrate
 func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr) // too many unchecked casts
+
 	if operation == "tags" {
 		// delete current nat route (is it really necessary ?)
 		routeName := params["subnetName"].(string) + "-nat-allowed"
-		xerr := s.rpcDeleteRoute(routeName) // FIXME: This is a problem, the stack shouln't export ANY method
+		xerr := s.rpcDeleteRoute(routeName)
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
@@ -274,7 +277,7 @@ func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fa
 		}
 
 		// create new nat route
-		_, xerr = s.rpcCreateRoute(params["networkName"].(string), params["subnetID"].(string), params["subnetName"].(string)) // FIXME: This is a problem, the stack shouln't export ANY method
+		_, xerr = s.rpcCreateRoute(params["networkName"].(string), params["subnetID"].(string), params["subnetName"].(string))
 		if xerr != nil {
 			return xerr
 		}

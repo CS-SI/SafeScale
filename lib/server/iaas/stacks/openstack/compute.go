@@ -131,7 +131,7 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -240,7 +240,7 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 
 // ListTemplates lists available IPAddress templates
 // IPAddress templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
+func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -858,11 +858,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				logrus.Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
 				if derr := s.rpcDeleteFloatingIP(ip.ID); derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 					logrus.Error(derr.Error())
 					return
 				}
@@ -1041,7 +1041,11 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
+		opts, err := s.GetRawAuthenticationOptions()
+		if err != nil {
+			return "", err
+		}
+		s.selectedAvailabilityZone = opts.AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
 			azList, xerr := s.ListAvailabilityZones()
 			if xerr != nil {
@@ -1254,7 +1258,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 }
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
-// By convention only one floating IP is allocated to an host
+// By convention only one floating IP is allocated to a host
 func (s stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(

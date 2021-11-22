@@ -566,7 +566,10 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	params := data.Map{}
 	if nodeType == clusternodetype.Master {
-		tp := instance.GetService().GetTenantParameters()
+		tp, xerr := instance.GetService().GetTenantParameters()
+		if xerr != nil {
+			return xerr
+		}
 		content := map[string]interface{}{
 			"tenants": []map[string]interface{}{tp},
 		}

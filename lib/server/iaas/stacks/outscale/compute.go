@@ -62,7 +62,7 @@ func normalizeImageName(name string) string {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (_ []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -199,7 +199,7 @@ func (s stack) parseTemplateID(id string) (abstract.HostTemplate, fail.Error) {
 
 // ListTemplates lists available host templates
 // IPAddress templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates() (_ []abstract.HostTemplate, xerr fail.Error) {
+func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, xerr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -450,7 +450,7 @@ func (s stack) tryCreateNICS(request *abstract.HostRequest, nics []osc.Nic) ([]o
 
 func (s stack) deleteNICs(nics []osc.Nic) fail.Error {
 	for _, nic := range nics {
-		// FIXME: parallelize ?
+		// TODO: parallelize ?
 		if xerr := s.rpcDeleteNic(nic.NicId); xerr != nil {
 			return xerr
 		}
@@ -493,7 +493,7 @@ func (s stack) hostState(id string) (hoststate.Enum, fail.Error) {
 	return hostState(vm.State), nil
 }
 
-// WaitHostReady waits an host achieve ready state
+// WaitHostReady waits a host achieve ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
 func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error) {
 	if s.IsNull() {
@@ -804,8 +804,10 @@ func (s stack) addPublicIPs(primaryNIC osc.Nic, otherNICs []osc.Nic) (osc.Public
 	return ip, nil
 }
 
-// CreateHost creates an host that fulfils the request
-func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, xerr fail.Error) {
+// CreateHost creates a host that fulfils the request
+func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
 	nullAHF := abstract.NewHostFull()
 	nullUDC := userdata.NewContent()
 	if s.IsNull() {
@@ -853,9 +855,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
-	defer func() { // FIXME: This should trigger a failure
+	defer func() {
 		if derr := s.DeleteKeyPair(creationKeyPair.Name); derr != nil {
 			logrus.Errorf("Cleaning up on failure, failed to delete creation keypair: %v", derr)
+			if ferr != nil {
+				_ = ferr.AddConsequence(derr)
+			}
 		}
 	}()
 

@@ -125,7 +125,7 @@ func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, f
 
 	stdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_mount.sh", data)
 	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout)
+		_ = xerr.Annotate("stdout", stdout) // FIXME: Missing annotations
 		return "", fail.Wrap(xerr, "error executing script to mount block device")
 	}
 	return stdout, nil

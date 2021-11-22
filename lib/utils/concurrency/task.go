@@ -250,7 +250,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	}
 
 	if parentTask == nil {
-		if ctx == context.TODO() { //nolint
+		if ctx == context.TODO() { // nolint
 			childContext, cancel = context.WithCancel(context.Background())
 		} else {
 			childContext, cancel = context.WithCancel(ctx)
