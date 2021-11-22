@@ -111,9 +111,10 @@ message TenantCompute {
 	string whitelist_template_regex = 6;
 	string blacklist_template_regex = 7;
 	string default_image = 8;
-	string default_volume_speed = 9;
-	repeated string dns_list = 10;
-	string operator_username = 11;
+	repeated string dns_list = 9;
+	string operator_username = 10;
+	string whitelist_image_regex = 11;
+	string blacklist_image_regex = 12;
 }
 
 message TenantNetwork {
@@ -128,6 +129,10 @@ message TenantObjectStorage {
 	string auth_url = 3;
 	string access_key = 4;
 	string region = 5;
+	string project_name = 6;
+	string application_key = 7;
+	string username = 8;
+	string password = 9;
 }
 
 message TenantMetadata {
@@ -388,6 +393,7 @@ message Host {
 	int32 ssh_port = 14;
 	string state_label = 15;
 	string creation_date = 16;
+	bool managed = 17;
 }
 
 message HostStatus {
@@ -564,6 +570,7 @@ message VolumeAttachmentResponse {
 	string format = 3;
 	string device = 4;
 	bool do_not_format = 5;
+	bool mount = 6;
 }
 
 message VolumeListRequest {

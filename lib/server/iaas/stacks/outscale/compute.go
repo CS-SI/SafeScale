@@ -1026,6 +1026,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Core.Tags["Template"] = vm.VmType
 	ahf.Core.Tags["Image"] = vm.ImageId
 
+	// recover metadata
+	for _, rt := range vm.Tags {
+		ahf.Core.Tags[rt.Key] = rt.Value
+	}
+
 	nics = append(nics, defaultNic)
 	xerr = s.setHostProperties(ahf, request.Subnets, vm, nics)
 	return ahf, udc, xerr

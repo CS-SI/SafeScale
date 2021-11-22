@@ -185,11 +185,21 @@ func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 	if in.CurrentState != hoststate.Unknown {
 		state = in.CurrentState
 	}
+
+	managed := false
+	if ct, ok := in.Core.Tags["DeclaredInBucket"]; ok {
+		if ct != "" {
+			managed = true
+		}
+	}
+
 	ph := &protocol.Host{
-		Id:         in.Core.ID,
-		Name:       in.Core.Name,
-		State:      HostStateFromAbstractToProtocol(state),
-		PrivateKey: in.Core.PrivateKey,
+		Id:           in.Core.ID,
+		Name:         in.Core.Name,
+		State:        HostStateFromAbstractToProtocol(state),
+		PrivateKey:   in.Core.PrivateKey,
+		CreationDate: in.Core.Tags["CreationDate"],
+		Managed:      managed,
 	}
 	if in.Networking != nil {
 		ph.PublicIp = in.Networking.PublicIPv4

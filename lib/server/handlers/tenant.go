@@ -145,6 +145,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {
 	Scan(string, bool, []string) (_ *protocol.ScanResultList, xerr fail.Error)
+	Inspect(string) (_ *protocol.TenantInspectResponse, xerr fail.Error)
 }
 
 // tenantHandler service
@@ -157,6 +158,147 @@ type tenantHandler struct {
 // NewTenantHandler creates a scanner service
 func NewTenantHandler(job server.Job) TenantHandler {
 	return &tenantHandler{job: job}
+}
+
+// Inspect displays tenant configuration
+func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInspectResponse, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if handler == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if handler.job == nil {
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
+	if tenantName == "" {
+		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
+	}
+
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+
+	svc := handler.job.Service()
+	currentName, err := svc.GetName()
+	if err != nil {
+		return nil, err
+	}
+	if tenantName != currentName {
+		return nil, fail.NewError("we only inspect current tenant right now")
+	}
+
+	fromParams := func(in map[string]interface{}, key1 string, key2 string) string {
+		if val, ok := in[key1]; ok {
+			if adict, ok := val.(map[string]interface{}); ok {
+				if val2, ok := adict[key2]; ok {
+					if val3, ok := val2.(string); ok {
+						return val3
+					}
+				}
+			}
+		}
+		return ""
+	}
+
+	fromParamsWithSynonims := func(in map[string]interface{}, keylist []string, synons []string) string {
+		for _, key1 := range keylist {
+			if val, ok := in[key1]; ok {
+				if adict, ok := val.(map[string]interface{}); ok {
+					for _, key2 := range synons {
+						if val2, ok := adict[key2]; ok {
+							if val3, ok := val2.(string); ok {
+								if val3 != "" {
+									return val3
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return ""
+	}
+
+	skipEmpty := func(in *protocol.KeyValue) *protocol.KeyValue {
+		if in == nil {
+			return nil
+		}
+		if in.Value == "" {
+			return nil
+		}
+
+		return in
+	}
+
+	opts, err := svc.GetConfigurationOptions()
+	if err != nil {
+		return nil, fail.Wrap(err, "unable to recover driver configuration")
+	}
+
+	params, err := svc.GetTenantParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	svcName, err := svc.GetName()
+	if err != nil {
+		return nil, err
+	}
+
+	provName, err := svc.GetProviderName()
+	if err != nil {
+		return nil, err
+	}
+
+	bucket, err := svc.GetMetadataBucket()
+	if err != nil {
+		return nil, err
+	}
+
+	return &protocol.TenantInspectResponse{
+		Name:     svcName,
+		Provider: provName,
+		Identity: &protocol.TenantIdentity{
+			User: skipEmpty(&protocol.KeyValue{
+				Key:   "Username",
+				Value: fromParams(params, "identity", "Username"),
+			}),
+			AppKey: nil, // secret
+			Domain: skipEmpty(&protocol.KeyValue{
+				Key:   "DomainName",
+				Value: fromParamsWithSynonims(params, []string{"objectstorage", "compute", "identity"}, []string{"DomainName", "Domain"}),
+			}),
+		},
+		Compute: &protocol.TenantCompute{
+			Region:                 fromParams(params, "compute", "Region"),
+			SubRegion:              opts.GetString("SubRegion"),
+			AvailabilityZone:       fromParams(params, "compute", "Zone"),
+			Context:                nil,
+			ApiKey:                 nil, // secret
+			WhitelistTemplateRegex: opts.GetString("WhitelistTemplateRegex"),
+			BlacklistTemplateRegex: opts.GetString("BlacklistTemplateRegex"),
+			DefaultImage:           opts.GetString("DefaultImage"),
+			DnsList:                opts.GetSliceOfStrings("DnsList"),
+			OperatorUsername:       fromParams(params, "compute", "OperatorUsername"),
+			WhitelistImageRegex:    opts.GetString("WhitelistImageRegex"),
+			BlacklistImageRegex:    opts.GetString("BlacklistImageRegex"),
+		},
+		ObjectStorage: &protocol.TenantObjectStorage{
+			Type:           fromParams(params, "objectstorage", "Type"),
+			Endpoint:       fromParams(params, "objectstorage", "Endpoint"),
+			AuthUrl:        fromParams(params, "objectstorage", "AuthURL"),
+			AccessKey:      "", // secret
+			Region:         fromParams(params, "objectstorage", "Region"),
+			ProjectName:    fromParams(params, "objectstorage", "ProjectName"),
+			ApplicationKey: "", // secret
+			Username:       fromParams(params, "objectstorage", "Username"),
+			Password:       "", // secret
+		},
+		Metadata: &protocol.TenantMetadata{
+			BucketName: bucket.GetName(),
+			Crypt:      fromParams(params, "metadata", "CryptKey") != "",
+		},
+	}, nil
 }
 
 // Scan scans the tenant and updates the database

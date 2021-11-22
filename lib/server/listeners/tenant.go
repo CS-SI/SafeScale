@@ -251,7 +251,13 @@ func (s *TenantListener) Inspect(ctx context.Context, in *protocol.TenantName) (
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
-	return nil, fail.NotImplementedError("tenant inspect not yet implemented")
+	handler := handlers.NewTenantHandler(job)
+	tenantInfo, err := handler.Inspect(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return tenantInfo, nil
 }
 
 // Upgrade upgrades metadata of a tenant if needed

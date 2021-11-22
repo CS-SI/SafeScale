@@ -957,6 +957,11 @@ func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (
 	completedHost.Core.Tags["Template"], _ = server.Image["id"].(string)
 	completedHost.Core.Tags["Image"], _ = server.Flavor["id"].(string)
 
+	// recover metadata
+	for k, v := range server.Metadata {
+		completedHost.Core.Tags[k] = v
+	}
+
 	if completedHost.Networking.PublicIPv4 == "" {
 		completedHost.Networking.PublicIPv4 = ipv4
 	}

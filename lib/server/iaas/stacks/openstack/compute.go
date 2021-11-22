@@ -480,6 +480,12 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 		ahf.Core.Tags[k] = v
 	}
 
+	ct, ok := ahf.Core.Tags["CreationDate"]
+	if !ok || ct == "" {
+		logrus.Warningf("CreationDate wars")
+		ahf.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
+	}
+
 	if !ahf.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
 	}
@@ -514,6 +520,16 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 
 	host.Core.Tags["Template"], _ = server.Image["id"].(string)
 	host.Core.Tags["Image"], _ = server.Flavor["id"].(string)
+
+	// recover metadata
+	for k, v := range server.Metadata {
+		host.Core.Tags[k] = v
+	}
+
+	ct, ok := host.Core.Tags["CreationDate"]
+	if !ok || ct == "" {
+		host.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
+	}
 
 	host.Sizing = s.toHostSize(server.Flavor)
 

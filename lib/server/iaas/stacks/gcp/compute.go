@@ -594,6 +594,7 @@ func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instanc
 		}
 	}
 
+	host.Core.Tags["CreationDate"] = instance.CreationTimestamp
 	host.Core.Tags["Template"] = instance.MachineType
 	delete(host.Core.Tags, "startup-script")
 

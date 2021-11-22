@@ -856,6 +856,7 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 			ahf.Core.Tags[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
 		}
 	}
+
 	ahf.Core.Tags["Template"] = instanceType
 	ahf.Core.Tags["Image"] = aws.StringValue(instance.ImageId)
 
