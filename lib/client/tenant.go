@@ -19,6 +19,7 @@ package client
 import (
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
@@ -82,7 +83,7 @@ func (t tenant) Inspect(name string, timeout time.Duration) (*protocol.TenantIns
 
 	ctx, xerr := utils.GetContext(true)
 	if xerr != nil {
-		return nil, xerr
+		return nil, fail.Wrap(xerr, "failure retrieving context")
 	}
 
 	service := protocol.NewTenantServiceClient(t.session.connection)

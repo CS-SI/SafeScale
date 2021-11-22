@@ -3459,7 +3459,7 @@ func (instance *Host) GetDefaultSubnet() (rs resources.Subnet, xerr fail.Error) 
 	return instance.unsafeGetDefaultSubnet()
 }
 
-// ToProtocol convert an resources.Host to protocol.Host
+// ToProtocol convert a resources.Host to protocol.Host
 func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 

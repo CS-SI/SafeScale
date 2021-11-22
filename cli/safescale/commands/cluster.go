@@ -805,7 +805,7 @@ var clusterKubectlCommand = &cli.Command{
 				if idx+1 < len(args) {
 					localFile := args[idx+1]
 					if localFile != "" {
-						// If it's an URL, propagate as-is
+						// If it's a URL, propagate as-is
 						if urlRegex.MatchString(localFile) {
 							filteredArgs = append(filteredArgs, "-f")
 							filteredArgs = append(filteredArgs, localFile)
@@ -909,7 +909,7 @@ var clusterHelmCommand = &cli.Command{
 				if idx+1 < len(args) {
 					localFile := args[idx+1]
 					if localFile != "" {
-						// If it's an URL, filter as-is
+						// If it's a URL, filter as-is
 						if urlRegex.MatchString(localFile) {
 							filteredArgs = append(filteredArgs, "-f")
 							filteredArgs = append(filteredArgs, localFile)

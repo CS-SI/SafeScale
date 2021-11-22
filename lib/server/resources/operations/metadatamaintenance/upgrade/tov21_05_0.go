@@ -444,21 +444,21 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			}
 		}
 
-	// -- GCP stack driver needs special treatment... --
-	{ // It only does something for gcp
-		stack, xerr := currentInstance.GetService().GetStack()
-		if xerr != nil {
-			return xerr
+		// -- GCP stack driver needs special treatment... --
+		{ // It only does something for gcp
+			stack, xerr := currentInstance.GetService().GetStack()
+			if xerr != nil {
+				return xerr
+			}
+			xerr = stack.Migrate("tags", map[string]interface{}{
+				"subnetName":  subnetName,
+				"networkName": networkName,
+				"subnetID":    subnetID,
+			})
+			if xerr != nil {
+				return xerr
+			}
 		}
-		xerr = stack.Migrate("tags", map[string]interface{}{
-			"subnetName":  subnetName,
-			"networkName": networkName,
-			"subnetID":    subnetID,
-		})
-		if xerr != nil {
-			return xerr
-		}
-	}
 
 		// -- upgrade gateways (must have been migrated before migrating remaining Hosts, to have proper properties set --
 		for _, v := range gatewayIDs {
@@ -941,7 +941,7 @@ func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Ser
 		if xerr != nil {
 			return xerr
 		}
-		defer func(item resources.Host) { //nolint
+		defer func(item resources.Host) { // nolint
 			item.Released()
 		}(host)
 
@@ -1562,6 +1562,7 @@ func (tv toV21_05_0) updateSecurityGroupBonds(svc iaas.Service) fail.Error {
 				return innerXErr
 			}
 
+			//goland:noinspection ALL
 			defer func(item resources.Host) {
 				item.Released()
 			}(hostInstance)
@@ -1584,6 +1585,7 @@ func (tv toV21_05_0) updateSecurityGroupBonds(svc iaas.Service) fail.Error {
 				return innerXErr
 			}
 
+			//goland:noinspection ALL
 			defer func(item resources.Host) {
 				item.Released()
 			}(hostInstance)

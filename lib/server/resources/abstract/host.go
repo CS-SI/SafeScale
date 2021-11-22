@@ -227,7 +227,7 @@ func (ht HostTemplate) OK() bool {
 }
 
 // HostCore contains the core information about a host
-// These information should not change over time
+// This information should not change over time // FIXME: Broken assumption
 type HostCore struct {
 	ID         string            `json:"id,omitempty"`
 	Name       string            `json:"name,omitempty"`

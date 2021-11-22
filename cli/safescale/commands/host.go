@@ -203,6 +203,7 @@ var hostInspect = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
+
 		return clitools.SuccessResponse(resp)
 	},
 }

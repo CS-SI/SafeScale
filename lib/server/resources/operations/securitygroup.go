@@ -646,6 +646,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 }
 
 // unbindFromSubnets unbinds security group from all the subnets bound to it and update the Subnet metadata accordingly
+//goland:noinspection GoDeferInLoop
 func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *propertiesv1.SecurityGroupSubnets) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -705,6 +706,7 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 					}
 				}
 
+				//goland:noinspection GoDeferInLoop
 				defer func(in resources.Subnet) {
 					in.Released()
 				}(subnetInstance)
