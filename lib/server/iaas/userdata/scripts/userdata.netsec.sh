@@ -80,9 +80,13 @@ function reset_fw() {
       sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 211 "reset_fw(): failure installing firewalld"
     fi
 
-    echo "Stopping ufw"
-    systemctl stop ufw || true    # set to true to fix issues
-    systemctl disable ufw || true # set to true to fix issues
+	systemctl is-active ufw &>/dev/null && {
+    	echo "Stopping ufw"
+    	systemctl stop ufw || true    # set to true to fix issues
+	}
+	systemctl is-enabled ufw &>/dev/null && {
+    	systemctl disable ufw || true # set to true to fix issues
+	}
     sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 212 "reset_fw(): failure purging ufw"
     ;;
 
@@ -92,10 +96,14 @@ function reset_fw() {
     sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 214 "reset_fw(): failure installing iptables"
     sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 215 "reset_fw(): failure installing firewalld"
 
-    echo "Stopping ufw"
-    systemctl stop ufw || failure 216 "reset_fw(): failure stopping ufw"
-    systemctl disable ufw || failure 217 "reset_fw(): failure disabling ufw"
-    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 218 "reset_fw(): failure purging ufw"
+	systemctl is-active ufw &>/dev/null && {
+    	echo "Stopping ufw"
+    	systemctl stop ufw || true    # set to true to fix issues
+	}
+	systemctl is-enabled ufw &>/dev/null && {
+    	systemctl disable ufw || true # set to true to fix issues
+	}
+    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 216 "reset_fw(): failure purging ufw"
     ;;
 
   redhat | rhel | centos | fedora)

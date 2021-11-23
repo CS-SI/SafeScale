@@ -294,6 +294,8 @@ func reduceHuaweicloudError(in []byte) (ferr fail.Error) {
 			switch code {
 			case "VPC.0101":
 				return fail.NotFoundError("failed to find VPC")
+			case "VPC.0114":
+				return fail.NotFoundError("exceeded VPC quota")
 			case "VPC.0209":
 				return fail.NotAvailableError("subnet still in use")
 			case "APIGW.0101":

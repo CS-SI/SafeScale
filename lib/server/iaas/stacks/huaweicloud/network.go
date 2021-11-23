@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
@@ -499,7 +501,7 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 			entry = s.(map[string]interface{})
 			id = entry["id"].(string)
 		}
-		return s.InspectSubnet(id)
+		return s.inspectOpenstackSubnet(id)
 	}
 	return nullAS, abstract.ResourceNotFoundError("subnet", name)
 }
@@ -540,6 +542,40 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	as.CIDR = resp.Subnet.CIDR
 	as.Network = resp.VpcID
 	as.IPVersion = fromIntIPVersion(resp.IPVersion)
+	return as, nil
+}
+
+func (s stack) inspectOpenstackSubnet(id string) (*abstract.Subnet, fail.Error) {
+	nullAS := abstract.NewSubnet()
+	if s.IsNull() {
+		return nullAS, fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return nullAS, fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+
+	as := abstract.NewSubnet()
+	var sn *subnets.Subnet
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			sn, innerErr = subnets.Get(s.NetworkClient, id).Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return nullAS, xerr
+	}
+
+	as.ID = sn.ID
+	as.Name = sn.Name
+	as.Network = sn.NetworkID
+	as.IPVersion = openstack.ToAbstractIPVersion(sn.IPVersion)
+	as.CIDR = sn.CIDR
+	as.DNSServers = sn.DNSNameservers
+
 	return as, nil
 }
 
