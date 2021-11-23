@@ -327,6 +327,14 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 		return xerr
 	}
 
+	// @TODO status: testing
+	/*
+		xerr = updateClusterInventory(ctx, instance)
+		if xerr != nil {
+			return fail.Wrap(xerr, "Create does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
+		}
+	*/
+
 	return nil
 }
 
@@ -1261,6 +1269,14 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		hosts = append(hosts, hostInstance)
 	}
 
+	// @TODO status: testing
+	/*
+		xerr = updateClusterInventory(ctx, instance)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "AddNodes does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
+		}
+	*/
+
 	return hosts, nil
 }
 
@@ -1390,6 +1406,14 @@ func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 		return nil, xerr
 	}
 
+	// @TODO status: testing
+	/*
+		xerr = updateClusterInventory(ctx, instance)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "DeleteLastNode does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
+		}
+	*/
+
 	return node, nil
 }
 
@@ -1485,6 +1509,14 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	if xerr != nil {
 		return xerr
 	}
+
+	// @TODO status: testing
+	/*
+		xerr = updateClusterInventory(ctx, instance)
+		if xerr != nil {
+			return fail.Wrap(xerr, "DeleteSpecificNode does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
+		}
+	*/
 
 	return nil
 }
@@ -3753,6 +3785,14 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	if len(errors) > 0 {
 		return emptySlice, fail.NewErrorList(errors)
 	}
+
+	// @TODO status: testing
+	/*
+		xerr = updateClusterInventory(ctx, instance)
+		if xerr != nil {
+			return nil, fail.Wrap(xerr, "Shrink does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
+		}
+	*/
 
 	return removedNodes, nil
 }
