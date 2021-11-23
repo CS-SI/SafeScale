@@ -61,8 +61,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	if len(hostReq.Subnets) == 0 {
 		return nil, fail.InvalidRequestError("params.request.Networks cannot be an empty '[]*abstract.Network'")
 	}
-	hostSizing := params.(taskCreateGatewayParameters).sizing
 
+	hostSizing := params.(taskCreateGatewayParameters).sizing
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
 	svc := instance.GetService()
 	hostReq.PublicIP = true

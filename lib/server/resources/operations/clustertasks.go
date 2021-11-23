@@ -1744,6 +1744,9 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")
 	}
 
+	sleepTime := <-instance.generator
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("master", clusternodetype.Master)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -2305,6 +2308,9 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	if p.index < 1 {
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
+
+	sleepTime := <-instance.generator
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("node", clusternodetype.Node)

@@ -21,6 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	mrand "math/rand"
 	"os"
 	"reflect"
 	"strconv"
@@ -84,6 +85,7 @@ type Cluster struct {
 	installMethods      sync.Map
 	lastStateCollection time.Time
 	makers              clusterflavors.Makers
+	generator           <-chan int
 }
 
 // NewCluster ...
@@ -103,7 +105,23 @@ func NewCluster(svc iaas.Service) (_ *Cluster, xerr fail.Error) {
 	instance := &Cluster{
 		MetadataCore: coreInstance,
 	}
+
 	return instance, nil
+}
+
+func randomGeneratorWithReseed(min, max int) <-chan int {
+	chint := make(chan int)
+	mrand.Seed(time.Now().UnixNano())
+	go func() { // feed it
+		for {
+			if min == max {
+				chint <- min
+			}
+			chint <- mrand.Intn(max-min) + min
+		}
+	}()
+
+	return chint
 }
 
 // LoadCluster ...
@@ -274,6 +292,8 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
+	instance.generator = randomGeneratorWithReseed(0, 2000)
+
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -325,7 +345,7 @@ func (instance *Cluster) Serialize() (_ []byte, xerr fail.Error) {
 	return r, fail.ConvertError(err)
 }
 
-// Deserialize reads json code and reinstantiates Cluster
+// Deserialize reads json code and recreates Cluster metadata
 func (instance *Cluster) Deserialize(buf []byte) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
