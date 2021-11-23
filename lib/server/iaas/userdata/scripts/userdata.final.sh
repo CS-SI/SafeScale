@@ -120,10 +120,10 @@ function install_python3() {
 	debian | ubuntu)
 		sfFinishPreviousInstall || fail 200 "failure finishing previous install"
 		sfApt update || fail 201 "failure updating packages"
-		sfApt -y install python3 &>/dev/null || fail 210 "failure installing python3"
+		sfApt -y install python3 python3-pip &>/dev/null || fail 210 "failure installing python3"
 		;;
 	redhat | rhel | centos)
-		yum install -y python3 || fail 210 "failure installing python3"
+		yum install -y python3 python3-pip || fail 210 "failure installing python3"
 		;;
 	*)
 		fail 209 "Unsupported Linux distribution '$LINUX_KIND'!"
