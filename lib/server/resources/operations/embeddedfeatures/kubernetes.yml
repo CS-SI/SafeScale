@@ -73,13 +73,14 @@ feature:
                     nodes:
                         targets:
                             gateways: all
+                            masters: all
                             nodes: all
                         run: |
                             if [ -f /etc/kubernetes/.joined ]; then
                                 pidof kubelet &>/dev/null || sfFail 192 "kubelet not running"
                                 sfExit
                             fi
-                            sfFail 193 "node didn't join (no .joined file)"
+                            sfFail 193 "server not joined (no .joined file)"
 
                     kube:
                         targets:
@@ -89,7 +90,7 @@ feature:
                                 [ $(sfKubectl get nodes -A | wc -l) -gt 1 ] || sfFail 194 "no nodes joined yet"
                                 sfExit
                             fi
-                            sfFail 195 "master didn't join (no .joined file)"
+                            sfFail 195 "master not joined (no .joined file)"
 
                     ready:
                         targets:
@@ -99,7 +100,7 @@ feature:
                                 [ $(sfKubectl get nodes -A | grep -v VERSION | grep -v Ready | wc -l) -eq 0 ] || sfFail 196 "not all nodes ready"
                                 sfExit
                             fi
-                            sfFail 197 "master didn't join (no .joined file)"
+                            sfFail 197 "master not joined (no .joined file)"
 
             add:
                 pace: ca-certs,sysconf,syshardening,cur-ver,common-tools,ca,halb,cp1-init,cni,cpx-init,join-gws,join-nodes,fw,supplemental,final
@@ -263,7 +264,7 @@ feature:
                                 for ip in {{range .ClusterNodeIPs}}{{.}} {{end}}; do
                                     sfDropzoneSync $ip || sfFail 202 "Error in sync"
                                 done
-                            }
+                            } || :
                             sfExit
 
                     common-tools:
@@ -277,14 +278,15 @@ feature:
                             id
                             sfDropzonePop ${SF_TMPDIR}
                             ls -l ${SF_TMPDIR}
-                            if [ -f ${SF_TMPDIR}/kubeversion ]; then
+                            if [ -r ${SF_TMPDIR}/kubeversion ]; then
                                 KUBE_VERSION=$(cat ${SF_TMPDIR}/kubeversion)
                                 echo "Current Kubernetes master is running $KUBE_VERSION, installing corresponding tools"
                             else
                                 KUBE_VERSION={{ .KubeVersion }}
                                 echo "Installing Kubernetes tools $KUBE_VERSION"
                             fi
-                            #sfDropzoneClean
+                            sfDropzoneClean
+                            mkdir -p $SF_ETCDIR/kubernetes/kubeversion && echo -n $KUBE_VERSION >$SF_ETCDIR/kubernetes/kubeversion
 
                             case $(sfGetFact "linux_kind") in
                                 debian|ubuntu)
@@ -490,11 +492,11 @@ feature:
 
                             mkdir -p /etc/kubernetes/kubeadm
 
-                            {{ if .KubeVersion }}
-                            KUBE_VERSION=v{{ .KubeVersion }}
-                            {{ else }}
-                            KUBE_VERSION=stable
-                            {{ end }}
+                            if [ -r ${SF_TMPDIR}/kubeversion ]; then
+                                KUBE_VERSION=$(cat ${SF_ETCDIR}/kubernetes/kubeversion)
+                            else
+                                KUBE_VERSION=stable
+                            fi
 
                             {{ if .ClusterControlplaneUsesVIP }}
                             LOCAL_PORT=6444
