@@ -85,7 +85,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		// If Host resources has been created and error occured after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
+		// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
 		if id := rgw.GetID(); id != "" {
 			as.GatewayIDs = append(as.GatewayIDs, id)
 		}
