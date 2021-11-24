@@ -97,31 +97,6 @@ EOF
 }
 export -f install_common_requirements
 
-case $(sfGetFact "linux_kind") in
-    debian|ubuntu)
-        sfRetryEx 3m 5 "sfApt update" || sfFail 192 "Problem installing node common requirements"
-        curl -kqSsL --fail -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
-        unzip rclone-current-linux-amd64.zip && \
-        cp rclone-*-linux-amd64/rclone /usr/local/bin && \
-        mkdir -p /usr/local/share/man/man1 && \
-        cp rclone-*-linux-amd64/rclone.1 /usr/local/share/man/man1/ && \
-        rm -rf rclone-* && \
-        chown root:root /usr/local/bin/rclone && \
-        chmod 755 /usr/local/bin/rclone && \
-        mandb
-        ;;
-    redhat|centos)
-        yum makecache fast || sfFail 192 "Problem updating sources"
-        yum install -y rclone || sfFail 192 "Problem installing node common requirements"
-        ;;
-    fedora)
-        dnf install -y rclone || sfFail 192 "Problem installing node common requirements"
-        ;;
-    *)
-        sfFail 1 "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
-        ;;
-esac
-
 # /usr/bin/time -p bash -c -x install_common_requirements
 install_common_requirements || sfFail $? "Problem installing common requirements"
 

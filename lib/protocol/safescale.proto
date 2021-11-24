@@ -591,8 +591,18 @@ service VolumeService {
 // safescale bucket list
 // safescale bucket inspect C1
 
-message Bucket {
+message BucketMount {
+	Reference host = 1;
+	string path = 2;
+}
+
+message BucketRequest {
 	string name = 1;
+}
+
+message BucketResponse {
+	string name = 1;
+	repeated BucketMount mounts = 2;
 }
 
 message BucketListRequest {
@@ -600,22 +610,22 @@ message BucketListRequest {
 }
 
 message BucketListResponse {
-	repeated Bucket buckets = 1;
+	repeated BucketResponse buckets = 1;
 }
 
-message BucketMountingPoint {
+message BucketMountRequest {
 	string bucket = 1;
 	Reference host = 2;
 	string path = 3;
 }
 
 service BucketService {
-	rpc Create(Bucket) returns (google.protobuf.Empty){}
-	rpc Mount(BucketMountingPoint) returns (google.protobuf.Empty){}
-	rpc Unmount(BucketMountingPoint) returns (google.protobuf.Empty){}
-	rpc Delete(Bucket) returns (google.protobuf.Empty){}
+	rpc Create(BucketRequest) returns (google.protobuf.Empty){}
+	rpc Mount(BucketMountRequest) returns (google.protobuf.Empty){}
+	rpc Unmount(BucketMountRequest) returns (google.protobuf.Empty){}
+	rpc Delete(BucketRequest) returns (google.protobuf.Empty){}
 	rpc List(BucketListRequest) returns (BucketListResponse){}
-	rpc Inspect(Bucket) returns (BucketMountingPoint){}
+	rpc Inspect(BucketRequest) returns (BucketResponse){}
 }
 
 // SSH requests

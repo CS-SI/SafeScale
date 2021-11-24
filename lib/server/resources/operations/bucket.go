@@ -19,28 +19,28 @@ package operations
 //go:generate rice embed-go
 
 import (
-	"bytes"
 	"context"
 	"reflect"
-	"regexp"
 	"strings"
 	"sync"
 
+	"github.com/CS-SI/SafeScale/lib/protocol"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/bucketproperty"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hostproperty"
+	propertiesv1 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v1"
+	"github.com/CS-SI/SafeScale/lib/system/bucketfs"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
-	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/template"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
@@ -461,6 +461,25 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
+	// -- check Bucket is not still mounted
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.BucketMount' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if len(mountsV1.ByHostID) > 0 {
+				return fail.NotAvailableError("still mounted on some Hosts")
+			}
+
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
 	// -- delete Bucket
 	xerr = instance.GetService().DeleteBucket(instance.GetName())
 	if xerr != nil {
@@ -474,8 +493,8 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	return instance.MetadataCore.Delete()
 }
 
-// Mount a bucket on a host on the given mount point
-func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr fail.Error) {
+// Mount a bucket on an host on the given mount point
+func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outerr fail.Error) {
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -488,6 +507,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 	if path == "" {
 		return fail.InvalidParameterCannotBeEmptyStringError("path")
 	}
+
+	defer fail.OnPanic(&outerr)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -509,68 +530,112 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (xerr 
 
 	tracer := debug.NewTracer(task, true, "('%s', '%s')", hostName, path).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
+	defer fail.OnExitLogError(&outerr, tracer.TraceMessage(""))
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	// Get Host data
 	hostInstance, xerr := LoadHost(instance.GetService(), hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
 	}
 
-	// Create mount point
+	// -- check if bucket is already mounted on host (only one mount by bucket by Host allowed by design)
+	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			if mountPath, ok := mountsV1.ByHostName[hostInstance.GetName()]; ok {
+				return fail.DuplicateError("there is already a mount of Bucket '%s' on Host '%s' in folder '%s'", instance.GetName(), hostInstance.GetName(), mountPath)
+			}
+
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	svc := instance.GetService()
+	authOpts, xerr := svc.GetAuthenticationOptions()
+	if xerr != nil {
+		return xerr
+	}
+
+	bucketFSClient, xerr := bucketfs.NewClient(hostInstance)
+	if xerr != nil {
+		return xerr
+	}
+
+	// -- assemble parameters for mount description
+	osConfig := svc.ObjectStorageConfiguration()
+
 	mountPoint := path
 	if path == abstract.DefaultBucketMountPoint {
 		mountPoint = abstract.DefaultBucketMountPoint + instance.GetName()
 	}
 
-	svc := instance.GetService()
-	authOpts, _ := svc.GetAuthenticationOptions()
-	authurlCfg, _ := authOpts.Config("AuthUrl")
-	authurl := authurlCfg.(string)
-	authurl = regexp.MustCompile("https?:/+(.*)/.*").FindStringSubmatch(authurl)[1]
-	tenantCfg, _ := authOpts.Config("TenantName")
-	tenant := tenantCfg.(string)
-	loginCfg, _ := authOpts.Config("Login")
-	login := loginCfg.(string)
-	passwordCfg, _ := authOpts.Config("Password")
-	password := passwordCfg.(string)
-	regionCfg, _ := authOpts.Config("Region")
-	region := regionCfg.(string)
-
-	objStorageProtocol := svc.ObjectStorageProtocol()
-	if objStorageProtocol == "swift" {
-		objStorageProtocol = "swiftks"
-	}
-	if objStorageProtocol == "google" {
-		objStorageProtocol = "gs"
-	}
-
-	d := struct {
-		Bucket     string
-		Tenant     string
-		Login      string
-		Password   string
-		AuthURL    string
-		Region     string
-		MountPoint string
-		Protocol   string
-	}{
-		Bucket:     instance.GetName(),
-		Tenant:     tenant,
-		Login:      login,
-		Password:   password,
-		AuthURL:    authurl,
-		Region:     region,
+	desc := bucketfs.Description{
+		BucketName: instance.GetName(),
+		Protocol:   svc.Protocol(),
 		MountPoint: mountPoint,
-		Protocol:   objStorageProtocol,
+	}
+	if anon, ok := authOpts.Config("AuthUrl"); ok {
+		desc.AuthURL = anon.(string)
 	}
 
-	err := instance.exec(ctx, hostInstance, "mount_object_storage.sh", d)
-	return fail.ConvertError(err)
+	// needed value for Description.ProjectName may come from various config entries depending on the Cloud Provider
+	if anon, ok := authOpts.Config("ProjectName"); ok {
+		desc.ProjectName = anon.(string)
+	} else if anon, ok := authOpts.Config("ProjectID"); ok {
+		desc.ProjectName = anon.(string)
+	} else if anon, ok := authOpts.Config("TenantName"); ok {
+		desc.ProjectName = anon.(string)
+	}
+
+	desc.Username = osConfig.User
+	desc.Password = osConfig.SecretKey
+	desc.Region = osConfig.Region
+
+	// -- execute the mount
+	xerr = bucketFSClient.Mount(ctx, desc)
+	if xerr != nil {
+		return xerr
+	}
+
+	// -- update metadata of Bucket
+	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			mountsV1.ByHostID[hostInstance.GetID()] = mountPoint
+			mountsV1.ByHostName[hostInstance.GetName()] = mountPoint
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	// -- update metadata of Host
+	return hostInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			mountsV1, ok := clonable.(*propertiesv1.HostMounts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			mountsV1.BucketMounts[instance.GetName()] = mountPoint
+			return nil
+		})
+	})
 }
 
 // Unmount a bucket
@@ -612,85 +677,114 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 
 	svc := instance.GetService()
 
-	// -- Check bucket existence
-	_, xerr = svc.InspectBucket(instance.GetName())
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		if strings.Contains(xerr.Error(), "not found") {
-			return fail.NotFoundError("failed to find Bucket '%s'", instance.GetName())
-		}
-		return xerr
-	}
-
-	// Get Host
 	hostInstance, xerr := LoadHost(svc, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	dataBu := struct {
-		Bucket string
-	}{
-		Bucket: instance.GetName(),
+	var mountPoint string
+	bucketName := instance.GetName()
+	mounts, xerr := hostInstance.GetMounts()
+	for k, v := range mounts.BucketMounts {
+		if k == bucketName {
+			mountPoint = v
+			break
+		}
+	}
+	if mountPoint == "" {
+		return fail.NotFoundError("failed to find corresponding mount on Host")
 	}
 
-	err := instance.exec(ctx, hostInstance, "umount_object_storage.sh", dataBu)
-	return fail.ConvertError(err)
-}
-
-// Execute the given script (embedded in a rice-box) with the given data on the host identified by hostid
-func (instance *bucket) exec(ctx context.Context, host resources.Host, script string, data interface{}) fail.Error {
-	scriptCmd, xerr := getBoxContent(script, data)
-	xerr = debug.InjectPlannedFail(xerr)
+	bucketFSClient, xerr := bucketfs.NewClient(hostInstance)
 	if xerr != nil {
 		return xerr
 	}
 
-	rc, stdout, stderr, rerr := host.Run(ctx, `sudo bash `+scriptCmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
-	if rerr != nil {
+	description := bucketfs.Description{
+		BucketName: bucketName,
+		MountPoint: mountPoint,
+	}
+	xerr = bucketFSClient.Unmount(ctx, description)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// If mount is not found on remote server, consider unmount as successful
+			debug.IgnoreError(xerr)
+			break
+		default:
+			return xerr
+		}
+	}
+
+	xerr = hostInstance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			mountsV1, ok := clonable.(*propertiesv1.HostMounts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			delete(mountsV1.BucketMounts, instance.GetName())
+			return nil
+		})
+	})
+	if xerr != nil {
 		return xerr
 	}
 
-	if rc != 0 {
-		finnerXerr := fail.NewError("embedded script %s failed to run", script)
-		_ = finnerXerr.Annotate("retcode", rc)
-		_ = finnerXerr.Annotate("stdout", stdout)
-		_ = finnerXerr.Annotate("stderr", stderr)
-		return finnerXerr
-	}
+	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
 
-	return nil
+			delete(mountsV1.ByHostID, hostInstance.GetID())
+			delete(mountsV1.ByHostName, hostInstance.GetName())
+			return nil
+		})
+	})
 }
 
-// Return the script (embedded in a rice-box) with placeholders replaced by the values given in data
-func getBoxContent(script string, data interface{}) (tplcmd string, xerr fail.Error) {
-	defer fail.OnExitLogError(&xerr, debug.NewTracer(nil, true, "").TraceMessage(""))
-
-	box, err := rice.FindBox("../operations/scripts")
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return "", fail.ConvertError(err)
-	}
-	scriptContent, err := box.String(script)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return "", fail.ConvertError(err)
-	}
-	tpl, err := template.Parse("TemplateName", scriptContent)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return "", fail.ConvertError(err)
+// ToProtocol returns the protocol message corresponding to Bucket fields
+func (b *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
+	out := &protocol.BucketResponse{
+		Name: b.GetName(),
 	}
 
-	var buffer bytes.Buffer
-	err = tpl.Option("missingkey=error").Execute(&buffer, data)
-	err = debug.InjectPlannedError(err)
-	if err != nil {
-		return "", fail.ConvertError(err)
+	xerr := b.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		svc := b.GetService()
+		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			out.Mounts = make([]*protocol.BucketMount, 0, len(mountsV1.ByHostID))
+			for k, v := range mountsV1.ByHostID {
+				hostInstance, xerr := LoadHost(svc, k)
+				if xerr != nil {
+					return xerr
+				}
+
+				defer func(i resources.Host) { //nolint
+					i.Released()
+				}(hostInstance)
+
+				out.Mounts = append(out.Mounts, &protocol.BucketMount{
+					Host: &protocol.Reference{
+						Id:   k,
+						Name: hostInstance.GetName(),
+					},
+					Path: v,
+				})
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	tplcmd = buffer.String()
-	// fmt.Println(tplcmd)
-	return tplcmd, nil
+	return out, nil
 }

@@ -17,43 +17,10 @@
 package converters
 
 import (
-	"context"
-
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
-
-// BucketMountPointFromResourceToProtocol converts a bucket mount point from resource to protocol
-func BucketMountPointFromResourceToProtocol(ctx context.Context, in resources.Bucket) (*protocol.BucketMountingPoint, fail.Error) {
-	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
-	}
-
-	if in == nil {
-		return nil, fail.InvalidParameterError("in", "cannot be nil")
-	}
-
-	host, xerr := in.GetHost(ctx)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	path, xerr := in.GetMountPoint(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	out := &protocol.BucketMountingPoint{
-		Bucket: in.GetName(),
-		Host:   &protocol.Reference{Name: host},
-		Path:   path,
-	}
-	return out, nil
-}
 
 func IndexedListOfClusterNodesFromResourceToProtocol(in resources.IndexedListOfClusterNodes) (*protocol.ClusterNodeListResponse, fail.Error) {
 	out := &protocol.ClusterNodeListResponse{}

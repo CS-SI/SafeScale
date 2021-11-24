@@ -34,9 +34,9 @@ import (
 
 // BucketListToProtocol convert a list of string into a *protocol.BucketListResponse
 func BucketListToProtocol(in []string) *protocol.BucketListResponse {
-	var buckets []*protocol.Bucket
+	var buckets []*protocol.BucketResponse
 	for _, name := range in {
-		buckets = append(buckets, &protocol.Bucket{Name: name})
+		buckets = append(buckets, &protocol.BucketResponse{Name: name})
 	}
 	return &protocol.BucketListResponse{
 		Buckets: buckets,

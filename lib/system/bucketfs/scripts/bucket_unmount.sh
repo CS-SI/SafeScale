@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# nfs_client_share_mount.sh
+# bucket_unmount.sh
 #
-# Declares a remote share mount and mount it
+# Unmounts an Object Storage Bucket
 
 {{.BashHeader}}
 
@@ -27,7 +27,6 @@ function print_error() {
 }
 trap print_error ERR
 
-mkdir -p "{{.MountPoint}}" && \
-mount.nfs -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" && \
-echo "{{.Export}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >>/etc/fstab
-sftp1:subdir /mnt/data rclone rw,noauto,nofail,_netdev,x-systemd.automount,args2env,vfs_cache_mode=writes,config=/etc/rclone.conf,cache_dir=/var/cache/rclone 0 0
+umount -fl {{ .MountPoint }}
+sed -i '\#{{ .MountPoint }} rclone#d' /etc/fstab
+rm -f {{ .ConfigFile }}
