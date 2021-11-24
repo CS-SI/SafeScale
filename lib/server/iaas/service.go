@@ -63,6 +63,7 @@ type Service interface {
 	InspectSecurityGroupByName(networkID string, name string) (*abstract.SecurityGroup, fail.Error)
 	ListHostsByName(bool) (map[string]*abstract.HostFull, fail.Error)
 	ListTemplatesBySizing(abstract.HostSizingRequirements, bool) ([]*abstract.HostTemplate, fail.Error)
+	ObjectStorageConfiguration() objectstorage.Config
 	SearchImage(string) (*abstract.Image, fail.Error)
 	TenantCleanup(bool) fail.Error // cleans up the data relative to SafeScale from tenant (not implemented yet)
 	WaitHostState(string, hoststate.Enum, time.Duration) fail.Error
@@ -930,4 +931,8 @@ func (svc service) InspectSecurityGroupByName(networkID, name string) (*abstract
 		return nil, fail.InvalidInstanceError()
 	}
 	return svc.InspectSecurityGroup(abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
+}
+
+func (svc service) ObjectStorageConfiguration() objectstorage.Config {
+	return svc.Location.Configuration()
 }

@@ -60,7 +60,7 @@ func (c bucket) Create(name string, timeout time.Duration) error {
 		return xerr
 	}
 
-	_, err := service.Create(ctx, &protocol.Bucket{Name: name})
+	_, err := service.Create(ctx, &protocol.BucketRequest{Name: name})
 	return err
 }
 
@@ -82,7 +82,7 @@ func (c bucket) Delete(names []string, timeout time.Duration) error {
 
 	bucketDeleter := func(aname string) {
 		defer wg.Done()
-		_, err := service.Delete(ctx, &protocol.Bucket{Name: aname})
+		_, err := service.Delete(ctx, &protocol.BucketRequest{Name: aname})
 		if err != nil {
 			mutex.Lock()
 			errs = append(errs, err.Error())
@@ -103,7 +103,7 @@ func (c bucket) Delete(names []string, timeout time.Duration) error {
 }
 
 // Inspect ...
-func (c bucket) Inspect(name string, timeout time.Duration) (*protocol.BucketMountingPoint, error) {
+func (c bucket) Inspect(name string, timeout time.Duration) (*protocol.BucketResponse, error) {
 	c.session.Connect()
 	defer c.session.Disconnect()
 	service := protocol.NewBucketServiceClient(c.session.connection)
@@ -112,7 +112,7 @@ func (c bucket) Inspect(name string, timeout time.Duration) (*protocol.BucketMou
 		return nil, err
 	}
 
-	return service.Inspect(ctx, &protocol.Bucket{Name: name})
+	return service.Inspect(ctx, &protocol.BucketRequest{Name: name})
 }
 
 // Mount ...
@@ -125,7 +125,7 @@ func (c bucket) Mount(bucketName, hostName, mountPoint string, timeout time.Dura
 		return xerr
 	}
 
-	_, err := service.Mount(ctx, &protocol.BucketMountingPoint{
+	_, err := service.Mount(ctx, &protocol.BucketMountRequest{
 		Bucket: bucketName,
 		Host:   &protocol.Reference{Name: hostName},
 		Path:   mountPoint,
@@ -143,7 +143,7 @@ func (c bucket) Unmount(bucketName, hostName string, timeout time.Duration) erro
 		return xerr
 	}
 
-	_, err := service.Unmount(ctx, &protocol.BucketMountingPoint{
+	_, err := service.Unmount(ctx, &protocol.BucketMountRequest{
 		Bucket: bucketName,
 		Host:   &protocol.Reference{Name: hostName},
 	})

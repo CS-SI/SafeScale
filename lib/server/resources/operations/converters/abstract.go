@@ -238,9 +238,9 @@ func HostStateFromAbstractToProtocol(in hoststate.Enum) protocol.HostState {
 
 // BucketListFromAbstractToProtocol ...
 func BucketListFromAbstractToProtocol(in []string) *protocol.BucketListResponse {
-	out := protocol.BucketListResponse{Buckets: []*protocol.Bucket{}}
+	out := protocol.BucketListResponse{Buckets: []*protocol.BucketResponse{}}
 	for _, v := range in {
-		b := protocol.Bucket{
+		b := protocol.BucketResponse{
 			Name: v,
 		}
 		out.Buckets = append(out.Buckets, &b)

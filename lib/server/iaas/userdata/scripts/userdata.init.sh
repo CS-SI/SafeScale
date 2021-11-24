@@ -50,7 +50,7 @@ function fail() {
 }
 export -f fail
 
-mkdir -p /opt/safescale/etc /opt/safescale/bin &>/dev/null
+mkdir -p /opt/safescale/etc/rclone /opt/safescale/bin &>/dev/null
 mkdir -p /opt/safescale/var/log &>/dev/null
 mkdir -p /opt/safescale/var/run /opt/safescale/var/state /opt/safescale/var/tmp &>/dev/null
 

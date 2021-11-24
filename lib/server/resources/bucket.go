@@ -19,6 +19,7 @@ package resources
 import (
 	"context"
 
+	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
@@ -39,5 +40,6 @@ type Bucket interface {
 	Create(ctx context.Context, name string) fail.Error
 	Delete(ctx context.Context) fail.Error
 	Mount(ctx context.Context, hostname string, path string) fail.Error
+	ToProtocol() (*protocol.BucketResponse, fail.Error)
 	Unmount(ctx context.Context, hostname string) fail.Error
 }

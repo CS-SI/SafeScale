@@ -80,13 +80,13 @@ function reset_fw() {
       sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 211 "reset_fw(): failure installing firewalld"
     fi
 
-	systemctl is-active ufw &>/dev/null && {
-    	echo "Stopping ufw"
-    	systemctl stop ufw || true    # set to true to fix issues
-	}
-	systemctl is-enabled ufw &>/dev/null && {
-    	systemctl disable ufw || true # set to true to fix issues
-	}
+    systemctl is-active ufw &>/dev/null && {
+        echo "Stopping ufw"
+        systemctl stop ufw || true    # set to true to fix issues
+    }
+    systemctl is-enabled ufw &>/dev/null && {
+        systemctl disable ufw || true # set to true to fix issues
+    }
     sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 212 "reset_fw(): failure purging ufw"
     ;;
 
@@ -96,13 +96,13 @@ function reset_fw() {
     sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 214 "reset_fw(): failure installing iptables"
     sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 215 "reset_fw(): failure installing firewalld"
 
-	systemctl is-active ufw &>/dev/null && {
-    	echo "Stopping ufw"
-    	systemctl stop ufw || true    # set to true to fix issues
-	}
-	systemctl is-enabled ufw &>/dev/null && {
-    	systemctl disable ufw || true # set to true to fix issues
-	}
+    systemctl is-active ufw &>/dev/null && {
+        echo "Stopping ufw"
+        systemctl stop ufw || true    # set to true to fix issues
+    }
+    systemctl is-enabled ufw &>/dev/null && {
+        systemctl disable ufw || true # set to true to fix issues
+    }
     sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 216 "reset_fw(): failure purging ufw"
     ;;
 
@@ -209,14 +209,14 @@ function configure_dhclient() {
   if [ -d /etc/dhcp/ ]; then
     HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
     cat >>$HOOK_FILE <<-EOF
-			make_resolv_conf() {
-			    :
-			}
+            make_resolv_conf() {
+                :
+            }
 
-			{{- if .AddGateway }}
-			unset new_routers
-			{{- end}}
-		EOF
+            {{- if .AddGateway }}
+            unset new_routers
+            {{- end}}
+EOF
     chmod +x $HOOK_FILE
   fi
 }
@@ -515,18 +515,18 @@ function configure_network_debian() {
 
   for IF in ${NICS}; do
     if [[ "$IF" == "$PU_IF" ]]; then
-      cat <<-EOF >${path}/10-${IF}-public.cfg
-				auto ${IF}
-				iface ${IF} inet dhcp
-			EOF
+      cat >${path}/10-${IF}-public.cfg <<-EOF
+                auto ${IF}
+                iface ${IF} inet dhcp
+EOF
     else
-      cat <<-EOF >${path}/11-${IF}-private.cfg
-				auto ${IF}
-				iface ${IF} inet dhcp
-				{{- if .AddGateway }}
-				  up route add -net default gw {{ .DefaultRouteIP }}
-				{{- end}}
-			EOF
+      cat>${path}/11-${IF}-private.cfg <<-EOF
+                auto ${IF}
+                iface ${IF} inet dhcp
+                {{- if .AddGateway }}
+                  up route add -net default gw {{ .DefaultRouteIP }}
+                {{- end}}
+EOF
     fi
   done
 
@@ -576,44 +576,44 @@ function configure_network_systemd_networkd() {
   # Recreate netplan configuration with last netplan version and more settings
   for IF in ${NICS}; do
     if [[ "$IF" == "$PU_IF" ]]; then
-      cat <<-EOF >/etc/netplan/10-${IF}-public.yaml
-				network:
-				  version: 2
-				  renderer: networkd
+      cat >/etc/netplan/10-${IF}-public.yaml <<-EOF
+                network:
+                  version: 2
+                  renderer: networkd
 
-				  ethernets:
-				    $IF:
-				      dhcp4: true
-				      dhcp6: false
-				      critical: true
-				      dhcp4-overrides:
-				          use-dns: false
-				          use-routes: true
-			EOF
+                  ethernets:
+                    $IF:
+                      dhcp4: true
+                      dhcp6: false
+                      critical: true
+                      dhcp4-overrides:
+                          use-dns: false
+                          use-routes: true
+EOF
     else
-      cat <<-EOF >/etc/netplan/11-${IF}-private.yaml
-				network:
-				  version: 2
-				  renderer: networkd
+      cat >/etc/netplan/11-${IF}-private.yaml <<-EOF
+                network:
+                  version: 2
+                  renderer: networkd
 
-				  ethernets:
-				    ${IF}:
-				      dhcp4: true
-				      dhcp6: false
-				      critical: true
-				      dhcp4-overrides:
-				        use-dns: false
-				{{- if .AddGateway }}
-				        use-routes: false
-				      routes:
-				      - to: 0.0.0.0/0
-				        via: {{ .DefaultRouteIP }}
-				        scope: global
-				        on-link: true
-				{{- else }}
-				        use-routes: true
-				{{- end}}
-			EOF
+                  ethernets:
+                    ${IF}:
+                      dhcp4: true
+                      dhcp6: false
+                      critical: true
+                      dhcp4-overrides:
+                        use-dns: false
+                {{- if .AddGateway }}
+                        use-routes: false
+                      routes:
+                      - to: 0.0.0.0/0
+                        via: {{ .DefaultRouteIP }}
+                        scope: global
+                        on-link: true
+                {{- else }}
+                        use-routes: true
+                {{- end}}
+EOF
     fi
   done
 
@@ -631,44 +631,44 @@ function configure_network_systemd_networkd() {
       # Recreate netplan configuration with last netplan version and more settings
       for IF in ${NICS}; do
         if [[ "$IF" == "$PU_IF" ]]; then
-          cat <<-EOF >/etc/netplan/10-$IF-public.yaml
-						network:
-						  version: 2
-						  renderer: networkd
+          cat >/etc/netplan/10-$IF-public.yaml <<-EOF
+                        network:
+                          version: 2
+                          renderer: networkd
 
-						  ethernets:
-						    ${IF}:
-						      dhcp4: true
-						      dhcp6: false
-						      critical: true
-						      dhcp4-overrides:
-						          use-dns: true
-						          use-routes: true
-					EOF
+                          ethernets:
+                            ${IF}:
+                              dhcp4: true
+                              dhcp6: false
+                              critical: true
+                              dhcp4-overrides:
+                                  use-dns: true
+                                  use-routes: true
+EOF
         else
-          cat <<-EOF >/etc/netplan/11-${IF}-private.yaml
-						network:
-						  version: 2
-						  renderer: networkd
+          cat >/etc/netplan/11-${IF}-private.yaml <<-EOF
+                        network:
+                          version: 2
+                          renderer: networkd
 
-						  ethernets:
-						    ${IF}:
-						      dhcp4: true
-						      dhcp6: false
-						      critical: true
-						      dhcp4-overrides:
-						        use-dns: true
-						{{- if .AddGateway }}
-						        use-routes: true
-						      routes:
-						      - to: 0.0.0.0/0
-						        via: {{ .DefaultRouteIP }}
-						        scope: global
-						        on-link: true
-						{{- else }}
-						        use-routes: true
-						{{- end}}
-					EOF
+                          ethernets:
+                            ${IF}:
+                              dhcp4: true
+                              dhcp6: false
+                              critical: true
+                              dhcp4-overrides:
+                                use-dns: true
+                        {{- if .AddGateway }}
+                                use-routes: true
+                              routes:
+                              - to: 0.0.0.0/0
+                                via: {{ .DefaultRouteIP }}
+                                scope: global
+                                on-link: true
+                        {{- else }}
+                                use-routes: true
+                        {{- end}}
+EOF
         fi
       done
     fi
@@ -723,10 +723,10 @@ function configure_network_systemd_networkd() {
 function configure_network_redhat() {
   echo "Configuring network (redhat-like)..."
 
-	if [ $VERSION_ID -eq 8 ]; then
-		echo "Configuring network (redhat8-like)..."
-		nmcli c mod eth0 connection.autoconnect yes || true
-	fi
+    if [ $VERSION_ID -eq 8 ]; then
+        echo "Configuring network (redhat8-like)..."
+        nmcli c mod eth0 connection.autoconnect yes || true
+    fi
 
   if [[ -z $VERSION_ID || $VERSION_ID -lt 7 ]]; then
     disable_svc() {
@@ -829,11 +829,11 @@ function configure_network_redhat_without_nmcli() {
   for IF in $NICS; do
     if [[ ${IF} != "lo" ]]; then
       cat >/etc/sysconfig/network-scripts/ifcfg-${IF} <<-EOF
-				DEVICE=$IF
-				BOOTPROTO=dhcp
-				ONBOOT=yes
-				NM_CONTROLLED=no
-			EOF
+                DEVICE=$IF
+                BOOTPROTO=dhcp
+                ONBOOT=yes
+                NM_CONTROLLED=no
+EOF
       {{- if .DNSServers }}
       i=1
       {{- range .DNSServers }}
@@ -981,9 +981,9 @@ function configure_as_gateway() {
       mv -f ${i}.new ${i}
     done
     cat >/etc/sysctl.d/21-gateway.conf <<-EOF
-			net.ipv4.ip_forward=1
-			net.ipv4.ip_nonlocal_bind=1
-		EOF
+            net.ipv4.ip_forward=1
+            net.ipv4.ip_nonlocal_bind=1
+EOF
     case $LINUX_KIND in
     ubuntu) systemctl restart systemd-sysctl ;;
     *) sysctl -p ;;
@@ -1024,15 +1024,15 @@ function configure_as_gateway() {
 }
 
 function configure_dns_legacy_issues() {
-	case $LINUX_KIND in
-	debian)
-		if [ $VERSION_ID -eq 9 ]; then
-			cp /etc/resolv.conf.tested /etc/resolv.conf
-		fi
-		;;
-	*) ;;
+    case $LINUX_KIND in
+    debian)
+        if [ $VERSION_ID -eq 9 ]; then
+            cp /etc/resolv.conf.tested /etc/resolv.conf
+        fi
+        ;;
+    *) ;;
 
-	esac
+    esac
 }
 
 function configure_dns_legacy() {
@@ -1057,15 +1057,15 @@ function configure_dns_legacy() {
     echo "/etc/dhcp/dhclient.conf not modified"
   fi
   {{- end }}
-  cat <<-'EOF' >/etc/resolv.conf
-		{{- if .DNSServers }}
-		  {{- range .DNSServers }}
-		nameserver {{ . }}
-		  {{- end }}
-		{{- else }}
-		nameserver 1.1.1.1
-		{{- end }}
-	EOF
+  cat >/etc/resolv.conf <<-'EOF'
+        {{- if .DNSServers }}
+          {{- range .DNSServers }}
+        nameserver {{ . }}
+          {{- end }}
+        {{- else }}
+        nameserver 1.1.1.1
+        {{- end }}
+EOF
 
   cp /etc/resolv.conf /etc/resolv.conf.tested
 
@@ -1083,15 +1083,15 @@ function configure_dns_resolvconf() {
 
   EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
 
-  cat <<-'EOF' >/etc/resolvconf/resolv.conf.d/head
-		{{- if .DNSServers }}
-		  {{- range .DNSServers }}
-		nameserver {{ . }}
-		  {{- end }}
-		{{- else }}
-		nameserver 1.1.1.1
-		{{- end }}
-	EOF
+  cat >/etc/resolvconf/resolv.conf.d/head <<-'EOF'
+        {{- if .DNSServers }}
+          {{- range .DNSServers }}
+        nameserver {{ . }}
+          {{- end }}
+        {{- else }}
+        nameserver 1.1.1.1
+        {{- end }}
+EOF
 
   resolvconf -u
   echo "done"
@@ -1105,16 +1105,16 @@ function configure_dns_systemd_resolved() {
   ln -s /run/systemd/resolve/resolv.conf /etc
   {{- end }}
 
-  cat <<-'EOF' >/etc/systemd/resolved.conf
-		[Resolve]
-		{{- if .DNSServers }}
-		DNS={{ range .DNSServers }}{{ . }} {{ end }}
-		{{- else }}
-		DNS=1.1.1.1
-		{{- end}}
-		Cache=yes
-		DNSStubListener=yes
-	EOF
+  cat >/etc/systemd/resolved.conf <<-'EOF'
+        [Resolve]
+        {{- if .DNSServers }}
+        DNS={{ range .DNSServers }}{{ . }} {{ end }}
+        {{- else }}
+        DNS=1.1.1.1
+        {{- end}}
+        Cache=yes
+        DNSStubListener=yes
+EOF
   systemctl restart systemd-resolved
   echo "done"
 }
@@ -1212,11 +1212,11 @@ function disable_upgrades() {
 function early_packages_update() {
   # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
   cat >/etc/gai.conf <<-EOF
-		precedence ::ffff:0:0/96 100
-		scopev4 ::ffff:169.254.0.0/112  2
-		scopev4 ::ffff:127.0.0.0/104    2
-		scopev4 ::ffff:0.0.0.0/96       14
-	EOF
+        precedence ::ffff:0:0/96 100
+        scopev4 ::ffff:169.254.0.0/112  2
+        scopev4 ::ffff:127.0.0.0/104    2
+        scopev4 ::ffff:0.0.0.0/96       14
+EOF
 
   case $LINUX_KIND in
   debian)
@@ -1294,17 +1294,46 @@ function early_packages_update() {
 }
 
 function install_packages() {
-  case $LINUX_KIND in
-  ubuntu | debian)
-    sfApt install -y -qq wget curl jq zip unzip time at &>/dev/null || failure 213 "failure installing utility packages: jq zip time at"
-    ;;
-  redhat | centos)
-    yum install --enablerepo=epel -y -q wget curl jq zip unzip time at &>/dev/null || failure 214 "failure installing utility packages: jq zip time at"
-    ;;
-  *)
-    failure 215 "Unsupported Linux distribution '$LINUX_KIND'!"
-    ;;
-  esac
+    case $LINUX_KIND in
+        ubuntu | debian)
+            sfApt install -y -qq wget curl jq zip unzip time at &>/dev/null || failure 213 "failure installing utility packages: jq zip time at"
+            ;;
+        redhat | centos)
+            yum install --enablerepo=epel -y -q wget curl jq zip unzip time at &>/dev/null || failure 214 "failure installing utility packages: jq zip time at"
+            ;;
+        *)
+            failure 215 "Unsupported Linux distribution '$LINUX_KIND'!"
+            ;;
+    esac
+}
+
+function install_rclone() {
+    case $LINUX_KIND in
+        debian|ubuntu)
+            curl -kqSsL --fail -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
+            unzip rclone-current-linux-amd64.zip && \
+            cp rclone-*-linux-amd64/rclone /usr/bin && \
+            mkdir -p /usr/share/man/man1 && \
+            cp rclone-*-linux-amd64/rclone.1 /usr/share/man/man1/ && \
+            rm -rf rclone-* && \
+            chown root:root /usr/bin/rclone && \
+            chmod 755 /usr/bin/rclone && \
+            mandb
+            ;;
+        redhat|centos)
+            yum makecache fast || sfFail 192 "Problem updating sources"
+            yum install -y rclone || sfFail 192 "Problem installing node common requirements"
+            ;;
+        fedora)
+            dnf install -y rclone || sfFail 192 "Problem installing node common requirements"
+            ;;
+        *)
+            sfFail 1 "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
+            ;;
+    esac
+
+    ln -s /usr/bin/rclone /sbin/mount.rclone && ln -s /usr/bin/rclone /usr/bin/rclonefs || sfFail 192 "failed to create rclone soft links"
+    return 0
 }
 
 function no_daily_update() {
@@ -1406,8 +1435,8 @@ function configure_root_password_if_needed() {
 
 function update_kernel_settings() {
   cat >/etc/sysctl.d/20-safescale.conf <<-EOF
-		vm.max_map_count=262144
-	EOF
+    vm.max_map_count=262144
+EOF
   case $LINUX_KIND in
   ubuntu) systemctl restart systemd-sysctl ;;
   *) sysctl -p ;;
@@ -1415,14 +1444,14 @@ function update_kernel_settings() {
 }
 
 function update_credentials() {
-	echo "{{.Username}}:{{.Password}}" | chpasswd
+    echo "{{.Username}}:{{.Password}}" | chpasswd
 
-	dd if=/dev/urandom of=/home/{{.Username}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
-	echo "{{.FinalPublicKey}}" >/home/{{.Username}}/.ssh/authorized_keys
-	dd if=/dev/urandom of=/home/{{.Username}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
-	echo "{{.FinalPrivateKey}}" >/home/{{.Username}}/.ssh/id_rsa
-	chmod 0700 /home/{{.Username}}/.ssh
-	chmod -R 0600 /home/{{.Username}}/.ssh/*
+    dd if=/dev/urandom of=/home/{{.Username}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
+    echo "{{.FinalPublicKey}}" >/home/{{.Username}}/.ssh/authorized_keys
+    dd if=/dev/urandom of=/home/{{.Username}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
+    echo "{{.FinalPrivateKey}}" >/home/{{.Username}}/.ssh/id_rsa
+    chmod 0700 /home/{{.Username}}/.ssh
+    chmod -R 0600 /home/{{.Username}}/.ssh/*
 }
 
 function enable_at_daemon() {
@@ -1494,14 +1523,15 @@ is_network_reachable && {
 }
 
 install_packages || failure 215 "failure installing packages"
+install_rclone || failure 216 "failure installing rclone"
 
-update_kernel_settings || failure 216 "failure updating kernel settings"
+update_kernel_settings || failure 217 "failure updating kernel settings"
 
-force_dbus_restart || failure 217 "failure restarting dbus"
+force_dbus_restart || failure 218 "failure restarting dbus"
 
-systemctl restart sshd || failure 217 "failure restarting sshd"
+systemctl restart sshd || failure 219 "failure restarting sshd"
 
-enable_at_daemon || failure 217 "failure starting at daemon"
+enable_at_daemon || failure 220 "failure starting at daemon"
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
 
