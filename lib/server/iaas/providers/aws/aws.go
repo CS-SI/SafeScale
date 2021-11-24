@@ -75,6 +75,8 @@ func New() providers.Provider {
 
 // Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
+	// tenantName, _ := params["name"].(string)
+
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
 		return &provider{}, fail.SyntaxError("section 'identity' not found in tenants.toml")

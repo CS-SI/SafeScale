@@ -328,7 +328,7 @@ func pollVolume(svc service, volumeID string, state volumestate.Enum, cout chan 
 	}
 }
 
-// ListTemplates lists available host templates
+// ListTemplates lists available host templates, if all bool is true, all templates are returned, if not, templates are filtered using blacklists and whitelists
 // Host templates are sorted using Dominant Resource Fairness Algorithm
 func (svc service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	if svc.IsNull() {
@@ -736,7 +736,7 @@ func filterImagesByRegexSlice(res []*regexp.Regexp) imagefilters.Predicate {
 	}
 }
 
-// ListImages reduces the list of needed
+// ListImages reduces the list of needed, if all bool is true, all images are returned, if not, images are filtered using blacklists and whitelists
 func (svc service) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()

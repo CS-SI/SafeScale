@@ -34,10 +34,10 @@ type Provider interface {
 	// Build builds a new Client from configuration parameter and can be called from nil
 	Build(map[string]interface{}) (Provider, fail.Error)
 
-	// ListImages lists available OS images
+	// ListImages lists available OS images, all bool is unused here but used at upper levels to filter using whitelists and blacklists
 	ListImages(all bool) ([]abstract.Image, fail.Error)
 
-	// ListTemplates lists available host templates, Host templates are sorted using Dominant Resource Fairness Algorithm
+	// ListTemplates lists available host templates, all bool is unused here but used at upper levels to filter using whitelists and blacklists, Host templates are sorted using Dominant Resource Fairness Algorithm
 	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 
 	// GetAuthenticationOptions returns authentication options as a Config

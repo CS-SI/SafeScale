@@ -24,6 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -293,7 +294,7 @@ func createFilters() []*ec2.Filter {
 }
 
 // ListImages lists available image
-func (s stack) ListImages(bool) (_ []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(_ bool) (_ []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -333,18 +334,38 @@ func toAbstractImage(in ec2.Image) abstract.Image {
 }
 
 // ListTemplates lists templates stored in AWS
-func (s stack) ListTemplates(bool) (templates []abstract.HostTemplate, xerr fail.Error) {
+func (s stack) ListTemplates(_ bool) (templates []abstract.HostTemplate, ferr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&xerr)
+	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeInstanceTypes(nil)
+	var resp []*ec2.InstanceTypeInfo
+	unfilteredResp, xerr := s.rpcDescribeInstanceTypes(nil)
 	if xerr != nil {
 		return emptySlice, xerr
+	}
+
+	// list only the resources actually available in our AZ
+	under, xerr := s.rpcDescribeInstanceTypeOfferings(aws.String(s.AwsConfig.Zone))
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+
+	// put those into a set
+	availableTemplateNames := mapset.NewSet()
+	for _, item := range under.InstanceTypeOfferings {
+		availableTemplateNames.Add(aws.StringValue(item.InstanceType))
+	}
+
+	// not available resources are filtered out
+	for _, item := range unfilteredResp {
+		if availableTemplateNames.Contains(aws.StringValue(item.InstanceType)) {
+			resp = append(resp, item)
+		}
 	}
 
 	// sort response on Network Performance to potentially have cheaper choices first
