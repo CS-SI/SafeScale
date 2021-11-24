@@ -266,6 +266,10 @@ func createFilters() []*ec2.Filter {
 			Name:   aws.String("ena-support"),
 			Values: []*string{aws.String("true")},
 		},
+		{
+			Name:   aws.String("is-public"),
+			Values: []*string{aws.String("true")},
+		},
 	}
 
 	// FIXME: AWS CentOS AND Others, and HARDCODED providers

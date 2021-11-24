@@ -400,7 +400,7 @@ func (svc service) FindTemplateBySizing(sizing abstract.HostSizingRequirements) 
 	return template, nil
 }
 
-// reduceTemplates filters from template slice the entries satisfyin whitelist and blacklist regexps
+// reduceTemplates filters from template slice the entries satisfying whitelist and blacklist regexps
 func (svc service) reduceTemplates(tpls []abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp) []abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if len(whitelistREs) > 0 {
@@ -564,7 +564,7 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 
 	reducedTmpls := svc.reduceTemplates(allTpls, svc.whitelistTemplateREs, svc.blacklistTemplateREs)
 	if sizing.MinGPU < 1 {
-		// Force filtering of known templates with GPU from template list whensizing explicitely wants no GPU
+		// Force filtering of known templates with GPU from template list when sizing explicitly asks for no GPU
 		gpus, xerr := svc.GetRegexpsOfTemplatesWithGPU()
 		if xerr != nil {
 			return nil, xerr

@@ -1268,6 +1268,35 @@ func (s stack) rpcDescribeImageByID(id *string) (*ec2.Image, fail.Error) {
 	return resp[0], nil
 }
 
+// FIXME: typeOfferings s.EC2Service.DescribeInstanceTypeOfferings
+func (s stack) rpcDescribeInstanceTypeOfferings(az *string) (*ec2.DescribeInstanceTypeOfferingsOutput, fail.Error) {
+	filters := []*ec2.Filter{
+		{
+			Name:   aws.String("location"),
+			Values: []*string{az},
+		},
+	}
+	request := ec2.DescribeInstanceTypeOfferingsInput{
+		Filters:      filters,
+		LocationType: aws.String(ec2.LocationTypeAvailabilityZone),
+	}
+
+	var offerings *ec2.DescribeInstanceTypeOfferingsOutput
+	xerr := stacks.RetryableRemoteCall(
+		func() error {
+			var err error
+			offerings, err = s.EC2Service.DescribeInstanceTypeOfferings(&request)
+			return err
+		},
+		normalizeError,
+	)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return offerings, nil
+}
+
 func (s stack) rpcModifyInstanceSecurityGroups(id *string, sgIDs []*string) fail.Error {
 	if xerr := validateAWSString(id, "id", true); xerr != nil {
 		return xerr

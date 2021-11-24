@@ -69,6 +69,9 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 
 // GetAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
+	if s.IsNull() {
+		return stacks.AuthenticationOptions{}, nil
+	}
 	return *s.AuthOptions, nil
 }
 
@@ -90,7 +93,6 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	accessKeyID := auth.AccessKeyID
 	secretAccessKey := auth.SecretAccessKey
 
-	// not used directly but for mocks
 	ss3 := session.Must(session.NewSession(&aws.Config{
 		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
 		S3ForcePathStyle: aws.Bool(true),
