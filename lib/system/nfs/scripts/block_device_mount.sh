@@ -20,35 +20,35 @@
 {{.BashHeader}}
 
 print_error() {
-    ec=$?
-    read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file (exit code $ec) :" "{"$(sed "${line}q;d" "$file")"}" >&2
+  ec=$?
+  read line file <<< $(caller)
+  echo "An error occurred in line $line of file $file (exit code $ec) :" "{"$(sed "${line}q;d" "$file")"}" >&2
 }
 
 trap print_error ERR
 
 UUID=""
 {{- if not .DoNotFormat }}
-mkfs -F -t {{.FileSystem}} "{{.Device}}" >/dev/null || {
-    echo "failed to format" && exit 2
+mkfs -F -t {{.FileSystem}} "{{.Device}}" > /dev/null || {
+  echo "failed to format" && exit 2
 }
 {{- end }}
 
 # define UUID variable
 eval $(blkid | grep "{{.Device}}" | cut -d: -f2-)
 [ "$UUID" = "" ] && {
-	echo "failed to get UUID of new device"
-	exit 1
+  echo "failed to get UUID of new device"
+  exit 1
 }
 
-cp /etc/fstab /tmp/fstab.sav.$$ && \
-echo "/dev/disk/by-uuid/$UUID {{.MountPoint}} {{.FileSystem}} defaults 0 2" >>/etc/fstab && \
-mkdir -p "{{.MountPoint}}" >/dev/null && \
-mount {{.MountPoint}} >/dev/null && \
-chmod a+rwx "{{.MountPoint}}" >/dev/null && \
-echo -n $UUID && \
-rm -f /tmp/fstab.sav.$$ && \
-exit 0
+cp /etc/fstab /tmp/fstab.sav.$$ &&
+  echo "/dev/disk/by-uuid/$UUID {{.MountPoint}} {{.FileSystem}} defaults 0 2" >> /etc/fstab &&
+  mkdir -p "{{.MountPoint}}" > /dev/null &&
+  mount {{.MountPoint}} > /dev/null &&
+  chmod a+rwx "{{.MountPoint}}" > /dev/null &&
+  echo -n $UUID &&
+  rm -f /tmp/fstab.sav.$$ &&
+  exit 0
 
 # If we arrive here, issue happened, restore fstab
 mv /tmp/fstab.sav.$$ /etc/fstab

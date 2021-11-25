@@ -20,14 +20,14 @@
 {{.BashHeader}}
 
 function print_error() {
-    ec=$?
-    read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
+  ec=$?
+  read line file <<< $(caller)
+  echo "An error occurred in line $line of file $file (exit code $ec) :" "{"$(sed "${line}q;d" "$file")"}" >&2
 }
 trap print_error ERR
 
 eval "$(lsblk -P -o MOUNTPOINT /dev/disk/by-uuid/{{.UUID}})"
 [ -z "$MOUNTPOINT" ] && echo "device /dev/disk/by-uuid/{{.UUID}} not mounted" && exit 1
 
-umount -l -f "$MOUNTPOINT" && \
-sed -i '\:{{.UUID}}:d' /etc/fstab
+umount -l -f "$MOUNTPOINT" &&
+  sed -i '\:{{.UUID}}:d' /etc/fstab

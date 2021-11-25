@@ -20,7 +20,7 @@
 {{.Header}}
 
 function print_error() {
-  read -r line file <<<"$(caller)"
+  read -r line file <<< "$(caller)"
   echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
   {{.ExitOnError}}
 }
@@ -30,19 +30,19 @@ function failure() {
   MYIP="$(ip -br a | grep UP | awk '{print $3}') | head -n 1"
   if [ $# -eq 1 ]; then
     echo "PROVISIONING_ERROR: $1"
-    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" >/opt/safescale/var/state/user_data.netsec.done
+    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" > /opt/safescale/var/state/user_data.netsec.done
     (
       sync
-      echo 3 >/proc/sys/vm/drop_caches
+      echo 3 > /proc/sys/vm/drop_caches
       sleep 2
     ) || true
     exit $1
   elif [ $# -eq 2 -a $1 -ne 0 ]; then
     echo "PROVISIONING_ERROR: $1, $2"
-    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$2" >/opt/safescale/var/state/user_data.netsec.done
+    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$2" > /opt/safescale/var/state/user_data.netsec.done
     (
       sync
-      echo 3 >/proc/sys/vm/drop_caches
+      echo 3 > /proc/sys/vm/drop_caches
       sleep 2
     ) || true
     exit $1
@@ -58,7 +58,7 @@ exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'netsec' is already done (otherwise will deadlock)
-uptime >/opt/safescale/var/state/user_data.netsec.done
+uptime > /opt/safescale/var/state/user_data.netsec.done
 
 # Includes the BashLibrary
 {{ .reserved_BashLibrary }}
@@ -74,20 +74,20 @@ function reset_fw() {
     if [[ $(lsb_release -rs | cut -d. -f1) -eq 10 ]]; then
       codename=$(sfGetFact "linux_codename")
       sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports iptables" || failure 208 "reset_fw(): failure installing iptables"
-      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports firewalld"  || failure 209 "reset_fw(): failure installing firewalld"
+      sfRetryEx 3m 5 "sfApt install -q -y -t ${codename}-backports firewalld" || failure 209 "reset_fw(): failure installing firewalld"
     else
       sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 210 "reset_fw(): failure installing iptables"
       sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 211 "reset_fw(): failure installing firewalld"
     fi
 
-    systemctl is-active ufw &>/dev/null && {
-        echo "Stopping ufw"
-        systemctl stop ufw || true    # set to true to fix issues
+    systemctl is-active ufw &> /dev/null && {
+      echo "Stopping ufw"
+      systemctl stop ufw || true # set to true to fix issues
     }
-    systemctl is-enabled ufw &>/dev/null && {
-        systemctl disable ufw || true # set to true to fix issues
+    systemctl is-enabled ufw &> /dev/null && {
+      systemctl disable ufw || true # set to true to fix issues
     }
-    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 212 "reset_fw(): failure purging ufw"
+    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null" || failure 212 "reset_fw(): failure purging ufw"
     ;;
 
   ubuntu)
@@ -96,20 +96,20 @@ function reset_fw() {
     sfRetryEx 3m 5 "sfApt install -q -y iptables" || failure 214 "reset_fw(): failure installing iptables"
     sfRetryEx 3m 5 "sfApt install -q -y firewalld" || failure 215 "reset_fw(): failure installing firewalld"
 
-    systemctl is-active ufw &>/dev/null && {
-        echo "Stopping ufw"
-        systemctl stop ufw || true    # set to true to fix issues
+    systemctl is-active ufw &> /dev/null && {
+      echo "Stopping ufw"
+      systemctl stop ufw || true # set to true to fix issues
     }
-    systemctl is-enabled ufw &>/dev/null && {
-        systemctl disable ufw || true # set to true to fix issues
+    systemctl is-enabled ufw &> /dev/null && {
+      systemctl disable ufw || true # set to true to fix issues
     }
-    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null"  || failure 216 "reset_fw(): failure purging ufw"
+    sfRetryEx 3m 5 "sfApt purge -q -y ufw &>/dev/null" || failure 216 "reset_fw(): failure purging ufw"
     ;;
 
   redhat | rhel | centos | fedora)
     # firewalld may not be installed
-    if ! systemctl is-active firewalld &>/dev/null; then
-      if ! systemctl status firewalld &>/dev/null; then
+    if ! systemctl is-active firewalld &> /dev/null; then
+      if ! systemctl status firewalld &> /dev/null; then
         is_network_reachable || failure 219 "reset_fw(): failure installing firewalld because repositories are not reachable"
         sfRetryEx 3m 5 "sfYum install -q -y firewalld" || failure 220 "reset_fw(): failure installing firewalld"
       fi
@@ -120,7 +120,7 @@ function reset_fw() {
   # Clear interfaces attached to zones
   for zone in public trusted; do
     for nic in $(firewall-offline-cmd --zone=$zone --list-interfaces || true); do
-      firewall-offline-cmd --zone=$zone --remove-interface=$nic &>/dev/null || true
+      firewall-offline-cmd --zone=$zone --remove-interface=$nic &> /dev/null || true
     done
   done
 
@@ -165,8 +165,8 @@ function reset_fw() {
     failure 226 "reset_fw(): firewall-offline-cmd failed with $op adding ssh service"
   fi
 
-  sfService enable firewalld &>/dev/null || failure 227 "reset_fw(): service firewalld enable failed with $?"
-  sfService start firewalld &>/dev/null || failure 228 "reset_fw(): service firewalld start failed with $?"
+  sfService enable firewalld &> /dev/null || failure 227 "reset_fw(): service firewalld enable failed with $?"
+  sfService start firewalld &> /dev/null || failure 228 "reset_fw(): service firewalld start failed with $?"
 
   sop=-1
   firewall-cmd --runtime-to-permanent && sop=$? || sop=$?
@@ -179,8 +179,8 @@ function reset_fw() {
   # Save current fw settings as permanent
   sfFirewallReload || (echo "reloading firewall failed with $?" && return 1)
 
-  firewall-cmd --list-all --zone=trusted >/tmp/firewall-trusted.cfg || true
-  firewall-cmd --list-all --zone=public >/tmp/firewall-public.cfg || true
+  firewall-cmd --list-all --zone=trusted > /tmp/firewall-trusted.cfg || true
+  firewall-cmd --list-all --zone=public > /tmp/firewall-public.cfg || true
 
   return 0
 }
@@ -208,15 +208,15 @@ function configure_dhclient() {
 
   if [ -d /etc/dhcp/ ]; then
     HOOK_FILE=/etc/dhcp/dhclient-enter-hooks
-    cat >>$HOOK_FILE <<-EOF
-            make_resolv_conf() {
-                :
-            }
+    cat >> $HOOK_FILE <<- EOF
+			make_resolv_conf() {
+			    :
+			}
 
-            {{- if .AddGateway }}
-            unset new_routers
-            {{- end}}
-EOF
+			{{- if .AddGateway }}
+			unset new_routers
+			{{- end}}
+		EOF
     chmod +x $HOOK_FILE
   fi
 }
@@ -227,13 +227,13 @@ function is_ip_private() {
 
   {{ if .EmulatedPublicNet}}
   r=$(sfCidr2iprange {{ .EmulatedPublicNet }})
-  bv=$(sfIP2long $(cut -d- -f1 <<<$r))
-  ev=$(sfIP2long $(cut -d- -f2 <<<$r))
+  bv=$(sfIP2long $(cut -d- -f1 <<< $r))
+  ev=$(sfIP2long $(cut -d- -f2 <<< $r))
   [ $ipv -ge $bv -a $ipv -le $ev ] && return 0
   {{- end }}
   for r in "192.168.0.0-192.168.255.255" "172.16.0.0-172.31.255.255" "10.0.0.0-10.255.255.255"; do
-    bv=$(sfIP2long $(cut -d- -f1 <<<$r))
-    ev=$(sfIP2long $(cut -d- -f2 <<<$r))
+    bv=$(sfIP2long $(cut -d- -f1 <<< $r))
+    ev=$(sfIP2long $(cut -d- -f2 <<< $r))
     [ $ipv -ge $bv -a $ipv -le $ev ] && return 0
   done
   return 1
@@ -284,25 +284,25 @@ function identify_nics() {
     [[ ! -z $IP ]] && is_ip_private $IP && PR_IFs="$PR_IFs $IF"
   done
   PR_IFs=$(echo ${PR_IFs} | xargs) || true
-  PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2>/dev/null) || true
+  PU_IF=$(ip route get 8.8.8.8 | awk -F"dev " 'NR==1{split($2,a," ");print a[1]}' 2> /dev/null) || true
   PU_IP=$(ip a | grep ${PU_IF} | grep inet | awk '{print $2}' | cut -d '/' -f1) || true
   if [[ ! -z ${PU_IP} ]]; then
     if is_ip_private $PU_IP; then
       PU_IF=
 
-      NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null | grep 404) || true
+      NO404=$(curl -s -o /dev/null -w "%{http_code}" http://169.254.169.254/latest/meta-data/public-ipv4 2> /dev/null | grep 404) || true
       if [[ -z $NO404 ]]; then
         # Works with FlexibleEngine and potentially with AWS (not tested yet)
-        PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null) || true
-        [[ -z $PU_IP ]] && PU_IP=$(curl ipinfo.io/ip 2>/dev/null)
+        PU_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4 2> /dev/null) || true
+        [[ -z $PU_IP ]] && PU_IP=$(curl ipinfo.io/ip 2> /dev/null)
       fi
     fi
   fi
   [[ -z ${PR_IFs} ]] && PR_IFs=$(substring_diff "$NICS" "$PU_IF")
 
   # Keeps track of interfaces identified for future scripting use
-  echo "$PR_IFs" >${SF_VARDIR}/state/private_nics
-  echo "$PU_IF" >${SF_VARDIR}/state/public_nics
+  echo "$PR_IFs" > ${SF_VARDIR}/state/private_nics
+  echo "$PU_IF" > ${SF_VARDIR}/state/public_nics
 
   check_providers
 
@@ -313,18 +313,18 @@ function identify_nics() {
 }
 
 function substring_diff() {
-  read -a l1 <<<$1
-  read -a l2 <<<$2
+  read -a l1 <<< $1
+  read -a l2 <<< $2
   echo "${l1[@]}" "${l2[@]}" | tr ' ' '\n' | sort | uniq -u
 }
 
 function collect_original_packages() {
   case $LINUX_KIND in
   debian | ubuntu)
-    dpkg-query -l >${SF_VARDIR}/log/packages_installed_before.phase2.list
+    dpkg-query -l > ${SF_VARDIR}/log/packages_installed_before.phase2.list
     ;;
   redhat | rhel | centos | fedora)
-    rpm -qa | sort >${SF_VARDIR}/log/packages_installed_before.phase2.list
+    rpm -qa | sort > ${SF_VARDIR}/log/packages_installed_before.phase2.list
     ;;
   *) ;;
   esac
@@ -356,10 +356,10 @@ function ensure_curl_is_installed() {
 function collect_installed_packages() {
   case $LINUX_KIND in
   debian | ubuntu)
-    dpkg-query -l >${SF_VARDIR}/log/packages_installed_after.phase2.list
+    dpkg-query -l > ${SF_VARDIR}/log/packages_installed_after.phase2.list
     ;;
   redhat | rhel | centos | fedora)
-    rpm -qa | sort >${SF_VARDIR}/log/packages_installed_after.phase2.list
+    rpm -qa | sort > ${SF_VARDIR}/log/packages_installed_after.phase2.list
     ;;
   *) ;;
 
@@ -374,7 +374,7 @@ function ensure_network_connectivity() {
 
   {{- if .AddGateway }}
   if [[ -n $(which route) ]]; then
-    route del -net default &>/dev/null
+    route del -net default &> /dev/null
     route add -net default gw {{ .DefaultRouteIP }}
   else
     ip route del default
@@ -396,10 +396,10 @@ function ensure_network_connectivity() {
 }
 
 function configure_dns() {
-  if systemctl status systemd-resolved &>/dev/null; then
+  if systemctl status systemd-resolved &> /dev/null; then
     echo "Configuring dns with resolved"
     configure_dns_systemd_resolved
-  elif systemctl status resolvconf &>/dev/null; then
+  elif systemctl status resolvconf &> /dev/null; then
     echo "Configuring dns with resolvconf"
     configure_dns_resolvconf
   else
@@ -450,20 +450,20 @@ function install_route_if_needed() {
 }
 
 function allow_custom_env_ssh_vars() {
-  cat >>/etc/ssh/sshd_config <<-EOF
-AcceptEnv SAFESCALESSHUSER
-AcceptEnv SAFESCALESSHPASS
-EOF
+  cat >> /etc/ssh/sshd_config <<- EOF
+		AcceptEnv SAFESCALESSHUSER
+		AcceptEnv SAFESCALESSHPASS
+	EOF
   systemctl reload sshd
 }
 
 function configure_network() {
   case $LINUX_KIND in
   debian | ubuntu)
-    if systemctl status systemd-networkd &>/dev/null; then
+    if systemctl status systemd-networkd &> /dev/null; then
       install_route_if_needed
       configure_network_systemd_networkd
-    elif systemctl status networking &>/dev/null; then
+    elif systemctl status networking &> /dev/null; then
       install_route_if_needed
       configure_network_debian
     else
@@ -473,7 +473,7 @@ function configure_network() {
 
   redhat | rhel | centos)
     # Network configuration
-    if systemctl status systemd-networkd &>/dev/null; then
+    if systemctl status systemd-networkd &> /dev/null; then
       install_route_if_needed
       configure_network_systemd_networkd
     else
@@ -515,18 +515,18 @@ function configure_network_debian() {
 
   for IF in ${NICS}; do
     if [[ "$IF" == "$PU_IF" ]]; then
-      cat >${path}/10-${IF}-public.cfg <<-EOF
-                auto ${IF}
-                iface ${IF} inet dhcp
-EOF
+      cat > ${path}/10-${IF}-public.cfg <<- EOF
+				auto ${IF}
+				iface ${IF} inet dhcp
+			EOF
     else
-      cat>${path}/11-${IF}-private.cfg <<-EOF
-                auto ${IF}
-                iface ${IF} inet dhcp
-                {{- if .AddGateway }}
-                  up route add -net default gw {{ .DefaultRouteIP }}
-                {{- end}}
-EOF
+      cat > ${path}/11-${IF}-private.cfg <<- EOF
+				auto ${IF}
+				iface ${IF} inet dhcp
+				{{- if .AddGateway }}
+					up route add -net default gw {{ .DefaultRouteIP }}
+				{{- end}}
+			EOF
     fi
   done
 
@@ -576,44 +576,44 @@ function configure_network_systemd_networkd() {
   # Recreate netplan configuration with last netplan version and more settings
   for IF in ${NICS}; do
     if [[ "$IF" == "$PU_IF" ]]; then
-      cat >/etc/netplan/10-${IF}-public.yaml <<-EOF
-                network:
-                  version: 2
-                  renderer: networkd
+      cat <<- EOF > /etc/netplan/10-${IF}-public.yaml
+				network:
+				  version: 2
+				  renderer: networkd
 
-                  ethernets:
-                    $IF:
-                      dhcp4: true
-                      dhcp6: false
-                      critical: true
-                      dhcp4-overrides:
-                          use-dns: false
-                          use-routes: true
-EOF
+				  ethernets:
+				    $IF:
+				      dhcp4: true
+				      dhcp6: false
+				      critical: true
+				      dhcp4-overrides:
+				          use-dns: false
+				          use-routes: true
+			EOF
     else
-      cat >/etc/netplan/11-${IF}-private.yaml <<-EOF
-                network:
-                  version: 2
-                  renderer: networkd
+      cat <<- EOF > /etc/netplan/11-${IF}-private.yaml
+				network:
+				  version: 2
+				  renderer: networkd
 
-                  ethernets:
-                    ${IF}:
-                      dhcp4: true
-                      dhcp6: false
-                      critical: true
-                      dhcp4-overrides:
-                        use-dns: false
-                {{- if .AddGateway }}
-                        use-routes: false
-                      routes:
-                      - to: 0.0.0.0/0
-                        via: {{ .DefaultRouteIP }}
-                        scope: global
-                        on-link: true
-                {{- else }}
-                        use-routes: true
-                {{- end}}
-EOF
+				  ethernets:
+				    ${IF}:
+				      dhcp4: true
+				      dhcp6: false
+				      critical: true
+				      dhcp4-overrides:
+				        use-dns: false
+				{{- if .AddGateway }}
+				        use-routes: false
+				      routes:
+				      - to: 0.0.0.0/0
+				        via: {{ .DefaultRouteIP }}
+				        scope: global
+				        on-link: true
+				{{- else }}
+				        use-routes: true
+				{{- end}}
+			EOF
     fi
   done
 
@@ -631,44 +631,44 @@ EOF
       # Recreate netplan configuration with last netplan version and more settings
       for IF in ${NICS}; do
         if [[ "$IF" == "$PU_IF" ]]; then
-          cat >/etc/netplan/10-$IF-public.yaml <<-EOF
-                        network:
-                          version: 2
-                          renderer: networkd
+          cat <<- EOF > /etc/netplan/10-$IF-public.yaml
+						network:
+						  version: 2
+						  renderer: networkd
 
-                          ethernets:
-                            ${IF}:
-                              dhcp4: true
-                              dhcp6: false
-                              critical: true
-                              dhcp4-overrides:
-                                  use-dns: true
-                                  use-routes: true
-EOF
+						  ethernets:
+						    ${IF}:
+						      dhcp4: true
+						      dhcp6: false
+						      critical: true
+						      dhcp4-overrides:
+						          use-dns: true
+						          use-routes: true
+					EOF
         else
-          cat >/etc/netplan/11-${IF}-private.yaml <<-EOF
-                        network:
-                          version: 2
-                          renderer: networkd
+          cat <<- EOF > /etc/netplan/11-${IF}-private.yaml
+						network:
+						  version: 2
+						  renderer: networkd
 
-                          ethernets:
-                            ${IF}:
-                              dhcp4: true
-                              dhcp6: false
-                              critical: true
-                              dhcp4-overrides:
-                                use-dns: true
-                        {{- if .AddGateway }}
-                                use-routes: true
-                              routes:
-                              - to: 0.0.0.0/0
-                                via: {{ .DefaultRouteIP }}
-                                scope: global
-                                on-link: true
-                        {{- else }}
-                                use-routes: true
-                        {{- end}}
-EOF
+						  ethernets:
+						    ${IF}:
+						      dhcp4: true
+						      dhcp6: false
+						      critical: true
+						      dhcp4-overrides:
+						        use-dns: true
+						{{- if .AddGateway }}
+						        use-routes: true
+						      routes:
+						      - to: 0.0.0.0/0
+						        via: {{ .DefaultRouteIP }}
+						        scope: global
+						        on-link: true
+						{{- else }}
+						        use-routes: true
+						{{- end}}
+					EOF
         fi
       done
     fi
@@ -723,10 +723,10 @@ EOF
 function configure_network_redhat() {
   echo "Configuring network (redhat-like)..."
 
-    if [ $VERSION_ID -eq 8 ]; then
-        echo "Configuring network (redhat8-like)..."
-        nmcli c mod eth0 connection.autoconnect yes || true
-    fi
+  if [ $VERSION_ID -eq 8 ]; then
+    echo "Configuring network (redhat8-like)..."
+    nmcli c mod eth0 connection.autoconnect yes || true
+  fi
 
   if [[ -z $VERSION_ID || $VERSION_ID -lt 7 ]]; then
     disable_svc() {
@@ -756,7 +756,7 @@ function configure_network_redhat() {
     }
   fi
 
-  NMCLI=$(which nmcli 2>/dev/null) || true
+  NMCLI=$(which nmcli 2> /dev/null) || true
   if [[ ${AWS} -eq 1 && $(sfGetFact "distrib_version") -ge 8 ]]; then
     configure_network_redhat_without_nmcli || {
       failure 208 "failed to set network without NetworkManager"
@@ -774,7 +774,7 @@ function configure_network_redhat() {
       failure 208 "failed to set network without NetworkManager"
     }
   else
-    NMCLI=$(which nmcli 2>/dev/null) || true
+    NMCLI=$(which nmcli 2> /dev/null) || true
     if [[ -z "${NMCLI}" ]]; then
       configure_network_redhat_without_nmcli || {
         failure 208 "failed to set network without NetworkManager"
@@ -798,11 +798,11 @@ function configure_network_redhat_without_nmcli() {
   echo "Configuring network (RedHat 6- alike)..."
 
   # We don't want NetworkManager if RedHat/CentOS < 7
-  stop_svc NetworkManager &>/dev/null
-  disable_svc NetworkManager &>/dev/null
+  stop_svc NetworkManager &> /dev/null
+  disable_svc NetworkManager &> /dev/null
   if [[ ${FEN} -eq 0 ]]; then
     sfRetryEx 3m 5 "sfYum remove -y NetworkManager &>/dev/null"
-    echo "exclude=NetworkManager" >>/etc/yum.conf
+    echo "exclude=NetworkManager" >> /etc/yum.conf
 
     if which dnf; then
       dnf install -q -y network-scripts || {
@@ -822,35 +822,35 @@ function configure_network_redhat_without_nmcli() {
       }
     fi
   else
-    yum remove -y NetworkManager &>/dev/null
+    yum remove -y NetworkManager &> /dev/null
   fi
 
   # Configure all network interfaces in dhcp
   for IF in $NICS; do
     if [[ ${IF} != "lo" ]]; then
-      cat >/etc/sysconfig/network-scripts/ifcfg-${IF} <<-EOF
-                DEVICE=$IF
-                BOOTPROTO=dhcp
-                ONBOOT=yes
-                NM_CONTROLLED=no
-EOF
+      cat > /etc/sysconfig/network-scripts/ifcfg-${IF} <<- EOF
+				DEVICE=$IF
+				BOOTPROTO=dhcp
+				ONBOOT=yes
+				NM_CONTROLLED=no
+			EOF
       {{- if .DNSServers }}
       i=1
       {{- range .DNSServers }}
-      echo "DNS${i}={{ . }}" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+      echo "DNS${i}={{ . }}" >> /etc/sysconfig/network-scripts/ifcfg-${IF}
       i=$((i + 1))
       {{- end }}
       {{- else }}
       EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
       if [[ -z ${EXISTING_DNS} ]]; then
-        echo "DNS1=1.1.1.1" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+        echo "DNS1=1.1.1.1" >> /etc/sysconfig/network-scripts/ifcfg-${IF}
       else
-        echo "DNS1=$EXISTING_DNS" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+        echo "DNS1=$EXISTING_DNS" >> /etc/sysconfig/network-scripts/ifcfg-${IF}
       fi
       {{- end }}
 
       {{- if .AddGateway }}
-      echo "GATEWAY={{ .DefaultRouteIP }}" >>/etc/sysconfig/network-scripts/ifcfg-${IF}
+      echo "GATEWAY={{ .DefaultRouteIP }}" >> /etc/sysconfig/network-scripts/ifcfg-${IF}
       {{- end}}
     fi
   done
@@ -859,13 +859,13 @@ EOF
   sleep 5
 
   {{- if .AddGateway }}
-  echo "GATEWAY={{ .DefaultRouteIP }}" >/etc/sysconfig/network
+  echo "GATEWAY={{ .DefaultRouteIP }}" > /etc/sysconfig/network
   {{- end }}
 
   enable_svc network
   restart_svc network
 
-  echo "exclude=NetworkManager" >>/etc/yum.conf
+  echo "exclude=NetworkManager" >> /etc/yum.conf
   sleep 5
 
   is_network_reachable || {
@@ -945,7 +945,7 @@ function check_for_network_refined() {
 
   for i in $(seq $NETROUNDS); do
     if which wget; then
-      wget -T 10 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+      wget -T 10 -O /dev/null www.google.com &> /dev/null && REACHED=1 && break
       ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
     else
       ping -n -c1 -w10 -i5 www.google.com && REACHED=1 && break
@@ -977,13 +977,13 @@ function configure_as_gateway() {
   if [[ ! -z ${PR_IFs} ]]; then
     # Enable forwarding
     for i in /etc/sysctl.d/* /etc/sysctl.conf; do
-      grep -v "net.ipv4.ip_forward=" ${i} >${i}.new
+      grep -v "net.ipv4.ip_forward=" ${i} > ${i}.new
       mv -f ${i}.new ${i}
     done
-    cat >/etc/sysctl.d/21-gateway.conf <<-EOF
-            net.ipv4.ip_forward=1
-            net.ipv4.ip_nonlocal_bind=1
-EOF
+    cat > /etc/sysctl.d/21-gateway.conf <<- EOF
+			net.ipv4.ip_forward=1
+			net.ipv4.ip_nonlocal_bind=1
+		EOF
     case $LINUX_KIND in
     ubuntu) systemctl restart systemd-sysctl ;;
     *) sysctl -p ;;
@@ -1002,7 +1002,7 @@ EOF
   firewall-offline-cmd --zone=trusted --add-masquerade
 
   # Allows default services on public zone
-  firewall-offline-cmd --zone=public --add-service=ssh 2>/dev/null
+  firewall-offline-cmd --zone=public --add-service=ssh 2> /dev/null
   # Applies fw rules
   # sfFirewallReload
 
@@ -1024,15 +1024,15 @@ EOF
 }
 
 function configure_dns_legacy_issues() {
-    case $LINUX_KIND in
-    debian)
-        if [ $VERSION_ID -eq 9 ]; then
-            cp /etc/resolv.conf.tested /etc/resolv.conf
-        fi
-        ;;
-    *) ;;
+  case $LINUX_KIND in
+  debian)
+    if [ $VERSION_ID -eq 9 ]; then
+      cp /etc/resolv.conf.tested /etc/resolv.conf
+    fi
+    ;;
+  *) ;;
 
-    esac
+  esac
 }
 
 function configure_dns_legacy() {
@@ -1046,26 +1046,26 @@ function configure_dns_legacy() {
     for i in {{range .DNSServers}} {{end}}; do
       [[ ! -z ${dnsservers} ]] && dnsservers="$dnsservers, "
     done
-    [[ ! -z ${dnsservers} ]] && echo "prepend domain-name-servers $dnsservers;" >>/etc/dhcp/dhclient.conf
+    [[ ! -z ${dnsservers} ]] && echo "prepend domain-name-servers $dnsservers;" >> /etc/dhcp/dhclient.conf
   else
     echo "dhclient.conf not modified"
   fi
   {{- else }}
   if [[ -e /etc/dhcp/dhclient.conf ]]; then
-    echo "prepend domain-name-servers 1.1.1.1;" >>/etc/dhcp/dhclient.conf
+    echo "prepend domain-name-servers 1.1.1.1;" >> /etc/dhcp/dhclient.conf
   else
     echo "/etc/dhcp/dhclient.conf not modified"
   fi
   {{- end }}
-  cat >/etc/resolv.conf <<-'EOF'
-        {{- if .DNSServers }}
-          {{- range .DNSServers }}
-        nameserver {{ . }}
-          {{- end }}
-        {{- else }}
-        nameserver 1.1.1.1
-        {{- end }}
-EOF
+  cat > /etc/resolv.conf <<- EOF
+		{{- if .DNSServers }}
+		{{- range .DNSServers }}
+		nameserver {{ . }}
+		{{- end }}
+		{{- else }}
+		nameserver 1.1.1.1
+		{{- end }}
+	EOF
 
   cp /etc/resolv.conf /etc/resolv.conf.tested
 
@@ -1083,15 +1083,15 @@ function configure_dns_resolvconf() {
 
   EXISTING_DNS=$(grep nameserver /etc/resolv.conf | awk '{print $2}')
 
-  cat >/etc/resolvconf/resolv.conf.d/head <<-'EOF'
-        {{- if .DNSServers }}
-          {{- range .DNSServers }}
-        nameserver {{ . }}
-          {{- end }}
-        {{- else }}
-        nameserver 1.1.1.1
-        {{- end }}
-EOF
+  cat > /etc/resolvconf/resolv.conf.d/head <<- EOF
+		{{- if .DNSServers }}
+		{{- range .DNSServers }}
+		nameserver {{ . }}
+		{{- end }}
+		{{- else }}
+		nameserver 1.1.1.1
+		{{- end }}
+	EOF
 
   resolvconf -u
   echo "done"
@@ -1105,16 +1105,16 @@ function configure_dns_systemd_resolved() {
   ln -s /run/systemd/resolve/resolv.conf /etc
   {{- end }}
 
-  cat >/etc/systemd/resolved.conf <<-'EOF'
-        [Resolve]
-        {{- if .DNSServers }}
-        DNS={{ range .DNSServers }}{{ . }} {{ end }}
-        {{- else }}
-        DNS=1.1.1.1
-        {{- end}}
-        Cache=yes
-        DNSStubListener=yes
-EOF
+  cat > /etc/systemd/resolved.conf <<- EOF
+    [Resolve]
+    {{- if .DNSServers }}
+    DNS={{ range .DNSServers }}{{ . }} {{ end }}
+    {{- else }}
+    DNS=1.1.1.1
+    {{- end}}
+    Cache=yes
+    DNSStubListener=yes
+	EOF
   systemctl restart systemd-resolved
   echo "done"
 }
@@ -1136,7 +1136,7 @@ function is_network_reachable() {
 
     if which wget; then
       TRIED=1
-      wget -T 4 -O /dev/null www.google.com &>/dev/null && REACHED=1 && break
+      wget -T 4 -O /dev/null www.google.com &> /dev/null && REACHED=1 && break
     fi
 
     if [[ ${TRIED} -eq 1 ]]; then
@@ -1158,7 +1158,7 @@ function install_drivers_nvidia() {
   case $LINUX_KIND in
   ubuntu)
     sfFinishPreviousInstall
-    add-apt-repository -y ppa:graphics-drivers &>/dev/null
+    add-apt-repository -y ppa:graphics-drivers &> /dev/null
     sfRetryEx 3m 5 "sfApt update" || failure 201 "apt update failed"
     sfRetryEx 3m 5 "sfApt -y install nvidia-410 &>/dev/null" || {
       sfRetryEx 3m 5 "sfApt -y install nvidia-driver-410 &>/dev/null" || failure 201 "failed nvidia driver install"
@@ -1167,21 +1167,21 @@ function install_drivers_nvidia() {
 
   debian)
     if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
-      echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >>/etc/modprobe.d/blacklist-nouveau.conf
+      echo -e "blacklist nouveau\nblacklist lbm-nouveau\noptions nouveau modeset=0\nalias nouveau off\nalias lbm-nouveau off" >> /etc/modprobe.d/blacklist-nouveau.conf
       rmmod nouveau
     fi
     sfRetryEx 3m 5 "sfApt update &>/dev/null"
     sfRetryEx 3m 5 "sfApt install -y dkms build-essential linux-headers-$(uname -r) gcc make &>/dev/null" || failure 202 "failure installing nvdiia requirements"
-    dpkg --add-architecture i386 &>/dev/null
+    dpkg --add-architecture i386 &> /dev/null
     sfRetryEx 3m 5 "sfApt update &>/dev/null"
     sfRetryEx 3m 5 "sfApt install -y lib32z1 lib32ncurses5 &>/dev/null" || failure 203 "failure installing nvidia requirements"
-    wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &>/dev/null || failure 204 "failure downloading nvidia installer"
+    wget http://us.download.nvidia.com/XFree86/Linux-x86_64/410.78/NVIDIA-Linux-x86_64-410.78.run &> /dev/null || failure 204 "failure downloading nvidia installer"
     bash NVIDIA-Linux-x86_64-410.78.run -s || failure 205 "failure running nvidia installer"
     ;;
 
   redhat | rhel | centos | fedora)
     if [ ! -f /etc/modprobe.d/blacklist-nouveau.conf ]; then
-      echo -e "blacklist nouveau\noptions nouveau modeset=0" >>/etc/modprobe.d/blacklist-nouveau.conf
+      echo -e "blacklist nouveau\noptions nouveau modeset=0" >> /etc/modprobe.d/blacklist-nouveau.conf
       dracut --force
       rmmod nouveau
     fi
@@ -1204,19 +1204,19 @@ function disable_upgrades() {
   ubuntu)
     sfApt remove -y unattended-upgrades || true
     ;;
-  *)
-    ;;
+  *) ;;
+
   esac
 }
 
 function early_packages_update() {
   # Ensure IPv4 will be used before IPv6 when resolving hosts (the latter shouldn't work regarding the network configuration we set)
-  cat >/etc/gai.conf <<-EOF
-        precedence ::ffff:0:0/96 100
-        scopev4 ::ffff:169.254.0.0/112  2
-        scopev4 ::ffff:127.0.0.0/104    2
-        scopev4 ::ffff:0.0.0.0/96       14
-EOF
+  cat > /etc/gai.conf <<- EOF
+		precedence ::ffff:0:0/96 100
+		scopev4 ::ffff:169.254.0.0/112  2
+		scopev4 ::ffff:127.0.0.0/104    2
+		scopev4 ::ffff:0.0.0.0/96       14
+	EOF
 
   case $LINUX_KIND in
   debian)
@@ -1294,46 +1294,46 @@ EOF
 }
 
 function install_packages() {
-    case $LINUX_KIND in
-        ubuntu | debian)
-            sfApt install -y -qq wget curl jq zip unzip time at &>/dev/null || failure 213 "failure installing utility packages: jq zip time at"
-            ;;
-        redhat | centos)
-            yum install --enablerepo=epel -y -q wget curl jq zip unzip time at &>/dev/null || failure 214 "failure installing utility packages: jq zip time at"
-            ;;
-        *)
-            failure 215 "Unsupported Linux distribution '$LINUX_KIND'!"
-            ;;
-    esac
+  case $LINUX_KIND in
+  ubuntu | debian)
+    sfApt install -y -qq wget curl jq zip unzip time at &> /dev/null || failure 213 "failure installing utility packages: jq zip time at"
+    ;;
+  redhat | centos)
+    yum install --enablerepo=epel -y -q wget curl jq zip unzip time at &> /dev/null || failure 214 "failure installing utility packages: jq zip time at"
+    ;;
+  *)
+    failure 215 "Unsupported Linux distribution '$LINUX_KIND'!"
+    ;;
+  esac
 }
 
 function install_rclone() {
-    case $LINUX_KIND in
-        debian|ubuntu)
-            curl -kqSsL --fail -O https://downloads.rclone.org/rclone-current-linux-amd64.zip && \
-            unzip rclone-current-linux-amd64.zip && \
-            cp rclone-*-linux-amd64/rclone /usr/bin && \
-            mkdir -p /usr/share/man/man1 && \
-            cp rclone-*-linux-amd64/rclone.1 /usr/share/man/man1/ && \
-            rm -rf rclone-* && \
-            chown root:root /usr/bin/rclone && \
-            chmod 755 /usr/bin/rclone && \
-            mandb
-            ;;
-        redhat|centos)
-            yum makecache fast || sfFail 192 "Problem updating sources"
-            yum install -y rclone || sfFail 192 "Problem installing node common requirements"
-            ;;
-        fedora)
-            dnf install -y rclone || sfFail 192 "Problem installing node common requirements"
-            ;;
-        *)
-            sfFail 1 "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
-            ;;
-    esac
+  case $LINUX_KIND in
+  debian | ubuntu)
+    curl -kqSsL --fail -O https://downloads.rclone.org/rclone-current-linux-amd64.zip &&
+      unzip rclone-current-linux-amd64.zip &&
+      cp rclone-*-linux-amd64/rclone /usr/bin &&
+      mkdir -p /usr/share/man/man1 &&
+      cp rclone-*-linux-amd64/rclone.1 /usr/share/man/man1/ &&
+      rm -rf rclone-* &&
+      chown root:root /usr/bin/rclone &&
+      chmod 755 /usr/bin/rclone &&
+      mandb
+    ;;
+  redhat | centos)
+    yum makecache fast || sfFail 192 "Problem updating sources"
+    yum install -y rclone || sfFail 192 "Problem installing node common requirements"
+    ;;
+  fedora)
+    dnf install -y rclone || sfFail 192 "Problem installing node common requirements"
+    ;;
+  *)
+    sfFail 1 "Unmanaged linux distribution type '$(sfGetFact "linux_kind")'"
+    ;;
+  esac
 
-    ln -s /usr/bin/rclone /sbin/mount.rclone && ln -s /usr/bin/rclone /usr/bin/rclonefs || sfFail 192 "failed to create rclone soft links"
-    return 0
+  ln -s /usr/bin/rclone /sbin/mount.rclone && ln -s /usr/bin/rclone /usr/bin/rclonefs || sfFail 192 "failed to create rclone soft links"
+  return 0
 }
 
 function no_daily_update() {
@@ -1376,24 +1376,24 @@ function add_common_repos() {
     no_daily_update
     add-apt-repository universe -y || return 1
     codename=$(sfGetFact "linux_codename")
-    echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" >/etc/apt/sources.list.d/${codename}-proposed.list
+    echo "deb http://archive.ubuntu.com/ubuntu/ ${codename}-proposed main" > /etc/apt/sources.list.d/${codename}-proposed.list
     ;;
   debian)
     sfFinishPreviousInstall
     ;;
   redhat | rhel | centos)
     if which dnf; then
-    # Install EPEL repo ...
+      # Install EPEL repo ...
       sfRetryEx 3m 5 "dnf install -y epel-release" || failure 217 "failure installing epel repo"
       sfRetryEx 3m 5 "dnf makecache fast -y || dnf makecache -y" || failure 218 "failure updating cache"
       # ... but don't enable it by default
-      dnf config-manager --set-disabled epel &>/dev/null || true
+      dnf config-manager --set-disabled epel &> /dev/null || true
     else
       # Install EPEL repo ...
       sfRetryEx 3m 5 "yum install -y epel-release" || failure 217 "failure installing epel repo"
       sfRetryEx 3m 5 "yum makecache fast || yum makecache" || failure 218 "failure updating cache"
       # ... but don't enable it by default
-      yum-config-manager --disablerepo=epel &>/dev/null || true
+      yum-config-manager --disablerepo=epel &> /dev/null || true
     fi
     ;;
   fedora)
@@ -1434,9 +1434,9 @@ function configure_root_password_if_needed() {
 }
 
 function update_kernel_settings() {
-  cat >/etc/sysctl.d/20-safescale.conf <<-EOF
-    vm.max_map_count=262144
-EOF
+  cat > /etc/sysctl.d/20-safescale.conf <<- EOF
+		vm.max_map_count=262144
+	EOF
   case $LINUX_KIND in
   ubuntu) systemctl restart systemd-sysctl ;;
   *) sysctl -p ;;
@@ -1444,14 +1444,14 @@ EOF
 }
 
 function update_credentials() {
-    echo "{{.Username}}:{{.Password}}" | chpasswd
+  echo "{{.Username}}:{{.Password}}" | chpasswd
 
-    dd if=/dev/urandom of=/home/{{.Username}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
-    echo "{{.FinalPublicKey}}" >/home/{{.Username}}/.ssh/authorized_keys
-    dd if=/dev/urandom of=/home/{{.Username}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
-    echo "{{.FinalPrivateKey}}" >/home/{{.Username}}/.ssh/id_rsa
-    chmod 0700 /home/{{.Username}}/.ssh
-    chmod -R 0600 /home/{{.Username}}/.ssh/*
+  dd if=/dev/urandom of=/home/{{.Username}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
+  echo "{{.FinalPublicKey}}" > /home/{{.Username}}/.ssh/authorized_keys
+  dd if=/dev/urandom of=/home/{{.Username}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
+  echo "{{.FinalPrivateKey}}" > /home/{{.Username}}/.ssh/id_rsa
+  chmod 0700 /home/{{.Username}}/.ssh
+  chmod -R 0600 /home/{{.Username}}/.ssh/*
 }
 
 function enable_at_daemon() {
@@ -1475,9 +1475,9 @@ function unsafe_update_credentials() {
   echo "{{.Username}}:safescale" | chpasswd
 
   dd if=/dev/urandom of=/home/{{.Username}}/.ssh/authorized_keys conv=notrunc bs=4096 count=8
-  echo "{{.FinalPublicKey}}" >/home/{{.Username}}/.ssh/authorized_keys
+  echo "{{.FinalPublicKey}}" > /home/{{.Username}}/.ssh/authorized_keys
   dd if=/dev/urandom of=/home/{{.Username}}/.ssh/id_rsa conv=notrunc bs=4096 count=8
-  echo "{{.FinalPrivateKey}}" >/home/{{.Username}}/.ssh/id_rsa
+  echo "{{.FinalPrivateKey}}" > /home/{{.Username}}/.ssh/id_rsa
   chmod 0700 /home/{{.Username}}/.ssh
   chmod -R 0600 /home/{{.Username}}/.ssh/*
 }
@@ -1491,8 +1491,8 @@ function check_unsupported() {
     fi
     {{- end }}
     ;;
-  *)
-    ;;
+  *) ;;
+
   esac
 }
 
@@ -1533,7 +1533,7 @@ systemctl restart sshd || failure 219 "failure restarting sshd"
 
 enable_at_daemon || failure 220 "failure starting at daemon"
 
-echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.netsec.done
+echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.netsec.done
 
 # !!! DON'T REMOVE !!! #insert_tag allows to add something just before exiting,
 #                      but after the template has been realized (cf. libvirt Stack)
@@ -1541,7 +1541,7 @@ echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:
 
 (
   sync
-  echo 3 >/proc/sys/vm/drop_caches
+  echo 3 > /proc/sys/vm/drop_caches
   sleep 2
 ) || true
 

@@ -21,13 +21,13 @@
 {{.BashHeader}}
 
 function print_error() {
-    ec=$?
-    read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
+  ec=$?
+  read line file <<< $(caller)
+  echo "An error occurred in line $line of file $file (exit code $ec) :" "{"$(sed "${line}q;d" "$file")"}" >&2
 }
 trap print_error ERR
 
 mkdir -p "{{.MountPoint}}" && \
 mount.nfs -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" && \
-echo "{{.Export}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >>/etc/fstab
+echo "{{.Export}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >> /etc/fstab
 sftp1:subdir /mnt/data rclone rw,noauto,nofail,_netdev,x-systemd.automount,args2env,vfs_cache_mode=writes,config=/etc/rclone.conf,cache_dir=/var/cache/rclone 0 0

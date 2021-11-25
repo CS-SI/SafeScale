@@ -26,74 +26,74 @@ set -x
 #### Installs and configure common tools for any kind of nodes ####
 
 install_common_requirements() {
-    echo "Installing common requirements..."
+  echo "Installing common requirements..."
 
-    export LANG=C
+  export LANG=C
 
-    # Disable SELinux
-    if [[ -n $(command -v getenforce) ]]; then
-        act=0
-        getenforce | grep "Disabled" || act=1
-        if [ $act -eq 1 ]; then
-            if [[ -n $(command -v setenforce) ]]; then
-                setenforce 0 || fail 201 "Error setting selinux in Disabled mode"
-                sed -i 's/^SELINUX=enforcing$/SELINUX=disabled/' /etc/selinux/config
-            fi
-        fi
+  # Disable SELinux
+  if [[ -n $(command -v getenforce) ]]; then
+    act=0
+    getenforce | grep "Disabled" || act=1
+    if [ $act -eq 1 ]; then
+      if [[ -n $(command -v setenforce) ]]; then
+        setenforce 0 || fail 201 "Error setting selinux in Disabled mode"
+        sed -i 's/^SELINUX=enforcing$/SELINUX=disabled/' /etc/selinux/config
+      fi
     fi
+  fi
 
-    # Creates user {{.ClusterAdminUsername}}
-    useradd -s /bin/bash -m -d /home/{{.ClusterAdminUsername}} {{.ClusterAdminUsername}}
-    groupadd -r -f docker &>/dev/null
-    usermod -aG docker {{.ClusterAdminUsername}}
-    echo -e "{{ .ClusterAdminPassword }}\n{{ .ClusterAdminPassword }}" | passwd {{.ClusterAdminUsername}}
-    mkdir -p ~{{.ClusterAdminUsername}}/.ssh && chmod 0700 ~{{.ClusterAdminUsername}}/.ssh
-    echo "{{ .SSHPublicKey }}" >~{{.ClusterAdminUsername}}/.ssh/authorized_keys
-    echo "{{ .SSHPrivateKey }}" >~{{.ClusterAdminUsername}}/.ssh/id_rsa
-    chmod 0400 ~{{.ClusterAdminUsername}}/.ssh/*
-    echo "{{.ClusterAdminUsername}} ALL=(ALL) NOPASSWD:ALL" >>/etc/sudoers.d/10-admins
-    chmod o-rwx /etc/sudoers.d/10-admins
+  # Creates user {{.ClusterAdminUsername}}
+  useradd -s /bin/bash -m -d /home/{{.ClusterAdminUsername}} {{.ClusterAdminUsername}}
+  groupadd -r -f docker &> /dev/null
+  usermod -aG docker {{.ClusterAdminUsername}}
+  echo -e "{{ .ClusterAdminPassword }}\n{{ .ClusterAdminPassword }}" | passwd {{.ClusterAdminUsername}}
+  mkdir -p ~{{.ClusterAdminUsername}}/.ssh && chmod 0700 ~{{.ClusterAdminUsername}}/.ssh
+  echo "{{ .SSHPublicKey }}" > ~{{.ClusterAdminUsername}}/.ssh/authorized_keys
+  echo "{{ .SSHPrivateKey }}" > ~{{.ClusterAdminUsername}}/.ssh/id_rsa
+  chmod 0400 ~{{.ClusterAdminUsername}}/.ssh/*
+  echo "{{.ClusterAdminUsername}} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/10-admins
+  chmod o-rwx /etc/sudoers.d/10-admins
 
-    mkdir -p ~{{.ClusterAdminUsername}}/.local/bin && find ~{{.ClusterAdminUsername}}/.local -exec chmod 0770 {} \;
-    cat >>~{{.ClusterAdminUsername}}/.bashrc <<-'EOF'
-        pathremove() {
-            local IFS=':'
-            local NEWPATH
-            local DIR
-            local PATHVARIABLE=${2:-PATH}
-            for DIR in ${!PATHVARIABLE} ; do
-                [ "$DIR" != "$1" ] && NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
-            done
-            export $PATHVARIABLE="$NEWPATH"
-        }
-        pathprepend() {
-            pathremove $1 $2
-            local PATHVARIABLE=${2:-PATH}
-            export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
-        }
-        pathappend() {
-            pathremove $1 $2
-            local PATHVARIABLE=${2:-PATH}
-            export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
-        }
-        pathprepend $HOME/.local/bin
-        pathprepend /usr/local/bin
-EOF
-    chown -R {{ .ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}
-
-    for i in ~{{.ClusterAdminUsername}}/.hushlogin ~{{.ClusterAdminUsername}}/.cloud-warnings.skip; do
-        touch $i
-        chown root:{{.ClusterAdminUsername}} $i
-        chmod ug+r-wx,o-rwx $i
+  mkdir -p ~{{.ClusterAdminUsername}}/.local/bin && find ~{{.ClusterAdminUsername}}/.local -exec chmod 0770 {} \;
+  cat >> ~{{.ClusterAdminUsername}}/.bashrc <<- 'EOF'
+  pathremove() {
+    local IFS=':'
+    local NEWPATH
+    local DIR
+    local PATHVARIABLE=${2:-PATH}
+    for DIR in ${!PATHVARIABLE} ; do
+      [ "$DIR" != "$1" ] && NEWPATH=${NEWPATH:+$NEWPATH:}$DIR
     done
+    export $PATHVARIABLE="$NEWPATH"
+  }
+  pathprepend() {
+    pathremove $1 $2
+    local PATHVARIABLE=${2:-PATH}
+    export $PATHVARIABLE="$1${!PATHVARIABLE:+:${!PATHVARIABLE}}"
+  }
+  pathappend() {
+    pathremove $1 $2
+    local PATHVARIABLE=${2:-PATH}
+    export $PATHVARIABLE="${!PATHVARIABLE:+${!PATHVARIABLE}:}$1"
+  }
+  pathprepend $HOME/.local/bin
+  pathprepend /usr/local/bin
+EOF
+  chown -R {{ .ClusterAdminUsername}}:{{.ClusterAdminUsername}} ~{{.ClusterAdminUsername}}
 
-    # Enable overlay module
-    echo overlay >/etc/modules-load.d/10-overlay.conf
+  for i in ~{{.ClusterAdminUsername}}/.hushlogin ~{{.ClusterAdminUsername}}/.cloud-warnings.skip; do
+    touch $i
+    chown root:{{.ClusterAdminUsername}} $i
+    chmod ug+r-wx,o-rwx $i
+  done
 
-    # Loads overlay module
-    modprobe overlay
+  # Enable overlay module
+  echo overlay > /etc/modules-load.d/10-overlay.conf
 
-    echo "Node common requirements successfully installed."
+  # Loads overlay module
+  modprobe overlay
+
+  echo "Node common requirements successfully installed."
 }
 export -f install_common_requirements
 
