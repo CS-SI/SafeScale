@@ -95,10 +95,11 @@ func (desc Description) createConfigurationFile() (*os.File, fail.Error) {
 	switch desc.Protocol {
 	case "swift":
 		templateName = "rclone-swift.conf"
-	case "google":
-		templateName = "rclone-google.conf"
 	case "s3":
 		templateName = "rclone-s3.conf"
+	case "google":
+		templateName = "rclone-google.conf"
+		return nil, fail.NotImplementedError("mount of Google Object Storage Bucket not yet implemented")
 	default:
 		return nil, fail.InvalidRequestError("unsupported Object Storage protocol '%s'", desc.Protocol)
 	}
