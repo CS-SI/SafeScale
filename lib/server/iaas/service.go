@@ -329,7 +329,7 @@ func pollVolume(svc service, volumeID string, state volumestate.Enum, cout chan 
 }
 
 // ListTemplates lists available host templates
-// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
+// Host templates are sorted using Dominant Resource Fairness Algorithm
 func (svc service) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()

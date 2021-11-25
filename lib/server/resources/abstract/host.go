@@ -181,7 +181,7 @@ type HostRequest struct {
 	IsGateway        bool                // IsGateway tells if the host will act as a gateway
 	KeepOnFailure    bool                // KeepOnFailure tells if resource must be kept on failure
 	Preemptible      bool                // Use spot-like instance
-	SecurityGroupIDs map[string]struct{} // List of Security Groups to attach to IPAddress (using map as dict)
+	SecurityGroupIDs map[string]struct{} // List of Security Groups to attach to Host (using map as dict)
 }
 
 // HostEffectiveSizing ...
@@ -273,7 +273,7 @@ func (hc *HostCore) OK() bool {
 	return hc.IsConsistent()
 }
 
-// Clone does a deep-copy of the IPAddress
+// Clone does a deep-copy of the Host
 // satisfies interface data.Clonable
 func (hc HostCore) Clone() data.Clonable {
 	return NewHostCore().Replace(&hc)
@@ -291,7 +291,7 @@ func (hc *HostCore) Replace(p data.Clonable) data.Clonable {
 	return hc
 }
 
-// Serialize serializes IPAddress instance into bytes (output json code)
+// Serialize serializes Host instance into bytes (output json code)
 func (hc *HostCore) Serialize() ([]byte, fail.Error) {
 	if hc == nil {
 		return nil, fail.InvalidInstanceError()
@@ -304,7 +304,7 @@ func (hc *HostCore) Serialize() ([]byte, fail.Error) {
 	return r, nil
 }
 
-// Deserialize reads json code and instantiates an IPAddress
+// Deserialize reads json code and instantiates an Host
 func (hc *HostCore) Deserialize(buf []byte) (ferr fail.Error) {
 	if hc == nil {
 		return fail.InvalidInstanceError()
@@ -348,7 +348,7 @@ func (hc *HostCore) GetID() string {
 	return hc.ID
 }
 
-// HostNetworking contains subnets information related to IPAddress
+// HostNetworking contains subnets information related to Host
 type HostNetworking struct {
 	IsGateway               bool              `json:"is_gateway,omitempty"`                 // Tells if host is a gateway of a network
 	DefaultGatewayID        string            `json:"default_gateway_id,omitempty"`         // DEPRECATED: contains the ID of the default gateway

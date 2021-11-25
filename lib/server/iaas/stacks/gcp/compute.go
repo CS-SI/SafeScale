@@ -839,7 +839,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	return s.rpcAddTagsToInstance(ahf.GetID(), []string{asg.GetID()})
 }
 
-// UnbindSecurityGroupFromHost unbinds a Security Group from a IPAddress
+// UnbindSecurityGroupFromHost unbinds a Security Group from a Host
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()

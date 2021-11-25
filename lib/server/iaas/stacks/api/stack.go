@@ -119,7 +119,7 @@ type Stack interface {
 	CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
 	// ClearHostStartupScript clears the Startup Script of the Host (if the stack can do it)
 	ClearHostStartupScript(stacks.HostParameter) fail.Error
-	// InspectHost returns the information of the IPAddress identified by id
+	// InspectHost returns the information of the Host identified by id
 	InspectHost(stacks.HostParameter) (*abstract.HostFull, fail.Error)
 	// GetHostState returns the current state of the host identified by id
 	GetHostState(stacks.HostParameter) (hoststate.Enum, fail.Error)

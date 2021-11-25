@@ -776,7 +776,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	// TODO: RESIZE Resize IPAddress HERE
+	// TODO: RESIZE Resize Host HERE
 	logrus.Warn("Trying to resize a Host...")
 
 	// TODO: RESIZE Call this
@@ -834,7 +834,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				return fail.NotFoundError("provider did not send information for Host %s", hostLabel)
 			}
 
-			ahf.Core.ID = server.ID // makes sure that on next turn we get IPAddress by ID
+			ahf.Core.ID = server.ID // makes sure that on next turn we get Host by ID
 			lastState := toHostState(server.Status)
 
 			// If we had a response, and the target state is Any, this is a success no matter what
@@ -922,7 +922,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 }
 
 // BindSecurityGroupToHost binds a security group to a host
-// If Security Group is already bound to IPAddress, returns *fail.ErrDuplicate
+// If Security Group is already bound to Host, returns *fail.ErrDuplicate
 func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()

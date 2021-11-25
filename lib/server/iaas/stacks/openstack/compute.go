@@ -238,8 +238,8 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 	return template, nil
 }
 
-// ListTemplates lists available IPAddress templates
-// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
+// ListTemplates lists available Host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
@@ -487,7 +487,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 	return ahf, nil
 }
 
-// complementHost complements IPAddress data with content of server parameter
+// complementHost complements Host data with content of server parameter
 func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 

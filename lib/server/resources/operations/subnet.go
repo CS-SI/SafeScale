@@ -1377,7 +1377,7 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 	return rn, an, nil
 }
 
-// unbindHostFromVIP unbinds a VIP from IPAddress
+// unbindHostFromVIP unbinds a Host from VIP
 // Actually does nothing in aws for now
 func (instance *Subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)

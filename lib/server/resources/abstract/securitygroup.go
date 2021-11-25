@@ -405,7 +405,7 @@ func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 	return sg
 }
 
-// Serialize serializes IPAddress instance into bytes (output json code)
+// Serialize serializes instance into bytes (output json code)
 func (sg *SecurityGroup) Serialize() ([]byte, fail.Error) {
 	if sg.IsNull() {
 		return nil, fail.InvalidInstanceError()

@@ -90,7 +90,7 @@ func (v *Volume) OK() bool {
 	return result
 }
 
-// Serialize serializes IPAddress instance into bytes (output json code)
+// Serialize serializes instance into bytes (output json code)
 func (v *Volume) Serialize() ([]byte, fail.Error) {
 	if v == nil {
 		return nil, fail.InvalidInstanceError()
@@ -99,7 +99,7 @@ func (v *Volume) Serialize() ([]byte, fail.Error) {
 	return r, fail.ConvertError(err)
 }
 
-// Deserialize reads json code and restores an IPAddress
+// Deserialize reads json code and restores a Volume
 func (v *Volume) Deserialize(buf []byte) (xerr fail.Error) {
 	if v == nil {
 		return fail.InvalidInstanceError()

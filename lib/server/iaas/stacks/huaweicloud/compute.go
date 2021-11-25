@@ -874,8 +874,8 @@ func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 	return imgList, nil
 }
 
-// ListTemplates lists available IPAddress templates
-// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
+// ListTemplates lists available Host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
 func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
@@ -930,7 +930,7 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	return flvList, nil
 }
 
-// complementHost complements IPAddress data with content of server parameter
+// complementHost complements Host data with content of server parameter
 func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
