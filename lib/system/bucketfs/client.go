@@ -55,11 +55,11 @@ func (c *Client) Mount(ctx context.Context, description Description) fail.Error 
 	}
 
 	data := map[string]interface{}{
-		"BucketName": description.BucketName,
-		"MountPoint": description.MountPoint,
-		"ConfigFile": description.FilePath(),
+		"BucketName":       description.BucketName,
+		"MountPoint":       description.MountPoint,
+		"ConfigFile":       description.FilePath(),
+		"OperatorUsername": description.OperatorUsername,
 	}
-
 	return executeScript(ctx, c.host, "bucket_mount.sh", data)
 }
 

@@ -27,6 +27,8 @@ function print_error() {
 }
 trap print_error ERR
 
-echo "{{ .BucketName }}:{{ .BucketName }} {{ .MountPoint }} rclone rw,noauto,nofail,x-systemd.automount,args2env,vfs_cache_mode=writes,config={{ .ConfigFile }},cache_dir=/var/cache/rclone 0 0" >>/etc/fstab
+echo "{{ .BucketName }}:{{ .BucketName }} {{ .MountPoint }} rclone rw,auto,nofail,args2env,vfs_cache_mode=writes,config={{ .ConfigFile }},cache_dir=/var/cache/rclone,allow-root,allow-other 0 0" >>/etc/fstab
 mkdir -p "{{.MountPoint}}"
+chown {{.OperatorUsername}}:{{.OperatorUsername}} "{{.MountPoint}}"
+chmod 777 "{{.MountPoint}}"
 mount "{{ .MountPoint }}"

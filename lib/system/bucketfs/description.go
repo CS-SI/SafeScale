@@ -30,19 +30,20 @@ import (
 
 // Description contains the configuration for bucket mount
 type Description struct {
-	BucketName  string
-	ProjectName string
-	Username    string
-	Password    string
-	AuthVersion string
-	AuthURL     string
-	Region      string
-	MountPoint  string
-	Protocol    string
+	BucketName       string
+	ProjectName      string
+	Username         string
+	Password         string
+	AuthVersion      string
+	AuthURL          string
+	Region           string
+	MountPoint       string
+	Protocol         string
+	OperatorUsername string
 }
 
 // Upload uploads configuration file to remote host
-func (desc Description) upload(ctx context.Context, host resources.Host) fail.Error {
+func (desc *Description) upload(ctx context.Context, host resources.Host) fail.Error {
 	f, xerr := desc.createConfigurationFile()
 	if xerr != nil {
 		return xerr
@@ -59,13 +60,12 @@ func (desc Description) upload(ctx context.Context, host resources.Host) fail.Er
 		return xerr
 	}
 
-	var operatorUsername string
 	if anon, ok := svcConf.Get("OperatorUsername"); ok {
-		operatorUsername = anon.(string)
+		desc.OperatorUsername = anon.(string)
 	} else {
-		operatorUsername = abstract.DefaultUser
+		desc.OperatorUsername = abstract.DefaultUser
 	}
-	owner := operatorUsername + ":" + operatorUsername
+	owner := desc.OperatorUsername + ":" + desc.OperatorUsername
 	target := desc.FilePath()
 	retcode, stdout, stderr, xerr := host.Push(ctx, f.Name(), target, owner, "0600", temporal.GetExecutionTimeout())
 	if xerr != nil {
