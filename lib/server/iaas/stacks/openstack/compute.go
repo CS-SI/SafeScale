@@ -482,7 +482,6 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	ct, ok := ahf.Core.Tags["CreationDate"]
 	if !ok || ct == "" {
-		logrus.Warningf("CreationDate wars")
 		ahf.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
 	}
 
