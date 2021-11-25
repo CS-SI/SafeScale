@@ -180,7 +180,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	wrapped := api.StackProxy{
 		InnerStack: stack,
-		Name:       "amazon",
+		Name:       "flexibleengine",
 	}
 
 	newP := &provider{

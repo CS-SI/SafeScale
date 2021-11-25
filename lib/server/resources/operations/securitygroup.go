@@ -1143,7 +1143,7 @@ func (instance *SecurityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, 
 	})
 }
 
-// BindToHost binds the security group to an Host.
+// BindToHost binds the security group to a host.
 func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 

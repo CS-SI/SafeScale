@@ -156,7 +156,7 @@ var bucketInspect = &cli.Command{
 
 var bucketMount = &cli.Command{
 	Name:      "mount",
-	Usage:     "Mount a bucket on the filesystem of an host",
+	Usage:     "Mount a bucket on the filesystem of a host",
 	ArgsUsage: "BUCKET_NAME HOST_REF",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -194,7 +194,7 @@ var bucketMount = &cli.Command{
 var bucketUnmount = &cli.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
-	Usage:     "Unmount a Bucket from the filesystem of an Host",
+	Usage:     "Unmount a Bucket from the filesystem of a host",
 	ArgsUsage: "BUCKET_NAME HOST_REF",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())

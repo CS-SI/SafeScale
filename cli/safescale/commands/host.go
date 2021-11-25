@@ -510,7 +510,7 @@ var hostListFeaturesCommand = &cli.Command{
 var hostAddFeatureCommand = &cli.Command{
 	Name:      "add-feature",
 	Aliases:   []string{"install-feature"},
-	Usage:     "!DEPRECATED!See safescale host feature add instead! Add a feature to an Host",
+	Usage:     "!DEPRECATED!See safescale host feature add instead! Add a feature to a host",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{

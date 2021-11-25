@@ -493,7 +493,7 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	return instance.MetadataCore.Delete()
 }
 
-// Mount a bucket on an host on the given mount point
+// Mount a bucket on a host on the given mount point
 func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outerr fail.Error) {
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -767,7 +767,7 @@ func (b *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
 					return xerr
 				}
 
-				defer func(i resources.Host) { //nolint
+				defer func(i resources.Host) { // nolint
 					i.Released()
 				}(hostInstance)
 
