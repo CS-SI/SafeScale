@@ -195,7 +195,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("AccessKey", opts.AccessKeyID)
 	cfg.Set("SecretKey", opts.SecretAccessKey)
 	cfg.Set("Region", opts.Region)
-	cfg.Set("URL", opts.IdentityEndpoint)
+	cfg.Set("AuthUrl", opts.IdentityEndpoint)
 	return cfg, nil
 }
 

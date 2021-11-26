@@ -3,7 +3,7 @@
 SafeScale being designed to abstract resources from various Cloud Providers, the resource names and usages may differ from
 what one Cloud Provider may provide.
 
-This documentation describes each SafeScale resource and differences from Cloud Provider counterparts.
+This documentation describes each SafeScale resource and differences from Cloud Provider counterparts (if it makes sense).
 
 ## resource `Network`
 
@@ -46,4 +46,13 @@ A `Volume` must be first created, then attached to a `Host`. By design, a `Volum
 
 ## resource `Bucket`
 
+This resource exists mainly to allow mount of Object Storage bucket on `Hosts`.
+
 ## resource `Cluster`
+
+This resource allows to control various `Hosts` as a whole, and to deploy software globally using `Features`.
+
+## resource `Feature`
+
+This resource proposes an unified way to add software to `Hosts` and `Clusters`.
+It does not have a metadata for itself you will not find entry names `features` in metadata storage), but is referenced in `Hosts` and `Clusters` properties.
