@@ -2111,6 +2111,7 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subne
 		subnetID:    instance.GetID(),
 		subnetName:  instance.GetName(),
 		subnetHosts: subnetHosts,
+		onRemoval:   true,
 	}
 	svc := instance.GetService()
 	for k := range sgs.ByID {

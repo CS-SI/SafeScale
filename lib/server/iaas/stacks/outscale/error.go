@@ -156,6 +156,8 @@ func qualifyFromCode(code, details string) fail.Error {
 		return fail.NotAuthenticatedError("user is not authenticated")
 	case "4019":
 		return fail.InvalidRequestError("invalid device name")
+	case "4043":
+		return fail.InvalidRequestError("invalid Security Group name")
 	case "4045":
 		return fail.InvalidRequestError("invalid Targets")
 	case "4047":

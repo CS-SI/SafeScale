@@ -1561,7 +1561,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
-				return fail.InconsistentError("'*securitygroupproperty.HostsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			// updates security group metadata
@@ -1571,7 +1571,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 			}
 			return nil
 		})
-	})
+	}, data.NewImmutableKeyValue("Reload", !params.onRemoval))
 	if xerr != nil {
 		return xerr
 	}
@@ -1581,7 +1581,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
-				return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			innerXErr := instance.GetService().UnbindSecurityGroupFromSubnet(instance.GetID(), params.subnetID)

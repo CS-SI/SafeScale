@@ -2,7 +2,7 @@
 
 Some providers do not provide all the information (CPU frequency, GPU availability, ...) through API about a Host template. So in order to allow the Host selection to be more precise, the SafeScale Scanner will investigate a given set of templates to register some useful information in a local database.
 
-SafeScale Scanner used to be a separate binary. Starting with release v21.05, it's now a service included into `safescaled` that can be requested using `safescale` command (you can find usage [here](USAGE.md#tenant_scan) or directly through gRPC API.
+SafeScale Scanner used to be a separate binary. Starting with release v21.11, it's now a service included into `safescaled` that can be requested using `safescale` command (you can find usage [here](USAGE.md#tenant_scan) or directly through gRPC API.
 
 ## Basic usage
 
