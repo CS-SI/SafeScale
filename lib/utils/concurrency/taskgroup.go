@@ -773,6 +773,7 @@ func (instance *taskGroup) Abort() fail.Error {
 	return nil
 }
 
+// AbortWithCause
 func (instance *taskGroup) AbortWithCause(cerr fail.Error) fail.Error {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()

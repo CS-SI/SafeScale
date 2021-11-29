@@ -185,11 +185,21 @@ func HostFullFromAbstractToProtocol(in *abstract.HostFull) *protocol.Host {
 	if in.CurrentState != hoststate.Unknown {
 		state = in.CurrentState
 	}
+
+	managed := false
+	if ct, ok := in.Core.Tags["DeclaredInBucket"]; ok {
+		if ct != "" {
+			managed = true
+		}
+	}
+
 	ph := &protocol.Host{
-		Id:         in.Core.ID,
-		Name:       in.Core.Name,
-		State:      HostStateFromAbstractToProtocol(state),
-		PrivateKey: in.Core.PrivateKey,
+		Id:           in.Core.ID,
+		Name:         in.Core.Name,
+		State:        HostStateFromAbstractToProtocol(state),
+		PrivateKey:   in.Core.PrivateKey,
+		CreationDate: in.Core.Tags["CreationDate"],
+		Managed:      managed,
 	}
 	if in.Networking != nil {
 		ph.PublicIp = in.Networking.PublicIPv4
@@ -237,10 +247,10 @@ func HostStateFromAbstractToProtocol(in hoststate.Enum) protocol.HostState {
 }
 
 // BucketListFromAbstractToProtocol ...
-func BucketListFromAbstractToProtocol(in []string) *protocol.BucketList {
-	out := protocol.BucketList{Buckets: []*protocol.Bucket{}}
+func BucketListFromAbstractToProtocol(in []string) *protocol.BucketListResponse {
+	out := protocol.BucketListResponse{Buckets: []*protocol.BucketResponse{}}
 	for _, v := range in {
-		b := protocol.Bucket{
+		b := protocol.BucketResponse{
 			Name: v,
 		}
 		out.Buckets = append(out.Buckets, &b)

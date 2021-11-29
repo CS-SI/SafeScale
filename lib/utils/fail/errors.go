@@ -953,7 +953,7 @@ func (e *ErrOverflow) Annotate(key string, value data.Annotation) data.Annotatab
 	return e
 }
 
-// ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occured in a given time).
+// ErrOverload when action cannot be honored because provider is overloaded (ie too many requests occurred in a given time).
 type ErrOverload struct {
 	*errorCore
 }

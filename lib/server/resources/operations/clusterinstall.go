@@ -145,7 +145,13 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	v["ClusterAdminUsername"] = "cladm"
 	v["ClusterAdminPassword"] = identity.AdminPassword
 	if _, ok := v["Username"]; !ok {
-		v["Username"] = abstract.DefaultUser
+		config, xerr := instance.GetService().GetConfigurationOptions()
+		if xerr != nil {
+			return xerr
+		}
+		if v["Username"], ok = config.Get("OperatorUsername"); !ok {
+			v["Username"] = abstract.DefaultUser
+		}
 	}
 	networkCfg, xerr := instance.GetNetworkConfig()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -250,7 +256,8 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 		return xerr
 	}
 
-	v["IPRanges"] = networkCfg.CIDR
+	// VPL: already set earlier
+	// v["IPRanges"] = networkCfg.CIDR
 	return nil
 }
 
@@ -559,7 +566,10 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	params := data.Map{}
 	if nodeType == clusternodetype.Master {
-		tp := instance.GetService().GetTenantParameters()
+		tp, xerr := instance.GetService().GetTenantParameters()
+		if xerr != nil {
+			return xerr
+		}
 		content := map[string]interface{}{
 			"tenants": []map[string]interface{}{tp},
 		}

@@ -29,13 +29,20 @@ type Officer struct {
 	variables interface{}
 }
 
+// Backoff is the type that must implement algorithms that space out retries to avoid congestion
 type Backoff func(duration time.Duration) *Officer
 
 // Constant sleeps for duration duration
 func Constant(duration time.Duration) *Officer {
+	jitter := getJitter(duration)
+
 	o := Officer{
 		Block: func(t Try) {
-			time.Sleep(duration)
+			toSleep := duration + jitter
+			if toSleep < 0 {
+				toSleep = duration
+			}
+			time.Sleep(toSleep)
 		},
 	}
 	return &o
@@ -43,9 +50,16 @@ func Constant(duration time.Duration) *Officer {
 
 // Incremental sleeps for duration + the number of tries
 func Incremental(duration time.Duration) *Officer {
+	jitter := getJitter(duration)
+
 	o := Officer{
 		Block: func(t Try) {
-			time.Sleep(duration + time.Duration(t.Count))
+			toSleep := duration + time.Duration(t.Count) + jitter
+			if toSleep < 0 {
+				toSleep = duration + time.Duration(t.Count)
+			}
+
+			time.Sleep(toSleep)
 		},
 	}
 	return &o
@@ -54,9 +68,15 @@ func Incremental(duration time.Duration) *Officer {
 
 // Linear sleeps for duration * the number of tries
 func Linear(duration time.Duration) *Officer {
+	jitter := getJitter(duration)
+
 	o := Officer{
 		Block: func(t Try) {
-			time.Sleep(duration * time.Duration(t.Count))
+			toSleep := duration*time.Duration(t.Count) + jitter
+			if toSleep < 0 {
+				toSleep = duration * time.Duration(t.Count)
+			}
+			time.Sleep(toSleep)
 		},
 	}
 	return &o
@@ -64,12 +84,29 @@ func Linear(duration time.Duration) *Officer {
 
 // Exponential sleeps for duration base * 2^tries
 func Exponential(base time.Duration) *Officer {
+	jitter := getJitter(base)
+
 	o := Officer{
 		Block: func(t Try) {
-			time.Sleep(time.Duration(float64(base) * math.Exp(float64(t.Count))))
+			toSleep := time.Duration(float64(base)*math.Exp(float64(t.Count))) + jitter
+			if toSleep < 0 {
+				toSleep = time.Duration(float64(base) * math.Exp(float64(t.Count)))
+			}
+			time.Sleep(toSleep)
 		},
 	}
 	return &o
+}
+
+// getJitter is a utility function to help Backoff functions not hammering the network in a predictable way
+func getJitter(base time.Duration) time.Duration {
+	var jitter time.Duration
+	if base >= 1*time.Second {
+		jitter = time.Duration(randomInt(-100, 100)) * time.Millisecond
+	} else {
+		jitter = time.Duration(randomInt(int(-base.Milliseconds()*10/100), int(base.Milliseconds()*10/100))) * time.Millisecond
+	}
+	return jitter
 }
 
 // Fibonacci sleeps for duration * fib(tries)
@@ -80,6 +117,9 @@ func Fibonacci(base time.Duration) *Officer {
 			"cur": 1,
 		},
 	}
+
+	jitter := getJitter(base)
+
 	o.Block = func(t Try) {
 		p := o.variables.(map[string]uint64)
 		var pre, cur uint64
@@ -88,7 +128,12 @@ func Fibonacci(base time.Duration) *Officer {
 		cur += pre
 		p["cur"] = cur
 
-		time.Sleep(base * time.Duration(cur))
+		toSleep := base*time.Duration(cur) + jitter
+		if toSleep < 0 {
+			toSleep = base * time.Duration(cur)
+		}
+
+		time.Sleep(toSleep)
 	}
 
 	return &o

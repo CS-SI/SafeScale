@@ -444,6 +444,7 @@ func (s stack) ListVolumeAttachments(serverID string) (_ []abstract.VolumeAttach
 	return vas, nil
 }
 
+// Migrate
 func (s stack) Migrate(operation string, params map[string]interface{}) (xerr fail.Error) {
 	return nil
 }

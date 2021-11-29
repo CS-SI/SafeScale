@@ -301,7 +301,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 	return nil
 }
 
-// CreateVolumeAttachment attaches a volume to an host
+// CreateVolumeAttachment attaches a volume to a host
 // - 'name' of the volume attachment
 // - 'volume' to attach
 // - 'host' on which the volume is attached
@@ -407,6 +407,7 @@ func (s stack) ListVolumeAttachments(serverID string) ([]abstract.VolumeAttachme
 	return vs, nil
 }
 
+// Migrate
 func (s stack) Migrate(operation string, params map[string]interface{}) (xerr fail.Error) {
 	return nil
 }

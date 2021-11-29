@@ -189,7 +189,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	tracer := debug.NewTracer(task, false /*Trace.IPAddress, */, "(%s)", name).Entering()
+	tracer := debug.NewTracer(task, false /*tracing.ShouldTrace("resources.host") || tracing.ShouldTrace("resources.feature"), */, "(%s)", name).Entering()
 	defer tracer.Exiting()
 
 	feat, xerr := NewFeature(instance.GetService(), name)
@@ -384,7 +384,13 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 	v["PublicIP"] = instance.publicIP
 
 	if _, ok := v["Username"]; !ok {
-		v["Username"] = abstract.DefaultUser
+		config, xerr := instance.GetService().GetConfigurationOptions()
+		if xerr != nil {
+			return xerr
+		}
+		if v["Username"], ok = config.Get("OperatorUsername"); !ok {
+			v["Username"] = abstract.DefaultUser
+		}
 	}
 
 	rs, xerr := instance.unsafeGetDefaultSubnet()

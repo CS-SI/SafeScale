@@ -61,8 +61,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	if len(hostReq.Subnets) == 0 {
 		return nil, fail.InvalidRequestError("params.request.Networks cannot be an empty '[]*abstract.Network'")
 	}
-	hostSizing := params.(taskCreateGatewayParameters).sizing
 
+	hostSizing := params.(taskCreateGatewayParameters).sizing
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
 	svc := instance.GetService()
 	hostReq.PublicIP = true
@@ -85,7 +85,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		// If Host resources has been created and error occured after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
+		// If Host resources has been created and error occurred after (and KeepOnFailure is requested), rgw.ID() does contain the ID of the Host
 		if id := rgw.GetID(); id != "" {
 			as.GatewayIDs = append(as.GatewayIDs, id)
 		}

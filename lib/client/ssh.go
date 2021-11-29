@@ -216,7 +216,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 		return invalid, "", "", xerr
 	}
 
-	// IPAddress checks
+	// Host checks
 	if hostFrom != "" && hostTo != "" {
 		return invalid, "", "", fail.NotImplementedError("copy between 2 hosts is not supported yet")
 	}

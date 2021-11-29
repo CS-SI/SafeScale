@@ -24,6 +24,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	mapset "github.com/deckarep/golang-set"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -266,9 +267,13 @@ func createFilters() []*ec2.Filter {
 			Name:   aws.String("ena-support"),
 			Values: []*string{aws.String("true")},
 		},
+		{
+			Name:   aws.String("is-public"),
+			Values: []*string{aws.String("true")},
+		},
 	}
 
-	// FIXME: AWS CentOS AND Others, and HARCODED providers
+	// FIXME: AWS CentOS AND Others, and HARDCODED providers
 	owners := []*string{
 		aws.String("099720109477"), // Ubuntu
 		aws.String("013116697141"), // Fedora
@@ -289,7 +294,7 @@ func createFilters() []*ec2.Filter {
 }
 
 // ListImages lists available image
-func (s stack) ListImages() (_ []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(_ bool) (_ []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -329,18 +334,38 @@ func toAbstractImage(in ec2.Image) abstract.Image {
 }
 
 // ListTemplates lists templates stored in AWS
-func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
+func (s stack) ListTemplates(_ bool) (templates []abstract.HostTemplate, ferr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.aws") || tracing.ShouldTrace("stacks.compute")).WithStopwatch().Entering().Exiting()
-	defer fail.OnExitTraceError(&xerr)
+	defer fail.OnExitTraceError(&ferr)
 
-	resp, xerr := s.rpcDescribeInstanceTypes(nil)
+	var resp []*ec2.InstanceTypeInfo
+	unfilteredResp, xerr := s.rpcDescribeInstanceTypes(nil)
 	if xerr != nil {
 		return emptySlice, xerr
+	}
+
+	// list only the resources actually available in our AZ
+	under, xerr := s.rpcDescribeInstanceTypeOfferings(aws.String(s.AwsConfig.Zone))
+	if xerr != nil {
+		return emptySlice, xerr
+	}
+
+	// put those into a set
+	availableTemplateNames := mapset.NewSet()
+	for _, item := range under.InstanceTypeOfferings {
+		availableTemplateNames.Add(aws.StringValue(item.InstanceType))
+	}
+
+	// not available resources are filtered out
+	for _, item := range unfilteredResp {
+		if availableTemplateNames.Contains(aws.StringValue(item.InstanceType)) {
+			resp = append(resp, item)
+		}
 	}
 
 	// sort response on Network Performance to potentially have cheaper choices first
@@ -530,7 +555,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		logrus.Debugf("Selected Availability Zone: '%s'", az)
 	}
 
-	// --- Initializes resources.IPAddress ---
+	// --- Initializes resources.Host ---
 
 	ahf = abstract.NewHostFull()
 	ahf.Core.PrivateKey = userData.FirstPrivateKey // Add initial PrivateKey to Host description
@@ -539,7 +564,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	ahf.Networking.DefaultSubnetID = defaultSubnetID
 	ahf.Networking.IsGateway = request.IsGateway
 
-	// Adds IPAddress property SizingV1
+	// Adds Host property SizingV1
 	ahf.Sizing = converters.HostTemplateToHostEffectiveSizing(template)
 
 	// Sets provider parameters to create ahf
@@ -609,7 +634,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			ahf.Core.ID = server.ID
 			ahf.Core.Name = server.Name
 
-			// Wait until IPAddress is ready, not just until the build is started
+			// Wait until Host is ready, not just until the build is started
 			if _, innerXErr = s.WaitHostReady(ahf, temporal.GetLongOperationTimeout()); innerXErr != nil {
 				if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
@@ -635,11 +660,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// Starting from here, delete host if exiting with error
 	defer func() {
-		if xerr != nil && !request.KeepOnFailure { // FIXME: Handle error groups
+		if ferr != nil && !request.KeepOnFailure {
 			logrus.Infof("Cleanup, deleting host '%s'", ahf.Core.Name)
 			if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
-				logrus.Warnf("Error deleting ahf: %v", derr)
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
+				logrus.Warnf("Error deleting host in cleanup: %v", derr)
 			}
 		}
 	}()
@@ -714,7 +739,6 @@ func (s stack) buildAwsMachine(
 }
 
 // ClearHostStartupScript clears the userdata startup script for Host instance (metadata service)
-// FIXME: see if anything is needed (does nothing for now)
 func (s stack) ClearHostStartupScript(hostParam stacks.HostParameter) fail.Error {
 	return nil
 }
@@ -832,6 +856,7 @@ func (s stack) inspectInstance(ahf *abstract.HostFull, hostLabel string, instanc
 			ahf.Core.Tags[aws.StringValue(tag.Key)] = aws.StringValue(tag.Value)
 		}
 	}
+
 	ahf.Core.Tags["Template"] = instanceType
 	ahf.Core.Tags["Image"] = aws.StringValue(instance.ImageId)
 
@@ -944,7 +969,7 @@ func (s stack) ListHosts(details bool) (hosts abstract.HostList, xerr fail.Error
 	return hosts, nil
 }
 
-// DeleteHost deletes a IPAddress
+// DeleteHost deletes a Host
 func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -1014,11 +1039,12 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			switch xerr.(type) {
 			case *fail.ErrAborted, *fail.ErrTimeout:
 				xerr = fail.ConvertError(xerr.Cause())
-			default:
-			}
-		}
-		if xerr != nil {
-			switch xerr.(type) {
+				switch xerr.(type) {
+				case *fail.ErrNotFound:
+					debug.IgnoreError(xerr)
+				default:
+					return xerr
+				}
 			case *fail.ErrNotFound:
 				debug.IgnoreError(xerr)
 			default:
@@ -1029,7 +1055,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 	// Remove volumes if some remain, report errors (other than not found) as warnings
 	for _, volume := range attachedVolumes {
-		// FIXME: parallelize ?
+		// TODO: parallelize ?
 		xerr = stacks.RetryableRemoteCall(
 			func() error {
 				_, err := s.EC2Service.DeleteVolume(&ec2.DeleteVolumeInput{VolumeId: aws.String(volume)})
@@ -1227,7 +1253,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 // BindSecurityGroupToHost ...
 // Returns:
-// - *fail.ErrNotFound if the IPAddress is not found
+// - *fail.ErrNotFound if the Host is not found
 func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -1281,7 +1307,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 // UnbindSecurityGroupFromHost ...
 // Returns:
 // - nil means success
-// - *fail.ErrNotFound if the IPAddress or the Security Group ID cannot be identified
+// - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
@@ -1316,10 +1342,14 @@ func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter
 
 	sgs := make([]*string, 0, len(resp.SecurityGroups)+1)
 
-	// If there is one last Security Group bound to IPAddress, restore bond to default SecurityGroup before removing
+	// If there is one last Security Group bound to Host, restore bond to default SecurityGroup before removing
 	if len(resp.SecurityGroups) == 1 && aws.StringValue(resp.SecurityGroups[0].GroupId) == asg.ID {
 		defaultSG := abstract.NewSecurityGroup()
-		defaultSG.Name = s.GetDefaultSecurityGroupName()
+		var err fail.Error
+		defaultSG.Name, err = s.GetDefaultSecurityGroupName()
+		if err != nil {
+			return err
+		}
 		defaultSG.Network = asg.Network
 		defaultSG, xerr := s.InspectSecurityGroup(defaultSG)
 		if xerr != nil {

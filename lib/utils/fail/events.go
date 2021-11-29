@@ -32,8 +32,7 @@ import (
 )
 
 const (
-	// errorOccurred       = "ERROR OCCURRED"
-	// outputErrorTemplate = "%s " + errorOccurred + ": %+v"
+	errorOccurred       = "ERROR OCCURRED"
 	outputErrorTemplate = "%s: %+v"
 )
 

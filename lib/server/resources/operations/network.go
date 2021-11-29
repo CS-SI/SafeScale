@@ -103,6 +103,7 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nil, fail.NotFoundError("failed to find Network '%s'", ref)
 		default:
@@ -636,7 +637,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 			}
 
 			if maybeDeleted {
-				logrus.Warningf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
+				logrus.Debugf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
 			}
 			iterations := 6
 			for {
@@ -647,7 +648,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 				}
 				iterations--
 				if iterations < 0 {
-					logrus.Warningf("The network '%s' is still there", abstractNetwork.ID)
+					logrus.Debugf("The network '%s' is still there", abstractNetwork.ID)
 					break
 				}
 				time.Sleep(temporal.GetDefaultDelay())

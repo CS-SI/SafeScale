@@ -84,7 +84,7 @@ var ClusterCommand = &cli.Command{
 var clusterListCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available clusters",
+	Usage:   "List available clusters",
 
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
@@ -805,7 +805,7 @@ var clusterKubectlCommand = &cli.Command{
 				if idx+1 < len(args) {
 					localFile := args[idx+1]
 					if localFile != "" {
-						// If it's an URL, propagate as-is
+						// If it's a URL, propagate as-is
 						if urlRegex.MatchString(localFile) {
 							filteredArgs = append(filteredArgs, "-f")
 							filteredArgs = append(filteredArgs, localFile)
@@ -893,13 +893,13 @@ var clusterHelmCommand = &cli.Command{
 			}
 			ignore := false
 			switch arg {
-			//case "--help":
+			// case "--help":
 			//	useTLS = ""
 			case "init":
 				if idx == 0 {
 					return cli.NewExitError("helm init is forbidden", int(exitcode.InvalidArgument))
 				}
-			//case "search", "repo", "help", "install", "uninstall":
+			// case "search", "repo", "help", "install", "uninstall":
 			//	if idx == 0 {
 			//		useTLS = ""
 			//	}
@@ -909,7 +909,7 @@ var clusterHelmCommand = &cli.Command{
 				if idx+1 < len(args) {
 					localFile := args[idx+1]
 					if localFile != "" {
-						// If it's an URL, filter as-is
+						// If it's a URL, filter as-is
 						if urlRegex.MatchString(localFile) {
 							filteredArgs = append(filteredArgs, "-f")
 							filteredArgs = append(filteredArgs, localFile)

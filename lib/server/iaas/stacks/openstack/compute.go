@@ -131,7 +131,7 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -238,9 +238,9 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 	return template, nil
 }
 
-// ListTemplates lists available IPAddress templates
-// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
+// ListTemplates lists available Host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
+func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -480,6 +480,11 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 		ahf.Core.Tags[k] = v
 	}
 
+	ct, ok := ahf.Core.Tags["CreationDate"]
+	if !ok || ct == "" {
+		ahf.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
+	}
+
 	if !ahf.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
 	}
@@ -487,7 +492,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 	return ahf, nil
 }
 
-// complementHost complements IPAddress data with content of server parameter
+// complementHost complements Host data with content of server parameter
 func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -514,6 +519,16 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 
 	host.Core.Tags["Template"], _ = server.Image["id"].(string)
 	host.Core.Tags["Image"], _ = server.Flavor["id"].(string)
+
+	// recover metadata
+	for k, v := range server.Metadata {
+		host.Core.Tags[k] = v
+	}
+
+	ct, ok := host.Core.Tags["CreationDate"]
+	if !ok || ct == "" {
+		host.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
+	}
 
 	host.Sizing = s.toHostSize(server.Flavor)
 
@@ -858,11 +873,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				logrus.Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
 				if derr := s.rpcDeleteFloatingIP(ip.ID); derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 					logrus.Error(derr.Error())
 					return
 				}
@@ -1041,7 +1056,11 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
+		opts, err := s.GetRawAuthenticationOptions()
+		if err != nil {
+			return "", err
+		}
+		s.selectedAvailabilityZone = opts.AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
 			azList, xerr := s.ListAvailabilityZones()
 			if xerr != nil {
@@ -1254,7 +1273,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 }
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
-// By convention only one floating IP is allocated to an host
+// By convention only one floating IP is allocated to a host
 func (s stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(

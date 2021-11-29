@@ -162,15 +162,15 @@ var errorFuncMap = map[string]func(string) fail.Error{
 }
 
 // reduceOpenstackError ...
-func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
+func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
 	defer func() {
-		switch xerr.(type) {
+		switch ferr.(type) {
 		case *fail.ErrRuntimePanic:
-			xerr = fail.InvalidRequestError(string(in))
+			ferr = fail.InvalidRequestError(string(in))
 		default:
 		}
 	}()
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), ": Normalizing error").Entering()
 	defer tracer.Exiting()

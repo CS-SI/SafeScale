@@ -17,7 +17,7 @@
 package aws
 
 import (
-	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/aws/aws-sdk-go/service/s3"
 
 	"fmt"
@@ -55,25 +55,28 @@ func (s *stack) IsNull() bool {
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() string {
-	return "aws"
+func (s stack) GetStackName() (string, fail.Error) {
+	return "aws", nil
 }
 
 // GetConfigurationOptions ...
-func (s stack) GetConfigurationOptions() stacks.ConfigurationOptions {
+func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
 	if s.IsNull() {
-		return stacks.ConfigurationOptions{}
+		return stacks.ConfigurationOptions{}, nil
 	}
-	return *s.Config
+	return *s.Config, nil
 }
 
 // GetAuthenticationOptions ...
-func (s stack) GetAuthenticationOptions() stacks.AuthenticationOptions {
-	return *s.AuthOptions
+func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
+	if s.IsNull() {
+		return stacks.AuthenticationOptions{}, nil
+	}
+	return *s.AuthOptions, nil
 }
 
 // New creates and initializes an AWS stack
-func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (api.Stack, error) {
+func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (*stack, error) {
 	if localCfg.Ec2Endpoint == "" {
 		localCfg.Ec2Endpoint = fmt.Sprintf("https://ec2.%s.amazonaws.com", localCfg.Region)
 	}
@@ -90,7 +93,6 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	accessKeyID := auth.AccessKeyID
 	secretAccessKey := auth.SecretAccessKey
 
-	// not used directly but for mocks
 	ss3 := session.Must(session.NewSession(&aws.Config{
 		Credentials:      credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
 		S3ForcePathStyle: aws.Bool(true),

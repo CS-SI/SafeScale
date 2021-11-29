@@ -52,7 +52,7 @@ var ShareCommand = &cli.Command{
 var shareCreate = &cli.Command{
 	Name:      "create",
 	Aliases:   []string{"new"},
-	Usage:     "Create a nfs server on an host and exports a directory",
+	Usage:     "Create a nfs server on a host and exports a directory",
 	ArgsUsage: "<Share_name> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -168,7 +168,7 @@ var shareDelete = &cli.Command{
 var shareList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList all created shared",
+	Usage:   "List all created shared",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())
 
@@ -188,7 +188,7 @@ var shareList = &cli.Command{
 
 var shareMount = &cli.Command{
 	Name:      "mount",
-	Usage:     "Mount an exported nfs directory on an Host",
+	Usage:     "Mount an exported nfs directory on a host",
 	ArgsUsage: "SHARE_REF HOST_REF",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -235,7 +235,7 @@ var shareMount = &cli.Command{
 var shareUnmount = &cli.Command{
 	Name:      "umount",
 	Aliases:   []string{"unmount"},
-	Usage:     "Unmount a Share from an Host",
+	Usage:     "Unmount a Share from a host",
 	ArgsUsage: "SHARE_REF HOST_REF",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args %s", shareCmdName, c.Command.Name, c.Args())

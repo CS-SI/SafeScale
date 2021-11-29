@@ -575,6 +575,49 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			return outcomes, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey)
 		}
 
+		// Determine list of hosts concerned by the step
+		var hostsList []resources.Host
+		if w.target.TargetType() == featuretargettype.Host {
+			hostsList, xerr = w.identifyHosts(task.Context(), map[string]string{"hosts": "1"})
+		} else {
+			stepT := stepTargets{}
+			anon, ok := stepMap[yamlTargetsKeyword]
+			if ok {
+				for i, j := range anon.(map[string]interface{}) {
+					switch j := j.(type) {
+					case bool:
+						if j {
+							stepT[i] = "true"
+						} else {
+							stepT[i] = "false"
+						}
+					case string:
+						stepT[i] = j
+					}
+				}
+			} else {
+				msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
+				return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), stepKey, yamlTargetsKeyword)
+			}
+
+			hostsList, xerr = w.identifyHosts(task.Context(), stepT)
+		}
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
+
+		if len(hostsList) == 0 {
+			continue
+		}
+
+		// Marks hosts instances as released after use
+		defer func() {
+			for _, v := range hostsList {
+				v.Released()
+			}
+		}()
+
 		var problem error
 		subtask, xerr := concurrency.NewTaskWithParent(task)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -587,6 +630,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			stepKey:   stepKey,
 			stepMap:   stepMap,
 			variables: v,
+			hosts:     hostsList,
 		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action.String()), strings.ToLower(w.target.TargetType().String()), k)))
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -627,6 +671,7 @@ type taskLaunchStepParameters struct {
 	stepKey   string
 	stepMap   map[string]interface{}
 	variables data.Map
+	hosts     []resources.Host
 }
 
 // taskLaunchStep starts the step
@@ -664,6 +709,9 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 	if p.variables == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("params[variables]")
 	}
+	if len(p.hosts) == 0 {
+		return nil, fail.InvalidParameterError("p.hosts", "cannot be empty slice")
+	}
 
 	if task.Aborted() {
 		lerr, err := task.LastError()
@@ -682,50 +730,50 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 
 	var (
 		runContent string
-		stepT      = stepTargets{}
+		// stepT      = stepTargets{}
 		// options    = map[string]string{}
 	)
 
-	// Determine list of hosts concerned by the step
-	var hostsList []resources.Host
-	if w.target.TargetType() == featuretargettype.Host {
-		hostsList, xerr = w.identifyHosts(task.Context(), map[string]string{"hosts": "1"})
-	} else {
-		anon, ok = p.stepMap[yamlTargetsKeyword]
-		if ok {
-			for i, j := range anon.(map[string]interface{}) {
-				switch j := j.(type) {
-				case bool:
-					if j {
-						stepT[i] = "true"
-					} else {
-						stepT[i] = "false"
-					}
-				case string:
-					stepT[i] = j
-				}
-			}
-		} else {
-			msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
-			return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlTargetsKeyword)
-		}
+	// // Determine list of hosts concerned by the step
+	// var hostsList []resources.Host
+	// if w.target.TargetType() == featuretargettype.Host {
+	// 	hostsList, xerr = w.identifyHosts(task.Context(), map[string]string{"hosts": "1"})
+	// } else {
+	// 	anon, ok = p.stepMap[yamlTargetsKeyword]
+	// 	if ok {
+	// 		for i, j := range anon.(map[string]interface{}) {
+	// 			switch j := j.(type) {
+	// 			case bool:
+	// 				if j {
+	// 					stepT[i] = "true"
+	// 				} else {
+	// 					stepT[i] = "false"
+	// 				}
+	// 			case string:
+	// 				stepT[i] = j
+	// 			}
+	// 		}
+	// 	} else {
+	// 		msg := `syntax error in Feature '%s' specification file (%s): no key '%s.%s' found`
+	// 		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlTargetsKeyword)
+	// 	}
+	//
+	// 	hostsList, xerr = w.identifyHosts(task.Context(), stepT)
+	// }
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	// if len(hostsList) == 0 {
+	// 	return nil, nil
+	// }
 
-		hostsList, xerr = w.identifyHosts(task.Context(), stepT)
-	}
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if len(hostsList) == 0 {
-		return nil, nil
-	}
-
-	// Marks hosts instances as released after use
-	defer func() {
-		for _, v := range hostsList {
-			v.Released()
-		}
-	}()
+	// // Marks hosts instances as released after use
+	// defer func() {
+	// 	for _, v := range hostsList {
+	// 		v.Released()
+	// 	}
+	// }()
 
 	// Get the content of the action based on method
 	var keyword string
@@ -793,7 +841,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		YamlKey: p.stepKey,
 		Serial:  serial,
 	}
-	r, xerr := stepInstance.Run(task, hostsList, p.variables, w.settings)
+	r, xerr := stepInstance.Run(task, p.hosts, p.variables, w.settings)
 	// If an error occurred, do not execute the remaining steps, fail immediately
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

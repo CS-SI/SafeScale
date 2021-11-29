@@ -212,7 +212,7 @@ var tenantMetadataUpgradeCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		//dryRun := c.Bool("dry-run")
+		// dryRun := c.Bool("dry-run")
 		results, err := clientSession.Tenant.Upgrade(c.Args().First(), false /*dryRun*/, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)

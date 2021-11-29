@@ -286,7 +286,7 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 	)
 }
 
-// AssociateFloatingIP associates a floating ip to an host
+// AssociateFloatingIP associates a floating ip to a host
 func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()

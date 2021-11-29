@@ -56,8 +56,8 @@ type Router struct {
 }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork() bool {
-	return false
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
+	return false, nil
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
@@ -424,11 +424,11 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (newNet *abstract.Subnet
 
 		// Starting from here, delete router if exit with error
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				derr := s.deleteRouter(router.ID)
 				if derr != nil {
 					wrapErr := fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", router.Name)
-					_ = xerr.AddConsequence(wrapErr)
+					_ = ferr.AddConsequence(wrapErr)
 					logrus.Error(wrapErr.Error())
 				}
 			}

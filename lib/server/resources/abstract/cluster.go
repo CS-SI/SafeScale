@@ -128,7 +128,7 @@ func (i *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 	return r, nil
 }
 
-// Deserialize reads json code and reinstantiates an IPAddress
+// Deserialize reads json code and reinstantiates a ClusterIdentity
 func (i *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
 	// i cannot be nil, but can be null value (which will be filled by this method)
 	if i == nil {

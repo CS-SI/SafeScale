@@ -43,7 +43,7 @@ import (
 // -------------IMAGES---------------------------------------------------------------------------------------------------
 
 // ListImages lists available OS images
-func (s stack) ListImages() (out []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (out []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -96,7 +96,7 @@ func (s stack) InspectImage(id string) (_ abstract.Image, xerr fail.Error) {
 // -------------TEMPLATES------------------------------------------------------------------------------------------------
 
 // ListTemplates overload OpenStackGcp ListTemplate method to filter wind and flex instance and add GPU configuration
-func (s stack) ListTemplates() (templates []abstract.HostTemplate, xerr fail.Error) {
+func (s stack) ListTemplates(bool) (templates []abstract.HostTemplate, xerr fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -285,9 +285,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUD, xerr
 	}
 
-	// FIXME: if host is single, we need to create firewall rules for the net-safescale network. But should they be
-	//        created here, as they won't have associated metadata ?
-
 	// --- query provider for Host creation ---
 
 	logrus.Debugf("requesting host '%s' resource creation...", request.ResourceName)
@@ -296,10 +293,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
-			if ahf, innerXErr = s.buildGcpMachine(
-				request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1),
-				hostMustHavePublicIP, request.SecurityGroupIDs,
-			); innerXErr != nil {
+			ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs)
+			if innerXErr != nil {
 				captured := normalizeError(innerXErr)
 				switch captured.(type) {
 				case *fail.ErrNotFound, *fail.ErrDuplicate, *fail.ErrInvalidRequest, *fail.ErrNotAuthenticated, *fail.ErrForbidden, *fail.ErrOverflow, *fail.ErrSyntax, *fail.ErrInconsistent, *fail.ErrInvalidInstance, *fail.ErrInvalidInstanceContent, *fail.ErrInvalidParameter, *fail.ErrRuntimePanic: // Do not retry if it's going to fail anyway
@@ -421,10 +416,7 @@ func (s stack) buildGcpMachine(
 ) (*abstract.HostFull, fail.Error) {
 
 	nullAHF := abstract.NewHostFull()
-	resp, xerr := s.rpcCreateInstance(
-		instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata,
-		isPublic, securityGroups,
-	)
+	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata, isPublic, securityGroups)
 	if xerr != nil {
 		return nullAHF, xerr
 	}
@@ -602,6 +594,7 @@ func (s stack) complementHost(host *abstract.HostFull, instance *compute.Instanc
 		}
 	}
 
+	host.Core.Tags["CreationDate"] = instance.CreationTimestamp
 	host.Core.Tags["Template"] = instance.MachineType
 	delete(host.Core.Tags, "startup-script")
 
@@ -671,7 +664,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 	return nil
 }
 
-// ResizeHost change the template used by an host
+// ResizeHost change the template used by a host
 func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
@@ -847,7 +840,7 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 	return s.rpcAddTagsToInstance(ahf.GetID(), []string{asg.GetID()})
 }
 
-// UnbindSecurityGroupFromHost unbinds a Security Group from a IPAddress
+// UnbindSecurityGroupFromHost unbinds a Security Group from a Host
 func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()

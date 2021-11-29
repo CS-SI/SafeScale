@@ -646,7 +646,10 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task)
 
 	// Determine if getGateway Failover must be set
-	caps := instance.GetService().GetCapabilities()
+	caps, xerr := instance.GetService().GetCapabilities()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
 	gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
 	for k := range req.DisabledDefaultFeatures {
 		if k == "gateway-failover" {
@@ -686,7 +689,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		}
 
 		defer func() {
-			if xerr != nil && !req.KeepOnFailure {
+			if ferr != nil && !req.KeepOnFailure {
 				// Using context.Background() here disables abort
 				if derr := networkInstance.Delete(context.Background()); derr != nil {
 					switch derr.(type) {
@@ -694,7 +697,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 						// missing Network is considered as a successful deletion, continue
 						debug.IgnoreError(derr)
 					default:
-						_ = xerr.AddConsequence(derr)
+						_ = ferr.AddConsequence(derr)
 					}
 				}
 			}
@@ -956,6 +959,7 @@ func (instance *Cluster) createHostResources(
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// It's a valid state not to have a secondary gateway, so continue
 			haveSecondaryGateway = false
 		default:
@@ -1692,7 +1696,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts !!")
+			logrus.Warningf("Timeouts creating masters !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to create master(s): %s", clusterName, xerr)
 		if len(collectedErs) != 0 {
@@ -1739,6 +1743,9 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	if p.index < 1 {
 		return nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")
 	}
+
+	sleepTime := <-instance.generator
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("master", clusternodetype.Master)
@@ -2095,7 +2102,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts !!")
+			logrus.Warningf("Timeouts configuring masters !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to configure master(s): %s", instance.GetName(), xerr)
 		if len(loadErrors) != 0 {
@@ -2263,7 +2270,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts !!")
+			logrus.Warningf("Timeouts creating nodes !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to create nodes(s): %s", instance.GetName(), xerr)
 		return nil, rerr
@@ -2301,6 +2308,9 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	if p.index < 1 {
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
+
+	sleepTime := <-instance.generator
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("node", clusternodetype.Node)
@@ -2652,7 +2662,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts !!")
+			logrus.Warningf("Timeouts configuring nodes !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to configure nodes(s): %s", instance.GetName(), xerr)
 		if len(startErrs) > 0 {
@@ -2843,9 +2853,9 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			ferr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
 		}
 	}()
 

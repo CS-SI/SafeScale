@@ -114,6 +114,7 @@ func GetHostTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_HOST_TIMEOUT", HostTimeout)
 }
 
+// GetOperationTimeout
 func GetOperationTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_OP_TIMEOUT", DefaultOperationTimeout)
 }
@@ -143,6 +144,7 @@ func GetExecutionTimeout() time.Duration {
 	return GetTimeoutFromEnv("SAFESCALE_EXECUTION_TIMEOUT", DefaultExecutionTimeout)
 }
 
+// MaxTimeout
 func MaxTimeout(a time.Duration, b time.Duration) time.Duration {
 	if a > b {
 		return a

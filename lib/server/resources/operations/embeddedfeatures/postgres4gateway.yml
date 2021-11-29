@@ -42,7 +42,6 @@ feature:
                             sfExit
 
             add:
-                # pace: config,secret,network,start
                 pace: config,start
                 steps:
                     config:
@@ -57,6 +56,7 @@ feature:
 
                             POSTGRES_PASSWORD="$(sfRandomString 16 "[:alnum:]")"
                             echo -n "$POSTGRES_PASSWORD" >${SF_ETCDIR}/postgres4gateway/password
+                            chmod go-rwx ${SF_ETCDIR}/postgres4gateway/password
 
                             cat >${SF_ETCDIR}/postgres4gateway/docker-compose.yml <<-EOF
                             version: '3.7'
@@ -64,15 +64,9 @@ feature:
                                 postgres:
                                     image: postgres:11-alpine
                                     environment:
-                                        # - POSTGRES_DB=postgres
-                                        # - POSTGRES_USER=postgres
                                         - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-                                        # - POSTGRES_PASSWORD_FILE=/run/secrets/postgres4gateway
                                     volumes:
                                         - ${SF_VARDIR}/postgres4gateway:/var/lib/postgresql/data
-                                    # networks:
-                                    #     - safescale-gw
-                                    # network_mode: "host"
                                     ports:
                                         - "{{ .HostIP }}:5432:5432"
                                     restart: always
@@ -81,44 +75,9 @@ feature:
                                         interval: 10s
                                         timeout: 5s
                                         retries: 5
-                            #         secrets:
-                            #             - postgres4gateway
-
-                            # secrets:
-                            #     postgres4gateway:
-                            #         external: true
-                            # networks:
-                            #     safescale-gw:
-                            #         external: true
                             EOF
                             chmod go-rwx ${SF_ETCDIR}/postgres4gateway/docker-compose.yml
                             sfExit
-
-                    # secret:
-                    #     targets:
-                    #         hosts: no
-                    #         gateways: any
-                    #         masters: no
-                    #         nodes: no
-                    #     run: |
-                    #         docker secret rm postgres4gateway &>/dev/null || true
-                    #         echo -n "$(sfRandomString 16 "[:alnum:]")" | docker secret create postgres4gateway - || exit 192
-                    #         exit 0
-
-                    # network:
-                    #     targets:
-                    #         hosts: no
-                    #         gateways: any
-                    #         masters: no
-                    #         nodes: no
-                    #     run: |
-                    #         # if ! docker network list --filter 'name=safescale-gw' {{ "--format '{{.Driver}}:{{.Scope}}'" }} | grep 'overlay:swarm'; then
-                    #         #     docker network create --attachable -d overlay --scope swarm safescale-gw || exit 192
-                    #         # fi
-                    #         if ! docker network list --filter 'name=safescale-gw' | grep safescale-gw; then
-                    #             docker network create --attachable -d bridge safescale-gw || exit 193
-                    #         fi
-                    #         exit 0
 
                     start:
                         targets:

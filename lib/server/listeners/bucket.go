@@ -40,15 +40,15 @@ import (
 // safescale bucket list
 // safescale bucket inspect C1
 
-// BucketListener is the bucket service grpc server
+// BucketListener is the bucket service gRPC server
 type BucketListener struct {
 	protocol.UnimplementedBucketServiceServer
 }
 
 // List available buckets
-func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl *protocol.BucketList, err error) {
+func (s *BucketListener) List(ctx context.Context, in *protocol.BucketListRequest) (bl *protocol.BucketListResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot list buckets")
+	defer fail.OnExitWrapError(&err, "cannot list Buckets")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -59,7 +59,7 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, "", "/buckets/list")
@@ -73,16 +73,16 @@ func (s *BucketListener) List(ctx context.Context, in *googleprotobuf.Empty) (bl
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := handlers.NewBucketHandler(job)
-	buckets, xerr := handler.List()
+	bucketList, xerr := handler.List(in.GetAll())
 	if err != nil {
 		return nil, xerr
 	}
 
-	return converters.BucketListFromAbstractToProtocol(buckets), nil
+	return converters.BucketListFromAbstractToProtocol(bucketList), nil
 }
 
 // Create a new bucket
-func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty *googleprotobuf.Empty, err error) {
+func (s *BucketListener) Create(ctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot create bucket")
 
@@ -99,7 +99,7 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetName()
@@ -122,7 +122,7 @@ func (s *BucketListener) Create(ctx context.Context, in *protocol.Bucket) (empty
 }
 
 // Delete a bucket
-func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty *googleprotobuf.Empty, err error) {
+func (s *BucketListener) Delete(ctx context.Context, in *protocol.BucketRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot delete bucket")
 
@@ -139,7 +139,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetName()
@@ -157,7 +157,7 @@ func (s *BucketListener) Delete(ctx context.Context, in *protocol.Bucket) (empty
 }
 
 // Inspect a bucket
-func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *protocol.BucketMountingPoint, err error) {
+func (s *BucketListener) Inspect(ctx context.Context, in *protocol.BucketRequest) (_ *protocol.BucketResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot inspect bucket")
 
@@ -173,7 +173,7 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetName()
@@ -198,11 +198,11 @@ func (s *BucketListener) Inspect(ctx context.Context, in *protocol.Bucket) (_ *p
 		return nil, fail.NotFoundError("bucket '%s' not found", bucketName)
 	}
 
-	return converters.BucketMountPointFromResourceToProtocol(job.Context(), resp)
+	return resp.ToProtocol()
 }
 
 // Mount a bucket on the filesystem of the host
-func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingPoint) (empty *googleprotobuf.Empty, err error) {
+func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot mount bucket")
 
@@ -219,7 +219,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetBucket()
@@ -238,7 +238,7 @@ func (s *BucketListener) Mount(ctx context.Context, in *protocol.BucketMountingP
 }
 
 // Unmount a bucket from the filesystem of the host
-func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountingPoint) (empty *googleprotobuf.Empty, err error) {
+func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot unmount bucket")
 
@@ -255,7 +255,7 @@ func (s *BucketListener) Unmount(ctx context.Context, in *protocol.BucketMountin
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	bucketName := in.GetBucket()

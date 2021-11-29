@@ -70,8 +70,10 @@ func DecorateWith(prefix, what, why string, ignoreCount uint) string {
 type Occurrence bool
 
 const (
+	// FirstOccurrence
 	FirstOccurrence Occurrence = false
-	LastOccurrence  Occurrence = true
+	// LastOccurrence
+	LastOccurrence Occurrence = true
 )
 
 // IgnoreTraceUntil cuts all the lines of the trace before and including lines with 'search' in it

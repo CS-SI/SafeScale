@@ -215,7 +215,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 	return objv, nil
 }
 
-// Attach a volume to an host
+// Attach a volume to a host
 func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, doNotFormat bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 

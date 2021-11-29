@@ -539,46 +539,6 @@ func TestErrCheckTimeout(t *testing.T) {
 	}
 }
 
-func TestErrCheckStdError(t *testing.T) {
-	iteration := 0
-	xerr := WhileUnsuccessful(
-		func() error {
-			iteration++
-			return fail.NewError("It failed at iteration #%d", iteration)
-		},
-		10*time.Millisecond,
-		80*time.Millisecond,
-	)
-	if xerr != nil {
-		xerr = fail.Wrap(xerr, "the checking failed")
-		t.Logf(xerr.Error())
-		if !(strings.Contains(xerr.Error(), "failed at iteration") && (strings.Contains(xerr.Error(), "#6") || strings.Contains(xerr.Error(), "#7") || strings.Contains(xerr.Error(), "#8") || strings.Contains(xerr.Error(), "#9"))) {
-			t.FailNow()
-		}
-	}
-}
-
-func TestErrCheckStdErrorHard(t *testing.T) {
-	iteration := 0
-	xerr := WhileUnsuccessfulWithHardTimeout(
-		func() error {
-			iteration++
-			return fail.NewError("It failed at iteration #%d", iteration)
-		},
-		10*time.Millisecond,
-		80*time.Millisecond,
-	)
-	if xerr != nil {
-		xerr = fail.Wrap(xerr, "the checking failed")
-		t.Logf(xerr.Error())
-		if !(strings.Contains(xerr.Error(), "failed at iteration") && (strings.Contains(xerr.Error(), "#6") || strings.Contains(xerr.Error(), "#7") || strings.Contains(xerr.Error(), "#8") || strings.Contains(xerr.Error(), "#9"))) {
-			if !strings.Contains(xerr.Error(), "desist") {
-				t.FailNow()
-			}
-		}
-	}
-}
-
 func TestErrCheckStopStdError(t *testing.T) {
 	iteration := 0
 	var errCause error

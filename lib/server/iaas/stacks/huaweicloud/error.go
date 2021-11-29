@@ -205,15 +205,15 @@ func errorMeansServiceUnavailable(err error) bool {
 }
 
 // reduceOpenstackError ...
-func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
+func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
 	defer func() {
-		switch xerr.(type) {
+		switch ferr.(type) {
 		case *fail.ErrRuntimePanic:
-			xerr = fail.InvalidRequestError(string(in))
+			ferr = fail.InvalidRequestError(string(in))
 		default:
 		}
 	}()
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), ": Normalizing error").Entering()
 	defer tracer.Exiting()
@@ -278,14 +278,14 @@ func normalizeError(err error) fail.Error {
 }
 
 // reduceHuaweicloudError ...
-func reduceHuaweicloudError(in []byte) (xerr fail.Error) {
+func reduceHuaweicloudError(in []byte) (ferr fail.Error) {
 	defer func() {
-		switch xerr.(type) { // nolint
+		switch ferr.(type) { // nolint
 		case *fail.ErrRuntimePanic:
-			xerr = fail.InvalidRequestError(string(in))
+			ferr = fail.InvalidRequestError(string(in))
 		}
 	}()
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	var body map[string]interface{}
 	unjsonedErr := json.Unmarshal(in, &body)
@@ -294,6 +294,8 @@ func reduceHuaweicloudError(in []byte) (xerr fail.Error) {
 			switch code {
 			case "VPC.0101":
 				return fail.NotFoundError("failed to find VPC")
+			case "VPC.0114":
+				return fail.NotFoundError("exceeded VPC quota")
 			case "VPC.0209":
 				return fail.NotAvailableError("subnet still in use")
 			case "APIGW.0101":

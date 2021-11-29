@@ -164,8 +164,8 @@ func NewSubnet(svc iaas.Service) (_ *Subnet, xerr fail.Error) {
 }
 
 // LoadSubnet loads the metadata of a Subnet
-func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance *Subnet, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance *Subnet, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -179,6 +179,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		subnetID        string
 		networkInstance resources.Network
 	)
+	var xerr fail.Error
 	networkRef = strings.TrimSpace(networkRef)
 	switch networkRef {
 	case "":
@@ -191,10 +192,16 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		if xerr != nil {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
+				debug.IgnoreError(xerr)
 				// Network metadata can be missing if it's the default Network, so continue
 			default:
 				return nil, xerr
 			}
+		}
+
+		withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+		if err != nil {
+			return nil, err
 		}
 
 		if networkInstance != nil { // nolint
@@ -224,7 +231,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 			if xerr != nil {
 				return nil, xerr
 			}
-		} else if svc.HasDefaultNetwork() {
+		} else if withDefaultSubnetwork {
 			// No Network Metadata, try to use the default Network if there is one
 			an, xerr := svc.GetDefaultNetwork()
 			xerr = debug.InjectPlannedFail(xerr)
@@ -276,11 +283,13 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		}
 		_ = cacheEntry.LockContent()
 		defer func() {
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
+			ferr = debug.InjectPlannedFail(ferr)
+			if ferr != nil {
 				_ = cacheEntry.UnlockContent()
 			}
 		}()
+	} else {
+		return nil, fail.NotFoundError("failed to find a Subnet '%s' in Network '%s'", subnetRef, networkRef)
 	}
 
 	// FIXME: The reload problem
@@ -568,7 +577,10 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		}
 	}()
 
-	caps := svc.GetCapabilities()
+	caps, xerr := svc.GetCapabilities()
+	if xerr != nil {
+		return xerr
+	}
 	failover := req.HA
 	if failover {
 		if caps.PrivateVirtualIP {
@@ -1284,7 +1296,10 @@ func (instance *Subnet) validateCIDR(req *abstract.SubnetRequest, network abstra
 // TODO: there is room for optimization here, 'allSubnets' is walked through at each call...
 func wouldOverlap(allSubnets []*abstract.Subnet, subnet net.IPNet) fail.Error {
 	for _, s := range allSubnets {
-		_, sDesc, _ := net.ParseCIDR(s.CIDR)
+		_, sDesc, xerr := net.ParseCIDR(s.CIDR)
+		if xerr != nil {
+			return fail.ConvertError(xerr)
+		}
 		if netutils.CIDROverlap(subnet, *sDesc) {
 			return fail.OverloadError("would intersect with '%s (%s)'", s.Name, s.CIDR)
 		}
@@ -1338,7 +1353,12 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 		rn = nil
 		switch xerr.(type) { // nolint
 		case *fail.ErrNotFound:
-			if !svc.HasDefaultNetwork() {
+			withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			if !withDefaultSubnetwork {
 				return nil, nil, xerr
 			}
 			an, xerr = svc.GetDefaultNetwork()
@@ -1357,12 +1377,12 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 	return rn, an, nil
 }
 
-// unbindHostFromVIP unbinds a VIP from IPAddress
+// unbindHostFromVIP unbinds a Host from VIP
 // Actually does nothing in aws for now
-func (instance *Subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Subnet) unbindHostFromVIP(vip *abstract.VirtualIP, host resources.Host) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
-	xerr = instance.GetService().UnbindHostFromVIP(vip, host.GetID())
+	xerr := instance.GetService().UnbindHostFromVIP(vip, host.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "cleaning up on %s, failed to unbind gateway '%s' from VIP", ActionFromError(xerr), host.GetName())
@@ -2043,7 +2063,7 @@ func (instance *Subnet) deleteGateways(subnet *abstract.Subnet) (ids []string, x
 
 	ids = []string{}
 	if len(subnet.GatewayIDs) > 0 {
-		// FIXME: parallelize
+		// TODO: parallelize
 		for _, v := range subnet.GatewayIDs {
 			hostInstance, xerr := LoadHost(svc, v)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -2091,6 +2111,7 @@ func (instance *Subnet) onRemovalUnbindSecurityGroups(ctx context.Context, subne
 		subnetID:    instance.GetID(),
 		subnetName:  instance.GetName(),
 		subnetHosts: subnetHosts,
+		onRemoval:   true,
 	}
 	svc := instance.GetService()
 	for k := range sgs.ByID {
@@ -2232,8 +2253,8 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	}
 
 	// RLock is needed because unsafeInspectGateway needs such a lock
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
 
 	var (
 		gw  resources.Host
@@ -2627,7 +2648,11 @@ func (instance *Subnet) EnableSecurityGroup(ctx context.Context, sgInstance reso
 			}
 
 			// Do security group stuff to enable it
-			if svc.GetCapabilities().CanDisableSecurityGroup {
+			caps, xerr := svc.GetCapabilities()
+			if xerr != nil {
+				return xerr
+			}
+			if caps.CanDisableSecurityGroup {
 				if innerXErr = svc.EnableSecurityGroup(asg); innerXErr != nil {
 					return innerXErr
 				}
@@ -2732,7 +2757,11 @@ func (instance *Subnet) DisableSecurityGroup(ctx context.Context, sg resources.S
 				return fail.NotFoundError("security group '%s' is not bound to Subnet '%s'", sg.GetName(), instance.GetID())
 			}
 
-			if svc.GetCapabilities().CanDisableSecurityGroup {
+			caps, xerr := svc.GetCapabilities()
+			if xerr != nil {
+				return xerr
+			}
+			if caps.CanDisableSecurityGroup {
 				if innerXErr = svc.DisableSecurityGroup(abstractSG); innerXErr != nil {
 					return innerXErr
 				}

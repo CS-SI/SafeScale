@@ -101,8 +101,8 @@ func NullStack() *stack { // nolint
 }
 
 // GetStackName returns the name of the stack
-func (s stack) GetStackName() string {
-	return "outscale"
+func (s stack) GetStackName() (string, fail.Error) {
+	return "outscale", nil
 }
 
 // New creates a new stack
@@ -211,12 +211,17 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks.outscale")).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	return []string{
-		"cn-southeast-1",
-		"eu-west-2",
-		"us-east-2",
-		"us-west-1",
-	}, nil
+	resp, _, err := s.client.RegionApi.ReadRegions(s.auth, nil)
+	if err != nil {
+		return []string{}, normalizeError(err)
+	}
+
+	var regions []string
+	for _, r := range resp.Regions {
+		regions = append(regions, r.RegionName)
+	}
+
+	return regions, nil
 }
 
 // ListAvailabilityZones returns availability zone in a set

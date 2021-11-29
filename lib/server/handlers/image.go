@@ -42,7 +42,7 @@ type imageHandler struct {
 	job server.Job
 }
 
-// NewImageHandler creates an host service
+// NewImageHandler creates a host service
 func NewImageHandler(job server.Job) ImageHandler {
 	return &imageHandler{job: job}
 }

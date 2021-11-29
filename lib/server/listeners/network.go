@@ -61,7 +61,7 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil && !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	networkName := in.GetName()
@@ -105,7 +105,9 @@ func (s *NetworkListener) Create(ctx context.Context, in *protocol.NetworkCreate
 			// VPL: using context.Background() instead of job.Context() disables the cancellation
 			// defer job.Task().DisarmAbortSignal()()
 			if dferr := networkInstance.Delete(context.Background()); dferr != nil {
-				_ = fail.ConvertError(ferr).AddConsequence(fail.Wrap(dferr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
+				casted := fail.ConvertError(ferr)
+				_ = casted.AddConsequence(fail.Wrap(dferr, "cleaning up on failure, failed to delete Network '%s'", in.GetName()))
+				ferr = casted
 			}
 		}
 	}()
@@ -179,7 +181,7 @@ func (s *NetworkListener) List(ctx context.Context, in *protocol.NetworkListRequ
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in)
 		}
 	}
 
@@ -231,7 +233,7 @@ func (s *NetworkListener) Inspect(ctx context.Context, in *protocol.Reference) (
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in)
 		}
 	}
 
@@ -279,7 +281,7 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 	ok, err := govalidator.ValidateStruct(in)
 	if err == nil {
 		if !ok {
-			logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+			logrus.Warnf("Structure validation failure: %v", in)
 		}
 	}
 
@@ -321,11 +323,15 @@ func (s *NetworkListener) Delete(ctx context.Context, in *protocol.Reference) (e
 				}
 			}
 
-			if cfg, xerr := svc.GetConfigurationOptions(); xerr == nil { // FIXME: Very bad practice
-				if name, found := cfg.Get("DefaultNetworkName"); found && name.(string) == abstractNetwork.Name {
-					return empty, fail.InvalidRequestError("cannot delete default Network %s because its existence is not controlled by SafeScale", refLabel)
-				}
+			cfg, cerr := svc.GetConfigurationOptions()
+			if cerr != nil {
+				return empty, cerr
 			}
+
+			if name, found := cfg.Get("DefaultNetworkName"); found && name.(string) == abstractNetwork.Name {
+				return empty, fail.InvalidRequestError("cannot delete default Network %s because its existence is not controlled by SafeScale", refLabel)
+			}
+
 			return empty, fail.InvalidRequestError("%s is not managed by SafeScale", refLabel)
 		default:
 			return empty, xerr

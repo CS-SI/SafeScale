@@ -132,7 +132,7 @@ func (s *Subnet) OK() bool {
 	return result
 }
 
-// Serialize serializes IPAddress instance into bytes (output json code)
+// Serialize serializes instance into bytes (output json code)
 func (s *Subnet) Serialize() ([]byte, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -141,7 +141,7 @@ func (s *Subnet) Serialize() ([]byte, fail.Error) {
 	return r, fail.ConvertError(err)
 }
 
-// Deserialize reads json code and reinstantiates an IPAddress
+// Deserialize reads json code and reinstantiates a Subnet
 func (s *Subnet) Deserialize(buf []byte) (xerr fail.Error) {
 	if s == nil {
 		return fail.InvalidInstanceError()

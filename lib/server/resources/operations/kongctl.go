@@ -53,10 +53,7 @@ var kongProxyCheckedCache cache.Cache
 
 // KongController allows to control Kong, installed on a host
 type KongController struct {
-	subnet resources.Subnet
-	// host      *pb.IPAddress
-	// safescale safescale.Client
-
+	subnet           resources.Subnet
 	gateway          resources.Host
 	gatewayPrivateIP string
 	gatewayPublicIP  string

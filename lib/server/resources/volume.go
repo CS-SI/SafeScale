@@ -36,7 +36,7 @@ type Volume interface {
 	observer.Observable
 	cache.Cacheable
 
-	Attach(ctx context.Context, host Host, path, format string, doNotFormat bool) fail.Error // attaches a volume to an host
+	Attach(ctx context.Context, host Host, path, format string, doNotFormat bool) fail.Error // attaches a volume to a host
 	Browse(ctx context.Context, callback func(*abstract.Volume) fail.Error) fail.Error       // walks through all the metadata objects in network
 	Create(ctx context.Context, req abstract.VolumeRequest) fail.Error                       // creates a volume
 	Delete(ctx context.Context) fail.Error                                                   // deletes a volume

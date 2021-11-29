@@ -128,7 +128,8 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	}
 
 	var buffer bytes.Buffer
-	if err := tmplPrepared.Option("missingkey=error").Execute(&buffer, data); err != nil {
+	err = tmplPrepared.Option("missingkey=error").Execute(&buffer, data)
+	if err != nil {
 		xerr = fail.ExecutionError(err, "failed to execute template")
 		xerr.Annotate("retcode", 255)
 		return "", xerr
@@ -153,7 +154,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		}
 	}()
 
-	// FIXME: This is not Windows friendly
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
@@ -166,8 +166,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 				_ = innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 				return innerXErr
 			}
-
-			// FIXME: Add crc
 
 			return nil
 		},

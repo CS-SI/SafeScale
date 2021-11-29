@@ -19,6 +19,7 @@ package commands
 
 import (
 	"fmt"
+
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 
 	"github.com/sirupsen/logrus"
@@ -53,12 +54,12 @@ var VolumeCommand = &cli.Command{
 var volumeList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available volumes",
+	Usage:   "List available volumes",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:    "all",
 			Aliases: []string{"a"},
-			Usage:   "ErrorList all Volumes on tenant (not only those created by SafeScale)",
+			Usage:   "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
@@ -189,7 +190,7 @@ var volumeCreate = &cli.Command{
 var volumeAttach = &cli.Command{
 	Name:      "attach",
 	Aliases:   []string{"bind"},
-	Usage:     "Attach a volume to an host",
+	Usage:     "Attach a volume to a host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
@@ -238,7 +239,7 @@ var volumeAttach = &cli.Command{
 var volumeDetach = &cli.Command{
 	Name:      "detach",
 	Aliases:   []string{"unbind"},
-	Usage:     "Detach a volume from an host",
+	Usage:     "Detach a volume from a host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())

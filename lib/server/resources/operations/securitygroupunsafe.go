@@ -403,7 +403,7 @@ func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractS
 	})
 }
 
-// unsafeBindToHost binds the security group to an Host.
+// unsafeBindToHost binds the security group to a host.
 // instance is not locked, it must have been done outside to prevent data races
 func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
