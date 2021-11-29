@@ -226,33 +226,35 @@ func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
 	var body map[string]interface{}
 	msg := string(in)
 	unjsonedErr := json.Unmarshal(in, &body)
-	if unjsonedErr == nil {
-		if lvl1, ok := body["badRequest"].(map[string]interface{}); ok {
-			if lvl2, ok := lvl1["message"].(string); ok {
-				msg = lvl2
-			}
-		} else if lvl1, ok := body["computeFault"].(map[string]interface{}); ok {
-			if lvl2, ok := lvl1["message"].(string); ok {
-				msg = lvl2
-			}
-		} else if lvl1, ok := body["NeutronError"].(map[string]interface{}); ok {
-			if t, ok := lvl1["type"].(string); ok {
-				var m string
-				if m, ok = lvl1["message"].(string); ok {
-					msg = m
-					// This switch exists only to return another kind of fail.Error if the errorName does not comply with the real Neutron error (not seen yet)
-					switch t {
-					// FIXME: What about *fail.ErrDuplicate ?
-					case "SecurityGroupRuleExists": // return a *fail.ErrDuplicate
-					default:
-					}
+	if unjsonedErr != nil {
+		return fail.Wrap(unjsonedErr, "error unmarshalling error received from provider: %s", string(in))
+	}
+
+	if lvl1, ok := body["badRequest"].(map[string]interface{}); ok {
+		if lvl2, ok := lvl1["message"].(string); ok {
+			msg = lvl2
+		}
+	} else if lvl1, ok := body["computeFault"].(map[string]interface{}); ok {
+		if lvl2, ok := lvl1["message"].(string); ok {
+			msg = lvl2
+		}
+	} else if lvl1, ok := body["NeutronError"].(map[string]interface{}); ok {
+		if t, ok := lvl1["type"].(string); ok {
+			var m string
+			if m, ok = lvl1["message"].(string); ok {
+				msg = m
+				// This switch exists only to return another kind of fail.Error if the errorName does not comply with the real Neutron error (not seen yet)
+				switch t {
+				// FIXME: What about *fail.ErrDuplicate ?
+				case "SecurityGroupRuleExists": // return a *fail.ErrDuplicate
+				default:
 				}
 			}
-		} else if lvl1, ok := body["conflictingRequest"].(map[string]interface{}); ok {
-			msg = lvl1["message"].(string)
-		} else if lvl1, ok := body["message"].(string); ok {
-			msg = lvl1
 		}
+	} else if lvl1, ok := body["conflictingRequest"].(map[string]interface{}); ok {
+		msg = lvl1["message"].(string)
+	} else if lvl1, ok := body["message"].(string); ok {
+		msg = lvl1
 	}
 
 	tracer.Trace("normalized error to '*fail.Err%s'", errorName)
@@ -270,15 +272,68 @@ func normalizeError(err error) fail.Error {
 		if cause := lvl1.Cause(); cause != nil {
 			switch lvl2 := cause.(type) { // nolint
 			case gophercloud.ErrDefault400:
-				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.Body))
+				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+			case gophercloud.ErrDefault401:
+				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+			case gophercloud.ErrDefault403:
+				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+			case gophercloud.ErrDefault404:
+				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+			case gophercloud.ErrDefault405:
+				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+			case gophercloud.ErrDefault429:
+				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+			case gophercloud.ErrDefault500:
+				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
+			case gophercloud.ErrDefault503:
+				return openstack.NormalizeError(reduceHuaweicloudError(lvl2.GetStatusCode(), lvl2.Body))
 			}
 		}
 	}
 	return openstack.NormalizeError(err)
 }
 
+func reduceHuaweiAPIErrors(errcode int, code string, body map[string]interface{}) (ferr fail.Error) {
+	// look at https://support.huaweicloud.com/intl/en-us/devg-apisign/api-sign-errorcode.html
+	switch code {
+	case "APIGW.0101":
+		return fail.NotFoundError("API not found") // FIXME: Check this, it has to be MORE final
+	case "APIGW.0103":
+		return fail.NotFoundError("The backend does not exist, contact your cloud provider")
+	case "APIGW.0104":
+		return fail.NotFoundError("The backend does not exist, contact your cloud provider")
+	case "APIGW.0105":
+		return fail.NotFoundError("The plugin does not exist, contact your cloud provider")
+	case "APIGW.0106":
+		return fail.NotAvailableError("Orchestration error")
+	case "APIGW.0201":
+		if errcode >= 500 {
+			return fail.NotAvailableError("Backend service in timeout or not available")
+		}
+		return fail.InvalidRequestError("Invalid request")
+	case "APIGW.0301", "APIGW.0302", "APIGW.0303", "APIGW.0304", "APIGW.0305", "APIGW.0306", "APIGW.0307":
+		return fail.NotAuthenticatedError("Permission denied")
+	case "APIGW.0308":
+		return fail.OverloadError("Too many requests, try again later")
+	case "APIGW.0310", "APIGW.0311":
+		return fail.NotAuthenticatedError("Permission denied, contact your cloud provider")
+	case "APIGW.0401", "APIGW.0402", "APIGW.0404", "APIGW.0801", "APIGW.0802":
+		return fail.ForbiddenError("Access denied")
+	case "APIGW.0501", "APIGW.0502":
+		return fail.ForbiddenError("Quotas exceeded")
+	case "APIGW.0601", "APIGW.0605", "APIGW.0606", "APIGW.0608", "APIGW.0609", "APIGW.0611", "APIGW.0613", "APIGW.0705":
+		return fail.UnknownError("Internal error, contact your cloud provider")
+	case "APIGW.0610":
+		return fail.NotAvailableError("Backend service in timeout or not available")
+	case "APIGW.0602", "APIGW.0607", "APIGW.0612":
+		return fail.InvalidRequestError("Invalid request")
+	default:
+		return fail.UnknownError("unhandled error received from provider: %d, %s", errcode, code)
+	}
+}
+
 // reduceHuaweicloudError ...
-func reduceHuaweicloudError(in []byte) (ferr fail.Error) {
+func reduceHuaweicloudError(errcode int, in []byte) (ferr fail.Error) {
 	defer func() {
 		switch ferr.(type) { // nolint
 		case *fail.ErrRuntimePanic:
@@ -289,17 +344,21 @@ func reduceHuaweicloudError(in []byte) (ferr fail.Error) {
 
 	var body map[string]interface{}
 	unjsonedErr := json.Unmarshal(in, &body)
-	if unjsonedErr == nil {
-		if code, ok := body["code"].(string); ok {
-			switch code {
-			case "VPC.0101":
-				return fail.NotFoundError("failed to find VPC")
-			case "VPC.0114":
-				return fail.NotFoundError("exceeded VPC quota")
-			case "VPC.0209":
-				return fail.NotAvailableError("subnet still in use")
-			case "APIGW.0101":
-				return fail.NotFoundError("API not found") // FIXME: Check this
+	if unjsonedErr != nil {
+		return fail.Wrap(unjsonedErr, "error unmarshalling error received from provider: %s", string(in))
+	}
+
+	if code, ok := body["code"].(string); ok {
+		switch code {
+		case "VPC.0101":
+			return fail.NotFoundError("failed to find VPC")
+		case "VPC.0114":
+			return fail.ForbiddenError("exceeded VPC quota")
+		case "VPC.0209":
+			return fail.NotAvailableError("subnet still in use")
+		default:
+			if strings.HasPrefix(code, "APIGW") {
+				return reduceHuaweiAPIErrors(errcode, code, body)
 			}
 		}
 	}

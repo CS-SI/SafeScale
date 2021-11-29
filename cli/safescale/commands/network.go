@@ -162,10 +162,15 @@ var networkInspect = &cli.Command{
 		}
 
 		// Convert struct to map using struct to json then json to map
-		// errors not checked willingly; json encoding and decoding of simple structs are not supposed to fail
 		mapped := map[string]interface{}{}
-		jsoned, _ := json.Marshal(network)
-		_ = json.Unmarshal(jsoned, &mapped)
+		jsoned, err := json.Marshal(network)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(jsoned, &mapped)
+		if err != nil {
+			return err
+		}
 
 		if len(network.Subnets) == 1 {
 			if network.Subnets[0] == network.Name {
@@ -184,8 +189,14 @@ var networkInspect = &cli.Command{
 				}
 
 				subnetMapped := map[string]interface{}{}
-				jsoned, _ := json.Marshal(subnet)
-				_ = json.Unmarshal(jsoned, &subnetMapped)
+				jsoned, err := json.Marshal(subnet)
+				if err != nil {
+					return err
+				}
+				err = json.Unmarshal(jsoned, &subnetMapped)
+				if err != nil {
+					return err
+				}
 
 				for k, v := range subnetMapped {
 					switch k {
@@ -1192,10 +1203,15 @@ var subnetInspect = &cli.Command{
 		}
 
 		// Convert struct to map using struct to json then json to map
-		// errors not checked willingly; json encoding and decoding of simple structs are not supposed to fail
 		mapped := map[string]interface{}{}
-		jsoned, _ := json.Marshal(subnet)
-		_ = json.Unmarshal(jsoned, &mapped)
+		jsoned, err := json.Marshal(subnet)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(jsoned, &mapped)
+		if err != nil {
+			return err
+		}
 
 		if err = queryGatewaysInformation(clientSession, subnet, mapped, true); err != nil {
 			return err
