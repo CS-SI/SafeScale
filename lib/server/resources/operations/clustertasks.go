@@ -1544,13 +1544,6 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 		return nil, xerr
 	}
 
-	// // Installs proxycache server on gateway (if not disabled)
-	// xerr = instance.installProxyCacheServer(task.Context(), p.Host, hostLabel)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-
 	// Installs requirements as defined by Cluster Flavor (if it exists)
 	xerr = instance.installNodeRequirements(task.Context(), clusternodetype.Gateway, p.Host, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
