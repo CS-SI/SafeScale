@@ -103,12 +103,20 @@ func (r *response) Display() {
 
 	// Removed error if it's nil
 	mapped := map[string]interface{}{}
-	_ = json.Unmarshal(out, &mapped)
+	err = json.Unmarshal(out, &mapped)
+	if err != nil {
+		logrus.Error("lib/utils/response.go: Response.Display(): failed to unmarshal the Response")
+		return
+	}
 	if mapped["error"] == nil {
 		delete(mapped, "error")
 	}
 
-	out, _ = json.Marshal(mapped)
+	out, err = json.Marshal(mapped)
+	if err != nil {
+		logrus.Error("lib/utils/response.go: Response.Display(): failed to marshal the Response")
+		return
+	}
 	fmt.Println(string(out))
 }
 
