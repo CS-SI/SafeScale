@@ -582,8 +582,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 		Protocol:   svc.Protocol(),
 		MountPoint: mountPoint,
 	}
-	if anon, ok := authOpts.Config("AuthUrl"); ok {
-		desc.AuthUrl = anon.(string)
+	if anon, ok := authOpts.Config("AuthURL"); ok {
+		desc.AuthURL = anon.(string)
 	}
 	desc.Endpoint = osConfig.Endpoint
 

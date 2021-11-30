@@ -35,7 +35,7 @@ type Description struct {
 	Username         string
 	Password         string
 	AuthVersion      string
-	AuthUrl          string
+	AuthURL          string
 	Endpoint         string
 	Region           string
 	MountPoint       string
