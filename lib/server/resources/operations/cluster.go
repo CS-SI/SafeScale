@@ -319,12 +319,14 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	}
 
 	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
 	_, xerr = task.Run(instance.taskCreateCluster, req)
-	instance.lock.Unlock()
 	if xerr != nil {
 		return xerr
 	}
-	return updateClusterInventory(ctx, instance)
+	return instance.unsafeUpdateClusterInventory(ctx)
+
 }
 
 // Serialize converts Cluster data to JSON
@@ -1065,7 +1067,6 @@ func (instance *Cluster) GetState() (state clusterstate.Enum, xerr fail.Error) {
 // AddNodes adds several nodes
 func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 
-	var mlocked bool = true
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -1101,11 +1102,8 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	// make sure no other parallel actions interferes
 	instance.lock.Lock()
-	defer func() {
-		if mlocked {
-			instance.lock.Unlock()
-		}
-	}()
+	defer instance.lock.Unlock()
+
 	xerr = instance.beingRemoved()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1264,9 +1262,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		hosts = append(hosts, hostInstance)
 	}
 
-	instance.lock.Unlock()
-	mlocked = false
-	xerr = updateClusterInventory(ctx, instance)
+	xerr = instance.unsafeUpdateClusterInventory(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1318,7 +1314,6 @@ func complementHostDefinition(req abstract.HostSizingRequirements, def propertie
 
 // DeleteLastNode deletes the last added node and returns its name
 func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3.ClusterNode, xerr fail.Error) {
-	var mlocked bool = true
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -1351,11 +1346,7 @@ func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 
 	// make sure no other parallel actions interferes
 	instance.lock.Lock()
-	defer func() {
-		if mlocked {
-			instance.lock.Unlock()
-		}
-	}()
+	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1405,9 +1396,7 @@ func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 		return nil, xerr
 	}
 
-	instance.lock.Unlock()
-	mlocked = false
-	xerr = updateClusterInventory(ctx, instance)
+	xerr = instance.unsafeUpdateClusterInventory(ctx)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1417,7 +1406,7 @@ func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3
 
 // DeleteSpecificNode deletes a node identified by its ID
 func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) (xerr fail.Error) {
-	var mlocked = true
+
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -1453,11 +1442,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 
 	// make sure no other parallel actions interferes
 	instance.lock.Lock()
-	defer func() {
-		if mlocked {
-			instance.lock.Unlock()
-		}
-	}()
+	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1512,10 +1497,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	if xerr != nil {
 		return xerr
 	}
-
-	instance.lock.Unlock()
-	mlocked = false
-	xerr = updateClusterInventory(ctx, instance)
+	xerr = instance.unsafeUpdateClusterInventory(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -2373,7 +2355,9 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 		}
 	}
 
-	xerr = updateClusterInventory(ctx, instance)
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+	xerr = instance.unsafeUpdateClusterInventory(ctx)
 	if xerr != nil {
 		return xerr
 	}
@@ -3091,14 +3075,14 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 }
 
 // Regenerate ansible inventory
-func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // nolint
+func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.Error {
 	logrus.Warningf("About to update ansible inventory")
 
 	// Check incoming parameters
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if rc == nil || rc.IsNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -3117,7 +3101,7 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 		"ClusterNodes":         resources.IndexedListOfClusterNodes{},
 	}
 
-	xerr := rc.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 
 		// Check if feature ansible is installed
 		xerr := props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -3172,7 +3156,7 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 			}
 
 			// Template params: gateways
-			rh, err := LoadHost(rc.GetService(), networkCfg.GatewayID)
+			rh, err := LoadHost(instance.GetService(), networkCfg.GatewayID)
 			if err == nil {
 				err = rh.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 					ahc, ok := clonable.(*abstract.HostCore)
@@ -3189,7 +3173,7 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 			}
 
 			if networkCfg.SecondaryGatewayIP != "" {
-				rh, err = LoadHost(rc.GetService(), networkCfg.SecondaryGatewayID)
+				rh, err = LoadHost(instance.GetService(), networkCfg.SecondaryGatewayID)
 				if err == nil {
 					err = rh.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 						ahc, ok := clonable.(*abstract.HostCore)
@@ -3211,7 +3195,7 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 			for _, v := range nodesV3.Masters {
 				if node, found := nodesV3.ByNumericalID[v]; found {
 					nodes[node.NumericalID] = node
-					master, err := LoadHost(rc.GetService(), node.ID)
+					master, err := LoadHost(instance.GetService(), node.ID)
 					if err == nil {
 						masters = append(masters, master)
 					} else {
@@ -3687,7 +3671,6 @@ func (instance *Cluster) ToProtocol() (_ *protocol.ClusterResponse, xerr fail.Er
 
 // Shrink reduces cluster size by 'count' nodes
 func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertiesv3.ClusterNode, ferr fail.Error) {
-	var mlocked = true
 	emptySlice := make([]*propertiesv3.ClusterNode, 0)
 	if instance == nil || instance.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -3719,11 +3702,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 
 	// make sure no other parallel actions interferes
 	instance.lock.Lock()
-	defer func() {
-		if mlocked {
-			instance.lock.Unlock()
-		}
-	}()
+	defer instance.lock.Unlock()
 
 	xerr = instance.beingRemoved()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3851,10 +3830,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	if len(errors) > 0 {
 		return emptySlice, fail.NewErrorList(errors)
 	}
-
-	instance.lock.Unlock()
-	mlocked = false
-	xerr = updateClusterInventory(ctx, instance)
+	xerr = instance.unsafeUpdateClusterInventory(ctx)
 	if xerr != nil {
 		return emptySlice, xerr
 	}
