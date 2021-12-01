@@ -1885,21 +1885,14 @@ var clusterAnsibleRunCommands = &cli.Command{
 		// Format arguments
 		args := c.Args().Tail()
 		var captureInventory = false
-		var captureBecomeUser = false
 		// FIXME: Must set absolute inventory path, use "sudo -i" (interactive) with debian change $PATH, and makes fail ansible path finder (dirty way)
 		// event not ~.ansible.cfg or ANSIBLE_CONFIG defined for user cladm (could be a solution ?)
 		var inventoryPath string = utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
-		var becomeUser string = "cladm"
 		var filteredArgs []string
 		for _, arg := range args {
 			if captureInventory {
 				inventoryPath = arg
 				captureInventory = false
-				continue
-			}
-			if captureBecomeUser {
-				becomeUser = arg
-				captureBecomeUser = false
 				continue
 			}
 			switch arg {
@@ -1911,12 +1904,9 @@ var clusterAnsibleRunCommands = &cli.Command{
 				*/
 				captureInventory = true // extract given inventory (overload default inventoryPath)
 				break
-			case "--become-user":
-				captureBecomeUser = true // extract given become user (overload default becomeUser)
-				break
 			default:
 				/* Expect here
-				[-h] [--version] [-v] [-b] [--become-method BECOME_METHOD]
+				[-h] [--version] [-v] [-b] [--become-method BECOME_METHOD] [--become-user USER]
 				[-K] [--list-hosts]
 				[-l SUBSET] [-P POLL_INTERVAL] [-B SECONDS] [-o] [-t TREE] [-k]
 				[--private-key PRIVATE_KEY_FILE] [-u REMOTE_USER]
@@ -1936,7 +1926,7 @@ var clusterAnsibleRunCommands = &cli.Command{
 		}
 
 		// Make command line
-		cmdStr := `sudo -u cladm -i ansible -i ` + inventoryPath + ` --become-user ` + becomeUser + ` ` + strings.Join(filteredArgs, " ") // + useTLS
+		cmdStr := `sudo -u cladm -i ansible -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
 		logrus.Tracef(cmdStr)
 		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 		if xerr != nil {
@@ -1981,13 +1971,11 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 		// Format arguments
 		args := c.Args().Tail()
 		var captureInventory = false
-		var captureBecomeUser = false
 		var capturePlaybookFile = true
 		// FIXME: Must set absolute inventory path, use "sudo -i" (interactive) with debian change $PATH, and makes fail ansible path finder (dirty way)
 		// event not ~.ansible.cfg or ANSIBLE_CONFIG defined for user cladm (could be a solution ?)
 		// find no configuration for playbook defaut directory, must be absolute (arg: local file, mapped to remote)
 		var inventoryPath string = utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
-		var becomeUser string = "cladm"
 		var playbookFile string = ""
 		var filteredArgs []string
 		var isParam bool
@@ -1999,11 +1987,6 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 			if captureInventory {
 				inventoryPath = arg
 				captureInventory = false
-				continue
-			}
-			if captureBecomeUser {
-				becomeUser = arg
-				captureBecomeUser = false
 				continue
 			}
 			if capturePlaybookFile {
@@ -2020,12 +2003,9 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 				*/
 				captureInventory = true // extract given inventory (overload default inventoryPath)
 				break
-			case "--become-user":
-				captureBecomeUser = true // extract given become user (overload default becomeUser)
-				break
 			default:
 				/* Expect here
-				[-h] [--version] [-v] [-b] [--become-method BECOME_METHOD]
+				[-h] [--version] [-v] [-b] [--become-method BECOME_METHOD] [--become-user USER]
 				[-K] [--list-hosts]
 				[-l SUBSET] [-P POLL_INTERVAL] [-B SECONDS] [-o] [-t TREE] [-k]
 				[--private-key PRIVATE_KEY_FILE] [-u REMOTE_USER]
@@ -2074,7 +2054,7 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 		valuesOnRemote.Add(&rfc)
 
 		// Run playbook
-		cmdStr := `sudo chown cladm:root ` + rfc.Remote + ` && sudo chmod 0774 ` + rfc.Remote + ` && sudo -u cladm -i ansible-playbook ` + rfc.Remote + ` -i ` + inventoryPath + ` --become-user ` + becomeUser + ` ` + strings.Join(filteredArgs, " ") // + useTLS
+		cmdStr := `sudo chown cladm:root ` + rfc.Remote + ` && sudo chmod 0774 ` + rfc.Remote + ` && sudo -u cladm -i ansible-playbook ` + rfc.Remote + ` -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
 		return executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
 
 	},
