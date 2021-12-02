@@ -19,14 +19,12 @@ package huaweicloud
 import (
 	"fmt"
 
-	// Gophercloud OpenStack API
-	gc "github.com/gophercloud/gophercloud"
-	gcos "github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
-
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	// Gophercloud OpenStack API
+	gc "github.com/gophercloud/gophercloud"
+	gcos "github.com/gophercloud/gophercloud/openstack"
 )
 
 // Stack is the implementation for huaweicloud cloud stack
@@ -51,10 +49,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 		return nil, fail.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
 	}
 
-	authOptions := auth
 	scope := gc.AuthScope{
-		ProjectName: auth.Region,
-		DomainName:  auth.DomainName,
+		ProjectID: auth.ProjectID,
 	}
 
 	stack, err := openstack.New(auth, &scope, cfg, nil)
@@ -63,43 +59,11 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*S
 	}
 
 	// Identity API
-	identity, err := gcos.NewIdentityV3(stack.Driver, gc.EndpointOpts{})
+	identity, err := gcos.NewIdentityV3(stack.Driver, gc.EndpointOpts{
+		Region: auth.Region,
+	})
 	if err != nil {
-		return nil, fail.Errorf(fmt.Sprintf("%s", openstack.ProviderErrorToString(err)), err)
-	}
-
-	// Recover Project ID of region
-	listOpts := projects.ListOpts{
-		Enabled: gc.Enabled,
-		Name:    authOptions.Region,
-	}
-	allPages, err := projects.List(identity, listOpts).AllPages()
-	if err != nil {
-		return nil, fail.Errorf(
-			fmt.Sprintf(
-				"failed to query project ID corresponding to region '%s': %s", authOptions.Region,
-				openstack.ProviderErrorToString(err),
-			), err,
-		)
-	}
-	allProjects, err := projects.ExtractProjects(allPages)
-	if err != nil {
-		return nil, fail.Errorf(
-			fmt.Sprintf(
-				"failed to load project ID corresponding to region '%s': %s", authOptions.Region,
-				openstack.ProviderErrorToString(err),
-			), err,
-		)
-	}
-	if len(allProjects) > 0 {
-		authOptions.ProjectID = allProjects[0].ID
-	} else {
-		return nil, fail.Errorf(
-			fmt.Sprintf(
-				"failed to found project ID corresponding to region '%s': %s", authOptions.Region,
-				openstack.ProviderErrorToString(err),
-			), err,
-		)
+		return nil, fail.Errorf(fmt.Sprintf("failed to get identity: %s", openstack.ProviderErrorToString(err)), err)
 	}
 
 	s := Stack{
