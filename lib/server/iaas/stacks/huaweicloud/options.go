@@ -29,7 +29,7 @@ func (s stack) GetAuthOpts() (providers.Config, error) {
 	cfg.Set("DomainName", s.authOpts.DomainName)
 	cfg.Set("Login", s.authOpts.Username)
 	cfg.Set("Password", s.authOpts.Password)
-	cfg.Set("AuthUrl", s.authOpts.IdentityEndpoint)
+	cfg.Set("AuthURL", s.authOpts.IdentityEndpoint)
 	cfg.Set("Region", s.authOpts.Region)
 
 	return cfg, nil

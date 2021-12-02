@@ -243,7 +243,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
 	cfg.Set("AlternateApiConsumerKey", alternateAPIApplicationKey)
 	cfg.Set("AlternateApiApplicationSecret", alternateAPIApplicationSecret)
