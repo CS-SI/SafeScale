@@ -1748,8 +1748,8 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	if task.Aborted() {
-		lerr, err := task.LastError()
-		if err != nil {
+		lerr, xerr := task.LastError()
+		if xerr != nil {
 			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
 		return nil, fail.AbortedError(lerr, "parent task killed")

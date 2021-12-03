@@ -658,4 +658,43 @@ func TestNotNilCheckCast(t *testing.T) {
 			_ = origin.GRPCCode()
 		}
 	}
+
+	/*
+		if origin != nil {
+			if _, ok := origin.(*ErrTimeout); !ok || origin.IsNull() {
+				t.Log("So far so good")
+			} else {
+				t.Errorf("Should not happen")
+			}
+		}
+	*/
+}
+
+func TestNotNilCheckCastNoProblems(t *testing.T) {
+	defer func() {
+		if a := recover(); a != nil {
+			t.Errorf("We panicked, this is a serious problem, it means that when we check for nil in our errors, we might be wrong")
+		}
+	}()
+
+	var origin Error
+	origin = noProblems()
+
+	var nilErrTimeout *ErrTimeout = nil
+	if origin != nil {
+		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same
+			t.Logf("a nil that is not interpreted as a nil, calling origin.whatever actually panics, put it to the test")
+			_ = origin.GRPCCode()
+		}
+	}
+
+	/*
+		if origin != nil {
+			if _, ok := origin.(*ErrTimeout); !ok || origin.IsNull() {
+				t.Log("So far so good")
+			} else {
+				t.Errorf("Should not happen")
+			}
+		}
+	*/
 }

@@ -280,7 +280,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 	// Load volume data
 	rv, xerr := volumefactory.Load(handler.job.Service(), volumeRef)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return xerr
 		}
 

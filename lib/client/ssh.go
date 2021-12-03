@@ -396,7 +396,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 				}
 
 				if xerr = crcCheck(); xerr != nil {
-					if _, ok := xerr.(*fail.ErrWarning); !ok {
+					if _, ok := xerr.(*fail.ErrWarning); !ok || xerr.IsNull() {
 						return xerr
 					}
 					logrus.Warnf(xerr.Error())

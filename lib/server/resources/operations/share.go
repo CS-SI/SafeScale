@@ -683,6 +683,9 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 		shareID = si.ShareID
 		return nil
 	})
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	rhServer, xerr := instance.GetServer()
 	xerr = debug.InjectPlannedFail(xerr)

@@ -200,8 +200,8 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, userData, 4*time.Minute) // FIXME: Hardcoded timeout
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		theCause := fail.Cause(xerr)
-		if _, ok := theCause.(*fail.ErrTimeout); !ok {
+		theCause := fail.ConvertError(fail.Cause(xerr))
+		if _, ok := theCause.(*fail.ErrTimeout); !ok || theCause.IsNull() {
 			return nil, xerr
 		}
 

@@ -797,6 +797,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 
 	if len(problems) > 0 {
 		// Mark Cluster as state Degraded
+		outerr := fail.NewErrorList(problems)
 		xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 				stateV1, ok := clonable.(*propertiesv1.ClusterState)
@@ -808,7 +809,6 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 				return nil
 			})
 		})
-		outerr := fail.NewErrorList(problems)
 		if xerr != nil {
 			_ = outerr.AddConsequence(xerr)
 		}

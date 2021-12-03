@@ -411,8 +411,10 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			instance.task.forceAbort()
 
 			_, check := instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
-			if _, ok := check.(*fail.ErrAborted); !ok {
-				logrus.Tracef("BROKEN ASSUMPTION: %v", check)
+			if check != nil {
+				if _, ok := check.(*fail.ErrAborted); !ok || check.IsNull() {
+					logrus.Tracef("BROKEN ASSUMPTION: %v", check)
+				}
 			}
 
 			var forgedError fail.Error
@@ -595,8 +597,10 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 	instance.task.forceAbort()
 
 	_, check := instance.task.Wait() // will get *fail.ErrAborted, we know that, we asked for
-	if _, ok := check.(*fail.ErrAborted); !ok {
-		logrus.Tracef("BROKEN ASSUMPTION: %v", check)
+	if check != nil {
+		if _, ok := check.(*fail.ErrAborted); !ok || check.IsNull() {
+			logrus.Tracef("BROKEN ASSUMPTION: %v", check)
+		}
 	}
 
 	// build error to return for the parent Task

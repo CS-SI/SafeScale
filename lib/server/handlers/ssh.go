@@ -568,7 +568,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 			}
 			checksumErr := crcCheck()
 			if checksumErr != nil {
-				if _, ok := checksumErr.(*fail.ErrWarning); !ok {
+				if _, ok := checksumErr.(*fail.ErrWarning); !ok || checksumErr.IsNull() {
 					return checksumErr
 				}
 				logrus.Warnf(checksumErr.Error())

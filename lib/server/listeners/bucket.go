@@ -74,7 +74,7 @@ func (s *BucketListener) List(ctx context.Context, in *protocol.BucketListReques
 
 	handler := handlers.NewBucketHandler(job)
 	bucketList, xerr := handler.List(in.GetAll())
-	if err != nil {
+	if xerr != nil {
 		return nil, xerr
 	}
 

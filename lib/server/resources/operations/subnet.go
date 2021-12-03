@@ -261,7 +261,6 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 	}
 
 	// -- second step: search instance in service cache
-	xerr = fail.NotFoundError()
 	if subnetID != "" {
 		subnetCache, xerr := svc.GetCache(subnetKind)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -278,7 +277,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		if xerr != nil {
 			return nil, xerr
 		}
-		if subnetInstance = cacheEntry.Content().(*Subnet); subnetInstance == nil {
+		if subnetInstance = cacheEntry.Content().(*Subnet); subnetInstance == nil { // FIXME: Really bad
 			return nil, fail.InconsistentError("nil found in cache for Subnet with id %s", subnetID)
 		}
 		_ = cacheEntry.LockContent()
@@ -2275,7 +2274,7 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	gw, xerr = instance.unsafeInspectGateway(false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return nil, xerr
 		}
 	} else {
@@ -2294,7 +2293,7 @@ func (instance *Subnet) ToProtocol() (_ *protocol.Subnet, xerr fail.Error) {
 	vip, xerr = instance.unsafeGetVirtualIP()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return nil, xerr
 		}
 	}

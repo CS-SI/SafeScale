@@ -31,7 +31,7 @@ import (
 type ErrTimeout = fail.ErrTimeout
 
 // TimeoutError creates an error of type ErrTimeout
-func TimeoutError(err error, limit time.Duration, actual time.Duration, options ...data.ImmutableKeyValue) *ErrTimeout {
+func TimeoutError(err error, limit time.Duration, actual time.Duration, options ...data.ImmutableKeyValue) fail.Error {
 	var (
 		msg      string
 		decorate bool
@@ -57,7 +57,7 @@ func TimeoutError(err error, limit time.Duration, actual time.Duration, options 
 type ErrLimit = fail.ErrOverflow
 
 // LimitError creates an error of type ErrLimit.
-func LimitError(err error, limit uint) *ErrLimit {
+func LimitError(err error, limit uint) fail.Error {
 	return fail.OverflowError(err, limit, "retry limit exceeded")
 }
 
@@ -65,7 +65,7 @@ func LimitError(err error, limit uint) *ErrLimit {
 type ErrStopRetry = fail.ErrAborted
 
 // StopRetryError creates an error of type ErrStopRetry
-func StopRetryError(err error, msg ...interface{}) *ErrStopRetry {
+func StopRetryError(err error, msg ...interface{}) fail.Error {
 	newMessage := strprocess.FormatStrings(msg...)
 	if newMessage == "" {
 		newMessage = "stopping retries"

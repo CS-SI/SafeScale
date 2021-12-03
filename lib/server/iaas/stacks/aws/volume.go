@@ -275,7 +275,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 				innerXErr  fail.Error
 			)
 			deviceName, availableDevices, innerXErr = s.findNextAvailableDevice(request.HostID, availableDevices)
-			if xerr != nil {
+			if innerXErr != nil {
 				return innerXErr
 			}
 

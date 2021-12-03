@@ -99,7 +99,7 @@ func (handler *bucketHandler) Create(name string) (xerr fail.Error) {
 	svc := handler.job.Service()
 	rb, xerr := bucketfactory.Load(svc, name)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return xerr
 		}
 	}

@@ -751,11 +751,18 @@ func (scmd *SSHCommand) Close() fail.Error {
 	if len(scmd.tunnels) > 0 {
 		err1 = scmd.tunnels.Close()
 	}
-	err2 := utils.LazyRemove(scmd.keyFile.Name())
 	if err1 != nil {
 		logrus.Errorf("SSHCommand.closeTunnels() failed: %s (%s)", err1.Error(), reflect.TypeOf(err1).String())
+		defer func() { // lazy removal
+			ierr := utils.LazyRemove(scmd.keyFile.Name())
+			if ierr != nil {
+				debug.IgnoreError(ierr)
+			}
+		}()
 		return fail.Wrap(err1, "failed to close SSH tunnels")
 	}
+
+	err2 := utils.LazyRemove(scmd.keyFile.Name())
 	if err2 != nil {
 		return fail.Wrap(err2, "failed to close SSH tunnels")
 	}

@@ -1981,8 +1981,8 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, waitingTime)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			theCause := fail.Cause(xerr)
-			if _, ok := theCause.(*fail.ErrTimeout); !ok {
+			theCause := fail.ConvertError(fail.Cause(xerr))
+			if _, ok := theCause.(*fail.ErrTimeout); !ok || theCause.IsNull() {
 				return xerr
 			}
 
@@ -2638,7 +2638,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					switch innerXErr.(type) {
 					case *retry.ErrStopRetry:
 						innerXErr = fail.ConvertError(fail.Cause(innerXErr))
-						if _, ok := innerXErr.(*fail.ErrNotFound); !ok {
+						if _, ok := innerXErr.(*fail.ErrNotFound); !ok || innerXErr.IsNull() {
 							return innerXErr
 						}
 						debug.IgnoreError(innerXErr)
@@ -2678,7 +2678,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		// If entry not found, considered as a success
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return xerr
 		}
 		debug.IgnoreError(xerr)

@@ -60,6 +60,8 @@ type Error interface {
 	GRPCCode() codes.Code
 	ToGRPCStatus() error
 
+	IsNull() bool
+
 	prependToMessage(string)
 }
 
