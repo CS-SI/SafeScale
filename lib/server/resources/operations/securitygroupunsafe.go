@@ -130,7 +130,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 				// Do not remove a Security Group marked as default for a subnet
 				if subnetsV1.DefaultFor != "" {
-					return fail.InvalidRequestError("failed to delete SecurityGroup '%s': is default for Subnet identifyed by '%s'", abstractSG.Name, subnetsV1.DefaultFor)
+					return fail.InvalidRequestError("failed to delete SecurityGroup '%s': is default for Subnet identified by '%s'", abstractSG.Name, subnetsV1.DefaultFor)
 				}
 				return nil
 			})

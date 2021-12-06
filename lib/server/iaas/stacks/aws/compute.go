@@ -1026,7 +1026,6 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			}
 		case *fail.ErrNotFound, *fail.ErrInvalidRequest:
 			debug.IgnoreError(xerr)
-			break
 		default:
 			return fail.Wrap(xerr, "failed to stop Host '%s' with id '%s'", ahf.GetName(), ahf.GetID())
 		}

@@ -71,7 +71,7 @@ func NewKeyPair(name string) (*KeyPair, fail.Error) {
 	}, nil
 }
 
-// HostSizingRequirements represents host sizing requirements to fulfil
+// HostSizingRequirements represents host sizing requirements to fulfill
 type HostSizingRequirements struct {
 	MinCores    int
 	MaxCores    int

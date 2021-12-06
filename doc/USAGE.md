@@ -2308,7 +2308,7 @@ The following actions are proposed:
               <li><code>helm</code> (flavor K8S)</li>
             </ul>
         </li>
-        <li><code>--os value</code> Image name for the servers (default: "Ubuntu 20.04", may be overriden by a cluster flavor)</li>
+        <li><code>--os value</code> Image name for the servers (default: "Ubuntu 20.04", may be overridden by a cluster flavor)</li>
         <li><code>-k</code> Keeps infrastructure created on failure; default behavior is to delete resources</li>
         <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of all hosts (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details)</li>
         <li><code>--gw-sizing &lt;sizing&gt;</code> Describes gateway sizing specifically (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details); takes precedence over <code>--sizing</code></li>

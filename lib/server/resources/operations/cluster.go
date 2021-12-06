@@ -3083,7 +3083,7 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 }
 
 // Regenerate ansible inventory
-func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error {
+func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // nolint
 	logrus.Warningf("About to update ansible inventory")
 
 	// Check incoming parameters
@@ -3256,7 +3256,10 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error {
 		cmd = fmt.Sprintf("sudo rm -f %s || true", rfcItem.Remote)
 		retcode, stdout, stderr, xerr = masters[master].Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
 		if retcode != 0 || xerr != nil {
-			return fail.NewError("The remove failed")
+			ne := fail.NewError("The remove failed")
+			_ = ne.Annotate("stdout", stdout)
+			_ = ne.Annotate("stderr", stderr)
+			return ne
 		}
 
 		// Upload new inventory
@@ -3284,7 +3287,10 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error {
 		cmd = fmt.Sprintf("sudo cp /tmp/_inventory.yml %s && sudo chown %s %s", target, params["ClusterAdminUsername"], target)
 		retcode, stdout, stderr, xerr = masters[master].Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
 		if retcode != 0 || xerr != nil {
-			return fail.NewError("The remove failed")
+			ne := fail.NewError("The remove failed")
+			_ = ne.Annotate("stdout", stdout)
+			_ = ne.Annotate("stderr", stderr)
+			return ne
 		}
 
 		// Test result

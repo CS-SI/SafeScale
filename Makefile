@@ -52,7 +52,7 @@ version:
 release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet semgrep style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
-releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet semgrep releasearchive
+releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 releasetags:
@@ -377,11 +377,12 @@ minimock: begin generate
 metalint: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running metalint checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
-	@golangci-lint --color never --timeout=10m --enable=unused --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=maligned --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --enable=funlen --enable=gochecknoglobals --enable=depguard run  ./... 2>&1 | xargs -n3 -d'\n' | grep -v nolint | grep -v _test.go | grep -v .pb. || true
+	@golangci-lint --color never --timeout=10m --no-config --disable=unused --disable=maligned --enable=unparam --enable=deadcode --enable=gocyclo --enable=varcheck --enable=staticcheck --enable=structcheck --enable=typecheck --enable=errcheck --enable=ineffassign --enable=interfacer --enable=unconvert --enable=goconst --enable=gosec --enable=megacheck --enable=gocritic --enable=dogsled --disable=funlen --disable=gochecknoglobals --enable=depguard run ./... 2>&1 | xargs -n3 -d'\n' | grep -v nolint | grep -v _test.go | grep -v .pb. || true
 
 style: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running style checks, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@($(WHICH) golangci-lint > /dev/null && golangci-lint --color never --enable=errcheck --enable=stylecheck --enable=deadcode --enable=golint --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>&1 | xargs -n3 -d'\n' | grep -v nolint | grep -v _test.go | grep -v .pb. || true) || echo "golangci-lint not installed in your system"
+	@($(WHICH) golangci-lint > /dev/null || (echo "golangci-lint not installed in your system" && exit 1))
+	@golangci-lint --color never --timeout=10m --no-config --disable=unused --enable=errcheck --enable=stylecheck --enable=deadcode --enable=golint --enable=gocritic --enable=staticcheck --enable=gosimple --enable=govet --enable=ineffassign --enable=varcheck run ./... 2>&1 | xargs -n3 -d'\n' | grep -v nolint | grep -v _test.go | grep -v .pb. || true
 
 coverage: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";

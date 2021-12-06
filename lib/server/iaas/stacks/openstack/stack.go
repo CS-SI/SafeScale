@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package openstack
+package openstack // Package openstack contains the implemenation of a stack for OpenStack providers
 
 import (
 	"strings"
@@ -60,7 +60,7 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and returns a stack pointer
-func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) {
+func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
 	if auth.DomainName == "" && auth.DomainID == "" {
 		auth.DomainName = "Default"
 	}

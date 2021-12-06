@@ -201,9 +201,10 @@ func (s stack) findOpenStackNetworkBoundToVPC(vpcName string) (*networks.Network
 		return nil, fail.Wrap(xerr, "failed to list routers")
 	}
 	for _, r := range routerList {
+		local := r
 		if r.Name == vpcName {
 			found = true
-			router = &r
+			router = &local
 			break
 		}
 	}

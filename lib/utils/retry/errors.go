@@ -41,7 +41,7 @@ func TimeoutError(err error, limit time.Duration, actual time.Duration, options 
 		for _, v := range options {
 			switch v.Key() { // nolint
 			case "callstack":
-				decorate = v.Value().(bool)
+				decorate, _ = v.Value().(bool) // no panics if value is not a bool
 			}
 		}
 	}

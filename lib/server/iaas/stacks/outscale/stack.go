@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package outscale
+package outscale // Package outscale contains stack implementation for Outscale
 
 import (
 	"context"

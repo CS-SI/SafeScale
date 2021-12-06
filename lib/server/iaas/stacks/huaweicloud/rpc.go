@@ -18,6 +18,7 @@ package huaweicloud
 
 import (
 	"encoding/json"
+	"net/http"
 	"strings"
 	"time"
 
@@ -52,6 +53,14 @@ func (s stack) rpcGetHostByID(id string) (*servers.Server, fail.Error) {
 	return server, nil
 }
 
+func closer(hr *http.Response) {
+	if hr != nil {
+		if hr.Body != nil {
+			_ = hr.Body.Close()
+		}
+	}
+}
+
 func (s stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	nullServer := &servers.Server{}
 	if name = strings.TrimSpace(name); name == "" {
@@ -62,12 +71,17 @@ func (s stack) rpcGetHostByName(name string) (*servers.Server, fail.Error) {
 	r := servers.GetResult{}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, r.Err = s.ComputeClient.Get(
+			var hr *http.Response
+			hr, r.Err = s.ComputeClient.Get( // nolint
 				s.ComputeClient.ServiceURL("servers?name="+name), &r.Body, &gophercloud.RequestOpts{
 					OkCodes: []int{200, 203},
 				},
 			)
-			return r.Err
+			if r.Err != nil {
+				return r.Err
+			}
+			defer closer(hr)
+			return nil
 		},
 		NormalizeError,
 	)

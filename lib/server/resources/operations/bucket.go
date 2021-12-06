@@ -391,7 +391,6 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		case *fail.ErrNotFound:
 			// no bucket with this name managed by SafeScale, continue
 			debug.IgnoreError(xerr)
-			break
 		default:
 			return xerr
 		}
@@ -408,7 +407,6 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
-			break
 		default:
 			if strings.Contains(xerr.Error(), "not found") {
 				debug.IgnoreError(xerr)
@@ -710,7 +708,6 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 		case *fail.ErrNotFound:
 			// If mount is not found on remote server, consider unmount as successful
 			debug.IgnoreError(xerr)
-			break
 		default:
 			return xerr
 		}
@@ -746,13 +743,13 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 }
 
 // ToProtocol returns the protocol message corresponding to Bucket fields
-func (b *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
+func (instance *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
 	out := &protocol.BucketResponse{
-		Name: b.GetName(),
+		Name: instance.GetName(),
 	}
 
-	xerr := b.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		svc := b.GetService()
+	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		svc := instance.GetService()
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {

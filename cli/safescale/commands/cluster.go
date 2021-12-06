@@ -393,7 +393,7 @@ var clusterCreateCommand = &cli.Command{
 			Name: "node-sizing",
 			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details),
 		This parameter accepts a supplemental <component> named count, with only = as <operator> and an int as <value> corresponding to the
-		number of workers to create (cannot be less than the minimum required by the flavour).
+		number of workers to create (cannot be less than the minimum required by the flavor).
 	example:
 		--node-sizing "cpu~4, ram~15, count=8" will create 8 nodes`,
 		},

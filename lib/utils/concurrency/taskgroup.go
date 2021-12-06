@@ -106,7 +106,7 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 	}
 
 	if parentTask == nil {
-		if ctx == context.TODO() {
+		if ctx == context.TODO() { // nolint
 			t, err = NewTask()
 		} else {
 			t, err = NewTaskWithContext(ctx)
@@ -161,6 +161,7 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 				if ok {
 					tg.task.id += "+" + value
 				}
+			default:
 			}
 		}
 	}
@@ -205,7 +206,7 @@ func (instance *taskGroup) Status() (TaskStatus, fail.Error) {
 // Context returns the TaskGroup context
 func (instance *taskGroup) Context() context.Context {
 	if instance.isNull() {
-		return context.TODO()
+		return context.TODO() // nolint
 	}
 
 	return instance.task.Context()
@@ -844,7 +845,7 @@ func (instance *taskGroup) New() (Task, fail.Error) {
 		return nil, fail.InvalidInstanceError()
 	}
 
-	return newTask(context.TODO(), instance.task)
+	return newTask(context.TODO(), instance.task) // nolint
 }
 
 // GroupStatus returns a map of the status of all children running in TaskGroup, ordered by TaskStatus

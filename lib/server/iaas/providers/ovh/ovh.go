@@ -411,7 +411,7 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 	}, nil
 }
 
-// BindHostToVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+// BindHostToVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if p.IsNull() {
 		return fail.InvalidInstanceError()
@@ -426,7 +426,7 @@ func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Err
 	return nil
 }
 
-// UnbindHostFromVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+// UnbindHostFromVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if p.IsNull() {
 		return fail.InvalidInstanceError()

@@ -68,7 +68,7 @@ var (
 		74: "Connection failed",
 		75: "Disconnected by application",
 		76: "Too many connections",
-		77: "Authentication cancelled by user",
+		77: "Authentication canceled by user",
 		78: "No more authentication methods available",
 		79: "Invalid user name",
 	}
@@ -94,7 +94,7 @@ var (
 		74: "Connection failed",
 		75: "Disconnected by application",
 		76: "Too many connections",
-		77: "Authentication cancelled by user",
+		77: "Authentication canceled by user",
 		78: "No more authentication methods available",
 		79: "Invalid user name",
 	}
@@ -1125,7 +1125,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			if innerXErr != nil {
 				return innerXErr
 			}
-			if retcode != 0 {
+			if retcode != 0 { // nolint
 				switch phase {
 				case "final":
 					// Before v21.05.0, final provisioning state is stored in user_data.phase2.done file, so try to see if legacy file exists...

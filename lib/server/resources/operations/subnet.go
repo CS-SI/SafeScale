@@ -24,9 +24,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
@@ -54,6 +51,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
+	"github.com/davecgh/go-spew/spew"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -277,9 +276,16 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 		if xerr != nil {
 			return nil, xerr
 		}
-		if subnetInstance = cacheEntry.Content().(*Subnet); subnetInstance == nil { // FIXME: Really bad
+
+		var ok bool
+		subnetInstance, ok = cacheEntry.Content().(*Subnet)
+		if !ok {
+			return nil, fail.InconsistentError("cache entry for %s is not a *Subnet", subnetID)
+		}
+		if subnetInstance == nil {
 			return nil, fail.InconsistentError("nil found in cache for Subnet with id %s", subnetID)
 		}
+
 		_ = cacheEntry.LockContent()
 		defer func() {
 			ferr = debug.InjectPlannedFail(ferr)
@@ -1810,8 +1816,8 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 		if !ok {
 			return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract)
-		ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)
+		ctx = context.WithValue(ctx, currentSubnetAbstractContextKey, subnetAbstract) // nolint
+		ctx = context.WithValue(ctx, currentSubnetPropertiesContextKey, props)        // nolint
 
 		return props.Inspect(subnetproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			var ok bool

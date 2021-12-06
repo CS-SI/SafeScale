@@ -643,7 +643,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		return nil, nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task)
+	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task) // nolint
 
 	// Determine if getGateway Failover must be set
 	caps, xerr := instance.GetService().GetCapabilities()
@@ -2170,7 +2170,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 		return nil, xerr
 	}
 
-	// Configure master for flavour
+	// Configure master for flavor
 	if instance.makers.ConfigureMaster != nil {
 		xerr = instance.makers.ConfigureMaster(instance, p.Index, p.Host)
 		xerr = debug.InjectPlannedFail(xerr)

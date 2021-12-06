@@ -804,7 +804,7 @@ func (s stack) addPublicIPs(primaryNIC osc.Nic, otherNICs []osc.Nic) (osc.Public
 	return ip, nil
 }
 
-// CreateHost creates a host that fulfils the request
+// CreateHost creates a host that fulfills the request
 func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull, udc *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 

@@ -306,7 +306,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 		}
 	}
 
-	instance.ctx = context.WithValue(childContext, KeyForTaskInContext, instance)
+	instance.ctx = context.WithValue(childContext, KeyForTaskInContext, instance) // nolint
 
 	return instance, nil
 }
@@ -1407,7 +1407,7 @@ func (instance *task) Abortable() (bool, fail.Error) {
 // Returns a function to rearm the signal handling
 // If on call the abort signal is already disarmed, does nothing and returned function does nothing also.
 // If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
-// Note: the disarm state is not propagated to subtasks. It's possible to disarm abort signal in a task and want to Abort() explicitely a subtask.
+// Note: the disarm state is not propagated to subtasks. It's possible to disarm abort signal in a task and want to Abort() explicitly a subtask.
 func (instance *task) DisarmAbortSignal() func() {
 	if instance.IsNull() {
 		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.")

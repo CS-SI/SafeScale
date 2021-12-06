@@ -81,7 +81,7 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and return interface stack
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (stack, fail.Error) {
+func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (stack, fail.Error) { // nolint
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {

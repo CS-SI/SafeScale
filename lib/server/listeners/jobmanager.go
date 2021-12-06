@@ -138,7 +138,6 @@ func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinitio
 		case *fail.ErrNotFound:
 			// If uuid is not found, it's done
 			tracer.Trace("Job '%s' already terminated.", uuid)
-			break
 		default:
 			return empty, xerr
 		}

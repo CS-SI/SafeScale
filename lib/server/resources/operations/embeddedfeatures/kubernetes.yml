@@ -527,7 +527,7 @@ feature:
                                 timeoutForControlPlane: 4m0s
                                 extraArgs:
                                     #? API server is restarted because of health check fail
-                                    #? Modern K8S deploys preferes RBAC admission associate to PodSecurityPolicy to authorization control
+                                    #? Modern K8S deploys prefers RBAC admission associate to PodSecurityPolicy to authorization control
                                     # anonymous-auth: "false"
                                     ##? EventRateLimit error running kubeadm init, alpha version
                                     ##? DenyEscalatingExec, deprecated
@@ -891,7 +891,7 @@ feature:
                         run: |
                             [ -f /etc/kubernetes/.joined ] && echo "already joined, nothing to do" && sfExit
 
-                            # Allows pods to start on master if there is only one master or if it's explicitely requested
+                            # Allows pods to start on master if there is only one master or if it's explicitly requested
                             if [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ]; then
                                 sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
                             fi

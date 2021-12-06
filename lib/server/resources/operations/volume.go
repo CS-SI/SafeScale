@@ -63,7 +63,7 @@ type volume struct {
 
 // VolumeNullValue returns an instance of share corresponding to its null value.
 // The idea is to avoid nil pointer using VolumeNullValue()
-func VolumeNullValue() *volume {
+func VolumeNullValue() *volume { // nolint
 	return &volume{MetadataCore: NullCore()}
 }
 
@@ -119,9 +119,15 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 		}
 	}
 
-	if rv = cacheEntry.Content().(resources.Volume); rv == nil {
+	var ok bool
+	rv, ok = cacheEntry.Content().(resources.Volume)
+	if !ok {
+		return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
+	}
+	if rv == nil {
 		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
 	}
+
 	_ = cacheEntry.LockContent()
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)

@@ -79,7 +79,7 @@ type ClusterFeatures struct {
 	// Installed ...
 	Installed map[string]*ClusterInstalledFeature `json:"installed"`
 	// Disabled keeps track of features normally automatically added with cluster creation,
-	// but explicitely disabled; if a disabled feature is added, must be removed from this property
+	// but explicitly disabled; if a disabled feature is added, must be removed from this property
 	Disabled map[string]struct{} `json:"disabled"`
 }
 

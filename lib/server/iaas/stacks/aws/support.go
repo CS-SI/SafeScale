@@ -42,14 +42,12 @@ type IPInSubnet struct {
 	PublicIP string
 }
 
-// IsOperation
+// IsOperation checks if 'op' interface has a field with 'name' of type 'fieldType'
 func IsOperation(op interface{}, name string, fieldType reflect.Type) bool {
 	val := reflect.Indirect(reflect.ValueOf(op))
-
 	result := false
 
 	for i := 0; i < val.Type().NumField(); i++ {
-
 		if val.Type().Field(i).Name == name {
 			if val.Type().Field(i).Type == fieldType {
 				result = true

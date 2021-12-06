@@ -239,7 +239,7 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 			default:
 			}
 
-			host, rerr = svc.InspectHost(host) // FIXME: all service functions should accept ctx in order to be cancelled
+			host, rerr = svc.InspectHost(host) // FIXME: all service functions should accept ctx in order to be canceled
 			if rerr != nil {
 				errCh <- rerr
 				return
@@ -766,11 +766,7 @@ func (svc service) SearchImage(osname string) (*abstract.Image, fail.Error) {
 		return nil, fail.NotFoundError("unable to find an image matching '%s'", osname)
 	}
 
-	// reg, err := regexp.Compile("[^A-Z0-9.]")
-	reg, err := regexp.Compile("[^A-Z0-9]")
-	if err != nil {
-		return nil, fail.ConvertError(err)
-	}
+	reg := regexp.MustCompile("[^A-Z0-9]")
 
 	var maxLength int
 	for _, img := range imgs {

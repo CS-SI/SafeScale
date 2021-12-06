@@ -859,7 +859,7 @@ func (handler *tenantHandler) collect() (xerr fail.Error) {
 		}
 		if !file.IsDir() {
 			if err = os.Remove(theFile); err != nil {
-				logrus.Infof("Error Supressing %s : %s", file.Name(), err.Error())
+				logrus.Infof("Error Suppressing %s : %s", file.Name(), err.Error())
 			}
 		}
 	}

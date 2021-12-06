@@ -110,7 +110,7 @@ func NewJob(ctx context.Context, cancel context.CancelFunc, svc iaas.Service, de
 	}
 
 	// attach task instance to the context
-	ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task) // FIXME don't use string as key
+	ctx = context.WithValue(ctx, concurrency.KeyForTaskInContext, task) // nolint
 
 	nj := job{
 		description: description,
