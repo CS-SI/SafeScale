@@ -16,13 +16,7 @@ endif
 
 MAKEFLAGS += -s
 
-BRANCH_NAME?="release/v20.06"
-FIRSTUPDATE := $(shell git remote update >/dev/null 2>&1)
-BUILD := $(shell git rev-parse HEAD)
-UPSTREAM := $(shell git rev-parse origin/$(BRANCH_NAME))
-LOCAL := $(shell git rev-parse HEAD)
-REMOTE := $(shell git rev-parse $(UPSTREAM))
-BASE := $(shell git merge-base HEAD $(UPSTREAM))
+BRANCH_NAME := $(shell git rev-parse HEAD)
 
 GO?=go
 GOFMT?=gofmt
