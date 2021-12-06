@@ -25,7 +25,7 @@ print_error() {
 }
 trap print_error ERR
 
-fail() {
+function fail() {
     echo "PROVISIONING_ERROR: $1"
     echo -n "$1,${LINUX_KIND},${FULL_VERSION_ID},$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.phase2.done
 
@@ -1274,6 +1274,37 @@ EOF
     return 0
 }
 
+configure_dns_fallback() {
+    echo "Configuring /etc/resolv.conf..."
+    cp /etc/resolv.conf /etc/resolv.conf.bak
+
+    rm -f /etc/resolv.conf
+    if [[ -e /etc/dhcp/dhclient.conf ]]; then
+        echo "cloudflare to the rescue"
+        echo "prepend domain-name-servers 1.1.1.1;" >>/etc/dhcp/dhclient.conf
+    else
+        echo "/etc/dhcp/dhclient.conf not modified"
+    fi
+
+    cat <<-'EOF' >/etc/resolv.conf
+nameserver 1.1.1.1
+EOF
+
+    cp /etc/resolv.conf /etc/resolv.conf.edited
+    touch /etc/resolv.conf && sleep 2 || true
+
+    # give it a try
+    sudo dhclient
+    sleep 2
+
+    op=-1
+    is_network_reachable && op=$? || true
+
+    [[ ${op} -ne 0 ]] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf && touch /etc/resolv.conf && sleep 2 || echo "dns change OK..."
+
+    echo done
+}
+
 configure_dns_legacy() {
     echo "Configuring /etc/resolv.conf..."
     cp /etc/resolv.conf /etc/resolv.conf.bak
@@ -1291,6 +1322,7 @@ configure_dns_legacy() {
     fi
     {{- else }}
     if [[ -e /etc/dhcp/dhclient.conf ]]; then
+        echo "cloudflare to the rescue"
         echo "prepend domain-name-servers 1.1.1.1;" >>/etc/dhcp/dhclient.conf
     else
         echo "/etc/dhcp/dhclient.conf not modified"
@@ -1317,6 +1349,10 @@ EOF
 
     cp /etc/resolv.conf /etc/resolv.conf.edited
     touch /etc/resolv.conf && sleep 2 || true
+
+    # give it a try
+    sudo dhclient
+    sleep 2
 
     op=-1
     is_network_reachable && op=$? || true
@@ -1695,8 +1731,8 @@ function fail_fast_unsupported_distros() {
     esac
 }
 
-check_network_reachable() {
-    NETROUNDS=4
+function check_network_reachable() {
+    NETROUNDS=2
     REACHED=0
     TRIED=0
 
@@ -1736,7 +1772,7 @@ check_dns_configuration() {
         THE_DNS=$(cat /etc/resolv.conf | grep -i '^nameserver' | head -n1 | cut -d ' ' -f2) || true
 
         if [[ -n ${THE_DNS} ]]; then
-            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" || echo "Failure connecting to DNS ${THE_DNS}"
         fi
     fi
 
@@ -1744,7 +1780,7 @@ check_dns_configuration() {
         echo "Getting DNS using systemd-resolve"
         THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}') || true
         if [[ -n ${THE_DNS} ]]; then
-            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" || echo "Failure connecting to DNS ${THE_DNS}"
         fi
     fi
 
@@ -1752,7 +1788,7 @@ check_dns_configuration() {
         echo "Getting DNS using resolvectl"
         THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}') || true
         if [[ -n ${THE_DNS} ]]; then
-            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" && return 0 || echo "Failure connecting to DNS ${THE_DNS}"
+            timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" || echo "Failure connecting to DNS ${THE_DNS}"
         fi
     fi
 
@@ -1760,8 +1796,8 @@ check_dns_configuration() {
     return 1
 }
 
-is_network_reachable() {
-    NETROUNDS=4
+function is_network_reachable() {
+    NETROUNDS=2
     REACHED=0
     TRIED=0
 
@@ -1772,7 +1808,7 @@ is_network_reachable() {
         fi
 
         if [[ ${TRIED} -eq 1 ]]; then
-            break
+            continue
         fi
 
         if which wget; then
@@ -1781,7 +1817,7 @@ is_network_reachable() {
         fi
 
         if [[ ${TRIED} -eq 1 ]]; then
-            break
+            continue
         fi
 
         ping -n -c1 -w4 -i1 www.google.com && REACHED=1 && break
@@ -1834,13 +1870,17 @@ else
     echo "Curl installed"
 fi
 
-check_dns_configuration || true
+check_dns_configuration && echo "DNS WORKS" || echo "DNS does NOT work"
 
 op=1
 is_network_reachable && op=$? || true
 in_reach_before_dns=$op
 
-configure_dns
+configure_dns || fail 188
+check_dns_configuration && echo "DNS WORKS after configuration" || {
+    configure_dns_fallback || fail 189
+    check_dns_configuration && echo "DNS WORKS after configuration" || fail 190
+}
 
 op=1
 is_network_reachable && op=$? || true
@@ -1869,7 +1909,7 @@ fi
 add_common_repos
 add_backport_repos
 
-early_packages_update
+early_packages_update || true
 
 install_route_if_needed
 install_packages
