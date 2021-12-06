@@ -37,26 +37,6 @@ import (
 // var originalCrash func(...int)
 var crash func(...int) error
 
-// func CrasherWithDescription(in error, description string, calldepth ...int) (err error) {
-// 	defer func() {
-// 		rerr := recover()
-// 		if _, ok := rerr.(error); ok {
-// 			err = rerr.(error)
-// 		} else {
-// 			if rerr != nil {
-// 				err = fmt.Errorf("error %s: %v", description, rerr)
-// 			}
-// 		}
-// 	}()
-// 	if in != nil {
-// 		return in
-// 	}
-// 	if originalCrash != nil {
-// 		originalCrash(calldepth...)
-// 	}
-// 	return nil
-// }
-
 // InjectPlannedError generates an error if planned, 'in' being an error of not
 func InjectPlannedError(in error, calldepth ...int) error {
 	if in != nil {
@@ -65,6 +45,21 @@ func InjectPlannedError(in error, calldepth ...int) error {
 
 	if crash != nil {
 		return crash(calldepth...)
+	}
+
+	return nil
+}
+
+// InjectPlannedFailWithDescription returns 'in' if it's not nil (an error occurred), or generates one if 'in' is nil
+func InjectPlannedFailWithDescription(in fail.Error, description string, calldepth ...int) (err fail.Error) {
+	if in != nil {
+		return in
+	}
+
+	if crash != nil {
+		if err := crash(calldepth...); err != nil {
+			return fail.AbortedError(err, "%s: planned error injected", description)
+		}
 	}
 
 	return nil
@@ -100,6 +95,20 @@ func (t probabilityTrigger) DoCrash() bool {
 
 func (t probabilityTrigger) Why() string {
 	return fmt.Sprintf("probability %f", t.p)
+}
+
+type onceTrigger struct {
+	count  int64
+	target int64
+}
+
+func (o *onceTrigger) DoCrash() bool {
+	o.count++
+	return o.target == o.count
+}
+
+func (o onceTrigger) Why() string {
+	return fmt.Sprintf("iteration %d", o.target)
 }
 
 type iterationTrigger struct {
@@ -138,7 +147,7 @@ func setup(spec string) error {
 	// sites := make(map[site]float64)
 	sites := make(map[site]crashTrigger)
 	for _, s := range strings.Split(spec, ",") {
-		//file, line, probability, err := newSite(s)
+		// file, line, probability, err := newSite(s)
 		file, line, trigger, err := newSite(s)
 		if err != nil {
 			return err
@@ -153,10 +162,6 @@ func setup(spec string) error {
 			return fmt.Errorf("failed to inject error at %s:%d: %v", file, line, err)
 		}
 
-		// chance := sites[site{
-		// 	file: file,
-		// 	line: int64(line),
-		// }]
 		trigger := sites[site{
 			file: file,
 			line: int64(line),
@@ -207,6 +212,11 @@ func newSite(s string) (string, int64, crashTrigger, error) {
 				iter, err := strconv.ParseInt(parts[3], 10, 64)
 				if err == nil {
 					return file, line, &iterationTrigger{max: iter}, nil
+				}
+			case "o": // once
+				iter, err := strconv.ParseInt(parts[3], 10, 64)
+				if err == nil {
+					return file, line, &onceTrigger{target: iter}, nil
 				}
 			}
 		}
