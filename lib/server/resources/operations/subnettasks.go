@@ -190,14 +190,16 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
-	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData, 4*time.Minute) // FIXME: Hardcoded timeout
+	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
+
+	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData, waitingTime)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// If we have an error here, we just ignore it
-	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, userData, 4*time.Minute) // FIXME: Hardcoded timeout
+	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, userData, waitingTime)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		theCause := fail.ConvertError(fail.Cause(xerr))
@@ -207,8 +209,6 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 
 		debug.IgnoreError(xerr)
 	}
-
-	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
 
 	// intermediate gateway reboot
 	logrus.Infof("Rebooting gateway '%s'", gwname)

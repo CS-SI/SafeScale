@@ -65,6 +65,7 @@ uptime > /opt/safescale/var/state/user_data.sysfix.done
 rm -f /opt/safescale/var/state/user_data.sysfix.done
 
 # ---- Main
+# ---- EndMain
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.sysfix.done
 

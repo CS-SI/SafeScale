@@ -1564,13 +1564,19 @@ function check_unsupported() {
 }
 
 # ---- Main
-
 check_unsupported
 #unsafe_update_credentials
 check_providers
 update_credentials
 configure_locale
 
+{{- if .IsGateway }}
+{{- else}}
+# Without the route in place, we won't have working DNS either, so we set the route first
+ensure_network_connectivity || echo "Network not ready yet: setting the route for machines other than the gateways"
+{{- end}}
+
+# Now, we can check if DNS works, if it's a gateway it should work every time; if not it depends on the previous route working
 check_dns_configuration && echo "DNS is ready" || echo "DNS NOT ready yet"
 configure_dns || failure 213 "problem configuring DNS"
 check_dns_configuration || {
@@ -1580,7 +1586,10 @@ check_dns_configuration || {
   }
 }
 
+{{- if .IsGateway }}
 ensure_network_connectivity || echo "Network not ready yet"
+{{- end}}
+
 is_network_reachable && {
   add_common_repos || failure 215 "failure adding common repos, 1st try"
 }
@@ -1591,7 +1600,6 @@ is_network_reachable && {
 identify_nics
 configure_network || failure 215 "failure configuring network"
 is_network_reachable || failure 215 "network is NOT ready after trying changing its DNS and configuration"
-
 
 is_network_reachable && {
   add_common_repos || failure 215 "failure adding common repos, 2nd try"
@@ -1610,6 +1618,7 @@ force_dbus_restart || failure 218 "failure restarting dbus"
 systemctl restart sshd || failure 219 "failure restarting sshd"
 
 enable_at_daemon || failure 220 "failure starting at daemon"
+# ---- EndMain
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.netsec.done
 
