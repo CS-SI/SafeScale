@@ -632,7 +632,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					// FIXME: Wrong, we need name, status and ID at least here
 					if server != nil {
 						ahc.ID = server.ID
 						ahc.Name = server.Name
@@ -806,7 +805,6 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-			// FIXME: Wrong, we need name, status and ID at least here
 			if server != nil {
 				ahf.Core.ID = server.ID
 				ahf.Core.Name = server.Name

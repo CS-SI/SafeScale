@@ -297,7 +297,7 @@ func reduceHuaweiAPIErrors(errcode int, code string, body map[string]interface{}
 	// look at https://support.huaweicloud.com/intl/en-us/devg-apisign/api-sign-errorcode.html
 	switch code {
 	case "APIGW.0101":
-		return fail.NotFoundError("API not found") // FIXME: Check this, it has to be MORE final
+		return fail.NotFoundError("API not found")
 	case "APIGW.0103":
 		return fail.NotFoundError("The backend does not exist, contact your cloud provider")
 	case "APIGW.0104":

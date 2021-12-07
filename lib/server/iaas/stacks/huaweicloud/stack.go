@@ -40,7 +40,6 @@ import (
 	// Gophercloud OpenStack API
 	"github.com/gophercloud/gophercloud"
 	gcos "github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
@@ -92,10 +91,8 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 		auth.DomainName = "Default"
 	}
 
-	authOptions := auth
 	scope := gophercloud.AuthScope{
-		ProjectName: auth.Region,
-		DomainName:  auth.DomainName,
+		ProjectID: auth.ProjectID,
 	}
 
 	gcOpts := gophercloud.AuthOptions{
@@ -123,7 +120,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 		cfgOpts:  cfg,
 	}
 
-	// FIXME: detect versions instead of statically declare them
+	// TODO: detect versions instead of statically declare them
 	s.versions = map[string]string{
 		"compute": "v2",
 		"volume":  "v2",
@@ -240,7 +237,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 		}
 	}
 
-	// FIXME: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
+	// TODO: should be moved on iaas.factory.go to apply on all providers (if the provider proposes AZ)
 	validAvailabilityZones, xerr := s.ListAvailabilityZones()
 	if xerr != nil {
 		switch xerr.(type) {
@@ -278,32 +275,6 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 	)
 	if commRetryErr != nil {
 		return stack{}, commRetryErr
-	}
-
-	// Recover Project ID of region
-	listOpts := projects.ListOpts{
-		Enabled: gophercloud.Enabled,
-		Name:    authOptions.Region,
-	}
-	var allProjects []projects.Project
-	commRetryErr = stacks.RetryableRemoteCall(
-		func() error {
-			allPages, innerErr := projects.List(identity, listOpts).AllPages()
-			if innerErr != nil {
-				return normalizeError(innerErr)
-			}
-			allProjects, innerErr = projects.ExtractProjects(allPages)
-			return normalizeError(innerErr)
-		},
-		normalizeError,
-	)
-	if commRetryErr != nil {
-		return stack{}, commRetryErr
-	}
-	if len(allProjects) > 0 {
-		authOptions.ProjectID = allProjects[0].ID
-	} else {
-		return stack{}, fail.NewError("failed to found project ID corresponding to region '%s'", authOptions.Region)
 	}
 
 	s.authOpts = auth
@@ -391,8 +362,7 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 	return template, nil
 }
 
-// CreateKeyPair TODO: replace with code to create KeyPair on provider side if it exists
-// creates and import a key pair
+// CreateKeyPair creates and import a key pair
 func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	nullAKP := &abstract.KeyPair{}
 	if s.IsNull() {
@@ -408,8 +378,7 @@ func (s stack) CreateKeyPair(name string) (*abstract.KeyPair, fail.Error) {
 	return abstract.NewKeyPair(name)
 }
 
-// InspectKeyPair TODO: replace with openstack code to get keypair (if it exits)
-// returns the key pair identified by id
+// InspectKeyPair returns the key pair identified by id
 func (s stack) InspectKeyPair(id string) (*abstract.KeyPair, fail.Error) {
 	nullAKP := &abstract.KeyPair{}
 	if s.IsNull() {
@@ -776,10 +745,7 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostRef).WithStopwatch().Entering().Exiting()
 
-	// TODO: RESIZE Resize Host HERE
-	logrus.Warn("Trying to resize a Host...")
-
-	// TODO: RESIZE Call this
+	logrus.Debugf("Trying to resize a Host...")
 	// servers.Resize()
 
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
@@ -900,7 +866,6 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-			// FIXME: Wrong, we need name, status and ID at least here
 			if server != nil {
 				ahf.Core.ID = server.ID
 				ahf.Core.Name = server.Name
