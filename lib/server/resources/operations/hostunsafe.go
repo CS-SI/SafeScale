@@ -104,8 +104,8 @@ func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.En
 // run executes command on the host
 // If run fails to connect to remote host, returns *fail.ErrNotAvailable
 // In case of error, can return:
-// - *fail.ErrExecution: // FIXME: complete comment
-// - *fail.ErrNotAvailable: // FIXME: complete comment
+// - *fail.ErrExecution: problem detected running the script
+// - *fail.ErrNotAvailable: execution with 409 or 404 errors
 // - *fail.ErrTimeout: execution has timed out
 // - *fail.ErrAborted: execution has been aborted by context
 func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
@@ -150,7 +150,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 				_ = innerXErr.Annotate("iterations", iterations)
 				return innerXErr
 			}
-			// If retcode == 255, ssh connection failed
+			// If retcode == 255, ssh connection failed // FIXME: historical reasons, not true anymore
 			if retcode == 255 {
 				return fail.NotAvailableError("failed to execute command '%s': failed to connect", cmd)
 			}

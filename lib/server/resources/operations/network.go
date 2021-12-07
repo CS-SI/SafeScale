@@ -199,7 +199,16 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	// Check if subnet already exists and is managed by SafeScale
 	svc := instance.GetService()
-	if existing, xerr := LoadNetwork(svc, req.Name); xerr == nil { // FIXME: VERY bad practice
+	existing, xerr := LoadNetwork(svc, req.Name)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	} else {
 		existing.Released()
 		return fail.DuplicateError("Network '%s' already exists", req.Name)
 	}
@@ -359,7 +368,16 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 
 	// Check if Network already exists and is managed by SafeScale
 	svc := instance.GetService()
-	if existing, xerr := LoadNetwork(svc, ref); xerr == nil { // FIXME: VERY bad practice
+	existing, xerr := LoadNetwork(svc, ref)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	} else {
 		existing.Released()
 		return fail.DuplicateError("cannot import Network '%s': there is already such a Network in metadata", ref)
 	}
