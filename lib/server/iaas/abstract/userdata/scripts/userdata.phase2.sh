@@ -1876,6 +1876,12 @@ op=1
 is_network_reachable && op=$? || true
 in_reach_before_dns=$op
 
+{{- if .IsGateway }}
+{{- else}}
+# If we are not the gateway, this should run first because we might need the routes to reach DNS
+ensure_network_connectivity || true
+{{- end}}
+
 configure_dns || fail 188
 check_dns_configuration && echo "DNS WORKS after configuration" || {
     configure_dns_fallback || fail 189
