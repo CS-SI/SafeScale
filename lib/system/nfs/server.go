@@ -150,7 +150,6 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 		"UUID": volumeUUID,
 	}
 
-	var stdout string
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
 		istdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
@@ -158,7 +157,6 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 			_ = xerr.Annotate("stdout", istdout)
 			return fail.Wrap(xerr, "error executing script to unmount block device")
 		}
-		stdout = istdout
 		return nil
 	}, temporal.GetMinDelay(), 0, 4) // 4 retries and that's it
 	if rerr != nil {
