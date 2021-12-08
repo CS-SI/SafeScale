@@ -562,6 +562,7 @@ message VolumeAttachmentRequest {
 	string format = 5;
 	string device = 6;
 	bool do_not_format = 7;
+	bool do_not_mount = 8;
 }
 
 message VolumeAttachmentResponse {
@@ -571,6 +572,7 @@ message VolumeAttachmentResponse {
 	string device = 4;
 	bool do_not_format = 5;
 	bool mount = 6;
+	bool formatted = 7;
 }
 
 message VolumeListRequest {
