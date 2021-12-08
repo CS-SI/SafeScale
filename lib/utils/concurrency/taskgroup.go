@@ -102,7 +102,7 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 	var t Task
 
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil!, use context.TODO() or context.Background() instead!")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil!, use context.Background() instead!")
 	}
 
 	if parentTask == nil {

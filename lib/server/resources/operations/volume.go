@@ -538,7 +538,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 }
 
 // Attach a volume to a host
-func (instance *volume) Attach(ctx context.Context, host resources.Host, path, format string, doNotFormat bool) (ferr fail.Error) {
+func (instance *volume) Attach(ctx context.Context, host resources.Host, path, format string, doNotFormat, doNotMount bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -609,6 +609,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 			mountPoint = path
 			if path == abstract.DefaultVolumeMountPoint {
 				mountPoint = abstract.DefaultVolumeMountPoint + volumeName
+			}
+
+			if doNotMount {
+				mountPoint = ""
 			}
 
 			// For now, allows only one attachment...
@@ -798,21 +802,23 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			volumeUUID, deeperXErr = nfsServer.MountBlockDevice(ctx, deviceName, mountPoint, format, doNotFormat)
-			if deeperXErr != nil {
-				return deeperXErr
-			}
-
-			defer func() {
-				if ferr != nil {
-					// Disable abort signal during the clean up
-					defer task.DisarmAbortSignal()()
-
-					if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
-					}
+			if !doNotMount {
+				volumeUUID, deeperXErr = nfsServer.MountBlockDevice(ctx, deviceName, mountPoint, format, doNotFormat)
+				if deeperXErr != nil {
+					return deeperXErr
 				}
-			}()
+
+				defer func() {
+					if ferr != nil {
+						// Disable abort signal during the clean up
+						defer task.DisarmAbortSignal()()
+
+						if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
+						}
+					}
+				}()
+			}
 
 			// Saves volume information in property
 			hostVolumesV1.VolumesByID[volumeID] = &propertiesv1.HostVolume{
@@ -833,8 +839,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				// Disable abort signal during the cleanup
 				defer task.DisarmAbortSignal()()
 
-				if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
-					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(innerXErr), volumeName, targetName))
+				if !doNotMount {
+					if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(innerXErr), volumeName, targetName))
+					}
 				}
 			}
 		}()
@@ -868,8 +876,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
 		if ferr != nil {
-			if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
+			if !doNotMount {
+				if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
+				}
 			}
 			derr := host.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
@@ -1189,8 +1199,11 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 		defer task.DisarmAbortSignal()()
 
 		// Unmount block device ...
-		if innerXErr = nfsServer.UnmountBlockDevice(ctx, attachment.Device); innerXErr != nil {
-			return innerXErr
+		if mountPath != "" {
+			if innerXErr = nfsServer.UnmountBlockDevice(ctx, attachment.Device); innerXErr != nil {
+				// debug.IgnoreError(innerXErr) // FIXME: TBR It has to be restored
+				return innerXErr
+			}
 		}
 
 		// ... then detach volume ...
