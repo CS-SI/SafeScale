@@ -223,14 +223,12 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 			logrus.Errorf("ErrTimeout running remote script '%s'", name)
 			xerr := fail.ExecutionError(cErr)
 			xerr.Annotate("retcode", 255)
-			// return 255, stdout, stderr, retryErr
 			return stdout, xerr
 		case *fail.ErrExecution:
 			return stdout, cErr
 		default:
 			xerr = fail.ExecutionError(xerr)
 			xerr.Annotate("retcode", 255).Annotate("stderr", "")
-			// return 255, stdout, stderr, retryErr
 			return stdout, xerr
 		}
 	}

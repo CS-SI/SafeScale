@@ -21,6 +21,8 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/retry"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Server getServer structure
@@ -123,12 +125,23 @@ func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, f
 		"DoNotFormat": doNotFormat,
 	}
 
-	stdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_mount.sh", data)
-	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout) // FIXME: Missing annotations
-		return "", fail.Wrap(xerr, "error executing script to mount block device")
+	var stdout string
+	// FIXME: Add a retry here only if we catch an executionerror of a connection error
+	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		istdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_mount.sh", data)
+		if xerr != nil {
+			_ = xerr.Annotate("stdout", istdout)
+			return fail.Wrap(xerr, "error executing script to mount block device")
+		}
+		stdout = istdout
+		return nil // we are done, break the retry
+	}, temporal.GetMinDelay(), 0, 4) // 4 retries and that's it
+	if rerr != nil {
+		return "", fail.Wrap(rerr, "error executing script to mount block device")
 	}
+
 	return stdout, nil
+
 }
 
 // UnmountBlockDevice unmounts a local block device on the remote system
@@ -137,10 +150,19 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 		"UUID": volumeUUID,
 	}
 
-	stdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
-	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout)
-		return fail.Wrap(xerr, "error executing script to unmount block device")
+	var stdout string
+	// FIXME: Add a retry here only if we catch an executionerror of a connection error
+	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
+		istdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
+		if xerr != nil {
+			_ = xerr.Annotate("stdout", istdout)
+			return fail.Wrap(xerr, "error executing script to unmount block device")
+		}
+		stdout = istdout
+		return nil
+	}, temporal.GetMinDelay(), 0, 4) // 4 retries and that's it
+	if rerr != nil {
+		return fail.Wrap(rerr, "error executing script to unmount block device")
 	}
 	return nil
 }
