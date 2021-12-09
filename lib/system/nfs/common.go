@@ -226,7 +226,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	}
 	if retcode != 0 {
 		xerr = fail.ExecutionError(nil, "command exited with error code '%d'", retcode)
-		_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 		return stdout, xerr
 	}
 

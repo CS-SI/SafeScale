@@ -48,7 +48,7 @@ func (s *Server) Install(ctx context.Context) fail.Error {
 
 	stdout, xerr := executeScript(ctx, *s.SSHConfig, "nfs_server_install.sh", map[string]interface{}{})
 	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install nfs server")
 	}
 	return nil
@@ -108,7 +108,7 @@ func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
 
 	stdout, xerr := executeScript(ctx, *s.SSHConfig, "nfs_server_path_unexport.sh", data)
 	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unexport a shared directory")
 	}
 	return nil
@@ -125,7 +125,7 @@ func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, f
 
 	stdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_mount.sh", data)
 	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout) // FIXME: Missing annotations
+		xerr.Annotate("stdout", stdout) // FIXME: Missing annotations
 		return "", fail.Wrap(xerr, "error executing script to mount block device")
 	}
 	return stdout, nil
@@ -139,7 +139,7 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 
 	stdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
 	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unmount block device")
 	}
 	return nil

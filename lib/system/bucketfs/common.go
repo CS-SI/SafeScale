@@ -162,7 +162,7 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 	}
 	if retcode != 0 {
 		xerr = fail.ExecutionError(nil, "command exited with error code '%d'", retcode)
-		_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 		return xerr
 	}
 

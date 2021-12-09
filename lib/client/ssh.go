@@ -332,10 +332,9 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 
 			if iretcode != 0 {
 				xerr = fail.NewError("failure copying '%s' to '%s': scp error code %d", toPath, hostTo, iretcode)
-
-				_ = xerr.Annotate("stdout", istdout)
-				_ = xerr.Annotate("stderr", istderr)
-				_ = xerr.Annotate("retcode", iretcode)
+				xerr.Annotate("stdout", istdout)
+				xerr.Annotate("stderr", istderr)
+				xerr.Annotate("retcode", iretcode)
 
 				return xerr
 			}

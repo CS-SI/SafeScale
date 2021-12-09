@@ -74,7 +74,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	}
 	if retcode != 0 {
 		xerr = fail.ExecutionError(xerr, "failed to copy rclone configuration file: %s, %s", stdout, stderr)
-		_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 		return xerr
 	}
 

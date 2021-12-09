@@ -539,9 +539,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			}
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				_ = xerr.Annotate("retcode", retcode)
-				_ = xerr.Annotate("stdout", outrun)
-				_ = xerr.Annotate("stderr", outerr)
+				xerr.Annotate("retcode", retcode)
+				xerr.Annotate("stdout", outrun)
+				xerr.Annotate("stderr", outerr)
 				return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
 			}
 			break
@@ -551,9 +551,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			if xerr == nil {
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					_ = xerr.Annotate("retcode", retcode)
-					_ = xerr.Annotate("stdout", outrun)
-					_ = xerr.Annotate("stderr", outerr)
+					xerr.Annotate("retcode", retcode)
+					xerr.Annotate("stdout", outrun)
+					xerr.Annotate("stderr", outerr)
 					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
 				}
 				break
@@ -562,9 +562,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			if !strings.Contains(xerr.Error(), "bad interpreter") {
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					_ = xerr.Annotate("retcode", retcode)
-					_ = xerr.Annotate("stdout", outrun)
-					_ = xerr.Annotate("stderr", outerr)
+					xerr.Annotate("retcode", retcode)
+					xerr.Annotate("stdout", outrun)
+					xerr.Annotate("stderr", outerr)
 					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
 				}
 				break
