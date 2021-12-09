@@ -2467,7 +2467,7 @@ func (instance *Subnet) unsafeUnbindSecurityGroup(ctx context.Context, sgInstanc
 			}
 
 			sgID := sgInstance.GetID()
-			// Check if the security group is listed for the host, inot already registered for the host with the exact same state
+			// Check if the security group is listed for the host, is not already registered for the host with the exact same state
 			found := false
 			for k := range ssgV1.ByID {
 				if k == sgID {

@@ -74,7 +74,7 @@ type taskGroup struct {
 // FUTURE: next version of TaskGroup will allow using options
 
 var (
-	// VPL: for future use, I intend to improve TaskGroup to allow these 2 behaviours
+	// VPL: for future use, I intend to improve TaskGroup to allow these 2 behaviors
 
 	// FailEarly tells the TaskGroup to fail as soon as a child fails
 	FailEarly = data.NewImmutableKeyValue("fail", "early")

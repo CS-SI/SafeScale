@@ -34,7 +34,7 @@ import (
 )
 
 // safescale bucket create c1
-// safescale bucket mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /buckets/c1)
+// safescale bucket mount c1 host1 --path="/shared/data" (uses s3ql, by default /buckets/c1)
 // safescale bucket umount c1 host1
 // safescale bucket delete c1
 // safescale bucket list
