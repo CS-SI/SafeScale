@@ -800,7 +800,9 @@ func (instance *Host) GetState() (state hoststate.Enum) {
 // If the metadata is already carrying a Host, returns fail.ErrNotAvailable
 // In case of error occurring after Host resource creation, 'instance' still contains ID of the Host created. This can be used to
 // defer Host deletion in case of error
-func (instance *Host) Create(ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements) (_ *userdata.Content, ferr fail.Error) {
+func (instance *Host) Create(
+	ctx context.Context, hostReq abstract.HostRequest, hostDef abstract.HostSizingRequirements,
+) (_ *userdata.Content, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
@@ -1267,7 +1269,9 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 }
 
 // setSecurityGroups sets the Security Groups for the host
-func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet) fail.Error {
+func (instance *Host) setSecurityGroups(
+	ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet,
+) fail.Error {
 	if req.Single {
 		svc := instance.GetService()
 		hostID := instance.GetID()
@@ -1403,7 +1407,9 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 						}(subnetInstance)
 
 						sgName := sg.GetName()
-						deeperXErr = subnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+						deeperXErr = subnetInstance.Review(func(
+							clonable data.Clonable, _ *serialize.JSONProperties,
+						) fail.Error {
 							abstractSubnet, ok := clonable.(*abstract.Subnet)
 							if !ok {
 								return fail.InconsistentError("'*abstract.Subnet' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -1449,7 +1455,9 @@ func (instance *Host) setSecurityGroups(ctx context.Context, req abstract.HostRe
 				}(otherSubnetInstance)
 
 				var otherAbstractSubnet *abstract.Subnet
-				innerXErr = otherSubnetInstance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+				innerXErr = otherSubnetInstance.Review(func(
+					clonable data.Clonable, _ *serialize.JSONProperties,
+				) fail.Error {
 					var ok bool
 					otherAbstractSubnet, ok = clonable.(*abstract.Subnet)
 					if !ok {
@@ -1595,7 +1603,9 @@ func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequiremen
 }
 
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
-func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration) fail.Error {
+func (instance *Host) runInstallPhase(
+	ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration,
+) fail.Error {
 	if instance.sshProfile == nil {
 		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
 	}
@@ -1675,7 +1685,9 @@ func (instance *Host) runInstallPhase(ctx context.Context, phase userdata.Phase,
 	return nil
 }
 
-func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase, timeout time.Duration) (string, fail.Error) {
+func (instance *Host) waitInstallPhase(
+	ctx context.Context, phase userdata.Phase, timeout time.Duration,
+) (string, fail.Error) {
 	givenTimeout := int(timeout.Minutes())
 	sshDefaultTimeout := int(temporal.GetHostTimeout().Minutes())
 	if givenTimeout > sshDefaultTimeout {
@@ -2073,7 +2085,9 @@ func (instance *Host) WaitSSHReady(ctx context.Context, timeout time.Duration) (
 }
 
 // createSingleHostNetwork creates Single-Host Network and Subnet
-func createSingleHostNetworking(ctx context.Context, svc iaas.Service, singleHostRequest abstract.HostRequest) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
+func createSingleHostNetworking(
+	ctx context.Context, svc iaas.Service, singleHostRequest abstract.HostRequest,
+) (_ resources.Subnet, _ func() fail.Error, ferr fail.Error) {
 	// Build network name
 	cfg, xerr := svc.GetConfigurationOptions()
 	if xerr != nil {
@@ -2269,26 +2283,20 @@ func (instance *Host) Delete(ctx context.Context) (xerr fail.Error) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	xerr = instance.Inspect(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			// Do not remove a Host that is a gateway
-			return props.Inspect(
-				hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-					hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	xerr = instance.Inspect(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// Do not remove a Host that is a gateway
+		return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
 
-					if hostNetworkV2.IsGateway {
-						return fail.NotAvailableError("cannot delete Host, it's a gateway that can only be deleted through its Subnet")
-					}
-					return nil
-				},
-			)
-		},
-	)
+			if hostNetworkV2.IsGateway {
+				return fail.NotAvailableError("cannot delete Host, it's a gateway that can only be deleted through its Subnet")
+			}
+			return nil
+		})
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2329,65 +2337,72 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 
 	svc := instance.GetService()
 	var shares map[string]*propertiesv1.HostShare
-	xerr = instance.Inspect(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			// Do not remove a Host having shares that are currently remotely mounted
-			innerXErr := props.Inspect(
-				hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
-					sharesV1, ok := clonable.(*propertiesv1.HostShares)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					shares = sharesV1.ByID
-					shareCount := len(shares)
-					for _, hostShare := range shares {
-						count := len(hostShare.ClientsByID)
-						if count > 0 {
-							// clients found, checks if these clients already exists...
-							for _, hostID := range hostShare.ClientsByID {
-								instance, inErr := LoadHost(svc, hostID, HostLightOption)
-								if inErr == nil {
-									instance.Released()
-									return fail.NotAvailableError(
-										"Host '%s' exports %d share%s and at least one share is mounted",
-										instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)),
-									)
-								}
-							}
-						}
-					}
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
+	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// Do not remove a Host having shares that are currently remotely mounted
+		innerXErr := props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+			sharesV1, ok := clonable.(*propertiesv1.HostShares)
+			if !ok {
+				return fail.InconsistentError(
+					"'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+				)
 			}
 
-			// Do not delete a Host with Volumes attached
-			return props.Inspect(
-				hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
-					hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
+			shares = sharesV1.ByID
+			shareCount := len(shares)
+			for _, hostShare := range shares {
+				count := len(hostShare.ClientsByID)
+				if count > 0 {
+					// clients found, checks if these clients already exists...
+					for _, hostID := range hostShare.ClientsByID {
+						instance, inErr := LoadHost(svc, hostID, HostLightOption)
+						if inErr == nil {
+							instance.Released()
+							return fail.NotAvailableError("Host '%s' exports %d share%s and at least one share is mounted", instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
+						}
 					}
+				}
+			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
 
-					nAttached := len(hostVolumesV1.VolumesByID)
-					if nAttached > 0 {
-						return fail.NotAvailableError(
-							"Host '%s' has %d volume%s attached", instance.GetName(), nAttached,
-							strprocess.Plural(uint(nAttached)),
-						)
-					}
-					return nil
-				},
-			)
-		},
-	)
+		// Do not delete a Host with Bucket mounted
+		innerXErr = props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostMounbts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			nMounted := len(hostMountsV1.BucketMounts)
+			if nMounted > 0 {
+				return fail.NotAvailableError("Host '%s' has %d Bucket%s mounted", instance.GetName(), nMounted, strprocess.Plural(uint(nMounted)))
+			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// Do not delete a Host with Volumes attached
+		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
+			hostVolumesV1, ok := clonable.(*propertiesv1.HostVolumes)
+			if !ok {
+				return fail.InconsistentError(
+					"'*propertiesv1.HostVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+				)
+			}
+
+			nAttached := len(hostVolumesV1.VolumesByID)
+			if nAttached > 0 {
+				return fail.NotAvailableError("Host '%s' has %d Volume%s attached", instance.GetName(), nAttached,
+					strprocess.Plural(uint(nAttached)),
+				)
+			}
+			return nil
+		})
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2397,65 +2412,22 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		single         bool
 		singleSubnetID string
 	)
-	xerr = instance.Alter(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			// If Host has mounted shares, unmounts them before anything else
-			var mounts []*propertiesv1.HostShare
-			innerXErr := props.Inspect(
-				hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-					hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					for _, i := range hostMountsV1.RemoteMountsByPath {
-						if task.Aborted() {
-							return fail.AbortedError(nil, "aborted")
-						}
-
-						// Retrieve v data
-						shareInstance, loopErr := LoadShare(svc, i.ShareID)
-						if loopErr != nil {
-							return loopErr
-						}
-
-						//goland:noinspection ALL
-						defer func(item resources.Share) {
-							item.Released()
-						}(shareInstance)
-
-						// Retrieve data about the server serving the v
-						rhServer, loopErr := shareInstance.GetServer()
-						if loopErr != nil {
-							return loopErr
-						}
-
-						// Retrieve data about v from its server
-						item, loopErr := rhServer.GetShare(i.ShareID)
-						if loopErr != nil {
-							return loopErr
-						}
-
-						mounts = append(mounts, item)
-					}
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
+	xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		// If Host has mounted shares, unmounts them before anything else
+		var mounts []*propertiesv1.HostShare
+		innerXErr := props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			// Unmounts tier shares mounted on Host (done outside the previous Host.properties.Reading() section, because
-			// Unmount() have to lock for write, and won't succeed while Host.properties.Reading() is running,
-			// leading to a deadlock)
-			for _, v := range mounts {
+			for _, i := range hostMountsV1.RemoteMountsByPath {
 				if task.Aborted() {
 					return fail.AbortedError(nil, "aborted")
 				}
 
-				shareInstance, loopErr := LoadShare(svc, v.ID)
+				// Retrieve Share data
+				shareInstance, loopErr := LoadShare(svc, i.ShareID)
 				if loopErr != nil {
 					return loopErr
 				}
@@ -2465,194 +2437,222 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					item.Released()
 				}(shareInstance)
 
-				loopErr = shareInstance.Unmount(ctx, instance)
+				// Retrieve data about the server serving the Share
+				hostServer, loopErr := shareInstance.GetServer()
 				if loopErr != nil {
 					return loopErr
 				}
+
+				// Retrieve data about v from its server
+				item, loopErr := hostServer.GetShare(i.ShareID)
+				if loopErr != nil {
+					return loopErr
+				}
+
+				mounts = append(mounts, item)
+			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// Unmounts tier shares mounted on Host (done outside the previous Host.properties.Reading() section, because
+		// Unmount() have to lock for write, and won't succeed while Host.properties.Reading() is running,
+		// leading to a deadlock)
+		for _, v := range mounts {
+			if task.Aborted() {
+				return fail.AbortedError(nil, "aborted")
 			}
 
-			// if Host exports shares, delete them
-			for _, v := range shares {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
-
-				shareInstance, loopErr := LoadShare(svc, v.Name)
-				if loopErr != nil {
-					return loopErr
-				}
-
-				loopErr = shareInstance.Delete(ctx)
-				if loopErr != nil {
-					return loopErr
-				}
+			shareInstance, loopErr := LoadShare(svc, v.ID)
+			if loopErr != nil {
+				return loopErr
 			}
 
-			// Walk through property propertiesv1.HostNetworking to remove the reference to the Host in Subnets
-			innerXErr = props.Inspect(
-				hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
-					hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-					hostID := instance.GetID()
-					// hostName := instance.GetName()
+			//goland:noinspection ALL
+			defer func(item resources.Share) {
+				item.Released()
+			}(shareInstance)
 
-					single = hostNetworkV2.Single
-					if single {
-						singleSubnetID = hostNetworkV2.DefaultSubnetID
-					}
+			loopErr = shareInstance.Unmount(ctx, instance)
+			if loopErr != nil {
+				return loopErr
+			}
+		}
 
-					if !single {
-						var errors []error
-						for k := range hostNetworkV2.SubnetsByID {
-							if !hostNetworkV2.IsGateway && k != hostNetworkV2.DefaultSubnetID {
-								subnetInstance, loopErr := LoadSubnet(svc, "", k)
-								if loopErr == nil {
-									//goland:noinspection ALL
-									defer func(item resources.Subnet) {
-										item.Released()
-									}(subnetInstance)
+		// if Host exports shares, delete them
+		for _, v := range shares {
+			if task.Aborted() {
+				return fail.AbortedError(nil, "aborted")
+			}
 
-									loopErr = subnetInstance.DetachHost(ctx, hostID)
-								}
-								if loopErr != nil {
-									logrus.Errorf(loopErr.Error())
-									errors = append(errors, loopErr)
-									continue
-								}
-							}
+			shareInstance, loopErr := LoadShare(svc, v.Name)
+			if loopErr != nil {
+				return loopErr
+			}
+
+			loopErr = shareInstance.Delete(ctx)
+			if loopErr != nil {
+				return loopErr
+			}
+		}
+
+		// Walk through property propertiesv1.HostNetworking to remove the reference to the Host in Subnets
+		innerXErr = props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
+			hostNetworkV2, ok := clonable.(*propertiesv2.HostNetworking)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			hostID := instance.GetID()
+			// hostName := instance.GetName()
+
+			single = hostNetworkV2.Single
+			if single {
+				singleSubnetID = hostNetworkV2.DefaultSubnetID
+			}
+
+			if !single {
+				var errors []error
+				for k := range hostNetworkV2.SubnetsByID {
+					if !hostNetworkV2.IsGateway && k != hostNetworkV2.DefaultSubnetID {
+						subnetInstance, loopErr := LoadSubnet(svc, "", k)
+						if loopErr == nil {
+							//goland:noinspection ALL
+							defer func(item resources.Subnet) {
+								item.Released()
+							}(subnetInstance)
+
+							loopErr = subnetInstance.DetachHost(ctx, hostID)
 						}
-						if len(errors) > 0 {
-							return fail.Wrap(fail.NewErrorList(errors), "failed to update metadata for Subnets of Host")
+						if loopErr != nil {
+							logrus.Errorf(loopErr.Error())
+							errors = append(errors, loopErr)
+							continue
 						}
 					}
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return innerXErr
+				}
+				if len(errors) > 0 {
+					return fail.Wrap(fail.NewErrorList(errors), "failed to update metadata for Subnets of Host")
+				}
+			}
+			return nil
+		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+
+		// Unbind Security Groups from Host
+		innerXErr = props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
+			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			// Unbind Security Groups from Host
-			innerXErr = props.Alter(
-				hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
-					hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.HostSecurityGroups' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
+			var errors []error
+			for _, v := range hsgV1.ByID {
+				sgInstance, derr := LoadSecurityGroup(svc, v.ID)
+				if derr == nil {
+					//goland:noinspection ALL
+					defer func(sgInstance resources.SecurityGroup) {
+						sgInstance.Released()
+					}(sgInstance)
 
-					// Unbind Security Groups from Host
-					var errors []error
-					for _, v := range hsgV1.ByID {
-						sgInstance, derr := LoadSecurityGroup(svc, v.ID)
-						if derr == nil {
-							//goland:noinspection ALL
-							defer func(sgInstance resources.SecurityGroup) {
-								sgInstance.Released()
-							}(sgInstance)
-
-							derr = sgInstance.UnbindFromHost(ctx, instance)
-						}
-						if derr != nil {
-							switch derr.(type) {
-							case *fail.ErrNotFound:
-								// Consider that a Security Group that cannot be loaded or is not bound as a success
-								debug.IgnoreError(derr)
-							default:
-								errors = append(errors, derr)
-							}
-						}
+					derr = sgInstance.UnbindFromHost(ctx, instance)
+				}
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// Consider that a Security Group that cannot be loaded or is not bound as a success
+						debug.IgnoreError(derr)
+					default:
+						errors = append(errors, derr)
 					}
-					if len(errors) > 0 {
-						return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
-					}
-
-					return nil
-				},
-			)
-			if innerXErr != nil {
-				return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
+				}
+			}
+			if len(errors) > 0 {
+				return fail.Wrap(fail.NewErrorList(errors), "failed to unbind some Security Groups")
 			}
 
-			// Delete Host
-			waitForDeletion := true
-			innerXErr = retry.WhileUnsuccessful(
+			return nil
+		})
+		if innerXErr != nil {
+			return fail.Wrap(innerXErr, "failed to unbind Security Groups from Host")
+		}
+
+		// Delete Host
+		waitForDeletion := true
+		innerXErr = retry.WhileUnsuccessful(
+			func() error {
+				if derr := svc.DeleteHost(instance.GetID()); derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// A Host not found is considered as a successful deletion
+						logrus.Tracef("Host not found, deletion considered as a success")
+						debug.IgnoreError(derr)
+					default:
+						return fail.Wrap(derr, "cannot delete Host")
+					}
+					waitForDeletion = false
+				}
+				return nil
+			},
+			temporal.GetMinDelay(),
+			temporal.GetHostCleanupTimeout(),
+		)
+		if innerXErr != nil {
+			switch innerXErr.(type) {
+			case *retry.ErrStopRetry:
+				return fail.Wrap(fail.Cause(innerXErr), "stopping retries")
+			case *retry.ErrTimeout:
+				return fail.Wrap(fail.Cause(innerXErr), "timeout")
+			default:
+				return innerXErr
+			}
+		}
+
+		// wait for effective Host deletion
+		if waitForDeletion {
+			innerXErr = retry.WhileUnsuccessfulWithHardTimeout(
 				func() error {
-					if derr := svc.DeleteHost(instance.GetID()); derr != nil {
-						switch derr.(type) {
+					state, stateErr := svc.GetHostState(instance.GetID())
+					if stateErr != nil {
+						switch stateErr.(type) {
 						case *fail.ErrNotFound:
-							// A Host not found is considered as a successful deletion
-							logrus.Tracef("Host not found, deletion considered as a success")
-							debug.IgnoreError(derr)
+							// If Host is not found anymore, consider this as a success
+							debug.IgnoreError(stateErr)
+							return nil
 						default:
-							return fail.Wrap(derr, "cannot delete Host")
+							return stateErr
 						}
-						waitForDeletion = false
+					}
+					if state == hoststate.Error {
+						return fail.NotAvailableError("Host is in state Error")
 					}
 					return nil
 				},
-				temporal.GetMinDelay(),
-				temporal.GetHostCleanupTimeout(),
+				temporal.GetDefaultDelay(),
+				temporal.GetOperationTimeout(),
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *retry.ErrStopRetry:
-					return fail.Wrap(fail.Cause(innerXErr), "stopping retries")
-				case *retry.ErrTimeout:
-					return fail.Wrap(fail.Cause(innerXErr), "timeout")
+					innerXErr = fail.ConvertError(fail.Cause(innerXErr))
+					if _, ok := innerXErr.(*fail.ErrNotFound); !ok || innerXErr.IsNull() {
+						return innerXErr
+					}
+					debug.IgnoreError(innerXErr)
+				case *fail.ErrNotFound:
+					debug.IgnoreError(innerXErr)
 				default:
 					return innerXErr
 				}
 			}
+		}
 
-			// wait for effective Host deletion
-			if waitForDeletion {
-				innerXErr = retry.WhileUnsuccessfulWithHardTimeout(
-					func() error {
-						state, stateErr := svc.GetHostState(instance.GetID())
-						if stateErr != nil {
-							switch stateErr.(type) {
-							case *fail.ErrNotFound:
-								// If Host is not found anymore, consider this as a success
-								debug.IgnoreError(stateErr)
-								return nil
-							default:
-								return stateErr
-							}
-						}
-						if state == hoststate.Error {
-							return fail.NotAvailableError("Host is in state Error")
-						}
-						return nil
-					},
-					temporal.GetDefaultDelay(),
-					temporal.GetOperationTimeout(),
-				)
-				if innerXErr != nil {
-					switch innerXErr.(type) {
-					case *retry.ErrStopRetry:
-						innerXErr = fail.ConvertError(fail.Cause(innerXErr))
-						if _, ok := innerXErr.(*fail.ErrNotFound); !ok || innerXErr.IsNull() {
-							return innerXErr
-						}
-						debug.IgnoreError(innerXErr)
-					case *fail.ErrNotFound:
-						debug.IgnoreError(innerXErr)
-					default:
-						return innerXErr
-					}
-				}
-			}
-
-			return nil
-		},
-	)
+		return nil
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -2689,8 +2689,6 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 }
 
 // GetSSHConfig loads SSH configuration for Host from metadata
-//
-// FIXME: verify that system.SSHConfig carries data about secondary getGateway
 func (instance *Host) GetSSHConfig() (_ *system.SSHConfig, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -2705,7 +2703,9 @@ func (instance *Host) GetSSHConfig() (_ *system.SSHConfig, xerr fail.Error) {
 }
 
 // Run tries to execute command 'cmd' on the Host
-func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *Host) Run(
+	ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration,
+) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	const invalid = -1
 
@@ -2750,7 +2750,9 @@ func (instance *Host) Run(ctx context.Context, cmd string, outs outputs.Enum, co
 }
 
 // Pull downloads a file from Host
-func (instance *Host) Pull(ctx context.Context, target, source string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *Host) Pull(
+	ctx context.Context, target, source string, timeout time.Duration,
+) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	const invalid = -1
 
@@ -2834,7 +2836,9 @@ func (instance *Host) Pull(ctx context.Context, target, source string, timeout t
 }
 
 // Push uploads a file to Host
-func (instance *Host) Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *Host) Push(
+	ctx context.Context, source, target, owner, mode string, timeout time.Duration,
+) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	const invalid = -1
 
@@ -3402,7 +3406,9 @@ func (instance *Host) PushStringToFile(ctx context.Context, content string, file
 }
 
 // PushStringToFileWithOwnership creates a file 'filename' on remote 'Host' with the content 'content', and apply ownership
-func (instance *Host) PushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) (xerr fail.Error) {
+func (instance *Host) PushStringToFileWithOwnership(
+	ctx context.Context, content string, filename string, owner, mode string,
+) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -3530,7 +3536,9 @@ func (instance *Host) ToProtocol() (ph *protocol.Host, xerr fail.Error) {
 }
 
 // BindSecurityGroup binds a security group to the Host; if enabled is true, apply it immediately
-func (instance *Host) BindSecurityGroup(ctx context.Context, sgInstance resources.SecurityGroup, enable resources.SecurityGroupActivation) (xerr fail.Error) {
+func (instance *Host) BindSecurityGroup(
+	ctx context.Context, sgInstance resources.SecurityGroup, enable resources.SecurityGroupActivation,
+) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
