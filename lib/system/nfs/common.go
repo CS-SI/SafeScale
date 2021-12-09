@@ -80,7 +80,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
-		xerr.Annotate("retcode", 255)
 		return "", xerr
 	}
 
@@ -107,7 +106,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	tmplBox, xerr := getTemplateBox()
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
-		xerr.Annotate("retcode", 255)
 		return "", xerr
 	}
 
@@ -115,7 +113,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	tmplContent, err := tmplBox.String(name)
 	if err != nil {
 		xerr = fail.ExecutionError(err)
-		_ = xerr.Annotate("retcode", 255)
 		return "", xerr
 	}
 
@@ -123,7 +120,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	tmplPrepared, err := template.Parse(name, tmplContent)
 	if err != nil {
 		xerr = fail.ExecutionError(err)
-		xerr.Annotate("retcode", 255)
 		return "", xerr
 	}
 
@@ -131,7 +127,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	err = tmplPrepared.Option("missingkey=error").Execute(&buffer, data)
 	if err != nil {
 		xerr = fail.ExecutionError(err, "failed to execute template")
-		xerr.Annotate("retcode", 255)
 		return "", xerr
 	}
 	content := buffer.String()
@@ -144,7 +139,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	// Copy script to remote host with retries if needed
 	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
-		xerr.Annotate("retcode", 255)
 		return "", xerr
 	}
 
@@ -182,7 +176,6 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 			return "", xerr
 		default:
 			yerr := fail.ExecutionError(xerr, "failed to copy script to remote host")
-			_ = yerr.Annotate("retcode", 255)
 			return "", yerr
 		}
 	}
@@ -222,15 +215,12 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		case *fail.ErrTimeout:
 			logrus.Errorf("ErrTimeout running remote script '%s'", name)
 			xerr := fail.ExecutionError(cErr)
-			xerr.Annotate("retcode", 255)
-			// return 255, stdout, stderr, retryErr
 			return stdout, xerr
 		case *fail.ErrExecution:
 			return stdout, cErr
 		default:
 			xerr = fail.ExecutionError(xerr)
-			xerr.Annotate("retcode", 255).Annotate("stderr", "")
-			// return 255, stdout, stderr, retryErr
+			xerr.Annotate("stderr", "")
 			return stdout, xerr
 		}
 	}

@@ -25,6 +25,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	rice "github.com/GeertJohan/go.rice"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/system"
@@ -81,7 +82,6 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
-		xerr.Annotate("retcode", 255)
 		return xerr
 	}
 
@@ -151,15 +151,12 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 		case *fail.ErrTimeout:
 			logrus.Errorf("ErrTimeout running remote script '%s'", name)
 			xerr := fail.ExecutionError(cErr)
-			xerr.Annotate("retcode", 255)
-			// return 255, stdout, stderr, retryErr
 			return xerr
 		case *fail.ErrExecution:
 			return cErr
 		default:
 			xerr = fail.ExecutionError(xerr)
-			xerr.Annotate("retcode", 255).Annotate("stderr", "")
-			// return 255, stdout, stderr, retryErr
+			xerr.Annotate("stderr", "")
 			return xerr
 		}
 	}
@@ -175,31 +172,29 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 func realizeTemplate(name string, data interface{}) (string, fail.Error) {
 	tmplBox, xerr := getTemplateBox()
 	if xerr != nil {
-		xerr = fail.ExecutionError(xerr)
-		xerr.Annotate("retcode", 255)
+		xerr = fail.ExecutionError(xerr, "failure retrieving embedded blobs")
 		return "", xerr
 	}
 
 	// get file content as string
 	tmplContent, err := tmplBox.String(name)
 	if err != nil {
-		xerr = fail.ExecutionError(err)
-		_ = xerr.Annotate("retcode", 255)
+		xerr = fail.ExecutionError(err, "failure retrieving embedded box '%s'", name)
 		return "", xerr
 	}
 
 	// Prepare the template for execution
 	tmplPrepared, err := template.Parse(name, tmplContent)
 	if err != nil {
-		xerr = fail.ExecutionError(err)
-		xerr.Annotate("retcode", 255)
+		xerr = fail.ExecutionError(err, "failure parsing template '%s'", name)
 		return "", xerr
 	}
 
 	var buffer bytes.Buffer
 	if err := tmplPrepared.Option("missingkey=error").Execute(&buffer, data); err != nil {
-		xerr = fail.ExecutionError(err, "failed to execute template")
-		xerr.Annotate("retcode", 255)
+		// log the faulty data
+		logrus.Debugf("failure to execute template '%s' due to unrendered data, data at fault: '%s'", name, spew.Sdump(data))
+		xerr = fail.ExecutionError(err, "failed to execute template '%s' due to unrendered values", name)
 		return "", xerr
 	}
 	content := buffer.String()
@@ -210,7 +205,6 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 	// Copy script to remote host with retries if needed
 	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
-		xerr.Annotate("retcode", 255)
 		return "", xerr
 	}
 
@@ -220,7 +214,7 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 		}
 	}()
 
-	// FIXME: This is not Windows friendly
+	// TODO: This is not Windows friendly
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
@@ -233,8 +227,6 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 				_ = innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 				return innerXErr
 			}
-
-			// FIXME: Add crc
 
 			return nil
 		},
@@ -257,7 +249,6 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 			return "", xerr
 		default:
 			xerr = fail.ExecutionError(xerr, "failed to copy script to remote host")
-			_ = xerr.Annotate("retcode", 255)
 			return "", xerr
 		}
 	}

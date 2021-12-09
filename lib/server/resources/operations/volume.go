@@ -966,11 +966,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 				return xerr
 			}
 			if retcode != 0 {
-				problem := fail.NewError(stderr)
-				if retcode == 255 {
-					problem = fail.NewError("failed to reach SSH service of host '%s', retrying", hostName)
-				}
-
+				problem := fail.NewError("failure trying to run '%s' on host '%s'", cmd, hostName)
 				_ = problem.Annotate("stdout", stdout)
 				_ = problem.Annotate("stderr", stderr)
 				_ = problem.Annotate("retcode", retcode)

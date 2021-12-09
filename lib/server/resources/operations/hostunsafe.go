@@ -142,7 +142,6 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout)
 			if innerXErr != nil {
-				// Adds stdout and stderr as annotations to innerXErr
 				_ = innerXErr.Annotate("retcode", retcode)
 				_ = innerXErr.Annotate("stdout", stdout)
 				_ = innerXErr.Annotate("stderr", stderr)
@@ -150,8 +149,8 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 				_ = innerXErr.Annotate("iterations", iterations)
 				return innerXErr
 			}
-			// If retcode == 255, ssh connection failed // FIXME: historical reasons, not true anymore
-			if retcode == 255 {
+
+			if retcode != 0 {
 				return fail.NotAvailableError("failed to execute command '%s': failed to connect", cmd)
 			}
 			return nil
