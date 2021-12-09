@@ -702,7 +702,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 	}
 	if retcode != 0 {
 		xerr = fail.ExecutionError(nil, "failed to install common node requirements")
-		_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 		return xerr
 	}
 

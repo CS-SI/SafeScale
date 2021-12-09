@@ -110,8 +110,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 					return retry.StopRetryError(innerXErr)
 				}
 			}
-			// If retcode == 255, ssh connection failed, retry
-			if retcode == 255 /*|| !ready*/ {
+			if retcode != 0 {
 				return fail.NotAvailableError(
 					"Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname,
 				)
@@ -333,15 +332,9 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 
 			if iretcode != 0 {
 				xerr = fail.NewError("failure copying '%s' to '%s': scp error code %d", toPath, hostTo, iretcode)
-				if iretcode == 255 {
-					xerr = fail.NewError(
-						"failure copying '%s' to '%s': failed to connect to '%s'", toPath, hostTo, hostTo,
-					)
-				}
-
-				_ = xerr.Annotate("stdout", istdout)
-				_ = xerr.Annotate("stderr", istderr)
-				_ = xerr.Annotate("retcode", iretcode)
+				xerr.Annotate("stdout", istdout)
+				xerr.Annotate("stderr", istderr)
+				xerr.Annotate("retcode", iretcode)
 
 				return xerr
 			}

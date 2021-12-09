@@ -1631,12 +1631,6 @@ func (instance *Host) runInstallPhase(
 		return fail.Wrap(xerr, "failed to apply configuration phase '%s'", phase)
 	}
 	if retcode != 0 {
-		if retcode == 255 {
-			return fail.NewError(
-				"failed to execute install phase '%s' on Host '%s': SSH connection failed", phase, instance.GetName(),
-			)
-		}
-
 		// build new error
 		problem := fail.NewError("failed to execute install phase '%s' on Host '%s'", phase, instance.GetName())
 		_ = problem.Annotate("retcode", retcode)
