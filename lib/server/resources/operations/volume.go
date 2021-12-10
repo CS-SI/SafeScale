@@ -1197,7 +1197,6 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 		// Unmount block device ...
 		if mountPath != "" {
 			if innerXErr = nfsServer.UnmountBlockDevice(ctx, attachment.Device); innerXErr != nil {
-				// debug.IgnoreError(innerXErr) // FIXME: TBR It has to be restored
 				return innerXErr
 			}
 		}

@@ -173,7 +173,6 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	}
 	mountPath := in.GetMountPath()
 
-	// FIXME: Finally, that's where it has to change
 	filesystem := in.GetFormat()
 	doNotFormat := in.DoNotFormat
 	doNotMount := in.DoNotMount
