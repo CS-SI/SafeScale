@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -30,6 +31,11 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/asaskevich/govalidator"
+)
+
+var (
+	dnsServers = []string{}
 )
 
 // provider is the provider implementation of the Aws provider
@@ -171,8 +177,26 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	customDNS, _ := computeCfg["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
+	}
+
 	cfgOptions := stacks.ConfigurationOptions{
-		DNSList:                   []string{},
+		DNSList:                   dnsServers,
 		UseFloatingIP:             true,
 		AutoHostNetworkInterfaces: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{

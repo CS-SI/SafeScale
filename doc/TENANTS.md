@@ -183,6 +183,7 @@ The valid keywords in this section are :
 > | `ProjectID` | OPTIONAL, CLIENT |
 > | `Region` | MANDATORY |
 > | `AvailabilityZone` | MANDATORY |
+> | `DNS` | OPTIONAL |
 > | `Scannable` | OPTIONAL |
 > | `OperatorUsername` | OPTIONAL |
 
@@ -295,6 +296,10 @@ Contains the zone to connect to. Values depend on provider.<br>
 Is mandatory in `tenants.compute`
 May be used in `tenants.objectstorage` and `tenants.metadata`.
 If the AvailabilityZone is empty in `tenants.metadata`, safescale searches for valid values in `tenants.objectstorage`, then in `tenants.compute` (where is mandatory)
+
+### `DNS`
+
+Contains a list of IP addresses of DNS servers separated by commas.
 
 ### `Domain`
 

@@ -19,6 +19,7 @@ package outscale
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -28,10 +29,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/asaskevich/govalidator"
 )
 
 const (
 	outscaleDefaultImage = "Ubuntu 20.04"
+)
+
+var (
+	dnsServers = []string{}
 )
 
 // provider is integration of outscale IaaS API
@@ -121,6 +127,24 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		}
 	}
 
+	customDNS, _ := compute["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
+	}
+
 	options := &outscale.ConfigurationOptions{
 		Identity: outscale.Credentials{
 			AccessKey: get(identity, "AccessKey"),
@@ -131,7 +155,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			Service:            get(compute, "Service", "api"),
 			Region:             region,
 			Subregion:          get(compute, "Subregion"),
-			DNSList:            getList(compute, "DNSList"),
+			DNSList:            dnsServers,
 			DefaultTenancy:     get(compute, "DefaultTenancy", "default"),
 			DefaultImage:       get(compute, "DefaultImage", outscaleDefaultImage),
 			DefaultVolumeSpeed: volumeSpeed(get(compute, "DefaultVolumeSpeed", "Hdd")),

@@ -494,6 +494,8 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		ok     bool
 	)
 
+	// FIXME: This code is ancient and doesn't provide nor hints nor protection against formatting
+
 	identity, _ := tenant["identity"].(map[string]interface{})
 	compute, _ := tenant["compute"].(map[string]interface{})
 	ostorage, _ := tenant["objectstorage"].(map[string]interface{})
@@ -566,6 +568,8 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 	}
 
+	config.DNS, _ = compute["DNS"].(string)
+
 	if config.Key, ok = metadata["ApplicationKey"].(string); !ok {
 		if config.Key, ok = ostorage["ApplicationKey"].(string); !ok {
 			config.Key, _ = identity["ApplicationKey"].(string)
@@ -600,6 +604,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		if config.Region, ok = ostorage["Region"].(string); !ok {
 			config.Region, _ = compute["Region"].(string)
 		}
+		// FIXME: Wrong, this needs validation, but not ALL providers
 		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
 		// 	return config, err
 		// }
@@ -611,7 +616,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 	}
 
-	// FIXME: Remove google custom code
+	// FIXME: Remove google custom code, it's a problem, think about delegation to providers
 	if config.Type == "google" {
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
 		for _, key := range keys {
