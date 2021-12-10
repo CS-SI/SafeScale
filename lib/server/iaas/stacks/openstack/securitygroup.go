@@ -543,7 +543,7 @@ func (s stack) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter
 				}
 			}
 			var innerXErr fail.Error
-			asg.Rules, innerXErr = asg.Rules.RemoveRuleByIndex(index)
+			innerXErr = asg.RemoveRuleByIndex(index)
 			if innerXErr != nil {
 				return innerXErr
 			}

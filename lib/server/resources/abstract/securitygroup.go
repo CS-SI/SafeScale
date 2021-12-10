@@ -306,22 +306,22 @@ func (sgrs SecurityGroupRules) IndexOfRuleByID(id string) (int, fail.Error) {
 }
 
 // RemoveRuleByIndex removes a rule identified by its index and returns the corresponding SecurityGroupRules
-func (sgrs SecurityGroupRules) RemoveRuleByIndex(index int) (SecurityGroupRules, fail.Error) {
-	// Remove corresponding rule in asg, willingly maintaining order
-	length := len(sgrs)
-	if index >= length {
-		return sgrs, fail.InvalidParameterError("ruleIdx", "cannot be equal or greater to length of 'rules'")
+func (sg *SecurityGroup) RemoveRuleByIndex(index int) fail.Error {
+	length := len(sg.Rules)
+	if index < 0 || index >= length {
+		return fail.InvalidParameterError("ruleIdx", "cannot be equal or greater to length of 'rules'")
 	}
-
-	newRules := make(SecurityGroupRules, 0, length-1)
-	newRules = append(newRules, sgrs[:index]...)
+	newRules := make(SecurityGroupRules, 0)
+	if index > 0 {
+		newRules = append(newRules, sg.Rules[:index]...)
+	}
 	if index < length-1 {
-		newRules = append(newRules, sgrs[index+1:]...)
+		newRules = append(newRules, sg.Rules[index+1:]...)
 	}
-	return newRules, nil
+	sg.Rules = newRules
+	return nil
 }
 
-// SecurityGroup represents a security group
 // Note: by design, security group names must be unique tenant-wide
 type SecurityGroup struct {
 	ID               string             `json:"id"`                    // ID of the group
@@ -377,9 +377,9 @@ func (sg *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 
 // NewSecurityGroup ...
 func NewSecurityGroup() *SecurityGroup {
-	return &SecurityGroup{
-		Rules: SecurityGroupRules{},
-	}
+	var asg SecurityGroup = SecurityGroup{}
+	asg.Rules = make(SecurityGroupRules, 0)
+	return &asg
 }
 
 // Clone does a deep-copy of the SecurityGroup
@@ -398,10 +398,14 @@ func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 
 	src := p.(*SecurityGroup)
 	*sg = *src
-	sg.Rules = make(SecurityGroupRules, len(src.Rules))
-	for k, v := range src.Rules {
-		sg.Rules[k] = v.Clone().(*SecurityGroupRule)
+	var cloneRule *SecurityGroupRule
+	var cloneRules SecurityGroupRules = make(SecurityGroupRules, 0)
+	for _, v := range src.Rules {
+		cloneRule = v.Clone().(*SecurityGroupRule)
+		cloneRules = append(cloneRules, cloneRule)
 	}
+	sg.Rules = cloneRules
+
 	return sg
 }
 

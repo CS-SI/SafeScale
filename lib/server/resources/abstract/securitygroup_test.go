@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -91,4 +92,42 @@ func TestSecurityGroup_Replace(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+}
+
+func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
+
+	sg := NewSecurityGroup()
+	sg.Name = "securitygroup"
+
+	sg.Rules = append(sg.Rules, &SecurityGroupRule{Description: "Rule 1"})
+	sg.Rules = append(sg.Rules, &SecurityGroupRule{Description: "Rule 2"})
+	sg.Rules = append(sg.Rules, &SecurityGroupRule{Description: "Rule 3"})
+
+	var err fail.Error
+	err = sg.RemoveRuleByIndex(0)
+
+	if err != nil {
+		t.Error("Mismatch length after RemoveRuleByIndex, expect 2")
+		t.Fail()
+	}
+	if len(sg.Rules) != 2 {
+		t.Error("Mismatch length after RemoveRuleByIndex, expect 2")
+		t.Fail()
+	}
+	if sg.Rules[0].Description != "Rule 2" {
+		t.Error("Unexpect element after RemoveRuleByIndex, have to keep sort")
+		t.Fail()
+	}
+
+	err = sg.RemoveRuleByIndex(-1)
+	if err == nil {
+		t.Error("Expect out of range error")
+		t.Fail()
+	}
+	err = sg.RemoveRuleByIndex(2)
+	if err == nil {
+		t.Error("Expect out of range error")
+		t.Fail()
+	}
+
 }
