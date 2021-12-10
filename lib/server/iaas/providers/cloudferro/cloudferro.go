@@ -19,6 +19,7 @@ package cloudferro
 import (
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -129,6 +130,24 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectName)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	customDNS, _ := compute["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					cloudferroDNSServers = append(cloudferroDNSServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				cloudferroDNSServers = append(cloudferroDNSServers, fragment)
+			}
+		}
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{

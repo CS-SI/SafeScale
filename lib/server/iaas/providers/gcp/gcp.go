@@ -19,6 +19,7 @@ package gcp
 import (
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -29,10 +30,15 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/asaskevich/govalidator"
 )
 
 const (
 	gcpDefaultImage = "Ubuntu 20.04"
+)
+
+var (
+	dnsServers = []string{"8.8.8.8", "1.1.1.1"}
 )
 
 // provider is the provider implementation of the Gcp provider
@@ -136,6 +142,24 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		FloatingIPPool:   "public",
 	}
 
+	customDNS, _ := computeCfg["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
+	}
+
 	providerName := "gcp"
 	metadataBucketName, err := objectstorage.BuildMetadataBucketName(providerName, region, "", projectID)
 	if err != nil {
@@ -143,7 +167,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
-		DNSList:                   []string{"8.8.8.8", "1.1.1.1"},
+		DNSList:                   dnsServers,
 		UseFloatingIP:             true,
 		AutoHostNetworkInterfaces: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{

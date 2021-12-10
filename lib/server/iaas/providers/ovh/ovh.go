@@ -115,6 +115,24 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		zone = "nova"
 	}
 
+	customDNS, _ := compute["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
+	}
+
 	projectName, validInput := compute["ProjectName"].(string)
 	if !validInput {
 		return nil, fail.NewError("Invalid input for 'ProjectName'")
