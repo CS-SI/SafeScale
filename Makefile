@@ -42,6 +42,9 @@ export BUILD_TAGS
 all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
+ci: logclean ground getdevdeps mod sdk generate lib cli minimock err vet
+	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
+
 allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
