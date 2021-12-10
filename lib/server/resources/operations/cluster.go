@@ -29,7 +29,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
@@ -3069,14 +3068,14 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 	}
 
 	cmd := dataBuffer.String()
-	remotePath := utils.TempFolder + "/" + fileName
+	remotePath := fmt.Sprintf("%s/%s", utils.TempFolder, fileName)
 
 	return cmd, remotePath, nil
 }
 
 // Regenerate ansible inventory
 func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.Error {
-	logrus.Warnf("About to update ansible inventory")
+	logrus.Infof("[Cluster %s] Update ansible inventory", instance.GetName())
 
 	// Check incoming parameters
 	if ctx == nil {
@@ -3141,7 +3140,9 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 		if !ok {
 			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-
+		if aci == nil {
+			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", "nil")
+		}
 		if reflect.TypeOf(aci.Name).Kind() != reflect.String && aci.Name == "" {
 			return fail.InconsistentError("Cluster name must be a not empty string")
 		}
@@ -3162,6 +3163,9 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			if nodesV3 == nil {
+				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", "nil")
+			}
 
 			// Template params: gateways
 			rh, err := LoadHost(instance.GetService(), networkCfg.GatewayID)
@@ -3170,12 +3174,14 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 			}
 			err = rh.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				ahc, ok := clonable.(*abstract.HostCore)
-				if ok {
-					params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
-					return nil
-				} else {
+				if !ok {
 					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
+				if ahc == nil {
+					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", "nil")
+				}
+				params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
+				return nil
 			})
 			if err != nil {
 				return fail.InconsistentError("Fail to load primary gateway '%s'", networkCfg.GatewayID)
@@ -3188,12 +3194,14 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 				}
 				err = rh.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 					ahc, ok := clonable.(*abstract.HostCore)
-					if ok {
-						params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
-						return nil
-					} else {
+					if !ok {
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
+					if ahc == nil {
+						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", "nil")
+					}
+					params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
+					return nil
 				})
 				if err != nil {
 					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.GatewayID)
@@ -3230,12 +3238,16 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 		return xerr
 	}
 
+	prerr := fmt.Sprintf("[Cluster %s] Update ansible inventory: ", instance.GetName())
+
 	// Feature ansible found ?
 	if !featureAnsibleInstalled {
+		logrus.Infof("%snothing to update (feature not installed)", prerr)
 		return nil
 	}
 	// Has at least one master ?
 	if len(masters) == 0 {
+		logrus.Infof("%snothing to update (no masters in cluster)", prerr)
 		return nil
 	}
 
@@ -3245,107 +3257,89 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 		// Note: path MUST be literal for rice to work
 		b, err := rice.FindBox("../operations/scripts/")
 		if err != nil {
-			return fail.Wrap(err, "failed to load template")
+			return fail.Wrap(err, "%sfailed to load template directory", prerr)
 		}
+
 		ansibleTemplateBox.Store(b)
-		logrus.Trace("loaded feature \"ansible\" inventory.py template")
+		logrus.Tracef("%sloaded feature \"ansible\" inventory.py template", prerr)
 		anon = ansibleTemplateBox.Load()
 		if anon == nil {
-			return fail.InconsistentError("ansible inventory template is nil")
+			return fail.InconsistentError("%sansible inventory template is nil", prerr)
 		}
 	}
 	box, ok := anon.(*rice.Box)
 	if !ok {
-		return fail.InconsistentError("fail to load template")
+		return fail.InconsistentError("%sfail to load template directory", prerr)
 	}
 	tmplString, err := box.String("ansible_inventory.py")
 	if err != nil {
-		return fail.Wrap(err, "failed to load template 'ansible_inventory.py'")
+		return fail.Wrap(err, "%sfailed to load template 'ansible_inventory.py'", prerr)
 	}
 
 	// --------- Build ansible inventory --------------
-	var fileName string = fmt.Sprintf("cluster-inventory-%s", params["Clustername"])
+	fileName := fmt.Sprintf("cluster-inventory-%s.py", params["Clustername"])
 	tmplCmd, err := template.Parse(fileName, tmplString)
 	if err != nil {
-		return fail.Wrap(err, "failed to parse template")
+		return fail.Wrap(err, "%sfailed to parse template 'ansible_inventory.py'", prerr)
 	}
 	dataBuffer := bytes.NewBufferString("")
 	ferr := tmplCmd.Execute(dataBuffer, params)
 	if ferr != nil {
-		return fail.Wrap(ferr, "failed to execute template")
+		return fail.Wrap(ferr, "%sfailed to execute template 'ansible_inventory.py'", prerr)
 	}
 
-	// --------- Upload file for each master --------------
-	rfcItem := Item{
-		Remote:       utils.TempFolder + fileName,
-		RemoteOwner:  "safescale:safescale",
-		RemoteRights: "ou+rx-w,g+rwx",
+	// --------- Upload file for each master and test it (parallelized) --------------
+	tg, xerr := concurrency.NewTaskGroup()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+	xerr = tg.SetID(fileName)
+	if xerr != nil {
+		return xerr
 	}
 
-	var retcode int
-	var stdout string
-	var stderr string
-	var target string = fmt.Sprintf("%s/ansible/inventory/", utils.EtcFolder)
-	var commands []string = []string{
-		fmt.Sprintf("[ -f %s_inventory.py ] && sudo rm -f %s_inventory.py", target, target),
-		fmt.Sprintf("sudo mv %s %s_inventory.py", rfcItem.Remote, target),
-		fmt.Sprintf("sudo chown cladm:root %s_inventory.py", target),
-		fmt.Sprintf("ansible-inventory -i %s_inventory.py --list", target),
-		fmt.Sprintf("[ -f %sinventory.py ] && sudo rm -f %sinventory.py", target, target),
-		fmt.Sprintf("sudo mv %s_inventory.py %sinventory.py", target, target),
-	}
-	var errmsg []string = []string{
-		"fail to clean up temporaries",
-		"fail to move uploaded inventory",
-		"fail to update rights of uploaded inventory",
-		"fail to test/run uploaded inventory",
-		"fail to remove previous inventory",
-		"fail to move uploaded inventory to final destination",
-	}
-
+	var errors []error
 	for master := range masters {
-		logrus.Infoln("Update master ", masters[master].GetName())
+		logrus.Infof("%sUpdate master %s", prerr, masters[master].GetName())
 
-		// Remove possible junks
-		cmd := fmt.Sprintf("[ -f %s ] && sudo rm -f %s", rfcItem.Remote, rfcItem.Remote)
-		retcode, stdout, stderr, xerr = masters[master].Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
+		_, xerr = tg.Start(
+			instance.taskUpdateClusterInventoryMaster,
+			taskUpdateClusterInventoryMasterParameters{
+				ctx:           ctx,
+				master:        masters[master],
+				inventoryData: dataBuffer.String(),
+			},
+			concurrency.InheritParentIDOption,
+			concurrency.AmendID(fmt.Sprintf("/cluster/%s/master/%s/update_inventory", instance.GetName(), masters[master].GetName())),
+		)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return fail.Wrap(xerr, "fail to clean previous temporaries")
-		}
-		if retcode != 0 {
-			xerr := fail.NewError("fail to clean previous temporaries")
-			_ = xerr.Annotate("stdout", stdout)
-			_ = xerr.Annotate("stderr", stderr)
-			_ = xerr.Annotate("retcode", retcode)
-			return xerr
-		}
-
-		// Upload new inventory
-		xerr = rfcItem.UploadString(ctx, dataBuffer.String(), masters[master])
-		if xerr != nil {
-			return fail.Wrap(xerr, "upload fail")
-		}
-
-		// Run update commands
-		for i, cmd := range commands {
-			logrus.Trace(cmd)
-			retcode, stdout, stderr, xerr = masters[master].Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return fail.Wrap(xerr, errmsg[i])
+			errors = append(errors, xerr)
+			abErr := tg.AbortWithCause(xerr)
+			if abErr != nil {
+				logrus.Warnf("%sthere was an error trying to abort TaskGroup: %s", prerr, spew.Sdump(abErr))
 			}
-			if retcode != 0 {
-				xerr := fail.NewError(errmsg[i])
-				_ = xerr.Annotate("stdout", stdout)
-				_ = xerr.Annotate("stderr", stderr)
-				_ = xerr.Annotate("retcode", retcode)
-				return xerr
-			}
+			break
 		}
 
 	}
+
+	var tgr concurrency.TaskGroupResult
+	tgr, xerr = tg.WaitGroup()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		if withTimeout(xerr) {
+			logrus.Warningf("%sTimeouts ansible update inventory", prerr)
+		}
+	}
+	if len(errors) != 0 {
+		return fail.NewError("%sfailed to update inventory: %s", prerr, fail.NewErrorList(errors))
+	}
+	logrus.Debugf("%supdate inventory successful: %v", prerr, tgr)
 
 	return nil
+
 }
 
 // configureNodesFromList configures nodes from a list
