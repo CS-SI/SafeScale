@@ -150,9 +150,6 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 				return innerXErr
 			}
 
-			if retcode != 0 {
-				return fail.NotAvailableError("failed to execute command '%s': failed to connect", cmd)
-			}
 			return nil
 		},
 		temporal.GetDefaultDelay(),

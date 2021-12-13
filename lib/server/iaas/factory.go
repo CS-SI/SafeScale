@@ -18,6 +18,7 @@ package iaas
 
 import (
 	"bytes"
+	"expvar"
 	"fmt"
 	"regexp"
 	"sync"
@@ -270,7 +271,20 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		newS.metadataBucket = metadataBucket
 		newS.metadataKey = metadataCryptKey
 
-		return newS, validateRegexps(newS, tenant)
+		if xerr := validateRegexps(newS, tenant); xerr != nil {
+			return NullService(), xerr
+		}
+
+		// increase tenant counter
+		ts := expvar.Get("tenant.setted")
+		if ts != nil {
+			tsi, ok := ts.(*expvar.Int)
+			if ok {
+				tsi.Add(1)
+			}
+		}
+
+		return newS, nil
 	}
 
 	if !tenantInCfg {

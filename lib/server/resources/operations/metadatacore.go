@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	_ "sync"
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
@@ -53,8 +54,6 @@ const (
 type MetadataCore struct {
 	id   atomic.Value
 	name atomic.Value
-
-	//	concurrency.TaskedLock `json:"-"`
 
 	lock       sync.RWMutex
 	shielded   *shielded.Shielded

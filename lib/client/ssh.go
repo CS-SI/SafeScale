@@ -110,11 +110,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 					return retry.StopRetryError(innerXErr)
 				}
 			}
-			if retcode != 0 {
-				return fail.NotAvailableError(
-					"Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname,
-				)
-			}
+
 			return nil
 		},
 		temporal.GetMinDelay(),
