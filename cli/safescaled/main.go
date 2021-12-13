@@ -27,6 +27,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/CS-SI/SafeScale/lib/utils/heartbeat"
 	"github.com/makholm/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -118,11 +119,21 @@ func work(c *cli.Context) {
 	protocol.RegisterTenantServiceServer(s, &listeners.TenantListener{})
 	protocol.RegisterVolumeServiceServer(s, &listeners.VolumeListener{})
 
-	// log.Println("Initializing service factory")
-	// commands.InitServiceFactory()
+	// enable heartbeat
+	go heartbeat.RunHeartbeatService(":10102")
 
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
+
+	// Track goroutines
+	startTrack()
+	defer endTrack()
+
+	// Expose runtime
+	// - /debug/vars
+	// - /debug/metrics
+	// - /debug/fgprof
+	expose()
 
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
 	if len(Tags) > 1 { // nolint

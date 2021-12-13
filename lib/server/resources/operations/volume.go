@@ -977,9 +977,9 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 			}
 			if retcode != 0 {
 				problem := fail.NewError("failure trying to run '%s' on host '%s'", cmd, hostName)
-				_ = problem.Annotate("stdout", stdout)
-				_ = problem.Annotate("stderr", stderr)
-				_ = problem.Annotate("retcode", retcode)
+				problem.Annotate("stdout", stdout)
+				problem.Annotate("stderr", stderr)
+				problem.Annotate("retcode", retcode)
 
 				return problem
 			}
