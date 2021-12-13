@@ -2354,13 +2354,6 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 		}
 	}
 
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
-	xerr = instance.unsafeUpdateClusterInventory(ctx)
-	if xerr != nil {
-		return xerr
-	}
-
 	return nil
 }
 
@@ -3092,8 +3085,10 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 		"ClusterName":          "",
 		"ClusterAdminUsername": "cladm",
 		"ClusterAdminPassword": "",
+		"PrimaryGatewayName":   "primary_gateway",
 		"PrimaryGatewayIP":     "",
 		"PrimaryGatewayPort":   "22",
+		"SecondaryGatewayName": "secondary_gateway",
 		"SecondaryGatewayIP":   "",
 		"SecondaryGatewayPort": "22",
 		"ClusterMasters":       resources.IndexedListOfClusterNodes{},
@@ -3151,10 +3146,8 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 		params["ClusterAdminUsername"] = "cladm"
 		params["ClusterAdminPassword"] = aci.AdminPassword
 		params["PrimaryGatewayIP"] = networkCfg.GatewayIP
-		params["PrimaryGatewayPort"] = "22"
 		if networkCfg.SecondaryGatewayIP != "" {
 			params["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
-			params["SecondaryGatewayPort"] = "22"
 		}
 
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
@@ -3180,7 +3173,10 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 				if ahc == nil {
 					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", "nil")
 				}
-				params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
+				params["PrimaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
+				if ahc.Name != "" {
+					params["PrimaryGatewayName"] = ahc.Name
+				}
 				return nil
 			})
 			if err != nil {
@@ -3190,7 +3186,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 			if networkCfg.SecondaryGatewayIP != "" {
 				rh, err = LoadHost(instance.GetService(), networkCfg.SecondaryGatewayID)
 				if err != nil {
-					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.GatewayID)
+					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
 				}
 				err = rh.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 					ahc, ok := clonable.(*abstract.HostCore)
@@ -3201,10 +3197,13 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", "nil")
 					}
 					params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
+					if ahc.Name != "" {
+						params["SecondaryGatewayName"] = ahc.Name
+					}
 					return nil
 				})
 				if err != nil {
-					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.GatewayID)
+					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
 				}
 			}
 
