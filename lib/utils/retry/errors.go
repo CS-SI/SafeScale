@@ -74,7 +74,7 @@ func StopRetryError(err error, msg ...interface{}) fail.Error {
 	}
 	switch ce := err.(type) {
 	case *fail.ErrAborted: // do not embed abort inside an abort
-		_ = ce.Annotate("message", newMessage)
+		ce.Annotate("message", newMessage)
 		return ce
 	default:
 		return fail.AbortedError(err, newMessage)

@@ -44,8 +44,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
-// UnsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
-func (instance *Host) UnsafeRun(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+// unsafeRun is the non goroutine-safe version of Run, with less parameter validation, that does the real work
+func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	const invalid = -1
 
@@ -142,11 +142,11 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 
 			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outs, timeout)
 			if innerXErr != nil {
-				_ = innerXErr.Annotate("retcode", retcode)
-				_ = innerXErr.Annotate("stdout", stdout)
-				_ = innerXErr.Annotate("stderr", stderr)
-				_ = innerXErr.Annotate("operation", cmd)
-				_ = innerXErr.Annotate("iterations", iterations)
+				innerXErr.Annotate("retcode", retcode)
+				innerXErr.Annotate("stdout", stdout)
+				innerXErr.Annotate("stderr", stderr)
+				innerXErr.Annotate("operation", cmd)
+				innerXErr.Annotate("iterations", iterations)
 				return innerXErr
 			}
 
@@ -178,9 +178,9 @@ func getMD5Hash(text string) string {
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-// UnsafePush is the non goroutine-safe version of Push, with less parameter validation, that do the real work
+// unsafePush is the non goroutine-safe version of Push, with less parameter validation, that do the real work
 // Note: must be used with wisdom
-func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
+func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 	const invalid = -1
 
@@ -237,9 +237,9 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 			}
 			if iretcode != 0 {
 				problem := fail.NewError("copy failed")
-				_ = problem.Annotate("stdout", istdout)
-				_ = problem.Annotate("stderr", istderr)
-				_ = problem.Annotate("retcode", iretcode)
+				problem.Annotate("stdout", istdout)
+				problem.Annotate("stderr", istderr)
+				problem.Annotate("retcode", iretcode)
 				return problem
 			}
 
@@ -250,9 +250,9 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 				fretcode, fstdout, fstderr, finnerXerr := run(crcCtx, instance.sshProfile, fmt.Sprintf("/usr/bin/md5sum %s", target), outputs.COLLECT, timeout)
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
-					_ = finnerXerr.Annotate("retcode", fretcode)
-					_ = finnerXerr.Annotate("stdout", fstdout)
-					_ = finnerXerr.Annotate("stderr", fstderr)
+					finnerXerr.Annotate("retcode", fretcode)
+					finnerXerr.Annotate("stdout", fstdout)
+					finnerXerr.Annotate("stderr", fstderr)
 
 					switch finnerXerr.(type) {
 					case *fail.ErrTimeout:
@@ -265,9 +265,9 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 				}
 				if fretcode != 0 {
 					finnerXerr = fail.NewError("failed to check md5")
-					_ = finnerXerr.Annotate("retcode", fretcode)
-					_ = finnerXerr.Annotate("stdout", fstdout)
-					_ = finnerXerr.Annotate("stderr", fstderr)
+					finnerXerr.Annotate("retcode", fretcode)
+					finnerXerr.Annotate("stdout", fstdout)
+					finnerXerr.Annotate("stderr", fstderr)
 				}
 				if finnerXerr != nil {
 					return finnerXerr
@@ -319,9 +319,9 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		iretcode, istdout, istderr, innerXerr := run(ctx, instance.sshProfile, cmd, outputs.COLLECT, timeout)
 		innerXerr = debug.InjectPlannedFail(innerXerr)
 		if innerXerr != nil {
-			_ = innerXerr.Annotate("retcode", iretcode)
-			_ = innerXerr.Annotate("stdout", istdout)
-			_ = innerXerr.Annotate("stderr", istderr)
+			innerXerr.Annotate("retcode", iretcode)
+			innerXerr.Annotate("stdout", istdout)
+			innerXerr.Annotate("stderr", istderr)
 
 			switch innerXerr.(type) {
 			case *fail.ErrTimeout:
@@ -334,9 +334,9 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 		}
 		if retcode != 0 {
 			innerXerr = fail.NewError("failed to update access rights")
-			_ = innerXerr.Annotate("retcode", iretcode)
-			_ = innerXerr.Annotate("stdout", istdout)
-			_ = innerXerr.Annotate("stderr", istderr)
+			innerXerr.Annotate("retcode", iretcode)
+			innerXerr.Annotate("stdout", istdout)
+			innerXerr.Annotate("stderr", istderr)
 		}
 		if innerXerr != nil {
 			return iretcode, istdout, istderr, innerXerr
@@ -346,16 +346,16 @@ func (instance *Host) UnsafePush(ctx context.Context, source, target, owner, mod
 	return retcode, stdout, stderr, xerr
 }
 
-// UnsafeGetVolumes is the not goroutine-safe version of GetVolumes, without parameter validation, that does the real work
+// unsafeGetVolumes is the not goroutine-safe version of GetVolumes, without parameter validation, that does the real work
 // Note: must be used with wisdom
-func (instance *Host) UnsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error) {
+func (instance *Host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error) {
 	var hvV1 *propertiesv1.HostVolumes
 	xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
 			var ok bool
 			hvV1, ok = clonable.(*propertiesv1.HostVolumes)
 			if !ok {
-				return fail.InconsistentError("'*propertiesv1.UnsafeGetVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.unsafeGetVolumes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			return nil
@@ -369,9 +369,9 @@ func (instance *Host) UnsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error)
 	return hvV1, nil
 }
 
-// UnsafeGetMounts returns the information about the mounts of the host
+// unsafeGetMounts returns the information about the mounts of the host
 // Intended to be used when objh is notoriously not nil (because previously checked)
-func (instance *Host) UnsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Error) {
+func (instance *Host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Error) {
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
@@ -436,7 +436,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	to := fmt.Sprintf("%s:%s", hostName, filename)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := instance.UnsafePush(ctx, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
+			retcode, stdout, stderr, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -445,7 +445,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 			}
 			if retcode == 1 && (strings.Contains(stderr, "lost connection") || strings.Contains(stdout, "lost connection")) {
 				problem := fail.NewError(stderr)
-				_ = problem.Annotate("retcode", retcode)
+				problem.Annotate("retcode", retcode)
 				return problem
 			}
 			if retcode != 0 {
@@ -482,15 +482,15 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	if cmd != "" {
 		retryErr = retry.WhileUnsuccessful(
 			func() error {
-				retcode, stdout, stderr, innerXErr := instance.UnsafeRun(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+				retcode, stdout, stderr, innerXErr := instance.unsafeRun(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrAborted:
 						return innerXErr
 					default:
-						_ = innerXErr.Annotate("retcode", retcode)
-						_ = innerXErr.Annotate("stdout", stdout)
-						_ = innerXErr.Annotate("stderr", stderr)
+						innerXErr.Annotate("retcode", retcode)
+						innerXErr.Annotate("stdout", stdout)
+						innerXErr.Annotate("stderr", stderr)
 						return innerXErr
 					}
 				}

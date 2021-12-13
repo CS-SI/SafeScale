@@ -1291,13 +1291,13 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 			item.Released()
 		}(hostInstance)
 
-		vols, _ := hostInstance.(*Host).UnsafeGetVolumes()
+		vols, _ := hostInstance.(*Host).unsafeGetVolumes()
 		device, ok := vols.DevicesByID[volumeID]
 		if !ok {
 			return nil, fail.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", volumeName, k)
 		}
 
-		mnts, _ := hostInstance.(*Host).UnsafeGetMounts()
+		mnts, _ := hostInstance.(*Host).unsafeGetMounts()
 		if mnts != nil {
 			path, ok := mnts.LocalMountsByDevice[device]
 			if !ok {

@@ -293,16 +293,16 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 						)
 						finnerXerr = debug.InjectPlannedFail(finnerXerr)
 						if finnerXerr != nil {
-							_ = finnerXerr.Annotate("retcode", fretcode)
-							_ = finnerXerr.Annotate("stdout", fstdout)
-							_ = finnerXerr.Annotate("stderr", fstderr)
+							finnerXerr.Annotate("retcode", fretcode)
+							finnerXerr.Annotate("stdout", fstdout)
+							finnerXerr.Annotate("stderr", fstderr)
 							return finnerXerr
 						}
 						if fretcode != 0 {
 							finnerXerr = fail.NewError("failed to remove file")
-							_ = finnerXerr.Annotate("retcode", fretcode)
-							_ = finnerXerr.Annotate("stdout", fstdout)
-							_ = finnerXerr.Annotate("stderr", fstderr)
+							finnerXerr.Annotate("retcode", fretcode)
+							finnerXerr.Annotate("stdout", fstdout)
+							finnerXerr.Annotate("stderr", fstderr)
 							return finnerXerr
 						}
 					}
@@ -362,16 +362,16 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 					)
 					finnerXerr = debug.InjectPlannedFail(finnerXerr)
 					if finnerXerr != nil {
-						_ = finnerXerr.Annotate("retcode", fretcode)
-						_ = finnerXerr.Annotate("stdout", fstdout)
-						_ = finnerXerr.Annotate("stderr", fstderr)
+						finnerXerr.Annotate("retcode", fretcode)
+						finnerXerr.Annotate("stdout", fstdout)
+						finnerXerr.Annotate("stderr", fstderr)
 						return fail.WarningError(finnerXerr, "failure running remote md5 command")
 					}
 					if fretcode != 0 {
 						finnerXerr = fail.NewError("failed to check md5")
-						_ = finnerXerr.Annotate("retcode", fretcode)
-						_ = finnerXerr.Annotate("stdout", fstdout)
-						_ = finnerXerr.Annotate("stderr", fstderr)
+						finnerXerr.Annotate("retcode", fretcode)
+						finnerXerr.Annotate("stdout", fstdout)
+						finnerXerr.Annotate("stderr", fstderr)
 						return fail.WarningError(finnerXerr, "unexpected error code running remote md5 command")
 					}
 					if !strings.Contains(fstdout, md5hash) {

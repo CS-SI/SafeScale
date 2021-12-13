@@ -1057,7 +1057,7 @@ func (instance *Cluster) createHostResources(
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
-			list, merr := instance.UnsafeListMasters()
+			list, merr := instance.unsafeListMasters()
 			if merr != nil {
 				_ = ferr.AddConsequence(merr)
 				return
@@ -2026,7 +2026,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 	logrus.Debugf("[Cluster %s] Configuring masters...", instance.GetName())
 
-	masters, xerr := instance.UnsafeListMasters()
+	masters, xerr := instance.unsafeListMasters()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

@@ -66,7 +66,7 @@ func (el *ErrorList) Annotate(key string, value data.Annotation) data.Annotatabl
 		logrus.Errorf("invalid call of ErrorList.WithField() from null instance")
 		return el
 	}
-	_ = el.errorCore.Annotate(key, value)
+	el.errorCore.Annotate(key, value)
 	return el
 }
 

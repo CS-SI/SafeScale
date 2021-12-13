@@ -1625,7 +1625,7 @@ func (instance *Host) runInstallPhase(
 
 	command := fmt.Sprintf("sudo bash %s; exit $?", file)
 	// Executes the script on the remote Host
-	retcode, stdout, stderr, xerr := instance.UnsafeRun(ctx, command, outputs.COLLECT, 0, timeout)
+	retcode, stdout, stderr, xerr := instance.unsafeRun(ctx, command, outputs.COLLECT, 0, timeout)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply configuration phase '%s'", phase)
@@ -1633,9 +1633,9 @@ func (instance *Host) runInstallPhase(
 	if retcode != 0 {
 		// build new error
 		problem := fail.NewError("failed to execute install phase '%s' on Host '%s'", phase, instance.GetName())
-		_ = problem.Annotate("retcode", retcode)
-		_ = problem.Annotate("stdout", stdout)
-		_ = problem.Annotate("stderr", stderr)
+		problem.Annotate("retcode", retcode)
+		problem.Annotate("stdout", stdout)
+		problem.Annotate("stderr", stderr)
 
 		if abstract.IsProvisioningError(problem) {
 			// Rewrite stdout, probably has too much information
@@ -1967,7 +1967,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
 	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 	defer cancelReboot()
-	_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
+	_, _, _, xerr = instance.unsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
@@ -2000,7 +2000,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
 		rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
 		defer cancelReboot()
-		_, _, _, xerr = instance.UnsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
+		_, _, _, xerr = instance.unsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
 		if xerr != nil {
 			logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 		}
@@ -2740,7 +2740,7 @@ func (instance *Host) Run(
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.UnsafeRun(ctx, cmd, outs, connectionTimeout, executionTimeout)
+	return instance.unsafeRun(ctx, cmd, outs, connectionTimeout, executionTimeout)
 }
 
 // Pull downloads a file from Host
@@ -2801,9 +2801,9 @@ func (instance *Host) Pull(
 			}
 			if iretcode != 0 {
 				problem := fail.NewError("copy failed")
-				_ = problem.Annotate("stdout", istdout)
-				_ = problem.Annotate("stderr", istderr)
-				_ = problem.Annotate("retcode", iretcode)
+				problem.Annotate("stdout", istdout)
+				problem.Annotate("stderr", istderr)
+				problem.Annotate("retcode", iretcode)
 				return problem
 			}
 
@@ -2867,7 +2867,7 @@ func (instance *Host) Push(
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.UnsafePush(ctx, source, target, owner, mode, timeout)
+	return instance.unsafePush(ctx, source, target, owner, mode, timeout)
 }
 
 // GetShare returns a clone of the propertiesv1.HostShare corresponding to share 'shareRef'
@@ -2930,7 +2930,7 @@ func (instance *Host) GetVolumes() (_ *propertiesv1.HostVolumes, xerr fail.Error
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.UnsafeGetVolumes()
+	return instance.unsafeGetVolumes()
 }
 
 // Start starts the Host
@@ -3301,7 +3301,7 @@ func (instance *Host) GetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Er
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.UnsafeGetMounts()
+	return instance.unsafeGetMounts()
 }
 
 // IsClusterMember returns true if the Host is member of a cluster

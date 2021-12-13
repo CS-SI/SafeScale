@@ -157,7 +157,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 			}
 			if retcode != 0 {
 				innerXErr = fail.ExecutionError(xerr, "script copy failed: %s, %s", stdout, stderr)
-				_ = innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+				innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 				return innerXErr
 			}
 

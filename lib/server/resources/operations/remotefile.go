@@ -101,14 +101,14 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 			}
 			if retcode == 1 && (strings.Contains(ierr, "lost connection") || strings.Contains(iout, "lost connection")) {
 				problem := fail.NewError(ierr)
-				_ = problem.Annotate("retcode", retcode)
-				_ = problem.Annotate("iterations", iterations)
+				problem.Annotate("retcode", retcode)
+				problem.Annotate("iterations", iterations)
 				return problem
 			}
 
 			if retcode != 0 {
 				problem := fail.NewError("failed to copy file '%s' to '%s:%s' (retcode: %d=%s)", rfc.Local, host.GetName(), rfc.Remote, retcode, system.SCPErrorString(retcode))
-				_ = problem.Annotate("iterations", iterations)
+				problem.Annotate("iterations", iterations)
 				return problem
 			}
 			return nil

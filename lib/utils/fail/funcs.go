@@ -60,7 +60,7 @@ func Annotate(err error, key string, content interface{}) Error {
 			enrich = NewError(err.Error())
 		}
 		if key != "" {
-			_ = enrich.Annotate(key, content)
+			enrich.Annotate(key, content)
 		}
 		return enrich
 	}

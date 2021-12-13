@@ -224,7 +224,7 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 			}
 			if retcode != 0 {
 				innerXErr = fail.ExecutionError(xerr, "failed to copy content: %s, %s", stdout, stderr)
-				_ = innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+				innerXErr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 				return innerXErr
 			}
 

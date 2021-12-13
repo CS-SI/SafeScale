@@ -194,7 +194,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
-		master, xerr := instance.UnsafeFindAvailableMaster(ctx)
+		master, xerr := instance.unsafeFindAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -208,7 +208,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	v["ClusterMasters"], xerr = instance.UnsafeListMasters()
+	v["ClusterMasters"], xerr = instance.unsafeListMasters()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -226,7 +226,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 	v["ClusterMasterIDs"] = list
 
-	v["ClusterMasterIPs"], xerr = instance.UnsafeListMasterIPs()
+	v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -681,7 +681,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	params["MasterIPs"], xerr = instance.UnsafeListMasterIPs()
+	params["MasterIPs"], xerr = instance.unsafeListMasterIPs()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
