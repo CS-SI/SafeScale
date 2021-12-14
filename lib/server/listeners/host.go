@@ -211,7 +211,7 @@ func (s *HostListener) Reboot(ctx context.Context, in *protocol.Reference) (empt
 
 	defer hostInstance.Released()
 
-	if xerr = hostInstance.Reboot(job.Context()); xerr != nil {
+	if xerr = hostInstance.Reboot(job.Context(), false); xerr != nil { // FIXME: We should run a sync first
 		return empty, xerr
 	}
 

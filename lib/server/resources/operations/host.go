@@ -1602,10 +1602,66 @@ func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequiremen
 	return template.ID, nil
 }
 
+func (instance *Host) thePhaseDoesSomething(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
+	// assume yes
+	result := true
+
+	// render content
+	content, xerr := userdataContent.Generate(phase)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return result
+	}
+
+	fullCt := string(content)
+	if !strings.Contains(fullCt, "# ---- Main") {
+		return result
+	}
+
+	if !strings.Contains(fullCt, "# ---- EndMain") {
+		return result
+	}
+
+	// TODO: Remove blank lines to simplify this test
+	if strings.Contains(fullCt, "# ---- Main\n# ---- EndMain") {
+		result = false
+	}
+
+	if strings.Contains(fullCt, "# ---- Main\n\n# ---- EndMain") {
+		result = false
+	}
+
+	if strings.Contains(fullCt, "# ---- Main\n\n\n# ---- EndMain") {
+		result = false
+	}
+
+	return result
+}
+
+func (instance *Host) thePhaseReboots(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
+	// assume yes
+	result := true
+
+	// render content
+	content, xerr := userdataContent.Generate(phase)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return result
+	}
+
+	fullCt := string(content)
+	return strings.Contains(fullCt, "# ---- REBOOT")
+}
+
 // runInstallPhase uploads then starts script corresponding to phase 'phase'
 func (instance *Host) runInstallPhase(
 	ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content, timeout time.Duration,
 ) fail.Error {
+	defer temporal.NewStopwatch().OnExitLogInfo(
+		fmt.Sprintf("Starting install phase %s on '%s'...", phase, instance.GetName()),
+		fmt.Sprintf("Ending phase %s on '%s'...", phase, instance.GetName()),
+	)()
+
 	if instance.sshProfile == nil {
 		return fail.InvalidInstanceContentError("instance.sshProfile", "cannot be nil")
 	}
@@ -1682,6 +1738,11 @@ func (instance *Host) runInstallPhase(
 func (instance *Host) waitInstallPhase(
 	ctx context.Context, phase userdata.Phase, timeout time.Duration,
 ) (string, fail.Error) {
+	defer temporal.NewStopwatch().OnExitLogInfo(
+		fmt.Sprintf("Waiting install phase %s on '%s'...", phase, instance.GetName()),
+		fmt.Sprintf("Finish Waiting install phase %s on '%s'...", phase, instance.GetName()),
+	)()
+
 	givenTimeout := int(timeout.Minutes())
 	sshDefaultTimeout := int(temporal.GetHostTimeout().Minutes())
 	if givenTimeout > sshDefaultTimeout {
@@ -1950,7 +2011,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return fail.Wrap(xerr, "failed to update Keypair")
+		return fail.Wrap(xerr, "failed to update Keypair of machine '%s'", instance.GetName())
 	}
 
 	xerr = instance.updateCachedInformation()
@@ -1959,19 +2020,18 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
-	logrus.Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
-
 	waitingTime := temporal.MaxTimeout(4*time.Minute, temporal.GetHostCreationTimeout())
+	// If the script doesn't reboot, we force a reboot
+	if !instance.thePhaseReboots(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent) {
+		logrus.Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
 
-	// Reboot Host
-	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
-	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
-	defer cancelReboot()
-	_, _, _, xerr = instance.unsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
-	if xerr != nil {
-		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
+		// Reboot Host
+		xerr = instance.Reboot(ctx, true)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 	}
-	time.Sleep(temporal.GetDefaultDelay())
 
 	_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, 0)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1983,33 +2043,34 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	// to fix possible system issues and finalize Host creation.
 	// For a gateway, userdata.PHASE3 to 5 have to be run explicitly (cf. operations/subnet.go)
 	if !userdataContent.IsGateway {
-		// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
-		xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, waitingTime)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			theCause := fail.ConvertError(fail.Cause(xerr))
-			if _, ok := theCause.(*fail.ErrTimeout); !ok || theCause.IsNull() {
+		if instance.thePhaseDoesSomething(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent) {
+			// execute userdata.PHASE4_SYSTEM_FIXES script to fix possible misconfiguration in system
+			xerr = instance.runInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, userdataContent, waitingTime)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				theCause := fail.ConvertError(fail.Cause(xerr))
+				if _, ok := theCause.(*fail.ErrTimeout); !ok || theCause.IsNull() {
+					return xerr
+				}
+
+				debug.IgnoreError(xerr)
+			}
+
+			// Reboot Host
+			logrus.Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
+			xerr = instance.Reboot(ctx, true)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
 				return xerr
 			}
 
-			debug.IgnoreError(xerr)
-		}
-
-		// Reboot Host
-		logrus.Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
-		command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
-		rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
-		defer cancelReboot()
-		_, _, _, xerr = instance.unsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
-		if xerr != nil {
-			logrus.Debugf("there was an error sending the reboot command: %v", xerr)
-		}
-		time.Sleep(temporal.GetDefaultDelay())
-
-		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, 0)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			return xerr
+			_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE4_SYSTEM_FIXES, 0)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+		} else {
+			logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
 		}
 
 		// execute userdata.PHASE5_FINAL script to final install/configure of the Host (no need to reboot)
@@ -3072,6 +3133,7 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 	// Invalidate Cache
 	_ = hostCache.FreeEntry(hostID)
 
+	// FIXME: It has to TRY to run a sync first, if it fails, we log it and continue stopping the host
 	xerr = svc.StopHost(hostID, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3115,8 +3177,52 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 }
 
 // Reboot reboots the Host
-func (instance *Host) Reboot(ctx context.Context) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *Host) Reboot(ctx context.Context, soft bool) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	if soft {
+		xerr := instance.softReboot(ctx)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			logrus.Warnf("Soft reboot failed, trying the hard way: %v", xerr)
+			xerr = instance.hardReboot(ctx)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+			return nil
+		}
+		return nil
+	}
+
+	xerr := instance.hardReboot(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+	return nil
+}
+
+func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	waitingTime := 4 * time.Minute // FIXME: Hardcoded
+
+	// Reboot Host
+	logrus.Infof("finalizing Host provisioning of '%s' (not-gateway): rebooting", instance.GetName())
+	command := `echo "sleep 4 ; sync ; sudo systemctl reboot" | at now`
+	rebootCtx, cancelReboot := context.WithTimeout(ctx, waitingTime)
+	defer cancelReboot()
+	_, _, _, xerr := instance.unsafeRun(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
+	if xerr != nil {
+		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
+	}
+	time.Sleep(temporal.GetDefaultDelay())
+	return nil
+}
+
+// HardReboot reboots the Host
+func (instance *Host) hardReboot(ctx context.Context) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -3151,7 +3257,14 @@ func (instance *Host) Reboot(ctx context.Context) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-	return instance.Start(ctx)
+
+	xerr = instance.Start(ctx)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // Resize ...
