@@ -170,6 +170,7 @@ func (w *worker) CanProceed(ctx context.Context, s resources.FeatureSettings) fa
 	switch w.target.TargetType() {
 	case featuretargettype.Cluster:
 		xerr := w.validateContextForCluster()
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr == nil && !s.SkipSizingRequirements {
 			xerr = w.validateClusterSizing(ctx)
 		}
@@ -260,6 +261,7 @@ func (w *worker) extractHostsFailingCheck(ctx context.Context, hosts []resources
 		res[h] = r
 		go func(host resources.Host, res chan resources.Results, done chan fail.Error) {
 			r2, innerXErr := w.feature.Check(ctx, host, w.variables, settings)
+			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				res <- nil
 				done <- innerXErr
@@ -291,7 +293,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []resources.Host{}
-		masters, xerr := w.cluster.ListMasterIDs(ctx)
+		masters, xerr := w.cluster.unsafeListMasterIDs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -378,6 +380,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		}
 
 		gw, xerr := subnetInstance.InspectGateway(true)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr == nil {
 			_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
 		}
@@ -470,6 +473,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 	defer rs.Released() // mark the instance as released at the end of the function, for cache considerations
 
 	gw, xerr := rs.InspectGateway(true)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr == nil {
 		if _, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout()); xerr == nil {
 			list = append(list, gw)
@@ -841,8 +845,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		YamlKey: p.stepKey,
 		Serial:  serial,
 	}
-	r, xerr := stepInstance.Run(task, p.hosts, p.variables, w.settings)
-	// If an error occurred, do not execute the remaining steps, fail immediately
+	r, xerr := stepInstance.Run(task, p.hosts, p.variables, w.settings) // If an error occurred, do not execute the remaining steps, fail immediately
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -961,7 +964,7 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 			return xerr
 		}
 
-		masters, xerr := w.cluster.ListMasterIDs(ctx)
+		masters, xerr := w.cluster.unsafeListMasterIDs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -984,7 +987,7 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 			return xerr
 		}
 
-		list, xerr := w.cluster.ListNodeIDs(ctx)
+		list, xerr := w.cluster.unsafeListNodeIDs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1127,6 +1130,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			primaryGatewayVariables["Hostname"] = h.GetName() + domain
 
 			tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/proxy/rule/"))
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -1365,6 +1369,7 @@ func normalizeScript(params *data.Map, reserved data.Map) (string, fail.Error) {
 	}
 
 	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}
