@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSubnet_Clone(t *testing.T) {
@@ -33,6 +34,7 @@ func TestSubnet_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, s, sc)
+	require.EqualValues(t, s, sc)
 	sc.Domain = "net.local"
 
 	areEqual := reflect.DeepEqual(s, sc)
@@ -40,4 +42,5 @@ func TestSubnet_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, s, sc)
 }

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHostNetwork_Clone(t *testing.T) {
@@ -39,6 +40,7 @@ func TestHostNetwork_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
+	require.EqualValues(t, ct, clonedCt)
 	clonedCt.NetworksByID["id2"] = "subnet2"
 	clonedCt.NetworksByName["subnet2"] = "id2"
 
@@ -47,4 +49,5 @@ func TestHostNetwork_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }

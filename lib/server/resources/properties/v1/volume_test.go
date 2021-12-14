@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVolumeAttachments_Clone(t *testing.T) {
@@ -34,6 +35,7 @@ func TestVolumeAttachments_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
+	require.EqualValues(t, ct, clonedCt)
 	clonedCt.Hosts["id2"] = "host2"
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
@@ -41,4 +43,5 @@ func TestVolumeAttachments_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }

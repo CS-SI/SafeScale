@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClusterInstalledFeature_Clone(t *testing.T) {
@@ -33,6 +34,7 @@ func TestClusterInstalledFeature_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
+	require.EqualValues(t, ct, clonedCt)
 
 	clonedCt.RequiredBy["other"] = struct{}{}
 
@@ -41,6 +43,7 @@ func TestClusterInstalledFeature_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }
 
 func TestFeatures_Clone(t *testing.T) {
@@ -55,6 +58,7 @@ func TestFeatures_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
+	require.EqualValues(t, ct, clonedCt)
 	clonedCt.Installed["fair"].Requires = map[string]struct{}{"commitment": {}}
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
@@ -62,4 +66,5 @@ func TestFeatures_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }

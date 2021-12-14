@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
 )
@@ -35,6 +36,7 @@ func TestState_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
+	require.EqualValues(t, ct, clonedCt)
 	clonedCt.State = clusterstate.Error
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
@@ -42,4 +44,5 @@ func TestState_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }
