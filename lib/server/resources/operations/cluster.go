@@ -1530,8 +1530,8 @@ func (instance *Cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 	}
 
 	// make sure no other parallel actions interferes
-	instance.lock.RLock()
-	defer instance.lock.RUnlock()
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
 
 	return instance.unsafeListMasterIDs(ctx)
 }
