@@ -91,8 +91,8 @@ type stack struct {
 	VolumeSpeedsMap      map[string]volumespeed.Enum
 	configurationOptions *stacks.ConfigurationOptions
 	deviceNames          []string
-
-	vpc *abstract.Network
+	templates            []abstract.HostTemplate
+	vpc                  *abstract.Network
 }
 
 // NullStack returns a null value of the stack
@@ -157,6 +157,8 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
 		},
 		auth: auth,
 	}
+	s.buildTemplateList()
+
 	return &s, s.initDefaultNetwork()
 }
 
