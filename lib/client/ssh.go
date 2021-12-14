@@ -111,6 +111,12 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 				}
 			}
 
+			if retcode == 255 { // ssh connection drop
+				return fail.NotAvailableError(
+					"Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname,
+				)
+			}
+
 			return nil
 		},
 		temporal.GetMinDelay(),
