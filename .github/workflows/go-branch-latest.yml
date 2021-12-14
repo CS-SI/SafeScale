@@ -1,10 +1,12 @@
-name: Latest Go Build CI
+name: Latest Go Build Features CI
 
 on:
   push:
-    branches: [ develop ]
+    branches:
+      - '*/*'       # usually features
   pull_request:
-    branches: [ develop ]
+    branches:
+      - '*/*'       # usually features
 
 env:
   GOVERSION: '1.17.4' # The Go version to download (if necessary) and use.
@@ -30,7 +32,7 @@ jobs:
         sudo chmod a+r -R /opt/protoc
         sudo chmod a+xr /opt/protoc/bin/protoc
         sudo ln -s /opt/protoc/bin/protoc /usr/local/bin/
-    - run: make all
+    - run: make all test
     - uses: actions/upload-artifact@v2
       if: failure()
       with:
