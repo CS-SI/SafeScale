@@ -225,7 +225,17 @@ func (sgr *SecurityGroupRule) Validate() fail.Error {
 
 // NewSecurityGroupRule creates an abstract.SecurityGroupRule
 func NewSecurityGroupRule() *SecurityGroupRule {
-	return &SecurityGroupRule{}
+	return &SecurityGroupRule{
+		IDs:         make([]string, 0),
+		Description: "",
+		EtherType:   ipversion.IPv6,
+		Direction:   securitygroupruledirection.Ingress,
+		Protocol:    "icmp",
+		PortFrom:    0,
+		PortTo:      0,
+		Sources:     make([]string, 0),
+		Targets:     make([]string, 0),
+	}
 }
 
 // Clone does a deep-copy of the SecurityGroup
@@ -249,6 +259,8 @@ func (sgr *SecurityGroupRule) Replace(p data.Clonable) data.Clonable {
 	copy(sgr.IDs, src.IDs)
 	sgr.Sources = make([]string, len(src.Sources))
 	copy(sgr.Sources, src.Sources)
+	sgr.Targets = make([]string, len(src.Targets))
+	copy(sgr.Targets, src.Targets)
 	return sgr
 }
 
@@ -277,6 +289,17 @@ func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (i
 		return -1, fail.NotFoundError("no corresponding rule found")
 	}
 	return index, nil
+}
+
+// Clone does a deep-copy of the SecurityGroupRules
+func (sgrs SecurityGroupRules) Clone() SecurityGroupRules {
+	var asgr SecurityGroupRules = make(SecurityGroupRules, 0)
+	var cloneRule *SecurityGroupRule
+	for _, v := range sgrs {
+		cloneRule = v.Clone().(*SecurityGroupRule)
+		asgr = append(asgr, cloneRule)
+	}
+	return asgr
 }
 
 // IndexOfRuleByID returns the index of the rule containing the provider rule ID provided
@@ -377,8 +400,15 @@ func (sg *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 
 // NewSecurityGroup ...
 func NewSecurityGroup() *SecurityGroup {
-	var asg SecurityGroup = SecurityGroup{}
-	asg.Rules = make(SecurityGroupRules, 0)
+	var asg SecurityGroup = SecurityGroup{
+		ID:               "",
+		Name:             "",
+		Network:          "",
+		Description:      "",
+		Rules:            make(SecurityGroupRules, 0),
+		DefaultForSubnet: "",
+		DefaultForHost:   "",
+	}
 	return &asg
 }
 
@@ -395,17 +425,9 @@ func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 	if sg == nil || p == nil {
 		return sg
 	}
-
 	src := p.(*SecurityGroup)
 	*sg = *src
-	var cloneRule *SecurityGroupRule
-	var cloneRules SecurityGroupRules = make(SecurityGroupRules, 0)
-	for _, v := range src.Rules {
-		cloneRule = v.Clone().(*SecurityGroupRule)
-		cloneRules = append(cloneRules, cloneRule)
-	}
-	sg.Rules = cloneRules
-
+	sg.Rules = src.Rules.Clone()
 	return sg
 }
 

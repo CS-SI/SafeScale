@@ -874,15 +874,15 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		rule := abstract.SecurityGroupRule{
-			Description: c.String("description"),
-			EtherType:   etherType,
-			Direction:   direction,
-			Protocol:    c.String("protocol"),
-			PortFrom:    int32(c.Int("port-from")),
-			PortTo:      int32(c.Int("port-to")),
-			Targets:     c.StringSlice("cidr"),
-		}
+		rule := abstract.NewSecurityGroupRule()
+		rule.Description = c.String("description")
+		rule.EtherType = etherType
+		rule.Direction = direction
+		rule.Protocol = c.String("protocol")
+		rule.PortFrom = int32(c.Int("port-from"))
+		rule.PortTo = int32(c.Int("port-to"))
+		rule.Targets = c.StringSlice("cidr")
+
 		switch rule.Direction {
 		case securitygroupruledirection.Ingress:
 			rule.Sources = c.StringSlice("cidr")
@@ -978,13 +978,13 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		rule := abstract.SecurityGroupRule{
-			EtherType: etherType,
-			Direction: direction,
-			Protocol:  c.String("protocol"),
-			PortFrom:  int32(c.Int("port-from")),
-			PortTo:    int32(c.Int("port-to")),
-		}
+		rule := abstract.NewSecurityGroupRule()
+		rule.EtherType = etherType
+		rule.Direction = direction
+		rule.Protocol = c.String("protocol")
+		rule.PortFrom = int32(c.Int("port-from"))
+		rule.PortTo = int32(c.Int("port-to"))
+
 		switch rule.Direction {
 		case securitygroupruledirection.Ingress:
 			rule.Sources = c.StringSlice("cidr")

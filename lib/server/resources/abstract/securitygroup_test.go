@@ -46,13 +46,13 @@ func TestSecurityGroup_Clone(t *testing.T) {
 		t.Fail()
 	}
 
-	sg.Rules = append(sg.Rules, &SecurityGroupRule{
-		Description: "run for cover",
-	})
+	sgr := NewSecurityGroupRule()
+	sgr.Description = "run for cover"
+	sg.Rules = append(sg.Rules, sgr)
 
-	sg.Rules = append(sg.Rules, &SecurityGroupRule{
-		Description: "the road is long",
-	})
+	sgr = NewSecurityGroupRule()
+	sgr.Description = "the road is long"
+	sg.Rules = append(sg.Rules, sgr)
 
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "don't")
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "look")
@@ -83,12 +83,13 @@ func TestSecurityGroup_Replace(t *testing.T) {
 	sg := NewSecurityGroup()
 	sg.Name = "securitygroup"
 
-	sg.Rules = append(sg.Rules, &SecurityGroupRule{
-		Description: "run for cover",
-	})
-	sg.Rules = append(sg.Rules, &SecurityGroupRule{
-		Description: "the road is long",
-	})
+	sgr := NewSecurityGroupRule()
+	sgr.Description = "run for cover"
+	sg.Rules = append(sg.Rules, sgr)
+
+	sgr = NewSecurityGroupRule()
+	sgr.Description = "run for cover"
+	sg.Rules = append(sg.Rules, sgr)
 
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "don't")
 	sg.Rules[0].Sources = append(sg.Rules[0].Sources, "look")
@@ -122,9 +123,17 @@ func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
 	sg := NewSecurityGroup()
 	sg.Name = "securitygroup"
 
-	sg.Rules = append(sg.Rules, &SecurityGroupRule{Description: "Rule 1"})
-	sg.Rules = append(sg.Rules, &SecurityGroupRule{Description: "Rule 2"})
-	sg.Rules = append(sg.Rules, &SecurityGroupRule{Description: "Rule 3"})
+	sgr := NewSecurityGroupRule()
+	sgr.Description = "Rule 1"
+	sg.Rules = append(sg.Rules, sgr)
+
+	sgr = NewSecurityGroupRule()
+	sgr.Description = "Rule 2"
+	sg.Rules = append(sg.Rules, sgr)
+
+	sgr = NewSecurityGroupRule()
+	sgr.Description = "Rule 3"
+	sg.Rules = append(sg.Rules, sgr)
 
 	var err fail.Error
 	err = sg.RemoveRuleByIndex(0)
