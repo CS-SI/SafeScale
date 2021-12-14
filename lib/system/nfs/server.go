@@ -57,7 +57,10 @@ func (s *Server) Install(ctx context.Context) fail.Error {
 }
 
 // AddShare configures a local path to be exported by NFS
-func (s *Server) AddShare(ctx context.Context, path string, options string /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/) fail.Error {
+func (s *Server) AddShare(
+	ctx context.Context, path string,
+	options string, /*securityModes []string, readOnly, rootSquash, secure, async, noHide, crossMount, subtreeCheck bool*/
+) fail.Error {
 	// FIXME: validate parameters
 
 	share, xerr := NewShare(s, path, options)
@@ -117,7 +120,9 @@ func (s *Server) RemoveShare(ctx context.Context, path string) fail.Error {
 }
 
 // MountBlockDevice mounts a block device in the remote system
-func (s *Server) MountBlockDevice(ctx context.Context, deviceName, mountPoint, format string, doNotFormat bool) (string, fail.Error) {
+func (s *Server) MountBlockDevice(
+	ctx context.Context, deviceName, mountPoint, format string, doNotFormat bool,
+) (string, fail.Error) {
 	data := map[string]interface{}{
 		"Device":      deviceName,
 		"MountPoint":  mountPoint,
@@ -152,9 +157,9 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 
 	// FIXME: Add a retry here only if we catch an executionerror of a connection error
 	rerr := retry.WhileUnsuccessfulWithLimitedRetries(func() error {
-		istdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
+		stdout, xerr := executeScript(ctx, *s.SSHConfig, "block_device_unmount.sh", data)
 		if xerr != nil {
-			xerr.Annotate("stdout", istdout)
+			xerr.Annotate("stdout", stdout)
 			return fail.Wrap(xerr, "error executing script to unmount block device")
 		}
 		return nil
@@ -162,5 +167,6 @@ func (s *Server) UnmountBlockDevice(ctx context.Context, volumeUUID string) fail
 	if rerr != nil {
 		return fail.Wrap(rerr, "error executing script to unmount block device")
 	}
+
 	return nil
 }
