@@ -18,10 +18,14 @@ package abstract
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSecurityGroup_Clone(t *testing.T) {
@@ -59,6 +63,10 @@ func TestSecurityGroup_Clone(t *testing.T) {
 		t.Fail()
 	}
 
+	// If we are cloning right, the 'value' (ignoring pointer memory addresses) of both sg and sgc should be the same
+	require.EqualValues(t, *sg, *sgc)
+
+	// then, if we modify one of the two clones, the other should NOT be modified, because Clone should create an INDEPENDENT copy
 	sg.Rules[0].Sources[0] = "do"
 
 	areEqual = reflect.DeepEqual(*sg, *sgc)
@@ -66,6 +74,9 @@ func TestSecurityGroup_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+
+	// and finally, make sure are NOT equal after modifying one and not the other
+	require.NotEqualValues(t, *sg, *sgc)
 }
 
 func TestSecurityGroup_Replace(t *testing.T) {
@@ -85,13 +96,25 @@ func TestSecurityGroup_Replace(t *testing.T) {
 
 	sgc := NewSecurityGroup()
 	sgcr := sgc.Replace(sg)
-	assert.Equal(t, sgc, sgcr)
 
-	areEqual := reflect.DeepEqual(*sg, *(sgcr.(*SecurityGroup)))
+	assert.Equal(t, sgc, sgcr)
+	var clob data.Clonable
+	clob = sg
+	require.EqualValues(t, clob, sgcr)
+
+	areEqual := reflect.DeepEqual(&sg, sgcr.(*SecurityGroup))
 	if areEqual {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+
+	sg.Rules[0].Sources[0] = "found"
+	if strings.Contains(spew.Sdump(sgcr), "found") {
+		t.Error("It's a shallow clone !")
+		t.Fail()
+	}
+
+	require.NotEqualValues(t, clob, sgcr)
 }
 
 func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
