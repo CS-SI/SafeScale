@@ -41,6 +41,8 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
+const maxMemorySize int = 1039
+
 func normalizeImageName(name string) string {
 	if len(name) == 0 {
 		return name
@@ -208,36 +210,40 @@ func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, xerr fail.Error) 
 	tracer := debug.NewTracer(nil, true /*tracing.ShouldTrace("stacks.compute") || tracing.ShouldTrace("stack.outscale")*/).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
+	templates := make([]abstract.HostTemplate, len(s.templates))
+	_ = copy(templates, s.templates)
+	return templates, nil
+}
+
+func (s *stack) buildTemplateList() {
 	// without GPU
 	cpus := intRange(1, 78, 1)
 	ramPerCore := intRange(1, 16, 1)
 	perfLevels := []int{1, 2, 3}
-	var templates []abstract.HostTemplate
+
 	for _, cpu := range cpus {
 		for _, ramCore := range ramPerCore {
 			for _, perf := range perfLevels {
 				ram := cpu * ramCore
 				// Outscale maximum memory size
-				if ram > 1039 {
+				if ram > maxMemorySize {
 					break
 				}
+
 				name := gpuTemplateName(0, cpu, ram, perf, 0, "")
-				templates = append(
-					templates, abstract.HostTemplate{
-						DiskSize: 0,
-						Name:     name,
-						Cores:    cpu,
-						RAMSize:  float32(ram),
-						ID:       name,
-
-						CPUFreq:   s.cpuFreq(perf),
-						GPUNumber: 0,
-					},
-				)
+				s.templates = append(s.templates, abstract.HostTemplate{
+					DiskSize:  0,
+					Name:      name,
+					Cores:     cpu,
+					RAMSize:   float32(ram),
+					ID:        name,
+					CPUFreq:   s.cpuFreq(perf),
+					GPUNumber: 0,
+				})
 			}
-
 		}
 	}
+
 	// instances with gpu https://wiki.outscale.net/pages/viewpage.action?pageId=49023126
 	// with nvidia-k2 GPU
 	gpus := intRange(1, 8, 2)
@@ -247,25 +253,22 @@ func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, xerr fail.Error) 
 				for _, perf := range perfLevels {
 					ram := cpu * ramCore
 					// Outscale maximum memory size
-					if ram > 1039 {
+					if ram > maxMemorySize {
 						break
 					}
-					//
-					name := gpuTemplateName(3, cpu, ram, perf, gpu, "nvidia-k2")
-					templates = append(
-						templates, abstract.HostTemplate{
-							DiskSize:  0,
-							Name:      name,
-							Cores:     cpu,
-							RAMSize:   float32(ram),
-							CPUFreq:   s.cpuFreq(perf),
-							ID:        name,
-							GPUNumber: gpu,
-							GPUType:   "nvidia-k2",
-						},
-					)
-				}
 
+					name := gpuTemplateName(3, cpu, ram, perf, gpu, "nvidia-k2")
+					s.templates = append(s.templates, abstract.HostTemplate{
+						DiskSize:  0,
+						Name:      name,
+						Cores:     cpu,
+						RAMSize:   float32(ram),
+						CPUFreq:   s.cpuFreq(perf),
+						ID:        name,
+						GPUNumber: gpu,
+						GPUType:   "nvidia-k2",
+					})
+				}
 			}
 		}
 	}
@@ -277,23 +280,21 @@ func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, xerr fail.Error) 
 				for _, perf := range perfLevels {
 					ram := cpu * ramCore
 					// Outscale maximum memory size
-					if ram > 1039 {
+					if ram > maxMemorySize {
 						break
 					}
-					//
+
 					name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p6")
-					templates = append(
-						templates, abstract.HostTemplate{
-							DiskSize:  0,
-							Name:      name,
-							Cores:     cpu,
-							RAMSize:   float32(ram),
-							CPUFreq:   s.cpuFreq(perf),
-							ID:        name,
-							GPUNumber: gpu,
-							GPUType:   "nvidia-p6",
-						},
-					)
+					s.templates = append(s.templates, abstract.HostTemplate{
+						DiskSize:  0,
+						Name:      name,
+						Cores:     cpu,
+						RAMSize:   float32(ram),
+						CPUFreq:   s.cpuFreq(perf),
+						ID:        name,
+						GPUNumber: gpu,
+						GPUType:   "nvidia-p6",
+					})
 				}
 			}
 		}
@@ -306,29 +307,25 @@ func (s stack) ListTemplates(bool) (_ []abstract.HostTemplate, xerr fail.Error) 
 				for _, perf := range perfLevels {
 					ram := cpu * ramCore
 					// Outscale maximum memory size
-					if ram > 1039 {
+					if ram > maxMemorySize {
 						break
 					}
-					//
+
 					name := gpuTemplateName(5, cpu, ram, perf, gpu, "nvidia-p100")
-					templates = append(
-						templates, abstract.HostTemplate{
-							DiskSize:  0,
-							Name:      name,
-							Cores:     cpu,
-							RAMSize:   float32(ram),
-							CPUFreq:   s.cpuFreq(perf),
-							ID:        name,
-							GPUNumber: gpu,
-							GPUType:   "nvidia-p100",
-						},
-					)
+					s.templates = append(s.templates, abstract.HostTemplate{
+						DiskSize:  0,
+						Name:      name,
+						Cores:     cpu,
+						RAMSize:   float32(ram),
+						CPUFreq:   s.cpuFreq(perf),
+						ID:        name,
+						GPUNumber: gpu,
+						GPUType:   "nvidia-p100",
+					})
 				}
 			}
 		}
 	}
-
-	return templates, nil
 }
 
 // InspectImage returns the Image referenced by id
@@ -508,7 +505,9 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 // - *retry.ErrTimeout: when the timeout is reached
 // - *retry.ErrStopRetry: when a breaking error arises; fail.Cause(xerr) contains the real error encountered
 // - fail.Error: any other errors
-func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
+func (s stack) WaitHostState(
+	hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration,
+) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAHC := abstract.NewHostCore()
 	if s.IsNull() {
 		return nullAHC, fail.InvalidInstanceError()
@@ -701,7 +700,9 @@ func (s stack) addPublicIP(nic osc.Nic) (_ osc.PublicIp, ferr fail.Error) {
 	return resp, nil
 }
 
-func (s stack) setHostProperties(ahf *abstract.HostFull, subnets []*abstract.Subnet, vm osc.Vm, nics []osc.Nic) fail.Error {
+func (s stack) setHostProperties(
+	ahf *abstract.HostFull, subnets []*abstract.Subnet, vm osc.Vm, nics []osc.Nic,
+) fail.Error {
 	vmType, xerr := s.InspectTemplate(vm.VmType)
 	if xerr != nil {
 		return xerr
@@ -753,7 +754,9 @@ func (s stack) setHostProperties(ahf *abstract.HostFull, subnets []*abstract.Sub
 	return nil
 }
 
-func (s stack) initHostProperties(request *abstract.HostRequest, host *abstract.HostFull, udc userdata.Content) fail.Error {
+func (s stack) initHostProperties(
+	request *abstract.HostRequest, host *abstract.HostFull, udc userdata.Content,
+) fail.Error {
 	defaultSubnet := func() *abstract.Subnet {
 		if len(request.Subnets) == 0 {
 			return nil
@@ -1296,7 +1299,9 @@ func (s stack) perfFromFreq(freq float32) int {
 }
 
 // ResizeHost Resize host
-func (s stack) ResizeHost(hostParam stacks.HostParameter, sizing abstract.HostSizingRequirements) (ahf *abstract.HostFull, xerr fail.Error) {
+func (s stack) ResizeHost(
+	hostParam stacks.HostParameter, sizing abstract.HostSizingRequirements,
+) (ahf *abstract.HostFull, xerr fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
@@ -1322,7 +1327,9 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, sizing abstract.HostSi
 }
 
 // BindSecurityGroupToHost ...
-func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) BindSecurityGroupToHost(
+	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
+) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1367,7 +1374,9 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 }
 
 // UnbindSecurityGroupFromHost ...
-func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(
+	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
+) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}

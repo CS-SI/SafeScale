@@ -277,7 +277,9 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 
 // WaitVolumeState waits a host achieve state
 // If timeout is reached, returns utils.ErrTimeout
-func (svc service) WaitVolumeState(volumeID string, state volumestate.Enum, timeout time.Duration) (*abstract.Volume, fail.Error) {
+func (svc service) WaitVolumeState(
+	volumeID string, state volumestate.Enum, timeout time.Duration,
+) (*abstract.Volume, fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -309,7 +311,9 @@ func (svc service) WaitVolumeState(volumeID string, state volumestate.Enum, time
 	}
 }
 
-func pollVolume(svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume) {
+func pollVolume(
+	svc service, volumeID string, state volumestate.Enum, cout chan int, next chan bool, hostc chan *abstract.Volume,
+) {
 	for {
 		v, err := svc.InspectVolume(volumeID)
 		if err != nil {
@@ -401,7 +405,9 @@ func (svc service) FindTemplateBySizing(sizing abstract.HostSizingRequirements) 
 }
 
 // reduceTemplates filters from template slice the entries satisfying whitelist and blacklist regexps
-func (svc service) reduceTemplates(tpls []abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp) []abstract.HostTemplate {
+func (svc service) reduceTemplates(
+	tpls []abstract.HostTemplate, whitelistREs, blacklistREs []*regexp.Regexp,
+) []abstract.HostTemplate {
 	var finalFilter *templatefilters.Filter
 	if len(whitelistREs) > 0 {
 		// finalFilter = templatefilters.NewFilter(filterTemplatesByRegexSlice(svc.whitelistTemplateREs))
@@ -435,7 +441,9 @@ func filterTemplatesByRegexSlice(res []*regexp.Regexp) templatefilters.Predicate
 
 // ListTemplatesBySizing select templates satisfying sizing requirements
 // returned list is ordered by size fitting
-func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements, force bool) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
+func (svc service) ListTemplatesBySizing(
+	sizing abstract.HostSizingRequirements, force bool,
+) (selectedTpls []*abstract.HostTemplate, rerr fail.Error) {
 	if svc.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -617,27 +625,27 @@ func (svc service) ListTemplatesBySizing(sizing abstract.HostSizingRequirements,
 		)
 		msg += " %s"
 		if sizing.MinCores > 0 && t.Cores < sizing.MinCores {
-			logrus.Debugf(msg, "not enough cores")
+			logrus.Tracef(msg, "not enough cores")
 			continue
 		}
 		if sizing.MaxCores > 0 && t.Cores > sizing.MaxCores {
-			logrus.Debugf(msg, "too many cores")
+			logrus.Tracef(msg, "too many cores")
 			continue
 		}
 		if sizing.MinRAMSize > 0.0 && t.RAMSize < sizing.MinRAMSize {
-			logrus.Debugf(msg, "not enough RAM")
+			logrus.Tracef(msg, "not enough RAM")
 			continue
 		}
 		if sizing.MaxRAMSize > 0.0 && t.RAMSize > sizing.MaxRAMSize {
-			logrus.Debugf(msg, "too many RAM")
+			logrus.Tracef(msg, "too many RAM")
 			continue
 		}
 		if t.DiskSize > 0 && sizing.MinDiskSize > 0 && t.DiskSize < sizing.MinDiskSize {
-			logrus.Debugf(msg, "not enough disk")
+			logrus.Tracef(msg, "not enough disk")
 			continue
 		}
 		if (sizing.MinGPU <= 0 && t.GPUNumber > 0) || (sizing.MinGPU > 0 && t.GPUNumber > sizing.MinGPU) {
-			logrus.Debugf(msg, "too many GPU")
+			logrus.Tracef(msg, "too many GPU")
 			continue
 		}
 
@@ -896,7 +904,9 @@ func (svc service) TenantCleanup(force bool) fail.Error {
 }
 
 // LookupRuleInSecurityGroup checks if a rule is already in Security Group rules
-func (svc service) LookupRuleInSecurityGroup(asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule) (bool, fail.Error) {
+func (svc service) LookupRuleInSecurityGroup(
+	asg *abstract.SecurityGroup, rule *abstract.SecurityGroupRule,
+) (bool, fail.Error) {
 	if asg.IsNull() {
 		return false, fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
