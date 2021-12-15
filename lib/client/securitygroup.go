@@ -166,7 +166,7 @@ func (sg securityGroup) Reset(ref string, timeout time.Duration) error {
 }
 
 // AddRule ...
-func (sg securityGroup) AddRule(group string, rule abstract.SecurityGroupRule, duration time.Duration) error {
+func (sg securityGroup) AddRule(group string, rule *abstract.SecurityGroupRule, duration time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -185,7 +185,7 @@ func (sg securityGroup) AddRule(group string, rule abstract.SecurityGroupRule, d
 }
 
 // DeleteRule ...
-func (sg securityGroup) DeleteRule(group string, rule abstract.SecurityGroupRule, duration time.Duration) error {
+func (sg securityGroup) DeleteRule(group string, rule *abstract.SecurityGroupRule, duration time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 

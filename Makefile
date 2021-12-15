@@ -328,6 +328,7 @@ mintest: begin
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
@@ -338,6 +339,7 @@ precommittest: begin
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
@@ -346,6 +348,7 @@ test: begin coverdeps # Run unit tests
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/utils/... -p 1 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 2>&1 >> test_results.log || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
