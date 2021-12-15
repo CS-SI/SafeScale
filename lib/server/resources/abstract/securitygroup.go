@@ -345,6 +345,7 @@ func (sg *SecurityGroup) RemoveRuleByIndex(index int) fail.Error {
 	return nil
 }
 
+// SecurityGroup represents a security group
 // Note: by design, security group names must be unique tenant-wide
 type SecurityGroup struct {
 	ID               string             `json:"id"`                    // ID of the group
