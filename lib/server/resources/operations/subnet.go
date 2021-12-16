@@ -235,7 +235,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 
 			if an.Name == networkRef || an.ID == networkRef {
 				// We are in default Network context, query Subnet list and search for the one requested
-				list, xerr := ListSubnets(context.TODO(), svc, an.ID, false)
+				list, xerr := ListSubnets(context.Background(), svc, an.ID, false)
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					return nil, xerr

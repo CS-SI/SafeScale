@@ -187,12 +187,12 @@ func (w *worker) CanProceed(ctx context.Context, s resources.FeatureSettings) fa
 
 // identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
-func (w *worker) identifyAvailableMaster() (_ resources.Host, xerr fail.Error) {
+func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host, xerr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		w.availableMaster, xerr = w.cluster.unsafeFindAvailableMaster(context.TODO())
+		w.availableMaster, xerr = w.cluster.unsafeFindAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -202,12 +202,12 @@ func (w *worker) identifyAvailableMaster() (_ resources.Host, xerr fail.Error) {
 }
 
 // identifyAvailableNode finds a node available and will use this one during all the install session
-func (w *worker) identifyAvailableNode() (_ resources.Host, xerr fail.Error) {
+func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, xerr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		w.availableNode, xerr = w.cluster.unsafeFindAvailableNode(context.TODO())
+		w.availableNode, xerr = w.cluster.unsafeFindAvailableNode(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -1253,7 +1253,7 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	ruleName, xerr := p.controller.Apply(p.rule, p.variables)
+	ruleName, xerr := p.controller.Apply(task.Context(), p.rule, p.variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		msg := "failed to apply proxy rule"
@@ -1290,7 +1290,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 
 	switch masterT {
 	case "1":
-		hostInstance, xerr := w.identifyAvailableMaster()
+		hostInstance, xerr := w.identifyAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -1311,7 +1311,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 
 	switch nodeT {
 	case "1":
-		hostInstance, xerr := w.identifyAvailableNode()
+		hostInstance, xerr := w.identifyAvailableNode(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
