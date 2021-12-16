@@ -173,16 +173,16 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 	}
 
 	wrapped := api.StackProxy{
-		InnerStack: stack,
-		Name:       "outscale",
+		FullStack: stack,
+		Name:      "outscale",
 	}
 
 	p.Stack = wrapped
 	p.tenantParameters = opt
 
 	wp := providers.ProviderProxy{
-		InnerProvider: p,
-		Name:          wrapped.Name,
+		Provider: p,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil

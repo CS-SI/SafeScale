@@ -72,6 +72,9 @@ type stack struct {
 
 	// selectedAvailabilityZone contains the last selected availability zone chosen
 	selectedAvailabilityZone string
+
+	stacks.Timeouts
+	stacks.Delays
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -288,6 +291,9 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 	if xerr != nil {
 		return stack{}, xerr
 	}
+
+	s.Timeouts = stacks.NewTimeouts()
+	s.Delays = stacks.NewDelays()
 
 	return s, nil
 }
@@ -734,7 +740,9 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // ResizeHost ...
-func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(
+	hostParam stacks.HostParameter, request abstract.HostSizingRequirements,
+) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
@@ -754,7 +762,9 @@ func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostS
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
+func (s stack) WaitHostState(
+	hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration,
+) (server *servers.Server, xerr fail.Error) {
 	nullServer := &servers.Server{}
 	if s.IsNull() {
 		return nullServer, fail.InvalidInstanceError()
@@ -889,7 +899,9 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to Host, returns *fail.ErrDuplicate
-func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) BindSecurityGroupToHost(
+	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
+) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -916,7 +928,9 @@ func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, ho
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(
+	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
+) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}

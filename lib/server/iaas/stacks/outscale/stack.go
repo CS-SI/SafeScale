@@ -82,7 +82,7 @@ type ConfigurationOptions struct {
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
 }
 
-// stack Outscale stack to adapt outscale IaaS API
+// stack implements Outscale IaaS API
 type stack struct {
 	Options              ConfigurationOptions
 	client               *osc.APIClient
@@ -93,6 +93,9 @@ type stack struct {
 	deviceNames          []string
 	templates            []abstract.HostTemplate
 	vpc                  *abstract.Network
+
+	stacks.Timeouts
+	stacks.Delays
 }
 
 // NullStack returns a null value of the stack
@@ -158,6 +161,9 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
 		auth: auth,
 	}
 	s.buildTemplateList()
+
+	s.Timeouts = stacks.NewTimeouts()
+	s.Delays = stacks.NewDelays()
 
 	return &s, s.initDefaultNetwork()
 }

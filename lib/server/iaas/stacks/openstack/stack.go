@@ -30,6 +30,9 @@ import (
 
 // stack contains the needs to operate on stack OpenStack
 type stack struct {
+	stacks.Timeouts
+	stacks.Delays
+
 	ComputeClient  *gophercloud.ServiceClient
 	NetworkClient  *gophercloud.ServiceClient
 	VolumeClient   *gophercloud.ServiceClient
@@ -60,7 +63,10 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and returns a stack pointer
-func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
+func New(
+	auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions,
+	serviceVersions map[string]string,
+) (*stack, fail.Error) { // nolint
 	if auth.DomainName == "" && auth.DomainID == "" {
 		auth.DomainName = "Default"
 	}
@@ -235,6 +241,9 @@ func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cf
 		}
 
 	}
+
+	s.Timeouts = stacks.NewTimeouts()
+	s.Delays = stacks.NewDelays()
 
 	return &s, nil
 }

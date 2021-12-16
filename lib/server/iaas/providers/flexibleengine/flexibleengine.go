@@ -203,8 +203,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	wrapped := api.StackProxy{
-		InnerStack: stack,
-		Name:       "flexibleengine",
+		FullStack: stack,
+		Name:      "flexibleengine",
 	}
 
 	newP := &provider{
@@ -213,8 +213,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	wp := providers.ProviderProxy{
-		InnerProvider: newP,
-		Name:          wrapped.Name,
+		Provider: newP,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil

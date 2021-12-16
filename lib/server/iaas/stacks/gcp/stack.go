@@ -38,6 +38,9 @@ type stack struct {
 	ComputeService *compute.Service
 
 	selfLinkPrefix string
+
+	stacks.Timeouts
+	stacks.Delays
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -71,7 +74,9 @@ func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail
 }
 
 // New Create and initialize a ClientAPI
-func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
+func New(
+	auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions,
+) (*stack, fail.Error) { // nolint
 	gcpStack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
@@ -95,6 +100,9 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cf
 
 	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID
 	// gcpStack.searchPrefix = `.*/projects/` + localCfg.ProjectID + `/global`
+
+	gcpStack.Timeouts = stacks.NewTimeouts()
+	gcpStack.Delays = stacks.NewDelays()
 
 	return gcpStack, nil
 }

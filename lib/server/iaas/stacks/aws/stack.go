@@ -43,6 +43,9 @@ type stack struct {
 	EC2Service     *ec2.EC2
 	SSMService     *ssm.SSM
 	PricingService *pricing.Pricing
+
+	stacks.Timeouts
+	stacks.Delays
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -77,7 +80,9 @@ func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail
 }
 
 // New creates and initializes an AWS stack
-func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (*stack, error) { // nolint
+func New(
+	auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions,
+) (*stack, error) { // nolint
 	if localCfg.Ec2Endpoint == "" {
 		localCfg.Ec2Endpoint = fmt.Sprintf("https://ec2.%s.amazonaws.com", localCfg.Region)
 	}
@@ -125,6 +130,9 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	stack.EC2Service = ec2.New(sec2, &aws.Config{})
 	stack.SSMService = ssm.New(sssm, &aws.Config{})
 	stack.PricingService = pricing.New(spricing, &aws.Config{})
+
+	stack.Timeouts = stacks.NewTimeouts()
+	stack.Delays = stacks.NewDelays()
 
 	return stack, nil
 }
