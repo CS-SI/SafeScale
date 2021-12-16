@@ -515,10 +515,11 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 }
 
 // controller controls the start, termination and possibly abortion of the action
-func (instance *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) fail.Error {
+func (instance *task) controller(action TaskAction, params TaskParameters, timeout time.Duration) (ferr fail.Error) {
 	if instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
+	defer fail.OnPanic(&ferr) // better safe than sorry
 
 	traceR := newTracer(instance, tracing.ShouldTrace("concurrency.task"))
 
@@ -526,7 +527,10 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 	instance.stats.controllerBegin = time.Now()
 	instance.lock.Unlock()
 
-	go func() {
+	go func() { // FIXME: this goroutine is isolated from the rest, what happens if run PANICS ?
+		var failure error
+		defer fail.OnPanic(&failure) // this prevents the os.Exit, but we lack communication outside the func -> the task will be unaware
+
 		instance.lock.Lock()
 		instance.stats.runBegin = time.Now()
 		instance.lock.Unlock()

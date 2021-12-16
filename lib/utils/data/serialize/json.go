@@ -150,9 +150,14 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		}
 		x.Properties[key] = item
 	}
-	clone := item.Clone()
 
-	xerr := clone.(*jsonProperty).Shielded.Inspect(inspector)
+	clone := item.Clone()
+	cloned, ok := clone.(*jsonProperty)
+	if !ok {
+		return fail.InconsistentError("clone is expected to be a *jsonProperty and it's not: %v", clone)
+	}
+
+	xerr := cloned.Shielded.Inspect(inspector)
 	if xerr != nil {
 		return xerr
 	}
