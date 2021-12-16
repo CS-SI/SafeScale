@@ -19,8 +19,10 @@
 
 package main
 
-import "github.com/sirupsen/logrus"
+import (
+	"github.com/sirupsen/logrus"
+)
 
 func expose() {
-	logrus.Warningf("Lazy bitch")
+	logrus.Debugf("Called expose function - release")
 }

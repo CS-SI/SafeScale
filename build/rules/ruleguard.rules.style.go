@@ -72,3 +72,13 @@ func failuresShouldBeXerrs(m dsl.Matcher) {
 		Where(m["err"].Text == "err" && m["err"].Type.Is("fail.Error") && m["x"].Text != "recover()").
 		Report("err variable shoud not be of type fail.Error, rename to xerr")
 }
+
+func removeDebugCode(m dsl.Matcher) {
+	m.Match(
+		"logrus.Warningf($*_, $*_)",
+		"logrus.Warning($*_, $x)",
+		"logrus.Warningf($*_)",
+		"logrus.Warning($*_)",
+	).
+		Report("REMOVE debug code before a release")
+}
