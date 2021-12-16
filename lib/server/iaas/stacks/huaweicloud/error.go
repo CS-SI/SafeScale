@@ -334,12 +334,6 @@ func reduceHuaweiAPIErrors(errcode int, code string, body map[string]interface{}
 
 // reduceHuaweicloudError ...
 func reduceHuaweicloudError(errcode int, in []byte) (ferr fail.Error) {
-	defer func() {
-		switch ferr.(type) { // nolint
-		case *fail.ErrRuntimePanic:
-			ferr = fail.InvalidRequestError(string(in))
-		}
-	}()
 	defer fail.OnPanic(&ferr)
 
 	var body map[string]interface{}

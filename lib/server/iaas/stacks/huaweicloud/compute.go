@@ -1235,10 +1235,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 							return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
 						}
 						// FIXME: capture more error types
-						switch commRetryErr.(type) { // nolint
+						switch commRetryErr.(type) {
 						case *fail.ErrNotFound:
 							resourcePresent = false
 							return nil
+						default:
 						}
 						return commRetryErr
 					},
