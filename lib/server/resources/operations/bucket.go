@@ -186,7 +186,7 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 	return nil
 }
 
-// Browse walks through Bucket metadata folder and executes a callback for each entries
+// Browse walks through Bucket metadata folder and executes a callback for each entry
 func (instance *bucket) Browse(
 	ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error,
 ) (outerr fail.Error) {
@@ -779,6 +779,7 @@ func (instance *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
 					return xerr
 				}
 
+				//goland:noinspection GoDeferInLoop
 				defer func(i resources.Host) { // nolint
 					i.Released()
 				}(hostInstance)

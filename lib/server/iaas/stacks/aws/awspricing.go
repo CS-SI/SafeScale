@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Attributes attributes of a compute instance
+// Attributes attributes of a computing instance
 type Attributes struct {
 	ClockSpeed                  string `json:"clockSpeed,omitempty"`
 	CurrentGeneration           string `json:"currentGeneration,omitempty"`

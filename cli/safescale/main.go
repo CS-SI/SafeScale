@@ -87,7 +87,8 @@ func main() {
 	app.Name = "safescale"
 	app.Usage = "safescale COMMAND"
 	app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
-	if len(Tags) > 1 { // nolint
+	if              //goland:noinspection GoBoolExpressions
+	len(Tags) > 1 { // nolint
 		app.Version += fmt.Sprintf(", with Tags: (%s)", Tags)
 	}
 	app.Authors = []*cli.Author{

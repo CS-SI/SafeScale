@@ -32,7 +32,6 @@ import (
 )
 
 const (
-	errorOccurred       = "ERROR OCCURRED" // nolint
 	outputErrorTemplate = "%s: %+v"
 )
 

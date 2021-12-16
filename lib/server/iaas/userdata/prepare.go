@@ -190,7 +190,6 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	return nil
 }
 
-// ToMap
 func (ud Content) ToMap() (map[string]interface{}, fail.Error) {
 	jsoned, err := json.Marshal(ud)
 	if err != nil {

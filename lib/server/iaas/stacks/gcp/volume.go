@@ -259,7 +259,6 @@ func (s stack) InspectVolumeAttachment(hostRef, vaID string) (*abstract.VolumeAt
 	return nil, abstract.ResourceNotFoundError("attachment", vaID)
 }
 
-// Migrate
 func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr) // too many unchecked casts
 

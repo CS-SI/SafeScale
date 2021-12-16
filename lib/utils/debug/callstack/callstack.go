@@ -70,9 +70,8 @@ func DecorateWith(prefix, what, why string, ignoreCount uint) string {
 type Occurrence bool
 
 const (
-	// FirstOccurrence
 	FirstOccurrence Occurrence = false
-	// LastOccurrence
+
 	LastOccurrence Occurrence = true
 )
 

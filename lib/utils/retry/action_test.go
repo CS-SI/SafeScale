@@ -497,7 +497,7 @@ func genSad() error {
 func genHandledPanic() error {
 	provErr := fail.NotFoundError("The resource %s is not there", "whatever")
 	interlude := fail.AbortedError(provErr, "we had to abort, we didn't know what to do without the resource")
-	endGame := fail.RuntimePanicError("thank god we catched this on time: %w", interlude)
+	endGame := fail.RuntimePanicError("thank god we caught this on time: %w", interlude)
 	return endGame
 }
 
@@ -571,7 +571,7 @@ func TestErrCheckStopStdError(t *testing.T) {
 }
 
 func TestErrCheckAbortedNoTimeout(t *testing.T) {
-	// This doesn't timeout, because we send a panic, but we should be able to track its origin...
+	// This doesn't end in timeout, because we send a panic, but we should be able to track its origin...
 	xerr := WhileUnsuccessful(
 		func() error {
 			innerXErr := genAbortedError()
@@ -607,7 +607,7 @@ func TestErrCheckAbortedNoTimeout(t *testing.T) {
 }
 
 func TestErrCheckPanicNoTimeout(t *testing.T) {
-	// This doesn't timeout, because we send an abortion, but we should be able to track its origin...
+	// This doesn't end in timeout, because we send an abortion, but we should be able to track its origin...
 	// previous test, TestErrCheckAbortedNoTimeout, works as expected, this does not
 	xerr := WhileUnsuccessful(
 		func() error {
@@ -712,7 +712,7 @@ func TestRetriesHitFirst(t *testing.T) {
 	}
 }
 
-// notice how this test and the next have the same results and it shouldn't
+// notice how this test and the next have the same results, problem is they shouldn't
 func TestCustomActionWithTimeout(t *testing.T) {
 	begin := time.Now()
 	xerr := Action(
@@ -736,7 +736,7 @@ func TestCustomActionWithTimeout(t *testing.T) {
 	}
 }
 
-// notice how this test and the previous have the same results and it shouldn't
+// notice how this test and the previous have the same results, problem is it shouldn't
 func TestOtherCustomActionWithTimeout(t *testing.T) {
 	begin := time.Now()
 	xerr := Action(

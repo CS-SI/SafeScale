@@ -39,7 +39,7 @@ func NewNetworkSecurityGroups() *NetworkSecurityGroups {
 	}
 }
 
-// Reset ...
+// IsNull ...
 func (nsg *NetworkSecurityGroups) IsNull() bool {
 	return nsg == nil || len(nsg.ByID) == 0
 }

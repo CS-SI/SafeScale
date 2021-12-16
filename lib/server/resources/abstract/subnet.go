@@ -28,14 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-const (
-	// SubnetDefaultSecurityGroupNameSuffix contains the suffix of the name of the default Security Group to create for a subnet
-	SubnetDefaultSecurityGroupNameSuffix = "-subnet-default-sg"
-
-	// VIPDefaultSecurityGroupNameSuffix contains the suffix of the name of the Security Group to create for a VIP
-	VIPDefaultSecurityGroupNameSuffix = "-vip-default-sg"
-)
-
 // SubnetRequest represents requirements to create a subnet where Mask is defined in CIDR notation
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type SubnetRequest struct {

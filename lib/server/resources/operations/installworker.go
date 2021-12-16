@@ -616,11 +616,12 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		}
 
 		// Marks hosts instances as released after use
-		defer func() {
-			for _, v := range hostsList {
+		//goland:noinspection GoDeferInLoop
+		defer func(hlist []resources.Host) {
+			for _, v := range hlist {
 				v.Released()
 			}
-		}()
+		}(hostsList)
 
 		var problem error
 		subtask, xerr := concurrency.NewTaskWithParent(task)

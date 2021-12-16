@@ -36,6 +36,7 @@ const (
 	outscaleDefaultImage = "Ubuntu 20.04"
 )
 
+//goland:noinspection GoPreferNilSlice
 var (
 	dnsServers = []string{}
 )
@@ -66,25 +67,6 @@ func get(m map[string]interface{}, key string, def ...string) string {
 		return ""
 	}
 	return v.(string)
-}
-func getList(m map[string]interface{}, key string) []string {
-	v, ok := m[key]
-	if !ok {
-		return []string{}
-	}
-	l, ok := v.([]interface{})
-	if !ok {
-		return []string{}
-	}
-	sl := make([]string, len(l))
-	for _, i := range l {
-		s, ok := i.(string)
-		if !ok {
-			return []string{}
-		}
-		sl = append(sl, s)
-	}
-	return sl
 }
 
 func volumeSpeed(s string) volumespeed.Enum {

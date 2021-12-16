@@ -293,7 +293,7 @@ func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (i
 
 // Clone does a deep-copy of the SecurityGroupRules
 func (sgrs SecurityGroupRules) Clone() SecurityGroupRules {
-	var asgr SecurityGroupRules = make(SecurityGroupRules, 0)
+	var asgr = make(SecurityGroupRules, 0)
 	var cloneRule *SecurityGroupRule
 	for _, v := range sgrs {
 		cloneRule = v.Clone().(*SecurityGroupRule)
@@ -401,7 +401,7 @@ func (sg *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 
 // NewSecurityGroup ...
 func NewSecurityGroup() *SecurityGroup {
-	var asg SecurityGroup = SecurityGroup{
+	var asg = SecurityGroup{
 		ID:               "",
 		Name:             "",
 		Network:          "",

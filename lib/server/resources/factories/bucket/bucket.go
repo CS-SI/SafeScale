@@ -33,7 +33,7 @@ func List(svc iaas.Service) ([]string, fail.Error) {
 	return svc.ListBuckets(objectstorage.RootPath)
 }
 
-// New instanciates a new bucket instance
+// New creates a bucket instance
 func New(svc iaas.Service) (resources.Bucket, fail.Error) {
 	return operations.NewBucket(svc)
 }

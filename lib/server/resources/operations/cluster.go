@@ -2920,9 +2920,9 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 	}
 
 	// Collect data
-	var featureAnsibleInstalled bool = false
+	var featureAnsibleInstalled = false
 	var masters []resources.Host
-	var params map[string]interface{} = map[string]interface{}{
+	var params = map[string]interface{}{
 		"ClusterName":          "",
 		"ClusterAdminUsername": "cladm",
 		"ClusterAdminPassword": "",
@@ -3050,7 +3050,7 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 	}
 
 	// --------- Build ansible inventory --------------
-	var fileName string = "cluster-inventory-" + params["Clustername"].(string)
+	var fileName = "cluster-inventory-" + params["Clustername"].(string)
 	tmplCmd, err := template.Parse(fileName, tmplString)
 	if err != nil {
 		return fail.Wrap(err, "failed to parse template")
@@ -3129,7 +3129,7 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 	_ = os.Remove(rfcItem.Local)
 
 	if len(errors) > 0 {
-		var msg string = "Fail to update ansible inventories\n"
+		var msg = "Fail to update ansible inventories\n"
 		for _, v := range errors {
 			msg += "  " + v.Error() + "\n"
 		}

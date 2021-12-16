@@ -136,7 +136,8 @@ func work(c *cli.Context) {
 	expose()
 
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
-	if len(Tags) > 1 { // nolint
+	if              //goland:noinspection GoBoolExpressions
+	len(Tags) > 1 { // nolint
 		version += fmt.Sprintf(", with Tags: (%s)", Tags)
 	}
 	fmt.Printf("Safescaled version: %s\nReady to serve on '%s' :-)\n", version, listen)

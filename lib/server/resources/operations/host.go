@@ -1610,16 +1610,16 @@ func (instance *Host) thePhaseDoesSomething(ctx context.Context, phase userdata.
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return result
+		return true
 	}
 
 	fullCt := string(content)
 	if !strings.Contains(fullCt, "# ---- Main") {
-		return result
+		return true
 	}
 
 	if !strings.Contains(fullCt, "# ---- EndMain") {
-		return result
+		return true
 	}
 
 	// TODO: Remove blank lines to simplify this test
@@ -1639,14 +1639,11 @@ func (instance *Host) thePhaseDoesSomething(ctx context.Context, phase userdata.
 }
 
 func (instance *Host) thePhaseReboots(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
-	// assume yes
-	result := true
-
 	// render content
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return result
+		return true
 	}
 
 	fullCt := string(content)

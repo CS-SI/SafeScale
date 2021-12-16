@@ -34,6 +34,7 @@ import (
 	"github.com/asaskevich/govalidator"
 )
 
+//goland:noinspection GoPreferNilSlice
 var (
 	dnsServers = []string{}
 )

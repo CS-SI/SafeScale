@@ -502,7 +502,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	// Select usable availability zone
-	az, xerr := s.SelectedAvailabilityZone()
+	zone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select Availability Zone")
 	}
@@ -537,7 +537,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
 		UserData:         userDataPhase1,
-		AvailabilityZone: az,
+		AvailabilityZone: zone,
 		Metadata:         metadata,
 	}
 
