@@ -77,7 +77,7 @@ checkbuild: begin
 	@(cd lib && $(MAKE) all)
 	@(cd cli && $(MAKE) all)
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | xargs errcheck | grep -v test | $(TEE) err_results.log
+	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | xargs errcheck -asserts | grep -v test | $(TEE) err_results.log
 	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
@@ -350,7 +350,7 @@ gofmt: begin
 
 err: begin generate
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running errcheck, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | xargs errcheck | grep -v test | $(TEE) err_results.log
+	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | xargs errcheck -asserts | grep -v test | $(TEE) err_results.log
 	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
 
 vet: begin generate
