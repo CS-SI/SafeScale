@@ -125,7 +125,7 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		delete(config, "secondary_gateway_ip")
 		delete(config, "network_id")
 		delete(config, "nodes")
-		delete(config, "last_state") // FIXME: Some of the information is not properly updated
+		delete(config, "last_state")
 		delete(config, "last_state_label")
 	} else {
 		remotedesktopInstalled := true

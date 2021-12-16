@@ -64,7 +64,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
 	}
-	if connectionTimeout > executionTimeout { // FIXME: Think about it
+	if connectionTimeout > executionTimeout {
 		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
 	}
 
