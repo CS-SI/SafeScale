@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package aws // Package aws contains the implementation of stack for Amazon
+// Package aws contains the implementation of stack for Amazon
+package aws
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"

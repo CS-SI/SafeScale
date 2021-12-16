@@ -176,7 +176,7 @@ linters-settings:
 
   gocognit:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
-    min-complexity: 70
+    min-complexity: 50
 
   goconst:
     # minimal length of string constant, 3 by default
@@ -198,7 +198,7 @@ linters-settings:
 
   gocyclo:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
-    min-complexity: 70
+    min-complexity: 60
 
   godot:
     # comments to be checked: `declarations`, `toplevel`, or `all`
