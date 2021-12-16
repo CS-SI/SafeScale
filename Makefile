@@ -39,6 +39,9 @@ JSONTOML := github.com/pelletier/go-toml
 BUILD_TAGS = 
 export BUILD_TAGS
 
+TEST_COVERAGE_ARGS =
+export TEST_COVERAGE_ARGS
+
 all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
@@ -71,6 +74,10 @@ releasearchive:
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Creating release archive $(NO_COLOR)\n";
 	@tar caf safescale-v$(VERSION)-$(shell $(GO) env GOOS)-$(shell $(GO) env GOARCH).tar.gz -C cli/safescale safescale -C ../../cli/safescaled safescaled
 endif
+
+with-coverage:
+	@echo "settings go test coverage option"
+	@$(eval TEST_COVERAGE_ARGS = "-coverprofile=cover.out")
 
 checkbuild: begin
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build assumes all dependencies are already there and code generation is also up to date $(NO_COLOR)\n";
@@ -313,10 +320,10 @@ mintest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running minimal unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
@@ -324,10 +331,10 @@ precommittest: begin
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running precommit unit tests subset, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 2>&1 > test_results.log || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 2>&1 >> test_results.log || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 2>&1 >> test_results.log || true
-	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
+	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
 
@@ -335,8 +342,8 @@ test: begin coverdeps # Run unit tests
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Running unit tests, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
 	@$(RM) ./test_results.log || true
 	@$(GO) clean -testcache
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/utils/... -p 1 2>&1 > test_results.log || true
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 2>&1 >> test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/utils/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 
@@ -389,9 +396,9 @@ warnings: begin
 	@golangci-lint --color never --timeout=10m run ./... 2>&1 | xargs -n3 -d'\n' | grep -v nolint | grep -v _test.go | grep -v .pb. | $(TEE) warnings_results.log
 	@if [ -s ./warnings_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) warnings FAILED, look at warnings_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
-coverage: begin generate
+coverage: begin generate with-coverage
 	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -coverprofile=cover.out > coverage_results.log 2>&1 || true
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -p 1 $(TEST_COVERAGE_ARGS) > coverage_results.log 2>&1 || true
 	@$(GO) tool cover -html=cover.out -o cover.html || true
 
 show-cov: begin generate
