@@ -138,7 +138,9 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		item  *jsonProperty
 		found bool
 	)
+
 	x.RLock()
+	defer x.RUnlock()
 	if item, found = x.Properties[key]; !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
 		item = &jsonProperty{
@@ -149,9 +151,13 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		x.Properties[key] = item
 	}
 	clone := item.Clone()
-	x.RUnlock()
 
-	return clone.(*jsonProperty).Shielded.Inspect(inspector)
+	xerr := clone.(*jsonProperty).Shielded.Inspect(inspector)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // Alter is used to lock an extension for write
