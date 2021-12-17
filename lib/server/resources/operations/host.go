@@ -247,7 +247,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 				}
 
 				// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
-				// Do not execute neither if Host is single or is a gateway
+				// Do not execute iff Host is single or is a gateway
 				if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
 					subnetInstance, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
 					xerr = debug.InjectPlannedFail(xerr)
@@ -449,7 +449,7 @@ func (instance *Host) carry(clonable data.Clonable) (ferr fail.Error) {
 	return nil
 }
 
-// Browse walks through Host MetadataFolder and executes a callback for each entries
+// Browse walks through Host MetadataFolder and executes a callback for each entry
 func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
