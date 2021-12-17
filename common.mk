@@ -64,7 +64,7 @@ SED?=sed
 TEE?=tee
 EXT?=
 WHICH?=which
-CERR?=default
+CERR?=hardened
 
 ifeq ($(OS),Windows_NT)
 EXT=.exe
