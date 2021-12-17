@@ -46,11 +46,15 @@ func (jp jsonProperty) Clone() data.Clonable {
 
 func (jp *jsonProperty) Replace(clonable data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value...
+	// Indeed, and that also means that not doing it here is a mistake, Clone() should use a replace function that don't use isNull(), and EVERYBODY else should use a Replace function that does use isNull
 	if jp == nil || clonable == nil {
-		return jp
+		return jp // FIXME: This is a problem, this means that mistakes go unnoticed
 	}
 
-	srcP := clonable.(*jsonProperty)
+	srcP, ok := clonable.(*jsonProperty)
+	if !ok {
+		return jp // FIXME: Again, mistakes go unnoticed, if we pick the wrong clonable nobody notices, Replace signature should return (data.Clonable, error)
+	}
 	*jp = *srcP
 	jp.Shielded = srcP.Shielded.Clone()
 	return jp
@@ -102,7 +106,7 @@ func (x *JSONProperties) Clone() *JSONProperties {
 		module: x.module,
 	}
 	for k, v := range x.Properties {
-		newP.Properties[k] = v.Clone().(*jsonProperty)
+		newP.Properties[k], _ = v.Clone().(*jsonProperty) // FIXME: Another problem here, Clone() should return (*JSONProperties, error)
 	}
 	return newP
 }
