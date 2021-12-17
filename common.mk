@@ -54,6 +54,7 @@ GO?=go
 GOFMT?=gofmt
 CP?=cp
 RM?=rm
+MV?=mv
 BROWSER?=firefox
 GREP?=grep
 EGREP?=egrep
