@@ -19,6 +19,7 @@ package aws
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/aws/aws-sdk-go/service/s3"
 
 	"fmt"
@@ -44,8 +45,7 @@ type stack struct {
 	SSMService     *ssm.SSM
 	PricingService *pricing.Pricing
 
-	stacks.Timeouts
-	stacks.Delays
+	*temporal.MutableTimings
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -131,8 +131,19 @@ func New(
 	stack.SSMService = ssm.New(sssm, &aws.Config{})
 	stack.PricingService = pricing.New(spricing, &aws.Config{})
 
-	stack.Timeouts = stacks.NewTimeouts()
-	stack.Delays = stacks.NewDelays()
+	stack.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 
 	return stack, nil
+}
+
+// Timings returns the instance containing current timeout/delay settings
+func (s *stack) Timings() temporal.Timings {
+	if s == nil {
+		return temporal.NewTimings()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings
 }

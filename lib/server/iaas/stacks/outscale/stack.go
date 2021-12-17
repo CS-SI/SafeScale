@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -94,8 +95,7 @@ type stack struct {
 	templates            []abstract.HostTemplate
 	vpc                  *abstract.Network
 
-	stacks.Timeouts
-	stacks.Delays
+	*temporal.MutableTimings
 }
 
 // NullStack returns a null value of the stack
@@ -162,8 +162,7 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
 	}
 	s.buildTemplateList()
 
-	s.Timeouts = stacks.NewTimeouts()
-	s.Delays = stacks.NewDelays()
+	s.MutableTimings = temporal.NewTimings()
 
 	return &s, s.initDefaultNetwork()
 }
@@ -252,4 +251,15 @@ func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
 		az[r.SubregionName] = true
 	}
 	return az, nil
+}
+
+// Timings returns the instance containing current timeout settings
+func (s *stack) Timings() temporal.Timings {
+	if s == nil {
+		return temporal.NewTimings()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings
 }

@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	scribble "github.com/nanobox-io/golang-scribble"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
@@ -257,7 +256,7 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 			case <-done: // only when it's closed
 				return
 			default:
-				time.Sleep(temporal.GetMinDelay())
+				time.Sleep(svc.Timings().SmallDelay())
 			}
 		}
 	}()

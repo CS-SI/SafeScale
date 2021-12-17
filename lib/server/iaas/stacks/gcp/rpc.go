@@ -127,7 +127,9 @@ func indexOf(element string, data []string) int {
 	return -1 // not found.
 }
 
-func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(opp *compute.Operation, poll time.Duration, duration time.Duration) (xerr fail.Error) {
+func (s stack) rpcWaitUntilOperationIsSuccessfulOrTimeout(
+	opp *compute.Operation, poll time.Duration, duration time.Duration,
+) (xerr fail.Error) {
 	if opp == nil {
 		return fail.InvalidParameterCannotBeNilError("opp")
 	}
@@ -260,7 +262,7 @@ func (s stack) rpcDeleteSubnetByName(name string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.MinDelay(), temporal.HostCleanupTimeout())
 }
 
 func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.Subnetwork, fail.Error) {
@@ -310,7 +312,7 @@ func (s stack) rpcCreateSubnet(subnetName, networkName, cidr string) (*compute.S
 	}
 
 	if err := s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
-		opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout(),
+		opp, temporal.MinDelay(), 2*temporal.ContextTimeout(),
 	); err != nil {
 		return &compute.Subnetwork{}, normalizeError(err)
 	}
@@ -436,7 +438,10 @@ func (s stack) rpcGetFirewallRuleByID(id string) (*compute.Firewall, fail.Error)
 	return resp.Items[0], nil
 }
 
-func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, direction string, sourcesUseGroups bool, sources []string, targetsUseGroups bool, targets []string, allowed []*compute.FirewallAllowed, denied []*compute.FirewallDenied) (*compute.Firewall, fail.Error) {
+func (s stack) rpcCreateFirewallRule(
+	ruleName, networkName, description, direction string, sourcesUseGroups bool, sources []string,
+	targetsUseGroups bool, targets []string, allowed []*compute.FirewallAllowed, denied []*compute.FirewallDenied,
+) (*compute.Firewall, fail.Error) {
 	if ruleName == "" {
 		return nil, fail.InvalidParameterError("ruleName", "cannot be empty string")
 	}
@@ -503,9 +508,8 @@ func (s stack) rpcCreateFirewallRule(ruleName, networkName, description, directi
 		}
 	}
 
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
-		opp, temporal.GetMinDelay(), temporal.GetHostTimeout(),
-	); xerr != nil {
+	xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout())
+	if xerr != nil {
 		return nil, xerr
 	}
 
@@ -606,7 +610,7 @@ func (s stack) rpcDeleteFirewallRuleByID(id string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), temporal.GetHostTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout())
 }
 
 func (s stack) rpcEnableFirewallRuleByName(name string) fail.Error {
@@ -644,7 +648,7 @@ func (s stack) rpcEnableFirewallRuleByName(name string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.MinDelay(), 2*temporal.ContextTimeout())
 }
 
 func (s stack) rpcDisableFirewallRuleByName(name string) fail.Error {
@@ -682,7 +686,7 @@ func (s stack) rpcDisableFirewallRuleByName(name string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.MinDelay(), 2*temporal.ContextTimeout())
 }
 
 func (s stack) rpcGetNetworkByID(id string) (*compute.Network, fail.Error) {
@@ -783,7 +787,7 @@ func (s stack) rpcCreateNetwork(name string) (*compute.Network, fail.Error) {
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
-		opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout(),
+		opp, temporal.MinDelay(), 2*temporal.ContextTimeout(),
 	); xerr != nil {
 		return nil, xerr
 	}
@@ -900,7 +904,7 @@ func (s stack) rpcCreateRoute(networkName, subnetID, subnetName string) (*comput
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
-		opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout(),
+		opp, temporal.MinDelay(), 2*temporal.ContextTimeout(),
 	); xerr != nil {
 		return nil, xerr
 	}
@@ -940,7 +944,7 @@ func (s stack) rpcDeleteRoute(name string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.MinDelay(), temporal.HostCleanupTimeout())
 }
 
 var imageFamilies = []string{
@@ -1162,7 +1166,10 @@ func (s stack) rpcListInstances() ([]*compute.Instance, fail.Error) {
 	return out, nil
 }
 
-func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string, hasPublicIP bool, sgs map[string]struct{}) (_ *compute.Instance, ferr fail.Error) {
+func (s stack) rpcCreateInstance(
+	name, networkName, subnetID, subnetName, templateName, imageURL string, diskSize int64, userdata string,
+	hasPublicIP bool, sgs map[string]struct{},
+) (_ *compute.Instance, ferr fail.Error) {
 	var xerr fail.Error
 	var tags []string
 	for k := range sgs {
@@ -1300,9 +1307,8 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 	}()
 
 	etag := op.Header.Get("Etag")
-	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
-		op, temporal.GetMinDelay(), temporal.GetHostTimeout(),
-	); xerr != nil {
+	xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout())
+	if xerr != nil {
 		return &compute.Instance{}, xerr
 	}
 
@@ -1457,7 +1463,7 @@ func (s stack) rpcCreateExternalAddress(name string, global bool) (_ *compute.Ad
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
-		op, temporal.GetMinDelay(), temporal.GetHostTimeout(),
+		op, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout(),
 	); xerr != nil {
 		return &compute.Address{}, xerr
 	}
@@ -1580,7 +1586,7 @@ func (s stack) rpcDeleteInstance(ref string) fail.Error {
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
-		op, temporal.GetMinDelay(), temporal.GetHostCleanupTimeout(),
+		op, temporal.MinDelay(), temporal.HostCleanupTimeout(),
 	); xerr != nil {
 		return xerr
 	}
@@ -1731,7 +1737,7 @@ func (s stack) rpcStopInstance(ref string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout())
 }
 
 func (s stack) rpcStartInstance(ref string) fail.Error {
@@ -1766,7 +1772,7 @@ func (s stack) rpcStartInstance(ref string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout())
 }
 
 func (s stack) rpcListZones() ([]*compute.Zone, fail.Error) {
@@ -1922,7 +1928,7 @@ func (s stack) rpcAddTagsToInstance(hostID string, tags []string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.MinDelay(), 2*temporal.ContextTimeout())
 }
 
 func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Error {
@@ -2001,7 +2007,7 @@ func (s stack) rpcRemoveTagsFromInstance(hostID string, tags []string) fail.Erro
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(opp, temporal.MinDelay(), 2*temporal.ContextTimeout())
 }
 
 func (s stack) rpcListNetworks() (_ []*compute.Network, xerr fail.Error) {
@@ -2078,7 +2084,7 @@ func (s stack) rpcDeleteNetworkByID(id string) (xerr fail.Error) {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(resp, temporal.GetMinDelay(), 2*temporal.GetContextTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(resp, temporal.MinDelay(), 2*temporal.ContextTimeout())
 }
 
 func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail.Error) {
@@ -2118,7 +2124,7 @@ func (s stack) rpcCreateDisk(name, kind string, size int64) (*compute.Disk, fail
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
-		op, temporal.GetMinDelay(), temporal.GetHostTimeout(),
+		op, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout(),
 	); xerr != nil {
 		return &compute.Disk{}, xerr
 	}
@@ -2195,7 +2201,7 @@ func (s stack) rpcDeleteDisk(ref string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout())
 }
 
 func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Error) {
@@ -2251,7 +2257,7 @@ func (s stack) rpcCreateDiskAttachment(diskRef, hostRef string) (string, fail.Er
 	}
 
 	if xerr = s.rpcWaitUntilOperationIsSuccessfulOrTimeout(
-		op, temporal.GetMinDelay(), temporal.GetHostTimeout(),
+		op, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout(),
 	); xerr != nil {
 		return "", xerr
 	}
@@ -2296,5 +2302,5 @@ func (s stack) rpcDeleteDiskAttachment(vaID string) fail.Error {
 		}
 	}
 
-	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, temporal.GetMinDelay(), temporal.GetHostTimeout())
+	return s.rpcWaitUntilOperationIsSuccessfulOrTimeout(op, s.Timings().SmallDelay(), s.Timings().HostOperationTimeout())
 }

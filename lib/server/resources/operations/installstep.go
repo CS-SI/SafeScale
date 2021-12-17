@@ -241,7 +241,9 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, xerr fail.Error) {
+func (is *step) Run(
+	task concurrency.Task, hosts []resources.Host, v data.Map, s resources.FeatureSettings,
+) (outcomes resources.UnitResults, xerr fail.Error) {
 	outcomes = &unitResults{}
 
 	if task.Aborted() {
@@ -259,7 +261,9 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 	return is.loopConcurrentlyOnHosts(task, hosts, v)
 }
 
-func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, xerr fail.Error) {
+func (is *step) loopSeriallyOnHosts(
+	task concurrency.Task, hosts []resources.Host, v data.Map,
+) (outcomes resources.UnitResults, xerr fail.Error) {
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
@@ -316,7 +320,9 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 	return outcomes, nil
 }
 
-func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, xerr fail.Error) {
+func (is *step) loopConcurrentlyOnHosts(
+	task concurrency.Task, hosts []resources.Host, v data.Map,
+) (outcomes resources.UnitResults, xerr fail.Error) {
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
@@ -460,7 +466,9 @@ type runOnHostParameters struct {
 // taskRunOnHost ...
 // Respects interface concurrency.TaskFunc
 // func (is *step) runOnHost(host *protocol.Host, v Variables) Resources.UnitResult {
-func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
+func (is *step) taskRunOnHost(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	defer func() {
@@ -534,7 +542,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	var outrun string
 	var outerr string
 	for {
-		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, temporal.ConnectionTimeout(), is.WallTime)
 		if retcode == 126 {
 			logrus.Debugf("Text busy happened")
 		}
@@ -579,7 +587,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		}
 
 		rounds--
-		time.Sleep(temporal.GetMinDelay())
+		time.Sleep(temporal.MinDelay())
 	}
 
 	return stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil

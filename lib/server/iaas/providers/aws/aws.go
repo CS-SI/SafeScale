@@ -219,6 +219,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, fail.ConvertError(err)
 	}
 
+	// Note: if timings have to be tuned, update awsStack.MutableTimings
+
 	wrapped := api.StackProxy{
 		FullStack: awsStack,
 		Name:      "amazon",

@@ -104,7 +104,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onVolumeCacheMiss(svc, ref) },
-		temporal.GetMetadataTimeout(),
+		temporal.MetadataTimeout(),
 	)
 	cacheEntry, xerr := volumeCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -184,13 +184,13 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
+	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -403,7 +403,7 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// delete volume
-	xerr = instance.GetService().DeleteVolume(instance.GetID())
+	xerr = instance.Service().DeleteVolume(instance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -476,7 +476,7 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	defer instance.lock.Unlock()
 
 	// Check if Volume exists and is managed by SafeScale
-	svc := instance.GetService()
+	svc := instance.Service()
 	existing, xerr := LoadVolume(svc, req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -588,7 +588,7 @@ func (instance *volume) Attach(
 		nfsServer                                                      *nfs.Server
 	)
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	targetID := host.GetID()
 	targetName := host.GetName()
 
@@ -756,8 +756,8 @@ func (instance *volume) Attach(
 			}
 			return nil
 		},
-		temporal.GetMinDelay(),
-		temporal.GetCommunicationTimeout(),
+		temporal.MinDelay(),
+		temporal.CommunicationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -795,7 +795,7 @@ func (instance *volume) Attach(
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			nfsServer, deeperXErr = nfs.NewServer(sshConfig)
+			nfsServer, deeperXErr = nfs.NewServer(svc, sshConfig)
 			if deeperXErr != nil {
 				return deeperXErr
 			}
@@ -972,7 +972,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 				return retry.StopRetryError(fmt.Errorf("aborted"))
 			}
 
-			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -987,8 +987,8 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 			}
 			return nil
 		},
-		temporal.GetMinDelay(),
-		temporal.GetExecutionTimeout(),
+		temporal.MinDelay(),
+		temporal.ExecutionTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1072,7 +1072,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 	}
 
 	// -- retrieve host data --
-	svc := instance.GetService()
+	svc := instance.Service()
 	targetName := host.GetName()
 
 	// -- Update target attachments --
@@ -1191,7 +1191,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 			}
 
 			// Create NFS Server instance
-			nfsServer, innerXErr := nfs.NewServer(sshConfig)
+			nfsServer, innerXErr := nfs.NewServer(svc, sshConfig)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1288,7 +1288,7 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 		return nil, xerr
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	for k := range attachments.Hosts {
 		hostInstance, xerr := LoadHost(svc, k)
 		xerr = debug.InjectPlannedFail(xerr)

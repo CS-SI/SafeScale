@@ -146,7 +146,7 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 
 	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onHostCacheMiss(svc, ref, updateCachedInformation) },
-		temporal.GetMetadataTimeout(),
+		temporal.MetadataTimeout(),
 	)
 	ce, xerr := hostCache.Get(ref, cacheOptions...)
 	if xerr != nil {
@@ -210,7 +210,7 @@ func onHostCacheMiss(svc iaas.Service, ref string, updateCachedInformation bool)
 
 // updateCachedInformation loads in cache SSH configuration to access host; this information will not change over time
 func (instance *Host) updateCachedInformation() fail.Error {
-	svc := instance.GetService()
+	svc := instance.Service()
 
 	opUser, opUserErr := getOperatorUsernameFromCfg(svc)
 	if opUserErr != nil {
@@ -415,13 +415,13 @@ func (instance *Host) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
+	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -553,7 +553,7 @@ func (instance *Host) ForceGetState(ctx context.Context) (state hoststate.Enum, 
 			return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
 
-		abstractHostFull, innerXErr := instance.GetService().InspectHost(ahc.ID)
+		abstractHostFull, innerXErr := instance.Service().InspectHost(ahc.ID)
 		if innerXErr != nil {
 			return innerXErr
 		}
@@ -596,7 +596,7 @@ func (instance *Host) unsafeReload() (xerr fail.Error) {
 	}
 
 	// Request Host inspection from provider
-	ahf, xerr := instance.GetService().InspectHost(instance.GetID())
+	ahf, xerr := instance.Service().InspectHost(instance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -700,7 +700,7 @@ func (instance *Host) Reload() (xerr fail.Error) {
 	}
 
 	// Request Host inspection from provider
-	ahf, xerr := instance.GetService().InspectHost(instance.GetID())
+	ahf, xerr := instance.Service().InspectHost(instance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -854,7 +854,7 @@ func (instance *Host) Create(
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 
 	// Check if Host exists and is managed bySafeScale
 	hostInstance, xerr := LoadHost(svc, hostReq.ResourceName)
@@ -1153,7 +1153,7 @@ func (instance *Host) Create(
 	// claiming Host is created
 	logrus.Infof("Waiting SSH availability on Host '%s' ...", instance.GetName())
 
-	status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, temporal.GetHostCreationTimeout())
+	status, xerr := instance.waitInstallPhase(ctx, userdata.PHASE1_INIT, temporal.HostCreationTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1245,8 +1245,8 @@ func determineImageID(svc iaas.Service, imageRef string) (string, string, fail.E
 			img, innerXErr = svc.SearchImage(imageRef)
 			return innerXErr
 		},
-		temporal.GetMinDelay(),
-		temporal.GetOperationTimeout(),
+		temporal.MinDelay(),
+		temporal.OperationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1283,7 +1283,7 @@ func (instance *Host) setSecurityGroups(
 	ctx context.Context, req abstract.HostRequest, defaultSubnet resources.Subnet,
 ) fail.Error {
 	if req.Single {
-		svc := instance.GetService()
+		svc := instance.Service()
 		hostID := instance.GetID()
 		for k := range req.SecurityGroupIDs {
 			if k != "" {
@@ -1304,7 +1304,7 @@ func (instance *Host) setSecurityGroups(
 				return fail.InconsistentError("'*propertiesv1.HostSecurityGroups' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			svc := instance.GetService()
+			svc := instance.Service()
 
 			// get default Subnet core data
 			var (
@@ -1519,7 +1519,7 @@ func (instance *Host) undoSetSecurityGroups(errorPtr *fail.Error, keepOnFailure 
 		return
 	}
 	if *errorPtr != nil && !keepOnFailure {
-		svc := instance.GetService()
+		svc := instance.Service()
 		derr := instance.Alter(
 			func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 				return props.Alter(
@@ -1572,7 +1572,7 @@ func (instance *Host) undoSetSecurityGroups(errorPtr *fail.Error, keepOnFailure 
 
 // UnbindDefaultSecurityGroupIfNeeded unbinds "default" Security Group from Host if it is bound
 func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.Error {
-	svc := instance.GetService()
+	svc := instance.Service()
 	sgName, err := svc.GetDefaultSecurityGroupName()
 	if err != nil {
 		return err
@@ -1601,7 +1601,7 @@ func (instance *Host) unbindDefaultSecurityGroupIfNeeded(networkID string) fail.
 }
 
 func (instance *Host) findTemplateBySizing(hostDef abstract.HostSizingRequirements) (string, fail.Error) {
-	svc := instance.GetService()
+	svc := instance.Service()
 
 	template, xerr := svc.FindTemplateBySizing(hostDef)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1751,7 +1751,7 @@ func (instance *Host) waitInstallPhase(
 	)()
 
 	givenTimeout := int(timeout.Minutes())
-	sshDefaultTimeout := int(temporal.GetHostTimeout().Minutes())
+	sshDefaultTimeout := int(instance.Service().Timings().HostOperationTimeout().Minutes())
 	if givenTimeout > sshDefaultTimeout {
 		sshDefaultTimeout = givenTimeout
 	}
@@ -1858,7 +1858,7 @@ func (instance *Host) updateSubnets(task concurrency.Task, req abstract.HostRequ
 						hostName := instance.GetName()
 
 						for _, as := range req.Subnets {
-							rs, innerXErr := LoadSubnet(instance.MetadataCore.GetService(), "", as.ID)
+							rs, innerXErr := LoadSubnet(instance.MetadataCore.Service(), "", as.ID)
 							if innerXErr != nil {
 								return innerXErr
 							}
@@ -1920,7 +1920,7 @@ func (instance *Host) undoUpdateSubnets(req abstract.HostRequest, errorPtr *fail
 						hostName := instance.GetName()
 
 						for _, as := range req.Subnets {
-							subnetInstance, innerXErr := LoadSubnet(instance.MetadataCore.GetService(), "", as.ID)
+							subnetInstance, innerXErr := LoadSubnet(instance.MetadataCore.Service(), "", as.ID)
 							if innerXErr != nil {
 								return innerXErr
 							}
@@ -1991,7 +1991,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 	}
 
 	// Reset userdata script for Host from Cloud Provider metadata service (if stack is able to do so)
-	xerr = instance.GetService().ClearHostStartupScript(instance.GetID())
+	xerr = instance.Service().ClearHostStartupScript(instance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1999,7 +1999,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 
 	// Executes userdata.PHASE2_NETWORK_AND_SECURITY script to configure networking and security
 	xerr = instance.runInstallPhase(
-		ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, temporal.GetHostTimeout(),
+		ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent, instance.Service().Timings().HostOperationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2027,7 +2027,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 		return xerr
 	}
 
-	waitingTime := temporal.MaxTimeout(4*time.Minute, temporal.GetHostCreationTimeout())
+	waitingTime := temporal.MaxTimeout(4*time.Minute, temporal.HostCreationTimeout())
 	// If the script doesn't reboot, we force a reboot
 	if !instance.thePhaseReboots(ctx, userdata.PHASE2_NETWORK_AND_SECURITY, userdataContent) {
 		logrus.Infof("finalizing Host provisioning of '%s': rebooting", instance.GetName())
@@ -2087,7 +2087,7 @@ func (instance *Host) finalizeProvisioning(ctx context.Context, userdataContent 
 			return xerr
 		}
 
-		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, temporal.GetHostTimeout())
+		_, xerr = instance.waitInstallPhase(ctx, userdata.PHASE5_FINAL, instance.Service().Timings().HostOperationTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) { // nolint
@@ -2395,7 +2395,7 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	var shares map[string]*propertiesv1.HostShare
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		// Do not remove a Host having shares that are currently remotely mounted
@@ -2658,8 +2658,8 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetHostCleanupTimeout(),
+			temporal.MinDelay(),
+			temporal.HostCleanupTimeout(),
 		)
 		if innerXErr != nil {
 			switch innerXErr.(type) {
@@ -2692,8 +2692,8 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					}
 					return nil
 				},
-				temporal.GetDefaultDelay(),
-				temporal.GetOperationTimeout(),
+				temporal.DefaultDelay(),
+				temporal.OperationTimeout(),
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -2879,7 +2879,7 @@ func (instance *Host) Pull(
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
+		temporal.DefaultDelay(),
 		2*timeout,
 	)
 	if xerr != nil {
@@ -3043,7 +3043,7 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 	hostName := instance.GetName()
 	hostID := instance.GetID()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	hostCache, xerr := svc.GetCache(hostKind)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3065,10 +3065,10 @@ func (instance *Host) Start(ctx context.Context) (xerr fail.Error) {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			return svc.WaitHostState(hostID, hoststate.Started, temporal.GetHostTimeout())
+			return svc.WaitHostState(hostID, hoststate.Started, svc.Timings().HostOperationTimeout())
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetExecutionTimeout(),
+		temporal.DefaultDelay(),
+		temporal.ExecutionTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3133,7 +3133,7 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 	hostName := instance.GetName()
 	hostID := instance.GetID()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 
 	hostCache, xerr := svc.GetCache(hostKind)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -3157,10 +3157,10 @@ func (instance *Host) Stop(ctx context.Context) (xerr fail.Error) {
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			return svc.WaitHostState(hostID, hoststate.Stopped, temporal.GetHostTimeout())
+			return svc.WaitHostState(hostID, hoststate.Stopped, svc.Timings().HostOperationTimeout())
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetExecutionTimeout(),
+		temporal.DefaultDelay(),
+		temporal.ExecutionTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3906,7 +3906,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)
@@ -3956,7 +3956,7 @@ func (instance *Host) EnableSecurityGroup(ctx context.Context, sg resources.Secu
 				}
 			} else {
 				// Bind the security group on provider side; if already bound (*fail.ErrDuplicate), considered as a success
-				xerr = sg.GetService().BindSecurityGroupToHost(asg, instance.GetID())
+				xerr = sg.Service().BindSecurityGroupToHost(asg, instance.GetID())
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
 					switch xerr.(type) {
@@ -4015,7 +4015,7 @@ func (instance *Host) DisableSecurityGroup(ctx context.Context, sgInstance resou
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	return instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Alter(hostproperty.SecurityGroupsV1, func(clonable data.Clonable) fail.Error {
 			hsgV1, ok := clonable.(*propertiesv1.HostSecurityGroups)

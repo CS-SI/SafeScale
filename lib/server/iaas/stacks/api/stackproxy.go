@@ -483,33 +483,3 @@ func (s StackProxy) Migrate(operation string, params map[string]interface{}) (fe
 	xerr := s.FullStack.Migrate(operation, params)
 	return xerr
 }
-
-// OperationTimeout ...
-func (s StackProxy) OperationTimeout() time.Duration {
-	return s.FullStack.OperationTimeout()
-}
-
-// HostCreationTimeout ...
-func (s StackProxy) HostCreationTimeout() time.Duration {
-	return s.FullStack.HostCreationTimeout()
-}
-
-// HostCleanupTimeout ...
-func (s StackProxy) HostCleanupTimeout() time.Duration {
-	return s.FullStack.HostCreationTimeout()
-}
-
-// LongHostOperationTimeout ...
-func (s StackProxy) LongHostOperationTimeout() time.Duration {
-	return s.FullStack.LongHostOperationTimeout()
-}
-
-// // ConnectionTimeout ...
-// func (s StackProxy) ConnectionTimeout() time.Duration {
-// 	return s.FullStack.ConnectionTimeout()
-// }
-//
-// // ExecutionTimeout ...
-// func (s StackProxy) ExecutionTimeout() time.Duration {
-// 	return s.FullStack.ExecutionTimeout()
-// }

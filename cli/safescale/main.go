@@ -62,7 +62,7 @@ func cleanup(clientSession *client.Session, onAbort *uint32) {
 		text = "y"
 	}
 	if strings.TrimRight(text, "\n") == "y" {
-		err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.GetExecutionTimeout())
+		err = clientSession.JobManager.Stop(utils.GetUUID(), temporal.ExecutionTimeout())
 		if err != nil {
 			fmt.Printf("failed to stop the process %v\n", err)
 		}

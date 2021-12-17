@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/iam/v1"
@@ -39,8 +40,7 @@ type stack struct {
 
 	selfLinkPrefix string
 
-	stacks.Timeouts
-	stacks.Delays
+	*temporal.MutableTimings
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -101,8 +101,18 @@ func New(
 	gcpStack.selfLinkPrefix = `https://www.googleapis.com/compute/v1/projects/` + localCfg.ProjectID
 	// gcpStack.searchPrefix = `.*/projects/` + localCfg.ProjectID + `/global`
 
-	gcpStack.Timeouts = stacks.NewTimeouts()
-	gcpStack.Delays = stacks.NewDelays()
+	gcpStack.MutableTimings = temporal.NewTimings()
 
 	return gcpStack, nil
+}
+
+// Timings returns the instance containing current timing (timeouts, delays) settings
+func (s *stack) Timings() temporal.Timings {
+	if s == nil {
+		return temporal.NewTimings()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings
 }

@@ -172,6 +172,8 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		return nil, fail.ConvertError(err)
 	}
 
+	// Note: if timings have to be tuned, update stack.MutableTimings
+
 	wrapped := api.StackProxy{
 		FullStack: stack,
 		Name:      "outscale",

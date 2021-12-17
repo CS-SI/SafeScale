@@ -83,7 +83,7 @@ func (instance *Subnet) unsafeGetDefaultRouteIP() (ip string, xerr fail.Error) {
 			return nil
 		}
 		if len(as.GatewayIDs) > 0 {
-			hostInstance, innerErr := LoadHost(instance.GetService(), as.GatewayIDs[0])
+			hostInstance, innerErr := LoadHost(instance.Service(), as.GatewayIDs[0])
 			if innerErr != nil {
 				return innerErr
 			}
@@ -241,7 +241,9 @@ func (instance *Subnet) unsafeCreateSecurityGroups(ctx context.Context, networkI
 }
 
 // createGWSecurityGroup creates a Security Group that will be applied to gateways of the Subnet
-func (instance *Subnet) createGWSecurityGroup(ctx context.Context, networkID, networkName string, keepOnFailure bool) (_ resources.SecurityGroup, ferr fail.Error) {
+func (instance *Subnet) createGWSecurityGroup(
+	ctx context.Context, networkID, networkName string, keepOnFailure bool,
+) (_ resources.SecurityGroup, ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -264,7 +266,7 @@ func (instance *Subnet) createGWSecurityGroup(ctx context.Context, networkID, ne
 	sgName := fmt.Sprintf(subnetGWSecurityGroupNamePattern, instance.GetName(), networkName)
 
 	var sg resources.SecurityGroup
-	sg, xerr = NewSecurityGroup(instance.GetService())
+	sg, xerr = NewSecurityGroup(instance.Service())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -331,14 +333,16 @@ func (instance *Subnet) createGWSecurityGroup(ctx context.Context, networkID, ne
 }
 
 // createPublicIPSecurityGroup creates a Security Group to be applied to host of the Subnet with public IP that is not a gateway
-func (instance *Subnet) createPublicIPSecurityGroup(ctx context.Context, networkID, networkName string, keepOnFailure bool) (_ resources.SecurityGroup, ferr fail.Error) {
+func (instance *Subnet) createPublicIPSecurityGroup(
+	ctx context.Context, networkID, networkName string, keepOnFailure bool,
+) (_ resources.SecurityGroup, ferr fail.Error) {
 	// Creates security group for hosts in Subnet to allow internal access
 	sgName := fmt.Sprintf(subnetPublicIPSecurityGroupNamePattern, instance.GetName(), networkName)
 
 	var sgInstance resources.SecurityGroup
 	var xerr fail.Error
 
-	sgInstance, xerr = NewSecurityGroup(instance.GetService())
+	sgInstance, xerr = NewSecurityGroup(instance.Service())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -399,7 +403,9 @@ func (instance *Subnet) undoCreateSecurityGroup(errorPtr *fail.Error, keepOnFail
 }
 
 // Creates a Security Group to be applied on Hosts in Subnet to allow internal access
-func (instance *Subnet) createInternalSecurityGroup(ctx context.Context, networkID, networkName string, keepOnFailure bool) (_ resources.SecurityGroup, ferr fail.Error) {
+func (instance *Subnet) createInternalSecurityGroup(
+	ctx context.Context, networkID, networkName string, keepOnFailure bool,
+) (_ resources.SecurityGroup, ferr fail.Error) {
 	sgName := fmt.Sprintf(subnetInternalSecurityGroupNamePattern, instance.GetName(), networkName)
 
 	cidr, xerr := instance.unsafeGetCIDR()
@@ -408,7 +414,7 @@ func (instance *Subnet) createInternalSecurityGroup(ctx context.Context, network
 	}
 
 	var sg resources.SecurityGroup
-	sg, xerr = NewSecurityGroup(instance.GetService())
+	sg, xerr = NewSecurityGroup(instance.Service())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

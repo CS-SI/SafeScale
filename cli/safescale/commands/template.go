@@ -66,7 +66,7 @@ var templateList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		templates, err := clientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), temporal.GetExecutionTimeout())
+		templates, err := clientSession.Template.List(c.Bool("all"), c.Bool("scanned-only"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -90,7 +90,7 @@ var templateMatch = &cli.Command{
 		sizing = append(sizing, c.Args().First())
 		sizing = append(sizing, c.Args().Tail()...)
 		sizingAsString := strings.Join(sizing, ",")
-		templates, err := clientSession.Template.Match(sizingAsString, temporal.GetExecutionTimeout())
+		templates, err := clientSession.Template.Match(sizingAsString, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of templates", false).Error())))
@@ -112,7 +112,7 @@ var templateInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		template, err := clientSession.Template.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		template, err := clientSession.Template.Inspect(c.Args().First(), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of template information", false).Error())))

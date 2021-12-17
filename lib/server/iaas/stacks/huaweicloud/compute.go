@@ -467,7 +467,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
+	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", s.Timings())
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -628,7 +628,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			ahc.Name = server.Name
 
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, temporal.GetHostTimeout())
+			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, s.Timings().HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -645,8 +645,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetLongOperationTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -801,7 +801,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nullAHF, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -929,7 +929,9 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, xerr fail.Error) {
+func (s stack) complementHost(
+	host *abstract.HostCore, server *servers.Server,
+) (completedHost *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(host)
@@ -1243,8 +1245,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						}
 						return commRetryErr
 					},
-					temporal.GetDefaultDelay(),
-					temporal.GetHostCleanupTimeout(),
+					temporal.DefaultDelay(),
+					temporal.HostCleanupTimeout(),
 				)
 				if innerRetryErr != nil {
 					switch innerRetryErr.(type) {
@@ -1263,7 +1265,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return fail.NewError("host '%s' in state 'Error', retrying to delete", hostRef)
 		},
 		0,
-		temporal.GetHostCleanupTimeout(),
+		temporal.HostCleanupTimeout(),
 	)
 	if outerRetryErr != nil {
 		switch outerRetryErr.(type) {
@@ -1360,8 +1362,8 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetOperationTimeout(),
+		temporal.DefaultDelay(),
+		temporal.OperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

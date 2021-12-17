@@ -30,7 +30,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // safescale ssh connect host2
@@ -92,7 +91,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	defer hostInstance.Released()
 
 	retcode, stdout, stderr, xerr := hostInstance.Run(
-		job.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout(),
+		job.Context(), command, outputs.COLLECT, job.Service().Timings().ConnectionTimeout(), job.Service().Timings().ExecutionTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -180,11 +179,11 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 
 	if pull {
 		retcode, stdout, stderr, xerr = hostInstance.Pull(
-			job.Context(), hostPath, localPath, temporal.GetLongOperationTimeout(),
+			job.Context(), hostPath, localPath, job.Service().Timings().HostLongOperationTimeout(),
 		)
 	} else {
 		retcode, stdout, stderr, xerr = hostInstance.Push(
-			job.Context(), localPath, hostPath, in.Owner, in.Mode, temporal.GetLongOperationTimeout(),
+			job.Context(), localPath, hostPath, in.Owner, in.Mode, job.Service().Timings().HostLongOperationTimeout(),
 		)
 	}
 	if xerr != nil {

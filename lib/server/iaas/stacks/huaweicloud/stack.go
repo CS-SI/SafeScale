@@ -73,8 +73,7 @@ type stack struct {
 	// selectedAvailabilityZone contains the last selected availability zone chosen
 	selectedAvailabilityZone string
 
-	stacks.Timeouts
-	stacks.Delays
+	*temporal.MutableTimings
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -83,12 +82,11 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and return interface stack
-//goland:noinspection GoExportedFuncWithUnexportedType
-func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (stack, fail.Error) { // nolint
+func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
 	if auth.IdentityEndpoint == "" {
-		return stack{}, fail.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
+		return nil, fail.InvalidParameterError("auth.IdentityEndpoint", "cannot be empty string")
 	}
 
 	if auth.DomainName == "" && auth.DomainID == "" {
@@ -117,7 +115,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 		cfg.DefaultSecurityGroupName = defaultSecurityGroupName
 	}
 
-	s := stack{
+	s := &stack{
 		DefaultSecurityGroupName: cfg.DefaultSecurityGroupName,
 
 		authOpts: auth,
@@ -143,9 +141,9 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAuthenticated:
-			return stack{}, fail.NotAuthenticatedError("authentication failed")
+			return nil, fail.NotAuthenticatedError("authentication failed")
 		default:
-			return stack{}, xerr
+			return nil, xerr
 		}
 	}
 
@@ -160,7 +158,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 		NormalizeError,
 	)
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
 
 	// Compute API
@@ -175,10 +173,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			NormalizeError,
 		)
 	default:
-		return stack{}, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
+		return nil, fail.NotImplementedError("unmanaged Openstack service 'compute' version '%s'", s.versions["compute"])
 	}
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
 
 	// Network API
@@ -193,10 +191,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			NormalizeError,
 		)
 	default:
-		return stack{}, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
+		return nil, fail.NotImplementedError("unmanaged Openstack service 'network' version '%s'", s.versions["network"])
 	}
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
 
 	// Volume API
@@ -220,10 +218,10 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			NormalizeError,
 		)
 	default:
-		return stack{}, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
+		return nil, fail.NotImplementedError("unmanaged service 'volumes' version '%s'", s.versions["volumes"])
 	}
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
 
 	// Get provider network ID from network service
@@ -237,7 +235,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			NormalizeError,
 		)
 		if xerr != nil {
-			return stack{}, xerr
+			return nil, xerr
 		}
 	}
 
@@ -249,7 +247,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			// continue
 			debug.IgnoreError(xerr)
 		default:
-			return stack{}, xerr
+			return nil, xerr
 		}
 	} else if len(validAvailabilityZones) != 0 {
 		var validZones []string
@@ -263,7 +261,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 			}
 		}
 		if !zoneIsValidInput {
-			return stack{}, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
+			return nil, fail.InvalidRequestError("invalid Availability zone '%s', valid zones are %s", auth.AvailabilityZone, strings.Join(validZones, ","))
 		}
 
 	}
@@ -278,7 +276,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 		normalizeError,
 	)
 	if commRetryErr != nil {
-		return stack{}, commRetryErr
+		return nil, commRetryErr
 	}
 
 	s.authOpts = auth
@@ -286,14 +284,13 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (st
 	s.IdentityClient = identity
 	s.cfgOpts.UseFloatingIP = true
 
+	s.MutableTimings = temporal.NewTimings()
+
 	// Initializes the VPC
 	xerr = s.initVPC()
 	if xerr != nil {
-		return stack{}, xerr
+		return nil, xerr
 	}
-
-	s.Timeouts = stacks.NewTimeouts()
-	s.Delays = stacks.NewDelays()
 
 	return s, nil
 }
@@ -835,7 +832,7 @@ func (s stack) WaitHostState(
 				)
 			}
 		},
-		temporal.GetMinDelay(),
+		temporal.MinDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -964,7 +961,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	var timeout = temporal.GetOperationTimeout()
+	var timeout = temporal.OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
@@ -981,7 +978,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 			}
 			return innerXErr
 		},
-		temporal.GetDefaultDelay(),
+		temporal.DefaultDelay(),
 		timeout,
 	)
 	if xerr != nil {
@@ -1166,4 +1163,15 @@ func (s *stack) initVPC() fail.Error {
 		}
 	}
 	return nil
+}
+
+// Timings returns the instance containing current timeout settings
+func (s *stack) Timings() temporal.Timings {
+	if s == nil {
+		return temporal.NewTimings()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings
 }

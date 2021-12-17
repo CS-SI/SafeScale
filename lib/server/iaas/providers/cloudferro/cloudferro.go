@@ -43,7 +43,7 @@ var (
 
 // provider is the implementation of the CloudFerro provider
 type provider struct {
-	api.Stack /**openstack.stack*/
+	api.Stack
 
 	tenantParameters map[string]interface{}
 	templatesWithGPU []string
@@ -174,6 +174,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	// Note: if timings have to be tuned, update stack.MutableTimings
 
 	wrapped := api.StackProxy{
 		FullStack: stack,

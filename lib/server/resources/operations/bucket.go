@@ -90,7 +90,7 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 
 	cacheOptions := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onBucketCacheMiss(svc, name) },
-		temporal.GetMetadataTimeout(),
+		temporal.MetadataTimeout(),
 	)
 	cacheEntry, xerr := bucketCache.Get(name, cacheOptions...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -155,13 +155,13 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
+	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -391,7 +391,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 
 	// -- check if bucket already exist in SafeScale
 	bucketInstance, xerr := LoadBucket(svc, name)
@@ -486,7 +486,7 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	}
 
 	// -- delete Bucket
-	xerr = instance.GetService().DeleteBucket(instance.GetName())
+	xerr = instance.Service().DeleteBucket(instance.GetName())
 	if xerr != nil {
 		if strings.Contains(xerr.Error(), "not found") {
 			return fail.NotFoundError("failed to find Bucket '%s'", instance.GetName())
@@ -545,7 +545,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	hostInstance, xerr := LoadHost(instance.GetService(), hostName)
+	hostInstance, xerr := LoadHost(instance.Service(), hostName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
@@ -579,7 +579,7 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 		return xerr
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	authOpts, xerr := svc.GetAuthenticationOptions()
 	if xerr != nil {
 		return xerr
@@ -706,7 +706,7 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	svc := instance.GetService()
+	svc := instance.Service()
 
 	hostInstance, xerr := LoadHost(svc, hostName)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -783,7 +783,7 @@ func (instance *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
 	}
 
 	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		svc := instance.GetService()
+		svc := instance.Service()
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {

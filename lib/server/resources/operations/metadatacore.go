@@ -117,8 +117,8 @@ func (c *MetadataCore) IsNull() bool {
 	return c == nil || (c.kind == "" || c.kind == NullMetadataKind || c.folder.IsNull() || (c.getID() == NullMetadataID && c.getName() == NullMetadataName))
 }
 
-// GetService returns the iaas.GetService used to create/load the persistent object
-func (c *MetadataCore) GetService() iaas.Service {
+// Service returns the iaas.Service used to create/load the persistent object
+func (c *MetadataCore) Service() iaas.Service {
 	if c == nil {
 		return nil
 	}
@@ -445,8 +445,8 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetContextTimeout(),
+			temporal.MinDelay(),
+			temporal.ContextTimeout(),
 		)
 	} else {
 		xerr = retry.WhileUnsuccessful(
@@ -461,8 +461,8 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetContextTimeout(),
+			temporal.MinDelay(),
+			temporal.ContextTimeout(),
 		)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
@@ -505,7 +505,7 @@ func (c *MetadataCore) readByID(id string) fail.Error {
 // readByReference gets the data from Object Storage
 // First read using 'ref' as an ID; if *fail.ErrNotFound occurs, read using 'ref' as a name
 func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
-	timeout := temporal.GetCommunicationTimeout()
+	timeout := temporal.CommunicationTimeout()
 
 	xerr = retry.WhileUnsuccessful(
 		func() error {
@@ -532,7 +532,7 @@ func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
 			}
 			return nil
 		},
-		temporal.GetMinDelay(),
+		temporal.MinDelay(),
 		timeout,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -649,8 +649,8 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			2*temporal.GetMetadataTimeout(),
+			temporal.MinDelay(),
+			2*temporal.MetadataTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -684,8 +684,8 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetContextTimeout(),
+			temporal.MinDelay(),
+			temporal.ContextTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

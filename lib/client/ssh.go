@@ -49,7 +49,9 @@ type ssh struct {
 }
 
 // Run executes the command
-func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
+func (s ssh) Run(
+	hostName, command string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration,
+) (int, string, string, fail.Error) {
 	const invalid = -1
 	var (
 		retcode        int
@@ -64,8 +66,8 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
 	}
-	if connectionTimeout > executionTimeout {
-		connectionTimeout = executionTimeout + temporal.GetContextTimeout()
+	if connectionTimeout > executionTimeout { // FIXME: Think about it
+		connectionTimeout = executionTimeout + temporal.ContextTimeout()
 	}
 
 	ctx, xerr := utils.GetContext(true)
@@ -119,7 +121,7 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 
 			return nil
 		},
-		temporal.GetMinDelay(),
+		temporal.MinDelay(),
 		connectionTimeout,
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
@@ -195,7 +197,9 @@ func getMD5Hash(text string) string {
 }
 
 // Copy ...
-func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) {
+func (s ssh) Copy(
+	from, to string, connectionTimeout, executionTimeout time.Duration,
+) (int, string, string, fail.Error) {
 	const invalid = -1
 	if from == "" {
 		return invalid, "", "", fail.InvalidParameterCannotBeEmptyStringError("from")
@@ -251,8 +255,8 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 		return invalid, "", "", xerr
 	}
 
-	if executionTimeout < temporal.GetHostTimeout() {
-		executionTimeout = temporal.GetHostTimeout()
+	if executionTimeout < temporal.HostOperationTimeout() {
+		executionTimeout = temporal.HostOperationTimeout()
 	}
 	if connectionTimeout < DefaultConnectionTimeout {
 		connectionTimeout = DefaultConnectionTimeout
@@ -404,7 +408,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 
 			return nil
 		},
-		temporal.GetMinDelay(),
+		temporal.MinDelay(),
 		connectionTimeout+2*executionTimeout,
 	)
 	if retryErr != nil {
@@ -448,8 +452,8 @@ func (s ssh) Connect(hostname, username, shell string, timeout time.Duration) er
 		func() error {
 			return sshCfg.Enter(username, shell)
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetConnectSSHTimeout(),
+		temporal.DefaultDelay(),
+		temporal.SSHConnectTimeout(),
 		retry.OrArbiter, // if sshCfg.Ender succeeds, we don't care about the timeout
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
@@ -484,8 +488,8 @@ func (s ssh) CreateTunnel(name string, localPort int, remotePort int, timeout ti
 			_, _, innerErr := sshCfg.CreateTunneling()
 			return innerErr
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetConnectSSHTimeout(),
+		temporal.DefaultDelay(),
+		temporal.SSHConnectTimeout(),
 		func(t retry.Try, v verdict.Enum) {
 			if v == verdict.Retry {
 				logrus.Infof("Remote SSH service on host '%s' isn't ready, retrying...\n", name)
@@ -550,8 +554,8 @@ func (s ssh) WaitReady( /*ctx context.Context, */ hostName string, timeout time.
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if timeout < temporal.GetHostTimeout() {
-		timeout = temporal.GetHostTimeout()
+	if timeout < temporal.HostOperationTimeout() {
+		timeout = temporal.HostOperationTimeout()
 	}
 	sshCfg, err := s.getHostSSHConfig(hostName)
 	if err != nil {

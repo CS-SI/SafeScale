@@ -295,13 +295,13 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 			continue
 		}
 
-		master, xerr = LoadHost(instance.GetService(), v.ID)
+		master, xerr = LoadHost(instance.Service(), v.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
 		}
 
-		_, xerr = master.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+		_, xerr = master.WaitSSHReady(ctx, temporal.SSHConnectTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -440,7 +440,7 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 		return nil, xerr
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	node = nil
 	found := false
 	for _, v := range list {
@@ -459,7 +459,7 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 			hostInstance.Released()
 		}(node)
 
-		_, xerr = node.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+		_, xerr = node.WaitSSHReady(ctx, temporal.SSHConnectTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {

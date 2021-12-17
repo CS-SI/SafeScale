@@ -73,7 +73,7 @@ var networkList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		networks, err := clientSession.Network.List(c.Bool("all"), temporal.GetExecutionTimeout())
+		networks, err := clientSession.Network.List(c.Bool("all"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -113,7 +113,7 @@ var networkDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Network.Delete(networkList, temporal.GetExecutionTimeout())
+		err := clientSession.Network.Delete(networkList, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -147,7 +147,7 @@ var networkInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		network, err := clientSession.Network.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		network, err := clientSession.Network.Inspect(c.Args().First(), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -174,7 +174,7 @@ var networkInspect = &cli.Command{
 
 		if len(network.Subnets) == 1 {
 			if network.Subnets[0] == network.Name {
-				subnet, err := clientSession.Subnet.Inspect(network.Id, network.Name, temporal.GetExecutionTimeout())
+				subnet, err := clientSession.Subnet.Inspect(network.Id, network.Name, temporal.ExecutionTimeout())
 				if err != nil {
 					err = fail.FromGRPCStatus(err)
 					return clitools.FailureResponse(
@@ -241,7 +241,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 
 	var gateways = make([]map[string]string, len(gwIDs))
 	if len(gwIDs) > 0 {
-		pgw, err = session.Host.Inspect(gwIDs[0], temporal.GetExecutionTimeout())
+		pgw, err = session.Host.Inspect(gwIDs[0], temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			var what string
@@ -254,7 +254,7 @@ func queryGatewaysInformation(session *client.Session, subnet *protocol.Subnet, 
 		gateways[0] = map[string]string{pgw.Name: pgw.Id}
 	}
 	if len(gwIDs) > 1 {
-		sgw, err = session.Host.Inspect(gwIDs[1], temporal.GetExecutionTimeout())
+		sgw, err = session.Host.Inspect(gwIDs[1], temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			xerr := fail.Wrap(err, "failed to inspect network: cannot inspect secondary gateway")
@@ -379,7 +379,7 @@ var networkCreate = &cli.Command{
 			c.Args().Get(0), c.String("cidr"), c.Bool("empty"),
 			c.String("gwname"), gatewaySSHPort, c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
-			temporal.GetExecutionTimeout(),
+			temporal.ExecutionTimeout(),
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -447,7 +447,7 @@ var networkSecurityGroupList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		list, err := clientSession.SecurityGroup.List(c.Bool("all"), temporal.GetExecutionTimeout())
+		list, err := clientSession.SecurityGroup.List(c.Bool("all"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -504,7 +504,7 @@ var networkSecurityGroupInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.SecurityGroup.Inspect(c.Args().Get(1), temporal.GetExecutionTimeout())
+		resp, err := clientSession.SecurityGroup.Inspect(c.Args().Get(1), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -598,7 +598,7 @@ var networkSecurityGroupCreate = &cli.Command{
 			Name:        c.Args().Get(1),
 			Description: c.String("description"),
 		}
-		resp, err := clientSession.SecurityGroup.Create(c.Args().First(), req, temporal.GetExecutionTimeout())
+		resp, err := clientSession.SecurityGroup.Create(c.Args().First(), req, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -641,7 +641,7 @@ var networkSecurityGroupClear = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.SecurityGroup.Clear(c.Args().Get(1), temporal.GetExecutionTimeout())
+		err := clientSession.SecurityGroup.Clear(c.Args().Get(1), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -690,7 +690,7 @@ var networkSecurityGroupDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.SecurityGroup.Delete(c.Args().Tail(), c.Bool("force"), temporal.GetExecutionTimeout())
+		err := clientSession.SecurityGroup.Delete(c.Args().Tail(), c.Bool("force"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -741,7 +741,7 @@ var networkSecurityGroupBonds = &cli.Command{
 
 		kind := strings.ToLower(c.String("kind"))
 
-		list, err := clientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, temporal.GetExecutionTimeout())
+		list, err := clientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of Security Groups", false).Error())))
@@ -884,7 +884,7 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 		}
 
 		if err := clientSession.SecurityGroup.AddRule(
-			c.Args().Get(1), rule, temporal.GetExecutionTimeout(),
+			c.Args().Get(1), rule, temporal.ExecutionTimeout(),
 		); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -985,7 +985,7 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			rule.Targets = c.StringSlice("cidr")
 		}
 
-		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, temporal.GetExecutionTimeout())
+		err := clientSession.SecurityGroup.DeleteRule(c.Args().Get(1), rule, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -1050,7 +1050,7 @@ var subnetList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Subnet.List(networkRef, c.Bool("all"), temporal.GetExecutionTimeout())
+		resp, err := clientSession.Subnet.List(networkRef, c.Bool("all"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -1136,7 +1136,7 @@ var subnetDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Subnet.Delete(networkRef, list, temporal.GetExecutionTimeout())
+		err := clientSession.Subnet.Delete(networkRef, list, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -1181,7 +1181,7 @@ var subnetInspect = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		subnet, err := clientSession.Subnet.Inspect(networkRef, c.Args().Get(1), temporal.GetExecutionTimeout())
+		subnet, err := clientSession.Subnet.Inspect(networkRef, c.Args().Get(1), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(
@@ -1306,7 +1306,7 @@ var subnetCreate = &cli.Command{
 			networkRef, c.Args().Get(1), c.String("cidr"), c.Bool("failover"),
 			c.String("gwname"), uint32(c.Int("gwport")), c.String("os"), sizing,
 			c.Bool("keep-on-failure"),
-			temporal.GetExecutionTimeout(),
+			temporal.ExecutionTimeout(),
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1600,7 +1600,7 @@ var subnetSecurityGroupAddCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.BindSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), temporal.GetExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), !c.Bool("disabled"), temporal.ExecutionTimeout(),
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1651,7 +1651,7 @@ var subnetSecurityGroupRemoveCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.UnbindSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.GetExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.ExecutionTimeout(),
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1719,7 +1719,7 @@ var subnetSecurityGroupListCommand = &cli.Command{
 		}
 
 		list, err := clientSession.Subnet.ListSecurityGroups(
-			networkRef, c.Args().Get(1), state, temporal.GetExecutionTimeout(),
+			networkRef, c.Args().Get(1), state, temporal.ExecutionTimeout(),
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1770,7 +1770,7 @@ var subnetSecurityGroupEnableCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.EnableSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.GetExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.ExecutionTimeout(),
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -1821,7 +1821,7 @@ var subnetSecurityGroupDisableCommand = &cli.Command{
 		}
 
 		err := clientSession.Subnet.DisableSecurityGroup(
-			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.GetExecutionTimeout(),
+			networkRef, c.Args().Get(1), c.Args().Get(2), temporal.ExecutionTimeout(),
 		)
 		if err != nil {
 			err = fail.FromGRPCStatus(err)

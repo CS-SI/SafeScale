@@ -1488,7 +1488,9 @@ func (s stack) rpcDescribeSpotPriceHistory(zone, templateID *string) ([]*ec2.Spo
 	return resp.SpotPriceHistory, nil
 }
 
-func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *bool, templateID, imageID, keypairName *string, userdata []byte) (*ec2.SpotInstanceRequest, fail.Error) {
+func (s stack) rpcRequestSpotInstance(
+	price, zone, subnetID *string, publicIP *bool, templateID, imageID, keypairName *string, userdata []byte,
+) (*ec2.SpotInstanceRequest, fail.Error) {
 	nullInstance := &ec2.SpotInstanceRequest{}
 	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
 		return nullInstance, xerr
@@ -1544,7 +1546,9 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
+func (s stack) rpcRunInstance(
+	name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte,
+) (_ *ec2.Instance, ferr fail.Error) {
 	nullInstance := &ec2.Instance{}
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nullInstance, xerr
@@ -1821,8 +1825,8 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostCleanupTimeout(),
+		temporal.DefaultDelay(),
+		temporal.HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1831,7 +1835,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId,
-				temporal.GetHostCleanupTimeout(),
+				temporal.HostCleanupTimeout(),
 			)
 		default:
 			return retryErr

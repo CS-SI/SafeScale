@@ -596,7 +596,7 @@ func (a action) loopWithSoftTimeout() (ferr fail.Error) {
 func (a action) loopWithHardTimeout() (ferr fail.Error) {
 	timeout := a.Timeout
 	if timeout == 0 {
-		timeout = temporal.GetOperationTimeout()
+		timeout = temporal.OperationTimeout()
 	}
 
 	var (

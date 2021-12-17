@@ -100,8 +100,8 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (res *abstract.Network
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetDefaultDelay(),
+			temporal.MinDelay(),
+			temporal.DefaultDelay(),
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
@@ -419,8 +419,8 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			temporal.GetDefaultDelay(),
+			temporal.MinDelay(),
+			temporal.DefaultDelay(),
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
@@ -524,7 +524,7 @@ func (s stack) InspectSubnetByName(networkRef, subnetName string) (_ *abstract.S
 			resp, innerErr = s.EC2Service.DescribeSubnets(req)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		temporal.CommunicationTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -567,7 +567,7 @@ func (s stack) ListSubnets(networkRef string) (list []*abstract.Subnet, xerr fai
 			subnets, innerErr = s.EC2Service.DescribeSubnets(query)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		temporal.CommunicationTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr
@@ -628,7 +628,7 @@ func (s stack) listSubnetIDs(networkRef string) (list []string, xerr fail.Error)
 			subnets, innerErr = s.EC2Service.DescribeSubnets(req)
 			return normalizeError(innerErr)
 		},
-		temporal.GetCommunicationTimeout(),
+		temporal.CommunicationTimeout(),
 	)
 	if xerr != nil {
 		return nil, xerr

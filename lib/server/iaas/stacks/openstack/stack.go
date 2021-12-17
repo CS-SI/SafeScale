@@ -21,6 +21,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 
@@ -30,9 +31,6 @@ import (
 
 // stack contains the needs to operate on stack OpenStack
 type stack struct {
-	stacks.Timeouts
-	stacks.Delays
-
 	ComputeClient  *gophercloud.ServiceClient
 	NetworkClient  *gophercloud.ServiceClient
 	VolumeClient   *gophercloud.ServiceClient
@@ -55,6 +53,8 @@ type stack struct {
 
 	// selectedAvailabilityZone contains the last selected availability zone chosen
 	selectedAvailabilityZone string
+
+	*temporal.MutableTimings
 }
 
 // NullStack returns a null value of the stack
@@ -88,7 +88,7 @@ func New(
 		cfg.DefaultSecurityGroupName = defaultSecurityGroupName
 	}
 
-	s := stack{
+	s := &stack{
 		DefaultSecurityGroupName: cfg.DefaultSecurityGroupName,
 
 		authOpts: auth,
@@ -242,10 +242,9 @@ func New(
 
 	}
 
-	s.Timeouts = stacks.NewTimeouts()
-	s.Delays = stacks.NewDelays()
+	s.MutableTimings = temporal.NewTimings()
 
-	return &s, nil
+	return s, nil
 }
 
 // IsNull ...
@@ -256,4 +255,15 @@ func (s *stack) IsNull() bool {
 // GetStackName returns the name of the stack
 func (s stack) GetStackName() (string, fail.Error) {
 	return "openstack", nil
+}
+
+// Timings returns the instance containing current timeout settings
+func (s *stack) Timings() temporal.Timings {
+	if s == nil {
+		return temporal.NewTimings()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings
 }
