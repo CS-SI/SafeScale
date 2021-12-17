@@ -1,4 +1,4 @@
-name: Latest Go Build CI
+name: Latest Go Build CI Debug Beta
 
 on:
   push:
