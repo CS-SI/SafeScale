@@ -300,7 +300,18 @@ func sprinterr(m dsl.Matcher) {
 	).
 		Where(m["err"].Type.Is("error")).
 		Report("maybe call $err.Error() instead of fmt.Sprint()?")
+}
 
+func jsonMarshalIgnored(m dsl.Matcher) {
+	m.Match(`_ = json.Marshal($*_)`).
+		Report("json marshalling errors cannot be ignored")
+}
+
+func jsonUnMarshalIgnored(m dsl.Matcher) {
+	m.Match(`$x, _ = json.UnMarshal($*_)`,
+		`$x, _ := json.UnMarshal($*_)`,
+	).
+		Report("json unmarshalling errors cannot be ignored")
 }
 
 func largeloopcopy(m dsl.Matcher) {

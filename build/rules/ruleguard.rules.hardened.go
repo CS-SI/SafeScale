@@ -516,3 +516,15 @@ func intermediateCastWithFunc(m dsl.Matcher) {
 	m.Match(`$x := $y.($z).$w($*_)`, `$x = $y.($z).$w($*_)`).Where(!m.File().Name.Matches(`.*test.go`)).
 		Report(`unchecked cast to $z, then calling a function, it's a panic waiting to happen... and adding 3 lines of code to prevent a panic is always, always, worthy`)
 }
+
+func jsonUnMarshalIgnored(m dsl.Matcher) {
+	m.Match(`_ = json.UnMarshal($*_)`).Where(!m.File().Name.Matches(`.*test.go`)).
+		Report("json marshalling errors cannot be ignored, log the error or handle it, never ignore")
+}
+
+func jsonMarshalIgnored(m dsl.Matcher) {
+	m.Match(`$x, _ = json.Marshal($*_)`,
+		`$x, _ := json.Marshal($*_)`,
+	).Where(!m.File().Name.Matches(`.*test.go`)).
+		Report("json unmarshalling errors cannot be ignored, log the error or handle it, never ignore")
+}

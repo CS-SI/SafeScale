@@ -387,7 +387,9 @@ semgrep: begin
 	@$(GO) get -d $(RULES_DSL)@v0.3.10 &>/dev/null || true;
 	@($(WHICH) ruleguard > /dev/null || (echo "ruleguard not installed in your system" && exit 1))
 	@$(RM) semgrep_results.log || true
-	@ruleguard -c=0 -rules build/rules/ruleguard.rules.$(CERR).go ./... 2>&1 | xargs -n2 -d'\n' | grep -v nolint | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) semgrep_results.log
+	@ruleguard -c=0 -rules build/rules/ruleguard.rules.$(CERR).go ./... 2>&1 | xargs -n2 -d'\n' | grep -v nolint | grep -v _test.go | grep -v mock | grep -v .pb. | awk 'NF' | $(TEE) semgrep_results.log
+	@ruleguard -c=0 -rules build/rules/ruleguard.rules.json.go ./... 2>&1 | xargs -n2 -d'\n' | grep -v nolint | grep -v mock | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) -a semgrep_results.log
+	@ruleguard -c=0 -rules build/rules/ruleguard.rules.locks.go ./... 2>&1 | xargs -n2 -d'\n' | grep -v defer | grep -v nolint | grep -v mock | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) -a semgrep_results.log
 	@if [ -s ./semgrep_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) semgrep FAILED, look at semgrep_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
 minimock: begin generate
