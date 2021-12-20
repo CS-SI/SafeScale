@@ -463,7 +463,10 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 			}
 		}
 
-		config.ProjectID = identity["project_id"].(string)
+		config.ProjectID, ok = identity["project_id"].(string)
+		if !ok {
+			return config, fail.NewError("'project_id' MUST be a string in tenants.toml: %v", identity["project_id"])
+		}
 
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",
@@ -639,7 +642,10 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 			}
 		}
 
-		config.ProjectID = identity["project_id"].(string)
+		config.ProjectID, ok = identity["project_id"].(string)
+		if !ok {
+			return config, fail.NewError("'project_id' MUST be a string in tenants.toml: %v", identity["project_id"])
+		}
 
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",

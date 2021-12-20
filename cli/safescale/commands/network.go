@@ -539,9 +539,18 @@ func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (
 	case true:
 		if rules, ok := out["rules"].([]interface{}); ok {
 			for _, v := range rules {
-				item := v.(map[string]interface{})
-				direction := item["direction"].(float64)
-				etherType := item["ether_type"].(float64)
+				item, ok := v.(map[string]interface{})
+				if !ok {
+					return nil, fail.NewError("rules MUST be map[string]interface{}")
+				}
+				direction, ok := item["direction"].(float64)
+				if !ok {
+					return nil, fail.NewError("direction MUST be float64")
+				}
+				etherType, ok := item["ether_type"].(float64)
+				if !ok {
+					return nil, fail.NewError("etherType MUST be float64")
+				}
 				item["direction_label"] = strings.ToLower(securitygroupruledirection.Enum(direction).String())
 				item["ether_type_label"] = strings.ToLower(ipversion.Enum(etherType).String())
 			}

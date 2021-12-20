@@ -62,7 +62,10 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	}
 
 	if anon, ok := svcConf.Get("OperatorUsername"); ok {
-		desc.OperatorUsername = anon.(string)
+		desc.OperatorUsername, ok = anon.(string)
+		if !ok {
+			return fail.NewError("OperatorUsername must be a string, it's not: %v", anon)
+		}
 	} else {
 		desc.OperatorUsername = abstract.DefaultUser
 	}

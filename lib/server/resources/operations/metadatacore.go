@@ -262,7 +262,9 @@ func (c *MetadataCore) Alter(callback resources.Callback, options ...data.Immuta
 		for _, v := range options {
 			switch v.Key() {
 			case "Reload":
-				doReload = v.Value().(bool)
+				if bv, ok := v.Value().(bool); ok {
+					doReload = bv
+				}
 			default:
 			}
 		}

@@ -254,7 +254,10 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 
 	var tmpl *txttmpl.Template
 	if anon != nil {
-		tmpl = anon.Load().(*txttmpl.Template)
+		tmpl, ok = anon.Load().(*txttmpl.Template)
+		if !ok {
+			return nil, fail.NewError("error loading template for phase %s", phase)
+		}
 	} else {
 		userdataPhaseTemplatesLock.Lock()
 		defer userdataPhaseTemplatesLock.Unlock()
@@ -276,6 +279,10 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 
 		userdataPhaseTemplates[phase] = new(atomic.Value)
 		userdataPhaseTemplates[phase].Store(tmpl)
+	}
+
+	if tmpl == nil {
+		return nil, fail.NewError("Nil is not a valid template for phase %s", phase)
 	}
 
 	// Transforms struct content to map using json

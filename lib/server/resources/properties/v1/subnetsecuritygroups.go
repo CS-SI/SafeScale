@@ -57,11 +57,11 @@ func (ssg *SubnetSecurityGroups) Replace(p data.Clonable) data.Clonable {
 		return ssg
 	}
 
-	src := p.(*SubnetSecurityGroups)
+	src, _ := p.(*SubnetSecurityGroups) // FIXME: Replace should also return an error
 	*ssg = *src
 	ssg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		ssg.ByID[k] = v.Clone().(*SecurityGroupBond)
+		ssg.ByID[k], _ = v.Clone().(*SecurityGroupBond) // FIXME: Replace should also return an error
 	}
 	ssg.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {

@@ -74,7 +74,7 @@ func (hv *HostVolumes) Replace(p data.Clonable) data.Clonable {
 		return hv
 	}
 
-	src := p.(*HostVolumes)
+	src, _ := p.(*HostVolumes) // FIXME: Replace should also return an error
 	hv.VolumesByID = make(map[string]*HostVolume, len(src.VolumesByID))
 	for k, v := range src.VolumesByID {
 		hv.VolumesByID[k] = v

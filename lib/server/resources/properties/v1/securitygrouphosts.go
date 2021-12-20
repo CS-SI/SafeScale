@@ -52,10 +52,15 @@ func (sgh *SecurityGroupHosts) Clone() data.Clonable {
 
 // Replace ...
 func (sgh *SecurityGroupHosts) Replace(p data.Clonable) data.Clonable {
-	src := p.(*SecurityGroupHosts)
+	// Do not test with isNull(), it's allowed to clone a null value...
+	if sgh == nil || p == nil {
+		return sgh
+	}
+
+	src, _ := p.(*SecurityGroupHosts) // FIXME: Replace should also return an error
 	sgh.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		sgh.ByID[k] = v.Clone().(*SecurityGroupBond)
+		sgh.ByID[k], _ = v.Clone().(*SecurityGroupBond) // FIXME: Replace should also return an error
 	}
 	sgh.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {

@@ -140,12 +140,17 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 	}
 	switch t.TargetType() {
 	case featuretargettype.Cluster:
-		w.cluster = t.(*Cluster)
-	// case featuretargettype.Node:
-	// 	w.node = true
-	// 	fallthrough
+		var ok bool
+		w.cluster, ok = t.(*Cluster)
+		if !ok {
+			return nil, fail.NewError("t should be a *Cluster")
+		}
 	case featuretargettype.Host:
-		w.host = t.(*Host)
+		var ok bool
+		w.host, ok = t.(*Host)
+		if !ok {
+			return nil, fail.NewError("t should be a *Host")
+		}
 	}
 
 	if m != installmethod.None {
@@ -700,7 +705,10 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		anon interface{}
 		ok   bool
 	)
-	p := params.(taskLaunchStepParameters)
+	p, ok := params.(taskLaunchStepParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "should be taskLaunchStepParameters")
+	}
 
 	if p.stepName == "" {
 		return nil, fail.InvalidParameterError("param.stepName", "cannot be empty string")
@@ -1240,7 +1248,10 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	p := params.(taskApplyProxyRuleParameters)
+	p, ok := params.(taskApplyProxyRuleParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "is not a taskApplyProxyRuleParameters")
+	}
 	hostName, ok := (*p.variables)["Hostname"].(string)
 	if !ok {
 		return nil, fail.InvalidParameterError("variables['Hostname']", "is not a string")
@@ -1472,7 +1483,10 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			return fail.AbortedError(lerr, "parent task killed")
 		}
 
-		r := rule.(map[interface{}]interface{})
+		r, ok := rule.(map[interface{}]interface{})
+		if !ok {
+			return fail.InvalidParameterError("rule", "should be a map[interface{}][interface{}]")
+		}
 		targets := w.interpretRuleTargets(r)
 
 		// If security rules concerns gateways, update subnet Security Group for gateways

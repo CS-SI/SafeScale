@@ -60,7 +60,7 @@ func (hif *HostInstalledFeature) Replace(p data.Clonable) data.Clonable {
 		return hif
 	}
 
-	src := p.(*HostInstalledFeature)
+	src, _ := p.(*HostInstalledFeature) // FIXME: Replace should also return an error
 	hif.HostContext = src.HostContext
 	hif.RequiredBy = make(map[string]struct{}, len(src.RequiredBy))
 	for k := range src.RequiredBy {
@@ -113,7 +113,7 @@ func (hf *HostFeatures) Replace(p data.Clonable) data.Clonable {
 		return hf
 	}
 
-	src := p.(*HostFeatures)
+	src, _ := p.(*HostFeatures) // FIXME: Replace should also return an error
 	hf.Installed = make(map[string]*HostInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {
 		hf.Installed[k] = v

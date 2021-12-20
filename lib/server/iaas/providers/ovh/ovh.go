@@ -158,10 +158,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
-		operatorUsername = operatorUsernameIf.(string)
-		if operatorUsername == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstract.DefaultUser
+		operatorUsername, ok = operatorUsernameIf.(string)
+		if ok { // FIXME: Validation
+			if operatorUsername == "" {
+				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+				operatorUsername = abstract.DefaultUser
+			}
 		}
 	}
 
@@ -364,8 +366,16 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	flavorMap := map[string]map[string]interface{}{}
 	for _, flavor := range flavors.([]interface{}) {
 		// Removal of all the unavailable templates
-		if flavor.(map[string]interface{})["available"].(bool) {
-			flavorMap[flavor.(map[string]interface{})["id"].(string)] = flavor.(map[string]interface{})
+		if flavmap, ok := flavor.(map[string]interface{}); ok {
+			if val, ok := flavmap["available"].(bool); ok {
+				if val {
+					if aflav, ok := flavmap["id"]; ok {
+						if key, ok := aflav.(string); ok {
+							flavorMap[key] = flavmap
+						}
+					}
+				}
+			}
 		}
 	}
 

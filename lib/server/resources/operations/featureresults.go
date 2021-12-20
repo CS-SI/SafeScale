@@ -169,7 +169,7 @@ func (r results) ErrorMessagesOfKey(key string) string {
 func (r results) ErrorMessagesOfUnit(unitName string) string {
 	output := ""
 	for _, urs := range r {
-		rurs := urs.(*unitResults)
+		rurs, _ := urs.(*unitResults) // FIXME: Missing error check
 		for k, v := range *rurs {
 			if k == unitName {
 				val := v.Error().Error()
@@ -186,7 +186,7 @@ func (r results) ErrorMessagesOfUnit(unitName string) string {
 func (r results) ResultsOfUnit(unitName string) resources.UnitResults {
 	newSrs := unitResults{}
 	for _, urs := range r {
-		rurs := urs.(*unitResults)
+		rurs, _ := urs.(*unitResults) // FIXME: Missing eror check
 		for k, v := range *rurs {
 			if k == unitName {
 				newSrs.AddOne(unitName, v)

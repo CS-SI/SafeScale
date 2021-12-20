@@ -55,7 +55,10 @@ import (
 func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	req := params.(abstract.ClusterRequest)
+	req, ok := params.(abstract.ClusterRequest)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "should be an abstract.ClusterRequest")
+	}
 	ctx := task.Context()
 
 	// Check if Cluster exists in metadata; if yes, error
@@ -475,7 +478,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	if imageQuery == "" {
 		if cfg, xerr := instance.GetService().GetConfigurationOptions(); xerr == nil {
 			if anon, ok := cfg.Get("DefaultImage"); ok {
-				imageQuery = anon.(string)
+				imageQuery, _ = anon.(string) // FIXME: Missing error handling
 			}
 		}
 	}

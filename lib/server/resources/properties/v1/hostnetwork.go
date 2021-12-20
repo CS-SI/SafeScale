@@ -78,7 +78,7 @@ func (hn *HostNetwork) Replace(p data.Clonable) data.Clonable {
 		return hn
 	}
 
-	src := p.(*HostNetwork)
+	src, _ := p.(*HostNetwork) // FIXME: Replace should also return an error
 	*hn = *src
 	hn.NetworksByID = make(map[string]string, len(src.NetworksByID))
 	for k, v := range src.NetworksByID {

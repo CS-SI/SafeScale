@@ -356,7 +356,11 @@ func (instance *Subnet) updateCachedInformation() fail.Error {
 			return xerr
 		}
 
-		instance.gateways[0] = hostInstance.(*Host)
+		var ok bool
+		instance.gateways[0], ok = hostInstance.(*Host)
+		if !ok {
+			return fail.NewError("hostInstance should be a *Host")
+		}
 	}
 	if secondaryGatewayID != "" {
 		hostInstance, xerr := LoadHost(instance.GetService(), secondaryGatewayID)
@@ -365,7 +369,11 @@ func (instance *Subnet) updateCachedInformation() fail.Error {
 			return xerr
 		}
 
-		instance.gateways[1] = hostInstance.(*Host)
+		var ok bool
+		instance.gateways[1], ok = hostInstance.(*Host)
+		if !ok {
+			return fail.NewError("hostInstance should be a *Host")
+		}
 	}
 
 	return nil

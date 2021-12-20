@@ -149,7 +149,12 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 		}
 	}
 
-	if sgInstance = cacheEntry.Content().(*SecurityGroup); sgInstance == nil {
+	var ok bool
+	sgInstance, ok = cacheEntry.Content().(*SecurityGroup)
+	if !ok {
+		return nil, fail.InconsistentError("cache content should be a *SecurityGroup", ref)
+	}
+	if sgInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
 	}
 	_ = cacheEntry.LockContent()

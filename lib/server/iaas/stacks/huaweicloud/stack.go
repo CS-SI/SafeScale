@@ -1113,7 +1113,10 @@ func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 
 func (s stack) Migrate(operation string, params map[string]interface{}) fail.Error {
 	if operation == "networklayers" {
-		abstractSubnet := params["layer"].(*abstract.Subnet)
+		abstractSubnet, ok := params["layer"].(*abstract.Subnet)
+		if !ok {
+			return fail.InvalidParameterError("params[layer]", "should be *abstract.Subnet")
+		}
 		// huaweicloud added a layer called "IPv4 SubnetID", which is returned as SubnetID but is not; Network is the real "OpenStack" Subnet ID
 		// FIXME: maybe huaweicloud has to be reviewed/rewritten not to use a mix of pure OpenStack API and customized Huaweicloud API?
 		abstractSubnet.ID = abstractSubnet.Network

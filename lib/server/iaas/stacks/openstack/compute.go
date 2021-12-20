@@ -413,15 +413,16 @@ func (s stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEff
 		}
 		tpl, xerr := s.InspectTemplate(fid)
 		if xerr != nil {
-			return hostSizing
+			return hostSizing // FIXME: Missing error handling, this function should also return an error
 		}
 		hostSizing.Cores = tpl.Cores
 		hostSizing.DiskSize = tpl.DiskSize
 		hostSizing.RAMSize = tpl.RAMSize
 	} else if _, ok := flavor["vcpus"]; ok {
-		hostSizing.Cores = flavor["vcpus"].(int)
-		hostSizing.DiskSize = flavor["disk"].(int)
-		hostSizing.RAMSize = flavor["ram"].(float32) / 1000.0
+		hostSizing.Cores, _ = flavor["vcpus"].(int)     // FIXME: Missing error handling, this function should also return an error
+		hostSizing.DiskSize, _ = flavor["disk"].(int)   // FIXME: Missing error handling, this function should also return an error
+		hostSizing.RAMSize, _ = flavor["ram"].(float32) // FIXME: Missing error handling, this function should also return an error
+		hostSizing.RAMSize = hostSizing.RAMSize / 1000.0
 	}
 	return hostSizing
 }
@@ -624,10 +625,16 @@ func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
 	if found && len(serverList) > 0 {
 		for _, anon := range serverList {
-			entry := anon.(map[string]interface{})
+			entry, ok := anon.(map[string]interface{})
+			if !ok {
+				return nullAHF, fail.InconsistentError("anon should be a map[string]interface{}")
+			}
 			if entry["name"].(string) == name {
 				host := abstract.NewHostCore()
-				host.ID = entry["id"].(string)
+				host.ID, ok = entry["id"].(string)
+				if !ok {
+					return nullAHF, fail.InconsistentError("entry[id] should be a string")
+				}
 				host.Name = name
 				hostFull, xerr := s.InspectHost(host)
 				if xerr != nil {

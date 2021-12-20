@@ -217,7 +217,10 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 			return ruleName, fail.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
 		if _, ok := unjsoned["source-control"]; ok {
-			sourceControl = unjsoned["source-control"].(map[string]interface{})
+			sourceControl, ok = unjsoned["source-control"].(map[string]interface{})
+			if !ok {
+				return "", fail.NewError("unjsoned[source-control] should be a map[string]interface{}")
+			}
 			delete(unjsoned, "source-control")
 		}
 		if _, ok := unjsoned["name"]; !ok {
@@ -243,7 +246,10 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 			return ruleName, fail.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
 		if _, ok := unjsoned["source-control"]; ok {
-			sourceControl = unjsoned["source-control"].(map[string]interface{})
+			sourceControl, ok = unjsoned["source-control"].(map[string]interface{})
+			if !ok {
+				return "", fail.NewError("unjsoned[source-control] should be a map[string]interface{}")
+			}
 			delete(unjsoned, "source-control")
 		}
 		if _, ok := unjsoned["name"]; !ok {
@@ -367,7 +373,10 @@ func (k *KongController) addSourceControl(ctx context.Context,
 			}
 
 			if plugin["name"] == "ip-restriction" {
-				ref = plugin["id"].(string)
+				ref, ok = plugin["id"].(string)
+				if !ok {
+					return fail.InvalidParameterError("plugin[id]", "should be a string")
+				}
 				break
 			}
 		}
@@ -438,7 +447,10 @@ func (k *KongController) post(ctx context.Context, name, url, data string, v *da
 
 	if propagate {
 		if id, ok := response["id"]; ok {
-			(*v)[name] = id.(string)
+			(*v)[name], ok = id.(string)
+			if !ok {
+				return nil, "", fail.NewError("id should be an string: %v", id)
+			}
 		}
 	}
 	return response, httpcode, nil
@@ -465,7 +477,10 @@ func (k *KongController) put(ctx context.Context, name, url, data string, v *dat
 
 	if propagate {
 		if id, ok := response["id"]; ok {
-			(*v)[name] = id.(string)
+			(*v)[name], ok = id.(string)
+			if !ok {
+				return nil, "", fail.NewError("id should be an string: %v", id)
+			}
 		}
 	}
 	return response, httpcode, nil
@@ -492,7 +507,10 @@ func (k *KongController) patch(ctx context.Context, name, url, data string, v *d
 
 	if propagate {
 		if id, ok := response["id"]; ok {
-			(*v)[name] = id.(string)
+			(*v)[name], ok = id.(string)
+			if !ok {
+				return nil, "", fail.NewError("id should be a string: %v", id)
+			}
 		}
 	}
 	return response, httpcode, nil

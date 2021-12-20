@@ -55,10 +55,10 @@ func (cp *ClusterControlplane) Replace(p data.Clonable) data.Clonable {
 		return cp
 	}
 
-	src := p.(*ClusterControlplane)
+	src, _ := p.(*ClusterControlplane) // FIXME: Replace should also return an error
 	*cp = *src
 	if src.VirtualIP != nil {
-		cp.VirtualIP = src.VirtualIP.Clone().(*abstract.VirtualIP)
+		cp.VirtualIP, _ = src.VirtualIP.Clone().(*abstract.VirtualIP) // FIXME: Replace should also return an error
 	}
 	return cp
 }

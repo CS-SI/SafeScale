@@ -328,11 +328,28 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	var list []*abstract.Network
 	if vpcs, ok := r.Body.(map[string]interface{})["vpcs"].([]interface{}); ok {
 		for _, v := range vpcs {
-			item := v.(map[string]interface{})
+			item, ok := v.(map[string]interface{})
+			if !ok {
+				logrus.Warnf("vpc should be a map[string]interface{}")
+				continue
+			}
 			an := abstract.NewNetwork()
-			an.Name = item["name"].(string)
-			an.ID = item["id"].(string)
-			an.CIDR = item["cidr"].(string)
+			an.Name, ok = item["name"].(string)
+			if !ok {
+				logrus.Warnf("name should NOT be empty")
+				continue
+			}
+			an.ID, ok = item["id"].(string)
+			if !ok {
+				logrus.Warnf("id should NOT be empty")
+				continue
+			}
+			an.CIDR, ok = item["cidr"].(string)
+			if !ok {
+				logrus.Warnf("cidr should NOT be empty")
+				continue
+			}
+			// FIXME: Missing validation, all previous fields should be NOT empty
 			list = append(list, an)
 		}
 	}
@@ -499,8 +516,17 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 			id    string
 		)
 		for _, s := range subnetworks {
-			entry = s.(map[string]interface{})
-			id = entry["id"].(string)
+			var ok bool
+			entry, ok = s.(map[string]interface{})
+			if !ok {
+				logrus.Warnf("subnet should be a map[string]interface{}")
+				continue
+			}
+			id, ok = entry["id"].(string)
+			if !ok {
+				logrus.Warnf("id should be a string")
+				continue
+			}
 		}
 		return s.inspectOpenstackSubnet(id)
 	}

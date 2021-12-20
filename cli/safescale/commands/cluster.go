@@ -142,7 +142,7 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		if !remotedesktopInstalled {
 			remotedesktopInstalled = false
 			installedFeatures, ok := config["installed_features"].(*protocol.FeatureListResponse)
-			if ok {
+			if ok { // FIXME: What if it fails ?, we should return an error too
 				for _, v := range installedFeatures.Features {
 					if v.Name == "remotedesktop" {
 						remotedesktopInstalled = true
@@ -152,15 +152,19 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 			}
 		}
 		if remotedesktopInstalled {
-			nodes := config["nodes"].(map[string][]*protocol.Host)
-			masters := nodes["masters"]
-			if len(masters) > 0 {
-				urls := make(map[string]string, len(masters))
-				endpointIP := config["endpoint_ip"].(string)
-				for _, v := range masters {
-					urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
+			nodes, ok := config["nodes"].(map[string][]*protocol.Host)
+			if ok { // FIXME: What if it fails ?, we should return an error too
+				masters := nodes["masters"]
+				if len(masters) > 0 {
+					urls := make(map[string]string, len(masters))
+					endpointIP, ok := config["endpoint_ip"].(string)
+					if ok { // FIXME: What if it fails ?, we should return an error too
+						for _, v := range masters {
+							urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
+						}
+						config["remote_desktop"] = urls
+					}
 				}
-				config["remote_desktop"] = urls
 			}
 		} else {
 			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))

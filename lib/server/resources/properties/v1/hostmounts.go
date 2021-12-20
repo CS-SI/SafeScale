@@ -57,7 +57,7 @@ func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
 		return hlm
 	}
 
-	src := p.(*HostLocalMount)
+	src, _ := p.(*HostLocalMount) // FIXME: Replace should also return an error
 	*hlm = *src
 	return hlm
 }
@@ -96,7 +96,7 @@ func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
 		return hrm
 	}
 
-	src := p.(*HostRemoteMount)
+	src, _ := p.(*HostRemoteMount) // FIXME: Replace should also return an error
 	*hrm = *src
 	return hrm
 }
@@ -144,14 +144,14 @@ func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
 		return hm
 	}
 
-	src := p.(*HostMounts)
+	src, _ := p.(*HostMounts) // FIXME: Replace should also return an error
 	hm.LocalMountsByDevice = make(map[string]string, len(src.LocalMountsByDevice))
 	for k, v := range src.LocalMountsByDevice {
 		hm.LocalMountsByDevice[k] = v
 	}
 	hm.LocalMountsByPath = make(map[string]*HostLocalMount, len(src.LocalMountsByPath))
 	for k, v := range src.LocalMountsByPath {
-		hm.LocalMountsByPath[k] = v.Clone().(*HostLocalMount)
+		hm.LocalMountsByPath[k], _ = v.Clone().(*HostLocalMount) // FIXME: Replace should also return an error
 	}
 	hm.RemoteMountsByShareID = make(map[string]string, len(src.RemoteMountsByShareID))
 	for k, v := range src.RemoteMountsByShareID {
@@ -163,7 +163,7 @@ func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
 	}
 	hm.RemoteMountsByPath = make(map[string]*HostRemoteMount, len(src.RemoteMountsByPath))
 	for k, v := range src.RemoteMountsByPath {
-		hm.RemoteMountsByPath[k] = v.Clone().(*HostRemoteMount)
+		hm.RemoteMountsByPath[k], _ = v.Clone().(*HostRemoteMount) // FIXME: Replace should also return an error
 	}
 	hm.BucketMounts = make(map[string]string, len(src.BucketMounts))
 	for k, v := range src.BucketMounts {

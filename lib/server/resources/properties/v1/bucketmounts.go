@@ -93,7 +93,7 @@ func (bm *BucketMounts) Replace(p data.Clonable) data.Clonable {
 		return bm
 	}
 
-	src := p.(*BucketMounts)
+	src, _ := p.(*BucketMounts) // FIXME: Replace should also return an error
 	bm.ByHostID = make(map[string]string, len(src.ByHostID))
 	for k, v := range src.ByHostID {
 		bm.ByHostID[k] = v

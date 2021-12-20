@@ -285,8 +285,14 @@ func (s stack) Migrate(operation string, params map[string]interface{}) (ferr fa
 	}
 
 	if operation == "removetag" {
-		subnetInstance := params["subnetInstance"].(resources.Subnet)
-		instance := params["instance"].(*operations.Host)
+		subnetInstance, ok := params["subnetInstance"].(resources.Subnet)
+		if !ok {
+			return fail.InvalidParameterError("subnetInstance", "should be resources.Subnet")
+		}
+		instance, ok := params["instance"].(*operations.Host)
+		if !ok {
+			return fail.InvalidParameterError("instance", "should be *operations.Host")
+		}
 
 		networkInstance, xerr := subnetInstance.InspectNetwork()
 		if xerr != nil {

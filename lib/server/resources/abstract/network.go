@@ -89,7 +89,7 @@ func (n *Network) Replace(p data.Clonable) data.Clonable {
 		return n
 	}
 
-	src := p.(*Network)
+	src, _ := p.(*Network) // FIXME: Replace should also return an error
 	*n = *src
 	n.DNSServers = make([]string, 0, len(src.DNSServers))
 	copy(n.DNSServers, src.DNSServers)

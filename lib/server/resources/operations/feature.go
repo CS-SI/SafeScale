@@ -86,7 +86,11 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 						logrus.Warn(xerr) // Don't hide errors
 						continue
 					}
-					casted := feat.(*Feature)
+					casted, ok := feat.(*Feature)
+					if !ok {
+						logrus.Warnf("feat should be a *Feature")
+						continue
+					}
 					if _, ok := allEmbeddedFeaturesMap[casted.displayName]; !ok {
 						allEmbeddedFeaturesMap[casted.displayName] = casted
 					}
@@ -160,12 +164,16 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 			xerr = nil
 			var ok bool
 			if _, ok = allEmbeddedFeaturesMap[name]; !ok {
-				xerr = fail.NotFoundError("failed to find a Feature named '%s'", name)
-			} else {
-				casted = allEmbeddedFeaturesMap[name].Clone().(*Feature)
-				casted.displayFileName = name + ".yml [embedded]"
-				xerr = nil
+				return nil, fail.NotFoundError("failed to find a Feature named '%s'", name)
 			}
+
+			casted, ok = allEmbeddedFeaturesMap[name].Clone().(*Feature)
+			if !ok {
+				return nil, fail.NewError("embedded feature should be a *Feature")
+			}
+			casted.displayFileName = name + ".yml [embedded]"
+			xerr = nil // FIXME: This function uses a bad error handling practice, when we have an error, return the error, don't reassign it
+
 		default:
 			xerr = fail.SyntaxError("failed to read the specification file of Feature called '%s': %s", name, err.Error())
 		}
@@ -210,7 +218,11 @@ func NewEmbeddedFeature(svc iaas.Service, name string) (_ resources.Feature, xer
 	if _, ok := allEmbeddedFeaturesMap[name]; !ok {
 		return casted, fail.NotFoundError("failed to find a Feature named '%s'", name)
 	}
-	casted = allEmbeddedFeaturesMap[name].Clone().(*Feature)
+	var ok bool
+	casted, ok = allEmbeddedFeaturesMap[name].Clone().(*Feature)
+	if !ok {
+		return nil, fail.NewError("feature is not a *Feature")
+	}
 	casted.svc = svc
 
 	// if we can log the sha256 of the feature, do it
@@ -247,7 +259,7 @@ func (f *Feature) Replace(p data.Clonable) data.Clonable {
 		return f
 	}
 
-	src := p.(*Feature)
+	src, _ := p.(*Feature) // FIXME: Replace should also return an error
 	*f = *src
 	f.installers = make(map[installmethod.Enum]Installer, len(src.installers))
 	for k, v := range src.installers {

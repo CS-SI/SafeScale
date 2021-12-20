@@ -57,7 +57,7 @@ func (nd *NetworkSubnets) Replace(p data.Clonable) data.Clonable {
 		return nd
 	}
 
-	src := p.(*NetworkSubnets)
+	src, _ := p.(*NetworkSubnets) // FIXME: Replace should also return an error
 	nd.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
 		nd.ByID[k] = v

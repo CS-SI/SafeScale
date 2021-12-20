@@ -252,7 +252,9 @@ func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
 			}
 		}
 	} else if lvl1, ok := body["conflictingRequest"].(map[string]interface{}); ok {
-		msg = lvl1["message"].(string)
+		if lvl1m, ok := lvl1["message"].(string); ok {
+			msg = lvl1m
+		} // FIXME: Missing else
 	} else if lvl1, ok := body["message"].(string); ok {
 		msg = lvl1
 	}

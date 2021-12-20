@@ -82,7 +82,7 @@ func (instance *Cluster) TargetType() featuretargettype.Enum {
 	return featuretargettype.Cluster
 }
 
-// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = the highest preference)
+// InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
 func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 	if instance == nil || instance.IsNull() {
@@ -92,7 +92,11 @@ func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 
 	out := make(map[uint8]installmethod.Enum)
 	instance.installMethods.Range(func(k, v interface{}) bool {
-		out[k.(uint8)] = v.(installmethod.Enum)
+		var ok bool
+		out[k.(uint8)], ok = v.(installmethod.Enum)
+		if !ok {
+			return false
+		}
 		return true
 	})
 	return out

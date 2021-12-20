@@ -61,7 +61,7 @@ func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
 		return nh
 	}
 
-	src := p.(*NetworkHosts)
+	src, _ := p.(*NetworkHosts) // FIXME: Replace should also return an error
 	nh.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
 		nh.ByID[k] = v

@@ -59,7 +59,7 @@ func (hcm *HostClusterMembership) Replace(p data.Clonable) data.Clonable {
 		return hcm
 	}
 
-	src := p.(*HostClusterMembership)
+	src, _ := p.(*HostClusterMembership) // FIXME: Replace should also return an error
 	*hcm = *src
 	return hcm
 }

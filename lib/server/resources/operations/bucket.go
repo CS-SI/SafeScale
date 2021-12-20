@@ -105,9 +105,16 @@ func LoadBucket(svc iaas.Service, name string) (b resources.Bucket, xerr fail.Er
 		}
 	}
 
-	if b = cacheEntry.Content().(resources.Bucket); b == nil {
+	var ok bool
+	b, ok = cacheEntry.Content().(resources.Bucket)
+	if !ok {
+		return nil, fail.InconsistentError("cache content should be a resources.Bucket", name)
+	}
+
+	if b == nil {
 		return nil, fail.InconsistentError("nil value found in Bucket cache for key '%s'", name)
 	}
+
 	_ = cacheEntry.LockContent()
 
 	return b, nil
@@ -597,17 +604,28 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 		MountPoint: mountPoint,
 	}
 	if anon, ok := authOpts.Config("AuthURL"); ok {
-		desc.AuthURL = anon.(string)
+		if aurl, ok := anon.(string); ok {
+			desc.AuthURL = aurl
+		}
 	}
 	desc.Endpoint = osConfig.Endpoint
 
 	// needed value for Description.ProjectName may come from various config entries depending on the Cloud Provider
 	if anon, ok := authOpts.Config("ProjectName"); ok {
-		desc.ProjectName = anon.(string)
+		desc.ProjectName, ok = anon.(string)
+		if !ok {
+			return fail.InconsistentError("anon should be a string")
+		}
 	} else if anon, ok := authOpts.Config("ProjectID"); ok {
-		desc.ProjectName = anon.(string)
+		desc.ProjectName, ok = anon.(string)
+		if !ok {
+			return fail.InconsistentError("anon should be a string")
+		}
 	} else if anon, ok := authOpts.Config("TenantName"); ok {
-		desc.ProjectName = anon.(string)
+		desc.ProjectName, ok = anon.(string)
+		if !ok {
+			return fail.InconsistentError("anon should be a string")
+		}
 	}
 
 	desc.Username = osConfig.User

@@ -197,7 +197,7 @@ func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
 		return vip
 	}
 
-	src := p.(*VirtualIP)
+	src, _ := p.(*VirtualIP) // FIXME: Replace should also return an error
 	*vip = *src
 	vip.Hosts = make([]*HostCore, 0, len(src.Hosts))
 	for _, v := range src.Hosts {

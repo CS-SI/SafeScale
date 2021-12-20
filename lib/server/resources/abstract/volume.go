@@ -74,7 +74,7 @@ func (v *Volume) Replace(p data.Clonable) data.Clonable {
 		return v
 	}
 
-	src := p.(*Volume)
+	src, _ := p.(*Volume) // FIXME: Replace should also return an error
 	*v = *src
 	return v
 }

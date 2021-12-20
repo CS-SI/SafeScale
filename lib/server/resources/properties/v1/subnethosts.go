@@ -54,7 +54,7 @@ func (sh *SubnetHosts) Replace(p data.Clonable) data.Clonable {
 		return sh
 	}
 
-	src := p.(*SubnetHosts)
+	src, _ := p.(*SubnetHosts) // FIXME: Replace should also return an error
 	sh.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
 		sh.ByID[k] = v

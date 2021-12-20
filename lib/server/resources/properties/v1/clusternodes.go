@@ -66,7 +66,7 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 		return n
 	}
 
-	src := p.(*ClusterNodes)
+	src, _ := p.(*ClusterNodes) // FIXME: Replace should also return an error
 	*n = *src
 	n.Masters = make([]*ClusterNode, len(src.Masters))
 	for k, v := range src.Masters {

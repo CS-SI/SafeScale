@@ -160,7 +160,10 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		}
 	}
 
-	hostInstance := ce.Content().(resources.Host)
+	hostInstance, ok := ce.Content().(resources.Host)
+	if !ok {
+		return nil, fail.InconsistentError("cache content for key %s is not a resources.Host", ref)
+	}
 	if hostInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
 	}
@@ -373,9 +376,11 @@ func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
 
 	var userName string
 	if anon, ok := cfg.Get("OperatorUsername"); ok {
-		userName = anon.(string)
-		if userName == "" {
-			logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
+		userName, ok = anon.(string)
+		if ok {
+			if userName == "" {
+				logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
+			}
 		}
 	}
 	if userName == "" {
@@ -1775,13 +1780,13 @@ func (instance *Host) waitInstallPhase(
 			stderr := ""
 
 			if astdout, ok := xerr.Annotation("stdout"); ok {
-				if _, ok = astdout.(string); ok {
-					stdout = astdout.(string)
+				if val, ok := astdout.(string); ok {
+					stdout = val
 				}
 			}
 			if astderr, ok := xerr.Annotation("stderr"); ok {
-				if _, ok = astderr.(string); ok {
-					stderr = astderr.(string)
+				if val, ok := astderr.(string); ok {
+					stderr = val
 				}
 			}
 
@@ -2955,11 +2960,17 @@ func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, xerr
 					}
 
 					if item, ok := sharesV1.ByID[shareRef]; ok {
-						hostShare = item.Clone().(*propertiesv1.HostShare)
+						hostShare, ok = item.Clone().(*propertiesv1.HostShare)
+						if !ok {
+							return fail.InconsistentError("item should be a *propertiesv1.HostShare")
+						}
 						return nil
 					}
 					if item, ok := sharesV1.ByName[shareRef]; ok {
-						hostShare = sharesV1.ByID[item].Clone().(*propertiesv1.HostShare)
+						hostShare, ok = sharesV1.ByID[item].Clone().(*propertiesv1.HostShare)
+						if !ok {
+							return fail.InconsistentError("hostShare should be a *propertiesv1.HostShare")
+						}
 						return nil
 					}
 					return fail.NotFoundError(

@@ -884,8 +884,14 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		}
 
 		{
-			primaryGateway = result["host"].(*Host)
-			primaryUserdata = result["userdata"].(*userdata.Content)
+			primaryGateway, ok = result["host"].(*Host)
+			if !ok {
+				return fail.InconsistentError("result[host] should be a *Host")
+			}
+			primaryUserdata, ok = result["userdata"].(*userdata.Content)
+			if !ok {
+				return fail.InconsistentError("result[userdata] should be a *userdata.Content")
+			}
 			primaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
 			// delete primary gateway if something fails
@@ -963,8 +969,15 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 
 		// else is toxic
 		{
-			secondaryGateway = result["host"].(*Host)
-			secondaryUserdata = result["userdata"].(*userdata.Content)
+			var ok bool
+			secondaryGateway, ok = result["host"].(*Host)
+			if !ok {
+				return fail.InconsistentError("result[host] should be a *Host")
+			}
+			secondaryUserdata, ok = result["userdata"].(*userdata.Content)
+			if !ok {
+				return fail.InvalidParameterError("result[userdata] shoulde be a *userdate.Content")
+			}
 			secondaryUserdata.GatewayHAKeepalivedPassword = keepalivedPassword
 
 			// register gateway id in subnet metadata

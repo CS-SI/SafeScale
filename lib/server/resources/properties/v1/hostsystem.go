@@ -55,7 +55,7 @@ func (hs *HostSystem) Replace(p data.Clonable) data.Clonable {
 		return hs
 	}
 
-	src := p.(*HostSystem)
+	src, _ := p.(*HostSystem) // FIXME: Replace should also return an error
 	*hs = *src
 	return hs
 }

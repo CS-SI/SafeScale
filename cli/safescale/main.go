@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
@@ -183,6 +184,9 @@ func main() {
 		// Starts ctrl+c handler before app.RunContext()
 		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 		go func() {
+			var crash error
+			defer fail.OnPanic(&crash)
+
 			for {
 				<-signalCh
 				atomic.StoreUint32(&onAbort, 1)
