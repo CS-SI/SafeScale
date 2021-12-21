@@ -68,7 +68,7 @@ type Host interface {
 	Push(ctx context.Context, source, target, owner, mode string, timeout time.Duration) (int, string, string, fail.Error)                       // uploads a file to host
 	PushStringToFile(ctx context.Context, content string, filename string) fail.Error                                                            // creates a file 'filename' on remote 'host' with the content 'content'
 	PushStringToFileWithOwnership(ctx context.Context, content string, filename string, owner, mode string) fail.Error                           // creates a file 'filename' on remote 'host' with the content 'content' and apply ownership to it
-	Reboot(ctx context.Context) fail.Error                                                                                                       // reboots the host
+	Reboot(ctx context.Context, soft bool) fail.Error                                                                                            // reboots the host
 	Resize(ctx context.Context, hostSize abstract.HostSizingRequirements) fail.Error                                                             // resize the host (probably not yet implemented on some proviers if not all)
 	Run(ctx context.Context, cmd string, outs outputs.Enum, connectionTimeout, executionTimeout time.Duration) (int, string, string, fail.Error) // tries to execute command 'cmd' on the host
 	Start(ctx context.Context) fail.Error                                                                                                        // starts the host

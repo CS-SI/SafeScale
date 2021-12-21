@@ -115,7 +115,7 @@ type Stack interface {
 	// DeleteVIP deletes the port corresponding to the VIP
 	DeleteVIP(*abstract.VirtualIP) fail.Error
 
-	// CreateHost creates a host that fulfils the request
+	// CreateHost creates a host that fulfills the request
 	CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
 	// ClearHostStartupScript clears the Startup Script of the Host (if the stack can do it)
 	ClearHostStartupScript(stacks.HostParameter) fail.Error

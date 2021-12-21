@@ -194,7 +194,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
-		master, xerr := instance.UnsafeFindAvailableMaster(ctx)
+		master, xerr := instance.unsafeFindAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -208,7 +208,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	v["ClusterMasters"], xerr = instance.UnsafeListMasters()
+	v["ClusterMasters"], xerr = instance.unsafeListMasters()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -226,7 +226,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 	v["ClusterMasterIDs"] = list
 
-	v["ClusterMasterIPs"], xerr = instance.UnsafeListMasterIPs()
+	v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -681,7 +681,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	params["MasterIPs"], xerr = instance.UnsafeListMasterIPs()
+	params["MasterIPs"], xerr = instance.unsafeListMasterIPs()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -702,7 +702,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 	}
 	if retcode != 0 {
 		xerr = fail.ExecutionError(nil, "failed to install common node requirements")
-		_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 		return xerr
 	}
 
@@ -718,6 +718,25 @@ func (instance *Cluster) installReverseProxy(ctx context.Context) (ferr fail.Err
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
+	}
+
+	dockerDisabled := false
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			_, dockerDisabled = featuresV1.Disabled["docker"]
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	if dockerDisabled {
+		return nil
 	}
 
 	clusterName := identity.Name
@@ -771,6 +790,25 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context) (ferr fail.Er
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
+	}
+
+	dockerDisabled := false
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			_, dockerDisabled = featuresV1.Disabled["docker"]
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	if dockerDisabled {
+		return nil
 	}
 
 	disabled := false
@@ -887,6 +925,24 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
 	}
 
+	dockerDisabled := false
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			_, dockerDisabled = featuresV1.Disabled["docker"]
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+	if dockerDisabled {
+		return nil
+	}
+
 	disabled := false
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -935,6 +991,25 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 		return fail.InvalidParameterError("hostLabel", "cannot be empty string")
 	}
 
+	dockerDisabled := false
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			_, dockerDisabled = featuresV1.Disabled["docker"]
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	if dockerDisabled {
+		return nil
+	}
+
 	disabled := false
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -975,6 +1050,25 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 // installDocker installs docker and docker-compose
 func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
+
+	dockerDisabled := false
+	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+			_, dockerDisabled = featuresV1.Disabled["docker"]
+			return nil
+		})
+	})
+	if xerr != nil {
+		return xerr
+	}
+
+	if dockerDisabled {
+		return nil
+	}
 
 	// uses NewFeature() to let a chance to the user to use its own docker feature
 	feat, xerr := NewFeature(instance.GetService(), "docker")

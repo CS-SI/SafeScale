@@ -17,7 +17,6 @@
 package operations
 
 import (
-	"context"
 	"fmt"
 	"reflect"
 	"time"
@@ -26,7 +25,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/userdata"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
@@ -61,8 +59,8 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	if len(hostReq.Subnets) == 0 {
 		return nil, fail.InvalidRequestError("params.request.Networks cannot be an empty '[]*abstract.Network'")
 	}
-
 	hostSizing := params.(taskCreateGatewayParameters).sizing
+
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
 	svc := instance.GetService()
 	hostReq.PublicIP = true
@@ -190,41 +188,46 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		fmt.Sprintf("Ending final configuration phases on the gateway '%s'", gwname),
 	)()
 
-	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData, 4*time.Minute) // FIXME: Hardcoded timeout
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
+	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
+
+	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData) {
+		xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY, userData, waitingTime)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
+	} else {
+		logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE3_GATEWAY_HIGH_AVAILABILITY)
 	}
 
-	// If we have an error here, we just ignore it
-	xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, userData, 4*time.Minute) // FIXME: Hardcoded timeout
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		theCause := fail.Cause(xerr)
-		if _, ok := theCause.(*fail.ErrTimeout); !ok {
+	if objgw.thePhaseDoesSomething(task.Context(), userdata.PHASE4_SYSTEM_FIXES, userData) {
+		// If we have an error here, we just ignore it
+		xerr = objgw.runInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, userData, waitingTime)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			theCause := fail.ConvertError(fail.Cause(xerr))
+			if _, ok := theCause.(*fail.ErrTimeout); !ok || theCause.IsNull() {
+				return nil, xerr
+			}
+
+			debug.IgnoreError(xerr)
+		}
+
+		// intermediate gateway reboot
+		logrus.Infof("Rebooting gateway '%s'", gwname)
+		xerr = objgw.Reboot(task.Context(), true)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
 			return nil, xerr
 		}
 
-		debug.IgnoreError(xerr)
-	}
-
-	waitingTime := 4 * time.Minute // FIXME: Hardcoded timeout
-
-	// intermediate gateway reboot
-	logrus.Infof("Rebooting gateway '%s'", gwname)
-	command := `echo "sleep 4 ; sudo systemctl reboot" | at now`
-	rebootCtx, cancelReboot := context.WithTimeout(task.Context(), waitingTime)
-	defer cancelReboot()
-	_, _, _, xerr = objgw.Run(rebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
-	if xerr != nil {
-		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
-	}
-	time.Sleep(temporal.GetDefaultDelay())
-
-	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, 0)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
+		_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE4_SYSTEM_FIXES, 0)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
+	} else {
+		logrus.Debugf("Nothing to do for the phase '%s'", userdata.PHASE4_SYSTEM_FIXES)
 	}
 
 	// final phase...
@@ -234,17 +237,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		return nil, xerr
 	}
 
-	// Final gateway reboot
-	logrus.Infof("Rebooting gateway '%s'", gwname)
-	command = `echo "sleep 4 ; sudo systemctl reboot" | at now`
-	lastRebootCtx, lastCancelReboot := context.WithTimeout(task.Context(), waitingTime)
-	defer lastCancelReboot()
-	_, _, _, xerr = objgw.Run(lastRebootCtx, command, outputs.COLLECT, 10*time.Second, waitingTime) // nolint
-	if xerr != nil {
-		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
-	}
-	time.Sleep(temporal.GetDefaultDelay())
-
+	// By design, phsse 5 doesn't  touch network cfg, so no reboot needed
 	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE5_FINAL, time.Duration(0))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

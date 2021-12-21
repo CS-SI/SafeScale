@@ -265,7 +265,6 @@ function no_daily_update() {
 }
 
 # ---- Main
-
 export DEBIAN_FRONTEND=noninteractive
 export UCF_FORCE_CONFFNEW=1
 
@@ -281,6 +280,7 @@ create_user
 no_daily_update
 
 touch /etc/cloud/cloud-init.disabled
+# ---- EndMain
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.init.done
 

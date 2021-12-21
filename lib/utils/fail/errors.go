@@ -60,6 +60,8 @@ type Error interface {
 	GRPCCode() codes.Code
 	ToGRPCStatus() error
 
+	IsNull() bool
+
 	prependToMessage(string)
 }
 
@@ -436,7 +438,7 @@ func (e *ErrWarning) Annotate(key string, value data.Annotation) data.Annotatabl
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrWarning.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -494,7 +496,7 @@ func (e *ErrTimeout) Annotate(key string, value data.Annotation) data.Annotatabl
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrTimeout.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -545,7 +547,7 @@ func (e *ErrNotFound) Annotate(key string, value data.Annotation) data.Annotatab
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotFound.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -596,7 +598,7 @@ func (e *ErrNotAvailable) Annotate(key string, value data.Annotation) data.Annot
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAvailable.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -653,7 +655,7 @@ func (e *ErrDuplicate) Annotate(key string, value data.Annotation) data.Annotata
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrDuplicate.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -699,7 +701,7 @@ func (e *ErrInvalidRequest) Annotate(key string, value data.Annotation) data.Ann
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidRequest.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -750,7 +752,7 @@ func (e *ErrSyntax) Annotate(key string, value data.Annotation) data.Annotatable
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -795,7 +797,7 @@ func (e *ErrNotAuthenticated) Annotate(key string, value data.Annotation) data.A
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -840,7 +842,7 @@ func (e *ErrForbidden) Annotate(key string, value data.Annotation) data.Annotata
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -892,7 +894,7 @@ func (e *ErrAborted) Annotate(key string, value data.Annotation) data.Annotatabl
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -949,7 +951,7 @@ func (e *ErrOverflow) Annotate(key string, value data.Annotation) data.Annotatab
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -994,7 +996,7 @@ func (e *ErrOverload) Annotate(key string, value data.Annotation) data.Annotatab
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverload.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -1046,7 +1048,7 @@ func (e *ErrNotImplemented) Annotate(key string, value data.Annotation) data.Ann
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotImplemented.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -1093,7 +1095,7 @@ func (e *ErrRuntimePanic) Annotate(key string, value data.Annotation) data.Annot
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrRuntimePanic.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -1140,7 +1142,7 @@ func (e *ErrInvalidInstance) Annotate(key string, value data.Annotation) data.An
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstance.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -1201,7 +1203,7 @@ func (e *ErrInvalidParameter) Annotate(key string, value data.Annotation) data.A
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidParameter.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -1248,7 +1250,7 @@ func (e *ErrInvalidInstanceContent) Annotate(key string, value data.Annotation) 
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstanceContent.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -1293,7 +1295,7 @@ func (e *ErrInconsistent) Annotate(key string, value data.Annotation) data.Annot
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInconsistent.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -1355,7 +1357,7 @@ func (e *ErrExecution) Annotate(key string, value data.Annotation) data.Annotata
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrExecution.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -1400,7 +1402,7 @@ func (e *ErrAlteredNothing) Annotate(key string, value data.Annotation) data.Ann
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAlteredNothing.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }
 
@@ -1445,6 +1447,6 @@ func (e *ErrUnknown) Annotate(key string, value data.Annotation) data.Annotatabl
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrUnknown.Annotate()", "from null instance", 0))
 		return e
 	}
-	_ = e.errorCore.Annotate(key, value)
+	e.errorCore.Annotate(key, value)
 	return e
 }

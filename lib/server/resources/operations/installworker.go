@@ -170,6 +170,7 @@ func (w *worker) CanProceed(ctx context.Context, s resources.FeatureSettings) fa
 	switch w.target.TargetType() {
 	case featuretargettype.Cluster:
 		xerr := w.validateContextForCluster()
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr == nil && !s.SkipSizingRequirements {
 			xerr = w.validateClusterSizing(ctx)
 		}
@@ -191,7 +192,7 @@ func (w *worker) identifyAvailableMaster() (_ resources.Host, xerr fail.Error) {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		w.availableMaster, xerr = w.cluster.UnsafeFindAvailableMaster(context.TODO())
+		w.availableMaster, xerr = w.cluster.unsafeFindAvailableMaster(context.TODO())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -206,7 +207,7 @@ func (w *worker) identifyAvailableNode() (_ resources.Host, xerr fail.Error) {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		w.availableNode, xerr = w.cluster.UnsafeFindAvailableNode(context.TODO())
+		w.availableNode, xerr = w.cluster.unsafeFindAvailableNode(context.TODO())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -260,6 +261,7 @@ func (w *worker) extractHostsFailingCheck(ctx context.Context, hosts []resources
 		res[h] = r
 		go func(host resources.Host, res chan resources.Results, done chan fail.Error) {
 			r2, innerXErr := w.feature.Check(ctx, host, w.variables, settings)
+			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				res <- nil
 				done <- innerXErr
@@ -291,7 +293,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 
 	if w.allMasters == nil || len(w.allMasters) == 0 {
 		w.allMasters = []resources.Host{}
-		masters, xerr := w.cluster.UnsafeListMasterIDs(ctx)
+		masters, xerr := w.cluster.unsafeListMasterIDs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -343,7 +345,7 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 
 	if w.allNodes == nil {
 		var allHosts []resources.Host
-		list, xerr := w.cluster.UnsafeListNodeIDs(ctx)
+		list, xerr := w.cluster.unsafeListNodeIDs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -378,6 +380,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		}
 
 		gw, xerr := subnetInstance.InspectGateway(true)
+		xerr = debug.InjectPlannedFail(xerr)
 		if xerr == nil {
 			_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
 		}
@@ -470,6 +473,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 	defer rs.Released() // mark the instance as released at the end of the function, for cache considerations
 
 	gw, xerr := rs.InspectGateway(true)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr == nil {
 		if _, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout()); xerr == nil {
 			list = append(list, gw)
@@ -841,8 +845,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		YamlKey: p.stepKey,
 		Serial:  serial,
 	}
-	r, xerr := stepInstance.Run(task, p.hosts, p.variables, w.settings)
-	// If an error occurred, do not execute the remaining steps, fail immediately
+	r, xerr := stepInstance.Run(task, p.hosts, p.variables, w.settings) // If an error occurred, do not execute the remaining steps, fail immediately
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -897,7 +900,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 // 'feature.suitableFor.cluster'.
 // If no flavors is listed, no flavors are authorized (but using 'cluster: no' is strongly recommended)
 func (w *worker) validateContextForCluster() fail.Error {
-	clusterFlavor, xerr := w.cluster.UnsafeGetFlavor()
+	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -938,7 +941,7 @@ func (w *worker) validateContextForHost(settings resources.FeatureSettings) fail
 }
 
 func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
-	clusterFlavor, xerr := w.cluster.UnsafeGetFlavor()
+	clusterFlavor, xerr := w.cluster.unsafeGetFlavor()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -961,7 +964,7 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 			return xerr
 		}
 
-		masters, xerr := w.cluster.ListMasterIDs(ctx)
+		masters, xerr := w.cluster.unsafeListMasterIDs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -984,7 +987,7 @@ func (w *worker) validateClusterSizing(ctx context.Context) (xerr fail.Error) {
 			return xerr
 		}
 
-		list, xerr := w.cluster.ListNodeIDs(ctx)
+		list, xerr := w.cluster.unsafeListNodeIDs(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1013,13 +1016,12 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 	}
 
 	const yamlKey = "feature.proxy.rules"
-	// rules, ok := w.feature.specs.Get(yamlKey).(map[string]map[string]interface{})
 	rules, ok := w.feature.specs.Get(yamlKey).([]interface{})
 	if !ok || len(rules) == 0 {
 		return nil
 	}
 
-	// FIXME: there are valid scenarios for reverse proxy settings when Feature applied to Host...
+	// TODO: there are valid scenarios for reverse proxy settings when Feature applied to Host...
 	if w.cluster == nil {
 		return fail.InvalidParameterError("w.cluster", "nil cluster in setReverseProxy, cannot be nil")
 	}
@@ -1097,7 +1099,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			}
 		}(hosts)
 
-		for _, h := range hosts { // make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
+		for _, h := range hosts { // FXIME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
 			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -1128,6 +1130,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			primaryGatewayVariables["Hostname"] = h.GetName() + domain
 
 			tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/proxy/rule/"))
+			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
@@ -1366,6 +1369,7 @@ func normalizeScript(params *data.Map, reserved data.Map) (string, fail.Error) {
 	}
 
 	bashLibraryVariables, xerr := bashLibraryDefinition.ToMap()
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
 	}

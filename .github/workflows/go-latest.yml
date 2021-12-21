@@ -7,7 +7,7 @@ on:
     branches: [ develop ]
 
 env:
-  GOVERSION: '1.17.3' # The Go version to download (if necessary) and use.
+  GOVERSION: '1.17.4' # The Go version to download (if necessary) and use.
   PROTOCVERSION: 3.17.3
 
 jobs:

@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
-// HostSizingRequirements describes host sizing requirements to fulfil
+// HostSizingRequirements describes host sizing requirements to fulfill
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields

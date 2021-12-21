@@ -157,13 +157,13 @@ func AmendID(id string) data.ImmutableKeyValue {
 }
 
 // RootTask is the "task to rule them all"
-func RootTask() (rt Task, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func RootTask() (rt Task, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 	anon := globalTask.Load()
 	if anon == nil {
-		newT, err := newTask(context.Background(), nil)
-		if err != nil {
-			return nil, err
+		newT, xerr := newTask(context.Background(), nil)
+		if xerr != nil {
+			return nil, xerr
 		}
 
 		newT.id = "0"
@@ -208,9 +208,9 @@ func NewTask() (Task, fail.Error) {
 
 // NewUnbreakableTask is a new task that cannot be aborted by default (but this can be changed with IgnoreAbortSignal(false))
 func NewUnbreakableTask() (Task, fail.Error) {
-	nt, err := newTask(context.Background(), nil) // nolint
-	if err != nil {
-		return nil, err
+	nt, xerr := newTask(context.Background(), nil) // nolint
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// To be able to For safety, normally the cancel signal capture routine is not started in this case...
@@ -306,7 +306,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 		}
 	}
 
-	instance.ctx = context.WithValue(childContext, KeyForTaskInContext, instance)
+	instance.ctx = context.WithValue(childContext, KeyForTaskInContext, instance) // nolint
 
 	return instance, nil
 }
@@ -911,7 +911,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 		}
 	}()
 
-	result, xerr := action(instance, params)
+	result, laterErr := action(instance, params) // we process this error later
 
 	instance.runTerminatedCh <- struct{}{} // Note: Do not put this inside a lock
 	close(instance.runTerminatedCh)        // Note: this channel MUST BE CLOSED
@@ -925,6 +925,8 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 	instance.resultObtained = true
 
 	currentError := instance.err
+
+	xerr := laterErr // time to process the previous error
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAborted:
@@ -951,6 +953,7 @@ func (instance *task) run(action TaskAction, params TaskParameters) {
 			}
 		}
 	}
+
 	instance.err = currentError
 }
 
@@ -1404,7 +1407,7 @@ func (instance *task) Abortable() (bool, fail.Error) {
 // Returns a function to rearm the signal handling
 // If on call the abort signal is already disarmed, does nothing and returned function does nothing also.
 // If on call the abort signal is not disarmed, disarms it and returned function will rearm it.
-// Note: the disarm state is not propagated to subtasks. It's possible to disarm abort signal in a task and want to Abort() explicitely a subtask.
+// Note: the disarm state is not propagated to subtasks. It's possible to disarm abort signal in a task and want to Abort() explicitly a subtask.
 func (instance *task) DisarmAbortSignal() func() {
 	if instance.IsNull() {
 		logrus.Errorf("task.DisarmAbortSignal() called from nil; ignored.")

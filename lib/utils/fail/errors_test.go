@@ -42,6 +42,10 @@ func generateNilNewError() *errorCore {
 	return nil
 }
 
+func noProblems() Error {
+	return nil
+}
+
 func TestAFailErrorisAnError(t *testing.T) {
 	var what error
 	tfe := NewError("ouch")
@@ -623,4 +627,74 @@ func TestPrettyPrintErrorWithExtraInformation(t *testing.T) {
 	if !strings.Contains(formatted, "100") {
 		t.Errorf("we just lost information: %s", formatted)
 	}
+}
+
+func TestNilCheckCast(t *testing.T) {
+	var origin Error
+	origin = generateErrTimeout()
+	if _, ok := origin.(*ErrTimeout); !ok {
+		t.Error("Must NOT happen")
+	}
+}
+
+type checkable interface {
+	IsNull() bool
+}
+
+func TestNotNilCheckCast(t *testing.T) {
+	defer func() {
+		if a := recover(); a != nil {
+			t.Errorf("We panicked, this is a serious problem, it means that when we check for nil in our errors, we might be wrong")
+		}
+	}()
+
+	var origin Error
+	origin = generateErrNilTimeout()
+
+	var nilErrTimeout *ErrTimeout = nil
+	if origin != nil {
+		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same
+			t.Logf("a nil that is not interpreted as a nil, calling origin.whatever actually panics, put it to the test")
+			_ = origin.GRPCCode()
+		}
+	}
+
+	/*
+		if origin != nil {
+			if _, ok := origin.(*ErrTimeout); !ok || origin.IsNull() {
+				t.Log("So far so good")
+			} else {
+				t.Errorf("Should not happen")
+			}
+		}
+	*/
+}
+
+func TestNotNilCheckCastNoProblems(t *testing.T) {
+	defer func() {
+		if a := recover(); a != nil {
+			t.Errorf("We panicked, this is a serious problem, it means that when we check for nil in our errors, we might be wrong")
+		}
+	}()
+
+	var origin Error
+	origin = noProblems()
+
+	var nilErrTimeout *ErrTimeout = nil
+	if origin != nil {
+		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same
+			t.Logf("a nil that is not interpreted as a nil, calling origin.whatever actually panics, put it to the test")
+			_ = origin.GRPCCode()
+		}
+	}
+
+	/*
+		if origin != nil {
+			if _, ok := origin.(*ErrTimeout); !ok || origin.IsNull() {
+				t.Log("So far so good")
+			} else {
+				t.Errorf("Should not happen")
+			}
+		}
+	*/
 }

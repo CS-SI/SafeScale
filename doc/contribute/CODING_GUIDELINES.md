@@ -32,7 +32,7 @@ You may find some function names prefixed with `unsafe`. In general, there is a 
 
 Inside its package, `unsafe` function is useable but in full knowledge of the risks:
   - parameters used in `unsafe` function calls must have been validated before the call
-  - lock consideration is responsability of the caller of `unsafe` function
+  - lock consideration is responsibility of the caller of `unsafe` function
 
 If the risks are not well understood, you may encounter issues (nil dereferences, deadlocks, data races, ...)
 

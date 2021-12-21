@@ -40,8 +40,9 @@ import (
 //go:generate minimock -o ../mocks/mock_location.go -i github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage.Location
 
 // FIXME: GCP Remove specific driver code
+// FIXME: Make this validable, what is optional ?, what is mandatory ?
 
-// Config ...
+// Config represents a tenant configuration
 type Config struct {
 	Type             string
 	EnvAuth          bool
@@ -60,6 +61,7 @@ type Config struct {
 	ProjectID        string
 	Credentials      string
 	BucketName       string
+	DNS              string
 }
 
 // Location ...
@@ -176,7 +178,7 @@ func (l *location) connect() fail.Error {
 	return fail.ConvertError(err)
 }
 
-// ObjectStorageProtocol returns the type of ObjectStorage
+// Protocol returns the type of ObjectStorage
 func (l location) Protocol() string {
 	if l.IsNull() {
 		return ""

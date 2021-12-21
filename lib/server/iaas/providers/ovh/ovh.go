@@ -115,6 +115,24 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		zone = "nova"
 	}
 
+	customDNS, _ := compute["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
+	}
+
 	projectName, validInput := compute["ProjectName"].(string)
 	if !validInput {
 		return nil, fail.NewError("Invalid input for 'ProjectName'")
@@ -243,7 +261,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
 	cfg.Set("AlternateApiConsumerKey", alternateAPIApplicationKey)
 	cfg.Set("AlternateApiApplicationSecret", alternateAPIApplicationSecret)
@@ -411,7 +429,7 @@ func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 	}, nil
 }
 
-// BindHostToVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+// BindHostToVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if p.IsNull() {
 		return fail.InvalidInstanceError()
@@ -426,7 +444,7 @@ func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Err
 	return nil
 }
 
-// UnbindHostFromVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+// UnbindHostFromVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if p.IsNull() {
 		return fail.InvalidInstanceError()

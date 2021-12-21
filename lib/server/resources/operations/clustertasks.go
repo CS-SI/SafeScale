@@ -643,7 +643,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		return nil, nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task)
+	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task) // nolint
 
 	// Determine if getGateway Failover must be set
 	caps, xerr := instance.GetService().GetCapabilities()
@@ -1057,7 +1057,7 @@ func (instance *Cluster) createHostResources(
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
-			list, merr := instance.UnsafeListMasters()
+			list, merr := instance.unsafeListMasters()
 			if merr != nil {
 				_ = ferr.AddConsequence(merr)
 				return
@@ -1544,13 +1544,6 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 		return nil, xerr
 	}
 
-	// // Installs proxycache server on gateway (if not disabled)
-	// xerr = instance.installProxyCacheServer(task.Context(), p.Host, hostLabel)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-
 	// Installs requirements as defined by Cluster Flavor (if it exists)
 	xerr = instance.installNodeRequirements(task.Context(), clusternodetype.Gateway, p.Host, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1755,8 +1748,8 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	if task.Aborted() {
-		lerr, err := task.LastError()
-		if err != nil {
+		lerr, xerr := task.LastError()
+		if xerr != nil {
 			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
 		return nil, fail.AbortedError(lerr, "parent task killed")
@@ -2033,7 +2026,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 	logrus.Debugf("[Cluster %s] Configuring masters...", instance.GetName())
 
-	masters, xerr := instance.UnsafeListMasters()
+	masters, xerr := instance.unsafeListMasters()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2177,7 +2170,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 		return nil, xerr
 	}
 
-	// Configure master for flavour
+	// Configure master for flavor
 	if instance.makers.ConfigureMaster != nil {
 		xerr = instance.makers.ConfigureMaster(instance, p.Index, p.Host)
 		xerr = debug.InjectPlannedFail(xerr)

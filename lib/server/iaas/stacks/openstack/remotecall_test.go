@@ -26,7 +26,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 )
 
-// NOTE, Testing this with enviroment variable SAFESCALE_COMMUNICATION_TIMEOUT=5s is STRONGLY advised
+// NOTE, Testing this with environment variable SAFESCALE_COMMUNICATION_TIMEOUT=5s is STRONGLY advised
 
 var numCalls int
 var numDNSCalls int

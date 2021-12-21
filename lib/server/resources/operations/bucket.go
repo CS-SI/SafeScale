@@ -187,7 +187,9 @@ func (instance *bucket) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Browse walks through Bucket metadata folder and executes a callback for each entries
-func (instance *bucket) Browse(ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error) (outerr fail.Error) {
+func (instance *bucket) Browse(
+	ctx context.Context, callback func(storageBucket *abstract.ObjectStorageBucket) fail.Error,
+) (outerr fail.Error) {
 	defer fail.OnPanic(&outerr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
@@ -391,7 +393,6 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		case *fail.ErrNotFound:
 			// no bucket with this name managed by SafeScale, continue
 			debug.IgnoreError(xerr)
-			break
 		default:
 			return xerr
 		}
@@ -408,7 +409,6 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
-			break
 		default:
 			if strings.Contains(xerr.Error(), "not found") {
 				debug.IgnoreError(xerr)
@@ -492,6 +492,11 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 }
 
 // Mount a bucket on a host on the given mount point
+// Returns:
+// - nil: mount successful
+// - *fail.ErrNotFound: Host not found
+// - *fail.ErrDuplicate: already mounted on Host
+// - *fail.ErrNotAvailable: already mounted
 func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outerr fail.Error) {
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -538,17 +543,26 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to mount bucket '%s' on Host '%s'", instance.GetName(), hostName)
 	}
+	defer hostInstance.Released()
 
-	// -- check if bucket is already mounted on host (only one mount by bucket by Host allowed by design)
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Alter(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+	// -- check if Bucket is already mounted on any Host (only one Mount by Bucket allowed by design, to mitigate sync issues induced by Object Storage)
+	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.BucketMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
+			// First check if mounted on Host...
 			if mountPath, ok := mountsV1.ByHostName[hostInstance.GetName()]; ok {
 				return fail.DuplicateError("there is already a mount of Bucket '%s' on Host '%s' in folder '%s'", instance.GetName(), hostInstance.GetName(), mountPath)
+			}
+
+			// Second check if already mounted on another Host...
+			if len(mountsV1.ByHostName) > 0 {
+				for hostName := range mountsV1.ByHostName {
+					return fail.NotAvailableError("already mounted on Host '%s'", hostName)
+				}
 			}
 
 			return nil
@@ -582,8 +596,8 @@ func (instance *bucket) Mount(ctx context.Context, hostName, path string) (outer
 		Protocol:   svc.Protocol(),
 		MountPoint: mountPoint,
 	}
-	if anon, ok := authOpts.Config("AuthUrl"); ok {
-		desc.AuthUrl = anon.(string)
+	if anon, ok := authOpts.Config("AuthURL"); ok {
+		desc.AuthURL = anon.(string)
 	}
 	desc.Endpoint = osConfig.Endpoint
 
@@ -710,7 +724,6 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 		case *fail.ErrNotFound:
 			// If mount is not found on remote server, consider unmount as successful
 			debug.IgnoreError(xerr)
-			break
 		default:
 			return xerr
 		}
@@ -746,13 +759,13 @@ func (instance *bucket) Unmount(ctx context.Context, hostName string) (xerr fail
 }
 
 // ToProtocol returns the protocol message corresponding to Bucket fields
-func (b *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
+func (instance *bucket) ToProtocol() (*protocol.BucketResponse, fail.Error) {
 	out := &protocol.BucketResponse{
-		Name: b.GetName(),
+		Name: instance.GetName(),
 	}
 
-	xerr := b.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		svc := b.GetService()
+	xerr := instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+		svc := instance.GetService()
 		return props.Inspect(bucketproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			mountsV1, ok := clonable.(*propertiesv1.BucketMounts)
 			if !ok {

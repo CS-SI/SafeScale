@@ -35,7 +35,7 @@ type Description struct {
 	Username         string
 	Password         string
 	AuthVersion      string
-	AuthUrl          string
+	AuthURL          string
 	Endpoint         string
 	Region           string
 	MountPoint       string
@@ -74,7 +74,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	}
 	if retcode != 0 {
 		xerr = fail.ExecutionError(xerr, "failed to copy rclone configuration file: %s, %s", stdout, stderr)
-		_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 		return xerr
 	}
 
@@ -99,8 +99,8 @@ func (desc Description) createConfigurationFile() (*os.File, fail.Error) {
 	case "s3":
 		templateName = "rclone-s3.conf"
 	case "google":
-		templateName = "rclone-google.conf"
-		return nil, fail.NotImplementedError("mount of Google Object Storage Bucket not yet implemented")
+		templateName = "rclone-google.conf"                                                               // nolint
+		return nil, fail.NotImplementedError("mount of Google Object Storage Bucket not yet implemented") // FIXME: Technical debt
 	default:
 		return nil, fail.InvalidRequestError("unsupported Object Storage protocol '%s'", desc.Protocol)
 	}

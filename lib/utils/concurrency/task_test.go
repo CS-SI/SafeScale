@@ -1058,7 +1058,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 
 		if !((xerr != nil) == errorExpected) {
 			if ctx.Err() != nil {
-				t.Errorf("context is reported as Cancelled: %v, yet the Wait returns nil", ctx.Err())
+				t.Errorf("context is reported as canceled: %v, yet the Wait returns nil", ctx.Err())
 			}
 			t.Errorf(
 				"Failure in test %d: %d, %d, %d, %t, wrong error: %v", ind, timeout, sleep, trigger, errorExpected,

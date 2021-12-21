@@ -29,8 +29,8 @@ func isNullIsDeprecated(m dsl.Matcher) {
 		Suggest("if $x == nil || $x.isNull() {")
 }
 
-func dangerousNegatives(m dsl.Matcher) {
-	m.Match(`if $x, ok := $y.($z); !ok { return $*_ }`).Report("false positive")
+func falsePositives(m dsl.Matcher) {
+	m.Match(`if $x, ok := $y.($z); !ok { return $*_ }`).Where(m["x"].Text != "_").Report("false positive")
 }
 
 func unexpectedNegatives(m dsl.Matcher) {
@@ -45,7 +45,20 @@ func unexpectedNegatives(m dsl.Matcher) {
 		Report("surpising idiom, consider less surprises")
 }
 
-func dangerousNegativesAll(m dsl.Matcher) {
-	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(!m.File().Name.Matches(`.*test.go`)).
+func dangerousNegatives(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(!m["z"].Text.Matches(".fail.*") && !m["x"].Text.Matches("_") && !m.File().Name.Matches(`.*test.go`)).
 		Report("the expression $y.($z) might be nil")
+}
+
+func typedNil(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(m["z"].Text.Matches(".fail.*") && m["x"].Text.Matches("_") && !m.File().Name.Matches(`.*test.go`)).
+		Report("the expression $y.($z) might be a typed nil")
+}
+
+func usingTypedNil(m dsl.Matcher) {
+	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Match(`if $x, ok := $y.($z); !ok { $*_ }`).Where(m["z"].Text.Matches(".fail.*") && !m["x"].Text.Matches("_") && !m.File().Name.Matches(`.*test.go`)).
+		Report("the expression $y.($z) might be a typed nil, so using $x is a serious mistake")
 }

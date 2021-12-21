@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,10 @@ const (
 	opentelekomDefaultImage = "Ubuntu 20.04"
 
 	identityEndpointTemplate string = "https://iam.%s.otc.t-systems.com"
+)
+
+var (
+	dnsServers = []string{"1.1.1.1"}
 )
 
 // provider is the providerementation of the OpenTelekom provider
@@ -125,8 +130,26 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	customDNS, _ := compute["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
+	}
+
 	cfgOptions := stacks.ConfigurationOptions{
-		DNSList:             []string{"1.1.1.1"},
+		DNSList:             dnsServers,
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{
@@ -194,7 +217,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
 
 	return cfg, nil

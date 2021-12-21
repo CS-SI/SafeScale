@@ -1765,7 +1765,6 @@ The following actions are proposed:
   },
   "status": "success"
 }
-
     </pre>
     response on failure:
     <pre>
@@ -2286,7 +2285,13 @@ The following actions are proposed:
         </li>
         <li><code>-N|--cidr &lt;network_CIDR&gt;</code> Defines the CIDR of the Subnet for the Cluster.</li>
         <li><code>-C|--complexity &lt;complexity&gt;</code> Defines the "complexity" of the Cluster, ie how many masters/nodes will be created (depending of cluster flavor).<br>
-            Valid values are:
+            Valid values for BOH are:
+            <ul>
+              <li><code>small</code>: 1 gateway, 1 master, 1 node</li>
+              <li><code>normal</code>: 2 gateways (if Cloud Provider supports LAN VIP), 2 masters, 3 nodes</li>
+              <li><code>large</code>: 2 gateways (if Cloud Provider supports LAN VIP), 3 masters, 7 node</li>
+            </ul>
+            Valid values for K8S are:
             <ul>
               <li><code>small</code>: 1 gateway, 1 master, 1 node</li>
               <li><code>normal</code>: 2 gateways (if Cloud Provider supports LAN VIP), 3 masters, 3 nodes</li>
@@ -2303,7 +2308,7 @@ The following actions are proposed:
               <li><code>helm</code> (flavor K8S)</li>
             </ul>
         </li>
-        <li><code>--os value</code> Image name for the servers (default: "Ubuntu 20.04", may be overriden by a cluster flavor)</li>
+        <li><code>--os value</code> Image name for the servers (default: "Ubuntu 20.04", may be overridden by a cluster flavor)</li>
         <li><code>-k</code> Keeps infrastructure created on failure; default behavior is to delete resources</li>
         <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of all hosts (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details)</li>
         <li><code>--gw-sizing &lt;sizing&gt;</code> Describes gateway sizing specifically (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details); takes precedence over <code>--sizing</code></li>

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNodes_Clone(t *testing.T) {
@@ -37,8 +38,10 @@ func TestNodes_Clone(t *testing.T) {
 	if !ok {
 		t.Fail()
 	}
+	require.EqualValues(t, ct, clonedCt)
 
 	assert.Equal(t, ct, clonedCt)
+	require.EqualValues(t, ct, clonedCt)
 	clonedCt.ByNumericalID[1].Name = "Else"
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
@@ -46,6 +49,7 @@ func TestNodes_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.FailNow()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }
 
 func TestNodes_Clone2(t *testing.T) {
@@ -62,6 +66,7 @@ func TestNodes_Clone2(t *testing.T) {
 	if !ok {
 		t.Fail()
 	}
+	require.EqualValues(t, ct, clonedCt)
 
 	assert.Equal(t, ct, clonedCt)
 	clonedCt.Masters = append(clonedCt.Masters, 10)
@@ -71,4 +76,5 @@ func TestNodes_Clone2(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.FailNow()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }

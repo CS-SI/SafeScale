@@ -42,6 +42,10 @@ const (
 	authURL string = "https://iam.%s.prod-cloud-ocb.orange-business.com/v3"
 )
 
+var (
+	dnsServers = []string{"100.125.0.41", "100.126.0.41"}
+)
+
 type gpuCfg struct {
 	GPUNumber int
 	GPUType   string
@@ -151,8 +155,26 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	customDNS, _ := compute["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
+	}
+
 	cfgOptions := stacks.ConfigurationOptions{
-		DNSList:             []string{"100.125.0.41", "100.126.0.41"},
+		DNSList:             dnsServers,
 		UseFloatingIP:       true,
 		UseLayer3Networking: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{
@@ -275,7 +297,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
 
 	return cfg, nil

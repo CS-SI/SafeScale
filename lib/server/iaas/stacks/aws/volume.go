@@ -275,7 +275,7 @@ func (s stack) CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) 
 				innerXErr  fail.Error
 			)
 			deviceName, availableDevices, innerXErr = s.findNextAvailableDevice(request.HostID, availableDevices)
-			if xerr != nil {
+			if innerXErr != nil {
 				return innerXErr
 			}
 
@@ -319,7 +319,7 @@ func (s stack) findNextAvailableDevice(hostID string, availableSlots map[string]
 	for _, v := range instance.BlockDeviceMappings {
 		var suffix string
 		deviceName := aws.StringValue(v.DeviceName)
-		if strings.HasPrefix(deviceName, "/dev/sd") {
+		if strings.HasPrefix(deviceName, "/dev/sd") { // nolint
 			suffix = strings.TrimPrefix(deviceName, "/dev/sd")
 			sdCount++
 		} else if strings.HasPrefix(deviceName, "/dev/xvd") {

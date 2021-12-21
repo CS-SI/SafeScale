@@ -667,7 +667,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 	svc := handler.job.Service()
 	network, xerr = networkfactory.Load(svc, scanNetworkName)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return nil, xerr
 		}
 
@@ -692,7 +692,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 	svc := handler.job.Service()
 	subnet, xerr = subnetfactory.Load(svc, scanNetworkName, scanSubnetName)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return nil, xerr
 		}
 		subnet, xerr = subnetfactory.New(svc)
@@ -859,7 +859,7 @@ func (handler *tenantHandler) collect() (xerr fail.Error) {
 		}
 		if !file.IsDir() {
 			if err = os.Remove(theFile); err != nil {
-				logrus.Infof("Error Supressing %s : %s", file.Name(), err.Error())
+				logrus.Infof("Error Suppressing %s : %s", file.Name(), err.Error())
 			}
 		}
 	}

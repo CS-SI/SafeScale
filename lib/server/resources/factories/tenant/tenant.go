@@ -34,7 +34,7 @@ type Tenant struct {
 // currentTenant contains the current tenant
 var currentTenant atomic.Value
 
-// GetCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
+// GetCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
 func GetCurrentTenant() *Tenant {
 	anon := currentTenant.Load()
 	if anon == nil {

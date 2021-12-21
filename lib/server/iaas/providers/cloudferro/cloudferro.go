@@ -19,6 +19,7 @@ package cloudferro
 import (
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -112,7 +113,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		TenantName:       projectName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   floatingIPPool, // FIXME: move in ConfigurationOptions
+		FloatingIPPool:   floatingIPPool,
 		AllowReauth:      true,
 	}
 
@@ -129,6 +130,24 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectName)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	customDNS, _ := compute["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					cloudferroDNSServers = append(cloudferroDNSServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				cloudferroDNSServers = append(cloudferroDNSServers, fragment)
+			}
+		}
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
@@ -186,7 +205,7 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
 	return cfg, nil
 }

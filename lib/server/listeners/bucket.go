@@ -34,7 +34,7 @@ import (
 )
 
 // safescale bucket create c1
-// safescale bucket mount c1 host1 --path="/shared/data" (utilisation de s3ql, par default /buckets/c1)
+// safescale bucket mount c1 host1 --path="/shared/data" (uses s3ql, by default /buckets/c1)
 // safescale bucket umount c1 host1
 // safescale bucket delete c1
 // safescale bucket list
@@ -74,7 +74,7 @@ func (s *BucketListener) List(ctx context.Context, in *protocol.BucketListReques
 
 	handler := handlers.NewBucketHandler(job)
 	bucketList, xerr := handler.List(in.GetAll())
-	if err != nil {
+	if xerr != nil {
 		return nil, xerr
 	}
 

@@ -200,7 +200,7 @@ func onClusterCacheMiss(svc iaas.Service, name string) (cache.Cacheable, fail.Er
 // updateCachedInformation updates information cached in the instance
 func (instance *Cluster) updateCachedInformation() {
 	var index uint8
-	flavor, err := instance.UnsafeGetFlavor()
+	flavor, err := instance.unsafeGetFlavor()
 	if err == nil && flavor == clusterflavor.K8S {
 		index++
 		instance.installMethods.Store(index, installmethod.Helm)
@@ -326,14 +326,6 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	if xerr != nil {
 		return xerr
 	}
-
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return fail.Wrap(xerr, "Create does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
 
 	return nil
 }
@@ -461,7 +453,7 @@ func (instance *Cluster) GetFlavor() (flavor clusterflavor.Enum, xerr fail.Error
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.UnsafeGetFlavor()
+	return instance.unsafeGetFlavor()
 }
 
 // GetComplexity returns the complexity of the Cluster
@@ -797,6 +789,7 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 
 	if len(problems) > 0 {
 		// Mark Cluster as state Degraded
+		outerr := fail.NewErrorList(problems)
 		xerr = instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Alter(clusterproperty.StateV1, func(clonable data.Clonable) fail.Error {
 				stateV1, ok := clonable.(*propertiesv1.ClusterState)
@@ -808,7 +801,6 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 				return nil
 			})
 		})
-		outerr := fail.NewErrorList(problems)
 		if xerr != nil {
 			_ = outerr.AddConsequence(xerr)
 		}
@@ -1269,14 +1261,6 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		hosts = append(hosts, hostInstance)
 	}
 
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "AddNodes does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
-
 	return hosts, nil
 }
 
@@ -1320,101 +1304,6 @@ func complementHostDefinition(req abstract.HostSizingRequirements, def propertie
 	}
 
 	return req
-}
-
-// DeleteLastNode deletes the last added node and returns its name
-func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3.ClusterNode, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if instance == nil || instance.IsNull() {
-		return nil, fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
-	defer tracer.Exiting()
-
-	// make sure no other parallel actions interferes
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
-
-	xerr = instance.beingRemoved()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// Removed reference of the node from Cluster
-	xerr = instance.Alter(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					numericalID := nodesV3.PrivateNodes[len(nodesV3.PrivateNodes)-1]
-					if node, ok = nodesV3.ByNumericalID[numericalID]; !ok {
-						return fail.InconsistentError("the last recorded node in metadata points to missing Host")
-					}
-
-					return nil
-				},
-			)
-		},
-	)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if node == nil {
-		return nil, fail.NotFoundError("failed to find last node")
-	}
-
-	selectedMaster, xerr := instance.UnsafeFindAvailableMaster(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = instance.deleteNode(ctx, node, selectedMaster.(*Host), HostFullOption)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "DeleteLastNode does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
-
-	return node, nil
 }
 
 // DeleteSpecificNode deletes a node identified by its ID
@@ -1466,7 +1355,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	if selectedMasterID != "" {
 		selectedMaster, xerr = LoadHost(instance.GetService(), selectedMasterID)
 	} else {
-		selectedMaster, xerr = instance.UnsafeFindAvailableMaster(ctx)
+		selectedMaster, xerr = instance.unsafeFindAvailableMaster(ctx)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1510,14 +1399,6 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 		return xerr
 	}
 
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return fail.Wrap(xerr, "DeleteSpecificNode does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
-
 	return nil
 }
 
@@ -1559,7 +1440,7 @@ func (instance *Cluster) ListMasters(ctx context.Context) (list resources.Indexe
 		return emptyList, xerr
 	}
 
-	return instance.UnsafeListMasters()
+	return instance.unsafeListMasters()
 }
 
 // ListMasterNames lists the names of the master nodes in the Cluster
@@ -1655,62 +1536,6 @@ func (instance *Cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 	return instance.unsafeListMasterIDs(ctx)
 }
 
-func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
-	emptyList := data.IndexedListOfStrings{}
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return emptyList, xerr
-			}
-		default:
-			return emptyList, xerr
-		}
-	}
-
-	xerr = instance.beingRemoved()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return emptyList, xerr
-	}
-
-	xerr = instance.Review(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					list = make(data.IndexedListOfStrings, len(nodesV3.Masters))
-					for _, v := range nodesV3.Masters {
-						if task.Aborted() {
-							return fail.AbortedError(nil, "aborted")
-						}
-
-						if node, found := nodesV3.ByNumericalID[v]; found {
-							list[node.NumericalID] = node.ID
-						}
-					}
-					return nil
-				},
-			)
-		},
-	)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return emptyList, xerr
-	}
-
-	return list, nil
-}
-
 // ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
 func (instance *Cluster) ListMasterIPs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -1745,7 +1570,7 @@ func (instance *Cluster) ListMasterIPs(ctx context.Context) (list data.IndexedLi
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.UnsafeListMasterIPs()
+	return instance.unsafeListMasterIPs()
 }
 
 // FindAvailableMaster returns ID of the first master available to execute order
@@ -1792,7 +1617,7 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 		return nil, xerr
 	}
 
-	return instance.UnsafeFindAvailableMaster(ctx)
+	return instance.unsafeFindAvailableMaster(ctx)
 }
 
 // ListNodes lists node instances corresponding to the nodes in the Cluster
@@ -1962,7 +1787,7 @@ func (instance *Cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.UnsafeListNodeIDs(ctx)
+	return instance.unsafeListNodeIDs(ctx)
 }
 
 // ListNodeIPs lists the IPs of the nodes in the Cluster
@@ -2044,7 +1869,7 @@ func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.UnsafeFindAvailableNode(ctx)
+	return instance.unsafeFindAvailableNode(ctx)
 }
 
 // LookupNode tells if the ID of the master passed as parameter is a node
@@ -3008,14 +2833,14 @@ func (instance *Cluster) configureCluster(ctx context.Context) (ferr fail.Error)
 		}
 	}()
 
-	// Install reverseproxy feature on Cluster (gateways)
+	// Install reverse-proxy feature on Cluster (gateways)
 	xerr = instance.installReverseProxy(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	// Install remotedesktop feature on Cluster (all masters)
+	// Install remote-desktop feature on Cluster (all masters)
 	xerr = instance.installRemoteDesktop(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3083,7 +2908,7 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 }
 
 // Regenerate ansible inventory
-func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error {
+func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // nolint
 	logrus.Warningf("About to update ansible inventory")
 
 	// Check incoming parameters
@@ -3256,7 +3081,10 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error {
 		cmd = fmt.Sprintf("sudo rm -f %s || true", rfcItem.Remote)
 		retcode, stdout, stderr, xerr = masters[master].Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
 		if retcode != 0 || xerr != nil {
-			return fail.NewError("The remove failed")
+			ne := fail.NewError("The remove failed")
+			ne.Annotate("stdout", stdout)
+			ne.Annotate("stderr", stderr)
+			return ne
 		}
 
 		// Upload new inventory
@@ -3284,7 +3112,10 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error {
 		cmd = fmt.Sprintf("sudo cp /tmp/_inventory.yml %s && sudo chown %s %s", target, params["ClusterAdminUsername"], target)
 		retcode, stdout, stderr, xerr = masters[master].Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
 		if retcode != 0 || xerr != nil {
-			return fail.NewError("The remove failed")
+			ne := fail.NewError("The remove failed")
+			ne.Annotate("stdout", stdout)
+			ne.Annotate("stderr", stderr)
+			return ne
 		}
 
 		// Test result
@@ -3755,7 +3586,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 			return emptySlice, xerr
 		}
 
-		selectedMaster, xerr := instance.UnsafeFindAvailableMaster(ctx)
+		selectedMaster, xerr := instance.unsafeFindAvailableMaster(ctx)
 		if xerr != nil {
 			return emptySlice, xerr
 		}
@@ -3785,14 +3616,6 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	if len(errors) > 0 {
 		return emptySlice, fail.NewErrorList(errors)
 	}
-
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "Shrink does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
 
 	return removedNodes, nil
 }

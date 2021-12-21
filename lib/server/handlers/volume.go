@@ -46,7 +46,7 @@ type VolumeHandler interface {
 	List(all bool) ([]resources.Volume, fail.Error)
 	Inspect(ref string) (resources.Volume, fail.Error)
 	Create(name string, size int, speed volumespeed.Enum) (resources.Volume, fail.Error)
-	Attach(volume string, host string, path string, format string, doNotFormat bool) fail.Error
+	Attach(volume string, host string, path string, format string, doNotFormat bool, doNotMount bool) fail.Error
 	Detach(volume string, host string) fail.Error
 }
 
@@ -216,7 +216,7 @@ func (handler *volumeHandler) Create(name string, size int, speed volumespeed.En
 }
 
 // Attach a volume to a host
-func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, doNotFormat bool) (xerr fail.Error) {
+func (handler *volumeHandler) Attach(volumeRef string, hostRef string, path string, format string, doNotFormat bool, doNotMount bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if handler == nil {
@@ -253,7 +253,7 @@ func (handler *volumeHandler) Attach(volumeRef, hostRef, path, format string, do
 		return xerr
 	}
 
-	return volumeInstance.Attach(handler.job.Context(), hostInstance, path, format, doNotFormat)
+	return volumeInstance.Attach(handler.job.Context(), hostInstance, path, format, doNotFormat, doNotMount)
 }
 
 // Detach detach the volume identified by ref, ref can be the name or the id
@@ -280,7 +280,7 @@ func (handler *volumeHandler) Detach(volumeRef, hostRef string) (xerr fail.Error
 	// Load volume data
 	rv, xerr := volumefactory.Load(handler.job.Service(), volumeRef)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return xerr
 		}
 

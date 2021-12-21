@@ -37,7 +37,7 @@ var (
 
 type FreeCIDRSlot struct {
 	First uint // contains the index of the first available CIDR (to use in lib/utils/net.NthIncludedSubnet() to find corresponding CIDR)
-	Last  uint // contains teh index of the last available CIDR
+	Last  uint // contains the index of the last available CIDR
 }
 
 // NetworkSingleHosts contains additional information describing the CIDR used for single Hosts

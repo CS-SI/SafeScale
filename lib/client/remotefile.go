@@ -163,7 +163,7 @@ func (rfh *RemoteFilesHandler) Upload(clientSession *Session, hostname string) e
 }
 
 // Cleanup executes the removal of remote files.
-// Note: Removal of local files is the responsability of the caller, not the RemoteFilesHandler.
+// Note: Removal of local files is the responsibility of the caller, not the RemoteFilesHandler.
 func (rfh *RemoteFilesHandler) Cleanup(clientSession *Session, hostname string) {
 	for _, v := range rfh.items {
 		xerr := v.RemoveRemote(clientSession, hostname)

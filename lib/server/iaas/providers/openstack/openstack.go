@@ -19,7 +19,9 @@ package openstack
 import (
 	"regexp"
 	"strconv"
+	"strings"
 
+	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -37,6 +39,10 @@ import (
 
 const (
 	openstackDefaultImage = "Ubuntu 20.04"
+)
+
+var (
+	dnsServers = []string{"8.8.8.8", "1.1.1.1"}
 )
 
 // provider is the provider implementation of the openstack provider respecting api.Provider
@@ -94,10 +100,24 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 
-	dnsServers, _ := network["DNSServers"].([]string)
-	if len(dnsServers) == 0 {
-		dnsServers = []string{"8.8.8.8", "1.1.1.1"}
+	customDNS, _ := compute["DNS"].(string)
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
 	}
+
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername = operatorUsernameIf.(string)
@@ -115,7 +135,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		TenantName:       tenantName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   floatingIPPool, // FIXME: move in ConfigurationOptions
+		FloatingIPPool:   floatingIPPool,
 	}
 
 	providerName := "openstack"
@@ -175,7 +195,7 @@ func (p *provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
 	cfg.Set("DomainName", opts.DomainName)
 

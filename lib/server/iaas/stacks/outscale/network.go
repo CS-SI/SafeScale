@@ -326,7 +326,7 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 			return xerr
 		}
 	} else if len(resp) > 0 { // Delete remaining nics (may happen when something goes wrong during VM deletions)
-		if xerr = s.deleteNICs(resp); xerr == nil { // FIXME: VERY bad practice
+		if xerr = s.deleteNICs(resp); xerr != nil {
 			return xerr
 		}
 	}

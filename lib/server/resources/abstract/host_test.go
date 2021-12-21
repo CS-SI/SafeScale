@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHostCore_Clone(t *testing.T) {
@@ -33,6 +34,8 @@ func TestHostCore_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, h, hc)
+	require.EqualValues(t, h, hc)
+
 	hc.Password = "changed password"
 
 	areEqual := reflect.DeepEqual(h, hc)
@@ -40,4 +43,5 @@ func TestHostCore_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, h, hc)
 }

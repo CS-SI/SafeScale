@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package aws
+package aws // Package aws contains the implementation of stack for Amazon
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -76,7 +76,7 @@ func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail
 }
 
 // New creates and initializes an AWS stack
-func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (*stack, error) {
+func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (*stack, error) { // nolint
 	if localCfg.Ec2Endpoint == "" {
 		localCfg.Ec2Endpoint = fmt.Sprintf("https://ec2.%s.amazonaws.com", localCfg.Region)
 	}

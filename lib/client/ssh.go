@@ -110,12 +110,13 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 					return retry.StopRetryError(innerXErr)
 				}
 			}
-			// If retcode == 255, ssh connection failed, retry
-			if retcode == 255 /*|| !ready*/ {
+
+			if retcode == 255 { // ssh connection drop
 				return fail.NotAvailableError(
 					"Remote SSH server on Host '%s' is not available, failed to connect", sshCfg.Hostname,
 				)
 			}
+
 			return nil
 		},
 		temporal.GetMinDelay(),
@@ -298,16 +299,16 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 						)
 						finnerXerr = debug.InjectPlannedFail(finnerXerr)
 						if finnerXerr != nil {
-							_ = finnerXerr.Annotate("retcode", fretcode)
-							_ = finnerXerr.Annotate("stdout", fstdout)
-							_ = finnerXerr.Annotate("stderr", fstderr)
+							finnerXerr.Annotate("retcode", fretcode)
+							finnerXerr.Annotate("stdout", fstdout)
+							finnerXerr.Annotate("stderr", fstderr)
 							return finnerXerr
 						}
 						if fretcode != 0 {
 							finnerXerr = fail.NewError("failed to remove file")
-							_ = finnerXerr.Annotate("retcode", fretcode)
-							_ = finnerXerr.Annotate("stdout", fstdout)
-							_ = finnerXerr.Annotate("stderr", fstderr)
+							finnerXerr.Annotate("retcode", fretcode)
+							finnerXerr.Annotate("stdout", fstdout)
+							finnerXerr.Annotate("stderr", fstderr)
 							return finnerXerr
 						}
 					}
@@ -333,15 +334,9 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 
 			if iretcode != 0 {
 				xerr = fail.NewError("failure copying '%s' to '%s': scp error code %d", toPath, hostTo, iretcode)
-				if iretcode == 255 {
-					xerr = fail.NewError(
-						"failure copying '%s' to '%s': failed to connect to '%s'", toPath, hostTo, hostTo,
-					)
-				}
-
-				_ = xerr.Annotate("stdout", istdout)
-				_ = xerr.Annotate("stderr", istderr)
-				_ = xerr.Annotate("retcode", iretcode)
+				xerr.Annotate("stdout", istdout)
+				xerr.Annotate("stderr", istderr)
+				xerr.Annotate("retcode", iretcode)
 
 				return xerr
 			}
@@ -373,16 +368,16 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 					)
 					finnerXerr = debug.InjectPlannedFail(finnerXerr)
 					if finnerXerr != nil {
-						_ = finnerXerr.Annotate("retcode", fretcode)
-						_ = finnerXerr.Annotate("stdout", fstdout)
-						_ = finnerXerr.Annotate("stderr", fstderr)
+						finnerXerr.Annotate("retcode", fretcode)
+						finnerXerr.Annotate("stdout", fstdout)
+						finnerXerr.Annotate("stderr", fstderr)
 						return fail.WarningError(finnerXerr, "failure running remote md5 command")
 					}
 					if fretcode != 0 {
 						finnerXerr = fail.NewError("failed to check md5")
-						_ = finnerXerr.Annotate("retcode", fretcode)
-						_ = finnerXerr.Annotate("stdout", fstdout)
-						_ = finnerXerr.Annotate("stderr", fstderr)
+						finnerXerr.Annotate("retcode", fretcode)
+						finnerXerr.Annotate("stdout", fstdout)
+						finnerXerr.Annotate("stderr", fstderr)
 						return fail.WarningError(finnerXerr, "unexpected error code running remote md5 command")
 					}
 					if !strings.Contains(fstdout, md5hash) {
@@ -396,7 +391,7 @@ func (s ssh) Copy(from, to string, connectionTimeout, executionTimeout time.Dura
 				}
 
 				if xerr = crcCheck(); xerr != nil {
-					if _, ok := xerr.(*fail.ErrWarning); !ok {
+					if _, ok := xerr.(*fail.ErrWarning); !ok || xerr.IsNull() {
 						return xerr
 					}
 					logrus.Warnf(xerr.Error())

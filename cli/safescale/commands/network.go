@@ -162,10 +162,15 @@ var networkInspect = &cli.Command{
 		}
 
 		// Convert struct to map using struct to json then json to map
-		// errors not checked willingly; json encoding and decoding of simple structs are not supposed to fail
 		mapped := map[string]interface{}{}
-		jsoned, _ := json.Marshal(network)
-		_ = json.Unmarshal(jsoned, &mapped)
+		jsoned, err := json.Marshal(network)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(jsoned, &mapped)
+		if err != nil {
+			return err
+		}
 
 		if len(network.Subnets) == 1 {
 			if network.Subnets[0] == network.Name {
@@ -184,8 +189,14 @@ var networkInspect = &cli.Command{
 				}
 
 				subnetMapped := map[string]interface{}{}
-				jsoned, _ := json.Marshal(subnet)
-				_ = json.Unmarshal(jsoned, &subnetMapped)
+				jsoned, err := json.Marshal(subnet)
+				if err != nil {
+					return err
+				}
+				err = json.Unmarshal(jsoned, &subnetMapped)
+				if err != nil {
+					return err
+				}
 
 				for k, v := range subnetMapped {
 					switch k {
@@ -863,15 +874,15 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		rule := abstract.SecurityGroupRule{
-			Description: c.String("description"),
-			EtherType:   etherType,
-			Direction:   direction,
-			Protocol:    c.String("protocol"),
-			PortFrom:    int32(c.Int("port-from")),
-			PortTo:      int32(c.Int("port-to")),
-			Targets:     c.StringSlice("cidr"),
-		}
+		rule := abstract.NewSecurityGroupRule()
+		rule.Description = c.String("description")
+		rule.EtherType = etherType
+		rule.Direction = direction
+		rule.Protocol = c.String("protocol")
+		rule.PortFrom = int32(c.Int("port-from"))
+		rule.PortTo = int32(c.Int("port-to"))
+		rule.Targets = c.StringSlice("cidr")
+
 		switch rule.Direction {
 		case securitygroupruledirection.Ingress:
 			rule.Sources = c.StringSlice("cidr")
@@ -967,13 +978,13 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		rule := abstract.SecurityGroupRule{
-			EtherType: etherType,
-			Direction: direction,
-			Protocol:  c.String("protocol"),
-			PortFrom:  int32(c.Int("port-from")),
-			PortTo:    int32(c.Int("port-to")),
-		}
+		rule := abstract.NewSecurityGroupRule()
+		rule.EtherType = etherType
+		rule.Direction = direction
+		rule.Protocol = c.String("protocol")
+		rule.PortFrom = int32(c.Int("port-from"))
+		rule.PortTo = int32(c.Int("port-to"))
+
 		switch rule.Direction {
 		case securitygroupruledirection.Ingress:
 			rule.Sources = c.StringSlice("cidr")
@@ -1192,10 +1203,15 @@ var subnetInspect = &cli.Command{
 		}
 
 		// Convert struct to map using struct to json then json to map
-		// errors not checked willingly; json encoding and decoding of simple structs are not supposed to fail
 		mapped := map[string]interface{}{}
-		jsoned, _ := json.Marshal(subnet)
-		_ = json.Unmarshal(jsoned, &mapped)
+		jsoned, err := json.Marshal(subnet)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(jsoned, &mapped)
+		if err != nil {
+			return err
+		}
 
 		if err = queryGatewaysInformation(clientSession, subnet, mapped, true); err != nil {
 			return err
