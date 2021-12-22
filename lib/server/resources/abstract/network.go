@@ -89,7 +89,8 @@ func (n *Network) Replace(p data.Clonable) data.Clonable {
 		return n
 	}
 
-	src, _ := p.(*Network) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*Network) // nolint
 	*n = *src
 	n.DNSServers = make([]string, 0, len(src.DNSServers))
 	copy(n.DNSServers, src.DNSServers)

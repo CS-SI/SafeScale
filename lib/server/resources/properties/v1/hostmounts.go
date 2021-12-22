@@ -57,7 +57,8 @@ func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
 		return hlm
 	}
 
-	src, _ := p.(*HostLocalMount) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostLocalMount) // nolint
 	*hlm = *src
 	return hlm
 }
@@ -96,7 +97,8 @@ func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
 		return hrm
 	}
 
-	src, _ := p.(*HostRemoteMount) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostRemoteMount) // nolint
 	*hrm = *src
 	return hrm
 }
@@ -144,14 +146,16 @@ func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
 		return hm
 	}
 
-	src, _ := p.(*HostMounts) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostMounts) // nolint
 	hm.LocalMountsByDevice = make(map[string]string, len(src.LocalMountsByDevice))
 	for k, v := range src.LocalMountsByDevice {
 		hm.LocalMountsByDevice[k] = v
 	}
 	hm.LocalMountsByPath = make(map[string]*HostLocalMount, len(src.LocalMountsByPath))
 	for k, v := range src.LocalMountsByPath {
-		hm.LocalMountsByPath[k], _ = v.Clone().(*HostLocalMount) // FIXME: Replace should also return an error
+		// FIXME: Replace should also return an error
+		hm.LocalMountsByPath[k], _ = v.Clone().(*HostLocalMount) // nolint
 	}
 	hm.RemoteMountsByShareID = make(map[string]string, len(src.RemoteMountsByShareID))
 	for k, v := range src.RemoteMountsByShareID {
@@ -163,7 +167,8 @@ func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
 	}
 	hm.RemoteMountsByPath = make(map[string]*HostRemoteMount, len(src.RemoteMountsByPath))
 	for k, v := range src.RemoteMountsByPath {
-		hm.RemoteMountsByPath[k], _ = v.Clone().(*HostRemoteMount) // FIXME: Replace should also return an error
+		// FIXME: Replace should also return an error
+		hm.RemoteMountsByPath[k], _ = v.Clone().(*HostRemoteMount) // nolint
 	}
 	hm.BucketMounts = make(map[string]string, len(src.BucketMounts))
 	for k, v := range src.BucketMounts {

@@ -74,7 +74,8 @@ func (v *Volume) Replace(p data.Clonable) data.Clonable {
 		return v
 	}
 
-	src, _ := p.(*Volume) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*Volume) // nolint
 	*v = *src
 	return v
 }

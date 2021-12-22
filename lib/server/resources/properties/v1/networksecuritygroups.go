@@ -56,7 +56,8 @@ func (nsg *NetworkSecurityGroups) Replace(p data.Clonable) data.Clonable {
 		return nsg
 	}
 
-	src, _ := p.(*NetworkSecurityGroups) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*NetworkSecurityGroups) // nolint
 	*nsg = *src
 	nsg.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {

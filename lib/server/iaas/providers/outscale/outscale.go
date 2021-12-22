@@ -103,13 +103,14 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		if userID == "" {
 			return nil, fail.SyntaxError("keyword 'UserID' in section 'identity' not found in tenant file")
 		}
+
 		metadata["Bucket"], xerr = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
 		if xerr != nil {
 			return nil, xerr
 		}
 	}
 
-	customDNS, _ := compute["DNS"].(string)
+	customDNS := get(compute, "DNS")
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {
 			fragments := strings.Split(customDNS, ",")

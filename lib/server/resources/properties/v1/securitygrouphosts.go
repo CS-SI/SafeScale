@@ -57,10 +57,12 @@ func (sgh *SecurityGroupHosts) Replace(p data.Clonable) data.Clonable {
 		return sgh
 	}
 
-	src, _ := p.(*SecurityGroupHosts) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*SecurityGroupHosts) // nolint
 	sgh.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		sgh.ByID[k], _ = v.Clone().(*SecurityGroupBond) // FIXME: Replace should also return an error
+		// FIXME: Replace should also return an error
+		sgh.ByID[k], _ = v.Clone().(*SecurityGroupBond) // nolint
 	}
 	sgh.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {

@@ -71,7 +71,7 @@ func (n share) Delete(names []string, timeout time.Duration) error {
 		if _, xerr := service.Delete(ctx, &protocol.Reference{Name: aname}); xerr != nil {
 			mutex.Lock()
 			errs = append(errs, xerr.Error())
-			mutex.Unlock()
+			mutex.Unlock() // nolint
 		}
 	}
 

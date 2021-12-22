@@ -1416,7 +1416,12 @@ func normalizeScript(params *data.Map, reserved data.Map) (string, fail.Error) {
 	}
 
 	dataBuffer := bytes.NewBufferString("")
-	err = anon.(*txttmpl.Template).Execute(dataBuffer, *params)
+	tmpl, ok := anon.(*txttmpl.Template)
+	if !ok {
+		return "", fail.InconsistentError("failed to cast anon to '*txttmpl.Template'")
+	}
+
+	err = tmpl.Execute(dataBuffer, *params)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
@@ -1509,7 +1514,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			sgRule := abstract.NewSecurityGroupRule()
 			sgRule.Direction = securitygroupruledirection.Ingress // Implicit for gateways
 			sgRule.EtherType = ipversion.IPv4
-			sgRule.Protocol, _ = r["protocol"].(string)
+			sgRule.Protocol, _ = r["protocol"].(string) // nolint
 			sgRule.Sources = []string{"0.0.0.0/0"}
 			sgRule.Targets = []string{gwSG.GetID()}
 

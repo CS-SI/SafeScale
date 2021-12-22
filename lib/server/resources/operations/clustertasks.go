@@ -478,7 +478,10 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	if imageQuery == "" {
 		if cfg, xerr := instance.GetService().GetConfigurationOptions(); xerr == nil {
 			if anon, ok := cfg.Get("DefaultImage"); ok {
-				imageQuery, _ = anon.(string) // FIXME: Missing error handling
+				imageQuery, ok = anon.(string)
+				if !ok {
+					return nil, nil, nil, fail.InconsistentError("failed to convert anon to 'string'")
+				}
 			}
 		}
 	}

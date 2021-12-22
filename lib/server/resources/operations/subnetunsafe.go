@@ -1193,7 +1193,12 @@ func (instance *Subnet) unsafeUnbindSecurityGroup(ctx context.Context, sgInstanc
 			}
 
 			// unbind security group from Subnet on cloud provider side
-			innerXErr := sgInstance.(*SecurityGroup).unbindFromSubnetHosts(ctx, taskUnbindFromHostsAttachedToSubnetParams{subnetID: instance.GetID(), subnetName: instance.GetName(), subnetHosts: subnetHosts})
+			sgInstanceImpl, ok := sgInstance.(*SecurityGroup)
+			if !ok {
+				return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup'")
+			}
+
+			innerXErr := sgInstanceImpl.unbindFromSubnetHosts(ctx, taskUnbindFromHostsAttachedToSubnetParams{subnetID: instance.GetID(), subnetName: instance.GetName(), subnetHosts: subnetHosts})
 			if innerXErr != nil {
 				return innerXErr
 			}

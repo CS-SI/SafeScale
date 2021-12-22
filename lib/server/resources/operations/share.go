@@ -98,13 +98,15 @@ func (si ShareIdentity) Clone() data.Clonable {
 
 // Replace ...
 // satisfies interface data.Clonable
+// may panic
 func (si *ShareIdentity) Replace(p data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value...
 	if si == nil || p == nil {
 		return si
 	}
 
-	src, _ := p.(*ShareIdentity) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*ShareIdentity) // nolint
 	*si = *src
 	return si
 }

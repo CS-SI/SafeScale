@@ -270,7 +270,12 @@ func (instance *Host) updateCachedInformation() fail.Error {
 							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
 
-						ip := rgw.(*Host).accessIP
+						castedGW, ok := rgw.(*Host)
+						if !ok {
+							return fail.InconsistentError("failed to cast rgw to '*Host'")
+						}
+
+						ip := castedGW.accessIP
 						primaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
 							Port:       int(gwahc.SSHPort),
@@ -3715,7 +3720,12 @@ func (instance *Host) BindSecurityGroup(
 			item.Disabled = bool(!enable)
 
 			// If enabled, apply it
-			innerXErr := sgInstance.(*SecurityGroup).unsafeBindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental)
+			sgInstanceImpl, ok := sgInstance.(*SecurityGroup)
+			if !ok {
+				return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup")
+			}
+
+			innerXErr := sgInstanceImpl.unsafeBindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate:

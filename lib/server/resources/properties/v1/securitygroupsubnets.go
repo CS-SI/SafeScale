@@ -57,10 +57,12 @@ func (sgn *SecurityGroupSubnets) Replace(p data.Clonable) data.Clonable {
 		return sgn
 	}
 
-	src, _ := p.(*SecurityGroupSubnets) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*SecurityGroupSubnets) // nolint
 	sgn.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		sgn.ByID[k], _ = v.Clone().(*SecurityGroupBond) // FIXME: Replace should also return an error
+		// FIXME: Replace should also return an error or generics
+		sgn.ByID[k], _ = v.Clone().(*SecurityGroupBond) // nolint
 	}
 	sgn.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {

@@ -85,7 +85,8 @@ func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
 		return i
 	}
 
-	src, _ := p.(*ClusterIdentity) // FIXME, Replace should also return an error
+	// FIXME, Replace should also return an error
+	src, _ := p.(*ClusterIdentity) // nolint
 	*i = *src
 	i.Keypair = nil
 	if src.Keypair != nil {

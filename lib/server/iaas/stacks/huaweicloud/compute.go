@@ -952,8 +952,8 @@ func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (
 	completedHost.Description.Updated = server.Updated
 	completedHost.CurrentState = host.LastState
 
-	completedHost.Core.Tags["Template"], _ = server.Image["id"].(string)
-	completedHost.Core.Tags["Image"], _ = server.Flavor["id"].(string)
+	completedHost.Core.Tags["Template"], _ = server.Image["id"].(string) // nolint
+	completedHost.Core.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
 
 	// recover metadata
 	for k, v := range server.Metadata {

@@ -97,7 +97,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	var networkName string
 	networkCfg, ok := params["network"].(map[string]interface{})
 	if ok {
-		networkName, _ = networkCfg["ProviderNetwork"].(string)
+		networkName, _ = networkCfg["ProviderNetwork"].(string) // nolint
 	}
 	if networkName == "" {
 		networkName = "safescale"
@@ -121,23 +121,23 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		NetworkName: networkName,
 	}
 
-	username, ok := identityCfg["Username"].(string)
+	username, ok := identityCfg["Username"].(string) // nolint
 	if !ok || username == "" {
-		username, _ = identityCfg["Username"].(string)
+		username, _ = identityCfg["Username"].(string) // nolint
 	}
-	password, _ := identityCfg["Password"].(string)
+	password, _ := identityCfg["Password"].(string) // nolint
 
 	accessKeyID, ok := identityCfg["AccessKeyID"].(string)
 	if !ok || accessKeyID == "" {
 		return &provider{}, fail.SyntaxError("field 'AccessKeyID' in section 'identity' not found in tenants.toml")
 	}
 
-	secretAccessKey, ok := identityCfg["SecretAccessKey"].(string)
+	secretAccessKey, ok := identityCfg["SecretAccessKey"].(string) // nolint
 	if !ok || secretAccessKey == "" {
 		return &provider{}, fail.SyntaxError("no secret access key provided in tenants.toml")
 	}
 
-	identityEndpoint, _ := identityCfg["IdentityEndpoint"].(string)
+	identityEndpoint, _ := identityCfg["IdentityEndpoint"].(string) // nolint
 	if identityEndpoint == "" {
 		identityEndpoint, ok = identityCfg["auth_uri"].(string) // deprecated, kept until next release
 		if !ok || identityEndpoint == "" {
@@ -145,16 +145,16 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
-	projectName, _ := computeCfg["ProjectName"].(string)
-	projectID, _ := computeCfg["ProjectID"].(string)
-	defaultImage, _ := computeCfg["DefaultImage"].(string)
+	projectName, _ := computeCfg["ProjectName"].(string)   // nolint
+	projectID, _ := computeCfg["ProjectID"].(string)       // nolint
+	defaultImage, _ := computeCfg["DefaultImage"].(string) // nolint
 
 	maxLifeTime := 0
 	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
 	}
 
-	operatorUsername, _ := computeCfg["OperatorUsername"].(string)
+	operatorUsername, _ := computeCfg["OperatorUsername"].(string) // nolint
 	if operatorUsername == "" {
 		operatorUsername = abstract.DefaultUser
 	}
@@ -178,7 +178,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
-	customDNS, _ := computeCfg["DNS"].(string)
+	customDNS, _ := computeCfg["DNS"].(string) // nolint
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {
 			fragments := strings.Split(customDNS, ",")

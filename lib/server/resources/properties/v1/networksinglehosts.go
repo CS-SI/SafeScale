@@ -71,7 +71,8 @@ func (nsh *NetworkSingleHosts) Replace(p data.Clonable) data.Clonable {
 		return nsh
 	}
 
-	src, _ := p.(*NetworkSingleHosts) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*NetworkSingleHosts) // nolint
 	nsh.FreeSlots = make([]FreeCIDRSlot, len(src.FreeSlots))
 	copy(nsh.FreeSlots, src.FreeSlots)
 	return nsh

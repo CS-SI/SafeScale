@@ -744,48 +744,32 @@ var networkSecurityGroupBonds = &cli.Command{
 		list, err := clientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "list of Security Groups", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of Security Groups", false).Error())))
 		}
 		result := map[string]interface{}{}
 		if len(list.Hosts) > 0 {
 			hosts := make([]map[string]interface{}, len(list.Hosts))
-			jsoned, _ := json.Marshal(list.Hosts)
+			jsoned, err := json.Marshal(list.Hosts)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+			}
+
 			err = json.Unmarshal(jsoned, &hosts)
 			if err != nil {
-				return clitools.FailureResponse(
-					clitools.ExitOnErrorWithMessage(
-						exitcode.Run, strprocess.Capitalize(
-							client.DecorateTimeoutError(
-								err, "list of security-groups", false,
-							).Error(),
-						),
-					),
-				)
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
 			}
 			result["hosts"] = hosts
 		}
 		if len(list.Subnets) > 0 {
 			subnets := make([]map[string]interface{}, len(list.Subnets))
-			jsoned, _ := json.Marshal(list.Subnets)
+			jsoned, err := json.Marshal(list.Subnets)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+			}
+
 			err = json.Unmarshal(jsoned, &subnets)
 			if err != nil {
-				return clitools.FailureResponse(
-					clitools.ExitOnErrorWithMessage(
-						exitcode.Run, strprocess.Capitalize(
-							client.DecorateTimeoutError(
-								err, "list of security-groups", false,
-							).Error(),
-						),
-					),
-				)
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
 			}
 			result["subnets"] = subnets
 		}

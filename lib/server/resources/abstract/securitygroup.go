@@ -254,7 +254,8 @@ func (sgr *SecurityGroupRule) Replace(p data.Clonable) data.Clonable {
 		return sgr
 	}
 
-	src, _ := p.(*SecurityGroupRule) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*SecurityGroupRule) // nolint
 	*sgr = *src
 	sgr.IDs = make([]string, len(src.IDs))
 	copy(sgr.IDs, src.IDs)
@@ -432,7 +433,9 @@ func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 	if sg == nil || p == nil {
 		return sg
 	}
-	src, _ := p.(*SecurityGroup) // FIXME: Replace should also return an error
+
+	// FIXME: Replace should also return an error
+	src, _ := p.(*SecurityGroup) // nolint
 	*sg = *src
 	sg.Rules = src.Rules.Clone()
 	return sg

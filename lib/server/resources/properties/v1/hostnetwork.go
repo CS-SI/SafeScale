@@ -78,7 +78,8 @@ func (hn *HostNetwork) Replace(p data.Clonable) data.Clonable {
 		return hn
 	}
 
-	src, _ := p.(*HostNetwork) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostNetwork) // nolint
 	*hn = *src
 	hn.NetworksByID = make(map[string]string, len(src.NetworksByID))
 	for k, v := range src.NetworksByID {

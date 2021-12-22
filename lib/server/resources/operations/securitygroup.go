@@ -675,8 +675,25 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 		}
 
 		// recover from context the Subnet Abstract and properties (if it exists)
-		currentSubnetAbstract, _ := ctx.Value(currentSubnetAbstractContextKey).(*abstract.Subnet)
-		currentSubnetProps, _ := ctx.Value(currentSubnetPropertiesContextKey).(*serialize.JSONProperties)
+		var (
+			currentSubnetAbstract *abstract.Subnet
+			currentSubnetProps    *serialize.JSONProperties
+			ok                    bool
+		)
+		value := ctx.Value(currentSubnetAbstractContextKey)
+		if value != nil {
+			currentSubnetAbstract, ok = value.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("failed to cast value to '*abstract.Subnet'")
+			}
+		}
+		value = ctx.Value(currentSubnetPropertiesContextKey)
+		if value != nil {
+			currentSubnetAbstract, ok = value.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("failed to cast value to '*serialize.JSONProperties'")
+			}
+		}
 
 		var subnetHosts *propertiesv1.SubnetHosts
 		// inspectFunc will get Hosts linked to Subnet from properties

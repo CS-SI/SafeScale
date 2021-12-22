@@ -419,9 +419,9 @@ func (s stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEff
 		hostSizing.DiskSize = tpl.DiskSize
 		hostSizing.RAMSize = tpl.RAMSize
 	} else if _, ok := flavor["vcpus"]; ok {
-		hostSizing.Cores, _ = flavor["vcpus"].(int)     // FIXME: Missing error handling, this function should also return an error
-		hostSizing.DiskSize, _ = flavor["disk"].(int)   // FIXME: Missing error handling, this function should also return an error
-		hostSizing.RAMSize, _ = flavor["ram"].(float32) // FIXME: Missing error handling, this function should also return an error
+		hostSizing.Cores, _ = flavor["vcpus"].(int)     // nolint // FIXME: Missing error handling, this function should also return an error
+		hostSizing.DiskSize, _ = flavor["disk"].(int)   // nolint // FIXME: Missing error handling, this function should also return an error
+		hostSizing.RAMSize, _ = flavor["ram"].(float32) // nolint // FIXME: Missing error handling, this function should also return an error
 		hostSizing.RAMSize = hostSizing.RAMSize / 1000.0
 	}
 	return hostSizing
@@ -518,8 +518,8 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 		Updated: server.Updated,
 	}
 
-	host.Core.Tags["Template"], _ = server.Image["id"].(string)
-	host.Core.Tags["Image"], _ = server.Flavor["id"].(string)
+	host.Core.Tags["Template"], _ = server.Image["id"].(string) // nolint
+	host.Core.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
 
 	// recover metadata
 	for k, v := range server.Metadata {

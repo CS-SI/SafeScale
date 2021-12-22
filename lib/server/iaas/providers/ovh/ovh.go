@@ -102,20 +102,20 @@ func (p *provider) IsNull() bool {
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	var validInput bool
 
-	identityParams, _ := params["identity"].(map[string]interface{})
-	compute, _ := params["compute"].(map[string]interface{})
-	// networkParams, _ := params["network"].(map[string]interface{})
+	identityParams, _ := params["identity"].(map[string]interface{}) // nolint
+	compute, _ := params["compute"].(map[string]interface{})         // nolint
+	// networkParams, _ := params["network"].(map[string]interface{}) // nolint
 
-	applicationKey, _ := identityParams["ApplicationKey"].(string)
-	openstackID, _ := identityParams["OpenstackID"].(string)
-	openstackPassword, _ := identityParams["OpenstackPassword"].(string)
-	region, _ := compute["Region"].(string)
+	applicationKey, _ := identityParams["ApplicationKey"].(string)       // nolint
+	openstackID, _ := identityParams["OpenstackID"].(string)             // nolint
+	openstackPassword, _ := identityParams["OpenstackPassword"].(string) // nolint
+	region, _ := compute["Region"].(string)                              // nolint
 	zone, ok := compute["AvailabilityZone"].(string)
 	if !ok {
 		zone = "nova"
 	}
 
-	customDNS, _ := compute["DNS"].(string)
+	customDNS, _ := compute["DNS"].(string) // nolint
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {
 			fragments := strings.Split(customDNS, ",")

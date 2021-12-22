@@ -190,7 +190,7 @@ func (c *MetadataCore) Inspect(callback resources.Callback) (xerr fail.Error) {
 	// Reload reloads data from Object Storage to be sure to have the last revision
 	c.lock.Lock()
 	xerr = c.reload()
-	c.lock.Unlock()
+	c.lock.Unlock() // nolint
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to reload metadata")
@@ -252,7 +252,6 @@ func (c *MetadataCore) Alter(callback resources.Callback, options ...data.Immuta
 		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			c.lock.Unlock()
 			return xerr
 		}
 	}

@@ -84,8 +84,8 @@ func (v volume) Delete(names []string, timeout time.Duration) error {
 
 		if err != nil {
 			mutex.Lock()
+			defer mutex.Unlock()
 			errs = append(errs, err.Error())
-			mutex.Unlock()
 		}
 	}
 

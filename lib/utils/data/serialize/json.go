@@ -106,7 +106,8 @@ func (x *JSONProperties) Clone() *JSONProperties {
 		module: x.module,
 	}
 	for k, v := range x.Properties {
-		newP.Properties[k], _ = v.Clone().(*jsonProperty) // FIXME: Another problem here, Clone() should return (*JSONProperties, error)
+		// FIXME: Another problem here, Clone() should return (*JSONProperties, error)
+		newP.Properties[k], _ = v.Clone().(*jsonProperty) // nolint
 	}
 	return newP
 }
@@ -211,7 +212,12 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 	}
 
 	clone := item.Clone()
-	xerr := clone.(*jsonProperty).Alter(alterer)
+	castedClone, ok := clone.(*jsonProperty)
+	if !ok {
+		return fail.InconsistentError("failed to cast clone to '*jsonProperty'")
+	}
+
+	xerr := castedClone.Alter(alterer)
 	if xerr != nil {
 		return xerr
 	}

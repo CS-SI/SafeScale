@@ -253,13 +253,20 @@ func (f *Feature) Clone() data.Clonable {
 
 // Replace ...
 // satisfies interface data.Clonable
+// may panic
 func (f *Feature) Replace(p data.Clonable) data.Clonable {
 	// Do not test with IsNull(), it's allowed to clone a null value...
 	if f == nil || p == nil {
 		return f
 	}
 
-	src, _ := p.(*Feature) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*Feature) // nolint
+	// VPL: Not used yet, need to think if we should return an error or panic, or something else
+	// src, ok := p.(*Feature)
+	// if !ok {
+	// 	panic("failed to cast p to '*Feature'")
+	// }
 	*f = *src
 	f.installers = make(map[installmethod.Enum]Installer, len(src.installers))
 	for k, v := range src.installers {
@@ -382,7 +389,12 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 	switch target.(type) {
 	case resources.Host:
 		var found bool
-		xerr = target.(*Host).Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		castedTarget, ok := target.(*Host)
+		if !ok {
+			return &results{}, fail.InconsistentError("failed to cast target to '*Host'")
+		}
+
+		xerr = castedTarget.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 			return props.Inspect(hostproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
 				hostFeaturesV1, ok := clonable.(*propertiesv1.HostFeatures)
 				if !ok {

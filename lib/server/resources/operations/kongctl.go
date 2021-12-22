@@ -226,7 +226,10 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		if _, ok := unjsoned["name"]; !ok {
 			unjsoned["name"] = ruleName
 		}
-		jsoned, _ := json.Marshal(&unjsoned)
+		jsoned, err := json.Marshal(&unjsoned)
+		if err != nil {
+			return "", fail.Wrap(err, "failed to marshal service rule")
+		}
 		content := string(jsoned)
 
 		url := "services/" + ruleName
@@ -245,6 +248,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		if err != nil {
 			return ruleName, fail.SyntaxError("syntax error in rule '%s': %s", ruleName, err.Error())
 		}
+
 		if _, ok := unjsoned["source-control"]; ok {
 			sourceControl, ok = unjsoned["source-control"].(map[string]interface{})
 			if !ok {
@@ -256,7 +260,11 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 			unjsoned["name"] = ruleName
 		}
 		unjsoned["protocols"] = []string{"https"}
-		jsoned, _ := json.Marshal(&unjsoned)
+		jsoned, err := json.Marshal(&unjsoned)
+		if err != nil {
+			return "", fail.Wrap(err, "failed to marshal route rule")
+		}
+
 		content = string(jsoned)
 		url := "routes/" + ruleName
 		response, _, xerr := k.put(ctx, ruleName, url, content, values, true)
@@ -264,6 +272,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
+
 		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, k.addSourceControl(ctx, ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
@@ -295,7 +304,11 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		}
 
 		// Now ready to add target to upstream
-		jsoned, _ := json.Marshal(&target)
+		jsoned, err := json.Marshal(&target)
+		if err != nil {
+			return "", fail.Wrap(err, "failed to marshall upstream rule")
+		}
+
 		content = string(jsoned)
 		url := "upstreams/" + ruleName + "/targets"
 		_, _, xerr = k.post(ctx, ruleName, url, content, values, false)
@@ -303,6 +316,7 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
+
 		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
 		return ruleName, nil
 
@@ -327,7 +341,11 @@ func (k *KongController) realizeRuleData(content string, v data.Map) (string, fa
 }
 
 func (k *KongController) createUpstream(ctx context.Context, name string, options data.Map, v *data.Map) fail.Error {
-	jsoned, _ := json.Marshal(&options)
+	jsoned, err := json.Marshal(&options)
+	if err != nil {
+		return fail.Wrap(err, "failed to marshal options")
+	}
+
 	response, _, xerr := k.put(ctx, name, "upstreams/"+name, string(jsoned), v, true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -388,7 +406,10 @@ func (k *KongController) addSourceControl(ctx context.Context,
 		resourceType: map[string]interface{}{"id": resourceID},
 		"config":     sourceControl,
 	}
-	jsoned, _ := json.Marshal(&kongdata)
+	jsoned, err := json.Marshal(&kongdata)
+	if err != nil { // should not happen...
+		return fail.Wrap(err, "failed to marshal kong data")
+	}
 
 	// Create or patch plugin ip-restriction
 	if ref == "" {

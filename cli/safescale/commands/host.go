@@ -166,12 +166,17 @@ var hostList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
 
-		jsoned, _ := json.Marshal(hosts.GetHosts())
+		jsoned, err := json.Marshal(hosts.GetHosts())
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
+		}
+
 		var result []map[string]interface{}
 		err = json.Unmarshal(jsoned, &result)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
+
 		for _, v := range result {
 			delete(v, "private_key")
 			delete(v, "state")

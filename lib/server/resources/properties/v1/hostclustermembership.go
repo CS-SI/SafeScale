@@ -59,7 +59,8 @@ func (hcm *HostClusterMembership) Replace(p data.Clonable) data.Clonable {
 		return hcm
 	}
 
-	src, _ := p.(*HostClusterMembership) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostClusterMembership) // nolint
 	*hcm = *src
 	return hcm
 }

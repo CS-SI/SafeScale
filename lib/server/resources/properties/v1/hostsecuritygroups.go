@@ -57,11 +57,13 @@ func (hsg *HostSecurityGroups) Replace(p data.Clonable) data.Clonable {
 		return hsg
 	}
 
-	src, _ := p.(*HostSecurityGroups) // FIXME: Replace should also return an error
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostSecurityGroups) // nolint
 	*hsg = *src
 	hsg.ByID = make(map[string]*SecurityGroupBond, len(src.ByID))
 	for k, v := range src.ByID {
-		hsg.ByID[k], _ = v.Clone().(*SecurityGroupBond) // FIXME: Replace should also return an error
+		// FIXME: Replace should also return an error
+		hsg.ByID[k], _ = v.Clone().(*SecurityGroupBond) // nolint
 	}
 	hsg.ByName = make(map[string]string, len(src.ByName))
 	for k, v := range src.ByName {

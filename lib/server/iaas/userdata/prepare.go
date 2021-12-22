@@ -245,9 +245,10 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 		}
 	}
 
-	userdataPhaseTemplatesLock.RLock()
+	userdataPhaseTemplatesLock.Lock()
+	defer userdataPhaseTemplatesLock.Unlock()
+
 	anon, ok := userdataPhaseTemplates[phase]
-	userdataPhaseTemplatesLock.RUnlock()
 	if !ok {
 		return nil, fail.NotImplementedError("phase '%s' not managed", phase)
 	}
@@ -259,8 +260,6 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 			return nil, fail.NewError("error loading template for phase %s", phase)
 		}
 	} else {
-		userdataPhaseTemplatesLock.Lock()
-		defer userdataPhaseTemplatesLock.Unlock()
 
 		box, err = rice.FindBox("../userdata/scripts")
 		if err != nil {
