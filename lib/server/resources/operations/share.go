@@ -182,10 +182,9 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 	var ok bool
 	if rs, ok = cacheEntry.Content().(resources.Share); !ok {
 		return ShareNullValue(), fail.InconsistentError("cache content should be a resources.Share", ref)
-	} else {
-		if rs == nil {
-			return ShareNullValue(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
-		}
+	}
+	if rs == nil {
+		return ShareNullValue(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
 
 	_ = cacheEntry.LockContent()

@@ -2222,10 +2222,8 @@ func createSingleHostNetworking(
 				default:
 					return nil, nil, xerr
 				}
-			} else {
-				if servers := strings.TrimSpace(opts.GetString("DNSServers")); servers != "" {
-					dnsServers = strings.Split(servers, ",")
-				}
+			} else if servers := strings.TrimSpace(opts.GetString("DNSServers")); servers != "" {
+				dnsServers = strings.Split(servers, ",")
 			}
 
 			subnetRequest.Name = singleHostRequest.ResourceName

@@ -422,7 +422,7 @@ func (s stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEff
 		hostSizing.Cores, _ = flavor["vcpus"].(int)     // nolint // FIXME: Missing error handling, this function should also return an error
 		hostSizing.DiskSize, _ = flavor["disk"].(int)   // nolint // FIXME: Missing error handling, this function should also return an error
 		hostSizing.RAMSize, _ = flavor["ram"].(float32) // nolint // FIXME: Missing error handling, this function should also return an error
-		hostSizing.RAMSize = hostSizing.RAMSize / 1000.0
+		hostSizing.RAMSize /= 1000.0
 	}
 	return hostSizing
 }

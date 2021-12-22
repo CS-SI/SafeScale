@@ -386,7 +386,7 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 	defer fail.OnExitLogError(&xerr, tracer.TraceMessage(""))
 
 	// -- passive check if feature is installed on target
-	switch target.(type) {
+	switch target.(type) { // nolint
 	case resources.Host:
 		var found bool
 		castedTarget, ok := target.(*Host)

@@ -49,9 +49,9 @@ func AbsPathify(inPath string) string {
 		}
 
 		if val, ok := overrides[ks]; ok {
-			inPath = strings.Replace(inPath, key, val, -1)
+			inPath = strings.ReplaceAll(inPath, key, val)
 		} else {
-			inPath = strings.Replace(inPath, key, os.Getenv(ks), -1)
+			inPath = strings.ReplaceAll(inPath, key, os.Getenv(ks))
 		}
 	}
 

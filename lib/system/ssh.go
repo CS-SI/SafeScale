@@ -723,15 +723,13 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 				}
 			}
 			return result, xerr
-		} else {
-			if rc, ok := note.(int); ok && rc == -1 {
-				if !params.collectOutputs {
-					if derr := pipeBridgeCtrl.Stop(); derr != nil {
-						_ = xerr.AddConsequence(derr)
-					}
+		} else if rc, ok := note.(int); ok && rc == -1 {
+			if !params.collectOutputs {
+				if derr := pipeBridgeCtrl.Stop(); derr != nil {
+					_ = xerr.AddConsequence(derr)
 				}
-				return result, xerr
 			}
+			return result, xerr
 		}
 
 		result["retcode"], ok = note.(int)

@@ -1792,7 +1792,7 @@ var clusterAnsibleInventoryCommands = &cli.Command{
 		settings := protocol.FeatureSettings{}
 		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 			err = fail.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error checking Feature \"ansible\" on Cluster '%s': %s", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
@@ -1801,8 +1801,8 @@ var clusterAnsibleInventoryCommands = &cli.Command{
 		var captureInventory = false
 		// FIXME: Must set absolute inventory path, use "sudo -i" (interactive) with debian change $PATH, and makes fail ansible path finder (dirty way)
 		// event not ~.ansible.cfg or ANSIBLE_CONFIG defined for user cladm (could be a solution ?)
-		var inventoryPath string = utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
 		var filteredArgs []string
+		inventoryPath := utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
 		for _, arg := range args {
 			if captureInventory {
 				inventoryPath = arg
@@ -1817,7 +1817,7 @@ var clusterAnsibleInventoryCommands = &cli.Command{
 				[-i INVENTORY]
 				*/
 				captureInventory = true // extract given inventory (overload default inventoryPath)
-				break
+
 			default:
 				/* Expect here
 				[-h | --help]
@@ -1832,7 +1832,6 @@ var clusterAnsibleInventoryCommands = &cli.Command{
 				[--list | --host HOST] <- must have at least one
 				*/
 				filteredArgs = append(filteredArgs, arg)
-				break
 			}
 		}
 
@@ -1882,7 +1881,7 @@ var clusterAnsibleRunCommands = &cli.Command{
 		settings := protocol.FeatureSettings{}
 		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 			err = fail.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error checking Feature \"ansible\" on Cluster '%s': %s", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
@@ -1891,8 +1890,8 @@ var clusterAnsibleRunCommands = &cli.Command{
 		var captureInventory = false
 		// FIXME: Must set absolute inventory path, use "sudo -i" (interactive) with debian change $PATH, and makes fail ansible path finder (dirty way)
 		// event not ~.ansible.cfg or ANSIBLE_CONFIG defined for user cladm (could be a solution ?)
-		var inventoryPath string = utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
 		var filteredArgs []string
+		inventoryPath := utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
 		for _, arg := range args {
 			if captureInventory {
 				inventoryPath = arg
@@ -1907,7 +1906,7 @@ var clusterAnsibleRunCommands = &cli.Command{
 				[-i INVENTORY]
 				*/
 				captureInventory = true // extract given inventory (overload default inventoryPath)
-				break
+
 			default:
 				/* Expect here
 				[-h] [--version] [-v] [-b] [--become-method BECOME_METHOD] [--become-user USER]
@@ -1925,7 +1924,6 @@ var clusterAnsibleRunCommands = &cli.Command{
 				[-a MODULE_ARGS] [-m MODULE_NAME]
 				*/
 				filteredArgs = append(filteredArgs, arg)
-				break
 			}
 		}
 
@@ -1968,21 +1966,23 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 		settings := protocol.FeatureSettings{}
 		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
 			err = fail.FromGRPCStatus(err)
-			msg := fmt.Sprintf("error checking Feature \"ansible\" on Cluster '%s': %s", featureName, clusterName, err.Error())
+			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
 			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 		}
 
 		// Format arguments
-		args := c.Args().Tail()
-		var captureInventory = false
-		var capturePlaybookFile = true
+		var (
+			captureInventory    = false
+			capturePlaybookFile = true
+			filteredArgs        []string
+			isParam             bool
+		)
 		// FIXME: Must set absolute inventory path, use "sudo -i" (interactive) with debian change $PATH, and makes fail ansible path finder (dirty way)
 		// event not ~.ansible.cfg or ANSIBLE_CONFIG defined for user cladm (could be a solution ?)
-		// find no configuration for playbook defaut directory, must be absolute (arg: local file, mapped to remote)
-		var inventoryPath string = utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
-		var playbookFile string = ""
-		var filteredArgs []string
-		var isParam bool
+		// find no configuration for playbook default directory, must be absolute (arg: local file, mapped to remote)
+		inventoryPath := utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
+		playbookFile := ""
+		args := c.Args().Tail()
 		for _, arg := range args {
 			isParam = (string([]rune(arg))[0] == '-')
 			if isParam {
@@ -2006,7 +2006,7 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 				[-i INVENTORY]
 				*/
 				captureInventory = true // extract given inventory (overload default inventoryPath)
-				break
+
 			default:
 				/* Expect here
 				[-h] [--version] [-v] [-b] [--become-method BECOME_METHOD] [--become-user USER]
@@ -2024,10 +2024,9 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 				[-a MODULE_ARGS] [-m MODULE_NAME]
 				*/
 				filteredArgs = append(filteredArgs, arg)
-				break
 			}
 
-			if !isParam && capturePlaybookFile == false {
+			if !isParam && !capturePlaybookFile {
 				capturePlaybookFile = true
 			}
 		}
@@ -2045,10 +2044,10 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 		}
 
 		// Prepare remote playbook
-		var playbookBasename string = playbookFile
+		playbookBasename := playbookFile
 		pos := strings.LastIndex(playbookFile, "/")
 		if pos >= 0 {
-			playbookBasename = playbookFile[pos+1 : len(playbookFile)]
+			playbookBasename = playbookFile[pos+1:]
 		}
 		valuesOnRemote := &client.RemoteFilesHandler{}
 		rfc := client.RemoteFileItem{

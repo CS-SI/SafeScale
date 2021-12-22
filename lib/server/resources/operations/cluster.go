@@ -1370,32 +1370,28 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	}
 
 	var node *propertiesv3.ClusterNode
-	xerr = instance.Review(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError(
+					"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+				)
+			}
 
-					numericalID, ok := nodesV3.PrivateNodeByID[hostID]
-					if !ok {
-						return fail.NotFoundError("failed to find a node identified by %s", hostID)
-					}
+			numericalID, ok := nodesV3.PrivateNodeByID[hostID]
+			if !ok {
+				return fail.NotFoundError("failed to find a node identified by %s", hostID)
+			}
 
-					node, ok = nodesV3.ByNumericalID[numericalID]
-					if !ok {
-						return fail.NotFoundError("failed to find a node identified by %s", hostID)
-					}
+			node, ok = nodesV3.ByNumericalID[numericalID]
+			if !ok {
+				return fail.NotFoundError("failed to find a node identified by %s", hostID)
+			}
 
-					return nil
-				},
-			)
-		},
-	)
+			return nil
+		})
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

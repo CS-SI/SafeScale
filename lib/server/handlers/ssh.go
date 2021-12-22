@@ -110,10 +110,8 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 		user, ok = anon.(string)
 		if !ok {
 			logrus.Warnf("OperatorUsername is not a string, check your tenants.toml file. Using 'safescale' user instead.")
-		} else {
-			if user == "" {
-				logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
-			}
+		} else if user == "" {
+			logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
 		}
 	}
 	if user == "" {

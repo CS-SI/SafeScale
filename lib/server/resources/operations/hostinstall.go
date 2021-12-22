@@ -247,10 +247,7 @@ func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 	instance.installMethods.Range(func(k, v interface{}) bool {
 		var ok bool
 		out[k.(uint8)], ok = v.(installmethod.Enum)
-		if !ok {
-			return false
-		}
-		return true
+		return ok
 	})
 	return out
 }

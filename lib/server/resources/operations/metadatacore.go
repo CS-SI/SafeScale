@@ -20,7 +20,6 @@ import (
 	"reflect"
 	"strings"
 	"sync"
-	_ "sync"
 	"sync/atomic"
 
 	"github.com/sirupsen/logrus"
