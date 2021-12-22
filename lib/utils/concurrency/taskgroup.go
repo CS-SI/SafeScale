@@ -554,7 +554,7 @@ func (instance *taskGroup) TryWait() (bool, TaskResult, fail.Error) {
 // If TaskGroup aborted, returns (false, nil, *fail.ErrAborted) (subsequent calls of TryWaitGroup may be necessary)
 // If TaskGroup still running, returns (false, nil, nil)
 // if TaskGroup is not started, returns (false, nil, *fail.ErrInconsistent)
-func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
+func (instance *taskGroup) TryWaitGroup() (bool, TaskGroupResult, fail.Error) {
 	if instance.isNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}

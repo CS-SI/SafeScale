@@ -1108,7 +1108,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			}
 		}(hosts)
 
-		for _, h := range hosts { // FXIME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
+		for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
 			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
