@@ -39,6 +39,7 @@ import (
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
@@ -54,7 +55,10 @@ import (
 func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	req := params.(abstract.ClusterRequest)
+	req, ok := params.(abstract.ClusterRequest)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "should be an abstract.ClusterRequest")
+	}
 	ctx := task.Context()
 
 	// Check if Cluster exists in metadata; if yes, error
@@ -474,7 +478,10 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	if imageQuery == "" {
 		if cfg, xerr := instance.GetService().GetConfigurationOptions(); xerr == nil {
 			if anon, ok := cfg.Get("DefaultImage"); ok {
-				imageQuery = anon.(string)
+				imageQuery, ok = anon.(string)
+				if !ok {
+					return nil, nil, nil, fail.InconsistentError("failed to convert anon to 'string'")
+				}
 			}
 		}
 	}
@@ -643,10 +650,13 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		return nil, nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task)
+	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task) // nolint
 
 	// Determine if getGateway Failover must be set
-	caps := instance.GetService().GetCapabilities()
+	caps, xerr := instance.GetService().GetCapabilities()
+	if xerr != nil {
+		return nil, nil, xerr
+	}
 	gwFailoverDisabled := req.Complexity == clustercomplexity.Small || !caps.PrivateVirtualIP
 	for k := range req.DisabledDefaultFeatures {
 		if k == "gateway-failover" {
@@ -686,7 +696,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		}
 
 		defer func() {
-			if xerr != nil && !req.KeepOnFailure {
+			if ferr != nil && !req.KeepOnFailure {
 				// Using context.Background() here disables abort
 				if derr := networkInstance.Delete(context.Background()); derr != nil {
 					switch derr.(type) {
@@ -694,7 +704,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 						// missing Network is considered as a successful deletion, continue
 						debug.IgnoreError(derr)
 					default:
-						_ = xerr.AddConsequence(derr)
+						_ = ferr.AddConsequence(derr)
 					}
 				}
 			}
@@ -956,6 +966,7 @@ func (instance *Cluster) createHostResources(
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// It's a valid state not to have a secondary gateway, so continue
 			haveSecondaryGateway = false
 		default:
@@ -1053,7 +1064,7 @@ func (instance *Cluster) createHostResources(
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
-			list, merr := instance.UnsafeListMasters()
+			list, merr := instance.unsafeListMasters()
 			if merr != nil {
 				_ = ferr.AddConsequence(merr)
 				return
@@ -1540,13 +1551,6 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 		return nil, xerr
 	}
 
-	// // Installs proxycache server on gateway (if not disabled)
-	// xerr = instance.installProxyCacheServer(task.Context(), p.Host, hostLabel)
-	// xerr = debug.InjectPlannedFail(xerr)
-	// if xerr != nil {
-	// 	return nil, xerr
-	// }
-
 	// Installs requirements as defined by Cluster Flavor (if it exists)
 	xerr = instance.installNodeRequirements(task.Context(), clusternodetype.Gateway, p.Host, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1692,7 +1696,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts !!")
+			logrus.Warningf("Timeouts creating masters !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to create master(s): %s", clusterName, xerr)
 		if len(collectedErs) != 0 {
@@ -1740,6 +1744,9 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")
 	}
 
+	sleepTime := <-instance.generator
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
+
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("master", clusternodetype.Master)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1748,8 +1755,8 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 	}
 
 	if task.Aborted() {
-		lerr, err := task.LastError()
-		if err != nil {
+		lerr, xerr := task.LastError()
+		if xerr != nil {
 			return nil, fail.AbortedError(nil, "parent task killed (without last error recovered)")
 		}
 		return nil, fail.AbortedError(lerr, "parent task killed")
@@ -2026,7 +2033,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 	logrus.Debugf("[Cluster %s] Configuring masters...", instance.GetName())
 
-	masters, xerr := instance.UnsafeListMasters()
+	masters, xerr := instance.unsafeListMasters()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2095,7 +2102,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts !!")
+			logrus.Warningf("Timeouts configuring masters !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to configure master(s): %s", instance.GetName(), xerr)
 		if len(loadErrors) != 0 {
@@ -2170,7 +2177,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 		return nil, xerr
 	}
 
-	// Configure master for flavour
+	// Configure master for flavor
 	if instance.makers.ConfigureMaster != nil {
 		xerr = instance.makers.ConfigureMaster(instance, p.Index, p.Host)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -2263,7 +2270,7 @@ func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurren
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts !!")
+			logrus.Warningf("Timeouts creating nodes !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to create nodes(s): %s", instance.GetName(), xerr)
 		return nil, rerr
@@ -2301,6 +2308,9 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	if p.index < 1 {
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
+
+	sleepTime := <-instance.generator
+	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}
 	hostReq.ResourceName, xerr = instance.buildHostname("node", clusternodetype.Node)
@@ -2652,7 +2662,7 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("Timeouts !!")
+			logrus.Warningf("Timeouts configuring nodes !!")
 		}
 		rerr := fail.NewError("[Cluster %s] failed to configure nodes(s): %s", instance.GetName(), xerr)
 		if len(startErrs) > 0 {
@@ -2843,9 +2853,9 @@ func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrenc
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			xerr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			ferr = fail.Wrap(xerr, "failed to delete Node '%s'", p.node.Name)
 		}
 	}()
 
@@ -2975,4 +2985,101 @@ func deleteHostOnFailure(instance resources.Host) fail.Error {
 
 	logrus.Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
 	return nil
+}
+
+type taskUpdateClusterInventoryMasterParameters struct {
+	ctx           context.Context
+	master        resources.Host
+	inventoryData string
+}
+
+// taskUpdateClusterInventoryMaster task to updates a Host (master) ansible inventory
+func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+
+	defer fail.OnPanic(&xerr)
+
+	if instance == nil || instance.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+
+	// Convert and validate params
+	casted, ok := params.(taskUpdateClusterInventoryMasterParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskUpdateClusterInventoryMasterParameters'")
+	}
+
+	return nil, instance.updateClusterInventoryMaster(casted.ctx, casted.master, casted.inventoryData)
+}
+
+// updateClusterInventoryMaster updates a Host (master) ansible inventory
+func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, master resources.Host, inventoryData string) (xerr fail.Error) {
+
+	rfcItem := Item{
+		Remote:       fmt.Sprintf("%s/%s", utils.TempFolder, "ansible-inventory.py"),
+		RemoteOwner:  "safescale:safescale",
+		RemoteRights: "ou+rx-w,g+rwx",
+	}
+
+	target := fmt.Sprintf("%s/ansible/inventory/", utils.EtcFolder)
+	commands := []string{
+		fmt.Sprintf("[ -f %s_inventory.py ] && sudo rm -f %s_inventory.py || exit 0", target, target),
+		fmt.Sprintf("sudo mv %s %s_inventory.py", rfcItem.Remote, target),
+		fmt.Sprintf("sudo chown cladm:root %s_inventory.py", target),
+		fmt.Sprintf("ansible-inventory -i %s_inventory.py --list", target),
+		fmt.Sprintf("[ -f %sinventory.py ] && sudo rm -f %sinventory.py  || exit 0", target, target),
+		fmt.Sprintf("sudo mv %s_inventory.py %sinventory.py", target, target),
+	}
+	prerr := fmt.Sprintf("[Cluster %s, master %s] Ansible inventory update: ", instance.GetName(), master.GetName())
+	errmsg := []string{
+		fmt.Sprintf("%sfail to clean up temporaries", prerr),
+		fmt.Sprintf("%sfail to move uploaded inventory", prerr),
+		fmt.Sprintf("%sfail to update rights of uploaded inventory", prerr),
+		fmt.Sprintf("%sfail to test/run uploaded inventory", prerr),
+		fmt.Sprintf("%sfail to remove previous inventory", prerr),
+		fmt.Sprintf("%sfail to move uploaded inventory to final destination", prerr),
+	}
+
+	// Remove possible junks
+	cmd := fmt.Sprintf("[ -f %s ] && sudo rm -f %s || exit 0", rfcItem.Remote, rfcItem.Remote)
+	retcode, stdout, stderr, xerr := master.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
+	if xerr != nil {
+		return fail.Wrap(xerr, "%sfail to clean previous temporaries", prerr)
+	}
+	if retcode != 0 {
+		xerr := fail.NewError("%sfail to clean previous temporaries", prerr)
+		_ = xerr.Annotate("cmd", cmd)
+		_ = xerr.Annotate("stdout", stdout)
+		_ = xerr.Annotate("stderr", stderr)
+		_ = xerr.Annotate("retcode", retcode)
+		return xerr
+	}
+
+	// Upload new inventory
+	xerr = rfcItem.UploadString(ctx, inventoryData, master)
+	if xerr != nil {
+		return fail.Wrap(xerr, "%supload fail", prerr)
+	}
+
+	// Run update commands
+	for i, cmd := range commands {
+		retcode, stdout, stderr, xerr = master.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return fail.Wrap(xerr, errmsg[i])
+		}
+		if retcode != 0 {
+			xerr := fail.NewError(errmsg[i])
+			_ = xerr.Annotate("cmd", cmd)
+			_ = xerr.Annotate("stdout", stdout)
+			_ = xerr.Annotate("stderr", stderr)
+			_ = xerr.Annotate("retcode", retcode)
+			return xerr
+		}
+	}
+
+	return nil
+
 }

@@ -21,23 +21,23 @@
 {{.BashHeader}}
 
 function print_error() {
-    ec=$?
-    read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
+  ec=$?
+  read line file <<< $(caller)
+  echo "An error occurred in line $line of file $file (exit code $ec) :" "{"$(sed "${line}q;d" "$file")"}" >&2
 }
 trap print_error ERR
 
 function dns_fallback {
-    grep nameserver /etc/resolv.conf && return 0
-    echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
-    sudo cp /tmp/resolv.conf /etc/resolv.conf
-    return 0
+  grep nameserver /etc/resolv.conf && return 0
+  echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
+  sudo cp /tmp/resolv.conf /etc/resolv.conf
+  return 0
 }
 
 function finishPreviousInstall() {
-    local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
-    if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
-    return 0
+  local unfinished=$(dpkg -l | grep -v ii | grep -v rc | tail -n +4 | wc -l)
+  if [[ "$unfinished" == 0 ]]; then echo "good"; else sudo dpkg --configure -a --force-all; fi
+  return 0
 }
 
 dns_fallback
@@ -47,37 +47,37 @@ dns_fallback
 echo "Install NFS server"
 
 case $LINUX_KIND in
-    debian|ubuntu)
-        export DEBIAN_FRONTEND=noninteractive
-        touch /var/log/lastlog
-        chgrp utmp /var/log/lastlog
-        chmod 664 /var/log/lastlog
-        sfApt update
-        sfApt install -qqy --force-yes nfs-common nfs-kernel-server
-        ;;
+debian | ubuntu)
+  export DEBIAN_FRONTEND=noninteractive
+  touch /var/log/lastlog
+  chgrp utmp /var/log/lastlog
+  chmod 664 /var/log/lastlog
+  sfApt update
+  sfApt install -qqy --force-yes nfs-common nfs-kernel-server
+  ;;
 
-    rhel|centos)
-        yum makecache fast
-        yum install -y nfs-utils
-        systemctl enable rpcbind
-        systemctl enable nfs-server
-        systemctl enable nfs-lock
-        systemctl enable nfs-idmap
+rhel | centos)
+  yum makecache fast
+  yum install -y nfs-utils
+  systemctl enable rpcbind
+  systemctl enable nfs-server
+  systemctl enable nfs-lock
+  systemctl enable nfs-idmap
 
-        setsebool -P use_nfs_home_dirs 1
-        sfFirewallAdd --zone=trusted --add-service=nfs
-        sfFirewallAdd --zone=trusted --add-service=mountd
-        sfFirewallAdd --zone=trusted --add-service=rpc-bind
-        sfFirewallReload
-        systemctl restart rpcbind
-        systemctl restart nfs-server
-        systemctl restart nfs
-        systemctl restart nfs-lock
-        systemctl restart nfs-idmap
-        ;;
+  setsebool -P use_nfs_home_dirs 1
+  sfFirewallAdd --zone=trusted --add-service=nfs
+  sfFirewallAdd --zone=trusted --add-service=mountd
+  sfFirewallAdd --zone=trusted --add-service=rpc-bind
+  sfFirewallReload
+  systemctl restart rpcbind
+  systemctl restart nfs-server
+  systemctl restart nfs
+  systemctl restart nfs-lock
+  systemctl restart nfs-idmap
+  ;;
 
-    *)
-        echo "Unsupported operating system '$LINUX_KIND'"
-        exit 1
-        ;;
+*)
+  echo "Unsupported operating system '$LINUX_KIND'"
+  exit 1
+  ;;
 esac

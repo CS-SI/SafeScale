@@ -30,7 +30,7 @@ import (
 
 // Stack is the interface to cloud stack
 type Stack interface {
-	GetStackName() string
+	GetStackName() (string, fail.Error)
 
 	// ListAvailabilityZones lists the usable Availability Zones
 	ListAvailabilityZones() (map[string]bool, fail.Error)
@@ -68,7 +68,7 @@ type Stack interface {
 	// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
 	DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
-	GetDefaultSecurityGroupName() string
+	GetDefaultSecurityGroupName() (string, fail.Error)
 	// EnableSecurityGroup enables a Security Group
 	EnableSecurityGroup(*abstract.SecurityGroup) fail.Error
 	// DisableSecurityGroup disables a Security Group
@@ -78,18 +78,18 @@ type Stack interface {
 	CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fail.Error)
 	// InspectNetwork returns the network identified by id
 	InspectNetwork(id string) (*abstract.Network, fail.Error)
-	// InspectNetworkByName returns the network identified by name)
+	// InspectNetworkByName returns the network identified by name
 	InspectNetworkByName(name string) (*abstract.Network, fail.Error)
 	// ListNetworks lists all networks
 	ListNetworks() ([]*abstract.Network, fail.Error)
 	// DeleteNetwork deletes the network identified by id
 	DeleteNetwork(id string) fail.Error
 	// HasDefaultNetwork tells if the stack has a default network (defined in tenant settings)
-	HasDefaultNetwork() bool
+	HasDefaultNetwork() (bool, fail.Error)
 	// GetDefaultNetwork returns the abstract.Network used as default Network
 	GetDefaultNetwork() (*abstract.Network, fail.Error)
 
-	// CreateSubnet creates a subnet in a existing network
+	// CreateSubnet creates a subnet in an existing network
 	CreateSubnet(req abstract.SubnetRequest) (*abstract.Subnet, fail.Error)
 	// InspectSubnet returns the network identified by id
 	InspectSubnet(id string) (*abstract.Subnet, fail.Error)
@@ -115,11 +115,11 @@ type Stack interface {
 	// DeleteVIP deletes the port corresponding to the VIP
 	DeleteVIP(*abstract.VirtualIP) fail.Error
 
-	// CreateHost creates an host that fulfils the request
+	// CreateHost creates a host that fulfills the request
 	CreateHost(request abstract.HostRequest) (*abstract.HostFull, *userdata.Content, fail.Error)
 	// ClearHostStartupScript clears the Startup Script of the Host (if the stack can do it)
 	ClearHostStartupScript(stacks.HostParameter) fail.Error
-	// InspectHost returns the information of the IPAddress identified by id
+	// InspectHost returns the information of the Host identified by id
 	InspectHost(stacks.HostParameter) (*abstract.HostFull, fail.Error)
 	// GetHostState returns the current state of the host identified by id
 	GetHostState(stacks.HostParameter) (hoststate.Enum, fail.Error)
@@ -133,13 +133,13 @@ type Stack interface {
 	StartHost(stacks.HostParameter) fail.Error
 	// RebootHost reboots a host
 	RebootHost(stacks.HostParameter) fail.Error
-	// ResizeHost resizes an host
+	// ResizeHost resizes a host
 	ResizeHost(stacks.HostParameter, abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error)
 	// WaitHostReady waits until host defined in hostParam is reachable by SSH
 	WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (*abstract.HostCore, fail.Error)
-	// BindSecurityGroupToHost attaches a security group to an host
+	// BindSecurityGroupToHost attaches a security group to a host
 	BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error
-	// UnbindSecurityGroupFromHost detaches a security group from an host
+	// UnbindSecurityGroupFromHost detaches a security group from a host
 	UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error
 
 	// CreateVolume creates a block volume
@@ -151,7 +151,7 @@ type Stack interface {
 	// DeleteVolume deletes the volume identified by id
 	DeleteVolume(id string) fail.Error
 
-	// CreateVolumeAttachment attaches a volume to an host
+	// CreateVolumeAttachment attaches a volume to a host
 	CreateVolumeAttachment(request abstract.VolumeAttachmentRequest) (string, fail.Error)
 	// InspectVolumeAttachment returns the volume attachment identified by id
 	InspectVolumeAttachment(serverID, id string) (*abstract.VolumeAttachment, fail.Error)
@@ -166,8 +166,14 @@ type Stack interface {
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally
 type ReservedForProviderUse interface {
-	ListImages() ([]abstract.Image, fail.Error)             // lists available OS images
-	ListTemplates() ([]abstract.HostTemplate, fail.Error)   // lists available host templates
-	GetConfigurationOptions() stacks.ConfigurationOptions   // Returns a read-only struct containing configuration options
-	GetAuthenticationOptions() stacks.AuthenticationOptions // Returns a read-only struct containing authentication options
+	ListImages(all bool) ([]abstract.Image, fail.Error)                      // lists available OS images
+	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)            // lists available host templates
+	GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error)   // Returns a read-only struct containing configuration options
+	GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) // Returns a read-only struct containing authentication options
+}
+
+// FullStack is the interface that MUST actually implement all the providers, don't do it, and we can encounter runtime panics
+type FullStack interface {
+	Stack
+	ReservedForProviderUse
 }

@@ -19,6 +19,7 @@ package cloudferro
 import (
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -58,26 +59,25 @@ func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
 
-// Build build a new Client from configuration parameter
-// Can be called from nil
+// Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
-	identity, _ := params["identity"].(map[string]interface{})
-	compute, _ := params["compute"].(map[string]interface{})
-	network, _ := params["network"].(map[string]interface{})
+	identity, _ := params["identity"].(map[string]interface{}) // nolint
+	compute, _ := params["compute"].(map[string]interface{})   // nolint
+	network, _ := params["network"].(map[string]interface{})   // nolint
 
-	username, _ := identity["Username"].(string)
-	password, _ := identity["Password"].(string)
-	domainName, _ := identity["DomainName"].(string)
+	username, _ := identity["Username"].(string)     // nolint
+	password, _ := identity["Password"].(string)     // nolint
+	domainName, _ := identity["DomainName"].(string) // nolint
 
-	// region, _ := compute["Region"].(string)
+	// region, _ := compute["Region"].(string) // nolint
 	region := "RegionOne"
-	// zone, _ := compute["AvailabilityZone"].(string)
+	// zone, _ := compute["AvailabilityZone"].(string) // nolint
 	zone := "nova"
-	projectName, _ := compute["ProjectName"].(string)
-	// projectID, _ := compute["ProjectID"].(string)
-	defaultImage, _ := compute["DefaultImage"].(string)
+	projectName, _ := compute["ProjectName"].(string) // nolint
+	// projectID, _ := compute["ProjectID"].(string) // nolint
+	defaultImage, _ := compute["DefaultImage"].(string) // nolint
 	if defaultImage == "" {
 		defaultImage = cloudferroDefaultImage
 	}
@@ -89,18 +89,20 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
-		operatorUsername = operatorUsernameIf.(string)
-		if operatorUsername == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstract.DefaultUser
+		operatorUsername, ok = operatorUsernameIf.(string)
+		if ok {
+			if operatorUsername == "" {
+				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+				operatorUsername = abstract.DefaultUser
+			}
 		}
 	}
 
-	providerNetwork, _ := network["ProviderNetwork"].(string)
+	providerNetwork, _ := network["ProviderNetwork"].(string) // nolint
 	if providerNetwork == "" {
 		providerNetwork = "external"
 	}
-	floatingIPPool, _ := network["FloatingIPPool"].(string)
+	floatingIPPool, _ := network["FloatingIPPool"].(string) // nolint
 	if floatingIPPool == "" {
 		floatingIPPool = providerNetwork
 	}
@@ -113,7 +115,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		TenantName:       projectName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   floatingIPPool, // FIXME: move in ConfigurationOptions
+		FloatingIPPool:   floatingIPPool,
 		AllowReauth:      true,
 	}
 
@@ -130,6 +132,24 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectName)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	customDNS, _ := compute["DNS"].(string) // nolint
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					cloudferroDNSServers = append(cloudferroDNSServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				cloudferroDNSServers = append(cloudferroDNSServers, fragment)
+			}
+		}
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{
@@ -155,11 +175,22 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	wrapped := api.StackProxy{
+		InnerStack: stack,
+		Name:       "cloudferro",
+	}
+
 	newP := &provider{
-		Stack:            stack,
+		Stack:            wrapped,
 		tenantParameters: params,
 	}
-	return newP, nil
+
+	wp := providers.ProviderProxy{
+		InnerProvider: newP,
+		Name:          wrapped.Name,
+	}
+
+	return wp, nil
 }
 
 // GetAuthenticationOptions returns the auth options
@@ -169,11 +200,14 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	if err != nil {
+		return nil, err
+	}
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
 	return cfg, nil
 }
@@ -185,14 +219,23 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	provName, xerr := p.GetName()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
-	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("ProviderName", provName)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
@@ -206,7 +249,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
 
-	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates()
+	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 	if xerr != nil {
 		return []abstract.HostTemplate{}, xerr
 	}
@@ -220,7 +263,7 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
 
-	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages()
+	allImages, xerr := p.Stack.(api.ReservedForProviderUse).ListImages(all)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -228,41 +271,41 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 }
 
 // GetName returns the providerName
-func (p provider) GetName() string {
-	return "cloudferro"
+func (p provider) GetName() (string, fail.Error) {
+	return "cloudferro", nil
 }
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() api.Stack {
-	return p.Stack
+func (p provider) GetStack() (api.Stack, fail.Error) {
+	return p.Stack, nil
 }
 
 // GetTenantParameters returns the tenant parameters as-is
-func (p provider) GetTenantParameters() map[string]interface{} {
+func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 	if p.IsNull() {
-		return map[string]interface{}{}
+		return map[string]interface{}{}, nil
 	}
 
-	return p.tenantParameters
+	return p.tenantParameters, nil
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p *provider) GetCapabilities() providers.Capabilities {
+func (p *provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 	if p.IsNull() {
-		return providers.Capabilities{}
+		return providers.Capabilities{}, nil
 	}
 
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
-	}
+	}, nil
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
-func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
 	if p.IsNull() {
-		return emptySlice
+		return emptySlice, nil
 	}
 
 	var (
@@ -271,12 +314,12 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice
+			return emptySlice, nil
 		}
 		out = append(out, re)
 	}
 
-	return out
+	return out, nil
 }
 
 func init() {

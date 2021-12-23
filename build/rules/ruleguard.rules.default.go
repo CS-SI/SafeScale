@@ -65,6 +65,32 @@ func errnoterror(m dsl.Matcher) {
 		Report("err variable not error type")
 }
 
+// err but no an error
+func xerrnoterror(m dsl.Matcher) {
+	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
+	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+
+	m.Match(
+		"if $*_, xerr := $x; $xerr != nil { $*_ } else if $_ { $*_ }",
+		"if $*_, xerr := $x; $xerr != nil { $*_ } else { $*_ }",
+		"if $*_, xerr := $x; $xerr != nil { $*_ }",
+
+		"if $*_, xerr = $x; $xerr != nil { $*_ } else if $_ { $*_ }",
+		"if $*_, xerr = $x; $xerr != nil { $*_ } else { $*_ }",
+		"if $*_, xerr = $x; $xerr != nil { $*_ }",
+
+		"$*_, xerr := $x; if $xerr != nil { $*_ } else if $_ { $*_ }",
+		"$*_, xerr := $x; if $xerr != nil { $*_ } else { $*_ }",
+		"$*_, xerr := $x; if $xerr != nil { $*_ }",
+
+		"$*_, xerr = $x; if $xerr != nil { $*_ } else if $_ { $*_ }",
+		"$*_, xerr = $x; if $xerr != nil { $*_ } else { $*_ }",
+		"$*_, xerr = $x; if $xerr != nil { $*_ }",
+	).
+		Where(m["xerr"].Text == "xerr" && !(m["xerr"].Type.Is("error") || m["xerr"].Type.Is("fail.Error")) && m["x"].Text != "recover()").
+		Report("xerr variable not error type")
+}
+
 // Identical if and else bodies
 func ifbodythenbody(m dsl.Matcher) {
 	m.Match("if $*_ { $body } else { $body }").
@@ -149,7 +175,6 @@ func oddifsequence(m dsl.Matcher) {
 
 // odd sequence of nested if tests
 func nestedifsequence(m dsl.Matcher) {
-
 	m.Match("if $x < $y { if $x >= $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
 	m.Match("if $x <= $y { if $x > $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
 	m.Match("if $x > $y { if $x <= $y {$*_ }; $*_ }").Report("odd sequence of nested if tests")
@@ -268,16 +293,6 @@ func urlredacted(m dsl.Matcher) {
 		Report("consider $x.Redacted() when outputting URLs")
 }
 
-func removeDebugCode(m dsl.Matcher) {
-	m.Match(
-		"logrus.Warningf($*_, $*_)",
-		"logrus.Warning($*_, $x)",
-		"logrus.Warningf($*_)",
-		"logrus.Warning($*_)",
-	).
-		Report("REMOVE debug code before a release")
-}
-
 func sprinterr(m dsl.Matcher) {
 	m.Match(`fmt.Sprint($err)`,
 		`fmt.Sprintf("%s", $err)`,
@@ -285,7 +300,18 @@ func sprinterr(m dsl.Matcher) {
 	).
 		Where(m["err"].Type.Is("error")).
 		Report("maybe call $err.Error() instead of fmt.Sprint()?")
+}
 
+func jsonMarshalIgnored(m dsl.Matcher) {
+	m.Match(`_ = json.Marshal($*_)`).
+		Report("json marshalling errors cannot be ignored")
+}
+
+func jsonUnMarshalIgnored(m dsl.Matcher) {
+	m.Match(`$x, _ = json.UnMarshal($*_)`,
+		`$x, _ := json.UnMarshal($*_)`,
+	).
+		Report("json unmarshalling errors cannot be ignored")
 }
 
 func largeloopcopy(m dsl.Matcher) {
@@ -343,7 +369,14 @@ func nilerr(m dsl.Matcher) {
 		`if err == nil { return $*_, err }`,
 	).
 		Report(`return nil error instead of nil value`)
+}
 
+func nilxerr(m dsl.Matcher) {
+	m.Match(
+		`if xerr == nil { return xerr }`,
+		`if xerr == nil { return $*_, xerr }`,
+	).
+		Report(`return nil error instead of nil value`)
 }
 
 func mailaddress(m dsl.Matcher) {

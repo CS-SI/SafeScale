@@ -68,7 +68,7 @@ var (
 		74: "Connection failed",
 		75: "Disconnected by application",
 		76: "Too many connections",
-		77: "Authentication cancelled by user",
+		77: "Authentication canceled by user",
 		78: "No more authentication methods available",
 		79: "Invalid user name",
 	}
@@ -94,7 +94,7 @@ var (
 		74: "Connection failed",
 		75: "Disconnected by application",
 		76: "Too many connections",
-		77: "Authentication cancelled by user",
+		77: "Authentication canceled by user",
 		78: "No more authentication methods available",
 		79: "Invalid user name",
 	}
@@ -716,7 +716,14 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 			stderr string
 			ok     bool
 		)
-		if note, ok = xerr.Annotation("retcode"); !ok || note.(int) == -1 {
+		if note, ok = xerr.Annotation("retcode"); !ok {
+			if !params.collectOutputs {
+				if derr := pipeBridgeCtrl.Stop(); derr != nil {
+					_ = xerr.AddConsequence(derr)
+				}
+			}
+			return result, xerr
+		} else if rc, ok := note.(int); ok && rc == -1 {
 			if !params.collectOutputs {
 				if derr := pipeBridgeCtrl.Stop(); derr != nil {
 					_ = xerr.AddConsequence(derr)
@@ -724,7 +731,11 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 			}
 			return result, xerr
 		}
-		result["retcode"] = note.(int)
+
+		result["retcode"], ok = note.(int)
+		if !ok {
+			logrus.Warnf("Unable to recover 'retcode' because 'note' is not an integer: %v", note)
+		}
 
 		// Make sure all outputs have been processed
 		if !params.collectOutputs {
@@ -733,7 +744,10 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 			}
 
 			if note, ok = xerr.Annotation("stderr"); ok {
-				result["stderr"] = note.(string)
+				result["stderr"], ok = note.(string)
+				if !ok {
+					logrus.Warnf("Unable to recover 'stederr' because 'note' is not an string: %v", note)
+				}
 			}
 		} else {
 			result["stdout"] = string(msgOut)
@@ -751,11 +765,18 @@ func (scmd *SSHCommand) Close() fail.Error {
 	if len(scmd.tunnels) > 0 {
 		err1 = scmd.tunnels.Close()
 	}
-	err2 := utils.LazyRemove(scmd.keyFile.Name())
 	if err1 != nil {
 		logrus.Errorf("SSHCommand.closeTunnels() failed: %s (%s)", err1.Error(), reflect.TypeOf(err1).String())
+		defer func() { // lazy removal
+			ierr := utils.LazyRemove(scmd.keyFile.Name())
+			if ierr != nil {
+				debug.IgnoreError(ierr)
+			}
+		}()
 		return fail.Wrap(err1, "failed to close SSH tunnels")
 	}
+
+	err2 := utils.LazyRemove(scmd.keyFile.Name())
 	if err2 != nil {
 		return fail.Wrap(err2, "failed to close SSH tunnels")
 	}
@@ -959,7 +980,7 @@ func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTt
 	return &sshCommand, nil
 }
 
-// newCopyCommand does the same thing than newCommand for SCP actions
+// newCopyCommand does the same thing as newCommand for SCP actions
 func (sconf *SSHConfig) newCopyCommand(ctx context.Context, localPath, remotePath string, isUpload bool) (*SSHCommand, fail.Error) {
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
@@ -1114,11 +1135,11 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			// Do not forget to close command, ie close SSH tunnel
 			defer func(cmd *SSHCommand) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
-			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout)
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 			if innerXErr != nil {
 				return innerXErr
 			}
-			if retcode != 0 {
+			if retcode != 0 { // nolint
 				switch phase {
 				case "final":
 					// Before v21.05.0, final provisioning state is stored in user_data.phase2.done file, so try to see if legacy file exists...
@@ -1130,7 +1151,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 					// Do not forget to close command, ie close SSH tunnel
 					defer func(cmd *SSHCommand) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
-					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout)
+					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 					if innerXErr != nil {
 						return innerXErr
 					}
@@ -1139,11 +1160,11 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			}
 			if retcode != 0 {
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
-				_ = fe.Annotate("retcode", retcode)
-				_ = fe.Annotate("stdout", stdout)
-				_ = fe.Annotate("stderr", stderr)
-				_ = fe.Annotate("operation", sshCmd.runCmdString)
-				_ = fe.Annotate("iterations", iterations)
+				fe.Annotate("retcode", retcode)
+				fe.Annotate("stdout", stdout)
+				fe.Annotate("stderr", stderr)
+				fe.Annotate("operation", sshCmd.runCmdString)
+				fe.Annotate("iterations", iterations)
 				return fe
 			}
 

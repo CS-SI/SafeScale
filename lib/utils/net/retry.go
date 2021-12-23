@@ -17,10 +17,14 @@
 package net
 
 import (
+	"errors"
 	"net"
 	"net/url"
+	"os"
 	"reflect"
+	"runtime"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -85,7 +89,7 @@ func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout t
 }
 
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
-// If the error is not a communication error, do not let a chance to retry by returning a *retry.ErrAborted error
+// If the error is not a communication error, we return a *retry.ErrAborted error
 // containing the causing error in it
 func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
@@ -107,6 +111,14 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 				return realErr
 			}
 			return normalizeURLError(realErr)
+		case *net.OpError: // reset-by-peer errors will be captured here
+			if IsConnectionReset(realErr) { // give a chance to reset-by-peer errors
+				return realErr
+			}
+			if realErr.Temporary() {
+				return realErr
+			}
+			return retry.StopRetryError(realErr)
 		case net.Error:
 			if realErr.Temporary() {
 				return realErr
@@ -153,10 +165,9 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 }
 
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
-// If the error is not a communication error, do not let a chance to retry by returning a *retry.ErrAborted error
+// If the error is not a communication error, we return a *retry.ErrAborted error
 // containing the causing error in it
 func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
-	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
 	defer func() {
 		if err != nil {
 			switch err.(type) {
@@ -254,4 +265,48 @@ func normalizeURLError(err *url.Error) fail.Error {
 	}
 
 	return retry.StopRetryError(err)
+}
+
+func erz(v error) uintptr {
+	if rv := reflect.ValueOf(v); rv.Kind() == reflect.Uintptr {
+		return uintptr(rv.Uint())
+	}
+	return 0
+}
+
+// IsConnectionReset returns true if given err is a "reset by peer" error
+func IsConnectionReset(err error) bool {
+	if runtime.GOOS == "windows" {
+		const WSAECONNABORTED = 10053
+		const WSAECONNRESET = 10054
+
+		if oe, ok := err.(*net.OpError); ok {
+			if oe.Op == "read" {
+				if se, ok := oe.Err.(*os.SyscallError); ok {
+					if se.Syscall == "wsarecv" {
+						if n := erz(se.Err); n == WSAECONNRESET || n == WSAECONNABORTED {
+							return true
+						}
+					}
+				}
+			}
+		}
+
+		return false
+	}
+
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno == syscall.ECONNRESET
+	}
+	return false
+}
+
+// IsConnectionRefused returns true if given err is a "connection refused" error
+func IsConnectionRefused(err error) bool {
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		return errno == syscall.ECONNREFUSED
+	}
+	return false
 }

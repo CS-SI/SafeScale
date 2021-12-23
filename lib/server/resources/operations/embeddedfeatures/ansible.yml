@@ -112,12 +112,12 @@ feature:
                             masters: all
                             nodes: no
                         run: |
-                            mkdir -p ${SF_ETCDIR}/ansible
+                            mkdir -p ${SF_ETCDIR}/ansible/inventory
+                            chmod -R ug+rw-x,o+r-wx ${SF_ETCDIR}/ansible
 
                             cat >${SF_ETCDIR}/ansible/ansible.cfg <<-EOF
                             [defaults]
-                            inventory = ${SF_ETCDIR}/ansible/inventory.cfg
-                            host_key_checking = False
+                            inventory = ${SF_ETCDIR}/ansible/inventory/inventory.py
                             remote_tmp = ${SF_TMPDIR}/ansible-\${USER}
                             log_path = ${SF_LOGDIR}/ansible.log
                             EOF
@@ -154,34 +154,17 @@ feature:
                             cluster_admin_username: "{{ .ClusterAdminUsername }}"
                             EOF
 
-                            cat >${SF_ETCDIR}/ansible/inventory.cfg <<-EOF
-                            [gateways]
-                            primary_gateway ansible_host={{ .PrimaryGatewayIP }}
-                            {{ if .SecondaryGatewayIP }}secondary_gateway ansible_host={{ .SecondaryGatewayIP }}{{ end }}
-
-                            [masters]
-                            {{- range .ClusterMasters }}
-                            {{ .Name }} ansible_host={{ .PrivateIP }}
-                            {{- end }}
-
-                            [nodes]
-                            {{- range .ClusterNodes }}
-                            {{ .Name }} ansible_host={{ .PrivateIP }}
-                            {{- end }}
-
-                            [{{ .ClusterName }}:hosts]
-                            gateways
-                            masters
-                            nodes
-
-                            [{{ .ClusterName }}:vars]
-                            ansible_user={{ .ClusterAdminUsername }}
-                            ansible_python_interpreter=/usr/bin/python3
+                            cat >${SF_ETCDIR}/ansible/inventory/inventory.py <<-EOF
+                            #!/usr/bin/env python3
+                            print("{\"_meta\": {\"hostvars\": {}},\"all\": {\"children\": [\"ungrouped\"]},\"ungrouped\": {\"children\": []}}")
                             EOF
 
                             chown -R {{ .ClusterAdminUsername }}:root ${SF_ETCDIR}/ansible
-                            chmod -R ug+rw-x,o+r-wx ${SF_ETCDIR}/ansible
+                            chmod -R ug+rwx,o+rx-w ${SF_ETCDIR}/ansible
                             find ${SF_ETCDIR}/ansible -type d -exec chmod a+x {} \;
+
+                            chown safescale:root ${SF_ETCDIR}/ansible/inventory/inventory.py
+                            chmod -R ug+rwx,o+rx-w ${SF_ETCDIR}/ansible/inventory
                             sfExit
 
             remove:

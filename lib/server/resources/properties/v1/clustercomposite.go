@@ -54,7 +54,8 @@ func (c *ClusterComposite) Replace(p data.Clonable) data.Clonable {
 		return c
 	}
 
-	src := p.(*ClusterComposite)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*ClusterComposite) // nolint
 	c.Tenants = make([]string, len(src.Tenants))
 	copy(c.Tenants, src.Tenants)
 	return c

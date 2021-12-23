@@ -108,8 +108,13 @@ func Upgrade(svc iaas.Service, from, to string, dryRun, doNotBackup bool) fail.E
 func BackupMetadata(svc iaas.Service, filename string) fail.Error {
 	targetFilename := filename
 
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return xerr
+	}
+
 	if targetFilename == "" {
-		targetFilename = fmt.Sprintf("safescale.%s-metadata.backup", svc.GetName())
+		targetFilename = fmt.Sprintf("safescale.%s-metadata.backup", svcName)
 	}
 
 	logrus.Warnf("trying to backup metadata into %s", targetFilename)

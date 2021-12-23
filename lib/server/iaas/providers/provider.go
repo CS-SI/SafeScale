@@ -29,15 +29,15 @@ import (
 // Provider is the interface to cloud stack
 // It has to recall Stack api, to serve as Provider AND as Stack
 type Provider interface {
-	Build(map[string]interface{}) (Provider, fail.Error)
-
 	api.Stack
 
-	// ListImages lists available OS images
+	// Build builds a new Client from configuration parameter and can be called from nil
+	Build(map[string]interface{}) (Provider, fail.Error)
+
+	// ListImages lists available OS images, all bool is unused here but used at upper levels to filter using whitelists and blacklists
 	ListImages(all bool) ([]abstract.Image, fail.Error)
 
-	// ListTemplates lists available host templates
-	// Host templates are sorted using Dominant Resource Fairness Algorithm
+	// ListTemplates lists available host templates, all bool is unused here but used at upper levels to filter using whitelists and blacklists, Host templates are sorted using Dominant Resource Fairness Algorithm
 	ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error)
 
 	// GetAuthenticationOptions returns authentication options as a Config
@@ -46,14 +46,14 @@ type Provider interface {
 	// GetConfigurationOptions returns configuration options as a Config
 	GetConfigurationOptions() (Config, fail.Error)
 
-	GetName() string     // GetName returns the tenant name
-	GetStack() api.Stack // Returns the stack object used by the provider. Use with caution
+	GetName() (string, fail.Error)     // GetName returns the tenant name
+	GetStack() (api.Stack, fail.Error) // Returns the stack object used by the provider. Use with caution
 
-	GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp
+	GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error)
 
 	// GetCapabilities returns the capabilities of the provider
-	GetCapabilities() Capabilities
+	GetCapabilities() (Capabilities, fail.Error)
 
 	// GetTenantParameters returns the tenant parameters as read
-	GetTenantParameters() map[string]interface{}
+	GetTenantParameters() (map[string]interface{}, fail.Error)
 }

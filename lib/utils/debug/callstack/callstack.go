@@ -71,7 +71,8 @@ type Occurrence bool
 
 const (
 	FirstOccurrence Occurrence = false
-	LastOccurrence  Occurrence = true
+
+	LastOccurrence Occurrence = true
 )
 
 // IgnoreTraceUntil cuts all the lines of the trace before and including lines with 'search' in it

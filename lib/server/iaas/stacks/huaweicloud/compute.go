@@ -348,7 +348,11 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
+		cfg, err := s.GetRawAuthenticationOptions()
+		if err != nil {
+			return "", err
+		}
+		s.selectedAvailabilityZone = cfg.AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
 			azList, xerr := s.ListAvailabilityZones()
 			if xerr != nil {
@@ -498,7 +502,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	// Select usable availability zone
-	az, xerr := s.SelectedAvailabilityZone()
+	zone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select Availability Zone")
 	}
@@ -533,7 +537,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
 		UserData:         userDataPhase1,
-		AvailabilityZone: az,
+		AvailabilityZone: zone,
 		Metadata:         metadata,
 	}
 
@@ -628,7 +632,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					// FIXME: Wrong, we need name, status and ID at least here
 					if server != nil {
 						ahc.ID = server.ID
 						ahc.Name = server.Name
@@ -699,11 +702,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				derr := s.DeleteFloatingIP(fip.ID)
 				if derr != nil {
 					logrus.Errorf("Error deleting Floating IP: %v", derr)
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 				}
 			}
 		}()
@@ -727,7 +730,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	return host, userData, nil
 }
 
-// validateHostname validates the name of an host based on known FlexibleEngine requirements
+// validateHostname validates the name of a host based on known FlexibleEngine requirements
 func validateHostname(req abstract.HostRequest) (bool, fail.Error) {
 	s := check.Struct{
 		"ResourceName": check.Composite{
@@ -802,7 +805,6 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-			// FIXME: Wrong, we need name, status and ID at least here
 			if server != nil {
 				ahf.Core.ID = server.ID
 				ahf.Core.Name = server.Name
@@ -831,7 +833,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -870,9 +872,9 @@ func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
 	return imgList, nil
 }
 
-// ListTemplates lists available IPAddress templates
-// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
+// ListTemplates lists available Host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
+func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -926,7 +928,7 @@ func (s stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
 	return flvList, nil
 }
 
-// complementHost complements IPAddress data with content of server parameter
+// complementHost complements Host data with content of server parameter
 func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -950,8 +952,13 @@ func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (
 	completedHost.Description.Updated = server.Updated
 	completedHost.CurrentState = host.LastState
 
-	completedHost.Core.Tags["Template"], _ = server.Image["id"].(string)
-	completedHost.Core.Tags["Image"], _ = server.Flavor["id"].(string)
+	completedHost.Core.Tags["Template"], _ = server.Image["id"].(string) // nolint
+	completedHost.Core.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
+
+	// recover metadata
+	for k, v := range server.Metadata {
+		completedHost.Core.Tags[k] = v
+	}
 
 	if completedHost.Networking.PublicIPv4 == "" {
 		completedHost.Networking.PublicIPv4 = ipv4
@@ -1228,10 +1235,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 							return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
 						}
 						// FIXME: capture more error types
-						switch commRetryErr.(type) { // nolint
+						switch commRetryErr.(type) {
 						case *fail.ErrNotFound:
 							resourcePresent = false
 							return nil
+						default:
 						}
 						return commRetryErr
 					},
@@ -1274,7 +1282,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
-// By convention only one floating IP is allocated to an host
+// By convention only one floating IP is allocated to a host
 func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	commRetryErr := stacks.RetryableRemoteCall(
@@ -1313,7 +1321,7 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 	return &fips[0], nil
 }
 
-// attachFloatingIP creates a Floating IP and attaches it to an host
+// attachFloatingIP creates a Floating IP and attaches it to a host
 func (s stack) attachFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Error) {
 	fip, xerr := s.CreateFloatingIP(host)
 	if xerr != nil {

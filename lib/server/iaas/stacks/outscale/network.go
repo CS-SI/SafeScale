@@ -33,11 +33,11 @@ import (
 const tagNameLabel = "name"
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork() bool {
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 	if s.IsNull() {
-		return false
+		return false, nil
 	}
-	return s.vpc != nil
+	return s.vpc != nil, nil
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
@@ -326,7 +326,7 @@ func (s stack) DeleteNetwork(id string) (xerr fail.Error) {
 			return xerr
 		}
 	} else if len(resp) > 0 { // Delete remaining nics (may happen when something goes wrong during VM deletions)
-		if xerr = s.deleteNICs(resp); xerr == nil { // FIXME: VERY bad practice
+		if xerr = s.deleteNICs(resp); xerr != nil {
 			return xerr
 		}
 	}

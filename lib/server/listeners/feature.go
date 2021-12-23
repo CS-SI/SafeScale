@@ -23,6 +23,9 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/asaskevich/govalidator"
+	"github.com/sirupsen/logrus"
+
 	// "github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
@@ -59,9 +62,9 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-	//		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
-	//	}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in)
+	}
 
 	targetType := in.GetTargetType()
 	switch targetType {
@@ -132,9 +135,9 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-	//		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
-	//	}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in)
+	}
 	targetType := in.GetTargetType()
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
@@ -242,9 +245,9 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-	//		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
-	//	}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in)
+	}
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
 	if targetRef == "" {
@@ -323,9 +326,9 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	//	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-	//		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
-	//	}
+	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
+		logrus.Warnf("Structure validation failure: %v", in)
+	}
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
 	if targetRef == "" {

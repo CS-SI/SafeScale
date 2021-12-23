@@ -55,7 +55,8 @@ func (hs *HostSystem) Replace(p data.Clonable) data.Clonable {
 		return hs
 	}
 
-	src := p.(*HostSystem)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostSystem) // nolint
 	*hs = *src
 	return hs
 }

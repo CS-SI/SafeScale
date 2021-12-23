@@ -43,8 +43,13 @@ func List(ctx context.Context, svc iaas.Service) ([]*abstract.Network, fail.Erro
 
 	var list []*abstract.Network
 
+	withDefaultNetwork, err := svc.HasDefaultNetwork()
+	if err != nil {
+		return nil, err
+	}
+
 	// Default network has no metadata, so we need to "simulate" them.
-	if svc.HasDefaultNetwork() {
+	if withDefaultNetwork {
 		an, xerr := svc.GetDefaultNetwork()
 		if xerr != nil {
 			return nil, xerr

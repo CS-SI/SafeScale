@@ -28,14 +28,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-const (
-	// SubnetDefaultSecurityGroupNameSuffix contains the suffix of the name of the default Security Group to create for a subnet
-	SubnetDefaultSecurityGroupNameSuffix = "-subnet-default-sg"
-
-	// VIPDefaultSecurityGroupNameSuffix contains the suffix of the name of the Security Group to create for a VIP
-	VIPDefaultSecurityGroupNameSuffix = "-vip-default-sg"
-)
-
 // SubnetRequest represents requirements to create a subnet where Mask is defined in CIDR notation
 // like "192.0.2.0/24" or "2001:db8::/32", as defined in RFC 4632 and RFC 4291.
 type SubnetRequest struct {
@@ -132,7 +124,7 @@ func (s *Subnet) OK() bool {
 	return result
 }
 
-// Serialize serializes IPAddress instance into bytes (output json code)
+// Serialize serializes instance into bytes (output json code)
 func (s *Subnet) Serialize() ([]byte, fail.Error) {
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -141,7 +133,7 @@ func (s *Subnet) Serialize() ([]byte, fail.Error) {
 	return r, fail.ConvertError(err)
 }
 
-// Deserialize reads json code and reinstantiates an IPAddress
+// Deserialize reads json code and reinstantiates a Subnet
 func (s *Subnet) Deserialize(buf []byte) (xerr fail.Error) {
 	if s == nil {
 		return fail.InvalidInstanceError()
@@ -205,7 +197,8 @@ func (vip *VirtualIP) Replace(p data.Clonable) data.Clonable {
 		return vip
 	}
 
-	src := p.(*VirtualIP)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*VirtualIP) // nolint
 	*vip = *src
 	vip.Hosts = make([]*HostCore, 0, len(src.Hosts))
 	for _, v := range src.Hosts {

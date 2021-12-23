@@ -62,7 +62,7 @@ var (
 	}
 )
 
-// Parse returns a Enum corresponding to the string parameter
+// Parse returns an Enum corresponding to the string parameter
 // If the string doesn't correspond to any Enum, returns an error (nil otherwise)
 // This function is intended to be used to parse user input.
 func Parse(v string) (Enum, fail.Error) {
@@ -78,7 +78,7 @@ func Parse(v string) (Enum, fail.Error) {
 
 }
 
-// FromString returns a Enum corresponding to the string parameter
+// FromString returns an Enum corresponding to the string parameter
 // This method is intended to be used from validated input.
 func FromString(v string) (e Enum) {
 	e, err := Parse(v)
@@ -88,7 +88,7 @@ func FromString(v string) (e Enum) {
 	return
 }
 
-// String returns a string representaton of an Enum
+// String returns a string representation of an Enum
 func (e Enum) String() string {
 	if str, found := enumMap[e]; found {
 		return str

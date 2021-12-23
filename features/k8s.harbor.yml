@@ -748,7 +748,7 @@ feature:
                         targets:
                             masters: one
                         run: |
-                            # Allows pods to start on master if there is only one master or if it's explicitely requested
+                            # Allows pods to start on master if there is only one master or if it's explicitly requested
                             [ "{{.ClusterComplexity}}" = "small" -o "{{.AllowPodsOnMasters}}" = "true" ] && sfKubectl taint nodes --all node-role.kubernetes.io/master- || true
                             # adds Kubernetes Dashboard
                             if [ "{{.Dashboard}}" == "true" ]; then

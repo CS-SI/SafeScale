@@ -61,7 +61,8 @@ func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
 		return nh
 	}
 
-	src := p.(*NetworkHosts)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*NetworkHosts) // nolint
 	nh.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {
 		nh.ByID[k] = v
@@ -74,5 +75,5 @@ func (nh *NetworkHosts) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.network", string(networkproperty.HostsV1), NewNetworkHosts())
+	serialize.PropertyTypeRegistry.Register("resources.network", networkproperty.HostsV1, NewNetworkHosts())
 }

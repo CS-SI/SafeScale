@@ -1,4 +1,4 @@
-package integrationtests
+package integrationtests // Package integrationtests this package contains integration tests
 
 import (
 	"fmt"

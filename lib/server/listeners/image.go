@@ -53,7 +53,7 @@ func (s *ImageListener) List(ctx context.Context, in *protocol.ImageListRequest)
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, err := PrepareJob(ctx, in.GetTenantId(), "/images/list")

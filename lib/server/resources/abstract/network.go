@@ -89,7 +89,8 @@ func (n *Network) Replace(p data.Clonable) data.Clonable {
 		return n
 	}
 
-	src := p.(*Network)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*Network) // nolint
 	*n = *src
 	n.DNSServers = make([]string, 0, len(src.DNSServers))
 	copy(n.DNSServers, src.DNSServers)
@@ -116,7 +117,7 @@ func (n *Network) OK() bool {
 	return result
 }
 
-// Serialize serializes IPAddress instance into bytes (output json code)
+// Serialize serializes Network instance into bytes (output json code)
 func (n *Network) Serialize() ([]byte, fail.Error) {
 	if n == nil {
 		return nil, fail.InvalidInstanceError()
@@ -125,7 +126,7 @@ func (n *Network) Serialize() ([]byte, fail.Error) {
 	return r, fail.ConvertError(err)
 }
 
-// Deserialize reads json code and reinstantiates an IPAddress
+// Deserialize reads json code and reinstantiates a Network
 func (n *Network) Deserialize(buf []byte) (xerr fail.Error) {
 	if n == nil {
 		return fail.InvalidInstanceError()

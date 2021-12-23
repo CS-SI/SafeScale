@@ -145,6 +145,7 @@ var cmd = fmt.Sprintf("export LANG=C;echo $(%s)î$(%s)î$(%s)î$(%s)î$(%s)î$(%
 // TenantHandler defines API to manipulate tenants
 type TenantHandler interface {
 	Scan(string, bool, []string) (_ *protocol.ScanResultList, xerr fail.Error)
+	Inspect(string) (_ *protocol.TenantInspectResponse, xerr fail.Error)
 }
 
 // tenantHandler service
@@ -157,6 +158,147 @@ type tenantHandler struct {
 // NewTenantHandler creates a scanner service
 func NewTenantHandler(job server.Job) TenantHandler {
 	return &tenantHandler{job: job}
+}
+
+// Inspect displays tenant configuration
+func (handler *tenantHandler) Inspect(tenantName string) (_ *protocol.TenantInspectResponse, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+	if handler == nil {
+		return nil, fail.InvalidInstanceError()
+	}
+	if handler.job == nil {
+		return nil, fail.InvalidInstanceContentError("handler.job", "cannot be nil")
+	}
+	if tenantName == "" {
+		return nil, fail.InvalidParameterError("tenant name", "cannot be empty string")
+	}
+
+	tracer := debug.NewTracer(handler.job.Task(), tracing.ShouldTrace("handlers.tenant")).WithStopwatch().Entering()
+	defer tracer.Exiting()
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
+
+	svc := handler.job.Service()
+	currentName, err := svc.GetName()
+	if err != nil {
+		return nil, err
+	}
+	if tenantName != currentName {
+		return nil, fail.NewError("we only inspect current tenant right now")
+	}
+
+	fromParams := func(in map[string]interface{}, key1 string, key2 string) string {
+		if val, ok := in[key1]; ok {
+			if adict, ok := val.(map[string]interface{}); ok {
+				if val2, ok := adict[key2]; ok {
+					if val3, ok := val2.(string); ok {
+						return val3
+					}
+				}
+			}
+		}
+		return ""
+	}
+
+	fromParamsWithSynonims := func(in map[string]interface{}, keylist []string, synons []string) string {
+		for _, key1 := range keylist {
+			if val, ok := in[key1]; ok {
+				if adict, ok := val.(map[string]interface{}); ok {
+					for _, key2 := range synons {
+						if val2, ok := adict[key2]; ok {
+							if val3, ok := val2.(string); ok {
+								if val3 != "" {
+									return val3
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return ""
+	}
+
+	skipEmpty := func(in *protocol.KeyValue) *protocol.KeyValue {
+		if in == nil {
+			return nil
+		}
+		if in.Value == "" {
+			return nil
+		}
+
+		return in
+	}
+
+	opts, err := svc.GetConfigurationOptions()
+	if err != nil {
+		return nil, fail.Wrap(err, "unable to recover driver configuration")
+	}
+
+	params, err := svc.GetTenantParameters()
+	if err != nil {
+		return nil, err
+	}
+
+	svcName, err := svc.GetName()
+	if err != nil {
+		return nil, err
+	}
+
+	provName, err := svc.GetProviderName()
+	if err != nil {
+		return nil, err
+	}
+
+	bucket, err := svc.GetMetadataBucket()
+	if err != nil {
+		return nil, err
+	}
+
+	return &protocol.TenantInspectResponse{
+		Name:     svcName,
+		Provider: provName,
+		Identity: &protocol.TenantIdentity{
+			User: skipEmpty(&protocol.KeyValue{
+				Key:   "Username",
+				Value: fromParams(params, "identity", "Username"),
+			}),
+			AppKey: nil, // secret
+			Domain: skipEmpty(&protocol.KeyValue{
+				Key:   "DomainName",
+				Value: fromParamsWithSynonims(params, []string{"objectstorage", "compute", "identity"}, []string{"DomainName", "Domain"}),
+			}),
+		},
+		Compute: &protocol.TenantCompute{
+			Region:                 fromParams(params, "compute", "Region"),
+			SubRegion:              opts.GetString("SubRegion"),
+			AvailabilityZone:       fromParams(params, "compute", "Zone"),
+			Context:                nil,
+			ApiKey:                 nil, // secret
+			WhitelistTemplateRegex: opts.GetString("WhitelistTemplateRegex"),
+			BlacklistTemplateRegex: opts.GetString("BlacklistTemplateRegex"),
+			DefaultImage:           opts.GetString("DefaultImage"),
+			DnsList:                opts.GetSliceOfStrings("DnsList"),
+			OperatorUsername:       fromParams(params, "compute", "OperatorUsername"),
+			WhitelistImageRegex:    opts.GetString("WhitelistImageRegex"),
+			BlacklistImageRegex:    opts.GetString("BlacklistImageRegex"),
+		},
+		ObjectStorage: &protocol.TenantObjectStorage{
+			Type:           fromParams(params, "objectstorage", "Type"),
+			Endpoint:       fromParams(params, "objectstorage", "Endpoint"),
+			AuthUrl:        fromParams(params, "objectstorage", "AuthURL"),
+			AccessKey:      "", // secret
+			Region:         fromParams(params, "objectstorage", "Region"),
+			ProjectName:    fromParams(params, "objectstorage", "ProjectName"),
+			ApplicationKey: "", // secret
+			Username:       fromParams(params, "objectstorage", "Username"),
+			Password:       "", // secret
+		},
+		Metadata: &protocol.TenantMetadata{
+			BucketName: bucket.GetName(),
+			Crypt:      fromParams(params, "metadata", "CryptKey") != "",
+		},
+	}, nil
 }
 
 // Scan scans the tenant and updates the database
@@ -309,17 +451,24 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 
 	scanWaitGroup.Wait()
 
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return nil, xerr
+	}
 	if err := handler.collect(); err != nil {
-		return nil, fail.Wrap(err, "failed to save scanned info for tenant '%s'", svc.GetName())
+		return nil, fail.Wrap(err, "failed to save scanned info for tenant '%s'", svcName)
 	}
 	return &protocol.ScanResultList{Results: scanResultList}, nil
 }
 
-func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (xerr fail.Error) {
+func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (ferr fail.Error) {
 
 	svc := handler.job.Service()
 	task := handler.job.Task()
-	tenantName := svc.GetName()
+	tenantName, xerr := svc.GetName()
+	if xerr != nil {
+		return xerr
+	}
 
 	hostName := scannedHostPrefix + template.Name
 	host, xerr := hostfactory.New(svc)
@@ -424,7 +573,10 @@ func (handler *tenantHandler) dryRun(templateNamesToScan []string) (_ *protocol.
 func (handler *tenantHandler) checkScannable() (isScannable bool, xerr fail.Error) {
 	svc := handler.job.Service()
 
-	params := svc.GetTenantParameters()
+	params, xerr := svc.GetTenantParameters()
+	if xerr != nil {
+		return false, xerr
+	}
 
 	compute, ok1 := params["compute"].(map[string]interface{})
 	isScannable, ok2 := compute["Scannable"].(bool)
@@ -459,7 +611,11 @@ func (handler *tenantHandler) dumpTemplates() (xerr fail.Error) {
 		return fail.ConvertError(err)
 	}
 
-	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", svc.GetName())
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return xerr
+	}
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-templates.json", svcName)
 	f = utils.AbsPathify(f)
 
 	if err = ioutil.WriteFile(f, content, 0600); err != nil {
@@ -491,7 +647,12 @@ func (handler *tenantHandler) dumpImages() (xerr fail.Error) {
 		return fail.ConvertError(err)
 	}
 
-	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", svc.GetName())
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return xerr
+	}
+
+	f := fmt.Sprintf("$HOME/.safescale/scanner/%s-images.json", svcName)
 	f = utils.AbsPathify(f)
 
 	if err := ioutil.WriteFile(f, content, 0600); err != nil {
@@ -506,7 +667,7 @@ func (handler *tenantHandler) getScanNetwork() (network resources.Network, xerr 
 	svc := handler.job.Service()
 	network, xerr = networkfactory.Load(svc, scanNetworkName)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return nil, xerr
 		}
 
@@ -531,7 +692,7 @@ func (handler *tenantHandler) getScanSubnet(networkID string) (subnet resources.
 	svc := handler.job.Service()
 	subnet, xerr = subnetfactory.Load(svc, scanNetworkName, scanSubnetName)
 	if xerr != nil {
-		if _, ok := xerr.(*fail.ErrNotFound); !ok {
+		if _, ok := xerr.(*fail.ErrNotFound); !ok || xerr.IsNull() {
 			return nil, xerr
 		}
 		subnet, xerr = subnetfactory.New(svc)
@@ -649,7 +810,11 @@ func (handler *tenantHandler) collect() (xerr fail.Error) {
 		return fail.InvalidRequestError("'Region' not set in tenant 'compute' section")
 	}
 
-	folder := fmt.Sprintf("images/%s/%s", svc.GetName(), region)
+	svcName, xerr := svc.GetName()
+	if xerr != nil {
+		return xerr
+	}
+	folder := fmt.Sprintf("images/%s/%s", svcName, region)
 
 	if err := os.MkdirAll(utils.AbsPathify("$HOME/.safescale/scanner"), 0777); err != nil {
 		return fail.ConvertError(err)
@@ -668,7 +833,13 @@ func (handler *tenantHandler) collect() (xerr fail.Error) {
 	for _, file := range files {
 		acpu := StoredCPUInfo{}
 		theFile := utils.AbsPathify(fmt.Sprintf("$HOME/.safescale/scanner/%s", file.Name()))
-		if strings.Contains(file.Name(), svc.GetName()+"#") {
+
+		svcName, xerr := svc.GetName()
+		if xerr != nil {
+			return xerr
+		}
+
+		if strings.Contains(file.Name(), svcName+"#") {
 			logrus.Infof("Storing: %s", file.Name())
 
 			byteValue, err := ioutil.ReadFile(theFile)
@@ -688,7 +859,7 @@ func (handler *tenantHandler) collect() (xerr fail.Error) {
 		}
 		if !file.IsDir() {
 			if err = os.Remove(theFile); err != nil {
-				logrus.Infof("Error Supressing %s : %s", file.Name(), err.Error())
+				logrus.Infof("Error Suppressing %s : %s", file.Name(), err.Error())
 			}
 		}
 	}

@@ -158,6 +158,9 @@ func (tunnel *SSHTunnel) netListenWithTimeout(network, address string, timeout t
 
 	resChan := make(chan result)
 	go func() {
+		var crash error
+		defer OnPanic(&crash)
+
 		theCli, theErr := net.Listen(network, address)
 		if theErr != nil {
 			litter.Config.HidePrivateFields = false
@@ -214,11 +217,12 @@ func (tunnel *SSHTunnel) Start() (err error) {
 	if tunnel.local.Port() == 0 {
 		tcpAddr, ok := listener.Addr().(*net.TCPAddr)
 		if !ok {
+			defer tunnel.mu.Unlock()
 			return fmt.Errorf("failure casting to *net.TCPAddr")
 		}
 		tunnel.local.port = tcpAddr.Port
 	}
-	tunnel.mu.Unlock()
+	tunnel.mu.Unlock() // nolint
 
 	defer func() {
 		tunnel.closerFw <- struct{}{}
@@ -240,6 +244,9 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		errCh := make(chan error)
 		connCh := make(chan net.Conn)
 		go func() {
+			var crash error
+			defer OnPanic(&crash)
+
 			cwErr := tunnel.newConnectionWaiter(listener, connCh)
 			if cwErr != nil {
 				cwErr = convertErrorToTunnelError(cwErr)
@@ -269,9 +276,12 @@ func (tunnel *SSHTunnel) Start() (err error) {
 		case conn := <-connCh:
 			tunnel.mu.Lock()
 			tunnel.conns = append(tunnel.conns, conn)
-			tunnel.mu.Unlock()
+			tunnel.mu.Unlock() // nolint
 			tunnel.logf("accepted connection")
 			go func() {
+				var crash error
+				defer OnPanic(&crash)
+
 				var fwErr error
 				for {
 					fwErr = tunnel.forward(conn)
@@ -382,6 +392,9 @@ func (tunnel *SSHTunnel) dialSSHWithTimeout(
 
 	resChan := make(chan result)
 	go func() {
+		var crash error
+		defer OnPanic(&crash)
+
 		theCli, theErr := sshDial(network, addr, config)
 		if theErr != nil {
 			litter.Config.HidePrivateFields = false
@@ -426,6 +439,9 @@ func (tunnel *SSHTunnel) dialSSHConnectionWithTimeout(
 
 	resChan := make(chan result)
 	go func() {
+		var crash error
+		defer OnPanic(&crash)
+
 		theConn, theErr := cli.Dial(n, addr)
 		if theErr != nil {
 			litter.Config.HidePrivateFields = false
@@ -480,6 +496,8 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 	tunnel.logf("[2/4] dialed %s in %s\n", tunnel.server.String(), time.Since(dialOp))
 	dialOp = time.Now()
 	tunnel.logf("[3/4] dialing %s with timeout of %s\n", tunnel.remote.String(), tunnel.dialTimeout)
+
+	// FIXME: Put everything between lock and unlock in a function
 	tunnel.mu.Lock()
 	remoteConn, err := tunnel.dialSSHConnectionWithTimeout(serverConn, "tcp", tunnel.remote.Address(), tunnel.dialTimeout)
 	if err != nil {
@@ -492,7 +510,8 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 		remoteConn, _ = setConnectionDeadlines(remoteConn, tunnel.timeKeepAliveRead, tunnel.timeKeepAliveWrite)
 	}
 	tunnel.conns = append(tunnel.conns, remoteConn)
-	tunnel.mu.Unlock()
+	tunnel.mu.Unlock() // nolint
+
 	tunnel.logf("[4/4] dialed %s through %s in %s\n", tunnel.remote.String(), tunnel.local.String(), time.Since(dialOp))
 
 	stopUpdown := make(chan struct{})
@@ -500,13 +519,16 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 	copyConn := func(copier string, writer, reader net.Conn, buff *[]byte) {
 		endCopy := make(chan bool)
 		go func() {
+			var crash error
+			defer OnPanic(&crash)
+
 			defer close(endCopy)
 			_, err := io.CopyBuffer(writer, reader, *buff)
 			if err != nil {
 				report := true
 				ignored := false
 				if opErr, ok := err.(*net.OpError); ok {
-					if strings.Contains(opErr.Err.Error(), "use of closed network connection") {
+					if strings.Contains(opErr.Err.Error(), "use of closed network connection") { // nolint
 						report = false
 						ignored = true
 					}
@@ -553,6 +575,9 @@ func (tunnel *SSHTunnel) forward(localConn net.Conn) (err error) {
 
 	// Both goroutines should end almost in the same second one after another, if not we can consider the tunnel dead...
 	go func() {
+		var crash error
+		defer OnPanic(&crash)
+
 		defer func() {
 			close(stopUpdown)
 			close(updown)

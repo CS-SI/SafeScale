@@ -23,7 +23,7 @@ import (
 )
 
 // HostLocalMount stores information about a device (as an attached volume) mount
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostLocalMount struct {
@@ -36,11 +36,6 @@ type HostLocalMount struct {
 // NewHostLocalMount ...
 func NewHostLocalMount() *HostLocalMount {
 	return &HostLocalMount{}
-}
-
-// Reset ...
-func (hlm *HostLocalMount) Reset() {
-	*hlm = HostLocalMount{}
 }
 
 // IsNull ...
@@ -62,13 +57,14 @@ func (hlm *HostLocalMount) Replace(p data.Clonable) data.Clonable {
 		return hlm
 	}
 
-	src := p.(*HostLocalMount)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostLocalMount) // nolint
 	*hlm = *src
 	return hlm
 }
 
 // HostRemoteMount stores information about a remote filesystem mount
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostRemoteMount struct {
@@ -82,11 +78,6 @@ type HostRemoteMount struct {
 // NewHostRemoteMount ...
 func NewHostRemoteMount() *HostRemoteMount {
 	return &HostRemoteMount{}
-}
-
-// Reset ...
-func (hrm *HostRemoteMount) Reset() {
-	*hrm = HostRemoteMount{}
 }
 
 // IsNull ...
@@ -106,13 +97,14 @@ func (hrm *HostRemoteMount) Replace(p data.Clonable) data.Clonable {
 		return hrm
 	}
 
-	src := p.(*HostRemoteMount)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostRemoteMount) // nolint
 	*hrm = *src
 	return hrm
 }
 
 // HostMounts contains information about mounts on the host
-// not FROZEN yet
+// !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental/overriding fields
 type HostMounts struct {
@@ -121,6 +113,7 @@ type HostMounts struct {
 	RemoteMountsByShareID map[string]string           `json:"remote_mounts_by_device,omitempty"` // contains local mount path, indexed by Share ID
 	RemoteMountsByExport  map[string]string           `json:"remote_mounts_by_export,omitempty"` // contains local mount path, indexed by export
 	RemoteMountsByPath    map[string]*HostRemoteMount `json:"remote_mounts_by_path,omitempty"`   // contains HostRemoteMount, indexed by path
+	BucketMounts          map[string]string           `json:"bucket_mounts,omitempty"`           // contains the path where the index (corresponding to Bucket name) is mounted
 }
 
 // NewHostMounts ...
@@ -131,23 +124,8 @@ func NewHostMounts() *HostMounts {
 		RemoteMountsByShareID: map[string]string{},
 		RemoteMountsByExport:  map[string]string{},
 		RemoteMountsByPath:    map[string]*HostRemoteMount{},
+		BucketMounts:          map[string]string{},
 	}
-}
-
-// Reset ...
-func (hm *HostMounts) Reset() {
-	*hm = HostMounts{
-		LocalMountsByDevice:   map[string]string{},
-		LocalMountsByPath:     map[string]*HostLocalMount{},
-		RemoteMountsByShareID: map[string]string{},
-		RemoteMountsByExport:  map[string]string{},
-		RemoteMountsByPath:    map[string]*HostRemoteMount{},
-	}
-}
-
-// Content ...  (data.Clonable interface)
-func (hm *HostMounts) Content() interface{} {
-	return hm
 }
 
 // IsNull ...
@@ -163,19 +141,21 @@ func (hm HostMounts) Clone() data.Clonable {
 
 // Replace ...  (data.Clonable interface)
 func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
-	// Do not test with isNull(), it's allowed to clone a null value...
+	// Note: do not validate with isNull(), it's allowed to replace a null value...
 	if hm == nil || p == nil {
 		return hm
 	}
 
-	src := p.(*HostMounts)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostMounts) // nolint
 	hm.LocalMountsByDevice = make(map[string]string, len(src.LocalMountsByDevice))
 	for k, v := range src.LocalMountsByDevice {
 		hm.LocalMountsByDevice[k] = v
 	}
 	hm.LocalMountsByPath = make(map[string]*HostLocalMount, len(src.LocalMountsByPath))
 	for k, v := range src.LocalMountsByPath {
-		hm.LocalMountsByPath[k] = v
+		// FIXME: Replace should also return an error
+		hm.LocalMountsByPath[k], _ = v.Clone().(*HostLocalMount) // nolint
 	}
 	hm.RemoteMountsByShareID = make(map[string]string, len(src.RemoteMountsByShareID))
 	for k, v := range src.RemoteMountsByShareID {
@@ -187,7 +167,12 @@ func (hm *HostMounts) Replace(p data.Clonable) data.Clonable {
 	}
 	hm.RemoteMountsByPath = make(map[string]*HostRemoteMount, len(src.RemoteMountsByPath))
 	for k, v := range src.RemoteMountsByPath {
-		hm.RemoteMountsByPath[k] = v
+		// FIXME: Replace should also return an error
+		hm.RemoteMountsByPath[k], _ = v.Clone().(*HostRemoteMount) // nolint
+	}
+	hm.BucketMounts = make(map[string]string, len(src.BucketMounts))
+	for k, v := range src.BucketMounts {
+		hm.BucketMounts[k] = v
 	}
 	return hm
 }

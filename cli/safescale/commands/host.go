@@ -144,13 +144,14 @@ var hostReboot = &cli.Command{
 var hostList = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available hosts (created by SafeScale)",
+	Usage:   "List available hosts (created by SafeScale)",
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
 			Name:    "all",
 			Aliases: []string{"a"},
-			Usage:   "ErrorList all hosts on tenant (not only those created by SafeScale)",
-		}},
+			Usage:   "List all hosts on tenant (not only those created by SafeScale)",
+		},
+	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
@@ -165,12 +166,17 @@ var hostList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
 
-		jsoned, _ := json.Marshal(hosts.GetHosts())
+		jsoned, err := json.Marshal(hosts.GetHosts())
+		if err != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
+		}
+
 		var result []map[string]interface{}
 		err = json.Unmarshal(jsoned, &result)
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of hosts", false).Error())))
 		}
+
 		for _, v := range result {
 			delete(v, "private_key")
 			delete(v, "state")
@@ -202,6 +208,7 @@ var hostInspect = &cli.Command{
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
+
 		return clitools.SuccessResponse(resp)
 	},
 }
@@ -508,7 +515,7 @@ var hostListFeaturesCommand = &cli.Command{
 var hostAddFeatureCommand = &cli.Command{
 	Name:      "add-feature",
 	Aliases:   []string{"install-feature"},
-	Usage:     "!DEPRECATED!See safescale host feature add instead! Add a feature to an Host",
+	Usage:     "!DEPRECATED!See safescale host feature add instead! Add a feature to a host",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{
@@ -808,7 +815,7 @@ func hostFeatureListAction(c *cli.Context) error {
 var hostFeatureAddCommand = &cli.Command{
 	Name:      "add",
 	Aliases:   []string{"install"},
-	Usage:     "Installs a feature to an host",
+	Usage:     "Installs a feature to a host",
 	ArgsUsage: "HOSTNAME FEATURENAME",
 
 	Flags: []cli.Flag{

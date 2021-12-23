@@ -25,7 +25,7 @@ has_python:
 
 prepare_python:
 	@which pip3 > /dev/null; if [ $$? -ne 0 ]; then echo "No pip installed !"; exit 1; fi
-	@pip3 install --user pipenv
+	@pip3 install --user pipenv==2021.5.29
 
 sdk_python: has_python sdk
 	@printf "%b" "$(MAKE_TRACE)$(OK_COLOR)$(INFO_STRING) Creating python3 protobuf, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n" 2>/dev/null;

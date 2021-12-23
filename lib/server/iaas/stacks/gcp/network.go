@@ -42,8 +42,8 @@ const (
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
 // No default network settings supported by GCP
-func (s stack) HasDefaultNetwork() bool {
-	return false
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
+	return false, nil
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
@@ -367,9 +367,9 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (_ *abstract.Subnet, fer
 	}
 
 	defer func() {
-		if xerr != nil && !req.KeepOnFailure {
+		if ferr != nil && !req.KeepOnFailure {
 			if derr := s.rpcDeleteRoute(route.Name); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", route.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete route '%s'", route.Name))
 			}
 		}
 	}()

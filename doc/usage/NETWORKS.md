@@ -75,7 +75,7 @@ To use this mode, you have to add `--empty` flag to the `safescale network creat
 $ safescale network create --empty --cidr 172.16.0.0/16 my-net
 ```
 
-This will create a Network/VPC on provider side, with the CIDR requested, but without the default SUbnet, gateway, ... You will have to create explicitely Subnets in this Network.
+This will create a Network/VPC on provider side, with the CIDR requested, but without the default SUbnet, gateway, ... You will have to create explicitly Subnets in this Network.
 
 Note that the flags `--gwname`, `--os`, `--sizing` and `failover` are meaningless in this mode. They will have to be used with `safescale network subnet create`
 

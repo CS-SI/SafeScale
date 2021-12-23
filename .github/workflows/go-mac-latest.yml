@@ -7,7 +7,7 @@ on:
     branches: [ develop ]
 
 env:
-  GOVERSION: '1.17.2' # The Go version to download (if necessary) and use.
+  GOVERSION: '1.17.5' # The Go version to download (if necessary) and use.
   PROTOCVERSION: 3.17.3
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
         brew update
         brew install protoc-gen-go
 
-    - run: make all
+    - run: make ci
     - uses: actions/upload-artifact@v2
       if: failure()
       with:

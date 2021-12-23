@@ -47,7 +47,6 @@ type Cluster interface {
 	CheckFeature(ctx context.Context, name string, vars data.Map, settings FeatureSettings) (Results, fail.Error)           // checks feature on cluster
 	CountNodes(ctx context.Context) (uint, fail.Error)                                                                      // counts the nodes of the cluster
 	Create(ctx context.Context, req abstract.ClusterRequest) fail.Error                                                     // creates a new cluster and save its metadata
-	DeleteLastNode(ctx context.Context) (*propertiesv3.ClusterNode, fail.Error)                                             // deletes the last added node and returns its name
 	DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) fail.Error                              // deletes a node identified by its ID
 	Delete(ctx context.Context, force bool) fail.Error                                                                      // deletes the cluster (Delete is not used to not collision with metadata)
 	FindAvailableMaster(ctx context.Context) (Host, fail.Error)                                                             // returns ID of the first master available to execute order

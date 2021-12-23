@@ -158,8 +158,8 @@ $ safescaled &
 It should display in your terminal something like this:
 
 ```bash
-Safescaled version: 21.03.0, build f3973fb5a642b7d93b0f20417631e2706a86c211 (2021/03/25-14:49)
-Ready to serve :-)
+Safescaled version: 21.11.0, build 5c7cc25ed29888ba6f8c9ee6feb6c48b79dde763 (2021/12/17-21:35)
+Ready to serve on 'localhost:50051' :-)
 ```
 
 By default, `safescaled` displays only warnings and errors messages. To have more information, you can use `-v` to increase verbosity, and `-d` to use debug mode (`-d -v` will produce A LOT of messages, it's for debug purposes).
@@ -395,7 +395,7 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><a name="tenant_scan"><code>safescale tenant scan &lt;tenant_name&gt;</code></a></td>
-  <td>REVIEW_ME: Scan the given tenant <code>&lt;tenant_name&gt;</code> for templates (see <a href="SCANNER.md">scanner documentation</a> for more details)</td>
+  <td>Scan the given tenant <code>&lt;tenant_name&gt;</code> for templates (see <a href="SCANNER.md">scanner documentation</a> for more details)</td>
 </tr>
 </tbody>
 </table>
@@ -939,21 +939,48 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group create [command_options] &lt;network_name_or_id&gt; &lt;security_group_name&gt;</code></td>
-  <td>REVIEW_ME: <br>Creates a <code>SecurityGroup</code> in a <code>Network</code>.<br>
+  <td><br>Creates a <code>SecurityGroup</code> in a <code>Network</code>.<br>
       <code>command_options</code>:
       <ul>
         <li><code>--description</code> Describes the usage of the Security Group (optional)</li>
       </ul>
       example:
-      <pre>$ safescale network security group create --description "sg for hosts in example_network" example_network sg-example-hosts</pre>
+      <pre>$ safescale network security group create --description "sg for hosts in example_network" example_network sg_example_hosts</pre>
       response on success:
       <pre>
-{"result":{
+{
+  "result":{
+    "default_for_hosts": "",
+    "default_for_subnets": "",
+    "description": "sg for hosts in example_network",
+    "id": "sg-b4c05e51",
+    "name": "sg_example_hosts",
+    "rules": []
+  },
+  "status": "success"
+}
       </pre>
-      response on failure:
+      response on failure (Security Group name invalid):
       <pre>
 {
   "error": {
+    "exitcode": 6,
+    "message": "Cannot create security group: stopping retries: invalid Security Group name"
+  },
+  "result": null,
+  "status": "failure"
+}
+      </pre>
+      response on failure (Network not found):
+      <pre>
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot create security group: failed to find Network 'example_network'"
+  },
+  "result": null,
+  "status": "failure"
+}
       </pre>
   </td>
 </tr>
@@ -1026,16 +1053,16 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group inspect &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Get information about a <code>SecurityGroup</code><br><br>
+  <td>Get information about a <code>SecurityGroup</code><br><br>
       example:
-      <pre>$ safescale network security group inspect example_network safescale-sg_subnet_publicip.example_network.example_network</pre>
+      <pre>$ safescale network security group inspect example-net safescale-sg_subnet_publicip.example-net.example-net</pre>
       response on success:
       <pre>
 {
   "result": {
-    "description": "SG for hosts with public IP in Subnet vpl-cluster of Network vpl-cluster",
+    "description": "SG for hosts with public IP in Subnet example-net of Network example-net",
     "id": "d1eaabcd-765b-49e9-883a-2f34d273bec0",
-    "name": "safescale-sg_subnet_publicip.example_network.example_network"
+    "name": "safescale-sg_subnet_publicip.example-net.example-net"
   },
   "status": "success"
 }
@@ -1045,7 +1072,7 @@ The following actions are proposed:
 {
   "error": {
     "exitcode": 6,
-    "message": "cannot inspect security group: failed to find Security Group 'safescale-sg_subnet_publicip.example_network.example_network'"
+    "message": "cannot inspect security group: failed to find Security Group 'safescale-sg_subnet_publicip.example-net.example-net'"
   },
   "result": null,
   "status": "failure"
@@ -1055,9 +1082,9 @@ The following actions are proposed:
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group delete &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Deletes a Security Group<br><br>
+  <td>Deletes a Security Group<br><br>
       example:
-      <pre>$ safescale network security group delete example_network sg-example-hosts</pre>
+      <pre>$ safescale network security group delete example-net sg_example_hosts</pre>
       response on success:
       <pre>
 {
@@ -1065,17 +1092,24 @@ The following actions are proposed:
   "status": "success"
 }
       </pre>
-      response on failure:
+      response on failure (Security Group does not exist):
       <pre>
-{"error":{
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete Security Group: failed to find Security Group 'sg_example_hosts'"
+  },
+  "result": null,
+  "status": "failure"
+}
       </pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group clear &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Removes rules from a Security Group<br><br>
+  <td>Removes rules from a Security Group<br><br>
       example:
-      <pre>$ safescale network security group clear example_network sg-example-hosts</pre>
+      <pre>$ safescale network security group clear example-net sg_example_hosts</pre>
       response on success:
       <pre>
 {
@@ -1083,24 +1117,54 @@ The following actions are proposed:
   "status": "success"
 }
       </pre>
-      response on failure:
+      response on failure (Security Group does not exist):
       <pre>
-{"error":{
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete Security Group: failed to find Security Group 'sg_example_host'"
+  },
+  "result": null,
+  "status": "failure"
+}
       </pre>
   </td>
 </tr>
 <tr>
   <td valign="top"><code>safescale network security group bonds &lt;network_name_or_id&gt; &lt;security_group_name_or_id&gt;</code></td>
-  <td>REVIEW_ME: Lists Security Groups bonds<br><br>
+  <td>Lists Security Groups bonds<br><br>
       example:
-      <pre>$ safescale network security group bonds example_network sg-example-hosts</pre>
+      <pre>$ safescale network security group bonds example-net sg_example_hosts</pre>
       response on success:
       <pre>
-{"result":
+{
+  "result": {
+    "hosts": [
+      {
+        "id": "i-1e153525",
+        "name": "gw-example-net"
+      }
+    ],
+    "subnets": [
+      {
+        "id": "subnet-684dff0c",
+        "name": "example-net"
+      }
+    ]
+  },
+  "status": "success"
+}
       </pre>
-      response on failure:
+      response on failure (Security Group does not exist):
       <pre>
-{"error":{
+{
+  "error": {
+    "exitcode": 6,
+    "message": "Cannot delete Security Group: failed to find Security Group 'sg_example_host'"
+  },
+  "result": null,
+  "status": "failure"
+}
       </pre>
   </td>
 </tr>
@@ -1124,7 +1188,7 @@ The following actions are proposed:
         <li><code>--description &lt;text&gt;</code> Sets a description to the rule (optional)
       </ul>
       example:
-      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example_network sg-for-some-hosts</pre>
+      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example-net sg_for_some_hosts</pre>
       response on success:
       <pre>
 {
@@ -1158,7 +1222,7 @@ The following actions are proposed:
         </li>
       </ul>
       example:
-      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example_network sg-for-some-hosts</pre>
+      <pre>$ safescale network security group rule add --from-port 80 --source 0.0.0.0/0 --description "allow HTTP" example-net sg-for-some-hosts</pre>
       response on success:
       <pre>
 {
@@ -1176,7 +1240,7 @@ The following actions are proposed:
 </tbody>
 </table>
 
-Note: if <code>&lt;subnet_name_or_id&gt;</code> or <code>&lt;security_group_name_od_id&gt;</code> contain an ID, value can be empty string ("" or CHECK_THIS:`-`); the ID is sufficient to locate what resource is concerned.
+Note: if <code>&lt;subnet_name_or_id&gt;</code> or <code>&lt;security_group_name_or_id&gt;</code> contain an ID, value can be empty string ("" or `-`); the ID is sufficient to locate what resource is concerned.
 
 <br><br>
 
@@ -1401,7 +1465,8 @@ REVIEW_ME:
   },
   "result": null,
   "status": "failure"
-}      </pre>
+}
+      </pre>
   </td>
 </tr>
 <tr>
@@ -1582,7 +1647,7 @@ REVIEW_ME:
   <td><code>safescale [global_options] host security group disable &lt;host_name_or_id&gt; &lt;securitygroup_name_or_id&gt;</code></td>
   <td>REVIEW_ME: Disables a Security Group bound to an Host, the rules of the Security Group are then not being appliedd.<br><br>
       example:
-      <pre>$ safescale host security group disable example_host sg-for-some-hosts</pre>
+      <pre>$ safescale host security group disable example_host sg_for_some_hosts</pre>
       response on success:
       <pre>
 {
@@ -1700,7 +1765,6 @@ The following actions are proposed:
   },
   "status": "success"
 }
-
     </pre>
     response on failure:
     <pre>
@@ -2221,7 +2285,13 @@ The following actions are proposed:
         </li>
         <li><code>-N|--cidr &lt;network_CIDR&gt;</code> Defines the CIDR of the Subnet for the Cluster.</li>
         <li><code>-C|--complexity &lt;complexity&gt;</code> Defines the "complexity" of the Cluster, ie how many masters/nodes will be created (depending of cluster flavor).<br>
-            Valid values are:
+            Valid values for BOH are:
+            <ul>
+              <li><code>small</code>: 1 gateway, 1 master, 1 node</li>
+              <li><code>normal</code>: 2 gateways (if Cloud Provider supports LAN VIP), 2 masters, 3 nodes</li>
+              <li><code>large</code>: 2 gateways (if Cloud Provider supports LAN VIP), 3 masters, 7 node</li>
+            </ul>
+            Valid values for K8S are:
             <ul>
               <li><code>small</code>: 1 gateway, 1 master, 1 node</li>
               <li><code>normal</code>: 2 gateways (if Cloud Provider supports LAN VIP), 3 masters, 3 nodes</li>
@@ -2238,7 +2308,7 @@ The following actions are proposed:
               <li><code>helm</code> (flavor K8S)</li>
             </ul>
         </li>
-        <li><code>--os value</code> Image name for the servers (default: "Ubuntu 20.04", may be overriden by a cluster flavor)</li>
+        <li><code>--os value</code> Image name for the servers (default: "Ubuntu 20.04", may be overridden by a cluster flavor)</li>
         <li><code>-k</code> Keeps infrastructure created on failure; default behavior is to delete resources</li>
         <li><code>--sizing|-S &lt;sizing&gt;</code> Describes sizing of all hosts (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details)</li>
         <li><code>--gw-sizing &lt;sizing&gt;</code> Describes gateway sizing specifically (refer to <a href="#safescale_sizing">Host sizing definition</a> paragraph for details); takes precedence over <code>--sizing</code></li>

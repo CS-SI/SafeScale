@@ -63,7 +63,7 @@ type volume struct {
 
 // VolumeNullValue returns an instance of share corresponding to its null value.
 // The idea is to avoid nil pointer using VolumeNullValue()
-func VolumeNullValue() *volume {
+func VolumeNullValue() *volume { // nolint
 	return &volume{MetadataCore: NullCore()}
 }
 
@@ -86,8 +86,8 @@ func NewVolume(svc iaas.Service) (_ resources.Volume, xerr fail.Error) {
 }
 
 // LoadVolume loads the metadata of a subnet
-func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return VolumeNullValue(), fail.InvalidParameterCannotBeNilError("svc")
@@ -111,6 +111,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
 			return VolumeNullValue(), fail.NotFoundError("failed to find Volume '%s'", ref)
 		default:
@@ -118,13 +119,19 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, xerr fail.Er
 		}
 	}
 
-	if rv = cacheEntry.Content().(resources.Volume); rv == nil {
+	var ok bool
+	rv, ok = cacheEntry.Content().(resources.Volume)
+	if !ok {
+		return nil, fail.InconsistentError("value in cache for Volume with key '%s' is not a resources.Volume", ref)
+	}
+	if rv == nil {
 		return nil, fail.InconsistentError("nil value in cache for Volume with key '%s'", ref)
 	}
+
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
 	}()
@@ -162,7 +169,7 @@ func (instance *volume) IsNull() bool {
 }
 
 // carry overloads rv.core.Carry() to add Volume to service cache
-func (instance *volume) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -189,10 +196,10 @@ func (instance *volume) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
 	}()
@@ -420,8 +427,8 @@ func (instance *volume) Delete(ctx context.Context) (xerr fail.Error) {
 }
 
 // Create a volume
-func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
 	if instance == nil {
@@ -514,10 +521,10 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 
 	// Starting from here, remove volume if exiting with error
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := svc.DeleteVolume(av.ID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", ActionFromError(xerr), req.Name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete volume '%s'", ActionFromError(ferr), req.Name))
 			}
 		}
 	}()
@@ -530,9 +537,11 @@ func (instance *volume) Create(ctx context.Context, req abstract.VolumeRequest) 
 	return instance.carry(av)
 }
 
-// Attach a volume to an host
-func (instance *volume) Attach(ctx context.Context, host resources.Host, path, format string, doNotFormat bool) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+// Attach a volume to a host
+func (instance *volume) Attach(
+	ctx context.Context, host resources.Host, path, format string, doNotFormat, doNotMount bool,
+) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
@@ -599,9 +608,13 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				return fail.InconsistentError("'*propertiesv1.VolumeAttachments' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			mountPoint = path
-			if path == abstract.DefaultVolumeMountPoint {
-				mountPoint = abstract.DefaultVolumeMountPoint + volumeName
+			if doNotMount {
+				mountPoint = ""
+			} else {
+				mountPoint = path
+				if path == abstract.DefaultVolumeMountPoint {
+					mountPoint = abstract.DefaultVolumeMountPoint + volumeName
+				}
 			}
 
 			// For now, allows only one attachment...
@@ -714,10 +727,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 	// Starting from here, remove volume attachment if exiting with error
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := svc.DeleteVolumeAttachment(targetID, vaID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(xerr), volumeName, targetName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to detach Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
 			}
 		}
 	}()
@@ -791,21 +804,23 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				return fail.AbortedError(nil, "aborted")
 			}
 
-			volumeUUID, deeperXErr = nfsServer.MountBlockDevice(ctx, deviceName, mountPoint, format, doNotFormat)
-			if deeperXErr != nil {
-				return deeperXErr
-			}
-
-			defer func() {
-				if ferr != nil {
-					// Disable abort signal during the clean up
-					defer task.DisarmAbortSignal()()
-
-					if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
-						_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
-					}
+			if !doNotMount {
+				volumeUUID, deeperXErr = nfsServer.MountBlockDevice(ctx, deviceName, mountPoint, format, doNotFormat)
+				if deeperXErr != nil {
+					return deeperXErr
 				}
-			}()
+
+				defer func() {
+					if ferr != nil {
+						// Disable abort signal during the clean up
+						defer task.DisarmAbortSignal()()
+
+						if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(ferr), volumeName, targetName))
+						}
+					}
+				}()
+			}
 
 			// Saves volume information in property
 			hostVolumesV1.VolumesByID[volumeID] = &propertiesv1.HostVolume{
@@ -823,16 +838,18 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 		defer func() {
 			if innerXErr != nil {
-				// Disable abort signal during the clean up
+				// Disable abort signal during the cleanup
 				defer task.DisarmAbortSignal()()
 
-				if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
-					_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(innerXErr), volumeName, targetName))
+				if !doNotMount {
+					if derr := nfsServer.UnmountBlockDevice(ctx, volumeUUID); derr != nil {
+						_ = innerXErr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount volume '%s' from host '%s'", ActionFromError(innerXErr), volumeName, targetName))
+					}
 				}
 			}
 		}()
 
-		return props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+		innerXErr = props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -848,6 +865,10 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 
 			return nil
 		})
+		if innerXErr != nil {
+			return innerXErr
+		}
+		return nil
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -855,10 +876,12 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(xerr), volumeName, targetName))
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
+			if !doNotMount {
+				if derr := nfsServer.UnmountBlockDevice(context.Background(), volumeUUID); derr != nil {
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to unmount Volume '%s' from Host '%s'", ActionFromError(ferr), volumeName, targetName))
+				}
 			}
 			derr := host.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 				innerXErr := props.Alter(hostproperty.VolumesV1, func(clonable data.Clonable) fail.Error {
@@ -888,7 +911,7 @@ func (instance *volume) Attach(ctx context.Context, host resources.Host, path, f
 				})
 			})
 			if derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to update metadata of host '%s'", ActionFromError(xerr), targetName))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to update metadata of host '%s'", ActionFromError(ferr), targetName))
 			}
 		}
 	}()
@@ -955,14 +978,10 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 				return xerr
 			}
 			if retcode != 0 {
-				problem := fail.NewError(stderr)
-				if retcode == 255 {
-					problem = fail.NewError("failed to reach SSH service of host '%s', retrying", hostName)
-				}
-
-				_ = problem.Annotate("stdout", stdout)
-				_ = problem.Annotate("stderr", stderr)
-				_ = problem.Annotate("retcode", retcode)
+				problem := fail.NewError("failure trying to run '%s' on host '%s'", cmd, hostName)
+				problem.Annotate("stdout", stdout)
+				problem.Annotate("stderr", stderr)
+				problem.Annotate("retcode", retcode)
 
 				return problem
 			}
@@ -1087,6 +1106,7 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 		}
 
 		// Obtain mounts information
+		notMounted := false
 		innerXErr = props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
 			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
 			if !ok {
@@ -1095,31 +1115,36 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 
 			device := attachment.Device
 			mountPath = hostMountsV1.LocalMountsByDevice[device]
-			mount = hostMountsV1.LocalMountsByPath[mountPath]
-			if mount == nil {
-				return fail.InconsistentError("metadata inconsistency: no mount corresponding to volume attachment")
+			if mountPath == "" {
+				notMounted = true
 			}
-
-			// Check if volume has other mount(s) inside it
-			for p, i := range hostMountsV1.LocalMountsByPath {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
+			if !notMounted {
+				mount = hostMountsV1.LocalMountsByPath[mountPath]
+				if mount == nil {
+					return fail.InconsistentError("metadata inconsistency: no mount corresponding to volume attachment")
 				}
 
-				if i.Device == device {
-					continue
-				}
-				if strings.Index(p+"/", mount.Path+"/") == 0 {
-					return fail.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'", volumeName, targetName, mount.Path, targetName, p)
-				}
-			}
-			for p := range hostMountsV1.RemoteMountsByPath {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
-				}
+				// Check if volume has other mount(s) inside it
+				for p, i := range hostMountsV1.LocalMountsByPath {
+					if task.Aborted() {
+						return fail.AbortedError(nil, "aborted")
+					}
 
-				if strings.Index(p+"/", mount.Path+"/") == 0 {
-					return fail.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'", volumeName, targetName, mount.Path, targetName, p)
+					if i.Device == device {
+						continue
+					}
+					if strings.Index(p+"/", mount.Path+"/") == 0 {
+						return fail.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a volume mounted in '%s:%s'", volumeName, targetName, mount.Path, targetName, p)
+					}
+				}
+				for p := range hostMountsV1.RemoteMountsByPath {
+					if task.Aborted() {
+						return fail.AbortedError(nil, "aborted")
+					}
+
+					if strings.Index(p+"/", mount.Path+"/") == 0 {
+						return fail.InvalidRequestError("cannot detach volume '%s' from '%s:%s', there is a share mounted in '%s:%s'", volumeName, targetName, mount.Path, targetName, p)
+					}
 				}
 			}
 			return nil
@@ -1133,53 +1158,55 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 		}
 
 		// Check if volume (or a subdir in volume) is shared
-		innerXErr = props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
-			hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
-
-			for _, v := range hostSharesV1.ByID {
-				if task.Aborted() {
-					return fail.AbortedError(nil, "aborted")
+		if !notMounted {
+			innerXErr = props.Inspect(hostproperty.SharesV1, func(clonable data.Clonable) fail.Error {
+				hostSharesV1, ok := clonable.(*propertiesv1.HostShares)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
 
-				if strings.Index(v.Path, mount.Path) == 0 {
-					return fail.InvalidRequestError("cannot detach volume '%s' from '%s': mounted in '%s' and shared", volumeName, targetName, mount.Path)
+				for _, v := range hostSharesV1.ByID {
+					if task.Aborted() {
+						return fail.AbortedError(nil, "aborted")
+					}
+
+					if strings.Index(v.Path, mount.Path) == 0 {
+						return fail.InvalidRequestError("cannot detach volume '%s' from '%s': mounted in '%s' and shared", volumeName, targetName, mount.Path)
+					}
 				}
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
 			}
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
-		}
 
-		// Unmount the Block Device ...
-		sshConfig, innerXErr := host.GetSSHConfig()
-		if innerXErr != nil {
-			return innerXErr
-		}
+			// -- Unmount the Block Device ...
+			sshConfig, innerXErr := host.GetSSHConfig()
+			if innerXErr != nil {
+				return innerXErr
+			}
 
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
+			if task.Aborted() {
+				return fail.AbortedError(nil, "aborted")
+			}
 
-		// Create NFS Server instance
-		nfsServer, innerXErr := nfs.NewServer(sshConfig)
-		if innerXErr != nil {
-			return innerXErr
-		}
+			// Create NFS Server instance
+			nfsServer, innerXErr := nfs.NewServer(sshConfig)
+			if innerXErr != nil {
+				return innerXErr
+			}
 
-		// Last chance to abort...
-		if task.Aborted() {
-			return fail.AbortedError(nil, "aborted")
-		}
+			// Last chance to abort...
+			if task.Aborted() {
+				return fail.AbortedError(nil, "aborted")
+			}
 
-		defer task.DisarmAbortSignal()()
+			defer task.DisarmAbortSignal()()
 
-		// Unmount block device ...
-		if innerXErr = nfsServer.UnmountBlockDevice(ctx, attachment.Device); innerXErr != nil {
-			return innerXErr
+			// Unmount block device ...
+			if innerXErr = nfsServer.UnmountBlockDevice(ctx, attachment.Device); innerXErr != nil {
+				return innerXErr
+			}
 		}
 
 		// ... then detach volume ...
@@ -1205,18 +1232,20 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 		}
 
 		// ... update host property propertiesv1.MountsV1 ...
-		innerXErr = props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
-			hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+		if !notMounted {
+			innerXErr = props.Alter(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {
+				hostMountsV1, ok := clonable.(*propertiesv1.HostMounts)
+				if !ok {
+					return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
 
-			delete(hostMountsV1.LocalMountsByDevice, mount.Device)
-			delete(hostMountsV1.LocalMountsByPath, mount.Path)
-			return nil
-		})
-		if innerXErr != nil {
-			return innerXErr
+				delete(hostMountsV1.LocalMountsByDevice, mount.Device)
+				delete(hostMountsV1.LocalMountsByPath, mount.Path)
+				return nil
+			})
+			if innerXErr != nil {
+				return innerXErr
+			}
 		}
 
 		// ... and finish with update of volume property propertiesv1.VolumeAttachments
@@ -1272,13 +1301,13 @@ func (instance *volume) ToProtocol() (*protocol.VolumeInspectResponse, fail.Erro
 			item.Released()
 		}(hostInstance)
 
-		vols, _ := hostInstance.(*Host).UnsafeGetVolumes()
+		vols, _ := hostInstance.(*Host).unsafeGetVolumes()
 		device, ok := vols.DevicesByID[volumeID]
 		if !ok {
 			return nil, fail.InconsistentError("failed to find a device corresponding to the attached volume '%s' on host '%s'", volumeName, k)
 		}
 
-		mnts, _ := hostInstance.(*Host).UnsafeGetMounts()
+		mnts, _ := hostInstance.(*Host).unsafeGetMounts()
 		if mnts != nil {
 			path, ok := mnts.LocalMountsByDevice[device]
 			if !ok {

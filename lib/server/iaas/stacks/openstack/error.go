@@ -162,15 +162,8 @@ var errorFuncMap = map[string]func(string) fail.Error{
 }
 
 // reduceOpenstackError ...
-func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
-	defer func() {
-		switch xerr.(type) {
-		case *fail.ErrRuntimePanic:
-			xerr = fail.InvalidRequestError(string(in))
-		default:
-		}
-	}()
-	defer fail.OnPanic(&xerr)
+func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	tracer := debug.NewTracer(nil, tracing.ShouldTrace("stacks") || tracing.ShouldTrace("stack.openstack"), ": Normalizing error").Entering()
 	defer tracer.Exiting()
@@ -183,33 +176,37 @@ func reduceOpenstackError(errorName string, in []byte) (xerr fail.Error) {
 	var body map[string]interface{}
 	msg := string(in)
 	unjsonedErr := json.Unmarshal(in, &body)
-	if unjsonedErr == nil {
-		if lvl1, ok := body["badRequest"].(map[string]interface{}); ok {
-			if lvl2, ok := lvl1["message"].(string); ok {
-				msg = lvl2
-			}
-		} else if lvl1, ok := body["computeFault"].(map[string]interface{}); ok {
-			if lvl2, ok := lvl1["message"].(string); ok {
-				msg = lvl2
-			}
-		} else if lvl1, ok := body["NeutronError"].(map[string]interface{}); ok {
-			if t, ok := lvl1["type"].(string); ok {
-				var m string
-				if m, ok = lvl1["message"].(string); ok {
-					msg = m
-					// This switch exists only to return another kind of fail.Error if the errorName does not comply with the real Neutron error (not seen yet)
-					switch t {
-					// FIXME: What about *fail.ErrDuplicate ?
-					case "SecurityGroupRuleExists": // return a *fail.ErrDuplicate
-					default:
-					}
+	if unjsonedErr != nil {
+		return fail.Wrap(unjsonedErr, "error unmarshalling error received from provider: %s", string(in))
+	}
+
+	if lvl1, ok := body["badRequest"].(map[string]interface{}); ok {
+		if lvl2, ok := lvl1["message"].(string); ok {
+			msg = lvl2
+		}
+	} else if lvl1, ok := body["computeFault"].(map[string]interface{}); ok {
+		if lvl2, ok := lvl1["message"].(string); ok {
+			msg = lvl2
+		}
+	} else if lvl1, ok := body["NeutronError"].(map[string]interface{}); ok {
+		if t, ok := lvl1["type"].(string); ok {
+			var m string
+			if m, ok = lvl1["message"].(string); ok {
+				msg = m
+				// This switch exists only to return another kind of fail.Error if the errorName does not comply with the real Neutron error (not seen yet)
+				switch t {
+				// FIXME: What about *fail.ErrDuplicate ?
+				case "SecurityGroupRuleExists": // return a *fail.ErrDuplicate
+				default:
 				}
 			}
-		} else if lvl1, ok := body["conflictingRequest"].(map[string]interface{}); ok {
-			msg = lvl1["message"].(string)
-		} else if lvl1, ok := body["message"].(string); ok {
-			msg = lvl1
 		}
+	} else if lvl1, ok := body["conflictingRequest"].(map[string]interface{}); ok {
+		if m, ok := lvl1["message"].(string); ok {
+			msg = m
+		}
+	} else if lvl1, ok := body["message"].(string); ok {
+		msg = lvl1
 	}
 
 	tracer.Trace("normalized error to '*fail.Err%s'", errorName)

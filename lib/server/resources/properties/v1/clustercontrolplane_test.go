@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 )
@@ -40,6 +41,7 @@ func TestControlPlane_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
+	require.EqualValues(t, ct, clonedCt)
 	clonedCt.VirtualIP.Hosts[0].Name = "Test"
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
@@ -47,4 +49,5 @@ func TestControlPlane_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }

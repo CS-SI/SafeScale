@@ -42,7 +42,7 @@ func NewNFSClient(sshconfig *system.SSHConfig) (*Client, fail.Error) {
 func (c *Client) Install(ctx context.Context) fail.Error {
 	stdout, xerr := executeScript(ctx, *c.SSHConfig, "nfs_client_install.sh", map[string]interface{}{})
 	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to install NFS client on remote host")
 	}
 	return nil
@@ -57,7 +57,7 @@ func (c *Client) Mount(ctx context.Context, export string, mountPoint string, wi
 	}
 	stdout, xerr := executeScript(ctx, *c.SSHConfig, "nfs_client_share_mount.sh", data)
 	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to mount remote NFS share")
 	}
 	return nil
@@ -68,7 +68,7 @@ func (c *Client) Unmount(ctx context.Context, export string) fail.Error {
 	data := map[string]interface{}{"Export": export}
 	stdout, xerr := executeScript(ctx, *c.SSHConfig, "nfs_client_share_unmount.sh", data)
 	if xerr != nil {
-		_ = xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stdout", stdout)
 		return fail.Wrap(xerr, "error executing script to unmount remote NFS share")
 	}
 	return nil

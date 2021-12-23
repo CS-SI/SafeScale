@@ -85,7 +85,8 @@ func (i *ClusterIdentity) Replace(p data.Clonable) data.Clonable {
 		return i
 	}
 
-	src := p.(*ClusterIdentity)
+	// FIXME, Replace should also return an error
+	src, _ := p.(*ClusterIdentity) // nolint
 	*i = *src
 	i.Keypair = nil
 	if src.Keypair != nil {
@@ -128,7 +129,7 @@ func (i *ClusterIdentity) Serialize() ([]byte, fail.Error) {
 	return r, nil
 }
 
-// Deserialize reads json code and reinstantiates an IPAddress
+// Deserialize reads json code and reinstantiates a ClusterIdentity
 func (i *ClusterIdentity) Deserialize(buf []byte) (xerr fail.Error) {
 	// i cannot be nil, but can be null value (which will be filled by this method)
 	if i == nil {

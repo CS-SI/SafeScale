@@ -362,17 +362,20 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if len(subtasks) != len(hosts) {
-			logrus.Warningf("TBR: no matter what, this should fail because something happened starting tasks")
+			logrus.Warningf("Not all tasks were started, there should be one subtask per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
 		}
-		logrus.Warningf("TBR: at this point, we failed because we have [%s]", spew.Sdump(xerr))
-		logrus.Warningf("TBR: when it happened, the outcomes were:")
+		logrus.Warningf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
 		wrongs := 0
 		for _, s := range subtasks {
 			sid, _ := s.ID()
 			outcome := tgr[sid]
 			if outcome != nil {
-				oko := outcome.(stepResult)
-				logrus.Warningf("TBR: output '%s' and err '%v'", oko.output, oko.err)
+				var ok bool
+				oko, ok := outcome.(stepResult)
+				if !ok {
+					return nil, fail.NewError("outcome should be a stepResult")
+				}
+				logrus.Warningf("step outcome: output '%s' and err '%v'", oko.output, oko.err)
 				if oko.err != nil {
 					wrongs++
 					continue
@@ -384,7 +387,7 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 			}
 		}
 		if wrongs == 0 && (len(subtasks) == len(hosts)) {
-			logrus.Warningf("TBR: this is BAD, there is a discrepancy between WaitGroup and its individual results")
+			logrus.Warningf("CRITICAL problem: there is a discrepancy between WaitGroup and its individual results")
 		}
 	}
 
@@ -392,7 +395,10 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 		sid, _ := s.ID()
 		outcome := tgr[sid]
 		if outcome != nil {
-			oko := outcome.(resources.UnitResult)
+			oko, ok := outcome.(resources.UnitResult)
+			if !ok {
+				return nil, fail.NewError("outcome should be a resources.UnitResult")
+			}
 			outcomes.AddOne(k, oko)
 		}
 	}
@@ -463,13 +469,13 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 				if !sres.Completed() || !sres.Successful() || sres.Error() != nil {
 					dur := spew.Sdump(result)
 					if !strings.Contains(dur, "check_") {
-						logrus.Warningf("task result: %s", spew.Sdump(result))
+						logrus.Debugf("task result: %s", spew.Sdump(result))
 					}
 				}
 			}
 		}
 		if ferr != nil {
-			logrus.Warningf("task error: %v", ferr)
+			logrus.Debugf("task error: %v", ferr)
 		}
 	}()
 
@@ -511,7 +517,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 	xerr = rfcItem.UploadString(task.Context(), command, p.Host)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Warningf("failure uploading script: %v", xerr)
+		logrus.Warnf("failure uploading script: %v", xerr)
 		problem := fail.Wrap(xerr, "failure uploading script")
 		return stepResult{err: problem}, problem
 	}
@@ -540,9 +546,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			}
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				_ = xerr.Annotate("retcode", retcode)
-				_ = xerr.Annotate("stdout", outrun)
-				_ = xerr.Annotate("stderr", outerr)
+				xerr.Annotate("retcode", retcode)
+				xerr.Annotate("stdout", outrun)
+				xerr.Annotate("stderr", outerr)
 				return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
 			}
 			break
@@ -552,9 +558,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			if xerr == nil {
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					_ = xerr.Annotate("retcode", retcode)
-					_ = xerr.Annotate("stdout", outrun)
-					_ = xerr.Annotate("stderr", outerr)
+					xerr.Annotate("retcode", retcode)
+					xerr.Annotate("stdout", outrun)
+					xerr.Annotate("stderr", outerr)
 					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
 				}
 				break
@@ -563,9 +569,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			if !strings.Contains(xerr.Error(), "bad interpreter") {
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					_ = xerr.Annotate("retcode", retcode)
-					_ = xerr.Annotate("stdout", outrun)
-					_ = xerr.Annotate("stderr", outerr)
+					xerr.Annotate("retcode", retcode)
+					xerr.Annotate("stdout", outrun)
+					xerr.Annotate("stderr", outerr)
 					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
 				}
 				break

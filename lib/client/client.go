@@ -227,7 +227,7 @@ func DecorateTimeoutError(err error, action string, maySucceed bool) error {
 	return err
 }
 
-// isTimeoutError tells if the err is a timeout kind
+// isTimeoutError tells if err is of timeout kind
 func isTimeoutError(err error) bool {
 	return status.Code(err) == codes.DeadlineExceeded
 }

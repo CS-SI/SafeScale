@@ -72,6 +72,7 @@ var ClusterCommand = &cli.Command{
 		clusterShrinkCommand,
 		clusterKubectlCommand,
 		clusterHelmCommand,
+		clusterAnsibleCommands,
 		clusterListFeaturesCommand,
 		clusterCheckFeatureCommand,
 		clusterAddFeatureCommand,
@@ -84,7 +85,7 @@ var ClusterCommand = &cli.Command{
 var clusterListCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
-	Usage:   "ErrorList available clusters",
+	Usage:   "List available clusters",
 
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
@@ -125,7 +126,7 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		delete(config, "secondary_gateway_ip")
 		delete(config, "network_id")
 		delete(config, "nodes")
-		delete(config, "last_state") // FIXME: Some of the information is not properly updated
+		delete(config, "last_state")
 		delete(config, "last_state_label")
 	} else {
 		remotedesktopInstalled := true
@@ -141,7 +142,7 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		if !remotedesktopInstalled {
 			remotedesktopInstalled = false
 			installedFeatures, ok := config["installed_features"].(*protocol.FeatureListResponse)
-			if ok {
+			if ok { // FIXME: What if it fails ?, we should return an error too
 				for _, v := range installedFeatures.Features {
 					if v.Name == "remotedesktop" {
 						remotedesktopInstalled = true
@@ -151,15 +152,19 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 			}
 		}
 		if remotedesktopInstalled {
-			nodes := config["nodes"].(map[string][]*protocol.Host)
-			masters := nodes["masters"]
-			if len(masters) > 0 {
-				urls := make(map[string]string, len(masters))
-				endpointIP := config["endpoint_ip"].(string)
-				for _, v := range masters {
-					urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
+			nodes, ok := config["nodes"].(map[string][]*protocol.Host)
+			if ok { // FIXME: What if it fails ?, we should return an error too
+				masters := nodes["masters"]
+				if len(masters) > 0 {
+					urls := make(map[string]string, len(masters))
+					endpointIP, ok := config["endpoint_ip"].(string)
+					if ok { // FIXME: What if it fails ?, we should return an error too
+						for _, v := range masters {
+							urls[v.Name] = fmt.Sprintf("https://%s/_platform/remotedesktop/%s/", endpointIP, v.Name)
+						}
+						config["remote_desktop"] = urls
+					}
 				}
-				config["remote_desktop"] = urls
 			}
 		} else {
 			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
@@ -393,7 +398,7 @@ var clusterCreateCommand = &cli.Command{
 			Name: "node-sizing",
 			Usage: `Describe node sizing in format "<component><operator><value>[,...]" (cf. --sizing for details),
 		This parameter accepts a supplemental <component> named count, with only = as <operator> and an int as <value> corresponding to the
-		number of workers to create (cannot be less than the minimum required by the flavour).
+		number of workers to create (cannot be less than the minimum required by the flavor).
 	example:
 		--node-sizing "cpu~4, ram~15, count=8" will create 8 nodes`,
 		},
@@ -805,7 +810,7 @@ var clusterKubectlCommand = &cli.Command{
 				if idx+1 < len(args) {
 					localFile := args[idx+1]
 					if localFile != "" {
-						// If it's an URL, propagate as-is
+						// If it's a URL, propagate as-is
 						if urlRegex.MatchString(localFile) {
 							filteredArgs = append(filteredArgs, "-f")
 							filteredArgs = append(filteredArgs, localFile)
@@ -893,13 +898,13 @@ var clusterHelmCommand = &cli.Command{
 			}
 			ignore := false
 			switch arg {
-			//case "--help":
+			// case "--help":
 			//	useTLS = ""
 			case "init":
 				if idx == 0 {
 					return cli.NewExitError("helm init is forbidden", int(exitcode.InvalidArgument))
 				}
-			//case "search", "repo", "help", "install", "uninstall":
+			// case "search", "repo", "help", "install", "uninstall":
 			//	if idx == 0 {
 			//		useTLS = ""
 			//	}
@@ -909,7 +914,7 @@ var clusterHelmCommand = &cli.Command{
 				if idx+1 < len(args) {
 					localFile := args[idx+1]
 					if localFile != "" {
-						// If it's an URL, filter as-is
+						// If it's a URL, filter as-is
 						if urlRegex.MatchString(localFile) {
 							filteredArgs = append(filteredArgs, "-f")
 							filteredArgs = append(filteredArgs, localFile)
@@ -1742,4 +1747,318 @@ func clusterFeatureRemoveAction(c *cli.Context) error {
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
 	return clitools.SuccessResponse(nil)
+}
+
+var clusterAnsibleCommands = &cli.Command{
+	Name:      "ansible",
+	Usage:     "Administrative commands",
+	ArgsUsage: "COMMAND",
+
+	Subcommands: []*cli.Command{
+		clusterAnsibleInventoryCommands,
+		clusterAnsibleRunCommands,
+		clusterAnsiblePlaybookCommands,
+	},
+}
+
+var clusterAnsibleInventoryCommands = &cli.Command{
+	Name:      "inventory",
+	Category:  "Administrative commands",
+	Usage:     "inventory CLUSTERNAME COMMAND [[--][PARAMS ...]]",
+	ArgsUsage: "CLUSTERNAME",
+
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		// Set client session
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		// Get cluster master
+		master, err := clientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
+		if err != nil {
+			msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
+			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		}
+
+		// Check for feature
+		values := map[string]string{}
+		settings := protocol.FeatureSettings{}
+		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
+			err = fail.FromGRPCStatus(err)
+			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
+			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+		}
+
+		// Format arguments
+		args := c.Args().Tail()
+		var captureInventory = false
+		// FIXME: Must set absolute inventory path, use "sudo -i" (interactive) with debian change $PATH, and makes fail ansible path finder (dirty way)
+		// event not ~.ansible.cfg or ANSIBLE_CONFIG defined for user cladm (could be a solution ?)
+		var filteredArgs []string
+		inventoryPath := utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
+		for _, arg := range args {
+			if captureInventory {
+				inventoryPath = arg
+				captureInventory = false
+				continue
+			}
+			switch arg {
+			case "-i":
+			case "--inventory":
+			case "--inventory-file": // Deprecated
+				/* Expect here
+				[-i INVENTORY]
+				*/
+				captureInventory = true // extract given inventory (overload default inventoryPath)
+
+			default:
+				/* Expect here
+				[-h | --help]
+				[-v | --version]
+				[--vault-id VAULT_IDS]
+				[--ask-vault-password | --vault-password-file VAULT_PASSWORD_FILES]
+				[--playbook-dir BASEDIR]
+				[-e EXTRA_VARS]
+				[--graph] [-y] [--toml] [--vars]
+				[--export] [--output OUTPUT_FILE]
+				[host|group]
+				[--list | --host HOST] <- must have at least one
+				*/
+				filteredArgs = append(filteredArgs, arg)
+			}
+		}
+
+		// Make command line
+		cmdStr := `sudo -u cladm -i ansible-inventory -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
+		logrus.Tracef(cmdStr)
+		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		if xerr != nil {
+			msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
+			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		}
+		if retcode != 0 {
+			return cli.NewExitError(stderr, retcode)
+		}
+		return nil
+	},
+}
+
+var clusterAnsibleRunCommands = &cli.Command{
+	Name:      "run",
+	Category:  "Administrative commands",
+	Usage:     "run CLUSTERNAME COMMAND [[--][PARAMS ...]]",
+	ArgsUsage: "CLUSTERNAME",
+
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		// Set client session
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		// Get cluster master
+		master, err := clientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
+		if err != nil {
+			msg := fmt.Sprintf("No masters found available for the cluster '%s': %v", clusterName, err.Error())
+			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		}
+
+		// Check for feature
+		values := map[string]string{}
+		settings := protocol.FeatureSettings{}
+		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
+			err = fail.FromGRPCStatus(err)
+			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
+			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+		}
+
+		// Format arguments
+		args := c.Args().Tail()
+		var captureInventory = false
+		// FIXME: Must set absolute inventory path, use "sudo -i" (interactive) with debian change $PATH, and makes fail ansible path finder (dirty way)
+		// event not ~.ansible.cfg or ANSIBLE_CONFIG defined for user cladm (could be a solution ?)
+		var filteredArgs []string
+		inventoryPath := utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
+		for _, arg := range args {
+			if captureInventory {
+				inventoryPath = arg
+				captureInventory = false
+				continue
+			}
+			switch arg {
+			case "-i":
+			case "--inventory":
+			case "--inventory-file": // Deprecated
+				/* Expect here
+				[-i INVENTORY]
+				*/
+				captureInventory = true // extract given inventory (overload default inventoryPath)
+
+			default:
+				/* Expect here
+				[-h] [--version] [-v] [-b] [--become-method BECOME_METHOD] [--become-user USER]
+				[-K] [--list-hosts]
+				[-l SUBSET] [-P POLL_INTERVAL] [-B SECONDS] [-o] [-t TREE] [-k]
+				[--private-key PRIVATE_KEY_FILE] [-u REMOTE_USER]
+				[-c CONNECTION] [-T TIMEOUT]
+				[--ssh-common-args SSH_COMMON_ARGS]
+				[--sftp-extra-args SFTP_EXTRA_ARGS]
+				[--scp-extra-args SCP_EXTRA_ARGS]
+				[--ssh-extra-args SSH_EXTRA_ARGS] [-C] [--syntax-check] [-D]
+				[-e EXTRA_VARS] [--vault-id VAULT_IDS]
+				[--ask-vault-pass | --vault-password-file VAULT_PASSWORD_FILES]
+				[-f FORKS] [-M MODULE_PATH] [--playbook-dir BASEDIR]
+				[-a MODULE_ARGS] [-m MODULE_NAME]
+				*/
+				filteredArgs = append(filteredArgs, arg)
+			}
+		}
+
+		// Make command line
+		cmdStr := `sudo -u cladm -i ansible -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
+		logrus.Tracef(cmdStr)
+		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		if xerr != nil {
+			msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
+			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		}
+		if retcode != 0 {
+			return cli.NewExitError(stderr, retcode)
+		}
+		return nil
+	},
+}
+
+var clusterAnsiblePlaybookCommands = &cli.Command{
+	Name:      "playbook",
+	Category:  "Administrative commands",
+	Usage:     "playbook CLUSTERNAME COMMAND [[--][PARAMS ...]]",
+	ArgsUsage: "CLUSTERNAME",
+
+	Action: func(c *cli.Context) error {
+		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
+		err := extractClusterName(c)
+		if err != nil {
+			return clitools.FailureResponse(err)
+		}
+
+		// Set client session
+		clientSession, xerr := client.New(c.String("server"))
+		if xerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+		}
+
+		// Check for feature
+		values := map[string]string{}
+		settings := protocol.FeatureSettings{}
+		if err := clientSession.Cluster.CheckFeature(clusterName, "ansible", values, &settings, 0); err != nil { // FIXME: define duration
+			err = fail.FromGRPCStatus(err)
+			msg := fmt.Sprintf("error checking Feature 'ansible' on Cluster '%s': %s", clusterName, err.Error())
+			return clitools.FailureResponse(clitools.ExitOnRPC(msg))
+		}
+
+		// Format arguments
+		var (
+			captureInventory    = false
+			capturePlaybookFile = true
+			filteredArgs        []string
+			isParam             bool
+		)
+		// FIXME: Must set absolute inventory path, use "sudo -i" (interactive) with debian change $PATH, and makes fail ansible path finder (dirty way)
+		// event not ~.ansible.cfg or ANSIBLE_CONFIG defined for user cladm (could be a solution ?)
+		// find no configuration for playbook default directory, must be absolute (arg: local file, mapped to remote)
+		inventoryPath := utils.BaseFolder + "/etc/ansible/inventory/inventory.py"
+		playbookFile := ""
+		args := c.Args().Tail()
+		for _, arg := range args {
+			isParam = (string([]rune(arg))[0] == '-')
+			if isParam {
+				capturePlaybookFile = false
+			}
+			if captureInventory {
+				inventoryPath = arg
+				captureInventory = false
+				continue
+			}
+			if capturePlaybookFile {
+				playbookFile = arg
+				capturePlaybookFile = false
+				continue
+			}
+			switch arg {
+			case "-i":
+			case "--inventory":
+			case "--inventory-file": // Deprecated
+				/* Expect here
+				[-i INVENTORY]
+				*/
+				captureInventory = true // extract given inventory (overload default inventoryPath)
+
+			default:
+				/* Expect here
+				[-h] [--version] [-v] [-b] [--become-method BECOME_METHOD] [--become-user USER]
+				[-K] [--list-hosts]
+				[-l SUBSET] [-P POLL_INTERVAL] [-B SECONDS] [-o] [-t TREE] [-k]
+				[--private-key PRIVATE_KEY_FILE] [-u REMOTE_USER]
+				[-c CONNECTION] [-T TIMEOUT]
+				[--ssh-common-args SSH_COMMON_ARGS]
+				[--sftp-extra-args SFTP_EXTRA_ARGS]
+				[--scp-extra-args SCP_EXTRA_ARGS]
+				[--ssh-extra-args SSH_EXTRA_ARGS] [-C] [--syntax-check] [-D]
+				[-e EXTRA_VARS] [--vault-id VAULT_IDS]
+				[--ask-vault-pass | --vault-password-file VAULT_PASSWORD_FILES]
+				[-f FORKS] [-M MODULE_PATH] [--playbook-dir BASEDIR]
+				[-a MODULE_ARGS] [-m MODULE_NAME]
+				*/
+				filteredArgs = append(filteredArgs, arg)
+			}
+
+			if !isParam && !capturePlaybookFile {
+				capturePlaybookFile = true
+			}
+		}
+
+		// Must set playbook file
+		if playbookFile == "" {
+			msg := fmt.Sprintf("Expect a playbook file for cluster '%s'", clusterName)
+			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		}
+
+		// Check local file exists
+		if _, err := os.Stat(playbookFile); os.IsNotExist(err) {
+			msg := fmt.Sprintf("Playbook file not found for cluster '%s'", clusterName)
+			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		}
+
+		// Prepare remote playbook
+		playbookBasename := playbookFile
+		pos := strings.LastIndex(playbookFile, "/")
+		if pos >= 0 {
+			playbookBasename = playbookFile[pos+1:]
+		}
+		valuesOnRemote := &client.RemoteFilesHandler{}
+		rfc := client.RemoteFileItem{
+			Local:  playbookFile,
+			Remote: fmt.Sprintf("%s/ansible_playbook.%s", utils.TempFolder, playbookBasename),
+		}
+		valuesOnRemote.Add(&rfc)
+
+		// Run playbook
+		cmdStr := `sudo chown cladm:root ` + rfc.Remote + ` && sudo chmod 0774 ` + rfc.Remote + ` && sudo -u cladm -i ansible-playbook ` + rfc.Remote + ` -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
+		return executeCommand(clientSession, cmdStr, valuesOnRemote, outputs.DISPLAY)
+
+	},
 }

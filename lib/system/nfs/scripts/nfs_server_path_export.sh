@@ -21,17 +21,17 @@
 {{.BashHeader}}
 
 function print_error() {
-    ec=$?
-    read line file <<<$(caller)
-    echo "An error occurred in line $line of file $file (exit code $ec) :" "{"`sed "${line}q;d" "$file"`"}" >&2
+  ec=$?
+  read line file <<< $(caller)
+  echo "An error occurred in line $line of file $file (exit code $ec) :" "{"$(sed "${line}q;d" "$file")"}" >&2
 }
 trap print_error ERR
 
 function dns_fallback {
-    grep nameserver /etc/resolv.conf &>/dev/null && return 0
-    echo -e "nameserver 1.1.1.1\n" >/tmp/resolv.conf
-    sudo cp /tmp/resolv.conf /etc/resolv.conf
-    return 0
+  grep nameserver /etc/resolv.conf &> /dev/null && return 0
+  echo -e "nameserver 1.1.1.1\n" > /tmp/resolv.conf
+  sudo cp /tmp/resolv.conf /etc/resolv.conf
+  return 0
 }
 
 dns_fallback
@@ -40,54 +40,52 @@ dns_fallback
 FSIDs=$(cat /etc/exports | sed -r 's/ /\n/g' | sed -r 's/,/\n/g' | grep fsid= | grep -o [0-9]* | uniq | sort -n)
 LAST_FSID=$(echo "$FSIDs" | tail -n 1)
 if [ -z "$LAST_FSID" ]; then
-    FSID=1
+  FSID=1
 else
-    FSID=$((LAST_FSID + 1))
+  FSID=$((LAST_FSID + 1))
 fi
 
 # Adapts ACL
 OPTIONS="*({{.Options}})"
 FILTERED_OPTIONS=
 if [ -z "$OPTIONS" ]; then
-    # No access rights, using default ones
-    FILTERED_OPTIONS="*(rw,fsid=$FSID,sync,no_root_squash,no_subtree_check)"
+  # No access rights, using default ones
+  FILTERED_OPTIONS="*(rw,fsid=$FSID,sync,no_root_squash,no_subtree_check)"
 else
-    # Wants to ensure FSID is valid otherwise updates it
-    ACL=$(echo $OPTIONS | sed "s/.*(\(.*\))/\1/")
-    if [ ! -z "$ACL" ]; then
-        # If there is something between parenthesis, checks if there is some fsid directive, and check the values
-        # are not already used for other shares
-        set +o pipefail
-        ACL_FSIDs=$(echo $ACL | sed -r 's/ /\n/g' | sed -r 's/,/\n/g' | grep fsid= | grep -o [0-9]* | uniq | sort -n)
-        set -o pipefail
-        for fsid in $ACL_FSIDs; do
-            echo $FSIDs | grep "^${fsid}" && {
-                # FSID value is already used, updating the Access Rights to use the calculated new FSID
-                FILTERED_OPTIONS=$(echo $OPTIONS | sed -r "s/fsid=[[:numeric:]]*/fsid=$FSID/g")
-            } && break
-        done
-        if [ -z $FILTERED_OPTIONS ]; then
-            # No updated access rights, with something between parenthesis, adding fsid= directive
-            FILTERED_OPTIONS=$(echo $OPTIONS | sed -r "s/\)/,fsid=$FSID)/g")
-        fi
-    else
-        # No updated access rights without anything between parenthesis, adding fsid= directive
-        FILTERED_OPTIONS=$(echo $OPTIONS | sed -r "s/\(\)/(fsid=$FSID)/g")
+  # Wants to ensure FSID is valid otherwise updates it
+  ACL=$(echo $OPTIONS | sed "s/.*(\(.*\))/\1/")
+  if [ ! -z "$ACL" ]; then
+    # If there is something between parenthesis, checks if there is some fsid directive, and check the values
+    # are not already used for other shares
+    set +o pipefail
+    ACL_FSIDs=$(echo $ACL | sed -r 's/ /\n/g' | sed -r 's/,/\n/g' | grep fsid= | grep -o [0-9]* | uniq | sort -n)
+    set -o pipefail
+    for fsid in $ACL_FSIDs; do
+      echo $FSIDs | grep "^${fsid}" && {
+        # FSID value is already used, updating the Access Rights to use the calculated new FSID
+        FILTERED_OPTIONS=$(echo $OPTIONS | sed -r "s/fsid=[[:numeric:]]*/fsid=$FSID/g")
+      } && break
+    done
+    if [ -z $FILTERED_OPTIONS ]; then
+      # No updated access rights, with something between parenthesis, adding fsid= directive
+      FILTERED_OPTIONS=$(echo $OPTIONS | sed -r "s/\)/,fsid=$FSID)/g")
     fi
+  else
+    # No updated access rights without anything between parenthesis, adding fsid= directive
+    FILTERED_OPTIONS=$(echo $OPTIONS | sed -r "s/\(\)/(fsid=$FSID)/g")
+  fi
 fi
 #VPL: case not managed: nothing between braces...
 
 # Check if path is already exported
-grep "^{{.Path}} $FILTERED_OPTIONS" /etc/exports &>/dev/null && echo "already exported" && exit 192
+grep "^{{.Path}} $FILTERED_OPTIONS" /etc/exports &> /dev/null && echo "already exported" && exit 192
 
 # Create exported dir if necessary
 mkdir -p "{{.Path}}"
 chmod a+rwx "{{.Path}}"
 
 # Configures export
-echo "{{.Path}} $FILTERED_OPTIONS" >>/etc/exports
+echo "{{.Path}} $FILTERED_OPTIONS" >> /etc/exports
 
 # Updates exports
 exportfs -a
-
-

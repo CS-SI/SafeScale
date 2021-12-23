@@ -107,8 +107,10 @@ func (handler *sshHandler) GetConfig(hostParam stacks.HostParameter) (sshConfig 
 	}
 	var user string
 	if anon, ok := cfg.Get("OperatorUsername"); ok {
-		user = anon.(string)
-		if user == "" {
+		user, ok = anon.(string)
+		if !ok {
+			logrus.Warnf("OperatorUsername is not a string, check your tenants.toml file. Using 'safescale' user instead.")
+		} else if user == "" {
 			logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
 		}
 	}
@@ -516,9 +518,9 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 			}
 			if iretcode != 0 {
 				problem := fail.NewError("copy failed")
-				_ = problem.Annotate("stdout", istdout)
-				_ = problem.Annotate("stderr", istderr)
-				_ = problem.Annotate("retcode", iretcode)
+				problem.Annotate("stdout", istdout)
+				problem.Annotate("stderr", istderr)
+				problem.Annotate("retcode", iretcode)
 				return problem
 			}
 
@@ -545,16 +547,16 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 				)
 				finnerXerr = debug.InjectPlannedFail(finnerXerr)
 				if finnerXerr != nil {
-					_ = finnerXerr.Annotate("retcode", fretcode)
-					_ = finnerXerr.Annotate("stdout", fstdout)
-					_ = finnerXerr.Annotate("stderr", fstderr)
+					finnerXerr.Annotate("retcode", fretcode)
+					finnerXerr.Annotate("stdout", fstdout)
+					finnerXerr.Annotate("stderr", fstderr)
 					return fail.WarningError(finnerXerr, "error running md5 command")
 				}
 				if fretcode != 0 {
 					finnerXerr = fail.NewError("failed to check md5")
-					_ = finnerXerr.Annotate("retcode", fretcode)
-					_ = finnerXerr.Annotate("stdout", fstdout)
-					_ = finnerXerr.Annotate("stderr", fstderr)
+					finnerXerr.Annotate("retcode", fretcode)
+					finnerXerr.Annotate("stdout", fstdout)
+					finnerXerr.Annotate("stderr", fstderr)
 					return fail.WarningError(finnerXerr, "unexpected return code of md5 command")
 				}
 				if !strings.Contains(fstdout, md5hash) {
@@ -568,7 +570,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 			}
 			checksumErr := crcCheck()
 			if checksumErr != nil {
-				if _, ok := checksumErr.(*fail.ErrWarning); !ok {
+				if _, ok := checksumErr.(*fail.ErrWarning); !ok || checksumErr.IsNull() {
 					return checksumErr
 				}
 				logrus.Warnf(checksumErr.Error())

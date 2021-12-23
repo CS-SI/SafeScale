@@ -131,7 +131,7 @@ func (s stack) ListAvailabilityZones() (list map[string]bool, xerr fail.Error) {
 }
 
 // ListImages lists available OS images
-func (s stack) ListImages() (imgList []abstract.Image, xerr fail.Error) {
+func (s stack) ListImages(bool) (imgList []abstract.Image, xerr fail.Error) {
 	var emptySlice []abstract.Image
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -238,9 +238,9 @@ func (s stack) InspectTemplate(id string) (template abstract.HostTemplate, xerr 
 	return template, nil
 }
 
-// ListTemplates lists available IPAddress templates
-// IPAddress templates are sorted using Dominant Resource Fairness Algorithm
-func (s stack) ListTemplates() ([]abstract.HostTemplate, fail.Error) {
+// ListTemplates lists available Host templates
+// Host templates are sorted using Dominant Resource Fairness Algorithm
+func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 	var emptySlice []abstract.HostTemplate
 	if s.IsNull() {
 		return emptySlice, fail.InvalidInstanceError()
@@ -413,15 +413,16 @@ func (s stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEff
 		}
 		tpl, xerr := s.InspectTemplate(fid)
 		if xerr != nil {
-			return hostSizing
+			return hostSizing // FIXME: Missing error handling, this function should also return an error
 		}
 		hostSizing.Cores = tpl.Cores
 		hostSizing.DiskSize = tpl.DiskSize
 		hostSizing.RAMSize = tpl.RAMSize
 	} else if _, ok := flavor["vcpus"]; ok {
-		hostSizing.Cores = flavor["vcpus"].(int)
-		hostSizing.DiskSize = flavor["disk"].(int)
-		hostSizing.RAMSize = flavor["ram"].(float32) / 1000.0
+		hostSizing.Cores, _ = flavor["vcpus"].(int)     // nolint // FIXME: Missing error handling, this function should also return an error
+		hostSizing.DiskSize, _ = flavor["disk"].(int)   // nolint // FIXME: Missing error handling, this function should also return an error
+		hostSizing.RAMSize, _ = flavor["ram"].(float32) // nolint // FIXME: Missing error handling, this function should also return an error
+		hostSizing.RAMSize /= 1000.0
 	}
 	return hostSizing
 }
@@ -480,6 +481,11 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 		ahf.Core.Tags[k] = v
 	}
 
+	ct, ok := ahf.Core.Tags["CreationDate"]
+	if !ok || ct == "" {
+		ahf.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
+	}
+
 	if !ahf.OK() {
 		logrus.Warnf("[TRACE] Unexpected host status: %s", spew.Sdump(ahf))
 	}
@@ -487,7 +493,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 	return ahf, nil
 }
 
-// complementHost complements IPAddress data with content of server parameter
+// complementHost complements Host data with content of server parameter
 func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -512,8 +518,18 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 		Updated: server.Updated,
 	}
 
-	host.Core.Tags["Template"], _ = server.Image["id"].(string)
-	host.Core.Tags["Image"], _ = server.Flavor["id"].(string)
+	host.Core.Tags["Template"], _ = server.Image["id"].(string) // nolint
+	host.Core.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
+
+	// recover metadata
+	for k, v := range server.Metadata {
+		host.Core.Tags[k] = v
+	}
+
+	ct, ok := host.Core.Tags["CreationDate"]
+	if !ok || ct == "" {
+		host.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
+	}
 
 	host.Sizing = s.toHostSize(server.Flavor)
 
@@ -609,10 +625,16 @@ func (s stack) InspectHostByName(name string) (*abstract.HostFull, fail.Error) {
 	serverList, found := r.Body.(map[string]interface{})["servers"].([]interface{})
 	if found && len(serverList) > 0 {
 		for _, anon := range serverList {
-			entry := anon.(map[string]interface{})
+			entry, ok := anon.(map[string]interface{})
+			if !ok {
+				return nullAHF, fail.InconsistentError("anon should be a map[string]interface{}")
+			}
 			if entry["name"].(string) == name {
 				host := abstract.NewHostCore()
-				host.ID = entry["id"].(string)
+				host.ID, ok = entry["id"].(string)
+				if !ok {
+					return nullAHF, fail.InconsistentError("entry[id] should be a string")
+				}
 				host.Name = name
 				hostFull, xerr := s.InspectHost(host)
 				if xerr != nil {
@@ -858,11 +880,11 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 		// Starting from here, delete Floating IP if exiting with error
 		defer func() {
-			if xerr != nil {
+			if ferr != nil {
 				logrus.Debugf("Cleaning up on failure, deleting floating ip '%s'", ip.ID)
 				if derr := s.rpcDeleteFloatingIP(ip.ID); derr != nil {
 					derr = fail.Wrap(derr, "cleaning up on failure, failed to delete Floating IP")
-					_ = xerr.AddConsequence(derr)
+					_ = ferr.AddConsequence(derr)
 					logrus.Error(derr.Error())
 					return
 				}
@@ -1041,7 +1063,11 @@ func (s stack) SelectedAvailabilityZone() (string, fail.Error) {
 	}
 
 	if s.selectedAvailabilityZone == "" {
-		s.selectedAvailabilityZone = s.GetAuthenticationOptions().AvailabilityZone
+		opts, err := s.GetRawAuthenticationOptions()
+		if err != nil {
+			return "", err
+		}
+		s.selectedAvailabilityZone = opts.AvailabilityZone
 		if s.selectedAvailabilityZone == "" {
 			azList, xerr := s.ListAvailabilityZones()
 			if xerr != nil {
@@ -1254,7 +1280,7 @@ func (s stack) ListHosts(details bool) (abstract.HostList, fail.Error) {
 }
 
 // getFloatingIP returns the floating IP associated with the host identified by hostID
-// By convention only one floating IP is allocated to an host
+// By convention only one floating IP is allocated to a host
 func (s stack) getFloatingIP(hostID string) (*floatingips.FloatingIP, fail.Error) {
 	var fips []floatingips.FloatingIP
 	xerr := stacks.RetryableRemoteCall(

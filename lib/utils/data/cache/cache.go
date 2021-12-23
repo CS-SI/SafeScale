@@ -125,7 +125,7 @@ func (instance *cache) Entry(key string) (*Entry, fail.Error) {
 }
 
 func (instance *cache) reservationExpired(key string) fail.Error {
-	instance.lock.RUnlock()
+	instance.lock.RUnlock() // nolint
 	defer instance.lock.RLock()
 
 	return instance.Free(key)
@@ -251,7 +251,7 @@ func (instance *cache) unsafeCommitEntry(key string, content Cacheable) (_ *Entr
 		// Update cache entry with real content
 		cacheEntry.lock.Lock()
 		cacheEntry.content = data.NewImmutableKeyValue(newContentKey, content)
-		cacheEntry.lock.Unlock()
+		cacheEntry.lock.Unlock() // nolint
 
 		// reserved key may have to change accordingly with the ID of content
 		delete(instance.cache, key)

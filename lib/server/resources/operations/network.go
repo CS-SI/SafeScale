@@ -103,6 +103,7 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nil, fail.NotFoundError("failed to find Network '%s'", ref)
 		default:
@@ -110,7 +111,12 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 		}
 	}
 
-	if networkInstance = cacheEntry.Content().(resources.Network); networkInstance == nil {
+	var ok bool
+	networkInstance, ok = cacheEntry.Content().(resources.Network)
+	if !ok {
+		return nil, fail.InconsistentError("cache content should be a resources.Network", ref)
+	}
+	if networkInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
 	_ = cacheEntry.LockContent()
@@ -198,7 +204,16 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	// Check if subnet already exists and is managed by SafeScale
 	svc := instance.GetService()
-	if existing, xerr := LoadNetwork(svc, req.Name); xerr == nil { // FIXME: VERY bad practice
+	existing, xerr := LoadNetwork(svc, req.Name)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	} else {
 		existing.Released()
 		return fail.DuplicateError("Network '%s' already exists", req.Name)
 	}
@@ -358,7 +373,16 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 
 	// Check if Network already exists and is managed by SafeScale
 	svc := instance.GetService()
-	if existing, xerr := LoadNetwork(svc, ref); xerr == nil { // FIXME: VERY bad practice
+	existing, xerr := LoadNetwork(svc, ref)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	} else {
 		existing.Released()
 		return fail.DuplicateError("cannot import Network '%s': there is already such a Network in metadata", ref)
 	}
@@ -465,8 +489,8 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 		if !ok {
 			return fail.InconsistentError("'*abstract.Network' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
-		ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract)
-		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)
+		ctx = context.WithValue(ctx, CurrentNetworkAbstractContextKey, networkAbstract) // nolint
+		ctx = context.WithValue(ctx, CurrentNetworkPropertiesContextKey, props)         // nolint
 		return nil
 	})
 	if xerr != nil {
@@ -636,7 +660,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 			}
 
 			if maybeDeleted {
-				logrus.Warningf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
+				logrus.Debugf("The network %s should be deleted already, if not errors will follow", abstractNetwork.ID)
 			}
 			iterations := 6
 			for {
@@ -647,7 +671,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 				}
 				iterations--
 				if iterations < 0 {
-					logrus.Warningf("The network '%s' is still there", abstractNetwork.ID)
+					logrus.Debugf("The network '%s' is still there", abstractNetwork.ID)
 					break
 				}
 				time.Sleep(temporal.GetDefaultDelay())

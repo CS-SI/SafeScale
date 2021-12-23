@@ -46,11 +46,15 @@ func (jp jsonProperty) Clone() data.Clonable {
 
 func (jp *jsonProperty) Replace(clonable data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value...
+	// Indeed, and that also means that not doing it here is a mistake, Clone() should use a replace function that don't use isNull(), and EVERYBODY else should use a Replace function that does use isNull
 	if jp == nil || clonable == nil {
-		return jp
+		return jp // FIXME: This is a problem, this means that mistakes go unnoticed
 	}
 
-	srcP := clonable.(*jsonProperty)
+	srcP, ok := clonable.(*jsonProperty)
+	if !ok {
+		return jp // FIXME: Again, mistakes go unnoticed, if we pick the wrong clonable nobody notices, Replace signature should return (data.Clonable, error)
+	}
 	*jp = *srcP
 	jp.Shielded = srcP.Shielded.Clone()
 	return jp
@@ -102,7 +106,8 @@ func (x *JSONProperties) Clone() *JSONProperties {
 		module: x.module,
 	}
 	for k, v := range x.Properties {
-		newP.Properties[k] = v.Clone().(*jsonProperty)
+		// FIXME: Another problem here, Clone() should return (*JSONProperties, error)
+		newP.Properties[k], _ = v.Clone().(*jsonProperty) // nolint
 	}
 	return newP
 }
@@ -138,7 +143,9 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		item  *jsonProperty
 		found bool
 	)
+
 	x.RLock()
+	defer x.RUnlock()
 	if item, found = x.Properties[key]; !found {
 		zeroValue := PropertyTypeRegistry.ZeroValue(x.module, key)
 		item = &jsonProperty{
@@ -148,10 +155,19 @@ func (x *JSONProperties) Inspect(key string, inspector func(clonable data.Clonab
 		}
 		x.Properties[key] = item
 	}
-	clone := item.Clone()
-	x.RUnlock()
 
-	return clone.(*jsonProperty).Shielded.Inspect(inspector)
+	clone := item.Clone()
+	cloned, ok := clone.(*jsonProperty)
+	if !ok {
+		return fail.InconsistentError("clone is expected to be a *jsonProperty and it's not: %v", clone)
+	}
+
+	xerr := cloned.Shielded.Inspect(inspector)
+	if xerr != nil {
+		return xerr
+	}
+
+	return nil
 }
 
 // Alter is used to lock an extension for write
@@ -196,7 +212,12 @@ func (x *JSONProperties) Alter(key string, alterer func(data.Clonable) fail.Erro
 	}
 
 	clone := item.Clone()
-	xerr := clone.(*jsonProperty).Alter(alterer)
+	castedClone, ok := clone.(*jsonProperty)
+	if !ok {
+		return fail.InconsistentError("failed to cast clone to '*jsonProperty'")
+	}
+
+	xerr := castedClone.Alter(alterer)
 	if xerr != nil {
 		return xerr
 	}

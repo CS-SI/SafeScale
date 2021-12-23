@@ -28,7 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Attributes attributes of a compute instance
+// Attributes attributes of a computing instance
 type Attributes struct {
 	ClockSpeed                  string `json:"clockSpeed,omitempty"`
 	CurrentGeneration           string `json:"currentGeneration,omitempty"`
@@ -165,7 +165,7 @@ func (p Price) parseFloat(str string) float64 {
 	b := bytes.Buffer{}
 	b.WriteString(str)
 	tokens := r.FindAllStringSubmatch(str, -1)
-	sizeStr := strings.Replace(tokens[0][1], ",", "", -1)
+	sizeStr := strings.ReplaceAll(tokens[0][1], ",", "")
 	size, err := strconv.ParseFloat(sizeStr, 64)
 	if err != nil {
 		return 0.0
@@ -191,7 +191,7 @@ func (p Price) parseStorage(str string) float64 {
 	if err != nil {
 		return 0.0
 	}
-	sizeStr := strings.Replace(tokens[0][2], ",", "", -1)
+	sizeStr := strings.ReplaceAll(tokens[0][2], ",", "")
 	size, err := strconv.ParseFloat(sizeStr, 64)
 	if err != nil {
 		return 0.0

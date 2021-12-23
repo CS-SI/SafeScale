@@ -20,33 +20,33 @@
 {{.Header}}
 
 function print_error() {
-	read -r line file <<<"$(caller)"
-	echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
-	{{.ExitOnError}}
+  read -r line file <<< "$(caller)"
+  echo "An error occurred in line $line of file $file:" "{$(sed "${line}q;d" "$file")}" >&2
+  {{.ExitOnError}}
 }
 trap print_error ERR
 
 function fail() {
-	MYIP="$(ip -br a | grep UP | awk '{print $3}') | head -n 1"
-	if [ $# -eq 1 ]; then
-		echo "PROVISIONING_ERROR: $1"
-		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" >/opt/safescale/var/state/user_data.gwha.done
-		(
-			sync
-			echo 3 >/proc/sys/vm/drop_caches
-			sleep 2
-		) || true
-		exit $1
-	elif [ $# -eq 2 -a $1 -ne 0 ]; then
-		echo "PROVISIONING_ERROR: $1, $2"
-		echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$2" >/opt/safescale/var/state/user_data.gwha.done
-		(
-			sync
-			echo 3 >/proc/sys/vm/drop_caches
-			sleep 2
-		) || true
-		exit $1
-	fi
+  MYIP="$(ip -br a | grep UP | awk '{print $3}') | head -n 1"
+  if [ $# -eq 1 ]; then
+    echo "PROVISIONING_ERROR: $1"
+    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$1" > /opt/safescale/var/state/user_data.gwha.done
+    (
+      sync
+      echo 3 > /proc/sys/vm/drop_caches
+      sleep 2
+    ) || true
+    exit $1
+  elif [ $# -eq 2 -a $1 -ne 0 ]; then
+    echo "PROVISIONING_ERROR: $1, $2"
+    echo -n "$1,${LINUX_KIND},${VERSION_ID},$(hostname),$MYIP,$(date +%Y/%m/%d-%H:%M:%S),PROVISIONING_ERROR:$2" > /opt/safescale/var/state/user_data.gwha.done
+    (
+      sync
+      echo 3 > /proc/sys/vm/drop_caches
+      sleep 2
+    ) || true
+    exit $1
+  fi
 }
 export -f fail
 
@@ -58,32 +58,32 @@ exec > >(tee -a ${LOGFILE} /opt/safescale/var/log/ss.log) 2>&1
 set -x
 
 # Tricks BashLibrary's waitUserData to believe the current phase 'gwha' is already done (otherwise will deadlock)
-uptime >/opt/safescale/var/state/user_data.gwha.done
+uptime > /opt/safescale/var/state/user_data.gwha.done
 
 # Includes the BashLibrary
 {{ .reserved_BashLibrary }}
 rm -f /opt/safescale/var/state/user_data.gwha.done
 
 function install_keepalived() {
-	case $LINUX_KIND in
-	ubuntu | debian)
-		sfApt update && sfApt -y install keepalived || return 1
-		;;
+  case $LINUX_KIND in
+  ubuntu | debian)
+    sfApt update && sfApt -y install keepalived || return 1
+    ;;
 
-	redhat | centos)
-		yum install -q -y keepalived || return 1
-		;;
-	*)
-		echo "Unsupported Linux distribution '$LINUX_KIND'!"
-		return 1
-		;;
-	esac
+  redhat | centos)
+    yum install -q -y keepalived || return 1
+    ;;
+  *)
+    echo "Unsupported Linux distribution '$LINUX_KIND'!"
+    return 1
+    ;;
+  esac
 
-	NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
-	read IF_PR ignore <<<$(cat ${SF_VARDIR}/state/private_nics)
-	read IF_PU ignore <<<$(cat ${SF_VARDIR}/state/public_nics)
+  NETMASK=$(echo {{ .CIDR }} | cut -d/ -f2)
+  read IF_PR ignore <<< $(cat ${SF_VARDIR}/state/private_nics)
+  read IF_PU ignore <<< $(cat ${SF_VARDIR}/state/public_nics)
 
-	cat >/etc/keepalived/keepalived.conf <<-EOF
+  cat > /etc/keepalived/keepalived.conf <<- EOF
 		vrrp_instance vrrp_group_gws_internal {
 		    state BACKUP
 		    interface ${IF_PR}
@@ -131,46 +131,46 @@ function install_keepalived() {
 		# }
 	EOF
 
-	if [ "$(sfGetFact "use_systemd")" = "1" ]; then
-		# Use systemd to ensure keepalived is restarted if network is restarted
-		# (otherwise, keepalived is in undetermined state)
-		mkdir -p /etc/systemd/system/keepalived.service.d
-		if [ "$(sfGetFact "redhat_like")" = "1" ]; then
-			cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+  if [ "$(sfGetFact "use_systemd")" = "1" ]; then
+    # Use systemd to ensure keepalived is restarted if network is restarted
+    # (otherwise, keepalived is in undetermined state)
+    mkdir -p /etc/systemd/system/keepalived.service.d
+    if [ "$(sfGetFact "redhat_like")" = "1" ]; then
+      cat > /etc/systemd/system/keepalived.service.d/override.conf << EOF
 [Unit]
 Requires=network.service
 PartOf=network.service
 EOF
-		else
-			cat >/etc/systemd/system/keepalived.service.d/override.conf <<EOF
+    else
+      cat > /etc/systemd/system/keepalived.service.d/override.conf << EOF
 [Unit]
 Requires=systemd-networkd.service
 PartOf=systemd-networkd.service
 EOF
-		fi
-		systemctl daemon-reload
-	fi
+    fi
+    systemctl daemon-reload
+  fi
 
-	sfService enable keepalived && sfService restart keepalived || return 1
+  sfService enable keepalived && sfService restart keepalived || return 1
 
-	return 0
+  return 0
 }
 
 # ---- Main
-
 {{- if .IsGateway }}
 {{- if .SecondaryGatewayPrivateIP }}
 install_keepalived
 [ $? -ne 0 ] && fail $?
 {{ end }}
 {{ end }}
+# ---- EndMain
 
-echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" >/opt/safescale/var/state/user_data.gwha.done
+echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.gwha.done
 
 (
-	sync
-	echo 3 >/proc/sys/vm/drop_caches
-	sleep 2
+  sync
+  echo 3 > /proc/sys/vm/drop_caches
+  sleep 2
 ) || true
 
 set +x

@@ -61,7 +61,12 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 	value := ctx.Value(CurrentNetworkAbstractContextKey)
 	if value != nil {
-		networkID = value.(*abstract.Network).ID
+		castedValue, ok := value.(*abstract.Network)
+		if !ok {
+			return fail.InconsistentError("failed to cast value to '*abstract.Network'")
+		}
+
+		networkID = castedValue.ID
 	}
 
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
@@ -130,7 +135,7 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 				// Do not remove a Security Group marked as default for a subnet
 				if subnetsV1.DefaultFor != "" {
-					return fail.InvalidRequestError("failed to delete SecurityGroup '%s': is default for Subnet identifyed by '%s'", abstractSG.Name, subnetsV1.DefaultFor)
+					return fail.InvalidRequestError("failed to delete SecurityGroup '%s': is default for Subnet identified by '%s'", abstractSG.Name, subnetsV1.DefaultFor)
 				}
 				return nil
 			})
@@ -403,7 +408,7 @@ func (instance *SecurityGroup) unsafeBindToSubnet(ctx context.Context, abstractS
 	})
 }
 
-// unsafeBindToHost binds the security group to an Host.
+// unsafeBindToHost binds the security group to a host.
 // instance is not locked, it must have been done outside to prevent data races
 func (instance *SecurityGroup) unsafeBindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)

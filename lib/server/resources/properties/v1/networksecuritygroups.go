@@ -39,7 +39,7 @@ func NewNetworkSecurityGroups() *NetworkSecurityGroups {
 	}
 }
 
-// Reset ...
+// IsNull ...
 func (nsg *NetworkSecurityGroups) IsNull() bool {
 	return nsg == nil || len(nsg.ByID) == 0
 }
@@ -56,7 +56,8 @@ func (nsg *NetworkSecurityGroups) Replace(p data.Clonable) data.Clonable {
 		return nsg
 	}
 
-	src := p.(*NetworkSecurityGroups)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*NetworkSecurityGroups) // nolint
 	*nsg = *src
 	nsg.ByID = make(map[string]string, len(src.ByID))
 	for k, v := range src.ByID {

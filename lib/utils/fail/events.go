@@ -32,8 +32,6 @@ import (
 )
 
 const (
-	// errorOccurred       = "ERROR OCCURRED"
-	// outputErrorTemplate = "%s " + errorOccurred + ": %+v"
 	outputErrorTemplate = "%s: %+v"
 )
 
@@ -123,8 +121,13 @@ func OnExitWrapError(err interface{}, msg ...interface{}) {
 			return
 		}
 		if newErr != nil {
-			targetErr := err.(*error)
-			*targetErr = newErr
+			targetErr, ok := err.(*error)
+			if ok {
+				*targetErr = newErr
+			} else {
+				logrus.Errorf("This is a coding mistake, OnExitWrapError only works when 'err' is a '*error'")
+				return
+			}
 		}
 	}
 }

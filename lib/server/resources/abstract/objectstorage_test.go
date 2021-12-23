@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestObjectStorageBucket_Clone(t *testing.T) {
@@ -33,6 +34,7 @@ func TestObjectStorageBucket_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, b, bc)
+	require.EqualValues(t, b, bc)
 	bc.MountPoint = "/mountpoint"
 
 	areEqual := reflect.DeepEqual(b, bc)
@@ -40,4 +42,5 @@ func TestObjectStorageBucket_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, b, bc)
 }

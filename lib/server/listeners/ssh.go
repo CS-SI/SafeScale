@@ -43,7 +43,7 @@ type SSHListener struct {
 	protocol.UnimplementedSshServiceServer
 }
 
-// Run executes an ssh command an an host
+// Run executes an ssh command an a host
 func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *protocol.SshResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot run by ssh")
@@ -60,7 +60,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	hostRef := in.GetHost().GetName()
@@ -105,7 +105,7 @@ func (s *SSHListener) Run(ctx context.Context, in *protocol.SshCommand) (sr *pro
 	}, nil
 }
 
-// Copy copies file from/to an host
+// Copy copies file from/to a host
 func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr *protocol.SshResponse, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot copy by ssh")
@@ -122,7 +122,7 @@ func (s *SSHListener) Copy(ctx context.Context, in *protocol.SshCopyCommand) (sr
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	var (

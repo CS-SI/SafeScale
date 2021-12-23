@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
@@ -87,7 +88,8 @@ func main() {
 	app.Name = "safescale"
 	app.Usage = "safescale COMMAND"
 	app.Version = Version + ", build " + Revision + " compiled with " + runtime.Version() + " (" + BuildDate + ")"
-	if len(Tags) > 1 { // nolint
+	if              //goland:noinspection GoBoolExpressions
+	len(Tags) > 1 { // nolint
 		app.Version += fmt.Sprintf(", with Tags: (%s)", Tags)
 	}
 	app.Authors = []*cli.Author{
@@ -142,7 +144,7 @@ func main() {
 		// Define trace settings of the application (what to trace if trace is wanted)
 		// TODO: is it the good behavior ? Shouldn't we fail ?
 		// If trace settings cannot be registered, report it but do not fail
-		// FIXME: introduce use of configuration file with autoreload on change
+		// TODO: introduce use of configuration file with autoreload on change
 		err := tracing.RegisterTraceSettings(appTrace())
 		if err != nil {
 			logrus.Errorf(err.Error())
@@ -182,6 +184,9 @@ func main() {
 		// Starts ctrl+c handler before app.RunContext()
 		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 		go func() {
+			var crash error
+			defer fail.OnPanic(&crash)
+
 			for {
 				<-signalCh
 				atomic.StoreUint32(&onAbort, 1)

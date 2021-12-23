@@ -29,7 +29,7 @@ type template struct {
 	session *Session
 }
 
-// List returns the list of availble templates on the current tenant
+// List returns the list of available templates on the current tenant
 func (t template) List(all, scannedOnly bool, timeout time.Duration) (*protocol.TemplateList, error) {
 	t.session.Connect()
 	defer t.session.Disconnect()

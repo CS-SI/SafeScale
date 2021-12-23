@@ -22,7 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 )
 
-// HostNetworking contains network information related to IPAddress
+// HostNetworking contains network information related to Host
 // !!! FROZEN !!!
 // Note: if tagged as FROZEN, must not be changed ever.
 //       Create a new version instead with needed supplemental fields
@@ -77,7 +77,8 @@ func (hn *HostNetworking) Replace(p data.Clonable) data.Clonable {
 		return hn
 	}
 
-	src := p.(*HostNetworking)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostNetworking) // nolint
 	*hn = *src
 	hn.SubnetsByID = make(map[string]string, len(src.SubnetsByID))
 	for k, v := range src.SubnetsByID {

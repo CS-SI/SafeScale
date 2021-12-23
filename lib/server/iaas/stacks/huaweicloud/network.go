@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
+	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
@@ -92,11 +94,11 @@ type vpcDeleteResult struct { // nolint
 }
 
 // HasDefaultNetwork returns true if the stack as a default network set (coming from tenants file)
-func (s stack) HasDefaultNetwork() bool {
+func (s stack) HasDefaultNetwork() (bool, fail.Error) {
 	if s.IsNull() {
-		return false
+		return false, nil
 	}
-	return s.vpc != nil
+	return s.vpc != nil, nil
 }
 
 // GetDefaultNetwork returns the *abstract.Network corresponding to the default network
@@ -199,9 +201,10 @@ func (s stack) findOpenStackNetworkBoundToVPC(vpcName string) (*networks.Network
 		return nil, fail.Wrap(xerr, "failed to list routers")
 	}
 	for _, r := range routerList {
+		local := r
 		if r.Name == vpcName {
 			found = true
-			router = &r
+			router = &local
 			break
 		}
 	}
@@ -325,11 +328,28 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	var list []*abstract.Network
 	if vpcs, ok := r.Body.(map[string]interface{})["vpcs"].([]interface{}); ok {
 		for _, v := range vpcs {
-			item := v.(map[string]interface{})
+			item, ok := v.(map[string]interface{})
+			if !ok {
+				logrus.Warnf("vpc should be a map[string]interface{}")
+				continue
+			}
 			an := abstract.NewNetwork()
-			an.Name = item["name"].(string)
-			an.ID = item["id"].(string)
-			an.CIDR = item["cidr"].(string)
+			an.Name, ok = item["name"].(string)
+			if !ok {
+				logrus.Warnf("name should NOT be empty")
+				continue
+			}
+			an.ID, ok = item["id"].(string)
+			if !ok {
+				logrus.Warnf("id should NOT be empty")
+				continue
+			}
+			an.CIDR, ok = item["cidr"].(string)
+			if !ok {
+				logrus.Warnf("cidr should NOT be empty")
+				continue
+			}
+			// FIXME: Missing validation, all previous fields should be NOT empty
 			list = append(list, an)
 		}
 	}
@@ -496,10 +516,19 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 			id    string
 		)
 		for _, s := range subnetworks {
-			entry = s.(map[string]interface{})
-			id = entry["id"].(string)
+			var ok bool
+			entry, ok = s.(map[string]interface{})
+			if !ok {
+				logrus.Warnf("subnet should be a map[string]interface{}")
+				continue
+			}
+			id, ok = entry["id"].(string)
+			if !ok {
+				logrus.Warnf("id should be a string")
+				continue
+			}
 		}
-		return s.InspectSubnet(id)
+		return s.inspectOpenstackSubnet(id)
 	}
 	return nullAS, abstract.ResourceNotFoundError("subnet", name)
 }
@@ -540,6 +569,40 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	as.CIDR = resp.Subnet.CIDR
 	as.Network = resp.VpcID
 	as.IPVersion = fromIntIPVersion(resp.IPVersion)
+	return as, nil
+}
+
+func (s stack) inspectOpenstackSubnet(id string) (*abstract.Subnet, fail.Error) {
+	nullAS := abstract.NewSubnet()
+	if s.IsNull() {
+		return nullAS, fail.InvalidInstanceError()
+	}
+	if id == "" {
+		return nullAS, fail.InvalidParameterError("id", "cannot be empty string")
+	}
+
+	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.network"), "(%s)", id).WithStopwatch().Entering().Exiting()
+
+	as := abstract.NewSubnet()
+	var sn *subnets.Subnet
+	xerr := stacks.RetryableRemoteCall(
+		func() (innerErr error) {
+			sn, innerErr = subnets.Get(s.NetworkClient, id).Extract()
+			return innerErr
+		},
+		NormalizeError,
+	)
+	if xerr != nil {
+		return nullAS, xerr
+	}
+
+	as.ID = sn.ID
+	as.Name = sn.Name
+	as.Network = sn.NetworkID
+	as.IPVersion = openstack.ToAbstractIPVersion(sn.IPVersion)
+	as.CIDR = sn.CIDR
+	as.DNSServers = sn.DNSNameservers
+
 	return as, nil
 }
 

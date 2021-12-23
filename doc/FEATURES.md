@@ -11,18 +11,15 @@ Here is a non-exhaustive list of features that are embedded with Safescale :
 
 feature | description | specificities
 ----- | ----- | -----
+`ansible` |  Install ansible     |
 `docker` |  Install docker and docker-compose     |
-`filebeat` |  Install filebeat on all hosts | For single host installation, will need parameters: <br>`KibanaURL="(http|https)://<host>:<port>/[...]"` <br> `ElasticsearchIP="IP_elasticsearch"`<br>`ElasticsearchPort="PORT_elasticsearch"`
-`metricbeat` |  Install metricbeat on all hosts and links it to elassandra | For single host installation, will need parameters: <br> `KibanaURL="(http|https)://<host>:<port>/[...]"` <br> `ElasticsearchIP="IP_elasticsearch"`<br>`ElasticsearchPort="PORT_elasticsearch"`
-`nvidiadocker` |  Install nvidia-docker, allowing nvidia driver to works in a docker container   |  On a cluster it will only be applied to nodes
+`ntpclient` |  Install NTP client     |
+`ntpserver` |  Install NTP server     |
 `remotedesktop` |  Install a remote desktop using guacamole with tigerVNC and xfce desktop   |  On a cluster a remote desktop will be installed on all masters. In this context, Username is automatically set to `cladm` and the associated password is stored in the cluster information, viewable with `safescale cluster inspect <cluster_name>`<br><br>When installed on single host, youy will need to set these parameters (this corresponding user must exist on the host before installation of the feature): <br> `Username="existing_user"` <br> `Password="user_password"`
 `edgeproxy4subnet` |  Install a Kong reverse proxy for SafeScale use<br>Corresponds to `reverseproxy`  | Automatically installed on gateways of clusters
 `postgresql4gateway` |  Install a postgresql v9 server on gateways  | Dependency of `edgeproxy4subnet`
-`kibana` | Installs Kibana for SafeScale use and links it with `elassandra` | Only available for cluster
-`sparkmaster` |  Install and configure a spark cluster   |  Only available on a Swarm or dcos flavored cluster
 `kubernetes` |  Install and configure a kubernetes cluster   |  Only available for clusters
-`k8s.helm2` |   Install helm packet manager v2  |  Only available on a kubernetes flavored cluster
-`k8s.prometheus-operator` |   Install prometheus-operator  |  Only available on K8S flavored cluster
+`helm3` |   Install helm packet manager v3  |  Only meaningful on a kubernetes flavored cluster
 
 _Note_: the `edgeproxy4subnet` feature is automatically installed on the gateway when a cluster is created by SafeScale.
 
@@ -40,7 +37,7 @@ In addition to _embedded features_ listed above, Safescale will look for _extern
 Each .yaml file in one of these folder will be treated as a feature.
 
 _Note 1_: Any _external feature_ named as an _embedded feature_ will take precedence over the _embedded feature_.
-_Note 2_: it's possible to use subfolder(s) inside ```features``` folder, by including the relative path from ```features``` in the name of the feature.
+_Note 2_: it's possible to use subfolder(s) inside ```features``` folder; when using it, the relative path from ```features``` must be used in the name of the feature.
 
 ### feature.yaml file
 
@@ -52,7 +49,7 @@ The file have to follow this struture.
 feature:
     suitableFor:
         host: <false | true>
-        cluster: <false | all | boh | dcos | k8s | ohpc | swarm>
+        cluster: <false | all | boh | k8s>
     requirements:
         features:
             - feature1
@@ -61,7 +58,7 @@ feature:
         - mandatory_parameter1
         - ...
     install:
-        <apt | bash | dcos | yum>:
+        <apt | bash | yum>:
             check:
                 pace: step1_name[,...]
                 steps:
@@ -193,7 +190,7 @@ feature:
 ### Install-step-run
 
 Each install step has a run field describing the commands who will be executed on the targeted host (the execution method will depend of the chosen installer). If a step exits with a return code different from 0, the step will be considered failed and the following steps will not be executed.<br>
-Several templated parameters are usable (using GO text template syntax) :
+Several templated parameters are usable (using GO text template syntax, extended with [sprig](https://github.com/Masterminds/sprig)) :
 *   `{{.Username}}` : the name of the user used by SafeScale
 *   `{{.Hostname}}` : the hostname of the current targeted host (keep in mind at the lower level, each step is applied on all hosts targeted)
 *   `{{.HostIP}}`   : the private IP of the current targeted host

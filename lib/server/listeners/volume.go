@@ -66,7 +66,7 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, err := PrepareJob(ctx, in.GetTenantId(), "/volumes/list")
@@ -117,7 +117,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -142,7 +142,7 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 	return rv.ToProtocol()
 }
 
-// Attach a volume to an host and create a mount point
+// Attach a volume to a host and create a mount point
 func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachmentRequest) (_ *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot attach volume")
@@ -160,7 +160,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
@@ -172,9 +172,10 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for host")
 	}
 	mountPath := in.GetMountPath()
-	// FIXME: change Format to Filesystem in protobuf
+
 	filesystem := in.GetFormat()
 	doNotFormat := in.DoNotFormat
+	doNotMount := in.DoNotMount
 
 	var doNotFormatStr string
 	if doNotFormat {
@@ -195,14 +196,14 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
-	if xerr = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat); xerr != nil {
+	if xerr = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat, doNotMount); xerr != nil {
 		return empty, xerr
 	}
 
 	return empty, nil
 }
 
-// Detach a volume from an host. It umount associated mountpoint
+// Detach a volume from a host. It umount associated mountpoint
 func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachmentRequest) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot detach volume")
@@ -220,7 +221,7 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 
 	ok, err := govalidator.ValidateStruct(in)
 	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
@@ -272,7 +273,7 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/delete", ref))
@@ -314,7 +315,7 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 	}
 
 	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in) // TODO: Generate json tags in protobuf
+		logrus.Warnf("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/inspect", ref))

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 )
@@ -37,6 +38,7 @@ func TestDefaults_Clone(t *testing.T) {
 	if !ok {
 		t.Fail()
 	}
+	require.EqualValues(t, ct, clonedCt)
 
 	assert.Equal(t, ct, clonedCt)
 	clonedCt.GatewaySizing.GPUNumber = 7
@@ -47,4 +49,5 @@ func TestDefaults_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }

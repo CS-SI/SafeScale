@@ -144,7 +144,7 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 	}
 
 	// Drain pods from node
-	//cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
+	// cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets --delete-emptydir-data", node.GetName())
 	cmd := fmt.Sprintf("sudo -u cladm -i kubectl drain %s --ignore-daemonsets", node.GetName())
 	retcode, stdout, stderr, xerr := selectedMaster.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
 	if xerr != nil {
@@ -160,9 +160,9 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 		fallthrough
 	default:
 		xerr := fail.ExecutionError(nil, "failed to drain pods from node '%s'", node.GetName())
-		_ = xerr.Annotate("retcode", retcode)
-		_ = xerr.Annotate("stdout", stdout)
-		_ = xerr.Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode)
+		xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stderr", stderr)
 		return xerr
 	}
 
@@ -182,9 +182,9 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 		fallthrough
 	default:
 		xerr := fail.ExecutionError(nil, "failed to delete node '%s' from cluster '%s'", node.GetName(), clusterInstance.GetName())
-		_ = xerr.Annotate("retcode", retcode)
-		_ = xerr.Annotate("stdout", stdout)
-		_ = xerr.Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode)
+		xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stderr", stderr)
 		return xerr
 	}
 
@@ -203,9 +203,9 @@ func leaveNodeFromCluster(ctx context.Context, clusterInstance resources.Cluster
 		fallthrough
 	default:
 		xerr := fail.ExecutionError(nil, "failed to reset kubernetes configuration on Host '%s'", node.GetName())
-		_ = xerr.Annotate("retcode", retcode)
-		_ = xerr.Annotate("stdout", stdout)
-		_ = xerr.Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode)
+		xerr.Annotate("stdout", stdout)
+		xerr.Annotate("stderr", stderr)
 		return xerr
 	}
 

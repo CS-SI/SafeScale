@@ -48,15 +48,26 @@ func CurrentTenant() *Tenant {
 		// Set unique tenant as selected
 		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
 		for _, tenant := range tenants {
-			name := tenant["name"].(string)
+			name, ok := tenant["name"].(string)
+			if !ok {
+				logrus.Warnf("tenant names should be strings: %v is not", tenant["name"])
+				continue
+			}
 
 			service, xerr := loadTenant(name)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
+				debug.IgnoreError(xerr)
 				return nil
 			}
 
-			currentTenant.Store(&Tenant{Name: name, BucketName: service.GetMetadataBucket().GetName(), Service: service})
+			bucket, xerr := service.GetMetadataBucket()
+			if xerr != nil {
+				debug.IgnoreError(xerr)
+				return nil
+			}
+
+			currentTenant.Store(&Tenant{Name: name, BucketName: bucket.GetName(), Service: service})
 			break // nolint
 		}
 		anon = currentTenant.Load()
@@ -77,7 +88,12 @@ func SetCurrentTenant(tenantName string) error {
 		return xerr
 	}
 
-	tenant = &Tenant{Name: tenantName, BucketName: service.GetMetadataBucket().GetName(), Service: service}
+	bucket, xerr := service.GetMetadataBucket()
+	if xerr != nil {
+		return xerr
+	}
+
+	tenant = &Tenant{Name: tenantName, BucketName: bucket.GetName(), Service: service}
 	currentTenant.Store(tenant)
 	return nil
 }

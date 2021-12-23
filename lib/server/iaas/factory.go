@@ -18,6 +18,7 @@ package iaas
 
 import (
 	"bytes"
+	"expvar"
 	"fmt"
 	"regexp"
 	"sync"
@@ -187,13 +188,12 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 			logrus.Warnf("missing section 'objectstorage' in configuration file for tenant '%s'", tenantName)
 		}
 
-		// Initializes Metadata Object Storage (may be different than the Object Storage)
+		// Initializes Metadata Object Storage (maybe different from the Object Storage)
 		var (
 			metadataBucket   abstract.ObjectStorageBucket
 			metadataCryptKey *crypt.Key
 		)
 		if tenantMetadataFound || tenantObjectStorageFound {
-			// FIXME: This requires tuning too
 			metadataLocationConfig, err := initMetadataLocationConfig(authOpts, tenant)
 			if err != nil {
 				return NullService(), err
@@ -271,7 +271,20 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		newS.metadataBucket = metadataBucket
 		newS.metadataKey = metadataCryptKey
 
-		return newS, validateRegexps(newS, tenant)
+		if xerr := validateRegexps(newS, tenant); xerr != nil {
+			return NullService(), xerr
+		}
+
+		// increase tenant counter
+		ts := expvar.Get("tenant.setted")
+		if ts != nil {
+			tsi, ok := ts.(*expvar.Int)
+			if ok {
+				tsi.Add(1)
+			}
+		}
+
+		return newS, nil
 	}
 
 	if !tenantInCfg {
@@ -366,9 +379,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		ok     bool
 	)
 
-	identity, _ := tenant["identity"].(map[string]interface{})
-	compute, _ := tenant["compute"].(map[string]interface{})
-	ostorage, _ := tenant["objectstorage"].(map[string]interface{})
+	identity, _ := tenant["identity"].(map[string]interface{})      // nolint
+	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
+	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
 
 	if config.Type, ok = ostorage["Type"].(string); !ok {
 		return config, fail.SyntaxError("missing setting 'Type' in 'objectstorage' section")
@@ -401,21 +414,21 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		}
 	}
 
-	config.AuthURL, _ = ostorage["AuthURL"].(string)
-	config.Endpoint, _ = ostorage["Endpoint"].(string)
+	config.AuthURL, _ = ostorage["AuthURL"].(string)   // nolint
+	config.Endpoint, _ = ostorage["Endpoint"].(string) // nolint
 
 	if config.User, ok = ostorage["AccessKey"].(string); !ok {
 		if config.User, ok = ostorage["OpenStackID"].(string); !ok {
 			if config.User, ok = ostorage["Username"].(string); !ok {
 				if config.User, ok = identity["OpenstackID"].(string); !ok {
-					config.User, _ = identity["Username"].(string)
+					config.User, _ = identity["Username"].(string) // nolint
 				}
 			}
 		}
 	}
 
 	if config.Key, ok = ostorage["ApplicationKey"].(string); !ok {
-		config.Key, _ = identity["ApplicationKey"].(string)
+		config.Key, _ = identity["ApplicationKey"].(string) // nolint
 	}
 
 	if config.SecretKey, ok = ostorage["SecretKey"].(string); !ok {
@@ -423,7 +436,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 			if config.SecretKey, ok = ostorage["Password"].(string); !ok {
 				if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
 					if config.SecretKey, ok = identity["OpenstackPassword"].(string); !ok {
-						config.SecretKey, _ = identity["Password"].(string)
+						config.SecretKey, _ = identity["Password"].(string) // nolint
 					}
 				}
 			}
@@ -431,14 +444,14 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	}
 
 	if config.Region, ok = ostorage["Region"].(string); !ok {
-		config.Region, _ = compute["Region"].(string)
+		config.Region, _ = compute["Region"].(string) // nolint
 		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
 		// 	return config, err
 		// }
 	}
 
 	if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
-		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string)
+		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string) // nolint
 	}
 
 	// FIXME: Remove google custom code
@@ -450,7 +463,10 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 			}
 		}
 
-		config.ProjectID = identity["project_id"].(string)
+		config.ProjectID, ok = identity["project_id"].(string)
+		if !ok {
+			return config, fail.NewError("'project_id' MUST be a string in tenants.toml: %v", identity["project_id"])
+		}
 
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",
@@ -495,10 +511,12 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		ok     bool
 	)
 
-	identity, _ := tenant["identity"].(map[string]interface{})
-	compute, _ := tenant["compute"].(map[string]interface{})
-	ostorage, _ := tenant["objectstorage"].(map[string]interface{})
-	metadata, _ := tenant["metadata"].(map[string]interface{})
+	// FIXME: This code is ancient and doesn't provide nor hints nor protection against formatting
+
+	identity, _ := tenant["identity"].(map[string]interface{})      // nolint
+	compute, _ := tenant["compute"].(map[string]interface{})        // nolint
+	ostorage, _ := tenant["objectstorage"].(map[string]interface{}) // nolint
+	metadata, _ := tenant["metadata"].(map[string]interface{})      // nolint
 
 	if config.Type, ok = metadata["Type"].(string); !ok {
 		if config.Type, ok = ostorage["Type"].(string); !ok {
@@ -514,7 +532,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 						if config.Domain, ok = compute["DomainName"].(string); !ok {
 							if config.Domain, ok = identity["Domain"].(string); !ok {
 								if config.Domain, ok = identity["DomainName"].(string); !ok {
-									config.Domain = authOpts.GetString("DomainName")
+									config.Domain = authOpts.GetString("DomainName") // nolint
 								}
 							}
 						}
@@ -533,7 +551,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 						if config.Tenant, ok = ostorage["ProjectID"].(string); !ok {
 							if config.Tenant, ok = compute["Tenant"].(string); !ok {
 								if config.Tenant, ok = compute["ProjectName"].(string); !ok {
-									config.Tenant, _ = compute["ProjectID"].(string)
+									config.Tenant, _ = compute["ProjectID"].(string) // nolint
 								}
 							}
 						}
@@ -544,11 +562,11 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 	}
 
 	if config.AuthURL, ok = metadata["AuthURL"].(string); !ok {
-		config.AuthURL, _ = ostorage["AuthURL"].(string)
+		config.AuthURL, _ = ostorage["AuthURL"].(string) // nolint
 	}
 
 	if config.Endpoint, ok = metadata["Endpoint"].(string); !ok {
-		config.Endpoint, _ = ostorage["Endpoint"].(string)
+		config.Endpoint, _ = ostorage["Endpoint"].(string) // nolint
 	}
 
 	if config.User, ok = metadata["AccessKey"].(string); !ok {
@@ -558,7 +576,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 					if config.User, ok = ostorage["OpenStackID"].(string); !ok {
 						if config.User, ok = ostorage["Username"].(string); !ok {
 							if config.User, ok = identity["Username"].(string); !ok {
-								config.User, _ = identity["OpenstackID"].(string)
+								config.User, _ = identity["OpenstackID"].(string) // nolint
 							}
 						}
 					}
@@ -567,9 +585,11 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		}
 	}
 
+	config.DNS, _ = compute["DNS"].(string) // nolint
+
 	if config.Key, ok = metadata["ApplicationKey"].(string); !ok {
 		if config.Key, ok = ostorage["ApplicationKey"].(string); !ok {
-			config.Key, _ = identity["ApplicationKey"].(string)
+			config.Key, _ = identity["ApplicationKey"].(string) // nolint
 		}
 	}
 
@@ -584,7 +604,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 									if config.SecretKey, ok = identity["SecretKey"].(string); !ok {
 										if config.SecretKey, ok = identity["AccessPassword"].(string); !ok {
 											if config.SecretKey, ok = identity["Password"].(string); !ok {
-												config.SecretKey, _ = identity["OpenstackPassword"].(string)
+												config.SecretKey, _ = identity["OpenstackPassword"].(string) // nolint
 											}
 										}
 									}
@@ -599,8 +619,9 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 
 	if config.Region, ok = metadata["Region"].(string); !ok {
 		if config.Region, ok = ostorage["Region"].(string); !ok {
-			config.Region, _ = compute["Region"].(string)
+			config.Region, _ = compute["Region"].(string) // nolint
 		}
+		// FIXME: Wrong, this needs validation, but not ALL providers
 		// if err := validateOVHObjectStorageRegionNaming("objectstorage", config.Region, config.AuthURL); err != nil {
 		// 	return config, err
 		// }
@@ -608,11 +629,11 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 
 	if config.AvailabilityZone, ok = metadata["AvailabilityZone"].(string); !ok {
 		if config.AvailabilityZone, ok = ostorage["AvailabilityZone"].(string); !ok {
-			config.AvailabilityZone, _ = compute["AvailabilityZone"].(string)
+			config.AvailabilityZone, _ = compute["AvailabilityZone"].(string) // nolint
 		}
 	}
 
-	// FIXME: Remove google custom code
+	// FIXME: Remove google custom code, it's a problem, think about delegation to providers
 	if config.Type == "google" {
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
 		for _, key := range keys {
@@ -621,7 +642,10 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 			}
 		}
 
-		config.ProjectID = identity["project_id"].(string)
+		config.ProjectID, ok = identity["project_id"].(string)
+		if !ok {
+			return config, fail.NewError("'project_id' MUST be a string in tenants.toml: %v", identity["project_id"])
+		}
 
 		googleCfg := stacks.GCPConfiguration{
 			Type:         "service_account",
@@ -644,7 +668,7 @@ func initMetadataLocationConfig(authOpts providers.Config, tenant map[string]int
 		config.Credentials = string(d1)
 	}
 
-	config.BucketName, _ = metadata["MetadataBucketName"].(string)
+	config.BucketName, _ = metadata["MetadataBucketName"].(string) // nolint
 	return config, nil
 }
 

@@ -40,8 +40,9 @@ import (
 //go:generate minimock -o ../mocks/mock_location.go -i github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage.Location
 
 // FIXME: GCP Remove specific driver code
+// FIXME: Make this easy to validate, what is optional ?, what is mandatory ?
 
-// Config ...
+// Config represents a tenant configuration
 type Config struct {
 	Type             string
 	EnvAuth          bool
@@ -60,13 +61,14 @@ type Config struct {
 	ProjectID        string
 	Credentials      string
 	BucketName       string
+	DNS              string
 }
 
 // Location ...
 type Location interface {
-	// ObjectStorageProtocol returns the name of the Object Storage protocol corresponding used by the location
-	ObjectStorageProtocol() string
-
+	// Protocol returns the name of the Object Storage protocol corresponding used by the location
+	Protocol() string
+	Configuration() Config // returns the configuration used to create Location
 	// ListBuckets returns all bucket prefixed by a string given as a parameter
 	ListBuckets(string) ([]string, fail.Error)
 	// FindBucket returns true of bucket exists in stowLocation
@@ -176,12 +178,20 @@ func (l *location) connect() fail.Error {
 	return fail.ConvertError(err)
 }
 
-// ObjectStorageProtocol returns the type of ObjectStorage
-func (l location) ObjectStorageProtocol() string {
+// Protocol returns the type of ObjectStorage
+func (l location) Protocol() string {
 	if l.IsNull() {
 		return ""
 	}
 	return l.config.Type
+}
+
+// Configuration returns the configuration used to create Location
+func (l location) Configuration() Config {
+	if l.IsNull() {
+		return Config{}
+	}
+	return l.config
 }
 
 func (l location) estimateSize(prefix string) (int, error) {

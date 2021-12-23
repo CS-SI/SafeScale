@@ -1,0 +1,12 @@
+rules:
+  - id: instancer
+    patterns:
+      - pattern-either:
+          - pattern: |
+              func (instance $_) $_() $_ {
+              	  if instance.isNull() {
+                  ...
+              }
+    message: "Null issues"
+    languages: [go]
+    severity: ERROR

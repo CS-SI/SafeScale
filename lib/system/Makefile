@@ -16,13 +16,17 @@ test:
 bashtest:
 	@(cd scripts && $(MAKE) $(@))
 
+bucketfs:
+	@(cd bucketfs && $(MAKE) all)
+
 nfs:
 	@(cd nfs && $(MAKE) all)
 
 generate: clean gensrc
+	@(cd bucketfs && $(MAKE) $(@))
 	@(cd nfs && $(MAKE) $(@))
-	@$(GO) generate . > /dev/null 2>&1
-	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1
+	@$(GO) generate . >/dev/null 2>&1
+	@$(GO) fmt $(VERSIONFILE) >/dev/null 2>&1
 
 gensrc:
 	@$(RM) $(VERSIONFILE) || true
@@ -34,5 +38,6 @@ gensrc:
 	@$(GO) fmt $(VERSIONFILE) > /dev/null 2>&1
 
 clean:
+	@(cd bucketfs && $(MAKE) $(@))
 	@(cd nfs && $(MAKE) $(@))
 	@$(RM) rice-box.go || true

@@ -30,7 +30,7 @@ type Arbiter func(Try) (verdict.Enum, fail.Error)
 // DefaultArbiter allows 10 retries, with a maximum duration of 30 seconds
 var DefaultArbiter = PrevailDone(Max(10), Timeout(temporal.GetBigDelay()))
 
-// CommonArbiter allows between 5 an 10 retries
+// CommonArbiter allows between 5 and 10 retries
 var CommonArbiter = PrevailDone(Min(5), Max(10))
 
 // ArbiterAggregator this type helps easy replacement of PrevailDone

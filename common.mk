@@ -1,4 +1,4 @@
-VERSION=21.11.0-rc4
+VERSION=21.11.0
 export VERSION
 
 ifeq ($(MAKE_LEVEL),)
@@ -54,6 +54,7 @@ GO?=go
 GOFMT?=gofmt
 CP?=cp
 RM?=rm
+MV?=mv
 BROWSER?=firefox
 GREP?=grep
 EGREP?=egrep
@@ -64,7 +65,7 @@ SED?=sed
 TEE?=tee
 EXT?=
 WHICH?=which
-CERR?=default
+CERR?=hardened
 
 ifeq ($(OS),Windows_NT)
 EXT=.exe

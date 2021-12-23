@@ -513,8 +513,13 @@ func (s stack) deleteRules(asg *abstract.SecurityGroup, ingress, egress []*ec2.I
 }
 
 // GetDefaultSecurityGroupName returns the name of the Security Group automatically bound to Hosts by provider
-func (s stack) GetDefaultSecurityGroupName() string {
-	return s.GetConfigurationOptions().DefaultSecurityGroupName
+func (s stack) GetDefaultSecurityGroupName() (string, fail.Error) {
+	cfg, err := s.GetRawConfigurationOptions()
+	if err != nil {
+		return "", err
+	}
+
+	return cfg.DefaultSecurityGroupName, nil
 }
 
 // EnableSecurityGroup enables a Security Group

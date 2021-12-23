@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -30,6 +31,12 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/asaskevich/govalidator"
+)
+
+//goland:noinspection GoPreferNilSlice
+var (
+	dnsServers = []string{}
 )
 
 // provider is the provider implementation of the Aws provider
@@ -61,11 +68,11 @@ func (p provider) DeleteVIP(*abstract.VirtualIP) fail.Error {
 	return fail.NotImplementedError("DeleteVIP() not implemented yet") // FIXME: Technical debt
 }
 
-func (p provider) GetTenantParameters() map[string]interface{} {
+func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 	if p.IsNull() {
-		return map[string]interface{}{}
+		return map[string]interface{}{}, nil
 	}
-	return p.tenantParameters
+	return p.tenantParameters, nil
 }
 
 // New creates a new instance of aws provider
@@ -73,8 +80,7 @@ func New() providers.Provider {
 	return &provider{}
 }
 
-// Build build a new Client from configuration parameter
-// Can be called from nil
+// Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
@@ -91,7 +97,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	var networkName string
 	networkCfg, ok := params["network"].(map[string]interface{})
 	if ok {
-		networkName, _ = networkCfg["ProviderNetwork"].(string)
+		networkName, _ = networkCfg["ProviderNetwork"].(string) // nolint
 	}
 	if networkName == "" {
 		networkName = "safescale"
@@ -115,23 +121,23 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		NetworkName: networkName,
 	}
 
-	username, ok := identityCfg["Username"].(string)
+	username, ok := identityCfg["Username"].(string) // nolint
 	if !ok || username == "" {
-		username, _ = identityCfg["Username"].(string)
+		username, _ = identityCfg["Username"].(string) // nolint
 	}
-	password, _ := identityCfg["Password"].(string)
+	password, _ := identityCfg["Password"].(string) // nolint
 
 	accessKeyID, ok := identityCfg["AccessKeyID"].(string)
 	if !ok || accessKeyID == "" {
 		return &provider{}, fail.SyntaxError("field 'AccessKeyID' in section 'identity' not found in tenants.toml")
 	}
 
-	secretAccessKey, ok := identityCfg["SecretAccessKey"].(string)
+	secretAccessKey, ok := identityCfg["SecretAccessKey"].(string) // nolint
 	if !ok || secretAccessKey == "" {
 		return &provider{}, fail.SyntaxError("no secret access key provided in tenants.toml")
 	}
 
-	identityEndpoint, _ := identityCfg["IdentityEndpoint"].(string)
+	identityEndpoint, _ := identityCfg["IdentityEndpoint"].(string) // nolint
 	if identityEndpoint == "" {
 		identityEndpoint, ok = identityCfg["auth_uri"].(string) // deprecated, kept until next release
 		if !ok || identityEndpoint == "" {
@@ -139,16 +145,16 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		}
 	}
 
-	projectName, _ := computeCfg["ProjectName"].(string)
-	projectID, _ := computeCfg["ProjectID"].(string)
-	defaultImage, _ := computeCfg["DefaultImage"].(string)
+	projectName, _ := computeCfg["ProjectName"].(string)   // nolint
+	projectID, _ := computeCfg["ProjectID"].(string)       // nolint
+	defaultImage, _ := computeCfg["DefaultImage"].(string) // nolint
 
 	maxLifeTime := 0
 	if _, ok := computeCfg["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(computeCfg["MaxLifetimeInHours"].(string))
 	}
 
-	operatorUsername, _ := computeCfg["OperatorUsername"].(string)
+	operatorUsername, _ := computeCfg["OperatorUsername"].(string) // nolint
 	if operatorUsername == "" {
 		operatorUsername = abstract.DefaultUser
 	}
@@ -172,8 +178,26 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	customDNS, _ := computeCfg["DNS"].(string) // nolint
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
+	}
+
 	cfgOptions := stacks.ConfigurationOptions{
-		DNSList:                   []string{},
+		DNSList:                   dnsServers,
 		UseFloatingIP:             true,
 		AutoHostNetworkInterfaces: false,
 		VolumeSpeeds: map[string]volumespeed.Enum{
@@ -194,12 +218,23 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
+
+	wrapped := api.StackProxy{
+		InnerStack: awsStack,
+		Name:       "amazon",
+	}
+
 	newP := &provider{
-		Stack:            awsStack,
+		Stack:            wrapped,
 		tenantParameters: params,
 	}
 
-	return newP, nil
+	wp := providers.ProviderProxy{
+		InnerProvider: newP,
+		Name:          wrapped.Name,
+	}
+
+	return wp, nil
 }
 
 // GetAuthenticationOptions returns the auth options
@@ -209,11 +244,14 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	if err != nil {
+		return nil, err
+	}
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
 	return cfg, nil
 }
@@ -225,14 +263,23 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	provName, xerr := p.GetName()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
-	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("ProviderName", provName)
 	cfg.Set("BuildSubnets", opts.BuildSubnets)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
@@ -241,14 +288,14 @@ func (p *provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 }
 
 // GetName returns the providerName
-func (p provider) GetName() string {
-	return "aws"
+func (p provider) GetName() (string, fail.Error) {
+	return "aws", nil
 }
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() api.Stack {
-	return p.Stack
+func (p provider) GetStack() (api.Stack, fail.Error) {
+	return p.Stack, nil
 }
 
 // ListImages overloads stack.ListImages to allow to filter the available images on the provider level
@@ -256,7 +303,7 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	if p.IsNull() {
 		return []abstract.Image{}, fail.InvalidInstanceError()
 	}
-	return p.Stack.(api.ReservedForProviderUse).ListImages()
+	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }
 
 // ListTemplates overloads stack.ListTemplates to allow to filter the available templates on the provider level
@@ -264,21 +311,21 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	if p.IsNull() {
 		return []abstract.HostTemplate{}, fail.InvalidInstanceError()
 	}
-	return p.Stack.(api.ReservedForProviderUse).ListTemplates()
+	return p.Stack.(api.ReservedForProviderUse).ListTemplates(all)
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p provider) GetCapabilities() providers.Capabilities {
+func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 	return providers.Capabilities{
 		PrivateVirtualIP: false,
-	}
+	}, nil
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
-func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
 	if p.IsNull() {
-		return emptySlice
+		return emptySlice, nil
 	}
 
 	var (
@@ -288,12 +335,12 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	for _, v := range p.templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice
+			return emptySlice, nil
 		}
 		out = append(out, re)
 	}
 
-	return out
+	return out, nil
 }
 
 func init() {

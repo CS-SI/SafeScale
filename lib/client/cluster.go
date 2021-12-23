@@ -406,8 +406,8 @@ func (c cluster) DeleteNode(clusterName string, nodes []string, duration time.Du
 
 		if _, err := service.DeleteNode(ctx, &protocol.ClusterNodeRequest{Name: clusterName, Host: &protocol.Reference{Name: ref}}); err != nil {
 			mutex.Lock()
+			defer mutex.Unlock()
 			errs = append(errs, err.Error())
-			mutex.Unlock()
 		}
 	}
 

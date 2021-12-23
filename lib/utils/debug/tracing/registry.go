@@ -24,7 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 )
 
-var settings map[string]map[string]bool = nil
+var settings map[string]map[string]bool
 
 // RegisterTraceSettings keeps track of what has to be traced
 func RegisterTraceSettings(jsonSettings string) error {
@@ -35,7 +35,7 @@ func RegisterTraceSettings(jsonSettings string) error {
 	newSettings := map[string]map[string]bool{}
 	err := json.Unmarshal([]byte(jsonSettings), &newSettings)
 	if err != nil {
-		return fmt.Errorf("no trace are enabled, an error occured loading trace settings: %v", err)
+		return fmt.Errorf("no trace are enabled, an error occurred loading trace settings: %v", err)
 	}
 
 	// Check with env variable SAFESCALE_TRACE if key or key.subkey is inside

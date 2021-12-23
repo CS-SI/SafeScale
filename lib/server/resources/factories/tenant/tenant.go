@@ -34,7 +34,7 @@ type Tenant struct {
 // currentTenant contains the current tenant
 var currentTenant atomic.Value
 
-// GetCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registerd
+// GetCurrentTenant returns the tenant used for commands or, if not set, set the tenant to use if it is the only one registered
 func GetCurrentTenant() *Tenant {
 	anon := currentTenant.Load()
 	if anon == nil {
@@ -46,7 +46,11 @@ func GetCurrentTenant() *Tenant {
 		// Set unique tenant as current
 		logrus.Infoln("No tenant set yet, but found only one tenant in configuration; setting it as current.")
 		for _, tenant := range tenants {
-			name := tenant["name"].(string)
+			name, ok := tenant["name"].(string)
+			if !ok {
+				logrus.Warnf("tenant name MUST be a string, it's not: %v", tenant["name"])
+				continue
+			}
 			service, err := iaas.UseService(name, operations.MinimumMetadataVersion)
 			if err != nil {
 				return nil

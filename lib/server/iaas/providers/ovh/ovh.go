@@ -97,22 +97,40 @@ func (p *provider) IsNull() bool {
 	return p == nil || p.Stack == nil
 }
 
-// Build build a new instance of Ovh using configuration parameters
+// Build builds a new instance of Ovh using configuration parameters
 // Can be called from nil
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	var validInput bool
 
-	identityParams, _ := params["identity"].(map[string]interface{})
-	compute, _ := params["compute"].(map[string]interface{})
-	// networkParams, _ := params["network"].(map[string]interface{})
+	identityParams, _ := params["identity"].(map[string]interface{}) // nolint
+	compute, _ := params["compute"].(map[string]interface{})         // nolint
+	// networkParams, _ := params["network"].(map[string]interface{}) // nolint
 
-	applicationKey, _ := identityParams["ApplicationKey"].(string)
-	openstackID, _ := identityParams["OpenstackID"].(string)
-	openstackPassword, _ := identityParams["OpenstackPassword"].(string)
-	region, _ := compute["Region"].(string)
+	applicationKey, _ := identityParams["ApplicationKey"].(string)       // nolint
+	openstackID, _ := identityParams["OpenstackID"].(string)             // nolint
+	openstackPassword, _ := identityParams["OpenstackPassword"].(string) // nolint
+	region, _ := compute["Region"].(string)                              // nolint
 	zone, ok := compute["AvailabilityZone"].(string)
 	if !ok {
 		zone = "nova"
+	}
+
+	customDNS, _ := compute["DNS"].(string) // nolint
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
 	}
 
 	projectName, validInput := compute["ProjectName"].(string)
@@ -140,10 +158,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
-		operatorUsername = operatorUsernameIf.(string)
-		if operatorUsername == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstract.DefaultUser
+		operatorUsername, ok = operatorUsernameIf.(string)
+		if ok { // FIXME: Validation
+			if operatorUsername == "" {
+				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+				operatorUsername = abstract.DefaultUser
+			}
 		}
 	}
 
@@ -209,12 +229,22 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	wrapped := api.StackProxy{
+		InnerStack: stack,
+		Name:       "ovh",
+	}
+
 	newP := &provider{
-		Stack:            stack,
+		Stack:            wrapped,
 		tenantParameters: params,
 	}
 
-	return newP, nil
+	wp := providers.ProviderProxy{
+		InnerProvider: newP,
+		Name:          wrapped.Name,
+	}
+
+	return wp, nil
 }
 
 // GetAuthenticationOptions returns the auth options
@@ -224,13 +254,16 @@ func (p provider) GetAuthenticationOptions() (providers.Config, fail.Error) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetAuthenticationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawAuthenticationOptions()
+	if err != nil {
+		return nil, err
+	}
 	cfg.Set("TenantName", opts.TenantName)
 	cfg.Set("TenantID", opts.TenantID)
 	cfg.Set("DomainName", opts.DomainName)
 	cfg.Set("Login", opts.Username)
 	cfg.Set("Password", opts.Password)
-	cfg.Set("AuthUrl", opts.IdentityEndpoint)
+	cfg.Set("AuthURL", opts.IdentityEndpoint)
 	cfg.Set("Region", opts.Region)
 	cfg.Set("AlternateApiConsumerKey", alternateAPIApplicationKey)
 	cfg.Set("AlternateApiApplicationSecret", alternateAPIApplicationSecret)
@@ -245,14 +278,23 @@ func (p provider) GetConfigurationOptions() (providers.Config, fail.Error) {
 		return cfg, fail.InvalidInstanceError()
 	}
 
-	opts := p.Stack.(api.ReservedForProviderUse).GetConfigurationOptions()
+	opts, err := p.Stack.(api.ReservedForProviderUse).GetRawConfigurationOptions()
+	if err != nil {
+		return nil, err
+	}
+
+	provName, xerr := p.GetName()
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	cfg.Set("DNSList", opts.DNSList)
 	cfg.Set("AutoHostNetworkInterfaces", opts.AutoHostNetworkInterfaces)
 	cfg.Set("UseLayer3Networking", opts.UseLayer3Networking)
 	cfg.Set("DefaultImage", opts.DefaultImage)
 	cfg.Set("MetadataBucketName", opts.MetadataBucket)
 	cfg.Set("OperatorUsername", opts.OperatorUsername)
-	cfg.Set("ProviderName", p.GetName())
+	cfg.Set("ProviderName", provName)
 	cfg.Set("UseNATService", opts.UseNATService)
 	cfg.Set("MaxLifeTimeInHours", opts.MaxLifeTime)
 
@@ -286,7 +328,7 @@ func (p provider) ListImages(all bool) ([]abstract.Image, fail.Error) {
 	if p.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	return p.Stack.(api.ReservedForProviderUse).ListImages()
+	return p.Stack.(api.ReservedForProviderUse).ListImages(all)
 }
 
 // ListTemplates overload OpenStack ListTemplate method to filter wind and flex instance and add GPU configuration
@@ -294,7 +336,7 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	if p.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
-	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates()
+	allTemplates, xerr := p.Stack.(api.ReservedForProviderUse).ListTemplates(false)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -324,8 +366,16 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	flavorMap := map[string]map[string]interface{}{}
 	for _, flavor := range flavors.([]interface{}) {
 		// Removal of all the unavailable templates
-		if flavor.(map[string]interface{})["available"].(bool) {
-			flavorMap[flavor.(map[string]interface{})["id"].(string)] = flavor.(map[string]interface{})
+		if flavmap, ok := flavor.(map[string]interface{}); ok {
+			if val, ok := flavmap["available"].(bool); ok {
+				if val {
+					if aflav, ok := flavmap["id"]; ok {
+						if key, ok := aflav.(string); ok {
+							flavorMap[key] = flavmap
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -365,31 +415,31 @@ func (p provider) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network,
 }
 
 // GetName returns the name of the driver
-func (p provider) GetName() string {
-	return "ovh"
+func (p provider) GetName() (string, fail.Error) {
+	return "ovh", nil
 }
 
 // GetStack returns the stack object used by the provider
 // Note: use with caution, last resort option
-func (p provider) GetStack() api.Stack {
-	return p.Stack
+func (p provider) GetStack() (api.Stack, fail.Error) {
+	return p.Stack, nil
 }
 
-func (p provider) GetTenantParameters() map[string]interface{} {
+func (p provider) GetTenantParameters() (map[string]interface{}, fail.Error) {
 	if p.IsNull() {
-		return map[string]interface{}{}
+		return map[string]interface{}{}, nil
 	}
-	return p.tenantParameters
+	return p.tenantParameters, nil
 }
 
 // GetCapabilities returns the capabilities of the provider
-func (p provider) GetCapabilities() providers.Capabilities {
+func (p provider) GetCapabilities() (providers.Capabilities, fail.Error) {
 	return providers.Capabilities{
 		PrivateVirtualIP: true,
-	}
+	}, nil
 }
 
-// BindHostToVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+// BindHostToVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if p.IsNull() {
 		return fail.InvalidInstanceError()
@@ -404,7 +454,7 @@ func (p provider) BindHostToVIP(vip *abstract.VirtualIP, hostID string) fail.Err
 	return nil
 }
 
-// UnbindHostFromVIP overriden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
+// UnbindHostFromVIP overridden because OVH doesn't honor allowed_address_pairs, providing its own, automatic way to deal with spoofing
 func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail.Error {
 	if p.IsNull() {
 		return fail.InvalidInstanceError()
@@ -420,10 +470,10 @@ func (p provider) UnbindHostFromVIP(vip *abstract.VirtualIP, hostID string) fail
 }
 
 // GetRegexpsOfTemplatesWithGPU returns a slice of regexps corresponding to templates with GPU
-func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
+func (p provider) GetRegexpsOfTemplatesWithGPU() ([]*regexp.Regexp, fail.Error) {
 	var emptySlice []*regexp.Regexp
 	if p.IsNull() {
-		return emptySlice
+		return emptySlice, nil
 	}
 
 	var (
@@ -437,12 +487,12 @@ func (p provider) GetRegexpsOfTemplatesWithGPU() []*regexp.Regexp {
 	for _, v := range templatesWithGPU {
 		re, err := regexp.Compile(v)
 		if err != nil {
-			return emptySlice
+			return emptySlice, nil
 		}
 		out = append(out, re)
 	}
 
-	return out
+	return out, nil
 }
 
 func init() {

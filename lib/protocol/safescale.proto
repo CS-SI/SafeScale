@@ -111,9 +111,10 @@ message TenantCompute {
 	string whitelist_template_regex = 6;
 	string blacklist_template_regex = 7;
 	string default_image = 8;
-	string default_volume_speed = 9;
-	repeated string dns_list = 10;
-	string operator_username = 11;
+	repeated string dns_list = 9;
+	string operator_username = 10;
+	string whitelist_image_regex = 11;
+	string blacklist_image_regex = 12;
 }
 
 message TenantNetwork {
@@ -128,6 +129,10 @@ message TenantObjectStorage {
 	string auth_url = 3;
 	string access_key = 4;
 	string region = 5;
+	string project_name = 6;
+	string application_key = 7;
+	string username = 8;
+	string password = 9;
 }
 
 message TenantMetadata {
@@ -388,6 +393,7 @@ message Host {
 	int32 ssh_port = 14;
 	string state_label = 15;
 	string creation_date = 16;
+	bool managed = 17;
 }
 
 message HostStatus {
@@ -556,6 +562,7 @@ message VolumeAttachmentRequest {
 	string format = 5;
 	string device = 6;
 	bool do_not_format = 7;
+	bool do_not_mount = 8;
 }
 
 message VolumeAttachmentResponse {
@@ -564,6 +571,8 @@ message VolumeAttachmentResponse {
 	string format = 3;
 	string device = 4;
 	bool do_not_format = 5;
+	bool mount = 6;
+	bool formatted = 7;
 }
 
 message VolumeListRequest {
@@ -591,27 +600,41 @@ service VolumeService {
 // safescale bucket list
 // safescale bucket inspect C1
 
-message Bucket {
+message BucketMount {
+	Reference host = 1;
+	string path = 2;
+}
+
+message BucketRequest {
 	string name = 1;
 }
 
-message BucketList {
-	repeated Bucket buckets = 1;
+message BucketResponse {
+	string name = 1;
+	repeated BucketMount mounts = 2;
 }
 
-message BucketMountingPoint {
+message BucketListRequest {
+	bool all = 1;
+}
+
+message BucketListResponse {
+	repeated BucketResponse buckets = 1;
+}
+
+message BucketMountRequest {
 	string bucket = 1;
 	Reference host = 2;
 	string path = 3;
 }
 
 service BucketService {
-	rpc Create(Bucket) returns (google.protobuf.Empty){}
-	rpc Mount(BucketMountingPoint) returns (google.protobuf.Empty){}
-	rpc Unmount(BucketMountingPoint) returns (google.protobuf.Empty){}
-	rpc Delete(Bucket) returns (google.protobuf.Empty){}
-	rpc List(google.protobuf.Empty) returns (BucketList){}
-	rpc Inspect(Bucket) returns (BucketMountingPoint){}
+	rpc Create(BucketRequest) returns (google.protobuf.Empty){}
+	rpc Mount(BucketMountRequest) returns (google.protobuf.Empty){}
+	rpc Unmount(BucketMountRequest) returns (google.protobuf.Empty){}
+	rpc Delete(BucketRequest) returns (google.protobuf.Empty){}
+	rpc List(BucketListRequest) returns (BucketListResponse){}
+	rpc Inspect(BucketRequest) returns (BucketResponse){}
 }
 
 // SSH requests

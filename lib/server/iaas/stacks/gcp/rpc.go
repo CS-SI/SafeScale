@@ -1270,6 +1270,7 @@ func (s stack) rpcCreateInstance(name, networkName, subnetID, subnetName, templa
 			if err != nil {
 				return err
 			}
+
 			if op != nil {
 				if op.HTTPStatusCode != 200 {
 					logrus.Tracef("received http error code %d", op.HTTPStatusCode)
@@ -1365,7 +1366,7 @@ func (s stack) rpcResetStartupScriptOfInstance(id string) fail.Error {
 		}
 	}
 
-	// remove startup-script from metadata to prevent it to rerun at reboot (standard behaviour in GCP)
+	// remove startup-script from metadata to prevent it to rerun at reboot (standard behavior in GCP)
 	if length := len(resp.Metadata.Items); length > 0 {
 		newMetadata := &compute.Metadata{}
 		newMetadata.Items = make([]*compute.MetadataItems, 0, length)

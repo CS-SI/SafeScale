@@ -13,12 +13,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
+# bucket_unmount.sh
+#
+# Unmounts an Object Storage Bucket
 
-/usr/local/bin/umount-{{.Bucket}}
-echo "umount: $?" >/tmp/umount.log
-rm /etc/s3ql/auth.{{.Bucket}}
-echo "rm auth: $?" >>/tmp/umount.log
-rm /usr/local/bin/mount-{{.Bucket}}
-echo "rm mount: $?" >>/tmp/umount.log
-rm /usr/local/bin/umount-{{.Bucket}}
-echo "rm umount: $?" >>/tmp/umount.log
+{{.BashHeader}}
+
+function print_error() {
+  ec=$?
+  read line file <<< $(caller)
+  echo "An error occurred in line $line of file $file (exit code $ec) :" "{"$(sed "${line}q;d" "$file")"}" >&2
+}
+trap print_error ERR
+
+umount -fl {{ .MountPoint }}
+sed -i '\#{{ .MountPoint }} rclone#d' /etc/fstab
+rm -f {{ .ConfigFile }}

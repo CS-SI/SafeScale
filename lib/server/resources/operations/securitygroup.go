@@ -115,9 +115,9 @@ func lookupSecurityGroup(svc iaas.Service, ref string) (bool, fail.Error) {
 }
 
 // LoadSecurityGroup ...
-func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup, xerr fail.Error) {
+func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup, ferr fail.Error) {
 	// Note: do not log error from here; caller has the responsibility to log if needed
-	defer fail.OnPanic(&xerr)
+	defer fail.OnPanic(&ferr)
 
 	if svc == nil {
 		return nil, fail.InvalidParameterError("svc", "cannot be nil")
@@ -141,6 +141,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotFound:
+			debug.IgnoreError(xerr)
 			// rewrite NotFoundError, user does not bother about metadata stuff
 			return nil, fail.NotFoundError("failed to find Security Group '%s'", ref)
 		default:
@@ -148,13 +149,18 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 		}
 	}
 
-	if sgInstance = cacheEntry.Content().(*SecurityGroup); sgInstance == nil {
+	var ok bool
+	sgInstance, ok = cacheEntry.Content().(*SecurityGroup)
+	if !ok {
+		return nil, fail.InconsistentError("cache content should be a *SecurityGroup", ref)
+	}
+	if sgInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Security Group cache for key '%s'", ref)
 	}
 	_ = cacheEntry.LockContent()
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			_ = cacheEntry.UnlockContent()
 		}
 	}()
@@ -196,7 +202,7 @@ func (instance *SecurityGroup) IsNull() bool {
 }
 
 // Carry overloads rv.core.Carry() to add Volume to service cache
-func (instance *SecurityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
+func (instance *SecurityGroup) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -223,10 +229,10 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (xerr fail.Error) {
 		return xerr
 	}
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := kindCache.FreeEntry(identifiable.GetID()); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free %s cache entry for key '%s'", instance.MetadataCore.GetKind(), identifiable.GetID()))
 			}
 		}
 	}()
@@ -401,10 +407,10 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	asg.Network = networkID
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			if derr := svc.DeleteSecurityGroup(asg); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(xerr), name))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s'", ActionFromError(ferr), name))
 			}
 		}
 	}()
@@ -417,13 +423,13 @@ func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, desc
 	}
 
 	defer func() {
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
+		ferr = debug.InjectPlannedFail(ferr)
+		if ferr != nil {
 			// Disable abort signal during clean up
 			defer task.DisarmAbortSignal()()
 
 			if derr := instance.MetadataCore.Delete(); derr != nil {
-				_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(xerr)))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Security Group '%s' metadata", ActionFromError(ferr)))
 			}
 		}
 	}()
@@ -645,6 +651,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 }
 
 // unbindFromSubnets unbinds security group from all the subnets bound to it and update the Subnet metadata accordingly
+//goland:noinspection GoDeferInLoop
 func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *propertiesv1.SecurityGroupSubnets) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -668,8 +675,25 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 		}
 
 		// recover from context the Subnet Abstract and properties (if it exists)
-		currentSubnetAbstract, _ := ctx.Value(currentSubnetAbstractContextKey).(*abstract.Subnet)
-		currentSubnetProps, _ := ctx.Value(currentSubnetPropertiesContextKey).(*serialize.JSONProperties)
+		var (
+			currentSubnetAbstract *abstract.Subnet
+			currentSubnetProps    *serialize.JSONProperties
+			ok                    bool
+		)
+		value := ctx.Value(currentSubnetAbstractContextKey)
+		if value != nil {
+			currentSubnetAbstract, ok = value.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("failed to cast value to '*abstract.Subnet'")
+			}
+		}
+		value = ctx.Value(currentSubnetPropertiesContextKey)
+		if value != nil {
+			currentSubnetAbstract, ok = value.(*abstract.Subnet)
+			if !ok {
+				return fail.InconsistentError("failed to cast value to '*serialize.JSONProperties'")
+			}
+		}
 
 		var subnetHosts *propertiesv1.SubnetHosts
 		// inspectFunc will get Hosts linked to Subnet from properties
@@ -704,6 +728,7 @@ func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *proper
 					}
 				}
 
+				//goland:noinspection GoDeferInLoop
 				defer func(in resources.Subnet) {
 					in.Released()
 				}(subnetInstance)
@@ -1140,7 +1165,7 @@ func (instance *SecurityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, 
 	})
 }
 
-// BindToHost binds the security group to an Host.
+// BindToHost binds the security group to a host.
 func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -1160,7 +1185,7 @@ func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance reso
 	return instance.unsafeBindToHost(ctx, hostInstance, enable, mark)
 }
 
-// UnbindFromHost unbinds the security group from an host
+// UnbindFromHost unbinds the security group from a host
 func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance resources.Host) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -1222,7 +1247,7 @@ func (instance *SecurityGroup) UnbindFromHost(ctx context.Context, hostInstance 
 	})
 }
 
-// UnbindFromHostByReference unbinds the security group from an host identified by reference (id or name)
+// UnbindFromHostByReference unbinds the security group from a host identified by reference (id or name)
 func (instance *SecurityGroup) UnbindFromHostByReference(ctx context.Context, hostRef string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -1558,7 +1583,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 		return props.Alter(securitygroupproperty.HostsV1, func(clonable data.Clonable) fail.Error {
 			sghV1, ok := clonable.(*propertiesv1.SecurityGroupHosts)
 			if !ok {
-				return fail.InconsistentError("'*securitygroupproperty.HostsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.SecurityGroupHosts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			// updates security group metadata
@@ -1568,7 +1593,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 			}
 			return nil
 		})
-	})
+	}, data.NewImmutableKeyValue("Reload", !params.onRemoval))
 	if xerr != nil {
 		return xerr
 	}
@@ -1578,7 +1603,7 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(ctx context.Context, params
 		return props.Alter(securitygroupproperty.SubnetsV1, func(clonable data.Clonable) fail.Error {
 			sgsV1, ok := clonable.(*propertiesv1.SecurityGroupSubnets)
 			if !ok {
-				return fail.InconsistentError("'*securitygroupproperty.SubnetsV1' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				return fail.InconsistentError("'*propertiesv1.SecurityGroupSubnets' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
 			innerXErr := instance.GetService().UnbindSecurityGroupFromSubnet(instance.GetID(), params.subnetID)
