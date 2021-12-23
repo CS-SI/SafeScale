@@ -42,7 +42,7 @@ export BUILD_TAGS
 TEST_COVERAGE_ARGS =
 export TEST_COVERAGE_ARGS
 
-all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet semgrep style metalint
+all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet semgrep style #metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 with-soft:
@@ -52,17 +52,17 @@ with-soft:
 ci: logclean ground getdevdeps mod sdk generate lib cli minimock err vet with-soft semgrep
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
-allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
+allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style #metalint
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
 
 version:
 	@printf "%b" "$(VERSION)-$$(git rev-parse --abbrev-ref HEAD | tr \"/\" \"_\")";
 
-release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet semgrep style metalint releasearchive
+release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet semgrep style releasearchive #metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
-releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet style metalint releasearchive
+releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet style releasearchive #metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
 
 releasetags:
