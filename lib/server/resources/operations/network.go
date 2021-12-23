@@ -111,7 +111,12 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 		}
 	}
 
-	if networkInstance = cacheEntry.Content().(resources.Network); networkInstance == nil {
+	var ok bool
+	networkInstance, ok = cacheEntry.Content().(resources.Network)
+	if !ok {
+		return nil, fail.InconsistentError("cache content should be a resources.Network", ref)
+	}
+	if networkInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
 	_ = cacheEntry.LockContent()

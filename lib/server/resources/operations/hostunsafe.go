@@ -382,7 +382,11 @@ func (instance *Host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr f
 				return fail.InconsistentError("'*propertiesv1.HostMounts' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			mounts = hostMountsV1.Clone().(*propertiesv1.HostMounts)
+			clone := hostMountsV1.Clone()
+			mounts, ok = clone.(*propertiesv1.HostMounts)
+			if !ok {
+				return fail.InconsistentError("clone should be a *propertiesv1.HostMounts")
+			}
 			return nil
 		})
 	})

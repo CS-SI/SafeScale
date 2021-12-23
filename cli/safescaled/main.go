@@ -69,7 +69,7 @@ func work(c *cli.Context) {
 
 	// NOTE: is it the good behavior ? Shouldn't we fail ?
 	// If trace settings cannot be registered, report it but do not fail
-	// FIXME: introduce use of configuration file with autoreload on change
+	// TODO: introduce use of configuration file with autoreload on change
 	err := tracing.RegisterTraceSettings(appTrace())
 	if err != nil {
 		logrus.Errorf(err.Error())
@@ -136,7 +136,8 @@ func work(c *cli.Context) {
 	expose()
 
 	version := Version + ", build " + Revision + " (" + BuildDate + ")"
-	if len(Tags) > 1 { // nolint
+	if              //goland:noinspection GoBoolExpressions
+	len(Tags) > 1 { // nolint
 		version += fmt.Sprintf(", with Tags: (%s)", Tags)
 	}
 	fmt.Printf("Safescaled version: %s\nReady to serve on '%s' :-)\n", version, listen)

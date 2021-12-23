@@ -63,7 +63,8 @@ func (hs *HostShare) Replace(p data.Clonable) data.Clonable {
 		return hs
 	}
 
-	src := p.(*HostShare)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostShare) // nolint
 	*hs = *src
 	hs.ClientsByID = make(map[string]string, len(src.ClientsByID))
 	for k, v := range src.ClientsByID {
@@ -110,7 +111,8 @@ func (hs *HostShares) Replace(p data.Clonable) data.Clonable {
 		return hs
 	}
 
-	src := p.(*HostShares)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostShares) // nolint
 	hs.ByID = make(map[string]*HostShare, len(src.ByID))
 	for k, v := range src.ByID {
 		hs.ByID[k] = v

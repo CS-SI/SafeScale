@@ -252,7 +252,9 @@ func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
 			}
 		}
 	} else if lvl1, ok := body["conflictingRequest"].(map[string]interface{}); ok {
-		msg = lvl1["message"].(string)
+		if lvl1m, ok := lvl1["message"].(string); ok {
+			msg = lvl1m
+		} // FIXME: Missing else
 	} else if lvl1, ok := body["message"].(string); ok {
 		msg = lvl1
 	}
@@ -334,12 +336,6 @@ func reduceHuaweiAPIErrors(errcode int, code string, body map[string]interface{}
 
 // reduceHuaweicloudError ...
 func reduceHuaweicloudError(errcode int, in []byte) (ferr fail.Error) {
-	defer func() {
-		switch ferr.(type) { // nolint
-		case *fail.ErrRuntimePanic:
-			ferr = fail.InvalidRequestError(string(in))
-		}
-	}()
 	defer fail.OnPanic(&ferr)
 
 	var body map[string]interface{}

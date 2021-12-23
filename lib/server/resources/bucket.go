@@ -35,8 +35,6 @@ type Bucket interface {
 	observer.Observable
 
 	Browse(ctx context.Context, callback func(bucket *abstract.ObjectStorageBucket) fail.Error) fail.Error
-	// GetHost(ctx context.Context) (string, fail.Error)
-	// GetMountPoint(ctx context.Context) (string, fail.Error)
 	Create(ctx context.Context, name string) fail.Error
 	Delete(ctx context.Context) fail.Error
 	Mount(ctx context.Context, hostname string, path string) fail.Error

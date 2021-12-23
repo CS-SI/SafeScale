@@ -102,20 +102,20 @@ func (p *provider) IsNull() bool {
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	var validInput bool
 
-	identityParams, _ := params["identity"].(map[string]interface{})
-	compute, _ := params["compute"].(map[string]interface{})
-	// networkParams, _ := params["network"].(map[string]interface{})
+	identityParams, _ := params["identity"].(map[string]interface{}) // nolint
+	compute, _ := params["compute"].(map[string]interface{})         // nolint
+	// networkParams, _ := params["network"].(map[string]interface{}) // nolint
 
-	applicationKey, _ := identityParams["ApplicationKey"].(string)
-	openstackID, _ := identityParams["OpenstackID"].(string)
-	openstackPassword, _ := identityParams["OpenstackPassword"].(string)
-	region, _ := compute["Region"].(string)
+	applicationKey, _ := identityParams["ApplicationKey"].(string)       // nolint
+	openstackID, _ := identityParams["OpenstackID"].(string)             // nolint
+	openstackPassword, _ := identityParams["OpenstackPassword"].(string) // nolint
+	region, _ := compute["Region"].(string)                              // nolint
 	zone, ok := compute["AvailabilityZone"].(string)
 	if !ok {
 		zone = "nova"
 	}
 
-	customDNS, _ := compute["DNS"].(string)
+	customDNS, _ := compute["DNS"].(string) // nolint
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {
 			fragments := strings.Split(customDNS, ",")
@@ -158,10 +158,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
-		operatorUsername = operatorUsernameIf.(string)
-		if operatorUsername == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstract.DefaultUser
+		operatorUsername, ok = operatorUsernameIf.(string)
+		if ok { // FIXME: Validation
+			if operatorUsername == "" {
+				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+				operatorUsername = abstract.DefaultUser
+			}
 		}
 	}
 
@@ -364,8 +366,16 @@ func (p provider) ListTemplates(all bool) ([]abstract.HostTemplate, fail.Error) 
 	flavorMap := map[string]map[string]interface{}{}
 	for _, flavor := range flavors.([]interface{}) {
 		// Removal of all the unavailable templates
-		if flavor.(map[string]interface{})["available"].(bool) {
-			flavorMap[flavor.(map[string]interface{})["id"].(string)] = flavor.(map[string]interface{})
+		if flavmap, ok := flavor.(map[string]interface{}); ok {
+			if val, ok := flavmap["available"].(bool); ok {
+				if val {
+					if aflav, ok := flavmap["id"]; ok {
+						if key, ok := aflav.(string); ok {
+							flavorMap[key] = flavmap
+						}
+					}
+				}
+			}
 		}
 	}
 

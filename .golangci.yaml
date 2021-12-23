@@ -74,11 +74,11 @@ linters-settings:
 
   cyclop:
     # the maximal code complexity to report
-    max-complexity: 10
+    max-complexity: 40
     # the maximal average package complexity. If it's higher than 0.0 (float) the check is enabled (default 0.0)
     package-average: 0.0
     # should ignore tests (default false)
-    skip-tests: false
+    skip-tests: true
 
   dogsled:
     # checks assignments with too many blank identifiers; default is 2
@@ -176,7 +176,7 @@ linters-settings:
 
   gocognit:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
-    min-complexity: 70
+    min-complexity: 50
 
   goconst:
     # minimal length of string constant, 3 by default
@@ -198,7 +198,7 @@ linters-settings:
 
   gocyclo:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
-    min-complexity: 70
+    min-complexity: 60
 
   godot:
     # comments to be checked: `declarations`, `toplevel`, or `all`
@@ -692,7 +692,6 @@ issues:
         - dupl
         - gosec
         - scopelint
-        - goconst
         - gocritic
         - funlen
         - deadcode

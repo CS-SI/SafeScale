@@ -1208,7 +1208,7 @@ func (s stack) ListHosts(details bool) (_ abstract.HostList, xerr fail.Error) {
 	}
 
 	var hosts abstract.HostList
-	for _, vm := range resp {
+	for _, vm := range resp { // nolint
 		if hostState(vm.State) == hoststate.Terminated {
 			continue
 		}

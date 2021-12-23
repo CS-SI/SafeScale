@@ -61,7 +61,7 @@ func (p *provider) IsNull() bool {
 
 // Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-	// tenantName, _ := params["name"].(string)
+	// tenantName, _ := params["name"].(string) // nolint
 
 	identityCfg, ok := params["identity"].(map[string]interface{})
 	if !ok {
@@ -77,23 +77,23 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	networkCfg, ok := params["network"].(map[string]interface{})
 	if ok { // Do not log missing network section, it may happen without issue
-		newNetworkName, _ := networkCfg["ProviderNetwork"].(string)
+		newNetworkName, _ := networkCfg["ProviderNetwork"].(string) // nolint
 		if newNetworkName != "" {
 			networkName = newNetworkName
 		}
 	}
 
-	gcpprojectID, _ := identityCfg["project_id"].(string)
-	privateKeyID, _ := identityCfg["private_key_id"].(string)
-	privateKey, _ := identityCfg["private_key"].(string)
-	clientEmail, _ := identityCfg["client_email"].(string)
-	clientID, _ := identityCfg["client_id"].(string)
-	authURI, _ := identityCfg["auth_uri"].(string)
-	tokenURI, _ := identityCfg["token_uri"].(string)
-	authProvider, _ := identityCfg["auth_provider_x509_cert_url"].(string)
-	clientCertURL, _ := identityCfg["client_x509_cert_url"].(string)
-	region, _ := computeCfg["Region"].(string)
-	zone, _ := computeCfg["Zone"].(string)
+	gcpprojectID, _ := identityCfg["project_id"].(string)                  // nolint
+	privateKeyID, _ := identityCfg["private_key_id"].(string)              // nolint
+	privateKey, _ := identityCfg["private_key"].(string)                   // nolint
+	clientEmail, _ := identityCfg["client_email"].(string)                 // nolint
+	clientID, _ := identityCfg["client_id"].(string)                       // nolint
+	authURI, _ := identityCfg["auth_uri"].(string)                         // nolint
+	tokenURI, _ := identityCfg["token_uri"].(string)                       // nolint
+	authProvider, _ := identityCfg["auth_provider_x509_cert_url"].(string) // nolint
+	clientCertURL, _ := identityCfg["client_x509_cert_url"].(string)       // nolint
+	region, _ := computeCfg["Region"].(string)                             // nolint
+	zone, _ := computeCfg["Zone"].(string)                                 // nolint
 
 	gcpConf := stacks.GCPConfiguration{
 		Type:         "service_account",
@@ -111,13 +111,13 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		NetworkName:  networkName,
 	}
 
-	username, _ := identityCfg["Username"].(string)
-	password, _ := identityCfg["Password"].(string)
-	identityEndpoint, _ := identityCfg["auth_uri"].(string)
+	username, _ := identityCfg["Username"].(string)         // nolint
+	password, _ := identityCfg["Password"].(string)         // nolint
+	identityEndpoint, _ := identityCfg["auth_uri"].(string) // nolint
 
-	projectName, _ := computeCfg["ProjectName"].(string)
-	projectID, _ := computeCfg["ProjectID"].(string)
-	defaultImage, _ := computeCfg["DefaultImage"].(string)
+	projectName, _ := computeCfg["ProjectName"].(string)   // nolint
+	projectID, _ := computeCfg["ProjectID"].(string)       // nolint
+	defaultImage, _ := computeCfg["DefaultImage"].(string) // nolint
 	if defaultImage == "" {
 		defaultImage = gcpDefaultImage
 	}
@@ -129,7 +129,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
-		operatorUsername = operatorUsernameIf.(string)
+		operatorUsername, _ = operatorUsernameIf.(string) // FIXME: Validation // nolint
 	}
 
 	authOptions := stacks.AuthenticationOptions{
@@ -142,7 +142,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		FloatingIPPool:   "public",
 	}
 
-	customDNS, _ := computeCfg["DNS"].(string)
+	customDNS, _ := computeCfg["DNS"].(string) // nolint
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {
 			fragments := strings.Split(customDNS, ",")

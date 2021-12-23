@@ -130,8 +130,8 @@ func (sg securityGroup) Delete(names []string, force bool, timeout time.Duration
 		_, err := service.Delete(ctx, req)
 		if err != nil {
 			mutex.Lock()
+			defer mutex.Unlock()
 			errs = append(errs, err.Error())
-			mutex.Unlock()
 		}
 	}
 

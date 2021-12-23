@@ -158,8 +158,8 @@ $ safescaled &
 It should display in your terminal something like this:
 
 ```bash
-Safescaled version: 21.03.0, build f3973fb5a642b7d93b0f20417631e2706a86c211 (2021/03/25-14:49)
-Ready to serve :-)
+Safescaled version: 21.11.0, build 5c7cc25ed29888ba6f8c9ee6feb6c48b79dde763 (2021/12/17-21:35)
+Ready to serve on 'localhost:50051' :-)
 ```
 
 By default, `safescaled` displays only warnings and errors messages. To have more information, you can use `-v` to increase verbosity, and `-d` to use debug mode (`-d -v` will produce A LOT of messages, it's for debug purposes).

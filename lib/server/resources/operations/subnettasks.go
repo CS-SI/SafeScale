@@ -52,14 +52,20 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	hostReq := params.(taskCreateGatewayParameters).request
+	castedParams, ok := params.(taskCreateGatewayParameters)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast params to 'taskCreateGatewayParameters'")
+	}
+
+	hostReq := castedParams.request
 	if hostReq.TemplateID == "" {
 		return nil, fail.InvalidRequestError("params.request.TemplateID cannot be empty string")
 	}
 	if len(hostReq.Subnets) == 0 {
 		return nil, fail.InvalidRequestError("params.request.Networks cannot be an empty '[]*abstract.Network'")
 	}
-	hostSizing := params.(taskCreateGatewayParameters).sizing
+
+	hostSizing := castedParams.sizing
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
 	svc := instance.GetService()
@@ -172,11 +178,17 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, 
 		return nil, fail.AbortedError(nil, "aborted")
 	}
 
-	objgw := params.(taskFinalizeGatewayConfigurationParameters).host
+	castedParams, ok := params.(taskFinalizeGatewayConfigurationParameters)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast params to 'taskFinalizeGatewayConfigurationParameters'")
+	}
+
+	objgw := castedParams.host
 	if objgw == nil || objgw.IsNull() {
 		return nil, fail.InvalidParameterError("params.host", "cannot be null value of 'host'")
 	}
-	userData := params.(taskFinalizeGatewayConfigurationParameters).userdata
+
+	userData := castedParams.userdata
 	gwname := objgw.GetName()
 
 	// Executes userdata phase2 script to finalize host installation

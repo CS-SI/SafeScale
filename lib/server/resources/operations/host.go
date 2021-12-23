@@ -160,7 +160,10 @@ func LoadHost(svc iaas.Service, ref string, options ...data.ImmutableKeyValue) (
 		}
 	}
 
-	hostInstance := ce.Content().(resources.Host)
+	hostInstance, ok := ce.Content().(resources.Host)
+	if !ok {
+		return nil, fail.InconsistentError("cache content for key %s is not a resources.Host", ref)
+	}
 	if hostInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Host cache for key '%s'", ref)
 	}
@@ -247,7 +250,7 @@ func (instance *Host) updateCachedInformation() fail.Error {
 				}
 
 				// During upgrade, hnV2.DefaultSubnetID may be empty string, do not execute the following code in this case
-				// Do not execute neither if Host is single or is a gateway
+				// Do not execute iff Host is single or is a gateway
 				if !hnV2.Single && !hnV2.IsGateway && hnV2.DefaultSubnetID != "" {
 					subnetInstance, xerr := LoadSubnet(svc, "", hnV2.DefaultSubnetID)
 					xerr = debug.InjectPlannedFail(xerr)
@@ -267,7 +270,12 @@ func (instance *Host) updateCachedInformation() fail.Error {
 							return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
 						}
 
-						ip := rgw.(*Host).accessIP
+						castedGW, ok := rgw.(*Host)
+						if !ok {
+							return fail.InconsistentError("failed to cast rgw to '*Host'")
+						}
+
+						ip := castedGW.accessIP
 						primaryGatewayConfig = &system.SSHConfig{
 							PrivateKey: gwahc.PrivateKey,
 							Port:       int(gwahc.SSHPort),
@@ -373,9 +381,11 @@ func getOperatorUsernameFromCfg(svc iaas.Service) (string, fail.Error) {
 
 	var userName string
 	if anon, ok := cfg.Get("OperatorUsername"); ok {
-		userName = anon.(string)
-		if userName == "" {
-			logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
+		userName, ok = anon.(string)
+		if ok {
+			if userName == "" {
+				logrus.Warnf("OperatorUsername is empty, check your tenants.toml file. Using 'safescale' user instead.")
+			}
 		}
 	}
 	if userName == "" {
@@ -449,7 +459,7 @@ func (instance *Host) carry(clonable data.Clonable) (ferr fail.Error) {
 	return nil
 }
 
-// Browse walks through Host MetadataFolder and executes a callback for each entries
+// Browse walks through Host MetadataFolder and executes a callback for each entry
 func (instance *Host) Browse(ctx context.Context, callback func(*abstract.HostCore) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -1610,16 +1620,16 @@ func (instance *Host) thePhaseDoesSomething(ctx context.Context, phase userdata.
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return result
+		return true
 	}
 
 	fullCt := string(content)
 	if !strings.Contains(fullCt, "# ---- Main") {
-		return result
+		return true
 	}
 
 	if !strings.Contains(fullCt, "# ---- EndMain") {
-		return result
+		return true
 	}
 
 	// TODO: Remove blank lines to simplify this test
@@ -1639,14 +1649,11 @@ func (instance *Host) thePhaseDoesSomething(ctx context.Context, phase userdata.
 }
 
 func (instance *Host) thePhaseReboots(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
-	// assume yes
-	result := true
-
 	// render content
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return result
+		return true
 	}
 
 	fullCt := string(content)
@@ -1778,13 +1785,13 @@ func (instance *Host) waitInstallPhase(
 			stderr := ""
 
 			if astdout, ok := xerr.Annotation("stdout"); ok {
-				if _, ok = astdout.(string); ok {
-					stdout = astdout.(string)
+				if val, ok := astdout.(string); ok {
+					stdout = val
 				}
 			}
 			if astderr, ok := xerr.Annotation("stderr"); ok {
-				if _, ok = astderr.(string); ok {
-					stderr = astderr.(string)
+				if val, ok := astderr.(string); ok {
+					stderr = val
 				}
 			}
 
@@ -2215,10 +2222,8 @@ func createSingleHostNetworking(
 				default:
 					return nil, nil, xerr
 				}
-			} else {
-				if servers := strings.TrimSpace(opts.GetString("DNSServers")); servers != "" {
-					dnsServers = strings.Split(servers, ",")
-				}
+			} else if servers := strings.TrimSpace(opts.GetString("DNSServers")); servers != "" {
+				dnsServers = strings.Split(servers, ",")
 			}
 
 			subnetRequest.Name = singleHostRequest.ResourceName
@@ -2958,11 +2963,17 @@ func (instance *Host) GetShare(shareRef string) (_ *propertiesv1.HostShare, xerr
 					}
 
 					if item, ok := sharesV1.ByID[shareRef]; ok {
-						hostShare = item.Clone().(*propertiesv1.HostShare)
+						hostShare, ok = item.Clone().(*propertiesv1.HostShare)
+						if !ok {
+							return fail.InconsistentError("item should be a *propertiesv1.HostShare")
+						}
 						return nil
 					}
 					if item, ok := sharesV1.ByName[shareRef]; ok {
-						hostShare = sharesV1.ByID[item].Clone().(*propertiesv1.HostShare)
+						hostShare, ok = sharesV1.ByID[item].Clone().(*propertiesv1.HostShare)
+						if !ok {
+							return fail.InconsistentError("hostShare should be a *propertiesv1.HostShare")
+						}
 						return nil
 					}
 					return fail.NotFoundError(
@@ -3707,7 +3718,12 @@ func (instance *Host) BindSecurityGroup(
 			item.Disabled = bool(!enable)
 
 			// If enabled, apply it
-			innerXErr := sgInstance.(*SecurityGroup).unsafeBindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental)
+			sgInstanceImpl, ok := sgInstance.(*SecurityGroup)
+			if !ok {
+				return fail.InconsistentError("failed to cast sgInstance to '*SecurityGroup")
+			}
+
+			innerXErr := sgInstanceImpl.unsafeBindToHost(ctx, instance, enable, resources.MarkSecurityGroupAsSupplemental)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrDuplicate:

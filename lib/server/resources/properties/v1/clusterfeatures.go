@@ -61,7 +61,8 @@ func (cif *ClusterInstalledFeature) Replace(p data.Clonable) data.Clonable {
 		return cif
 	}
 
-	src := p.(*ClusterInstalledFeature)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*ClusterInstalledFeature) // nolint
 	cif.RequiredBy = make(map[string]struct{}, len(src.RequiredBy))
 	for k := range src.RequiredBy {
 		cif.RequiredBy[k] = struct{}{}
@@ -110,10 +111,12 @@ func (f *ClusterFeatures) Replace(p data.Clonable) data.Clonable {
 		return f
 	}
 
-	src := p.(*ClusterFeatures)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*ClusterFeatures) // nolint
 	f.Installed = make(map[string]*ClusterInstalledFeature, len(src.Installed))
 	for k, v := range src.Installed {
-		f.Installed[k] = v.Clone().(*ClusterInstalledFeature)
+		// FIXME: Replace should also return an error
+		f.Installed[k], _ = v.Clone().(*ClusterInstalledFeature) // nolint
 	}
 	f.Disabled = make(map[string]struct{}, len(src.Disabled))
 	for k, v := range src.Disabled {

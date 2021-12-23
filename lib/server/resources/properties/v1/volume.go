@@ -95,7 +95,8 @@ func (va *VolumeAttachments) Replace(p data.Clonable) data.Clonable {
 		return va
 	}
 
-	src := p.(*VolumeAttachments)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*VolumeAttachments) // nolint
 	*va = *src
 	va.Hosts = make(map[string]string, len(src.Hosts))
 	for k, v := range src.Hosts {

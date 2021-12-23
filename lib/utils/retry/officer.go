@@ -121,7 +121,7 @@ func Fibonacci(base time.Duration) *Officer {
 	jitter := getJitter(base)
 
 	o.Block = func(t Try) {
-		p := o.variables.(map[string]uint64)
+		p, _ := o.variables.(map[string]uint64) // nolint
 		var pre, cur uint64
 		pre = p["pre"]
 		cur, p["pre"] = p["cur"], p["cur"]

@@ -106,7 +106,8 @@ func (hs *HostSizing) Replace(p data.Clonable) data.Clonable {
 		return hs
 	}
 
-	src := p.(*HostSizing)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*HostSizing) // nolint
 	hs.RequestedSize = NewHostSizingRequirements()
 	*hs.RequestedSize = *src.RequestedSize
 	hs.AllocatedSize = NewHostEffectiveSizing()

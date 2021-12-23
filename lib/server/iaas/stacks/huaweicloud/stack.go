@@ -74,12 +74,13 @@ type stack struct {
 	selectedAvailabilityZone string
 }
 
-// NullStack is not exposed through API, is needed essentially by testss
+// NullStack is not exposed through API, is needed essentially by tests
 func NullStack() *stack { // nolint
 	return &stack{}
 }
 
 // New authenticates and return interface stack
+//goland:noinspection GoExportedFuncWithUnexportedType
 func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (stack, fail.Error) { // nolint
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
@@ -1110,10 +1111,12 @@ func (s stack) DeleteVolumeAttachment(serverID, vaID string) fail.Error {
 	)
 }
 
-// Migrate
 func (s stack) Migrate(operation string, params map[string]interface{}) fail.Error {
 	if operation == "networklayers" {
-		abstractSubnet := params["layer"].(*abstract.Subnet)
+		abstractSubnet, ok := params["layer"].(*abstract.Subnet)
+		if !ok {
+			return fail.InvalidParameterError("params[layer]", "should be *abstract.Subnet")
+		}
 		// huaweicloud added a layer called "IPv4 SubnetID", which is returned as SubnetID but is not; Network is the real "OpenStack" Subnet ID
 		// FIXME: maybe huaweicloud has to be reviewed/rewritten not to use a mix of pure OpenStack API and customized Huaweicloud API?
 		abstractSubnet.ID = abstractSubnet.Network

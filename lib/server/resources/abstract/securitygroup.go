@@ -25,6 +25,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 // SecurityGroupRule represents a rule of a SecurityGroup
@@ -253,7 +254,8 @@ func (sgr *SecurityGroupRule) Replace(p data.Clonable) data.Clonable {
 		return sgr
 	}
 
-	src := p.(*SecurityGroupRule)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*SecurityGroupRule) // nolint
 	*sgr = *src
 	sgr.IDs = make([]string, len(src.IDs))
 	copy(sgr.IDs, src.IDs)
@@ -293,10 +295,15 @@ func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (i
 
 // Clone does a deep-copy of the SecurityGroupRules
 func (sgrs SecurityGroupRules) Clone() SecurityGroupRules {
-	var asgr SecurityGroupRules = make(SecurityGroupRules, 0)
+	var asgr = make(SecurityGroupRules, 0)
 	var cloneRule *SecurityGroupRule
 	for _, v := range sgrs {
-		cloneRule = v.Clone().(*SecurityGroupRule)
+		var ok bool
+		cloneRule, ok = v.Clone().(*SecurityGroupRule)
+		if !ok {
+			logrus.Warnf("this is not a *SecurityGroupRule: %v", v.Clone())
+			continue
+		}
 		asgr = append(asgr, cloneRule)
 	}
 	return asgr
@@ -401,7 +408,7 @@ func (sg *SecurityGroup) SetNetworkID(networkID string) *SecurityGroup {
 
 // NewSecurityGroup ...
 func NewSecurityGroup() *SecurityGroup {
-	var asg SecurityGroup = SecurityGroup{
+	var asg = SecurityGroup{
 		ID:               "",
 		Name:             "",
 		Network:          "",
@@ -426,7 +433,9 @@ func (sg *SecurityGroup) Replace(p data.Clonable) data.Clonable {
 	if sg == nil || p == nil {
 		return sg
 	}
-	src := p.(*SecurityGroup)
+
+	// FIXME: Replace should also return an error
+	src, _ := p.(*SecurityGroup) // nolint
 	*sg = *src
 	sg.Rules = src.Rules.Clone()
 	return sg

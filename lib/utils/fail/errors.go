@@ -159,7 +159,7 @@ func defaultCauseFormatter(e Error) string {
 	if errCore.cause != nil {
 		switch cerr := errCore.cause.(type) {
 		case Error:
-			errCore.lock.RUnlock()
+			errCore.lock.RUnlock() // nolint
 			raw := cerr.UnformattedError()
 			errCore.lock.RLock()
 			if raw != "" {
@@ -190,7 +190,7 @@ func defaultCauseFormatter(e Error) string {
 			}
 		}
 	}
-	errCore.lock.RUnlock()
+	errCore.lock.RUnlock() // nolint
 	return msgFinal
 }
 

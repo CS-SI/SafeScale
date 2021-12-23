@@ -40,7 +40,7 @@ import (
 //go:generate minimock -o ../mocks/mock_location.go -i github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage.Location
 
 // FIXME: GCP Remove specific driver code
-// FIXME: Make this validable, what is optional ?, what is mandatory ?
+// FIXME: Make this easy to validate, what is optional ?, what is mandatory ?
 
 // Config represents a tenant configuration
 type Config struct {

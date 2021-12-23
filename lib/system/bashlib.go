@@ -40,7 +40,7 @@ const (
 	DockerImagePullTimeoutReservedKeyword = "reserved_DockerImagePullTimeout"
 )
 
-// bashLibrayContent contains the content of the script bash_library.sh, that will be injected inside scripts through parameter {{.reserved_BashLibrary}}
+// bashLibraryContent contains the content of the script bash_library.sh, that will be injected inside scripts through parameter {{.reserved_BashLibrary}}
 var bashLibraryContent atomic.Value
 
 type BashLibraryDefinition struct {

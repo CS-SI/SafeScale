@@ -88,7 +88,10 @@ func (m StructWithPointersAndCorrectReplace) Clone() data.Clonable {
 }
 
 func (m *StructWithPointersAndCorrectReplace) Replace(clonable data.Clonable) data.Clonable {
-	src := clonable.(*StructWithPointersAndCorrectReplace)
+	src, ok := clonable.(*StructWithPointersAndCorrectReplace)
+	if !ok {
+		panic("clonable cannot be casted to '*StructWithPointersAndCorrectReplace'")
+	}
 
 	// This part copies non-pointers values
 	*m = *src

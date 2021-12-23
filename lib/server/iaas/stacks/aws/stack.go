@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-package aws // Package aws contains the implementation of stack for Amazon
+// Package aws contains the implementation of stack for Amazon
+package aws
 
 import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
@@ -59,7 +60,7 @@ func (s stack) GetStackName() (string, fail.Error) {
 	return "aws", nil
 }
 
-// GetConfigurationOptions ...
+// GetRawConfigurationOptions ...
 func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.Error) {
 	if s.IsNull() {
 		return stacks.ConfigurationOptions{}, nil
@@ -67,7 +68,7 @@ func (s stack) GetRawConfigurationOptions() (stacks.ConfigurationOptions, fail.E
 	return *s.Config, nil
 }
 
-// GetAuthenticationOptions ...
+// GetRawAuthenticationOptions ...
 func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) {
 	if s.IsNull() {
 		return stacks.AuthenticationOptions{}, nil

@@ -140,12 +140,17 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 	}
 	switch t.TargetType() {
 	case featuretargettype.Cluster:
-		w.cluster = t.(*Cluster)
-	// case featuretargettype.Node:
-	// 	w.node = true
-	// 	fallthrough
+		var ok bool
+		w.cluster, ok = t.(*Cluster)
+		if !ok {
+			return nil, fail.NewError("t should be a *Cluster")
+		}
 	case featuretargettype.Host:
-		w.host = t.(*Host)
+		var ok bool
+		w.host, ok = t.(*Host)
+		if !ok {
+			return nil, fail.NewError("t should be a *Host")
+		}
 	}
 
 	if m != installmethod.None {
@@ -187,12 +192,12 @@ func (w *worker) CanProceed(ctx context.Context, s resources.FeatureSettings) fa
 
 // identifyAvailableMaster finds a master available, and keep track of it
 // for all the life of the action (prevent to request too often)
-func (w *worker) identifyAvailableMaster() (_ resources.Host, xerr fail.Error) {
+func (w *worker) identifyAvailableMaster(ctx context.Context) (_ resources.Host, xerr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableMaster == nil {
-		w.availableMaster, xerr = w.cluster.unsafeFindAvailableMaster(context.TODO())
+		w.availableMaster, xerr = w.cluster.unsafeFindAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -202,12 +207,12 @@ func (w *worker) identifyAvailableMaster() (_ resources.Host, xerr fail.Error) {
 }
 
 // identifyAvailableNode finds a node available and will use this one during all the install session
-func (w *worker) identifyAvailableNode() (_ resources.Host, xerr fail.Error) {
+func (w *worker) identifyAvailableNode(ctx context.Context) (_ resources.Host, xerr fail.Error) {
 	if w.cluster == nil {
 		return nil, abstract.ResourceNotAvailableError("cluster", "")
 	}
 	if w.availableNode == nil {
-		w.availableNode, xerr = w.cluster.unsafeFindAvailableNode(context.TODO())
+		w.availableNode, xerr = w.cluster.unsafeFindAvailableNode(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -616,11 +621,12 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		}
 
 		// Marks hosts instances as released after use
-		defer func() {
-			for _, v := range hostsList {
+		//goland:noinspection GoDeferInLoop
+		defer func(hlist []resources.Host) {
+			for _, v := range hlist {
 				v.Released()
 			}
-		}()
+		}(hostsList)
 
 		var problem error
 		subtask, xerr := concurrency.NewTaskWithParent(task)
@@ -699,7 +705,10 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		anon interface{}
 		ok   bool
 	)
-	p := params.(taskLaunchStepParameters)
+	p, ok := params.(taskLaunchStepParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "should be taskLaunchStepParameters")
+	}
 
 	if p.stepName == "" {
 		return nil, fail.InvalidParameterError("param.stepName", "cannot be empty string")
@@ -1099,7 +1108,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 			}
 		}(hosts)
 
-		for _, h := range hosts { // FXIME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
+		for _, h := range hosts { // FIXME: make no mistake, this does NOT run in parallel, it's a HUGE bottleneck
 			primaryGatewayVariables["HostIP"], xerr = h.GetPrivateIP()
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -1239,7 +1248,10 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
-	p := params.(taskApplyProxyRuleParameters)
+	p, ok := params.(taskApplyProxyRuleParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "is not a taskApplyProxyRuleParameters")
+	}
 	hostName, ok := (*p.variables)["Hostname"].(string)
 	if !ok {
 		return nil, fail.InvalidParameterError("variables['Hostname']", "is not a string")
@@ -1253,7 +1265,7 @@ func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters
 		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	ruleName, xerr := p.controller.Apply(p.rule, p.variables)
+	ruleName, xerr := p.controller.Apply(task.Context(), p.rule, p.variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		msg := "failed to apply proxy rule"
@@ -1290,7 +1302,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 
 	switch masterT {
 	case "1":
-		hostInstance, xerr := w.identifyAvailableMaster()
+		hostInstance, xerr := w.identifyAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -1311,7 +1323,7 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 
 	switch nodeT {
 	case "1":
-		hostInstance, xerr := w.identifyAvailableNode()
+		hostInstance, xerr := w.identifyAvailableNode(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -1404,7 +1416,12 @@ func normalizeScript(params *data.Map, reserved data.Map) (string, fail.Error) {
 	}
 
 	dataBuffer := bytes.NewBufferString("")
-	err = anon.(*txttmpl.Template).Execute(dataBuffer, *params)
+	tmpl, ok := anon.(*txttmpl.Template)
+	if !ok {
+		return "", fail.InconsistentError("failed to cast anon to '*txttmpl.Template'")
+	}
+
+	err = tmpl.Execute(dataBuffer, *params)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", fail.ConvertError(err)
@@ -1471,7 +1488,10 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			return fail.AbortedError(lerr, "parent task killed")
 		}
 
-		r := rule.(map[interface{}]interface{})
+		r, ok := rule.(map[interface{}]interface{})
+		if !ok {
+			return fail.InvalidParameterError("rule", "should be a map[interface{}][interface{}]")
+		}
 		targets := w.interpretRuleTargets(r)
 
 		// If security rules concerns gateways, update subnet Security Group for gateways
@@ -1494,7 +1514,7 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 			sgRule := abstract.NewSecurityGroupRule()
 			sgRule.Direction = securitygroupruledirection.Ingress // Implicit for gateways
 			sgRule.EtherType = ipversion.IPv4
-			sgRule.Protocol, _ = r["protocol"].(string)
+			sgRule.Protocol, _ = r["protocol"].(string) // nolint
 			sgRule.Sources = []string{"0.0.0.0/0"}
 			sgRule.Targets = []string{gwSG.GetID()}
 

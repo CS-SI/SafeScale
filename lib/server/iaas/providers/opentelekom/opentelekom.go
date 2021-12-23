@@ -66,34 +66,36 @@ func (p *provider) IsNull() bool {
 
 // Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-	identity, _ := params["identity"].(map[string]interface{})
-	compute, _ := params["compute"].(map[string]interface{})
-	network, _ := params["network"].(map[string]interface{})
+	identity, _ := params["identity"].(map[string]interface{}) // nolint
+	compute, _ := params["compute"].(map[string]interface{})   // nolint
+	network, _ := params["network"].(map[string]interface{})   // nolint
 
-	username, _ := identity["Username"].(string)
-	password, _ := identity["Password"].(string)
-	domainName, _ := identity["DomainName"].(string)
-	projectID, _ := compute["ProjectID"].(string)
-	region, _ := compute["Region"].(string)
-	zone, _ := compute["AvailabilityZone"].(string)
-	vpcName, _ := network["DefaultNetworkName"].(string)
-	vpcCIDR, _ := network["DefaultNetworkCIDR"].(string)
+	username, _ := identity["Username"].(string)         // nolint
+	password, _ := identity["Password"].(string)         // nolint
+	domainName, _ := identity["DomainName"].(string)     // nolint
+	projectID, _ := compute["ProjectID"].(string)        // nolint
+	region, _ := compute["Region"].(string)              // nolint
+	zone, _ := compute["AvailabilityZone"].(string)      // nolint
+	vpcName, _ := network["DefaultNetworkName"].(string) // nolint
+	vpcCIDR, _ := network["DefaultNetworkCIDR"].(string) // nolint
 
-	identityEndpoint, _ := identity["IdentityEndpoint"].(string)
+	identityEndpoint, _ := identity["IdentityEndpoint"].(string) // nolint
 	if identityEndpoint == "" {
 		identityEndpoint = fmt.Sprintf(identityEndpointTemplate, region)
 	}
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
-		operatorUsername = operatorUsernameIf.(string)
-		if operatorUsername == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstract.DefaultUser
+		operatorUsername, ok = operatorUsernameIf.(string)
+		if ok {
+			if operatorUsername == "" {
+				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+				operatorUsername = abstract.DefaultUser
+			}
 		}
 	}
 
-	defaultImage, _ := compute["DefaultImage"].(string)
+	defaultImage, _ := compute["DefaultImage"].(string) // nolint
 	if defaultImage == "" {
 		defaultImage = opentelekomDefaultImage
 	}
@@ -130,7 +132,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
-	customDNS, _ := compute["DNS"].(string)
+	customDNS, _ := compute["DNS"].(string) //. nolint
 	if customDNS != "" {
 		if strings.Contains(customDNS, ",") {
 			fragments := strings.Split(customDNS, ",")

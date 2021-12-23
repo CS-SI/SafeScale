@@ -245,8 +245,9 @@ func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 
 	out := make(map[uint8]installmethod.Enum)
 	instance.installMethods.Range(func(k, v interface{}) bool {
-		out[k.(uint8)] = v.(installmethod.Enum)
-		return true
+		var ok bool
+		out[k.(uint8)], ok = v.(installmethod.Enum)
+		return ok
 	})
 	return out
 }

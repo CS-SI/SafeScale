@@ -37,7 +37,7 @@ func NewClient(target resources.Host) (*Client, fail.Error) {
 	return &Client{host: target}, nil
 }
 
-// Mount proceed to the mount of a Bucket on Host
+// Mount proceeds to the mount of a Bucket on Host
 func (c *Client) Mount(ctx context.Context, description Description) fail.Error {
 	if c == nil {
 		return fail.InvalidInstanceError()

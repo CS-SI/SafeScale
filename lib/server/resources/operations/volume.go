@@ -1179,10 +1179,8 @@ func (instance *volume) Detach(ctx context.Context, host resources.Host) (xerr f
 			if innerXErr != nil {
 				return innerXErr
 			}
-		}
 
-		// -- Unmount the Block Device ...
-		if !notMounted {
+			// -- Unmount the Block Device ...
 			sshConfig, innerXErr := host.GetSSHConfig()
 			if innerXErr != nil {
 				return innerXErr
