@@ -1,5 +1,9 @@
 # Put safescale as a service
 
+> **Warning**: By default, service is run as "root". Have to specify config file "tenant.toml" placement has restrictions :
+> If service is run as **root**, must be at "/etc/safescale/tenant.toml"
+> If service is run as an **user**, can be at "/etc/safescale/tenant.toml", or "/home/[**user**]/.safescale/tenant.toml"
+
 `safescaled` can be turned easily as a linux service using `systemd` in a few single steps:
 
  - copy SafeScale binaries (ie `safescale` and `safescaled`) into `/usr/local/bin`
@@ -14,6 +18,7 @@ After=multi-user.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/safescaled
+# User=root
 
 [Install]
 WantedBy=multi-user.target
