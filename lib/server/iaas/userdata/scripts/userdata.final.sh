@@ -132,9 +132,9 @@ function install_python3() {
 }
 
 # ---- Main
-
 install_drivers_nvidia
 install_python3
+# ---- EndMain
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.final.done
 # For compatibility with previous user_data implementation (until v19.03.x)...

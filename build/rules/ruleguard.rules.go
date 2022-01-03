@@ -293,16 +293,6 @@ func urlredacted(m dsl.Matcher) {
 		Report("consider $x.Redacted() when outputting URLs")
 }
 
-func removeDebugCode(m dsl.Matcher) {
-	m.Match(
-		"logrus.Warningf($*_, $*_)",
-		"logrus.Warning($*_, $x)",
-		"logrus.Warningf($*_)",
-		"logrus.Warning($*_)",
-	).
-		Report("REMOVE debug code before a release")
-}
-
 func sprinterr(m dsl.Matcher) {
 	m.Match(`fmt.Sprint($err)`,
 		`fmt.Sprintf("%s", $err)`,

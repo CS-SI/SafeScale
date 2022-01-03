@@ -161,7 +161,7 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 			}
 
 			coinFlip = rand.Float32() < probError
-			var iErr error = nil
+			var iErr error
 			if coinFlip {
 				iErr = fmt.Errorf("it was head")
 			}

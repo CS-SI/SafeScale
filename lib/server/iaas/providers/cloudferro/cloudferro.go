@@ -19,6 +19,7 @@ package cloudferro
 import (
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
@@ -62,21 +63,21 @@ func (p *provider) IsNull() bool {
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
 	// tenantName, _ := params["name"].(string)
 
-	identity, _ := params["identity"].(map[string]interface{})
-	compute, _ := params["compute"].(map[string]interface{})
-	network, _ := params["network"].(map[string]interface{})
+	identity, _ := params["identity"].(map[string]interface{}) // nolint
+	compute, _ := params["compute"].(map[string]interface{})   // nolint
+	network, _ := params["network"].(map[string]interface{})   // nolint
 
-	username, _ := identity["Username"].(string)
-	password, _ := identity["Password"].(string)
-	domainName, _ := identity["DomainName"].(string)
+	username, _ := identity["Username"].(string)     // nolint
+	password, _ := identity["Password"].(string)     // nolint
+	domainName, _ := identity["DomainName"].(string) // nolint
 
-	// region, _ := compute["Region"].(string)
+	// region, _ := compute["Region"].(string) // nolint
 	region := "RegionOne"
-	// zone, _ := compute["AvailabilityZone"].(string)
+	// zone, _ := compute["AvailabilityZone"].(string) // nolint
 	zone := "nova"
-	projectName, _ := compute["ProjectName"].(string)
-	// projectID, _ := compute["ProjectID"].(string)
-	defaultImage, _ := compute["DefaultImage"].(string)
+	projectName, _ := compute["ProjectName"].(string) // nolint
+	// projectID, _ := compute["ProjectID"].(string) // nolint
+	defaultImage, _ := compute["DefaultImage"].(string) // nolint
 	if defaultImage == "" {
 		defaultImage = cloudferroDefaultImage
 	}
@@ -88,18 +89,20 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
-		operatorUsername = operatorUsernameIf.(string)
-		if operatorUsername == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstract.DefaultUser
+		operatorUsername, ok = operatorUsernameIf.(string)
+		if ok {
+			if operatorUsername == "" {
+				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+				operatorUsername = abstract.DefaultUser
+			}
 		}
 	}
 
-	providerNetwork, _ := network["ProviderNetwork"].(string)
+	providerNetwork, _ := network["ProviderNetwork"].(string) // nolint
 	if providerNetwork == "" {
 		providerNetwork = "external"
 	}
-	floatingIPPool, _ := network["FloatingIPPool"].(string)
+	floatingIPPool, _ := network["FloatingIPPool"].(string) // nolint
 	if floatingIPPool == "" {
 		floatingIPPool = providerNetwork
 	}
@@ -112,7 +115,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		TenantName:       projectName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   floatingIPPool, // FIXME: move in ConfigurationOptions
+		FloatingIPPool:   floatingIPPool,
 		AllowReauth:      true,
 	}
 
@@ -129,6 +132,24 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	metadataBucketName, xerr := objectstorage.BuildMetadataBucketName(providerName, region, domainName, projectName)
 	if xerr != nil {
 		return nil, xerr
+	}
+
+	customDNS, _ := compute["DNS"].(string) // nolint
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					cloudferroDNSServers = append(cloudferroDNSServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				cloudferroDNSServers = append(cloudferroDNSServers, fragment)
+			}
+		}
 	}
 
 	cfgOptions := stacks.ConfigurationOptions{

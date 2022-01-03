@@ -172,9 +172,10 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 		return empty, fail.InvalidRequestError("neither name nor id given as reference for host")
 	}
 	mountPath := in.GetMountPath()
-	// FIXME: change Format to Filesystem in protobuf
+
 	filesystem := in.GetFormat()
 	doNotFormat := in.DoNotFormat
+	doNotMount := in.DoNotMount
 
 	var doNotFormatStr string
 	if doNotFormat {
@@ -195,7 +196,7 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	handler := VolumeHandler(job)
-	if xerr = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat); xerr != nil {
+	if xerr = handler.Attach(volumeRef, hostRef, mountPath, filesystem, doNotFormat, doNotMount); xerr != nil {
 		return empty, xerr
 	}
 

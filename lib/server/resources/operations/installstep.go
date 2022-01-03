@@ -370,7 +370,11 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 			sid, _ := s.ID()
 			outcome := tgr[sid]
 			if outcome != nil {
-				oko := outcome.(stepResult)
+				var ok bool
+				oko, ok := outcome.(stepResult)
+				if !ok {
+					return nil, fail.NewError("outcome should be a stepResult")
+				}
 				logrus.Warningf("step outcome: output '%s' and err '%v'", oko.output, oko.err)
 				if oko.err != nil {
 					wrongs++
@@ -391,7 +395,10 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 		sid, _ := s.ID()
 		outcome := tgr[sid]
 		if outcome != nil {
-			oko := outcome.(resources.UnitResult)
+			oko, ok := outcome.(resources.UnitResult)
+			if !ok {
+				return nil, fail.NewError("outcome should be a resources.UnitResult")
+			}
 			outcomes.AddOne(k, oko)
 		}
 	}
@@ -539,9 +546,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			}
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
-				_ = xerr.Annotate("retcode", retcode)
-				_ = xerr.Annotate("stdout", outrun)
-				_ = xerr.Annotate("stderr", outerr)
+				xerr.Annotate("retcode", retcode)
+				xerr.Annotate("stdout", outrun)
+				xerr.Annotate("stderr", outerr)
 				return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
 			}
 			break
@@ -551,9 +558,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			if xerr == nil {
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					_ = xerr.Annotate("retcode", retcode)
-					_ = xerr.Annotate("stdout", outrun)
-					_ = xerr.Annotate("stderr", outerr)
+					xerr.Annotate("retcode", retcode)
+					xerr.Annotate("stdout", outrun)
+					xerr.Annotate("stderr", outerr)
 					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
 				}
 				break
@@ -562,9 +569,9 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 			if !strings.Contains(xerr.Error(), "bad interpreter") {
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
-					_ = xerr.Annotate("retcode", retcode)
-					_ = xerr.Annotate("stdout", outrun)
-					_ = xerr.Annotate("stderr", outerr)
+					xerr.Annotate("retcode", retcode)
+					xerr.Annotate("stdout", outrun)
+					xerr.Annotate("stderr", outerr)
 					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
 				}
 				break

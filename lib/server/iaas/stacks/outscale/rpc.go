@@ -192,7 +192,7 @@ func localizeInstance(instances []osc.Vm) (osc.Vm, fail.Error) {
 	var instance osc.Vm
 	found := false
 	if len(instances) > 0 {
-		for _, v := range instances {
+		for _, v := range instances { // nolint
 			if v.State != "terminated" {
 				if found {
 					return osc.Vm{}, fail.InconsistentError("found more than one Host")

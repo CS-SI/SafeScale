@@ -31,7 +31,7 @@ import (
 
 // var sshCfgCache = cache.NewMapCache()
 
-// securityGroup is the safescale client part handling security groups
+// securityGroup is the SafeScale client part handling security groups
 type securityGroup struct {
 	// session is not used currently
 	session *Session
@@ -48,7 +48,11 @@ func (sg securityGroup) List(all bool, timeout time.Duration) (*protocol.Securit
 	}
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	return service.List(ctx, &protocol.SecurityGroupListRequest{All: all})
+	rv, err := service.List(ctx, &protocol.SecurityGroupListRequest{All: all})
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
 }
 
 // Inspect ...
@@ -62,7 +66,11 @@ func (sg securityGroup) Inspect(ref string, timeout time.Duration) (*protocol.Se
 	}
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	return service.Inspect(ctx, &protocol.Reference{Name: ref})
+	rv, err := service.Inspect(ctx, &protocol.Reference{Name: ref})
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
 }
 
 // Create creates a new security group
@@ -89,7 +97,11 @@ func (sg securityGroup) Create(networkRef string, req abstract.SecurityGroup, ti
 		return nullSg, err
 	}
 
-	return converters.SecurityGroupFromProtocolToAbstract(resp)
+	rv, err := converters.SecurityGroupFromProtocolToAbstract(resp)
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
 }
 
 // Delete deletes several hosts at the same time in goroutines
@@ -118,8 +130,8 @@ func (sg securityGroup) Delete(names []string, force bool, timeout time.Duration
 		_, err := service.Delete(ctx, req)
 		if err != nil {
 			mutex.Lock()
+			defer mutex.Unlock()
 			errs = append(errs, err.Error())
-			mutex.Unlock()
 		}
 	}
 
@@ -147,7 +159,10 @@ func (sg securityGroup) Clear(ref string, timeout time.Duration) error {
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	_, err := service.Clear(ctx, &protocol.Reference{Name: ref})
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Reset ...
@@ -162,11 +177,14 @@ func (sg securityGroup) Reset(ref string, timeout time.Duration) error {
 
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	_, err := service.Reset(ctx, &protocol.Reference{Name: ref})
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // AddRule ...
-func (sg securityGroup) AddRule(group string, rule abstract.SecurityGroupRule, duration time.Duration) error {
+func (sg securityGroup) AddRule(group string, rule *abstract.SecurityGroupRule, duration time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -181,11 +199,14 @@ func (sg securityGroup) AddRule(group string, rule abstract.SecurityGroupRule, d
 		Rule:  converters.SecurityGroupRuleFromAbstractToProtocol(rule),
 	}
 	_, err := service.AddRule(ctx, req)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // DeleteRule ...
-func (sg securityGroup) DeleteRule(group string, rule abstract.SecurityGroupRule, duration time.Duration) error {
+func (sg securityGroup) DeleteRule(group string, rule *abstract.SecurityGroupRule, duration time.Duration) error {
 	sg.session.Connect()
 	defer sg.session.Disconnect()
 
@@ -200,7 +221,10 @@ func (sg securityGroup) DeleteRule(group string, rule abstract.SecurityGroupRule
 	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
 	_, err := service.DeleteRule(ctx, def)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Bonds ...
@@ -218,5 +242,9 @@ func (sg securityGroup) Bonds(group, kind string, duration time.Duration) (*prot
 		Kind:   strings.ToLower(kind),
 	}
 	service := protocol.NewSecurityGroupServiceClient(sg.session.connection)
-	return service.Bonds(ctx, req)
+	rv, err := service.Bonds(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	return rv, nil
 }

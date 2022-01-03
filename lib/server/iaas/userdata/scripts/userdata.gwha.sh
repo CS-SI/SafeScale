@@ -157,13 +157,13 @@ EOF
 }
 
 # ---- Main
-
 {{- if .IsGateway }}
 {{- if .SecondaryGatewayPrivateIP }}
 install_keepalived
 [ $? -ne 0 ] && fail $?
 {{ end }}
 {{ end }}
+# ---- EndMain
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.gwha.done
 

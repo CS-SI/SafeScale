@@ -61,7 +61,12 @@ func (instance *SecurityGroup) unsafeDelete(ctx context.Context, force bool) fai
 
 	value := ctx.Value(CurrentNetworkAbstractContextKey)
 	if value != nil {
-		networkID = value.(*abstract.Network).ID
+		castedValue, ok := value.(*abstract.Network)
+		if !ok {
+			return fail.InconsistentError("failed to cast value to '*abstract.Network'")
+		}
+
+		networkID = castedValue.ID
 	}
 
 	xerr = instance.Alter(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {

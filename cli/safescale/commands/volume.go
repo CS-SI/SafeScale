@@ -207,6 +207,10 @@ var volumeAttach = &cli.Command{
 			Name:  "do-not-format",
 			Usage: "Prevent the volume to be formatted (the previous format of the disk will be kept, beware that a new volume has no format before his first attachment and so would not be mounted with this option)",
 		},
+		&cli.BoolFlag{
+			Name:  "do-not-mount",
+			Usage: "Prevent the volume to be mounted",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
@@ -223,6 +227,7 @@ var volumeAttach = &cli.Command{
 		def := protocol.VolumeAttachmentRequest{
 			Format:      c.String("format"),
 			DoNotFormat: c.Bool("do-not-format"),
+			DoNotMount:  c.Bool("do-not-mount"),
 			MountPath:   c.String("path"),
 			Host:        &protocol.Reference{Name: c.Args().Get(1)},
 			Volume:      &protocol.Reference{Name: c.Args().Get(0)},
@@ -262,15 +267,21 @@ var volumeDetach = &cli.Command{
 	},
 }
 
-type volumeInfoDisplayable struct {
-	ID        string
-	Name      string
-	Speed     string
-	Size      int32
+type attachmentInfoDisplayable struct {
 	Host      string
 	MountPath string
 	Format    string
 	Device    string
+}
+
+type volumeInfoDisplayable struct {
+	ID          string
+	Name        string
+	Speed       string
+	Size        int32
+	Attachments []attachmentInfoDisplayable
+	Mounted     bool
+	Attached    bool
 }
 
 type volumeDisplayable struct {
@@ -287,15 +298,27 @@ func toDisplayableVolumeInfo(volumeInfo *protocol.VolumeInspectResponse) *volume
 		Speed: protocol.VolumeSpeed_name[int32(volumeInfo.GetSpeed())],
 		Size:  volumeInfo.GetSize(),
 	}
+
+	var mounted bool
+	var links []attachmentInfoDisplayable
 	attachments := volumeInfo.GetAttachments()
-	if len(attachments) > 0 {
-		out.MountPath = attachments[0].MountPath
-		out.Format = attachments[0].Format
-		out.Device = attachments[0].Device
-		ref, _ := srvutils.GetReference(attachments[0].GetHost())
-		out.Host = ref
+	for _, attach := range attachments {
+		ref, _ := srvutils.GetReference(attach.GetHost())
+		item := attachmentInfoDisplayable{
+			Host:      ref,
+			MountPath: attach.MountPath,
+			Format:    attach.Format,
+			Device:    attach.Device,
+		}
+		if attach.MountPath != "" {
+			mounted = true
+		}
+		links = append(links, item)
 	}
 
+	out.Attached = len(attachments) > 0
+	out.Attachments = links
+	out.Mounted = mounted
 	return out
 }
 

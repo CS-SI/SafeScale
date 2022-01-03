@@ -51,7 +51,7 @@ func (sgb *SecurityGroupBond) Replace(p data.Clonable) data.Clonable {
 		return sgb
 	}
 
-	src := p.(*SecurityGroupBond)
+	src, _ := p.(*SecurityGroupBond) // FIXME: Replace should also return an error
 	*sgb = *src
 	return sgb
 }

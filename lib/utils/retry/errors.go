@@ -41,7 +41,8 @@ func TimeoutError(err error, limit time.Duration, actual time.Duration, options 
 		for _, v := range options {
 			switch v.Key() { // nolint
 			case "callstack":
-				decorate, _ = v.Value().(bool) // no panics if value is not a bool
+				// no panics if value is not a bool
+				decorate, _ = v.Value().(bool) // nolint
 			}
 		}
 	}
@@ -74,7 +75,7 @@ func StopRetryError(err error, msg ...interface{}) fail.Error {
 	}
 	switch ce := err.(type) {
 	case *fail.ErrAborted: // do not embed abort inside an abort
-		_ = ce.Annotate("message", newMessage)
+		ce.Annotate("message", newMessage)
 		return ce
 	default:
 		return fail.AbortedError(err, newMessage)

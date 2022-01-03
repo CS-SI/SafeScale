@@ -43,6 +43,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+//goland:noinspection GoSnakeCaseUsage
 type toV21_05_0 struct {
 	dryRun bool
 }
@@ -275,7 +276,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			// owningInstance may be identical to currentInstance, so we need to pass the properties of currentInstance through context,
 			// to prevent deadlock trying to alter an instance already inside an Alter
 			ctx = context.WithValue(ctx, operations.CurrentNetworkPropertiesContextKey, currentNetworkProps) // nolint
-			gwSG, internalSG, publicSG, innerXErr := subnetInstance.UnsafeCreateSecurityGroups(ctx, owningInstance, false)
+			gwSG, internalSG, publicSG, innerXErr := subnetInstance.CreateSecurityGroups(ctx, owningInstance, false)
 			innerXErr = debug.InjectPlannedFail(innerXErr)
 			if innerXErr != nil {
 				return innerXErr
@@ -466,6 +467,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 			if innerXErr != nil {
 				return innerXErr
 			}
+			//goland:noinspection GoDeferInLoop
 			defer func(item resources.Host) {
 				item.Released()
 			}(hostInstance)
@@ -941,6 +943,7 @@ func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Ser
 		if xerr != nil {
 			return xerr
 		}
+		//goland:noinspection GoDeferInLoop
 		defer func(item resources.Host) { // nolint
 			item.Released()
 		}(host)

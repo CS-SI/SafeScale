@@ -330,13 +330,13 @@ func ClusterListFromAbstractToProtocol(in []abstract.ClusterIdentity) *protocol.
 func SecurityGroupRulesFromAbstractToProtocol(in abstract.SecurityGroupRules) []*protocol.SecurityGroupRule {
 	out := make([]*protocol.SecurityGroupRule, 0, len(in))
 	for _, v := range in {
-		out = append(out, SecurityGroupRuleFromAbstractToProtocol(*v))
+		out = append(out, SecurityGroupRuleFromAbstractToProtocol(v))
 	}
 	return out
 }
 
 // SecurityGroupRuleFromAbstractToProtocol converts an abstract.SecurityGroupRule to a *protocol.SecurityGroupRule
-func SecurityGroupRuleFromAbstractToProtocol(in abstract.SecurityGroupRule) *protocol.SecurityGroupRule {
+func SecurityGroupRuleFromAbstractToProtocol(in *abstract.SecurityGroupRule) *protocol.SecurityGroupRule {
 	out := &protocol.SecurityGroupRule{
 		Ids:         in.IDs,
 		Description: in.Description,
@@ -355,7 +355,7 @@ func SecurityGroupRuleFromAbstractToProtocol(in abstract.SecurityGroupRule) *pro
 	return out
 }
 
-// SecurityGroupFromAbstractToProtocol converts a abstract.SecurityGroup to a *protocol.SecurityGroup
+// SecurityGroupFromAbstractToProtocol converts an abstract.SecurityGroup to a *protocol.SecurityGroup
 func SecurityGroupFromAbstractToProtocol(in abstract.SecurityGroup) *protocol.SecurityGroupResponse {
 	return &protocol.SecurityGroupResponse{
 		Id:          in.ID,

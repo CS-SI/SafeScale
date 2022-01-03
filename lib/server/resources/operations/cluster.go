@@ -22,7 +22,6 @@ import (
 	"encoding/json"
 	"fmt"
 	mrand "math/rand"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -30,7 +29,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
@@ -200,7 +198,7 @@ func onClusterCacheMiss(svc iaas.Service, name string) (cache.Cacheable, fail.Er
 // updateCachedInformation updates information cached in the instance
 func (instance *Cluster) updateCachedInformation() {
 	var index uint8
-	flavor, err := instance.UnsafeGetFlavor()
+	flavor, err := instance.unsafeGetFlavor()
 	if err == nil && flavor == clusterflavor.K8S {
 		index++
 		instance.installMethods.Store(index, installmethod.Helm)
@@ -326,14 +324,10 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	if xerr != nil {
 		return xerr
 	}
-
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return fail.Wrap(xerr, "Create does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
+	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	if xerr != nil {
+		return xerr
+	}
 
 	return nil
 }
@@ -461,7 +455,7 @@ func (instance *Cluster) GetFlavor() (flavor clusterflavor.Enum, xerr fail.Error
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	return instance.UnsafeGetFlavor()
+	return instance.unsafeGetFlavor()
 }
 
 // GetComplexity returns the complexity of the Cluster
@@ -1269,13 +1263,10 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		hosts = append(hosts, hostInstance)
 	}
 
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "AddNodes does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
+	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	return hosts, nil
 }
@@ -1320,101 +1311,6 @@ func complementHostDefinition(req abstract.HostSizingRequirements, def propertie
 	}
 
 	return req
-}
-
-// DeleteLastNode deletes the last added node and returns its name
-func (instance *Cluster) DeleteLastNode(ctx context.Context) (node *propertiesv3.ClusterNode, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
-
-	if instance == nil || instance.IsNull() {
-		return nil, fail.InvalidInstanceError()
-	}
-	if ctx == nil {
-		return nil, fail.InvalidParameterCannotBeNilError("ctx")
-	}
-
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return nil, xerr
-			}
-		default:
-			return nil, xerr
-		}
-	}
-
-	if task.Aborted() {
-		return nil, fail.AbortedError(nil, "aborted")
-	}
-
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
-	defer tracer.Exiting()
-
-	// make sure no other parallel actions interferes
-	instance.lock.Lock()
-	defer instance.lock.Unlock()
-
-	xerr = instance.beingRemoved()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// Removed reference of the node from Cluster
-	xerr = instance.Alter(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					numericalID := nodesV3.PrivateNodes[len(nodesV3.PrivateNodes)-1]
-					if node, ok = nodesV3.ByNumericalID[numericalID]; !ok {
-						return fail.InconsistentError("the last recorded node in metadata points to missing Host")
-					}
-
-					return nil
-				},
-			)
-		},
-	)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-	if node == nil {
-		return nil, fail.NotFoundError("failed to find last node")
-	}
-
-	selectedMaster, xerr := instance.UnsafeFindAvailableMaster(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	xerr = instance.deleteNode(ctx, node, selectedMaster.(*Host), HostFullOption)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "DeleteLastNode does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
-
-	return node, nil
 }
 
 // DeleteSpecificNode deletes a node identified by its ID
@@ -1466,7 +1362,7 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	if selectedMasterID != "" {
 		selectedMaster, xerr = LoadHost(instance.GetService(), selectedMasterID)
 	} else {
-		selectedMaster, xerr = instance.UnsafeFindAvailableMaster(ctx)
+		selectedMaster, xerr = instance.unsafeFindAvailableMaster(ctx)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -1474,32 +1370,28 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	}
 
 	var node *propertiesv3.ClusterNode
-	xerr = instance.Review(
-		func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+			if !ok {
+				return fail.InconsistentError(
+					"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+				)
+			}
 
-					numericalID, ok := nodesV3.PrivateNodeByID[hostID]
-					if !ok {
-						return fail.NotFoundError("failed to find a node identified by %s", hostID)
-					}
+			numericalID, ok := nodesV3.PrivateNodeByID[hostID]
+			if !ok {
+				return fail.NotFoundError("failed to find a node identified by %s", hostID)
+			}
 
-					node, ok = nodesV3.ByNumericalID[numericalID]
-					if !ok {
-						return fail.NotFoundError("failed to find a node identified by %s", hostID)
-					}
+			node, ok = nodesV3.ByNumericalID[numericalID]
+			if !ok {
+				return fail.NotFoundError("failed to find a node identified by %s", hostID)
+			}
 
-					return nil
-				},
-			)
-		},
-	)
+			return nil
+		})
+	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1509,14 +1401,6 @@ func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, 
 	if xerr != nil {
 		return xerr
 	}
-
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return fail.Wrap(xerr, "DeleteSpecificNode does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
 
 	return nil
 }
@@ -1559,7 +1443,7 @@ func (instance *Cluster) ListMasters(ctx context.Context) (list resources.Indexe
 		return emptyList, xerr
 	}
 
-	return instance.UnsafeListMasters()
+	return instance.unsafeListMasters()
 }
 
 // ListMasterNames lists the names of the master nodes in the Cluster
@@ -1655,62 +1539,6 @@ func (instance *Cluster) ListMasterIDs(ctx context.Context) (list data.IndexedLi
 	return instance.unsafeListMasterIDs(ctx)
 }
 
-func (instance *Cluster) unsafeListMasterIDs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
-	emptyList := data.IndexedListOfStrings{}
-	task, xerr := concurrency.TaskFromContext(ctx)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		switch xerr.(type) {
-		case *fail.ErrNotAvailable:
-			task, xerr = concurrency.VoidTask()
-			if xerr != nil {
-				return emptyList, xerr
-			}
-		default:
-			return emptyList, xerr
-		}
-	}
-
-	xerr = instance.beingRemoved()
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return emptyList, xerr
-	}
-
-	xerr = instance.Review(
-		func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-			return props.Inspect(
-				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
-
-					list = make(data.IndexedListOfStrings, len(nodesV3.Masters))
-					for _, v := range nodesV3.Masters {
-						if task.Aborted() {
-							return fail.AbortedError(nil, "aborted")
-						}
-
-						if node, found := nodesV3.ByNumericalID[v]; found {
-							list[node.NumericalID] = node.ID
-						}
-					}
-					return nil
-				},
-			)
-		},
-	)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return emptyList, xerr
-	}
-
-	return list, nil
-}
-
 // ListMasterIPs lists the IPs of masters (if there is such masters in the flavor...)
 func (instance *Cluster) ListMasterIPs(ctx context.Context) (list data.IndexedListOfStrings, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
@@ -1745,7 +1573,7 @@ func (instance *Cluster) ListMasterIPs(ctx context.Context) (list data.IndexedLi
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.UnsafeListMasterIPs()
+	return instance.unsafeListMasterIPs()
 }
 
 // FindAvailableMaster returns ID of the first master available to execute order
@@ -1792,7 +1620,7 @@ func (instance *Cluster) FindAvailableMaster(ctx context.Context) (master resour
 		return nil, xerr
 	}
 
-	return instance.UnsafeFindAvailableMaster(ctx)
+	return instance.unsafeFindAvailableMaster(ctx)
 }
 
 // ListNodes lists node instances corresponding to the nodes in the Cluster
@@ -1962,7 +1790,7 @@ func (instance *Cluster) ListNodeIDs(ctx context.Context) (list data.IndexedList
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.UnsafeListNodeIDs(ctx)
+	return instance.unsafeListNodeIDs(ctx)
 }
 
 // ListNodeIPs lists the IPs of the nodes in the Cluster
@@ -2044,7 +1872,7 @@ func (instance *Cluster) FindAvailableNode(ctx context.Context) (node resources.
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	return instance.UnsafeFindAvailableNode(ctx)
+	return instance.unsafeFindAvailableNode(ctx)
 }
 
 // LookupNode tells if the ID of the master passed as parameter is a node
@@ -3008,14 +2836,14 @@ func (instance *Cluster) configureCluster(ctx context.Context) (ferr fail.Error)
 		}
 	}()
 
-	// Install reverseproxy feature on Cluster (gateways)
+	// Install reverse-proxy feature on Cluster (gateways)
 	xerr = instance.installReverseProxy(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	// Install remotedesktop feature on Cluster (all masters)
+	// Install remote-desktop feature on Cluster (all masters)
 	xerr = instance.installRemoteDesktop(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -3083,33 +2911,35 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 }
 
 // Regenerate ansible inventory
-func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // nolint
-	logrus.Warningf("About to update ansible inventory")
+func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.Error {
+	logrus.Infof("[Cluster %s] Update ansible inventory", instance.GetName())
 
 	// Check incoming parameters
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-	if rc == nil || rc.IsNull() {
+	if instance == nil || instance.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
 	// Collect data
-	var featureAnsibleInstalled bool = false
+	featureAnsibleInstalled := false
 	var masters []resources.Host
-	var params map[string]interface{} = map[string]interface{}{
+	var params = map[string]interface{}{
 		"ClusterName":          "",
 		"ClusterAdminUsername": "cladm",
 		"ClusterAdminPassword": "",
+		"PrimaryGatewayName":   fmt.Sprintf("gw-%s", instance.GetName()),
 		"PrimaryGatewayIP":     "",
 		"PrimaryGatewayPort":   "22",
+		"SecondaryGatewayName": fmt.Sprintf("gw2-%s", instance.GetName()),
 		"SecondaryGatewayIP":   "",
 		"SecondaryGatewayPort": "22",
 		"ClusterMasters":       resources.IndexedListOfClusterNodes{},
 		"ClusterNodes":         resources.IndexedListOfClusterNodes{},
 	}
 
-	xerr := rc.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+	xerr := instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
 
 		// Check if feature ansible is installed
 		xerr := props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
@@ -3134,6 +2964,9 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			if networkV3 == nil {
+				return fail.InconsistentError("'*propertiesv3.ClusterNetwork' expected, '%s' provided", "nil")
+			}
 			networkCfg = networkV3
 			return nil
 		})
@@ -3146,32 +2979,88 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 		if !ok {
 			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", reflect.TypeOf(clonable).String())
 		}
+		if aci == nil {
+			return fail.InconsistentError("'*abstract.ClusterIdentity' expected, '%s' provided", "nil")
+		}
+		if reflect.TypeOf(aci.Name).Kind() != reflect.String && aci.Name == "" {
+			return fail.InconsistentError("Cluster name must be a not empty string")
+		}
+
 		params["Clustername"] = aci.Name
 		params["ClusterAdminUsername"] = "cladm"
 		params["ClusterAdminPassword"] = aci.AdminPassword
 		params["PrimaryGatewayIP"] = networkCfg.GatewayIP
-		params["PrimaryGatewayPort"] = "22"
 		if networkCfg.SecondaryGatewayIP != "" {
 			params["SecondaryGatewayIP"] = networkCfg.SecondaryGatewayIP
-			params["SecondaryGatewayPort"] = "22"
 		}
+
 		return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 
 			nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 			if !ok {
 				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+			if nodesV3 == nil {
+				return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", "nil")
+			}
+
+			// Template params: gateways
+			rh, err := LoadHost(instance.GetService(), networkCfg.GatewayID)
+			if err != nil {
+				return fail.InconsistentError("Fail to load primary gateway '%s'", networkCfg.GatewayID)
+			}
+			err = rh.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+				ahc, ok := clonable.(*abstract.HostCore)
+				if !ok {
+					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+				}
+				if ahc == nil {
+					return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", "nil")
+				}
+				params["PrimaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
+				if ahc.Name != "" {
+					params["PrimaryGatewayName"] = ahc.Name
+				}
+				return nil
+			})
+			if err != nil {
+				return fail.InconsistentError("Fail to load primary gateway '%s'", networkCfg.GatewayID)
+			}
+
+			if networkCfg.SecondaryGatewayIP != "" {
+				rh, err = LoadHost(instance.GetService(), networkCfg.SecondaryGatewayID)
+				if err != nil {
+					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
+				}
+				err = rh.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+					ahc, ok := clonable.(*abstract.HostCore)
+					if !ok {
+						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+					if ahc == nil {
+						return fail.InconsistentError("'*abstract.HostCore' expected, '%s' provided", "nil")
+					}
+					params["SecondaryGatewayPort"] = strconv.Itoa(int(ahc.SSHPort))
+					if ahc.Name != "" {
+						params["SecondaryGatewayName"] = ahc.Name
+					}
+					return nil
+				})
+				if err != nil {
+					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
+				}
+			}
+
 			// Template params: masters
 			nodes := make(resources.IndexedListOfClusterNodes, len(nodesV3.Masters))
 			for _, v := range nodesV3.Masters {
 				if node, found := nodesV3.ByNumericalID[v]; found {
 					nodes[node.NumericalID] = node
-					master, err := LoadHost(rc.GetService(), node.ID)
-					if err == nil {
-						masters = append(masters, master)
-					} else {
-						logrus.Warn("Fail to load host \"%\"", node.ID)
+					master, err := LoadHost(instance.GetService(), node.ID)
+					if err != nil {
+						return fail.InconsistentError("Fail to load master '%s'", node.ID)
 					}
+					masters = append(masters, master)
 				}
 			}
 			params["ClusterMasters"] = nodes
@@ -3193,18 +3082,18 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 		return xerr
 	}
 
-	logrus.Infoln("Collect data !", featureAnsibleInstalled, len(masters))
+	prerr := fmt.Sprintf("[Cluster %s] Update ansible inventory: ", instance.GetName())
 
 	// Feature ansible found ?
 	if !featureAnsibleInstalled {
+		logrus.Infof("%snothing to update (feature not installed)", prerr)
 		return nil
 	}
 	// Has at least one master ?
 	if len(masters) == 0 {
+		logrus.Infof("%snothing to update (no masters in cluster)", prerr)
 		return nil
 	}
-
-	logrus.Infoln("Update ansible inventory !")
 
 	// --------- Load template box --------------
 	anon := ansibleTemplateBox.Load()
@@ -3212,106 +3101,89 @@ func updateClusterInventory(ctx context.Context, rc *Cluster) fail.Error { // no
 		// Note: path MUST be literal for rice to work
 		b, err := rice.FindBox("../operations/scripts/")
 		if err != nil {
-			return fail.Wrap(err, "failed to load template")
+			return fail.Wrap(err, "%sfailed to load template directory", prerr)
 		}
+
 		ansibleTemplateBox.Store(b)
-		logrus.Tracef("loaded feature \"ansible\" inventory.py template")
+		logrus.Tracef("%sloaded feature \"ansible\" inventory.py template", prerr)
 		anon = ansibleTemplateBox.Load()
+		if anon == nil {
+			return fail.InconsistentError("%sansible inventory template is nil", prerr)
+		}
 	}
-	box := anon.(*rice.Box)
-	tmplString, err := box.String("ansible_inventory.yml")
+	box, ok := anon.(*rice.Box)
+	if !ok {
+		return fail.InconsistentError("%sfail to load template directory", prerr)
+	}
+	tmplString, err := box.String("ansible_inventory.py")
 	if err != nil {
-		return fail.Wrap(err, "failed recover ansible template")
+		return fail.Wrap(err, "%sfailed to load template 'ansible_inventory.py'", prerr)
 	}
 
 	// --------- Build ansible inventory --------------
-	var fileName string = "cluster-inventory-" + params["Clustername"].(string)
+	fileName := fmt.Sprintf("cluster-inventory-%s.py", params["Clustername"])
 	tmplCmd, err := template.Parse(fileName, tmplString)
 	if err != nil {
-		return fail.Wrap(err, "failed to parse template")
+		return fail.Wrap(err, "%sfailed to parse template 'ansible_inventory.py'", prerr)
 	}
 	dataBuffer := bytes.NewBufferString("")
 	ferr := tmplCmd.Execute(dataBuffer, params)
 	if ferr != nil {
-		return fail.Wrap(ferr, "failed to execute template")
+		return fail.Wrap(ferr, "%sfailed to execute template 'ansible_inventory.py'", prerr)
 	}
-	// resultString := dataBuffer.String()
 
-	// --------- Upload file for each master --------------
-	rfcItem := Item{
-		Remote: "/tmp/_inventory.yml",
+	// --------- Upload file for each master and test it (parallelized) --------------
+	tg, xerr := concurrency.NewTaskGroup()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return xerr
 	}
-	logrus.Infoln("Upload new inventory to masters")
+	xerr = tg.SetID(fileName)
+	if xerr != nil {
+		return xerr
+	}
 
-	var cmd string
-	var retcode int
-	var stdout string
-	var stderr string
-	var errors []fail.Error
-
+	var errors []error
 	for master := range masters {
-		logrus.Infoln("Update master ", masters[master].GetName())
+		logrus.Infof("%sUpdate master %s", prerr, masters[master].GetName())
 
-		// Remove possible junks
-		cmd = fmt.Sprintf("sudo rm -f %s || true", rfcItem.Remote)
-		retcode, stdout, stderr, xerr = masters[master].Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
-		if retcode != 0 || xerr != nil {
-			ne := fail.NewError("The remove failed")
-			_ = ne.Annotate("stdout", stdout)
-			_ = ne.Annotate("stderr", stderr)
-			return ne
-		}
-
-		// Upload new inventory
-		xerr = rfcItem.UploadString(ctx, dataBuffer.String(), masters[master])
+		_, xerr = tg.Start(
+			instance.taskUpdateClusterInventoryMaster,
+			taskUpdateClusterInventoryMasterParameters{
+				ctx:           ctx,
+				master:        masters[master],
+				inventoryData: dataBuffer.String(),
+			},
+			concurrency.InheritParentIDOption,
+			concurrency.AmendID(fmt.Sprintf("/cluster/%s/master/%s/update_inventory", instance.GetName(), masters[master].GetName())),
+		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			errors = append(errors, xerr)
-		}
-		if retcode != 0 || xerr != nil {
-			if xerr != nil {
-				return fail.NewError("The upload failed: %s", xerr.Error())
+			abErr := tg.AbortWithCause(xerr)
+			if abErr != nil {
+				logrus.Warnf("%sthere was an error trying to abort TaskGroup: %s", prerr, spew.Sdump(abErr))
 			}
-			return fail.NewError("The upload failed")
+			break
 		}
 
-		// chown root
-		// chgrp {{ .ClusterAdminUsername }}
-		// chmod 0751
-
-		// chown -R {{ .ClusterAdminUsername }}:root ${SF_ETCDIR}/ansible
-		// chmod -R ug+rw-x,o+r-wx ${SF_ETCDIR}/ansible
-
-		// Remove possible junks
-		target := utils.BaseFolder + "/etc/ansible/_inventory.yml"
-		cmd = fmt.Sprintf("sudo cp /tmp/_inventory.yml %s && sudo chown %s %s", target, params["ClusterAdminUsername"], target)
-		retcode, stdout, stderr, xerr = masters[master].Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
-		if retcode != 0 || xerr != nil {
-			ne := fail.NewError("The remove failed")
-			_ = ne.Annotate("stdout", stdout)
-			_ = ne.Annotate("stderr", stderr)
-			return ne
-		}
-
-		// Test result
-		cmd = fmt.Sprintf("ansible-inventory -i %s --list", target)
-		retcode, stdout, stderr, xerr = masters[master].Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
-		if xerr != nil {
-			errors = append(errors, xerr)
-		}
-		logrus.Infoln(cmd, retcode, stdout, stderr, xerr)
 	}
-	_ = os.Remove(rfcItem.Local)
 
-	if len(errors) > 0 {
-		var msg string = "Fail to update ansible inventories\n"
-		for _, v := range errors {
-			msg += "  " + v.Error() + "\n"
+	var tgr concurrency.TaskGroupResult
+	tgr, xerr = tg.WaitGroup()
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		if withTimeout(xerr) {
+			logrus.Warningf("%sTimeouts ansible update inventory", prerr)
 		}
-		return fail.NewError(msg)
 	}
+	if len(errors) != 0 {
+		return fail.NewError("%sfailed to update inventory: %s", prerr, fail.NewErrorList(errors))
+	}
+	logrus.Debugf("%supdate inventory successful: %v", prerr, tgr)
 
 	return nil
+
 }
 
 // configureNodesFromList configures nodes from a list
@@ -3761,7 +3633,7 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 			return emptySlice, xerr
 		}
 
-		selectedMaster, xerr := instance.UnsafeFindAvailableMaster(ctx)
+		selectedMaster, xerr := instance.unsafeFindAvailableMaster(ctx)
 		if xerr != nil {
 			return emptySlice, xerr
 		}
@@ -3791,14 +3663,10 @@ func (instance *Cluster) Shrink(ctx context.Context, count uint) (_ []*propertie
 	if len(errors) > 0 {
 		return emptySlice, fail.NewErrorList(errors)
 	}
-
-	// @TODO status: testing
-	/*
-		xerr = updateClusterInventory(ctx, instance)
-		if xerr != nil {
-			return nil, fail.Wrap(xerr, "Shrink does NOT clean up") // FIXME: TBR This does not trigger a cleanup and it should !!
-		}
-	*/
+	xerr = instance.unsafeUpdateClusterInventory(ctx)
+	if xerr != nil {
+		return emptySlice, xerr
+	}
 
 	return removedNodes, nil
 }

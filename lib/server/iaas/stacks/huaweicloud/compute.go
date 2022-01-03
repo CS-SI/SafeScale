@@ -502,7 +502,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	}
 
 	// Select usable availability zone
-	az, xerr := s.SelectedAvailabilityZone()
+	zone, xerr := s.SelectedAvailabilityZone()
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to select Availability Zone")
 	}
@@ -537,7 +537,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		Networks:         nets,
 		FlavorRef:        request.TemplateID,
 		UserData:         userDataPhase1,
-		AvailabilityZone: az,
+		AvailabilityZone: zone,
 		Metadata:         metadata,
 	}
 
@@ -632,7 +632,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					// FIXME: Wrong, we need name, status and ID at least here
 					if server != nil {
 						ahc.ID = server.ID
 						ahc.Name = server.Name
@@ -806,7 +805,6 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-			// FIXME: Wrong, we need name, status and ID at least here
 			if server != nil {
 				ahf.Core.ID = server.ID
 				ahf.Core.Name = server.Name
@@ -954,8 +952,8 @@ func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (
 	completedHost.Description.Updated = server.Updated
 	completedHost.CurrentState = host.LastState
 
-	completedHost.Core.Tags["Template"], _ = server.Image["id"].(string)
-	completedHost.Core.Tags["Image"], _ = server.Flavor["id"].(string)
+	completedHost.Core.Tags["Template"], _ = server.Image["id"].(string) // nolint
+	completedHost.Core.Tags["Image"], _ = server.Flavor["id"].(string)   // nolint
 
 	// recover metadata
 	for k, v := range server.Metadata {
@@ -1237,10 +1235,11 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 							return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
 						}
 						// FIXME: capture more error types
-						switch commRetryErr.(type) { // nolint
+						switch commRetryErr.(type) {
 						case *fail.ErrNotFound:
 							resourcePresent = false
 							return nil
+						default:
 						}
 						return commRetryErr
 					},

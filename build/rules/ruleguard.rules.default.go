@@ -293,16 +293,6 @@ func urlredacted(m dsl.Matcher) {
 		Report("consider $x.Redacted() when outputting URLs")
 }
 
-func removeDebugCode(m dsl.Matcher) {
-	m.Match(
-		"logrus.Warningf($*_, $*_)",
-		"logrus.Warning($*_, $x)",
-		"logrus.Warningf($*_)",
-		"logrus.Warning($*_)",
-	).
-		Report("REMOVE debug code before a release")
-}
-
 func sprinterr(m dsl.Matcher) {
 	m.Match(`fmt.Sprint($err)`,
 		`fmt.Sprintf("%s", $err)`,
@@ -310,7 +300,18 @@ func sprinterr(m dsl.Matcher) {
 	).
 		Where(m["err"].Type.Is("error")).
 		Report("maybe call $err.Error() instead of fmt.Sprint()?")
+}
 
+func jsonMarshalIgnored(m dsl.Matcher) {
+	m.Match(`_ = json.Marshal($*_)`).
+		Report("json marshalling errors cannot be ignored")
+}
+
+func jsonUnMarshalIgnored(m dsl.Matcher) {
+	m.Match(`$x, _ = json.UnMarshal($*_)`,
+		`$x, _ := json.UnMarshal($*_)`,
+	).
+		Report("json unmarshalling errors cannot be ignored")
 }
 
 func largeloopcopy(m dsl.Matcher) {

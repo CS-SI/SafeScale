@@ -76,8 +76,8 @@ func (s subnet) Delete(networkRef string, names []string, timeout time.Duration)
 
 		if err != nil {
 			mutex.Lock()
+			defer mutex.Unlock()
 			errs = append(errs, err.Error())
-			mutex.Unlock()
 		}
 	}
 

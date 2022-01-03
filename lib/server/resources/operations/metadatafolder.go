@@ -133,10 +133,10 @@ func (f MetadataFolder) absolutePath(path ...string) string {
 	}
 	relativePath = strings.Trim(relativePath, "/")
 	if relativePath != "" {
-		absolutePath := strings.Replace(relativePath, "//", "/", -1)
+		absolutePath := strings.ReplaceAll(relativePath, "//", "/")
 		if f.path != "" {
 			absolutePath = f.path + "/" + relativePath
-			absolutePath = strings.Replace(absolutePath, "//", "/", -1)
+			absolutePath = strings.ReplaceAll(absolutePath, "//", "/")
 		}
 		return absolutePath
 	}

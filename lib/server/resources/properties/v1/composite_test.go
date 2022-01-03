@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClusterCompositeV1_Clone(t *testing.T) {
@@ -34,6 +35,7 @@ func TestClusterCompositeV1_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, ct, clonedCt)
+	require.EqualValues(t, ct, clonedCt)
 	clonedCt.Tenants[0] = "choose"
 
 	areEqual := reflect.DeepEqual(ct, clonedCt)
@@ -41,4 +43,5 @@ func TestClusterCompositeV1_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, ct, clonedCt)
 }

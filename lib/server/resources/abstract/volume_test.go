@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVolume_Clone(t *testing.T) {
@@ -34,6 +35,8 @@ func TestVolume_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, v, vc)
+	require.EqualValues(t, v, vc)
+
 	vc.Size = 20
 
 	areEqual := reflect.DeepEqual(v, vc)
@@ -41,4 +44,5 @@ func TestVolume_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, v, vc)
 }

@@ -19,7 +19,9 @@ package openstack
 import (
 	"regexp"
 	"strconv"
+	"strings"
 
+	"github.com/asaskevich/govalidator"
 	"github.com/sirupsen/logrus"
 
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/secgroups"
@@ -37,6 +39,10 @@ import (
 
 const (
 	openstackDefaultImage = "Ubuntu 20.04"
+)
+
+var (
+	dnsServers = []string{"8.8.8.8", "1.1.1.1"}
 )
 
 // provider is the provider implementation of the openstack provider respecting api.Provider
@@ -62,29 +68,29 @@ func (p *provider) IsNull() bool {
 
 // Build builds a new Client from configuration parameter
 func (p *provider) Build(params map[string]interface{}) (providers.Provider, fail.Error) {
-	identity, _ := params["identity"].(map[string]interface{})
-	compute, _ := params["compute"].(map[string]interface{})
-	network, _ := params["network"].(map[string]interface{})
+	identity, _ := params["identity"].(map[string]interface{}) // nolint
+	compute, _ := params["compute"].(map[string]interface{})   // nolint
+	network, _ := params["network"].(map[string]interface{})   // nolint
 
-	identityEndpoint, _ := identity["IdentityEndpoint"].(string)
-	username, _ := identity["Username"].(string)
-	password, _ := identity["Password"].(string)
-	tenantName, _ := compute["TenantName"].(string)
-	tenantID, _ := compute["TenantID"].(string)
-	region, _ := compute["Region"].(string)
-	zone, _ := compute["AvailabilityZone"].(string)
+	identityEndpoint, _ := identity["IdentityEndpoint"].(string) // nolint
+	username, _ := identity["Username"].(string)                 // nolint
+	password, _ := identity["Password"].(string)                 // nolint
+	tenantName, _ := compute["TenantName"].(string)              // nolint
+	tenantID, _ := compute["TenantID"].(string)                  // nolint
+	region, _ := compute["Region"].(string)                      // nolint
+	zone, _ := compute["AvailabilityZone"].(string)              // nolint
 	if zone == "" {
 		zone = "nova"
 	}
-	providerNetwork, _ := network["ExternalNetwork"].(string)
+	providerNetwork, _ := network["ExternalNetwork"].(string) // nolint
 	if providerNetwork == "" {
 		providerNetwork = "public"
 	}
-	floatingIPPool, _ := network["FloatingIPPool"].(string)
+	floatingIPPool, _ := network["FloatingIPPool"].(string) // nolint
 	if floatingIPPool == "" {
 		floatingIPPool = providerNetwork
 	}
-	defaultImage, _ := compute["DefaultImage"].(string)
+	defaultImage, _ := compute["DefaultImage"].(string) // nolint
 	if defaultImage == "" {
 		defaultImage = openstackDefaultImage
 	}
@@ -94,16 +100,32 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 
-	dnsServers, _ := network["DNSServers"].([]string)
-	if len(dnsServers) == 0 {
-		dnsServers = []string{"8.8.8.8", "1.1.1.1"}
+	customDNS, _ := compute["DNS"].(string) // nolint
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
+		}
 	}
+
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
-		operatorUsername = operatorUsernameIf.(string)
-		if operatorUsername == "" {
-			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-			operatorUsername = abstract.DefaultUser
+		operatorUsername, ok = operatorUsernameIf.(string)
+		if ok {
+			if operatorUsername == "" {
+				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+				operatorUsername = abstract.DefaultUser
+			}
 		}
 	}
 
@@ -115,7 +137,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		TenantName:       tenantName,
 		Region:           region,
 		AvailabilityZone: zone,
-		FloatingIPPool:   floatingIPPool, // FIXME: move in ConfigurationOptions
+		FloatingIPPool:   floatingIPPool,
 	}
 
 	providerName := "openstack"

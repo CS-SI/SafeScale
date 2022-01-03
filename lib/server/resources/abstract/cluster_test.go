@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClusterIdentity_Clone(t *testing.T) {
@@ -33,6 +34,7 @@ func TestClusterIdentity_Clone(t *testing.T) {
 	}
 
 	assert.Equal(t, c, cc)
+	require.EqualValues(t, c, cc)
 	cc.AdminPassword = "changed password"
 
 	areEqual := reflect.DeepEqual(c, cc)
@@ -40,4 +42,5 @@ func TestClusterIdentity_Clone(t *testing.T) {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
+	require.NotEqualValues(t, c, cc)
 }

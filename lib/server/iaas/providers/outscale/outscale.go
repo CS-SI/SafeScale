@@ -19,6 +19,7 @@ package outscale
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
 	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
@@ -28,10 +29,16 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/asaskevich/govalidator"
 )
 
 const (
 	outscaleDefaultImage = "Ubuntu 20.04"
+)
+
+//goland:noinspection GoPreferNilSlice
+var (
+	dnsServers = []string{}
 )
 
 // provider is integration of outscale IaaS API
@@ -60,25 +67,6 @@ func get(m map[string]interface{}, key string, def ...string) string {
 		return ""
 	}
 	return v.(string)
-}
-func getList(m map[string]interface{}, key string) []string {
-	v, ok := m[key]
-	if !ok {
-		return []string{}
-	}
-	l, ok := v.([]interface{})
-	if !ok {
-		return []string{}
-	}
-	sl := make([]string, len(l))
-	for _, i := range l {
-		s, ok := i.(string)
-		if !ok {
-			return []string{}
-		}
-		sl = append(sl, s)
-	}
-	return sl
 }
 
 func volumeSpeed(s string) volumespeed.Enum {
@@ -115,9 +103,28 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 		if userID == "" {
 			return nil, fail.SyntaxError("keyword 'UserID' in section 'identity' not found in tenant file")
 		}
+
 		metadata["Bucket"], xerr = objectstorage.BuildMetadataBucketName(stackName, region, "", userID)
 		if xerr != nil {
 			return nil, xerr
+		}
+	}
+
+	customDNS := get(compute, "DNS")
+	if customDNS != "" {
+		if strings.Contains(customDNS, ",") {
+			fragments := strings.Split(customDNS, ",")
+			for _, fragment := range fragments {
+				fragment = strings.TrimSpace(fragment)
+				if govalidator.IsIP(fragment) {
+					dnsServers = append(dnsServers, fragment)
+				}
+			}
+		} else {
+			fragment := strings.TrimSpace(customDNS)
+			if govalidator.IsIP(fragment) {
+				dnsServers = append(dnsServers, fragment)
+			}
 		}
 	}
 
@@ -131,7 +138,7 @@ func (p *provider) Build(opt map[string]interface{}) (_ providers.Provider, xerr
 			Service:            get(compute, "Service", "api"),
 			Region:             region,
 			Subregion:          get(compute, "Subregion"),
-			DNSList:            getList(compute, "DNSList"),
+			DNSList:            dnsServers,
 			DefaultTenancy:     get(compute, "DefaultTenancy", "default"),
 			DefaultImage:       get(compute, "DefaultImage", outscaleDefaultImage),
 			DefaultVolumeSpeed: volumeSpeed(get(compute, "DefaultVolumeSpeed", "Hdd")),

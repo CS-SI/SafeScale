@@ -73,7 +73,8 @@ func (n *ClusterNodes) Replace(p data.Clonable) data.Clonable {
 		return n
 	}
 
-	src := p.(*ClusterNodes)
+	// FIXME: Replace should also return an error
+	src, _ := p.(*ClusterNodes) // nolint
 	*n = *src
 	n.Masters = make([]*ClusterNode, 0, len(src.Masters))
 	// copy(n.Masters, src.Masters)

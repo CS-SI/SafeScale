@@ -39,6 +39,7 @@ import (
 	propertiesv2 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v2"
 	propertiesv3 "github.com/CS-SI/SafeScale/lib/server/resources/properties/v3"
 	"github.com/CS-SI/SafeScale/lib/utils"
+	"github.com/CS-SI/SafeScale/lib/utils/cli/enums/outputs"
 	"github.com/CS-SI/SafeScale/lib/utils/concurrency"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
@@ -54,7 +55,10 @@ import (
 func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
-	req := params.(abstract.ClusterRequest)
+	req, ok := params.(abstract.ClusterRequest)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "should be an abstract.ClusterRequest")
+	}
 	ctx := task.Context()
 
 	// Check if Cluster exists in metadata; if yes, error
@@ -474,7 +478,10 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	if imageQuery == "" {
 		if cfg, xerr := instance.GetService().GetConfigurationOptions(); xerr == nil {
 			if anon, ok := cfg.Get("DefaultImage"); ok {
-				imageQuery = anon.(string)
+				imageQuery, ok = anon.(string)
+				if !ok {
+					return nil, nil, nil, fail.InconsistentError("failed to convert anon to 'string'")
+				}
 			}
 		}
 	}
@@ -1057,7 +1064,7 @@ func (instance *Cluster) createHostResources(
 			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
-			list, merr := instance.UnsafeListMasters()
+			list, merr := instance.unsafeListMasters()
 			if merr != nil {
 				_ = ferr.AddConsequence(merr)
 				return
@@ -2026,7 +2033,7 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 	logrus.Debugf("[Cluster %s] Configuring masters...", instance.GetName())
 
-	masters, xerr := instance.UnsafeListMasters()
+	masters, xerr := instance.unsafeListMasters()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2978,4 +2985,101 @@ func deleteHostOnFailure(instance resources.Host) fail.Error {
 
 	logrus.Debugf(prefix + fmt.Sprintf("successfully deleted Host '%s'", hostName))
 	return nil
+}
+
+type taskUpdateClusterInventoryMasterParameters struct {
+	ctx           context.Context
+	master        resources.Host
+	inventoryData string
+}
+
+// taskUpdateClusterInventoryMaster task to updates a Host (master) ansible inventory
+func (instance *Cluster) taskUpdateClusterInventoryMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+
+	defer fail.OnPanic(&xerr)
+
+	if instance == nil || instance.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+	if task == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("task")
+	}
+
+	// Convert and validate params
+	casted, ok := params.(taskUpdateClusterInventoryMasterParameters)
+	if !ok {
+		return nil, fail.InvalidParameterError("params", "must be a 'taskUpdateClusterInventoryMasterParameters'")
+	}
+
+	return nil, instance.updateClusterInventoryMaster(casted.ctx, casted.master, casted.inventoryData)
+}
+
+// updateClusterInventoryMaster updates a Host (master) ansible inventory
+func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, master resources.Host, inventoryData string) (xerr fail.Error) {
+
+	rfcItem := Item{
+		Remote:       fmt.Sprintf("%s/%s", utils.TempFolder, "ansible-inventory.py"),
+		RemoteOwner:  "safescale:safescale",
+		RemoteRights: "ou+rx-w,g+rwx",
+	}
+
+	target := fmt.Sprintf("%s/ansible/inventory/", utils.EtcFolder)
+	commands := []string{
+		fmt.Sprintf("[ -f %s_inventory.py ] && sudo rm -f %s_inventory.py || exit 0", target, target),
+		fmt.Sprintf("sudo mv %s %s_inventory.py", rfcItem.Remote, target),
+		fmt.Sprintf("sudo chown cladm:root %s_inventory.py", target),
+		fmt.Sprintf("ansible-inventory -i %s_inventory.py --list", target),
+		fmt.Sprintf("[ -f %sinventory.py ] && sudo rm -f %sinventory.py  || exit 0", target, target),
+		fmt.Sprintf("sudo mv %s_inventory.py %sinventory.py", target, target),
+	}
+	prerr := fmt.Sprintf("[Cluster %s, master %s] Ansible inventory update: ", instance.GetName(), master.GetName())
+	errmsg := []string{
+		fmt.Sprintf("%sfail to clean up temporaries", prerr),
+		fmt.Sprintf("%sfail to move uploaded inventory", prerr),
+		fmt.Sprintf("%sfail to update rights of uploaded inventory", prerr),
+		fmt.Sprintf("%sfail to test/run uploaded inventory", prerr),
+		fmt.Sprintf("%sfail to remove previous inventory", prerr),
+		fmt.Sprintf("%sfail to move uploaded inventory to final destination", prerr),
+	}
+
+	// Remove possible junks
+	cmd := fmt.Sprintf("[ -f %s ] && sudo rm -f %s || exit 0", rfcItem.Remote, rfcItem.Remote)
+	retcode, stdout, stderr, xerr := master.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
+	if xerr != nil {
+		return fail.Wrap(xerr, "%sfail to clean previous temporaries", prerr)
+	}
+	if retcode != 0 {
+		xerr := fail.NewError("%sfail to clean previous temporaries", prerr)
+		_ = xerr.Annotate("cmd", cmd)
+		_ = xerr.Annotate("stdout", stdout)
+		_ = xerr.Annotate("stderr", stderr)
+		_ = xerr.Annotate("retcode", retcode)
+		return xerr
+	}
+
+	// Upload new inventory
+	xerr = rfcItem.UploadString(ctx, inventoryData, master)
+	if xerr != nil {
+		return fail.Wrap(xerr, "%supload fail", prerr)
+	}
+
+	// Run update commands
+	for i, cmd := range commands {
+		retcode, stdout, stderr, xerr = master.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return fail.Wrap(xerr, errmsg[i])
+		}
+		if retcode != 0 {
+			xerr := fail.NewError(errmsg[i])
+			_ = xerr.Annotate("cmd", cmd)
+			_ = xerr.Annotate("stdout", stdout)
+			_ = xerr.Annotate("stderr", stderr)
+			_ = xerr.Annotate("retcode", retcode)
+			return xerr
+		}
+	}
+
+	return nil
+
 }

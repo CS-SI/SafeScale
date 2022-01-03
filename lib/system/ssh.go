@@ -716,7 +716,14 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 			stderr string
 			ok     bool
 		)
-		if note, ok = xerr.Annotation("retcode"); !ok || note.(int) == -1 {
+		if note, ok = xerr.Annotation("retcode"); !ok {
+			if !params.collectOutputs {
+				if derr := pipeBridgeCtrl.Stop(); derr != nil {
+					_ = xerr.AddConsequence(derr)
+				}
+			}
+			return result, xerr
+		} else if rc, ok := note.(int); ok && rc == -1 {
 			if !params.collectOutputs {
 				if derr := pipeBridgeCtrl.Stop(); derr != nil {
 					_ = xerr.AddConsequence(derr)
@@ -724,7 +731,11 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 			}
 			return result, xerr
 		}
-		result["retcode"] = note.(int)
+
+		result["retcode"], ok = note.(int)
+		if !ok {
+			logrus.Warnf("Unable to recover 'retcode' because 'note' is not an integer: %v", note)
+		}
 
 		// Make sure all outputs have been processed
 		if !params.collectOutputs {
@@ -733,7 +744,10 @@ func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskPar
 			}
 
 			if note, ok = xerr.Annotation("stderr"); ok {
-				result["stderr"] = note.(string)
+				result["stderr"], ok = note.(string)
+				if !ok {
+					logrus.Warnf("Unable to recover 'stederr' because 'note' is not an string: %v", note)
+				}
 			}
 		} else {
 			result["stdout"] = string(msgOut)
@@ -1121,7 +1135,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			// Do not forget to close command, ie close SSH tunnel
 			defer func(cmd *SSHCommand) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
-			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout)
+			retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -1137,7 +1151,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 					// Do not forget to close command, ie close SSH tunnel
 					defer func(cmd *SSHCommand) { cmdCloseFunc(cmd, &innerXErr) }(sshCmd)
 
-					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout)
+					retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timeout/4)
 					if innerXErr != nil {
 						return innerXErr
 					}
@@ -1146,11 +1160,11 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 			}
 			if retcode != 0 {
 				fe := fail.NewError("remote SSH NOT ready: error code: %d", retcode)
-				_ = fe.Annotate("retcode", retcode)
-				_ = fe.Annotate("stdout", stdout)
-				_ = fe.Annotate("stderr", stderr)
-				_ = fe.Annotate("operation", sshCmd.runCmdString)
-				_ = fe.Annotate("iterations", iterations)
+				fe.Annotate("retcode", retcode)
+				fe.Annotate("stdout", stdout)
+				fe.Annotate("stderr", stderr)
+				fe.Annotate("operation", sshCmd.runCmdString)
+				fe.Annotate("iterations", iterations)
 				return fe
 			}
 

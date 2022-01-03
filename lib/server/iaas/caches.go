@@ -23,6 +23,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -95,20 +96,10 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
 
-	// Search in the cache by ID
-	if ce, xerr = instance.byID.Entry(key); xerr == nil {
+	ce, found := instance.loadEntry(key)
+	if found {
 		return ce, nil
 	}
-
-	// Not found, search an entry in the cache by name to get id and search again by id
-	instance.lock.Lock()
-	if id, ok := instance.byName[key]; ok {
-		if ce, xerr = instance.byID.Entry(id); xerr == nil {
-			instance.lock.Unlock()
-			return ce, nil
-		}
-	}
-	instance.lock.Unlock()
 
 	// We have a cache miss, check if we have a function to get the missing content
 	if len(options) > 0 {
@@ -119,9 +110,17 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 		for _, v := range options {
 			switch v.Key() {
 			case cacheOptionOnMissKeyword:
-				onMissFunc = v.Value().(func() (cache.Cacheable, fail.Error))
+				var ok bool
+				onMissFunc, ok = v.Value().(func() (cache.Cacheable, fail.Error))
+				if !ok {
+					logrus.Warnf("unable to set onMissFunc because of wrong cast: %v", v.Value()) // FIXME: Error hiding
+				}
 			case cacheOptionOnMissTimeoutKeyword:
-				onMissTimeout = v.Value().(time.Duration)
+				var ok bool
+				onMissTimeout, ok = v.Value().(time.Duration)
+				if !ok {
+					logrus.Warnf("unable to set onMissTimeout because of wrong cast: %v", v.Value()) // FIXME: Error hiding
+				}
 			default:
 			}
 		}
@@ -171,6 +170,26 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 	}
 
 	return nil, fail.NotFoundError("failed to find cache entry with key %s, and does not know how to fill the miss", key)
+}
+
+// loadEntry returns the entry corresponding to the key if it exists
+// returns:
+// - *cache.Entry, true: if key is found
+// - nil, false: if key is not found
+func (instance *ResourceCache) loadEntry(key string) (*cache.Entry, bool) {
+	instance.lock.Lock()
+	defer instance.lock.Unlock()
+
+	if ce, xerr := instance.byID.Entry(key); xerr == nil {
+		return ce, true
+	}
+
+	if id, ok := instance.byName[key]; ok {
+		if ce, xerr := instance.byID.Entry(id); xerr == nil {
+			return ce, true
+		}
+	}
+	return nil, false
 }
 
 // ReserveEntry sets a cache entry to reserve the key and returns the Entry associated

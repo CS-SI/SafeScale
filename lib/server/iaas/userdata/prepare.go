@@ -190,7 +190,6 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 	return nil
 }
 
-// ToMap
 func (ud Content) ToMap() (map[string]interface{}, fail.Error) {
 	jsoned, err := json.Marshal(ud)
 	if err != nil {
@@ -246,19 +245,21 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 		}
 	}
 
-	userdataPhaseTemplatesLock.RLock()
+	userdataPhaseTemplatesLock.Lock()
+	defer userdataPhaseTemplatesLock.Unlock()
+
 	anon, ok := userdataPhaseTemplates[phase]
-	userdataPhaseTemplatesLock.RUnlock()
 	if !ok {
 		return nil, fail.NotImplementedError("phase '%s' not managed", phase)
 	}
 
 	var tmpl *txttmpl.Template
 	if anon != nil {
-		tmpl = anon.Load().(*txttmpl.Template)
+		tmpl, ok = anon.Load().(*txttmpl.Template)
+		if !ok {
+			return nil, fail.NewError("error loading template for phase %s", phase)
+		}
 	} else {
-		userdataPhaseTemplatesLock.Lock()
-		defer userdataPhaseTemplatesLock.Unlock()
 
 		box, err = rice.FindBox("../userdata/scripts")
 		if err != nil {
@@ -277,6 +278,10 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 
 		userdataPhaseTemplates[phase] = new(atomic.Value)
 		userdataPhaseTemplates[phase].Store(tmpl)
+	}
+
+	if tmpl == nil {
+		return nil, fail.NewError("Nil is not a valid template for phase %s", phase)
 	}
 
 	// Transforms struct content to map using json

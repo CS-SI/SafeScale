@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEasyCloneable(t *testing.T) {
@@ -36,6 +37,7 @@ func TestEasyCloneable(t *testing.T) {
 
 	a.Rumba = 9
 	ieq = reflect.DeepEqual(a, b)
+	require.EqualValues(t, a, b)
 	assert.True(t, ieq)
 
 	a.Content = "whatever"

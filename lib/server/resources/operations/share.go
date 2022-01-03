@@ -98,14 +98,16 @@ func (si ShareIdentity) Clone() data.Clonable {
 
 // Replace ...
 // satisfies interface data.Clonable
-func (si *ShareIdentity) Replace(src data.Clonable) data.Clonable {
+// may panic
+func (si *ShareIdentity) Replace(p data.Clonable) data.Clonable {
 	// Do not test with isNull(), it's allowed to clone a null value...
-	if si == nil || src == nil {
+	if si == nil || p == nil {
 		return si
 	}
 
-	srcSi := src.(*ShareIdentity)
-	*si = *srcSi
+	// FIXME: Replace should also return an error
+	src, _ := p.(*ShareIdentity) // nolint
+	*si = *src
 	return si
 }
 
@@ -177,9 +179,14 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 		}
 	}
 
-	if rs = cacheEntry.Content().(resources.Share); rs == nil {
+	var ok bool
+	if rs, ok = cacheEntry.Content().(resources.Share); !ok {
+		return ShareNullValue(), fail.InconsistentError("cache content should be a resources.Share", ref)
+	}
+	if rs == nil {
 		return ShareNullValue(), fail.InconsistentError("nil value found in Share cache for key '%s'", ref)
 	}
+
 	_ = cacheEntry.LockContent()
 	defer func() {
 		ferr = debug.InjectPlannedFail(ferr)
@@ -488,13 +495,19 @@ func (instance *Share) Create(
 		case *fail.ErrExecution:
 			var retcode int
 			if annotation, ok := xerr.Annotation("retcode"); ok {
-				retcode = annotation.(int)
+				if v, ok := annotation.(int); ok {
+					retcode = v
+				}
 			}
 			var msg string
 			if stdout, ok := xerr.Annotation("stdout"); ok {
-				msg = stdout.(string)
+				if m, ok := stdout.(string); ok {
+					msg = m
+				}
 			} else if stderr, ok := xerr.Annotation("stderr"); ok {
-				msg = stderr.(string)
+				if m, ok := stderr.(string); ok {
+					msg = m
+				}
 			}
 
 			switch retcode {
@@ -707,7 +720,10 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 				return fail.InconsistentError("'*propertiesv1.HostShares' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
 
-			hostShare = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			hostShare, ok = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			if !ok {
+				return fail.InconsistentError("clone should be a *propertiesv1.HostShare")
+			}
 			return nil
 		})
 	})
@@ -1115,7 +1131,10 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 				return fail.NotFoundError("failed to find Share '%s' in Host '%s' metadata", shareName, objserver.GetName())
 			}
 
-			hostShare = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			hostShare, ok = hostSharesV1.ByID[shareID].Clone().(*propertiesv1.HostShare)
+			if !ok {
+				return fail.InconsistentError("clone should be a *propertiesv1.HostShare")
+			}
 
 			if len(hostShare.ClientsByName) > 0 {
 				var list []string

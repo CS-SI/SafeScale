@@ -82,7 +82,7 @@ func (instance *Cluster) TargetType() featuretargettype.Enum {
 	return featuretargettype.Cluster
 }
 
-// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = the highest preference)
+// InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = the highest preference)
 // satisfies resources.Targetable interface
 func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 	if instance == nil || instance.IsNull() {
@@ -92,8 +92,9 @@ func (instance *Cluster) InstallMethods() map[uint8]installmethod.Enum {
 
 	out := make(map[uint8]installmethod.Enum)
 	instance.installMethods.Range(func(k, v interface{}) bool {
-		out[k.(uint8)] = v.(installmethod.Enum)
-		return true
+		var ok bool
+		out[k.(uint8)], ok = v.(installmethod.Enum)
+		return ok
 	})
 	return out
 }
@@ -194,7 +195,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 		v["ClusterControlplaneEndpointIP"] = controlPlaneV1.VirtualIP.PrivateIP
 	} else {
 		// Don't set ClusterControlplaneUsesVIP if there is no VIP... use IP of first available master instead
-		master, xerr := instance.UnsafeFindAvailableMaster(ctx)
+		master, xerr := instance.unsafeFindAvailableMaster(ctx)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -208,7 +209,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 		v["ClusterControlplaneUsesVIP"] = false
 	}
-	v["ClusterMasters"], xerr = instance.UnsafeListMasters()
+	v["ClusterMasters"], xerr = instance.unsafeListMasters()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -226,7 +227,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 	}
 	v["ClusterMasterIDs"] = list
 
-	v["ClusterMasterIPs"], xerr = instance.UnsafeListMasterIPs()
+	v["ClusterMasterIPs"], xerr = instance.unsafeListMasterIPs()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -681,7 +682,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 
 	params["ClusterName"] = identity.Name
 	params["DNSServerIPs"] = dnsServers
-	params["MasterIPs"], xerr = instance.UnsafeListMasterIPs()
+	params["MasterIPs"], xerr = instance.unsafeListMasterIPs()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -702,7 +703,7 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 	}
 	if retcode != 0 {
 		xerr = fail.ExecutionError(nil, "failed to install common node requirements")
-		_ = xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
+		xerr.Annotate("retcode", retcode).Annotate("stdout", stdout).Annotate("stderr", stderr)
 		return xerr
 	}
 

@@ -111,7 +111,12 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 		}
 	}
 
-	if networkInstance = cacheEntry.Content().(resources.Network); networkInstance == nil {
+	var ok bool
+	networkInstance, ok = cacheEntry.Content().(resources.Network)
+	if !ok {
+		return nil, fail.InconsistentError("cache content should be a resources.Network", ref)
+	}
+	if networkInstance == nil {
 		return nil, fail.InconsistentError("nil value found in Network cache for key '%s'", ref)
 	}
 	_ = cacheEntry.LockContent()
@@ -199,7 +204,16 @@ func (instance *Network) Create(ctx context.Context, req abstract.NetworkRequest
 
 	// Check if subnet already exists and is managed by SafeScale
 	svc := instance.GetService()
-	if existing, xerr := LoadNetwork(svc, req.Name); xerr == nil { // FIXME: VERY bad practice
+	existing, xerr := LoadNetwork(svc, req.Name)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	} else {
 		existing.Released()
 		return fail.DuplicateError("Network '%s' already exists", req.Name)
 	}
@@ -359,7 +373,16 @@ func (instance *Network) Import(ctx context.Context, ref string) (xerr fail.Erro
 
 	// Check if Network already exists and is managed by SafeScale
 	svc := instance.GetService()
-	if existing, xerr := LoadNetwork(svc, ref); xerr == nil { // FIXME: VERY bad practice
+	existing, xerr := LoadNetwork(svc, ref)
+	if xerr != nil {
+		switch xerr.(type) {
+		case *fail.ErrNotFound:
+			// continue
+			debug.IgnoreError(xerr)
+		default:
+			return xerr
+		}
+	} else {
 		existing.Released()
 		return fail.DuplicateError("cannot import Network '%s': there is already such a Network in metadata", ref)
 	}

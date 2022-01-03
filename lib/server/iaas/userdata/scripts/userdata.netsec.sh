@@ -125,9 +125,9 @@ function reset_fw() {
   done
 
   # Attach Internet interface or source IP to zone public if host is gateway
-  [ ! -z $PU_IF ] && {
+  [[ ! -z ${PU_IF} ]] && {
     # sfFirewallAdd --zone=public --add-interface=$PU_IF || return 1
-    firewall-offline-cmd --zone=public --add-interface=$PU_IF || failure 221 "reset_fw(): firewall-offline-cmd failed with $? adding interfaces"
+    firewall-offline-cmd --zone=public --add-interface=${PU_IF} || failure 221 "reset_fw(): firewall-offline-cmd failed with $? adding interfaces"
   }
   {{- if or .PublicIP .IsGateway }}
   [[ -z ${PU_IF} ]] && {
@@ -141,9 +141,9 @@ function reset_fw() {
 
   # Attach LAN interfaces to zone trusted
   [[ ! -z ${PR_IFs} ]] && {
-    for i in $PR_IFs; do
-      # sfFirewallAdd --zone=trusted --add-interface=$PR_IFs || return 1
-      firewall-offline-cmd --zone=trusted --add-interface=$PR_IFs || failure 224 "reset_fw(): firewall-offline-cmd failed with $? adding $PR_IFs to trusted"
+    for i in ${PR_IFs}; do
+      # sfFirewallAdd --zone=trusted --add-interface=${PR_IFs} || return 1
+      firewall-offline-cmd --zone=trusted --add-interface=${PR_IFs} || failure 224 "reset_fw(): firewall-offline-cmd failed with $? adding ${PR_IFs} to trusted"
     done
   }
   # Attach lo interface to zone trusted
@@ -967,8 +967,9 @@ function check_for_network_refined() {
 # - DNS and routes (by pinging a FQDN)
 # - IP address on "physical" interfaces
 function check_for_network() {
-  check_for_network_refined 12
-  return $?
+  op=-1
+  check_for_network_refined 12 && op=$? || true
+  return $op
 }
 
 function configure_as_gateway() {
@@ -1035,6 +1036,36 @@ function configure_dns_legacy_issues() {
   esac
 }
 
+function configure_dns_fallback() {
+  echo "Configuring /etc/resolv.conf..."
+  cp /etc/resolv.conf /etc/resolv.conf.bak
+
+  rm -f /etc/resolv.conf
+  if [[ -e /etc/dhcp/dhclient.conf ]]; then
+    echo "prepend domain-name-servers 1.1.1.1;" >> /etc/dhcp/dhclient.conf
+  else
+    echo "/etc/dhcp/dhclient.conf not modified"
+  fi
+  cat > /etc/resolv.conf <<- EOF
+		nameserver 1.1.1.1
+	EOF
+
+  cp /etc/resolv.conf /etc/resolv.conf.tested
+  touch /etc/resolv.conf && sleep 2 || true
+
+  # give it a try
+  sudo dhclient
+  sleep 2
+
+  op=-1
+  CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
+  [ ${op} -ne 0 ] && echo "changing dns wasn't a good idea..." && cp /etc/resolv.conf.bak /etc/resolv.conf || echo "dns change OK..."
+
+  configure_dns_legacy_issues
+
+  echo "done"
+}
+
 function configure_dns_legacy() {
   echo "Configuring /etc/resolv.conf..."
   cp /etc/resolv.conf /etc/resolv.conf.bak
@@ -1068,6 +1099,11 @@ function configure_dns_legacy() {
 	EOF
 
   cp /etc/resolv.conf /etc/resolv.conf.tested
+  touch /etc/resolv.conf && sleep 2 || true
+
+  # give it a try
+  sudo dhclient
+  sleep 2
 
   op=-1
   CONNECTED=$(curl -I www.google.com -m 5 | grep "200 OK") && op=$? || true
@@ -1409,6 +1445,7 @@ function configure_locale() {
     ;;
   esac
   export LANGUAGE=en_US.UTF-8 LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+  return 0
 }
 
 function force_dbus_restart() {
@@ -1419,6 +1456,36 @@ function force_dbus_restart() {
     sudo systemctl restart dbus.service
     ;;
   esac
+}
+
+function check_dns_configuration() {
+  if [[ -r /etc/resolv.conf ]]; then
+    echo "Getting DNS using resolv.conf..."
+    THE_DNS=$(cat /etc/resolv.conf | grep -i '^nameserver' | head -n1 | cut -d ' ' -f2) || true
+
+    if [[ -n ${THE_DNS} ]]; then
+      timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" || echo "Failure connecting to DNS ${THE_DNS}"
+    fi
+  fi
+
+  if which systemd-resolve; then
+    echo "Getting DNS using systemd-resolve"
+    THE_DNS=$(systemd-resolve --status | grep "Current DNS" | awk '{print $4}') || true
+    if [[ -n ${THE_DNS} ]]; then
+      timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" || echo "Failure connecting to DNS ${THE_DNS}"
+    fi
+  fi
+
+  if which resolvectl; then
+    echo "Getting DNS using resolvectl"
+    THE_DNS=$(resolvectl | grep "Current DNS" | awk '{print $4}') || true
+    if [[ -n ${THE_DNS} ]]; then
+      timeout 2s bash -c "echo > /dev/tcp/${THE_DNS}/53" && echo "DNS ${THE_DNS} up and running" || echo "Failure connecting to DNS ${THE_DNS}"
+    fi
+  fi
+
+  timeout 2s bash -c "echo > /dev/tcp/www.google.com/80" && echo "Network OK" && return 0 || echo "Network not reachable"
+  return 1
 }
 
 # sets root password to the same as the one for SafeScale OperatorUsername (on distribution where root needs password),
@@ -1497,14 +1564,32 @@ function check_unsupported() {
 }
 
 # ---- Main
-
 check_unsupported
 #unsafe_update_credentials
 check_providers
 update_credentials
 configure_locale
-configure_dns
-ensure_network_connectivity || true
+
+{{- if .IsGateway }}
+{{- else}}
+# Without the route in place, we won't have working DNS either, so we set the route first
+ensure_network_connectivity || echo "Network not ready yet: setting the route for machines other than the gateways"
+{{- end}}
+
+# Now, we can check if DNS works, if it's a gateway it should work every time; if not it depends on the previous route working
+check_dns_configuration && echo "DNS is ready" || echo "DNS NOT ready yet"
+configure_dns || failure 213 "problem configuring DNS"
+check_dns_configuration || {
+  configure_dns_fallback || failure 213 "problem configuring DNS, fallback didn't work either"
+  check_dns_configuration || {
+    failure 214 "DNS NOT ready after being configured"
+  }
+}
+
+{{- if .IsGateway }}
+ensure_network_connectivity || echo "Network not ready yet"
+{{- end}}
+
 is_network_reachable && {
   add_common_repos || failure 215 "failure adding common repos, 1st try"
 }
@@ -1513,7 +1598,8 @@ is_network_reachable && {
 }
 
 identify_nics
-configure_network
+configure_network || failure 215 "failure configuring network"
+is_network_reachable || failure 215 "network is NOT ready after trying changing its DNS and configuration"
 
 is_network_reachable && {
   add_common_repos || failure 215 "failure adding common repos, 2nd try"
@@ -1532,6 +1618,7 @@ force_dbus_restart || failure 218 "failure restarting dbus"
 systemctl restart sshd || failure 219 "failure restarting sshd"
 
 enable_at_daemon || failure 220 "failure starting at daemon"
+# ---- EndMain
 
 echo -n "0,linux,${LINUX_KIND},${VERSION_ID},$(hostname),$(date +%Y/%m/%d-%H:%M:%S)" > /opt/safescale/var/state/user_data.netsec.done
 

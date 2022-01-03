@@ -85,8 +85,8 @@ func (c bucket) Delete(names []string, timeout time.Duration) error {
 		_, err := service.Delete(ctx, &protocol.BucketRequest{Name: aname})
 		if err != nil {
 			mutex.Lock()
+			defer mutex.Unlock()
 			errs = append(errs, err.Error())
-			mutex.Unlock()
 		}
 	}
 

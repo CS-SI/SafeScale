@@ -74,7 +74,7 @@ type taskGroup struct {
 // FUTURE: next version of TaskGroup will allow using options
 
 var (
-	// VPL: for future use, I intend to improve TaskGroup to allow these 2 behaviours
+	// VPL: for future use, I intend to improve TaskGroup to allow these 2 behaviors
 
 	// FailEarly tells the TaskGroup to fail as soon as a child fails
 	FailEarly = data.NewImmutableKeyValue("fail", "early")
@@ -102,7 +102,7 @@ func newTaskGroup(ctx context.Context, parentTask Task, options ...data.Immutabl
 	var t Task
 
 	if ctx == nil {
-		return nil, fail.InvalidParameterError("ctx", "cannot be nil!, use context.TODO() or context.Background() instead!")
+		return nil, fail.InvalidParameterError("ctx", "cannot be nil!, use context.Background() instead!")
 	}
 
 	if parentTask == nil {
@@ -297,7 +297,7 @@ func (instance *taskGroup) StartWithTimeout(action TaskAction, params TaskParame
 				// Abort() will be used on it to abort in time
 				t.(*task).lock.Lock()
 				t.(*task).cancelDisengaged = true
-				t.(*task).lock.Unlock()
+				t.(*task).lock.Unlock() // nolint
 
 				for {
 					aborted := t.Aborted()
@@ -437,7 +437,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 			}
 			instance.task.err = forgedError
 			instance.task.status = DONE
-			instance.task.lock.Unlock()
+			instance.task.lock.Unlock() // nolint
 			continue
 
 		case UNKNOWN:
@@ -554,7 +554,7 @@ func (instance *taskGroup) TryWait() (bool, TaskResult, fail.Error) {
 // If TaskGroup aborted, returns (false, nil, *fail.ErrAborted) (subsequent calls of TryWaitGroup may be necessary)
 // If TaskGroup still running, returns (false, nil, nil)
 // if TaskGroup is not started, returns (false, nil, *fail.ErrInconsistent)
-func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Error) {
+func (instance *taskGroup) TryWaitGroup() (bool, TaskGroupResult, fail.Error) {
 	if instance.isNull() {
 		return false, nil, fail.InvalidInstanceError()
 	}
@@ -576,9 +576,14 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 	defer instance.children.lock.RUnlock()
 
 	for _, s := range instance.children.tasks {
-		s.task.(*task).lock.RLock()
-		runTerminated := s.task.(*task).runTerminated
-		s.task.(*task).lock.RUnlock()
+		castedTask, ok := s.task.(*task)
+		if !ok {
+			return false, nil, fail.InconsistentError("failed to cast s.task to '*task'")
+		}
+
+		castedTask.lock.RLock()
+		runTerminated := castedTask.runTerminated
+		castedTask.lock.RUnlock() // nolint
 		if !runTerminated {
 			return false, nil, nil
 		}
@@ -623,7 +628,7 @@ func (instance *taskGroup) TryWaitGroup() (bool, map[string]TaskResult, fail.Err
 		}
 	}
 	instance.task.err = forgeError
-	instance.task.lock.Unlock()
+	instance.task.lock.Unlock() // nolint
 
 	// now constructs
 	instance.lock.RLock()
@@ -691,7 +696,7 @@ func (instance *taskGroup) WaitGroupFor(timeout time.Duration) (bool, TaskGroupR
 				t.(*task).lock.Lock()
 				t.(*task).abortDisengaged = true
 				t.(*task).cancelDisengaged = true
-				t.(*task).lock.Unlock()
+				t.(*task).lock.Unlock() // nolint
 
 				var done bool
 				for !t.Aborted() && !done {
@@ -758,14 +763,14 @@ func (instance *taskGroup) Abort() fail.Error {
 
 	instance.task.lock.RLock()
 	status := instance.task.status
-	instance.task.lock.RUnlock()
+	instance.task.lock.RUnlock() // nolint
 
 	// If taskGroup is not started, go directly to Abort
 	if status == READY {
 		instance.task.lock.Lock()
 		instance.task.status = DONE
 		instance.task.err = fail.AbortedError(nil)
-		instance.task.lock.Unlock()
+		instance.task.lock.Unlock() // nolint
 		return nil
 	}
 
@@ -778,7 +783,6 @@ func (instance *taskGroup) Abort() fail.Error {
 	return nil
 }
 
-// AbortWithCause
 func (instance *taskGroup) AbortWithCause(cerr fail.Error) fail.Error {
 	if instance.isNull() {
 		return fail.InvalidInstanceError()
@@ -786,14 +790,14 @@ func (instance *taskGroup) AbortWithCause(cerr fail.Error) fail.Error {
 
 	instance.task.lock.RLock()
 	status := instance.task.status
-	instance.task.lock.RUnlock()
+	instance.task.lock.RUnlock() // nolint
 
 	// If taskGroup is not started, go directly to Abort
 	if status == READY {
 		instance.task.lock.Lock()
 		instance.task.status = DONE
 		instance.task.err = fail.AbortedError(cerr)
-		instance.task.lock.Unlock()
+		instance.task.lock.Unlock() // nolint
 		return nil
 	}
 

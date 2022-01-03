@@ -252,7 +252,9 @@ func reduceOpenstackError(errorName string, in []byte) (ferr fail.Error) {
 			}
 		}
 	} else if lvl1, ok := body["conflictingRequest"].(map[string]interface{}); ok {
-		msg = lvl1["message"].(string)
+		if lvl1m, ok := lvl1["message"].(string); ok {
+			msg = lvl1m
+		} // FIXME: Missing else
 	} else if lvl1, ok := body["message"].(string); ok {
 		msg = lvl1
 	}
@@ -297,7 +299,7 @@ func reduceHuaweiAPIErrors(errcode int, code string, body map[string]interface{}
 	// look at https://support.huaweicloud.com/intl/en-us/devg-apisign/api-sign-errorcode.html
 	switch code {
 	case "APIGW.0101":
-		return fail.NotFoundError("API not found") // FIXME: Check this, it has to be MORE final
+		return fail.NotFoundError("API not found")
 	case "APIGW.0103":
 		return fail.NotFoundError("The backend does not exist, contact your cloud provider")
 	case "APIGW.0104":
@@ -334,12 +336,6 @@ func reduceHuaweiAPIErrors(errcode int, code string, body map[string]interface{}
 
 // reduceHuaweicloudError ...
 func reduceHuaweicloudError(errcode int, in []byte) (ferr fail.Error) {
-	defer func() {
-		switch ferr.(type) { // nolint
-		case *fail.ErrRuntimePanic:
-			ferr = fail.InvalidRequestError(string(in))
-		}
-	}()
 	defer fail.OnPanic(&ferr)
 
 	var body map[string]interface{}

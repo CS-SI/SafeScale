@@ -539,9 +539,18 @@ func reformatSecurityGroup(in *protocol.SecurityGroupResponse, showRules bool) (
 	case true:
 		if rules, ok := out["rules"].([]interface{}); ok {
 			for _, v := range rules {
-				item := v.(map[string]interface{})
-				direction := item["direction"].(float64)
-				etherType := item["ether_type"].(float64)
+				item, ok := v.(map[string]interface{})
+				if !ok {
+					return nil, fail.NewError("rules MUST be map[string]interface{}")
+				}
+				direction, ok := item["direction"].(float64)
+				if !ok {
+					return nil, fail.NewError("direction MUST be float64")
+				}
+				etherType, ok := item["ether_type"].(float64)
+				if !ok {
+					return nil, fail.NewError("etherType MUST be float64")
+				}
 				item["direction_label"] = strings.ToLower(securitygroupruledirection.Enum(direction).String())
 				item["ether_type_label"] = strings.ToLower(ipversion.Enum(etherType).String())
 			}
@@ -735,48 +744,32 @@ var networkSecurityGroupBonds = &cli.Command{
 		list, err := clientSession.SecurityGroup.Bonds(c.Args().Get(1), kind, temporal.GetExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
-			return clitools.FailureResponse(
-				clitools.ExitOnRPC(
-					strprocess.Capitalize(
-						client.DecorateTimeoutError(
-							err, "list of Security Groups", false,
-						).Error(),
-					),
-				),
-			)
+			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of Security Groups", false).Error())))
 		}
 		result := map[string]interface{}{}
 		if len(list.Hosts) > 0 {
 			hosts := make([]map[string]interface{}, len(list.Hosts))
-			jsoned, _ := json.Marshal(list.Hosts)
+			jsoned, err := json.Marshal(list.Hosts)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+			}
+
 			err = json.Unmarshal(jsoned, &hosts)
 			if err != nil {
-				return clitools.FailureResponse(
-					clitools.ExitOnErrorWithMessage(
-						exitcode.Run, strprocess.Capitalize(
-							client.DecorateTimeoutError(
-								err, "list of security-groups", false,
-							).Error(),
-						),
-					),
-				)
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
 			}
 			result["hosts"] = hosts
 		}
 		if len(list.Subnets) > 0 {
 			subnets := make([]map[string]interface{}, len(list.Subnets))
-			jsoned, _ := json.Marshal(list.Subnets)
+			jsoned, err := json.Marshal(list.Subnets)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "bonds of security-groups", false).Error())))
+			}
+
 			err = json.Unmarshal(jsoned, &subnets)
 			if err != nil {
-				return clitools.FailureResponse(
-					clitools.ExitOnErrorWithMessage(
-						exitcode.Run, strprocess.Capitalize(
-							client.DecorateTimeoutError(
-								err, "list of security-groups", false,
-							).Error(),
-						),
-					),
-				)
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, strprocess.Capitalize(client.DecorateTimeoutError(err, "list of security-groups", false).Error())))
 			}
 			result["subnets"] = subnets
 		}
@@ -874,15 +867,15 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		rule := abstract.SecurityGroupRule{
-			Description: c.String("description"),
-			EtherType:   etherType,
-			Direction:   direction,
-			Protocol:    c.String("protocol"),
-			PortFrom:    int32(c.Int("port-from")),
-			PortTo:      int32(c.Int("port-to")),
-			Targets:     c.StringSlice("cidr"),
-		}
+		rule := abstract.NewSecurityGroupRule()
+		rule.Description = c.String("description")
+		rule.EtherType = etherType
+		rule.Direction = direction
+		rule.Protocol = c.String("protocol")
+		rule.PortFrom = int32(c.Int("port-from"))
+		rule.PortTo = int32(c.Int("port-to"))
+		rule.Targets = c.StringSlice("cidr")
+
 		switch rule.Direction {
 		case securitygroupruledirection.Ingress:
 			rule.Sources = c.StringSlice("cidr")
@@ -978,13 +971,13 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		rule := abstract.SecurityGroupRule{
-			EtherType: etherType,
-			Direction: direction,
-			Protocol:  c.String("protocol"),
-			PortFrom:  int32(c.Int("port-from")),
-			PortTo:    int32(c.Int("port-to")),
-		}
+		rule := abstract.NewSecurityGroupRule()
+		rule.EtherType = etherType
+		rule.Direction = direction
+		rule.Protocol = c.String("protocol")
+		rule.PortFrom = int32(c.Int("port-from"))
+		rule.PortTo = int32(c.Int("port-to"))
+
 		switch rule.Direction {
 		case securitygroupruledirection.Ingress:
 			rule.Sources = c.StringSlice("cidr")
