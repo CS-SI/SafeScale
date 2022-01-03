@@ -3227,7 +3227,7 @@ func (instance *Host) softReboot(ctx context.Context) (ferr fail.Error) {
 	if xerr != nil {
 		logrus.Debugf("there was an error sending the reboot command: %v", xerr)
 	}
-	time.Sleep(temporal.GetDefaultDelay())
+	time.Sleep(temporal.DefaultDelay())
 	return nil
 }
 

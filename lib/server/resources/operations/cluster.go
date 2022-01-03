@@ -3018,7 +3018,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 			}
 
 			// Template params: gateways
-			rh, err := LoadHost(instance.GetService(), networkCfg.GatewayID)
+			rh, err := LoadHost(instance.Service(), networkCfg.GatewayID)
 			if err != nil {
 				return fail.InconsistentError("Fail to load primary gateway '%s'", networkCfg.GatewayID)
 			}
@@ -3041,7 +3041,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 			}
 
 			if networkCfg.SecondaryGatewayIP != "" {
-				rh, err = LoadHost(instance.GetService(), networkCfg.SecondaryGatewayID)
+				rh, err = LoadHost(instance.Service(), networkCfg.SecondaryGatewayID)
 				if err != nil {
 					return fail.InconsistentError("Fail to load secondary gateway '%s'", networkCfg.SecondaryGatewayID)
 				}
@@ -3069,7 +3069,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 			for _, v := range nodesV3.Masters {
 				if node, found := nodesV3.ByNumericalID[v]; found {
 					nodes[node.NumericalID] = node
-					master, err := LoadHost(instance.GetService(), node.ID)
+					master, err := LoadHost(instance.Service(), node.ID)
 					if err != nil {
 						return fail.InconsistentError("Fail to load master '%s'", node.ID)
 					}

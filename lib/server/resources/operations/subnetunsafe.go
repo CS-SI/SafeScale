@@ -500,7 +500,7 @@ func (instance *Subnet) unsafeCreateSubnet(ctx context.Context, req abstract.Sub
 		return fail.Wrap(xerr, "failed to validate CIDR '%s' for Subnet '%s'", req.CIDR, req.Name)
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	abstractSubnet, xerr := svc.CreateSubnet(req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -693,7 +693,7 @@ func (instance *Subnet) unsafeFinalizeSubnetCreation() fail.Error {
 }
 
 func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.SubnetRequest, gwname string, gwSizing *abstract.HostSizingRequirements, sgs map[string]struct{}) (ferr fail.Error) {
-	svc := instance.GetService()
+	svc := instance.Service()
 	if gwSizing == nil {
 		gwSizing = &abstract.HostSizingRequirements{MinGPU: -1}
 	}

@@ -3076,7 +3076,7 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 
 	// Remove possible junks
 	cmd := fmt.Sprintf("[ -f %s ] && sudo rm -f %s || exit 0", rfcItem.Remote, rfcItem.Remote)
-	retcode, stdout, stderr, xerr := master.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
+	retcode, stdout, stderr, xerr := master.Run(ctx, cmd, outputs.COLLECT, temporal.ConnectionTimeout(), temporal.DefaultDelay())
 	if xerr != nil {
 		return fail.Wrap(xerr, "%sfail to clean previous temporaries", prerr)
 	}
@@ -3097,7 +3097,7 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 
 	// Run update commands
 	for i, cmd := range commands {
-		retcode, stdout, stderr, xerr = master.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetDefaultDelay())
+		retcode, stdout, stderr, xerr = master.Run(ctx, cmd, outputs.COLLECT, temporal.ConnectionTimeout(), temporal.DefaultDelay())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, errmsg[i])

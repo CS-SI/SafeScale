@@ -1840,7 +1840,7 @@ var clusterAnsibleInventoryCommands = &cli.Command{
 		// Make command line
 		cmdStr := `sudo -u cladm -i ansible-inventory -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
 		logrus.Tracef(cmdStr)
-		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 		if xerr != nil {
 			msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -1932,7 +1932,7 @@ var clusterAnsibleRunCommands = &cli.Command{
 		// Make command line
 		cmdStr := `sudo -u cladm -i ansible -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
 		logrus.Tracef(cmdStr)
-		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 		if xerr != nil {
 			msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)

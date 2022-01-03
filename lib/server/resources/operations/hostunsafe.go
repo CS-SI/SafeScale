@@ -447,7 +447,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(
 	to := fmt.Sprintf("%s:%s", hostName, filename)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
+			retcode, stdout, stderr, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, temporal.ExecutionTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}
