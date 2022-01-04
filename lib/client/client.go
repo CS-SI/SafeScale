@@ -56,7 +56,7 @@ type Session struct {
 
 // DefaultTimeout tells to use the timeout by default depending on context
 var (
-	DefaultConnectionTimeout = temporal.SSHConnectTimeout()
+	DefaultConnectionTimeout = temporal.SSHConnectionTimeout()
 	DefaultExecutionTimeout  = temporal.ExecutionTimeout()
 )
 

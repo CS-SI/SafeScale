@@ -989,9 +989,7 @@ var clusterRunCommand = &cli.Command{
 	},
 }
 
-func executeCommand(
-	clientSession *client.Session, command string, files *client.RemoteFilesHandler, outs outputs.Enum,
-) error {
+func executeCommand(clientSession *client.Session, command string, files *client.RemoteFilesHandler, outs outputs.Enum) error {
 	logrus.Debugf("command=[%s]", command)
 	master, err := clientSession.Cluster.FindAvailableMaster(clusterName, 0) // FIXME: set duration
 	if err != nil {

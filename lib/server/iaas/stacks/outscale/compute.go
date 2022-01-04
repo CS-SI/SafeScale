@@ -38,7 +38,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const maxMemorySize int = 1039
@@ -505,9 +504,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 // - *retry.ErrTimeout: when the timeout is reached
 // - *retry.ErrStopRetry: when a breaking error arises; fail.Cause(xerr) contains the real error encountered
 // - fail.Error: any other errors
-func (s stack) WaitHostState(
-	hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration,
-) (_ *abstract.HostCore, xerr fail.Error) {
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAHC := abstract.NewHostCore()
 	if s.IsNull() {
 		return nullAHC, fail.InvalidInstanceError()
@@ -549,7 +546,7 @@ func (s stack) WaitHostState(
 				return fail.NewError("wrong state: %s", st)
 			}
 		},
-		temporal.DefaultDelay(),
+		s.Timings().NormalDelay(),
 		timeout,
 	)
 	if xerr != nil {
@@ -1015,7 +1012,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, xerr
 	}
 
-	if _, xerr = s.WaitHostState(vm.VmId, hoststate.Started, s.Timings().HostOperationTimeout()); xerr != nil {
+	_, xerr = s.WaitHostState(vm.VmId, hoststate.Started, s.Timings().HostOperationTimeout())
+	if xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 
@@ -1054,7 +1052,7 @@ func (s stack) deleteHost(id string) fail.Error {
 	if xerr := s.rpcDeleteVms([]string{id}); xerr != nil {
 		return xerr
 	}
-	_, xerr := s.WaitHostState(id, hoststate.Terminated, temporal.HostCreationTimeout())
+	_, xerr := s.WaitHostState(id, hoststate.Terminated, s.Timings().HostCreationTimeout())
 	return xerr
 }
 

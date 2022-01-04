@@ -40,9 +40,7 @@ import (
 )
 
 // AddFeature handles 'safescale host feature add <host name or id> <feature name>'
-func (instance *Host) AddFeature(
-	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
-) (outcomes resources.Results, xerr fail.Error) {
+func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -116,9 +114,7 @@ func (instance *Host) AddFeature(
 }
 
 // CheckFeature ...
-func (instance *Host) CheckFeature(
-	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
-) (_ resources.Results, xerr fail.Error) {
+func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -162,9 +158,7 @@ func (instance *Host) CheckFeature(
 }
 
 // DeleteFeature handles 'safescale host delete-feature <host name> <feature name>'
-func (instance *Host) DeleteFeature(
-	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
-) (_ resources.Results, xerr fail.Error) {
+func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (_ resources.Results, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -259,9 +253,7 @@ func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 }
 
 // RegisterFeature registers an installed Feature in metadata of Host
-func (instance *Host) RegisterFeature(
-	feat resources.Feature, requiredBy resources.Feature, clusterContext bool,
-) (xerr fail.Error) {
+func (instance *Host) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, clusterContext bool) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {

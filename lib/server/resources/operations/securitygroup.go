@@ -134,7 +134,7 @@ func LoadSecurityGroup(svc iaas.Service, ref string) (sgInstance *SecurityGroup,
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onSGCacheMiss(svc, ref) },
-		temporal.MetadataTimeout(),
+		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := sgCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -256,9 +256,7 @@ func (instance *SecurityGroup) carry(clonable data.Clonable) (ferr fail.Error) {
 }
 
 // Browse walks through SecurityGroup MetadataFolder and executes a callback for each entries
-func (instance *SecurityGroup) Browse(
-	ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error,
-) (xerr fail.Error) {
+func (instance *SecurityGroup) Browse(ctx context.Context, callback func(*abstract.SecurityGroup) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Do not test with IsNull here, as Browse may be used from null value
@@ -312,9 +310,7 @@ func (instance *SecurityGroup) Browse(
 // Create creates a new SecurityGroup and its metadata.
 // If needed by Cloud Provider, the Security Group will be attached to Network identified by 'networkID' (otherwise this parameter is ignored)
 // If the metadata is already carrying a SecurityGroup, returns fail.ErrNotAvailable
-func (instance *SecurityGroup) Create(
-	ctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules,
-) (ferr fail.Error) {
+func (instance *SecurityGroup) Create(ctx context.Context, networkID, name, description string, rules abstract.SecurityGroupRules) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	// note: do not test IsNull() here, it's expected to be IsNull() actually
@@ -656,9 +652,7 @@ func (instance *SecurityGroup) unbindFromHosts(ctx context.Context, in *properti
 
 // unbindFromSubnets unbinds security group from all the subnets bound to it and update the Subnet metadata accordingly
 //goland:noinspection GoDeferInLoop
-func (instance *SecurityGroup) unbindFromSubnets(
-	ctx context.Context, in *propertiesv1.SecurityGroupSubnets,
-) fail.Error {
+func (instance *SecurityGroup) unbindFromSubnets(ctx context.Context, in *propertiesv1.SecurityGroupSubnets) fail.Error {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -964,8 +958,10 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 				return innerXErr
 			}
 		}
+		svc := instance.Service()
 		for _, v := range rules {
-			if _, innerXErr = instance.Service().AddRuleToSecurityGroup(asg, v); innerXErr != nil {
+			_, innerXErr = svc.AddRuleToSecurityGroup(asg, v)
+			if innerXErr != nil {
 				return innerXErr
 			}
 		}
@@ -1172,10 +1168,7 @@ func (instance *SecurityGroup) ToProtocol() (_ *protocol.SecurityGroupResponse, 
 }
 
 // BindToHost binds the security group to a host.
-func (instance *SecurityGroup) BindToHost(
-	ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation,
-	mark resources.SecurityGroupMark,
-) (xerr fail.Error) {
+func (instance *SecurityGroup) BindToHost(ctx context.Context, hostInstance resources.Host, enable resources.SecurityGroupActivation, mark resources.SecurityGroupMark) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -1648,7 +1641,9 @@ func (instance *SecurityGroup) unbindFromSubnetHosts(
 }
 
 // UnbindFromSubnetByReference unbinds the security group from a subnet
-func (instance *SecurityGroup) UnbindFromSubnetByReference(ctx context.Context, subnetRef string) (xerr fail.Error) {
+func (instance *SecurityGroup) UnbindFromSubnetByReference(
+	ctx context.Context, subnetRef string,
+) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {

@@ -28,7 +28,6 @@ import (
 	"sync/atomic"
 	txttmpl "text/template"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/sirupsen/logrus"
 
@@ -39,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Content is the structure to apply to userdata.sh template

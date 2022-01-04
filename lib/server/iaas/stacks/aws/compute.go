@@ -411,9 +411,7 @@ func toAbstractHostTemplate(in ec2.InstanceTypeInfo) abstract.HostTemplate {
 
 // WaitHostReady waits until a host achieves ready state
 // hostParam can be an ID of host, or an instance of *resources.Host; any other type will panic
-func (s stack) WaitHostReady(
-	hostParam stacks.HostParameter, timeout time.Duration,
-) (_ *abstract.HostCore, xerr fail.Error) {
+func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAHC := abstract.NewHostCore()
 	if s.IsNull() {
 		return nullAHC, fail.InvalidInstanceError()
@@ -1123,8 +1121,8 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 			}
 			return nil
 		},
-		temporal.DefaultDelay(),
-		temporal.HostCleanupTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1133,7 +1131,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef,
-				temporal.HostCleanupTimeout(),
+				s.Timings().HostCleanupTimeout(),
 			)
 		default:
 			return retryErr
@@ -1173,8 +1171,8 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 			}
 			return nil
 		},
-		temporal.DefaultDelay(),
-		temporal.HostCleanupTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1183,7 +1181,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get information of host '%s' after %v", hostRef,
-				temporal.HostCleanupTimeout(),
+				s.Timings().HostCleanupTimeout(),
 			)
 		default:
 			return retryErr
@@ -1222,8 +1220,8 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 			}
 			return nil
 		},
-		temporal.DefaultDelay(),
-		2*temporal.HostCleanupTimeout(),
+		s.Timings().NormalDelay(),
+		2*s.Timings().HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1232,7 +1230,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef,
-				temporal.HostCleanupTimeout(),
+				s.Timings().HostCleanupTimeout(),
 			)
 		default:
 			return retryErr
@@ -1243,9 +1241,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 }
 
 // ResizeHost changes the sizing of an existing host
-func (s stack) ResizeHost(
-	hostParam stacks.HostParameter, request abstract.HostSizingRequirements,
-) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
@@ -1257,9 +1253,7 @@ func (s stack) ResizeHost(
 // BindSecurityGroupToHost ...
 // Returns:
 // - *fail.ErrNotFound if the Host is not found
-func (s stack) BindSecurityGroupToHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) fail.Error {
+func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1313,9 +1307,7 @@ func (s stack) BindSecurityGroupToHost(
 // Returns:
 // - nil means success
 // - *fail.ErrNotFound if the Host or the Security Group ID cannot be identified
-func (s stack) UnbindSecurityGroupFromHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}

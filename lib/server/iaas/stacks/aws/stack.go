@@ -18,10 +18,6 @@
 package aws
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
-	"github.com/aws/aws-sdk-go/service/s3"
-
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -30,9 +26,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 type stack struct {
@@ -80,9 +79,7 @@ func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail
 }
 
 // New creates and initializes an AWS stack
-func New(
-	auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions,
-) (*stack, error) { // nolint
+func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cfg stacks.ConfigurationOptions) (*stack, error) { // nolint
 	if localCfg.Ec2Endpoint == "" {
 		localCfg.Ec2Endpoint = fmt.Sprintf("https://ec2.%s.amazonaws.com", localCfg.Region)
 	}

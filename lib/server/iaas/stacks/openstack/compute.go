@@ -456,7 +456,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.OperationTimeout())
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, s.Timings().OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -494,9 +494,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(
-	hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port,
-) (host *abstract.HostFull, xerr fail.Error) {
+func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Updates intrinsic data of host if needed
@@ -952,9 +950,7 @@ func (s stack) GetMetadataOfInstance(id string) (map[string]string, fail.Error) 
 }
 
 // identifyOpenstackSubnetsAndPorts ...
-func (s stack) identifyOpenstackSubnetsAndPorts(
-	request abstract.HostRequest, defaultSubnet *abstract.Subnet,
-) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) {
+func (s stack) identifyOpenstackSubnetsAndPorts(request abstract.HostRequest, defaultSubnet *abstract.Subnet) (nets []servers.Network, netPorts []ports.Port, createdPorts []string, ferr fail.Error) {
 	nets = []servers.Network{}
 	netPorts = []ports.Port{}
 	createdPorts = []string{}
@@ -1128,9 +1124,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(
-	hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration,
-) (server *servers.Server, xerr fail.Error) {
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
 	nullServer := &servers.Server{}
 	if s.IsNull() {
 		return nullServer, fail.InvalidInstanceError()
@@ -1201,7 +1195,7 @@ func (s stack) WaitHostState(
 				)
 			}
 		},
-		temporal.MinDelay(),
+		s.Timings().SmallDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -1414,8 +1408,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					}
 					return fail.NewError("host %s state is '%s'", hostRef, server.Status)
 				},
-				temporal.DefaultDelay(),
-				temporal.ContextTimeout(),
+				s.Timings().NormalDelay(),
+				s.Timings().ContextTimeout(),
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -1433,7 +1427,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return nil
 		},
 		0,
-		temporal.HostCleanupTimeout(),
+		s.Timings().HostCleanupTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) { // FIXME: Look at that
@@ -1570,9 +1564,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // ResizeHost ...
-func (s stack) ResizeHost(
-	hostParam stacks.HostParameter, request abstract.HostSizingRequirements,
-) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
@@ -1595,9 +1587,7 @@ func (s stack) ResizeHost(
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to IPAddress, returns *fail.ErrDuplicate
-func (s stack) BindSecurityGroupToHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) fail.Error {
+func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -1624,9 +1614,7 @@ func (s stack) BindSecurityGroupToHost(
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s stack) UnbindSecurityGroupFromHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}

@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // -------------IMAGES---------------------------------------------------------------------------------------------------
@@ -330,7 +329,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			}
 			return nil
 		},
-		temporal.DefaultDelay(),
+		s.Timings().NormalDelay(),
 		s.Timings().HostLongOperationTimeout(),
 	)
 	if retryErr != nil {
@@ -358,9 +357,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 // WaitHostReady waits until a host reaches ready state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter.
-func (s stack) WaitHostReady(
-	hostParam stacks.HostParameter, timeout time.Duration,
-) (_ *abstract.HostCore, xerr fail.Error) {
+func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, xerr fail.Error) {
 	nullAHC := abstract.NewHostCore()
 	if s.IsNull() {
 		return nullAHC, fail.InvalidInstanceError()
@@ -388,7 +385,7 @@ func (s stack) WaitHostReady(
 			}
 			return nil
 		},
-		temporal.DefaultDelay(),
+		s.Timings().NormalDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -650,8 +647,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 			_, innerXErr := s.rpcGetInstance(ahf.Core.ID)
 			return innerXErr
 		},
-		temporal.DefaultDelay(),
-		temporal.ContextTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().ContextTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -667,9 +664,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 }
 
 // ResizeHost change the template used by a host
-func (s stack) ResizeHost(
-	hostParam stacks.HostParameter, request abstract.HostSizingRequirements,
-) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	return nil, fail.NotImplementedError("ResizeHost() not implemented yet") // FIXME: Technical debt
 }
 
@@ -821,9 +816,7 @@ func (s stack) ListRegions() (_ []string, xerr fail.Error) {
 }
 
 // BindSecurityGroupToHost ...
-func (s stack) BindSecurityGroupToHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) (xerr fail.Error) {
+func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -847,9 +840,7 @@ func (s stack) BindSecurityGroupToHost(
 }
 
 // UnbindSecurityGroupFromHost unbinds a Security Group from a Host
-func (s stack) UnbindSecurityGroupFromHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) (xerr fail.Error) {
+func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (xerr fail.Error) {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}

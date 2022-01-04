@@ -53,7 +53,7 @@ func cleanup(clientSession *client.Session, onAbort *uint32) {
 		os.Exit(0)
 	}
 
-	fmt.Println("\nBe careful stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible!")
+	fmt.Println("\nBe careful: stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible.")
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Do you really want to stop the command ? [y]es [n]o: ")
 	text, err := reader.ReadString('\n')

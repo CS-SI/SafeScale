@@ -22,11 +22,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	rice "github.com/GeertJohan/go.rice"
 
 	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate rice embed-go
@@ -84,6 +84,7 @@ func BuildBashLibraryDefinition(
 	return out, nil
 }
 
+// ToMap transforms bld to a map
 func (bld *BashLibraryDefinition) ToMap() (map[string]interface{}, fail.Error) {
 	empty := map[string]interface{}{}
 	if bld == nil {

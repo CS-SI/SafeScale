@@ -114,9 +114,7 @@ func (s StackProxy) ListSecurityGroups(networkRef string) (_ []*abstract.Securit
 	return groups, xerr
 }
 
-func (s StackProxy) CreateSecurityGroup(
-	networkRef, name, description string, rules abstract.SecurityGroupRules,
-) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s StackProxy) CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	groups, xerr := s.FullStack.CreateSecurityGroup(networkRef, name, description, rules)
@@ -144,18 +142,14 @@ func (s StackProxy) DeleteSecurityGroup(group *abstract.SecurityGroup) (ferr fai
 	return xerr
 }
 
-func (s StackProxy) AddRuleToSecurityGroup(
-	sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule,
-) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s StackProxy) AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.FullStack.AddRuleToSecurityGroup(sgParam, rule)
 	return group, xerr
 }
 
-func (s StackProxy) DeleteRuleFromSecurityGroup(
-	sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule,
-) (_ *abstract.SecurityGroup, ferr fail.Error) {
+func (s StackProxy) DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (_ *abstract.SecurityGroup, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	group, xerr := s.FullStack.DeleteRuleFromSecurityGroup(sgParam, rule)
@@ -267,27 +261,21 @@ func (s StackProxy) DeleteSubnet(id string) (ferr fail.Error) {
 	return xerr
 }
 
-func (s StackProxy) BindSecurityGroupToSubnet(
-	sgParam stacks.SecurityGroupParameter, subnetID string,
-) (ferr fail.Error) {
+func (s StackProxy) BindSecurityGroupToSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.BindSecurityGroupToSubnet(sgParam, subnetID)
 	return xerr
 }
 
-func (s StackProxy) UnbindSecurityGroupFromSubnet(
-	sgParam stacks.SecurityGroupParameter, subnetID string,
-) (ferr fail.Error) {
+func (s StackProxy) UnbindSecurityGroupFromSubnet(sgParam stacks.SecurityGroupParameter, subnetID string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.UnbindSecurityGroupFromSubnet(sgParam, subnetID)
 	return xerr
 }
 
-func (s StackProxy) CreateVIP(
-	networkID, subnetID, name string, securityGroups []string,
-) (_ *abstract.VirtualIP, ferr fail.Error) {
+func (s StackProxy) CreateVIP(networkID, subnetID, name string, securityGroups []string) (_ *abstract.VirtualIP, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	network, xerr := s.FullStack.CreateVIP(networkID, subnetID, name, securityGroups)
@@ -385,36 +373,28 @@ func (s StackProxy) RebootHost(parameter stacks.HostParameter) (ferr fail.Error)
 	return xerr
 }
 
-func (s StackProxy) ResizeHost(
-	parameter stacks.HostParameter, requirements abstract.HostSizingRequirements,
-) (_ *abstract.HostFull, ferr fail.Error) {
+func (s StackProxy) ResizeHost(parameter stacks.HostParameter, requirements abstract.HostSizingRequirements) (_ *abstract.HostFull, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.FullStack.ResizeHost(parameter, requirements)
 	return host, xerr
 }
 
-func (s StackProxy) WaitHostReady(
-	hostParam stacks.HostParameter, timeout time.Duration,
-) (_ *abstract.HostCore, ferr fail.Error) {
+func (s StackProxy) WaitHostReady(hostParam stacks.HostParameter, timeout time.Duration) (_ *abstract.HostCore, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	host, xerr := s.FullStack.WaitHostReady(hostParam, timeout)
 	return host, xerr
 }
 
-func (s StackProxy) BindSecurityGroupToHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) (ferr fail.Error) {
+func (s StackProxy) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.BindSecurityGroupToHost(sgParam, hostParam)
 	return xerr
 }
 
-func (s StackProxy) UnbindSecurityGroupFromHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) (ferr fail.Error) {
+func (s StackProxy) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	xerr := s.FullStack.UnbindSecurityGroupFromHost(sgParam, hostParam)

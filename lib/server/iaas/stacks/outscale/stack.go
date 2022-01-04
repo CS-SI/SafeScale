@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -29,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Credentials outscale credentials
@@ -163,6 +163,7 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
 	s.buildTemplateList()
 
 	s.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 
 	return &s, s.initDefaultNetwork()
 }

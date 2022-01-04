@@ -48,7 +48,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 type blockDevice struct {
@@ -801,7 +800,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nullAHF, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.OperationTimeout())
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, s.Timings().OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -929,9 +928,7 @@ func (s stack) ListTemplates(bool) ([]abstract.HostTemplate, fail.Error) {
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(
-	host *abstract.HostCore, server *servers.Server,
-) (completedHost *abstract.HostFull, xerr fail.Error) {
+func (s stack) complementHost(host *abstract.HostCore, server *servers.Server) (completedHost *abstract.HostFull, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	networks, addresses, ipv4, ipv6, xerr := s.collectAddresses(host)
@@ -1245,8 +1242,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						}
 						return commRetryErr
 					},
-					temporal.DefaultDelay(),
-					temporal.HostCleanupTimeout(),
+					s.Timings().NormalDelay(),
+					s.Timings().HostCleanupTimeout(),
 				)
 				if innerRetryErr != nil {
 					switch innerRetryErr.(type) {
@@ -1265,7 +1262,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return fail.NewError("host '%s' in state 'Error', retrying to delete", hostRef)
 		},
 		0,
-		temporal.HostCleanupTimeout(),
+		s.Timings().HostCleanupTimeout(), // FIXME: is it a sufficient timeout?
 	)
 	if outerRetryErr != nil {
 		switch outerRetryErr.(type) {
@@ -1313,9 +1310,7 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 	}
 	// VPL: fip not found is not an abnormal situation, do not log or raise error
 	if len(fips) > 1 {
-		return nil, fail.InconsistentError(
-			"configuration error, more than one Floating IP associated to host '%s'", hostID,
-		)
+		return nil, fail.InconsistentError("configuration error, more than one Floating IP associated to host '%s'", hostID)
 	}
 	if len(fips) == 0 {
 		return nil, nil
@@ -1362,8 +1357,8 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			return nil
 		},
-		temporal.DefaultDelay(),
-		temporal.OperationTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().OperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

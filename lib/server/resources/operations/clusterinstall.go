@@ -47,7 +47,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 var (
@@ -264,9 +263,7 @@ func (instance *Cluster) ComplementFeatureParameters(ctx context.Context, v data
 
 // RegisterFeature registers an installed Feature in metadata of a Cluster
 // satisfies interface resources.Targetable
-func (instance *Cluster) RegisterFeature(
-	feat resources.Feature, requiredBy resources.Feature, _ bool,
-) (ferr fail.Error) {
+func (instance *Cluster) RegisterFeature(feat resources.Feature, requiredBy resources.Feature, _ bool) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -376,9 +373,7 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 }
 
 // AddFeature installs a feature on the Cluster
-func (instance *Cluster) AddFeature(
-	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
-) (resources.Results, fail.Error) {
+func (instance *Cluster) AddFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -399,9 +394,7 @@ func (instance *Cluster) AddFeature(
 }
 
 // CheckFeature tells if a feature is installed on the Cluster
-func (instance *Cluster) CheckFeature(
-	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
-) (resources.Results, fail.Error) {
+func (instance *Cluster) CheckFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -422,9 +415,7 @@ func (instance *Cluster) CheckFeature(
 }
 
 // RemoveFeature uninstalls a feature from the Cluster
-func (instance *Cluster) RemoveFeature(
-	ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings,
-) (resources.Results, fail.Error) {
+func (instance *Cluster) RemoveFeature(ctx context.Context, name string, vars data.Map, settings resources.FeatureSettings) (resources.Results, fail.Error) {
 	if instance == nil || instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -445,9 +436,7 @@ func (instance *Cluster) RemoveFeature(
 }
 
 // ExecuteScript executes the script template with the parameters on target Host
-func (instance *Cluster) ExecuteScript(
-	ctx context.Context, tmplName string, variables data.Map, host resources.Host,
-) (_ int, _ string, _ string, ferr fail.Error) {
+func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, variables data.Map, host resources.Host) (_ int, _ string, _ string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	const invalid = -1
 
@@ -565,14 +554,12 @@ func (instance *Cluster) ExecuteScript(
 		}
 
 		rounds--
-		time.Sleep(temporal.MinDelay())
+		time.Sleep(timings.SmallDelay())
 	}
 }
 
 // installNodeRequirements ...
-func (instance *Cluster) installNodeRequirements(
-	ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string,
-) (ferr fail.Error) {
+func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType clusternodetype.Enum, host resources.Host, hostLabel string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -932,9 +919,7 @@ func (instance *Cluster) installAnsible(ctx context.Context) (xerr fail.Error) {
 }
 
 // install proxycache-client feature if not disabled
-func (instance *Cluster) installProxyCacheClient(
-	ctx context.Context, host resources.Host, hostLabel string,
-) (ferr fail.Error) {
+func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1000,9 +985,7 @@ func (instance *Cluster) installProxyCacheClient(
 }
 
 // install proxycache-server feature if not disabled
-func (instance *Cluster) installProxyCacheServer(
-	ctx context.Context, host resources.Host, hostLabel string,
-) (ferr fail.Error) {
+func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 

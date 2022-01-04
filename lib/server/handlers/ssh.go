@@ -362,9 +362,7 @@ func (handler *sshHandler) Run(hostRef, cmd string) (retCode int, stdOut string,
 }
 
 // run executes command on the host
-func (handler *sshHandler) runWithTimeout(
-	ssh *system.SSHConfig, cmd string, duration time.Duration,
-) (_ int, _ string, _ string, xerr fail.Error) {
+func (handler *sshHandler) runWithTimeout(ssh *system.SSHConfig, cmd string, duration time.Duration) (_ int, _ string, _ string, xerr fail.Error) {
 	const invalid = -1
 
 	// Create the command

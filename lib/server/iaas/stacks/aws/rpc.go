@@ -24,7 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -1488,9 +1487,7 @@ func (s stack) rpcDescribeSpotPriceHistory(zone, templateID *string) ([]*ec2.Spo
 	return resp.SpotPriceHistory, nil
 }
 
-func (s stack) rpcRequestSpotInstance(
-	price, zone, subnetID *string, publicIP *bool, templateID, imageID, keypairName *string, userdata []byte,
-) (*ec2.SpotInstanceRequest, fail.Error) {
+func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *bool, templateID, imageID, keypairName *string, userdata []byte) (*ec2.SpotInstanceRequest, fail.Error) {
 	nullInstance := &ec2.SpotInstanceRequest{}
 	if xerr := validateAWSString(zone, "zone", true); xerr != nil {
 		return nullInstance, xerr
@@ -1546,9 +1543,7 @@ func (s stack) rpcRequestSpotInstance(
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcRunInstance(
-	name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte,
-) (_ *ec2.Instance, ferr fail.Error) {
+func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
 	nullInstance := &ec2.Instance{}
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nullInstance, xerr
@@ -1825,8 +1820,8 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 
 			return nil
 		},
-		temporal.DefaultDelay(),
-		temporal.HostCleanupTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1834,8 +1829,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
 			return fail.Wrap(
-				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId,
-				temporal.HostCleanupTimeout(),
+				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId, s.Timings().HostCleanupTimeout(),
 			)
 		default:
 			return retryErr

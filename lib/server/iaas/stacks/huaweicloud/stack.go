@@ -82,6 +82,7 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and return interface stack
+//goland:noinspection GoExportedFuncWithUnexportedType
 func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	// gophercloud doesn't know how to determine Auth API version to use for FlexibleEngine.
 	// So we help him to.
@@ -285,6 +286,7 @@ func New(auth stacks.AuthenticationOptions, cfg stacks.ConfigurationOptions) (*s
 	s.cfgOpts.UseFloatingIP = true
 
 	s.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 
 	// Initializes the VPC
 	xerr = s.initVPC()
@@ -737,9 +739,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) fail.Error {
 }
 
 // ResizeHost ...
-func (s stack) ResizeHost(
-	hostParam stacks.HostParameter, request abstract.HostSizingRequirements,
-) (*abstract.HostFull, fail.Error) {
+func (s stack) ResizeHost(hostParam stacks.HostParameter, request abstract.HostSizingRequirements) (*abstract.HostFull, fail.Error) {
 	nullAHF := abstract.NewHostFull()
 	if s.IsNull() {
 		return nullAHF, fail.InvalidInstanceError()
@@ -759,9 +759,7 @@ func (s stack) ResizeHost(
 
 // WaitHostState waits a host achieve defined state
 // hostParam can be an ID of host, or an instance of *abstract.HostCore; any other type will return an utils.ErrInvalidParameter
-func (s stack) WaitHostState(
-	hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration,
-) (server *servers.Server, xerr fail.Error) {
+func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enum, timeout time.Duration) (server *servers.Server, xerr fail.Error) {
 	nullServer := &servers.Server{}
 	if s.IsNull() {
 		return nullServer, fail.InvalidInstanceError()
@@ -832,7 +830,7 @@ func (s stack) WaitHostState(
 				)
 			}
 		},
-		temporal.MinDelay(),
+		s.Timings().SmallDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -896,9 +894,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 
 // BindSecurityGroupToHost binds a security group to a host
 // If Security Group is already bound to Host, returns *fail.ErrDuplicate
-func (s stack) BindSecurityGroupToHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) fail.Error {
+func (s stack) BindSecurityGroupToHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -925,9 +921,7 @@ func (s stack) BindSecurityGroupToHost(
 }
 
 // UnbindSecurityGroupFromHost unbinds a security group from a host
-func (s stack) UnbindSecurityGroupFromHost(
-	sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter,
-) fail.Error {
+func (s stack) UnbindSecurityGroupFromHost(sgParam stacks.SecurityGroupParameter, hostParam stacks.HostParameter) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -961,7 +955,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	var timeout = temporal.OperationTimeout()
+	var timeout = s.Timings().OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
@@ -978,7 +972,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 			}
 			return innerXErr
 		},
-		temporal.DefaultDelay(),
+		s.Timings().NormalDelay(),
 		timeout,
 	)
 	if xerr != nil {

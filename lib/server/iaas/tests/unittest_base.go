@@ -185,9 +185,7 @@ func (tester *ServiceTester) CreateNetwork(t *testing.T, name string, cidr strin
 }
 
 // CreateSubnet creates a test subnet
-func (tester *ServiceTester) CreateSubnet(
-	t *testing.T, networkID, name string, withGW bool, cidr string,
-) (*abstract.Subnet, *abstract.HostFull) {
+func (tester *ServiceTester) CreateSubnet(t *testing.T, networkID, name string, withGW bool, cidr string) (*abstract.Subnet, *abstract.HostFull) {
 	subnet, err := tester.Service.CreateSubnet(abstract.SubnetRequest{
 		Name:      name,
 		IPVersion: ipversion.IPv4,
@@ -227,9 +225,7 @@ func (tester *ServiceTester) CreateSubnet(
 }
 
 // CreateHost creates a test host
-func (tester *ServiceTester) CreateHost(
-	t *testing.T, name string, subnet *abstract.Subnet, public bool,
-) (*abstract.HostFull, *userdata.Content, fail.Error) {
+func (tester *ServiceTester) CreateHost(t *testing.T, name string, subnet *abstract.Subnet, public bool) (*abstract.HostFull, *userdata.Content, fail.Error) {
 	tpls, xerr := tester.Service.ListTemplatesBySizing(abstract.HostSizingRequirements{
 		MinCores:    1,
 		MinRAMSize:  1,

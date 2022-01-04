@@ -131,9 +131,7 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(
-	f resources.Feature, t resources.Targetable, m installmethod.Enum, a installaction.Enum, cb alterCommandCB,
-) (*worker, fail.Error) {
+func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum, a installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
 	w := worker{
 		feature:   f.(*Feature),
 		target:    t,
@@ -390,13 +388,13 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		gw, xerr := subnetInstance.InspectGateway(true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr == nil {
-			_, xerr = gw.WaitSSHReady(ctx, temporal.SSHConnectTimeout())
+			_, xerr = gw.WaitSSHReady(ctx, gw.Service().Timings().SSHConnectionTimeout())
 		}
 
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if gw, xerr = subnetInstance.InspectGateway(false); xerr == nil {
-				_, xerr = gw.WaitSSHReady(ctx, temporal.SSHConnectTimeout())
+				_, xerr = gw.WaitSSHReady(ctx, gw.Service().Timings().SSHConnectionTimeout())
 			}
 		}
 
@@ -413,14 +411,18 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		var gw resources.Host
-		if gw, xerr = LoadHost(w.cluster.Service(), netCfg.GatewayID); xerr == nil {
-			_, xerr = gw.WaitSSHReady(ctx, temporal.SSHConnectTimeout())
+		svc := w.cluster.Service()
+		gw, xerr = LoadHost(svc, netCfg.GatewayID)
+		if xerr == nil {
+			_, xerr = gw.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
 		}
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			if gw, xerr = LoadHost(w.cluster.Service(), netCfg.SecondaryGatewayID); xerr == nil {
-				_, xerr = gw.WaitSSHReady(ctx, temporal.SSHConnectTimeout())
+			gw, xerr = LoadHost(svc, netCfg.SecondaryGatewayID)
+			if xerr == nil {
+				_, xerr = gw.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
 			}
 		}
 		xerr = debug.InjectPlannedFail(xerr)
@@ -469,7 +471,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 	if w.cluster != nil {
 		var netCfg *propertiesv3.ClusterNetwork
 		if netCfg, xerr = w.cluster.GetNetworkConfig(); xerr == nil {
-			rs, xerr = LoadSubnet(w.cluster.Service(), "", netCfg.SubnetID)
+			rs, xerr = LoadSubnet(w.service, "", netCfg.SubnetID)
 		}
 	} else {
 		rs, xerr = w.host.GetDefaultSubnet()
@@ -483,12 +485,12 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 	gw, xerr := rs.InspectGateway(true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr == nil {
-		if _, xerr = gw.WaitSSHReady(ctx, temporal.SSHConnectTimeout()); xerr == nil {
+		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
 	}
 	if gw, xerr = rs.InspectGateway(false); xerr == nil {
-		if _, xerr = gw.WaitSSHReady(ctx, temporal.SSHConnectTimeout()); xerr == nil {
+		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
 	}
@@ -501,9 +503,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(
-	ctx context.Context, v data.Map, s resources.FeatureSettings,
-) (outcomes resources.Results, xerr fail.Error) {
+func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
 	w.variables = v
 	w.settings = s
 
@@ -690,9 +690,7 @@ type taskLaunchStepParameters struct {
 }
 
 // taskLaunchStep starts the step
-func (w *worker) taskLaunchStep(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, xerr fail.Error) {
+func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if w == nil {
@@ -1057,22 +1055,20 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return nil
 	}
 
-	svc := w.cluster.Service()
-
 	netprops, xerr := w.cluster.GetNetworkConfig()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	subnetInstance, xerr := LoadSubnet(svc, "", netprops.SubnetID)
+	subnetInstance, xerr := LoadSubnet(w.service, "", netprops.SubnetID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer subnetInstance.Released() // mark instance as released at the end of the function, for cache considerations
 
-	primaryKongController, xerr := NewKongController(ctx, svc, subnetInstance, true)
+	primaryKongController, xerr := NewKongController(ctx, w.service, subnetInstance, true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply reverse proxy rules")
@@ -1080,7 +1076,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 
 	var secondaryKongController *KongController
 	if ok, _ := subnetInstance.HasVirtualIP(); ok {
-		secondaryKongController, xerr = NewKongController(ctx, svc, subnetInstance, false)
+		secondaryKongController, xerr = NewKongController(ctx, w.service, subnetInstance, false)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to apply reverse proxy rules")
@@ -1248,9 +1244,7 @@ type taskApplyProxyRuleParameters struct {
 	variables  *data.Map
 }
 
-func taskApplyProxyRule(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (tr concurrency.TaskResult, xerr fail.Error) {
+func taskApplyProxyRule(task concurrency.Task, params concurrency.TaskParameters) (tr concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if task == nil {
@@ -1467,15 +1461,11 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 		return nil
 	}
 
-	var (
-		svc iaas.Service
-		rs  resources.Subnet
-	)
+	var rs resources.Subnet
 	if w.cluster != nil {
-		svc = w.cluster.Service()
 		var netprops *propertiesv3.ClusterNetwork
 		if netprops, xerr = w.cluster.GetNetworkConfig(); xerr == nil {
-			rs, xerr = LoadSubnet(svc, netprops.NetworkID, netprops.SubnetID)
+			rs, xerr = LoadSubnet(w.service, netprops.NetworkID, netprops.SubnetID)
 		}
 	} else if w.host != nil {
 		rs, xerr = w.host.GetDefaultSubnet()
@@ -1505,7 +1495,6 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 
 		// If security rules concerns gateways, update subnet Security Group for gateways
 		if _, ok := targets["gateways"]; ok {
-
 			description, ok := r["name"].(string)
 			if !ok {
 				return fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)

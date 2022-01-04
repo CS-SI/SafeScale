@@ -153,7 +153,7 @@ func NewTimings() *MutableTimings {
 			Operation:              OperationTimeout(),
 			Metadata:               MetadataTimeout(),
 			MetadataReadAfterWrite: MetadataReadAfterWriteTimeout(),
-			SSHConnection:          SSHConnectTimeout(),
+			SSHConnection:          SSHConnectionTimeout(),
 		},
 		Delays: Delays{
 			Small:  SmallDelay(),
@@ -247,7 +247,7 @@ func (t *MutableTimings) HostLongOperationTimeout() time.Duration {
 // SSHConnectionTimeout returns the configured timeout for SSH connection
 func (t *MutableTimings) SSHConnectionTimeout() time.Duration {
 	if t == nil {
-		return SSHConnectTimeout()
+		return SSHConnectionTimeout()
 	}
 
 	return t.Timeouts.SSHConnection
@@ -343,14 +343,14 @@ func HostCleanupTimeout() time.Duration {
 	return getFromEnv(defaultHostCleanupTimeout, "SAFESCALE_HOST_CLEANUP_TIMEOUT")
 }
 
-// SSHConnectTimeout ...
-func SSHConnectTimeout() time.Duration {
-	return getFromEnv(defaultSSHConnectionTimeout, "SAFESCALE_SSH_CONNECT_TIMEOUT")
+// SSHConnectionTimeout ...
+func SSHConnectionTimeout() time.Duration {
+	return getFromEnv(defaultSSHConnectionTimeout, "SAFESCALE_SSH_CONNECTION_TIMEOUT", "SAFESCALE_SSH_CONNECT_TIMEOUT")
 }
 
 // ConnectionTimeout ...
 func ConnectionTimeout() time.Duration {
-	return getFromEnv(defaultConnectionTimeout, "SAFESCALE_CONNECT_TIMEOUT")
+	return getFromEnv(defaultConnectionTimeout, "SAFESCALE_CONNECTION_TIMEOUT", "SAFESCALE_CONNECT_TIMEOUT")
 }
 
 // ExecutionTimeout ...

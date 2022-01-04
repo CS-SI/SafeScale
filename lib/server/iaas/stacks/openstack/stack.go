@@ -19,14 +19,14 @@ package openstack // Package openstack contains the implemenation of a stack for
 import (
 	"strings"
 
-	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // stack contains the needs to operate on stack OpenStack
@@ -63,10 +63,7 @@ func NullStack() *stack { // nolint
 }
 
 // New authenticates and returns a stack pointer
-func New(
-	auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions,
-	serviceVersions map[string]string,
-) (*stack, fail.Error) { // nolint
+func New(auth stacks.AuthenticationOptions, authScope *gophercloud.AuthScope, cfg stacks.ConfigurationOptions, serviceVersions map[string]string) (*stack, fail.Error) { // nolint
 	if auth.DomainName == "" && auth.DomainID == "" {
 		auth.DomainName = "Default"
 	}
@@ -243,6 +240,7 @@ func New(
 	}
 
 	s.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 
 	return s, nil
 }

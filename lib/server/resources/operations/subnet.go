@@ -46,7 +46,6 @@ import (
 	netutils "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 )
 
@@ -266,7 +265,7 @@ func LoadSubnet(svc iaas.Service, networkRef, subnetRef string) (subnetInstance 
 
 		options := iaas.CacheMissOption(
 			func() (cache.Cacheable, fail.Error) { return onSubnetCacheMiss(svc, subnetID) },
-			temporal.MetadataTimeout(),
+			svc.Timings().MetadataTimeout(),
 		)
 		cacheEntry, xerr := subnetCache.Get(subnetID, options...)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -374,7 +373,7 @@ func (instance *Subnet) updateCachedInformation() fail.Error {
 		var ok bool
 		instance.gateways[1], ok = hostInstance.(*Host)
 		if !ok {
-			return fail.NewError("hostInstance should be a *Host")
+			return fail.InconsistentError("hostInstance should be a *Host")
 		}
 	}
 
@@ -401,7 +400,7 @@ func (instance *Subnet) Carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -582,8 +581,8 @@ func (instance *Subnet) deleteSubnetThenWaitCompletion(id string) fail.Error {
 			if xerr != nil {
 				switch xerr.(type) {
 				case *fail.ErrNotFound:
-					debug.IgnoreError(xerr)
 					// Subnet not found, good
+					debug.IgnoreError(xerr)
 					return nil
 				default:
 					return xerr

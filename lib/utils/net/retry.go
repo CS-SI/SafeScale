@@ -27,13 +27,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // WhileUnsuccessfulButRetryable executes callback inside a retry loop with tolerance for communication errors (relative to net package),

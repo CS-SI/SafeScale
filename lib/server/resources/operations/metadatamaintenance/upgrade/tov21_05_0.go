@@ -163,9 +163,7 @@ func (tv toV21_05_0) upgradeNetworkMetadataIfNeeded(owningInstance, currentInsta
 	svc := currentInstance.Service()
 
 	var somethingMissing bool
-	xerr := currentInstance.Alter(func(
-		clonable data.Clonable, currentNetworkProps *serialize.JSONProperties,
-	) (ferr fail.Error) {
+	xerr := currentInstance.Alter(func(clonable data.Clonable, currentNetworkProps *serialize.JSONProperties) (ferr fail.Error) {
 		abstractNetwork, ok := clonable.(*abstract.Network)
 		if !ok {
 			return fail.InconsistentError("'*abstract.Networking' expected, '%s' provided", reflect.TypeOf(clonable).String())
@@ -916,9 +914,7 @@ func (tv toV21_05_0) upgradeClusterMetadataIfNeeded(instance *operations.Cluster
 	return nil
 }
 
-func (tv toV21_05_0) addFeatureInProperties(
-	feat resources.Feature, svc iaas.Service, hosts data.IndexedListOfStrings,
-) fail.Error {
+func (tv toV21_05_0) addFeatureInProperties(feat resources.Feature, svc iaas.Service, hosts data.IndexedListOfStrings) fail.Error {
 	requires, xerr := feat.GetRequirements()
 	if xerr != nil {
 		return xerr
@@ -1237,9 +1233,7 @@ func (tv toV21_05_0) upgradeClusterNetworkPropertyIfNeeded(instance *operations.
 	return missingSomething, nil
 }
 
-func inspectNetworkAndSubnet(
-	instance *operations.Cluster, networkName string,
-) (resources.Network, resources.Subnet, bool, fail.Error) {
+func inspectNetworkAndSubnet(instance *operations.Cluster, networkName string) (resources.Network, resources.Subnet, bool, fail.Error) {
 	subnetInstance, xerr := operations.LoadSubnet(instance.Service(), "", networkName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

@@ -24,7 +24,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
@@ -164,7 +163,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) },
-		temporal.MetadataTimeout(),
+		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := shareCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -249,7 +248,7 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1180,8 +1179,6 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	// FIXME: we should have a defer statement to restore Share in case of failure...
-
 	defer task.DisarmAbortSignal()()
 
 	// Remove Share metadata
@@ -1232,8 +1229,9 @@ func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 			// SecurityModes: Share.ShareAcls,
 		},
 	}
+	svc := instance.Service()
 	for k := range share.ClientsByName {
-		h, xerr := LoadHost(instance.Service(), k)
+		h, xerr := LoadHost(svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Errorf(xerr.Error())

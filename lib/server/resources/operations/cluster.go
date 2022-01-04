@@ -141,7 +141,7 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(svc, name) },
-		temporal.MetadataTimeout(),
+		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := clusterCache.Get(name, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -381,9 +381,7 @@ func (instance *Cluster) bootstrap(flavor clusterflavor.Enum) (xerr fail.Error) 
 
 // Browse walks through Cluster MetadataFolder and executes a callback for each entry
 // FIXME: adds a Cluster status check to prevent operations on removed clusters
-func (instance *Cluster) Browse(
-	ctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error,
-) (xerr fail.Error) {
+func (instance *Cluster) Browse(ctx context.Context, callback func(*abstract.ClusterIdentity) fail.Error) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	// Note: Do not test with Isnull here, as Browse may be used from null value
@@ -612,8 +610,8 @@ func (instance *Cluster) Start(ctx context.Context) (xerr fail.Error) {
 
 				return fail.NewError("current state of Cluster is '%s'", state.String())
 			},
-			temporal.DefaultDelay(),
-			temporal.ExecutionTimeout(),
+			instance.Service().Timings().NormalDelay(),
+			instance.Service().Timings().ExecutionTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -891,8 +889,8 @@ func (instance *Cluster) Stop(ctx context.Context) (xerr fail.Error) {
 
 				return nil
 			},
-			temporal.DefaultDelay(),
-			temporal.ExecutionTimeout(),
+			instance.Service().Timings().NormalDelay(),
+			instance.Service().Timings().ExecutionTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -1069,9 +1067,7 @@ func (instance *Cluster) GetState() (state clusterstate.Enum, xerr fail.Error) {
 }
 
 // AddNodes adds several nodes
-func (instance *Cluster) AddNodes(
-	ctx context.Context, count uint, def abstract.HostSizingRequirements, keepOnFailure bool,
-) (_ []resources.Host, ferr fail.Error) {
+func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.HostSizingRequirements, keepOnFailure bool) (_ []resources.Host, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -1159,11 +1155,9 @@ func (instance *Cluster) AddNodes(
 		nodes  []*propertiesv3.ClusterNode
 	)
 
-	timeout := 2 * temporal.HostCreationTimeout() // More than enough
+	timeout := 2 * svc.Timings().HostCreationTimeout() // More than enough
 
-	tg, xerr := concurrency.NewTaskGroupWithParent(
-		task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)),
-	)
+	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1259,7 +1253,7 @@ func (instance *Cluster) AddNodes(
 
 	hosts := make([]resources.Host, 0, len(nodes))
 	for _, v := range nodes {
-		hostInstance, xerr := LoadHost(instance.Service(), v.ID)
+		hostInstance, xerr := LoadHost(svc, v.ID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, xerr
@@ -1276,9 +1270,7 @@ func (instance *Cluster) AddNodes(
 }
 
 // complementHostDefinition complements req with default values if needed
-func complementHostDefinition(
-	req abstract.HostSizingRequirements, def propertiesv2.HostSizingRequirements,
-) abstract.HostSizingRequirements {
+func complementHostDefinition(req abstract.HostSizingRequirements, def propertiesv2.HostSizingRequirements) abstract.HostSizingRequirements {
 	if def.MinCores > 0 && req.MinCores == 0 {
 		req.MinCores = def.MinCores
 	}
@@ -1320,9 +1312,7 @@ func complementHostDefinition(
 }
 
 // DeleteSpecificNode deletes a node identified by its ID
-func (instance *Cluster) DeleteSpecificNode(
-	ctx context.Context, hostID string, selectedMasterID string,
-) (xerr fail.Error) {
+func (instance *Cluster) DeleteSpecificNode(ctx context.Context, hostID string, selectedMasterID string) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -1939,9 +1929,7 @@ func (instance *Cluster) LookupNode(ctx context.Context, ref string) (found bool
 				clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
 					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
 					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
 					}
 
 					_, found = nodesV3.PrivateNodeByID[hostInstance.GetID()]
@@ -2018,9 +2006,7 @@ func (instance *Cluster) CountNodes(ctx context.Context) (count uint, xerr fail.
 }
 
 // GetNodeByID returns a node based on its ID
-func (instance *Cluster) GetNodeByID(
-	ctx context.Context, hostID string,
-) (hostInstance resources.Host, xerr fail.Error) {
+func (instance *Cluster) GetNodeByID(ctx context.Context, hostID string) (hostInstance resources.Host, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -2212,9 +2198,7 @@ func (instance *Cluster) deleteMaster(ctx context.Context, host resources.Host) 
 }
 
 // deleteNode deletes a node
-func (instance *Cluster) deleteNode(
-	ctx context.Context, node *propertiesv3.ClusterNode, master *Host, loadHostMethod data.ImmutableKeyValue,
-) (ferr fail.Error) {
+func (instance *Cluster) deleteNode(ctx context.Context, node *propertiesv3.ClusterNode, master *Host, loadHostMethod data.ImmutableKeyValue) (ferr fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2775,9 +2759,7 @@ func (instance *Cluster) extractNetworkingInfo() (networkInstance resources.Netw
 						deleteNetwork = networkV3.CreatedNetwork
 					}
 					if networkV3.SubnetID != "" {
-						subnetInstance, innerXErr = LoadSubnet(
-							instance.Service(), networkV3.NetworkID, networkV3.SubnetID,
-						)
+						subnetInstance, innerXErr = LoadSubnet(instance.Service(), networkV3.NetworkID, networkV3.SubnetID)
 						if innerXErr != nil {
 							return innerXErr
 						}
@@ -2893,9 +2875,7 @@ func (instance *Cluster) determineRequiredNodes() (uint, uint, uint, fail.Error)
 }
 
 // realizeTemplate generates a file from box template with variables updated
-func realizeTemplate(
-	box *rice.Box, tmplName string, data map[string]interface{}, fileName string,
-) (string, string, fail.Error) {
+func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}, fileName string) (string, string, fail.Error) {
 	if box == nil {
 		return "", "", fail.InvalidParameterError("box", "cannot be nil!")
 	}
@@ -3200,9 +3180,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 }
 
 // configureNodesFromList configures nodes from a list
-func (instance *Cluster) configureNodesFromList(
-	task concurrency.Task, nodes []*propertiesv3.ClusterNode,
-) (xerr fail.Error) {
+func (instance *Cluster) configureNodesFromList(task concurrency.Task, nodes []*propertiesv3.ClusterNode) (xerr fail.Error) {
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster")).Entering()
 	defer tracer.Exiting()
 
@@ -3296,9 +3274,7 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 }
 
 // leaveNodesFromList makes nodes from a list leave the Cluster
-func (instance *Cluster) leaveNodesFromList(
-	ctx context.Context, hosts []resources.Host, selectedMaster resources.Host,
-) (xerr fail.Error) {
+func (instance *Cluster) leaveNodesFromList(ctx context.Context, hosts []resources.Host, selectedMaster resources.Host) (xerr fail.Error) {
 	logrus.Debugf("Instructing nodes to leave Cluster...")
 
 	// Unjoins from Cluster are done sequentially, experience shows too many join at the same time

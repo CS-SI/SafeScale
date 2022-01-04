@@ -196,9 +196,7 @@ func (f MetadataFolder) Delete(path string, name string) fail.Error {
 // returns true, nil if the object has been found
 // returns false, fail.Error if an error occurred (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (f MetadataFolder) Read(
-	path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue,
-) fail.Error {
+func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -218,7 +216,7 @@ func (f MetadataFolder) Read(
 			}
 			return f.service.ReadObject(bucket.Name, f.absolutePath(path, name), &buffer, 0, 0)
 		},
-		temporal.CommunicationTimeout(),
+		f.service.Timings().CommunicationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -276,9 +274,7 @@ func (f MetadataFolder) Read(
 // Returns nil on success (with assurance the write has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (f MetadataFolder) Write(
-	path string, name string, content []byte, options ...datadef.ImmutableKeyValue,
-) fail.Error {
+func (f MetadataFolder) Write(path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
 	if f.IsNull() {
 		return fail.InvalidInstanceError()
 	}
@@ -313,7 +309,7 @@ func (f MetadataFolder) Write(
 
 	bucketName := bucket.Name
 	absolutePath := f.absolutePath(path, name)
-	timeout := temporal.MetadataReadAfterWriteTimeout()
+	timeout := f.service.Timings().MetadataReadAfterWriteTimeout()
 
 	// Outer retry will write the metadata at most 3 times
 	xerr = retry.Action(
@@ -343,7 +339,7 @@ func (f MetadataFolder) Write(
 					return nil
 				},
 				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
-				retry.Fibonacci(temporal.MinDelay()),
+				retry.Fibonacci(f.service.Timings().SmallDelay()),
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
@@ -366,7 +362,7 @@ func (f MetadataFolder) Write(
 			return nil
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
-		retry.Constant(temporal.MinDelay()),
+		retry.Constant(f.service.Timings().SmallDelay()),
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {

@@ -40,7 +40,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -96,7 +95,7 @@ func LoadNetwork(svc iaas.Service, ref string) (networkInstance resources.Networ
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onNetworkCacheMiss(svc, ref) },
-		temporal.MetadataTimeout(),
+		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := networkCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -301,7 +300,7 @@ func (instance *Network) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -646,8 +645,8 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 
 							return fail.Wrap(recErr, "another kind of error")
 						},
-						temporal.MinDelay(),
-						temporal.ContextTimeout(),
+						svc.Timings().SmallDelay(),
+						svc.Timings().ContextTimeout(),
 					)
 					if errWaitMore != nil {
 						_ = innerXErr.AddConsequence(errWaitMore)
@@ -674,7 +673,7 @@ func (instance *Network) Delete(ctx context.Context) (xerr fail.Error) {
 					logrus.Debugf("The network '%s' is still there", abstractNetwork.ID)
 					break
 				}
-				time.Sleep(temporal.DefaultDelay())
+				time.Sleep(svc.Timings().NormalDelay())
 			}
 		}
 		return nil

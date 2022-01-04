@@ -95,9 +95,7 @@ type JobManagerListener struct {
 // func (s *JobManagerListener) mustEmbedUnimplementedJobServiceServer() {}
 
 // Stop specified process
-func (s *JobManagerListener) Stop(
-	ctx context.Context, in *protocol.JobDefinition,
-) (empty *googleprotobuf.Empty, err error) {
+func (s *JobManagerListener) Stop(ctx context.Context, in *protocol.JobDefinition) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot stop job")
 	defer fail.OnPanic(&err)

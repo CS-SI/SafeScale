@@ -57,9 +57,7 @@ type Stack interface {
 	// ListSecurityGroups lists the security groups
 	ListSecurityGroups(networkRef string) ([]*abstract.SecurityGroup, fail.Error)
 	// CreateSecurityGroup creates a security group
-	CreateSecurityGroup(
-		networkRef, name, description string, rules abstract.SecurityGroupRules,
-	) (*abstract.SecurityGroup, fail.Error)
+	CreateSecurityGroup(networkRef, name, description string, rules abstract.SecurityGroupRules) (*abstract.SecurityGroup, fail.Error)
 	// InspectSecurityGroup returns information about a security group
 	InspectSecurityGroup(sgParam stacks.SecurityGroupParameter) (*abstract.SecurityGroup, fail.Error)
 	// ClearSecurityGroup removes rules from group
@@ -67,13 +65,9 @@ type Stack interface {
 	// DeleteSecurityGroup deletes a security group and all its rules
 	DeleteSecurityGroup(*abstract.SecurityGroup) fail.Error
 	// AddRuleToSecurityGroup adds a rule to an existing security group
-	AddRuleToSecurityGroup(
-		sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule,
-	) (*abstract.SecurityGroup, fail.Error)
+	AddRuleToSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// DeleteRuleFromSecurityGroup deletes a rule identified by ID from a security group
-	DeleteRuleFromSecurityGroup(
-		sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule,
-	) (*abstract.SecurityGroup, fail.Error)
+	DeleteRuleFromSecurityGroup(sgParam stacks.SecurityGroupParameter, rule *abstract.SecurityGroupRule) (*abstract.SecurityGroup, fail.Error)
 	// GetDefaultSecurityGroupName returns the name of the default security group automatically bound to new host
 	GetDefaultSecurityGroupName() (string, fail.Error)
 	// EnableSecurityGroup enables a Security Group

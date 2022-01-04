@@ -445,8 +445,8 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.MinDelay(),
-			temporal.ContextTimeout(),
+			c.Service().Timings().SmallDelay(),
+			c.Service().Timings().ContextTimeout(),
 		)
 	} else {
 		xerr = retry.WhileUnsuccessful(
@@ -461,8 +461,8 @@ func (c *MetadataCore) ReadByID(id string) (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.MinDelay(),
-			temporal.ContextTimeout(),
+			c.Service().Timings().SmallDelay(),
+			c.Service().Timings().ContextTimeout(),
 		)
 	}
 	xerr = debug.InjectPlannedFail(xerr)
@@ -505,8 +505,8 @@ func (c *MetadataCore) readByID(id string) fail.Error {
 // readByReference gets the data from Object Storage
 // First read using 'ref' as an ID; if *fail.ErrNotFound occurs, read using 'ref' as a name
 func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
-	timeout := temporal.CommunicationTimeout()
-
+	timeout := c.Service().Timings().CommunicationTimeout()
+	delay := c.Service().Timings().SmallDelay()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			if innerXErr := c.readByID(ref); innerXErr != nil {
@@ -532,7 +532,7 @@ func (c *MetadataCore) readByReference(ref string) (xerr fail.Error) {
 			}
 			return nil
 		},
-		temporal.MinDelay(),
+		delay,
 		timeout,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -649,8 +649,8 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.MinDelay(),
-			2*temporal.MetadataTimeout(),
+			c.Service().Timings().SmallDelay(),
+			2*c.Service().Timings().MetadataTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -684,8 +684,8 @@ func (c *MetadataCore) reload() (xerr fail.Error) {
 				}
 				return nil
 			},
-			temporal.MinDelay(),
-			temporal.ContextTimeout(),
+			c.Service().Timings().SmallDelay(),
+			c.Service().Timings().ContextTimeout(),
 		)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {

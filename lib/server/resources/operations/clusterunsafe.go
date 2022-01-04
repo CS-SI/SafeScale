@@ -35,7 +35,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // unsafeGetIdentity returns the identity of the Cluster
@@ -301,7 +300,7 @@ func (instance *Cluster) unsafeFindAvailableMaster(ctx context.Context) (master 
 			return nil, xerr
 		}
 
-		_, xerr = master.WaitSSHReady(ctx, temporal.SSHConnectTimeout())
+		_, xerr = master.WaitSSHReady(ctx, instance.Service().Timings().SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {
@@ -459,7 +458,7 @@ func (instance *Cluster) unsafeFindAvailableNode(ctx context.Context) (node reso
 			hostInstance.Released()
 		}(node)
 
-		_, xerr = node.WaitSSHReady(ctx, temporal.SSHConnectTimeout())
+		_, xerr = node.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			switch xerr.(type) {

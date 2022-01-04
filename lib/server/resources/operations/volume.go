@@ -46,7 +46,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 const (
@@ -104,7 +103,7 @@ func LoadVolume(svc iaas.Service, ref string) (rv resources.Volume, ferr fail.Er
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onVolumeCacheMiss(svc, ref) },
-		temporal.MetadataTimeout(),
+		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := volumeCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -190,7 +189,7 @@ func (instance *volume) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -756,8 +755,8 @@ func (instance *volume) Attach(
 			}
 			return nil
 		},
-		temporal.MinDelay(),
-		temporal.CommunicationTimeout(),
+		instance.Service().Timings().SmallDelay(),
+		instance.Service().Timings().CommunicationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -964,6 +963,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 		}
 	}
 
+	svc := host.Service()
 	hostName := host.GetName()
 	cmd := "sudo lsblk -l -o NAME,TYPE | grep disk | cut -d' ' -f1"
 	retryErr := retry.WhileUnsuccessful(
@@ -972,7 +972,7 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 				return retry.StopRetryError(fmt.Errorf("aborted"))
 			}
 
-			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
+			retcode, stdout, stderr, xerr = host.Run(ctx, cmd, outputs.COLLECT, svc.Timings().ConnectionTimeout(), svc.Timings().ExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -987,8 +987,8 @@ func listAttachedDevices(ctx context.Context, host resources.Host) (_ mapset.Set
 			}
 			return nil
 		},
-		temporal.MinDelay(),
-		temporal.ExecutionTimeout(),
+		svc.Timings().SmallDelay(),
+		svc.Timings().ExecutionTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

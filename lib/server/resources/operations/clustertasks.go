@@ -52,9 +52,7 @@ import (
 )
 
 // taskCreateCluster is the TaskAction that creates a Cluster
-func (instance *Cluster) taskCreateCluster(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	req, ok := params.(abstract.ClusterRequest)
@@ -640,9 +638,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 }
 
 // createNetworkingResources creates the network and subnet for the Cluster
-func (instance *Cluster) createNetworkingResources(
-	task concurrency.Task, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements,
-) (_ resources.Network, _ resources.Subnet, ferr fail.Error) {
+func (instance *Cluster) createNetworkingResources(task concurrency.Task, req abstract.ClusterRequest, gatewaysDef *abstract.HostSizingRequirements) (_ resources.Network, _ resources.Subnet, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -657,7 +653,8 @@ func (instance *Cluster) createNetworkingResources(
 	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task) // nolint
 
 	// Determine if getGateway Failover must be set
-	caps, xerr := instance.Service().GetCapabilities()
+	svc := instance.Service()
+	caps, xerr := svc.GetCapabilities()
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -674,7 +671,7 @@ func (instance *Cluster) createNetworkingResources(
 	// Creates Network
 	var networkInstance resources.Network
 	if req.NetworkID != "" {
-		networkInstance, xerr = LoadNetwork(instance.Service(), req.NetworkID)
+		networkInstance, xerr = LoadNetwork(svc, req.NetworkID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to use network %s to contain Cluster Subnet", req.NetworkID)
@@ -687,7 +684,7 @@ func (instance *Cluster) createNetworkingResources(
 			KeepOnFailure: req.KeepOnFailure,
 		}
 
-		networkInstance, xerr = NewNetwork(instance.Service())
+		networkInstance, xerr = NewNetwork(svc)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to instantiate new Network")
@@ -757,7 +754,7 @@ func (instance *Cluster) createNetworkingResources(
 		KeepOnFailure: false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 	}
 
-	subnetInstance, xerr := NewSubnet(instance.Service())
+	subnetInstance, xerr := NewSubnet(svc)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
@@ -939,8 +936,9 @@ func (instance *Cluster) createHostResources(
 			}
 
 			// we have to wait for completion of aborted Tasks/TaskGroups, not get out before
+			timeout := instance.Service().Timings().HostLongOperationTimeout()
 			for _, v := range startedTasks {
-				_, _, werr := v.WaitFor(instance.Service().Timings().HostLongOperationTimeout())
+				_, _, werr := v.WaitFor(timeout)
 				if werr != nil {
 					werr = fail.Wrap(
 						werr, "cleaning up on failure, failed to wait for %s %s", reflect.TypeOf(v).String(), taskID(v),
@@ -978,14 +976,14 @@ func (instance *Cluster) createHostResources(
 		}
 	}
 
-	_, xerr = primaryGateway.WaitSSHReady(ctx, temporal.ExecutionTimeout())
+	_, xerr = primaryGateway.WaitSSHReady(ctx, instance.Service().Timings().ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "wait for remote ssh service to be ready")
 	}
 
 	if haveSecondaryGateway {
-		_, xerr = secondaryGateway.WaitSSHReady(ctx, temporal.ExecutionTimeout())
+		_, xerr = secondaryGateway.WaitSSHReady(ctx, instance.Service().Timings().ExecutionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to wait for remote ssh service to become ready")
@@ -1348,9 +1346,7 @@ func (instance *Cluster) createHostResources(
 }
 
 // complementSizingRequirements complements req with default values if needed
-func complementSizingRequirements(
-	req *abstract.HostSizingRequirements, def abstract.HostSizingRequirements,
-) *abstract.HostSizingRequirements {
+func complementSizingRequirements(req *abstract.HostSizingRequirements, def abstract.HostSizingRequirements) *abstract.HostSizingRequirements {
 	var finalDef abstract.HostSizingRequirements
 	if req == nil {
 		finalDef = def
@@ -1399,9 +1395,7 @@ func complementSizingRequirements(
 }
 
 // taskStartHost is the code called in a Task to start a Host
-func (instance *Cluster) taskStartHost(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1425,7 +1419,8 @@ func (instance *Cluster) taskStartHost(
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	xerr = instance.Service().StartHost(id)
+	svc := instance.Service()
+	xerr = svc.StartHost(id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
@@ -1441,12 +1436,12 @@ func (instance *Cluster) taskStartHost(
 	}
 
 	// -- refresh state of host --
-	hostInstance, xerr := LoadHost(instance.Service(), id)
+	hostInstance, xerr := LoadHost(svc, id)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	_, xerr = hostInstance.WaitSSHReady(task.Context(), instance.Service().Timings().HostOperationTimeout())
+	_, xerr = hostInstance.WaitSSHReady(task.Context(), svc.Timings().HostOperationTimeout())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1455,9 +1450,7 @@ func (instance *Cluster) taskStartHost(
 	return nil, xerr
 }
 
-func (instance *Cluster) taskStopHost(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1480,7 +1473,8 @@ func (instance *Cluster) taskStopHost(
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	xerr = instance.Service().StopHost(id, false)
+	svc := instance.Service()
+	xerr = svc.StopHost(id, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
@@ -1494,7 +1488,7 @@ func (instance *Cluster) taskStopHost(
 	}
 
 	// -- refresh state of host --
-	hostInstance, xerr := LoadHost(instance.Service(), id)
+	hostInstance, xerr := LoadHost(svc, id)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1508,9 +1502,7 @@ type taskInstallGatewayParameters struct {
 }
 
 // taskInstallGateway installs necessary components on one gateway
-func (instance *Cluster) taskInstallGateway(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1573,9 +1565,7 @@ type taskConfigureGatewayParameters struct {
 }
 
 // taskConfigureGateway prepares one gateway
-func (instance *Cluster) taskConfigureGateway(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1628,9 +1618,7 @@ type taskCreateMastersParameters struct {
 }
 
 // taskCreateMasters creates masters
-func (instance *Cluster) taskCreateMasters(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -1675,7 +1663,7 @@ func (instance *Cluster) taskCreateMasters(
 
 	logrus.Debugf("[Cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
 
-	timeout := 2 * temporal.HostCreationTimeout()
+	timeout := 2 * instance.Service().Timings().HostCreationTimeout()
 	var collectedErs []error
 
 	for i := uint(1); i <= p.count; i++ {
@@ -1733,9 +1721,7 @@ type taskCreateMasterParameters struct {
 }
 
 // taskCreateMaster creates one master
-func (instance *Cluster) taskCreateMaster(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1856,7 +1842,8 @@ func (instance *Cluster) taskCreateMaster(
 		return nil, xerr
 	}
 
-	subnet, xerr := LoadSubnet(instance.Service(), "", netCfg.SubnetID)
+	svc := instance.Service()
+	subnet, xerr := LoadSubnet(svc, "", netCfg.SubnetID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1896,7 +1883,7 @@ func (instance *Cluster) taskCreateMaster(
 		hostReq.TemplateID = p.masterDef.Template
 	}
 
-	hostInstance, xerr := NewHost(instance.Service())
+	hostInstance, xerr := NewHost(svc)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2005,9 +1992,7 @@ func withTimeout(xerr fail.Error) bool {
 }
 
 // taskConfigureMasters configure masters
-func (instance *Cluster) taskConfigureMasters(
-	task concurrency.Task, _ concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -2145,9 +2130,7 @@ type taskConfigureMasterParameters struct {
 }
 
 // taskConfigureMaster configures one master
-func (instance *Cluster) taskConfigureMaster(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -2217,9 +2200,7 @@ type taskCreateNodesParameters struct {
 }
 
 // taskCreateNodes creates nodes
-func (instance *Cluster) taskCreateNodes(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskCreateNodes(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -2263,7 +2244,7 @@ func (instance *Cluster) taskCreateNodes(
 		return nil, xerr
 	}
 
-	timeout := 2 * temporal.HostCreationTimeout()
+	timeout := 2 * instance.Service().Timings().HostCreationTimeout()
 	for i := uint(1); i <= p.count; i++ {
 		captured := i
 		_, xerr := tg.StartWithTimeout(
@@ -2306,9 +2287,7 @@ type taskCreateNodeParameters struct {
 }
 
 // taskCreateNode creates a node in the Cluster
-func (instance *Cluster) taskCreateNode(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -2412,7 +2391,8 @@ func (instance *Cluster) taskCreateNode(
 		return nil, xerr
 	}
 
-	subnet, xerr := LoadSubnet(instance.Service(), "", netCfg.SubnetID)
+	svc := instance.Service()
+	subnet, xerr := LoadSubnet(svc, "", netCfg.SubnetID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2449,7 +2429,7 @@ func (instance *Cluster) taskCreateNode(
 		hostReq.TemplateID = p.nodeDef.Template
 	}
 
-	hostInstance, xerr := NewHost(instance.Service())
+	hostInstance, xerr := NewHost(svc)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2588,9 +2568,7 @@ func (instance *Cluster) taskCreateNode(
 }
 
 // taskConfigureNodes configures nodes
-func (instance *Cluster) taskConfigureNodes(
-	task concurrency.Task, _ concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -2711,9 +2689,7 @@ type taskConfigureNodeParameters struct {
 }
 
 // taskConfigureNode configure one node
-func (instance *Cluster) taskConfigureNode(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -2787,9 +2763,7 @@ type taskDeleteNodeOnFailureParameters struct {
 }
 
 // taskDeleteNodeOnFailure deletes a node when a failure occurred
-func (instance *Cluster) taskDeleteNodeOnFailure(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskDeleteNodeOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -2837,9 +2811,7 @@ type taskDeleteNodeParameters struct {
 }
 
 // taskDeleteNode deletes one node
-func (instance *Cluster) taskDeleteNode(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskDeleteNode(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -2905,9 +2877,7 @@ func (instance *Cluster) taskDeleteNode(
 }
 
 // taskDeleteMaster deletes one master
-func (instance *Cluster) taskDeleteMaster(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskDeleteMaster(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -2976,9 +2946,7 @@ type taskDeleteHostOnFailureParameters struct {
 }
 
 // taskDeleteHostOnFailure deletes a host
-func (instance *Cluster) taskDeleteHostOnFailure(
-	task concurrency.Task, params concurrency.TaskParameters,
-) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskDeleteHostOnFailure(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -3076,7 +3044,9 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 
 	// Remove possible junks
 	cmd := fmt.Sprintf("[ -f %s ] && sudo rm -f %s || exit 0", rfcItem.Remote, rfcItem.Remote)
-	retcode, stdout, stderr, xerr := master.Run(ctx, cmd, outputs.COLLECT, temporal.ConnectionTimeout(), temporal.DefaultDelay())
+	connTimeout := instance.Service().Timings().ConnectionTimeout()
+	delay := instance.Service().Timings().NormalDelay()
+	retcode, stdout, stderr, xerr := master.Run(ctx, cmd, outputs.COLLECT, connTimeout, delay)
 	if xerr != nil {
 		return fail.Wrap(xerr, "%sfail to clean previous temporaries", prerr)
 	}
@@ -3097,7 +3067,7 @@ func (instance *Cluster) updateClusterInventoryMaster(ctx context.Context, maste
 
 	// Run update commands
 	for i, cmd := range commands {
-		retcode, stdout, stderr, xerr = master.Run(ctx, cmd, outputs.COLLECT, temporal.ConnectionTimeout(), temporal.DefaultDelay())
+		retcode, stdout, stderr, xerr = master.Run(ctx, cmd, outputs.COLLECT, connTimeout, delay)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, errmsg[i])

@@ -74,9 +74,7 @@ func (s stack) GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail
 }
 
 // New Create and initialize a ClientAPI
-func New(
-	auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions,
-) (*stack, fail.Error) { // nolint
+func New(auth stacks.AuthenticationOptions, localCfg stacks.GCPConfiguration, cfg stacks.ConfigurationOptions) (*stack, fail.Error) { // nolint
 	gcpStack := &stack{
 		Config:      &cfg,
 		AuthOptions: &auth,
@@ -102,6 +100,7 @@ func New(
 	// gcpStack.searchPrefix = `.*/projects/` + localCfg.ProjectID + `/global`
 
 	gcpStack.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 
 	return gcpStack, nil
 }

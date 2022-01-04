@@ -611,12 +611,14 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 	count := uint(1)
 
 	defer func() {
-		if checkTimeouts := os.Getenv("SAFESCALE_CHECK"); checkTimeouts != "ok" && checkTimeouts != "all" {
+		// FIXME: document use of env SAFESCALE_CHECK
+		checkTimeouts := os.Getenv("SAFESCALE_CHECK")
+		if checkTimeouts != "ok" && checkTimeouts != "all" {
 			return
 		}
 
 		all := false
-		if checkTimeouts := os.Getenv("SAFESCALE_CHECK"); checkTimeouts == "all" {
+		if checkTimeouts == "all" {
 			all = true
 		}
 
