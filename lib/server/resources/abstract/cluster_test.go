@@ -20,6 +20,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,4 +44,53 @@ func TestClusterIdentity_Clone(t *testing.T) {
 		t.Fail()
 	}
 	require.NotEqualValues(t, c, cc)
+}
+
+func TestClusterIdentity_OK(t *testing.T) {
+
+	c := NewClusterIdentity()
+	if c.OK() {
+		t.Error("Not ok, name and flavor missing")
+		t.Fail()
+	}
+	c.Name = "cluster"
+	if c.OK() {
+		t.Error("Not ok, flavor missing")
+		t.Fail()
+	}
+	c.Flavor = clusterflavor.K8S
+	if !c.OK() {
+		t.Error("No, Cluster is OK")
+		t.Fail()
+	}
+	c.Name = ""
+	if c.OK() {
+		t.Error("Not ok, name is empty")
+		t.Fail()
+	}
+
+}
+
+func TestClusterIdentity_Serialize(t *testing.T) {
+
+	c1 := NewClusterIdentity()
+	c1.Name = "cluster"
+	c1.Flavor = clusterflavor.K8S
+
+	serial, err := c1.Serialize()
+	if err != nil {
+		t.Error(err)
+	}
+	c2 := NewClusterIdentity()
+	err = c2.Deserialize(serial)
+	if err != nil {
+		t.Error(err)
+	}
+
+	areEqual := reflect.DeepEqual(c1, c2)
+	if !areEqual {
+		t.Error("Serialize/Deserialize does not preserve informations")
+		t.Fail()
+	}
+
 }

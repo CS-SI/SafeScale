@@ -21,12 +21,95 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSecurityGroupRule_IsNull(t *testing.T) {
+	sgr := SecurityGroupRule{}
+	if !sgr.IsNull() {
+		t.Error("SecurityGroupRule is null")
+		t.Fail()
+	}
+	sgr.Sources = append(sgr.Sources, "Source 1")
+	if sgr.IsNull() {
+		t.Error("SecurityGroupRule is not null")
+		t.Fail()
+	}
+	sgr.Sources = []string{}
+	sgr.Targets = append(sgr.Sources, "Target 1")
+	if sgr.IsNull() {
+		t.Error("SecurityGroupRule is not null")
+		t.Fail()
+	}
+}
+
+func TestSecurityGroupRule_EqualTo(t *testing.T) {
+
+	sgr := &SecurityGroupRule{}
+	sgr.IDs = []string{"a", "b", "c"}
+	sgr.Description = "SecurityGroupRule Description"
+	sgr.EtherType = ipversion.IPv4                     // ipversion.IPv6
+	sgr.Direction = securitygroupruledirection.Ingress // securitygroupruledirection.Egress
+	sgr.Protocol = "TCP"
+	sgr.PortFrom = -1
+	sgr.PortTo = -1
+	sgr.Sources = []string{"Source1", "Source2", "Source3"}
+	sgr.Targets = []string{"Target1", "Target2", "Target3"}
+
+	sgr2 := &SecurityGroupRule{}
+	sgr2.IDs = []string{"c", "b", "a"}
+	sgr2.Description = "SecurityGroupRule Description"
+	sgr2.EtherType = ipversion.IPv4                     // ipversion.IPv6
+	sgr2.Direction = securitygroupruledirection.Ingress // securitygroupruledirection.Egress
+	sgr2.Protocol = "TCP"
+	sgr2.PortFrom = -1
+	sgr2.PortTo = -1
+	sgr2.Sources = []string{"Source2", "Source1", "Source3"}
+	sgr2.Targets = []string{"Target2", "Target3", "Target1"}
+
+	if !sgr.EqualTo(sgr2) {
+		t.Error("Securitygroups are equals !")
+		t.Fail()
+	}
+
+}
+
+func TestSecurityGroupRule_EquivalentTo(t *testing.T) {
+
+	sgr := &SecurityGroupRule{}
+	sgr.IDs = []string{"a", "b", "c"}
+	sgr.Description = "SecurityGroupRule Description"
+	sgr.EtherType = ipversion.IPv4                     // ipversion.IPv6
+	sgr.Direction = securitygroupruledirection.Ingress // securitygroupruledirection.Egress
+	sgr.Protocol = "TCP"
+	sgr.PortFrom = -1
+	sgr.PortTo = -1
+	sgr.Sources = []string{"Source1", "Source2", "Source3"}
+	sgr.Targets = []string{"Target1", "Target2", "Target3"}
+
+	sgr2 := &SecurityGroupRule{}
+	sgr2.IDs = []string{"d", "e", "f"}
+	sgr2.Description = "SecurityGroupRule Description"
+	sgr2.EtherType = ipversion.IPv4                     // ipversion.IPv6
+	sgr2.Direction = securitygroupruledirection.Ingress // securitygroupruledirection.Egress
+	sgr2.Protocol = "TCP"
+	sgr2.PortFrom = -1
+	sgr2.PortTo = -1
+	sgr2.Sources = []string{"Source2", "Source1", "Source3"}
+	sgr2.Targets = []string{"Target2", "Target3", "Target1"}
+
+	if !sgr.EquivalentTo(sgr2) {
+		t.Error("Securitygroups are equivalents !")
+		t.Fail()
+	}
+
+}
 
 func TestSecurityGroup_Clone(t *testing.T) {
 	sg := NewSecurityGroup()
