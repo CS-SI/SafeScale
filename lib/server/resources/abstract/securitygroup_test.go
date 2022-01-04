@@ -113,7 +113,45 @@ func TestSecurityGroupRule_EquivalentTo(t *testing.T) {
 
 func TestSecurityGroup_Clone(t *testing.T) {
 	sg := NewSecurityGroup()
-	sg.Name = "securitygroup"
+	sg.ID = "SecurityGroup ID"
+	sg.Name = "SecurityGroup Name"
+	sg.Network = "SecurityGroup Network"
+	sg.Description = "SecurityGroup Description"
+	sg.Rules = SecurityGroupRules{
+		&SecurityGroupRule{
+			IDs:         []string{"a1", "b1", "c1"},
+			Description: "SG1 Description",
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.Ingress,
+			Protocol:    "icmp",
+			PortFrom:    0,
+			PortTo:      0,
+			Sources:     []string{"src_a1", "src_b1", "src_c1"},
+			Targets:     []string{"trg_a1", "trg_b1", "trg_c1"},
+		},
+		&SecurityGroupRule{
+			IDs:         []string{"a2", "b2", "c2"},
+			Description: "SG2 Description",
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.Ingress,
+			Protocol:    "icmp",
+			PortFrom:    0,
+			PortTo:      0,
+			Sources:     []string{"src_a2", "src_b2", "src_c2"},
+			Targets:     []string{"trg_a2", "trg_b2", "trg_c2"},
+		},
+		&SecurityGroupRule{
+			IDs:         []string{"a3", "b3", "c3"},
+			Description: "SG3 Description",
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.Ingress,
+			Protocol:    "icmp",
+			PortFrom:    0,
+			PortTo:      0,
+			Sources:     []string{"src_a3", "src_b3", "src_c3"},
+			Targets:     []string{"trg_a3", "trg_b3", "trg_c3"},
+		},
+	}
 
 	sgc, ok := sg.Clone().(*SecurityGroup)
 	if !ok {
@@ -160,6 +198,39 @@ func TestSecurityGroup_Clone(t *testing.T) {
 
 	// and finally, make sure are NOT equal after modifying one and not the other
 	require.NotEqualValues(t, *sg, *sgc)
+}
+
+func TestSecurityGroup_NewSecurityGroup(t *testing.T) {
+
+	sg := NewSecurityGroup()
+	if !sg.IsNull() {
+		t.Error("SecurityGroup is null !")
+		t.Fail()
+	}
+	if sg.IsConsistent() {
+		t.Error("SecurityGroup is not consistent !")
+		t.Fail()
+	}
+	if sg.IsComplete() {
+		t.Error("SecurityGroup is not complete !")
+		t.Fail()
+	}
+	sg.ID = "SecurityGroup ID"
+	sg.Name = "SecurityGroup Name"
+	sg.Network = "SecurityGroup Network"
+	if sg.IsNull() {
+		t.Error("SecurityGroup is not null !")
+		t.Fail()
+	}
+	if !sg.IsConsistent() {
+		t.Error("SecurityGroup is consistent !")
+		t.Fail()
+	}
+	if !sg.IsComplete() {
+		t.Error("SecurityGroup is complete !")
+		t.Fail()
+	}
+
 }
 
 func TestSecurityGroup_Replace(t *testing.T) {
@@ -242,6 +313,70 @@ func TestSecurityGroup_RemoveRuleByIndex(t *testing.T) {
 	err = sg.RemoveRuleByIndex(2)
 	if err == nil {
 		t.Error("Expect out of range error")
+		t.Fail()
+	}
+
+}
+
+func TestSecurityGroup_Serialize(t *testing.T) {
+
+	sg := NewSecurityGroup()
+	sg.ID = "SecurityGroup ID"
+	sg.Name = "SecurityGroup Name"
+	sg.Network = "SecurityGroup Network"
+	sg.Description = "SecurityGroup Description"
+	sg.Rules = SecurityGroupRules{
+		&SecurityGroupRule{
+			IDs:         []string{"a1", "b1", "c1"},
+			Description: "SG1 Description",
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.Ingress,
+			Protocol:    "icmp",
+			PortFrom:    0,
+			PortTo:      0,
+			Sources:     []string{"src_a1", "src_b1", "src_c1"},
+			Targets:     []string{"trg_a1", "trg_b1", "trg_c1"},
+		},
+		&SecurityGroupRule{
+			IDs:         []string{"a2", "b2", "c2"},
+			Description: "SG2 Description",
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.Ingress,
+			Protocol:    "icmp",
+			PortFrom:    0,
+			PortTo:      0,
+			Sources:     []string{"src_a2", "src_b2", "src_c2"},
+			Targets:     []string{"trg_a2", "trg_b2", "trg_c2"},
+		},
+		&SecurityGroupRule{
+			IDs:         []string{"a3", "b3", "c3"},
+			Description: "SG3 Description",
+			EtherType:   ipversion.IPv6,
+			Direction:   securitygroupruledirection.Ingress,
+			Protocol:    "icmp",
+			PortFrom:    0,
+			PortTo:      0,
+			Sources:     []string{"src_a3", "src_b3", "src_c3"},
+			Targets:     []string{"trg_a3", "trg_b3", "trg_c3"},
+		},
+	}
+
+	serial, err := sg.Serialize()
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+
+	sg2 := NewSecurityGroup()
+	err = sg2.Deserialize(serial)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+
+	areEqual := reflect.DeepEqual(sg, sg2)
+	if !areEqual {
+		t.Error("Serialize/Deserialize does not restitute values")
 		t.Fail()
 	}
 
