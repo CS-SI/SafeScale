@@ -37,7 +37,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/strprocess"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // RouterRequest represents a router request
@@ -662,8 +661,8 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetContextTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().ContextTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

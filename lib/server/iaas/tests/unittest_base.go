@@ -585,7 +585,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		err := tester.Service.StopHost(host.Core.ID, true)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Stopped, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Stopped, temporal.BigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
@@ -595,7 +595,7 @@ func (tester *ServiceTester) StartStopHost(t *testing.T) {
 		err := tester.Service.StartHost(host.Core.ID)
 		require.Nil(t, err)
 		start := time.Now()
-		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Started, temporal.GetBigDelay())
+		err = tester.Service.WaitHostState(host.Core.ID, hoststate.Started, temporal.BigDelay())
 		tt := time.Now()
 		fmt.Println(tt.Sub(start))
 		assert.Nil(t, err)
@@ -624,7 +624,7 @@ func (tester *ServiceTester) Volumes(t *testing.T) {
 	assert.Equal(t, 25, v1.Size)
 	assert.Equal(t, volumespeed.Hdd, v1.Speed)
 
-	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.Available, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.Available, temporal.BigDelay())
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(abstract.VolumeRequest{
@@ -637,7 +637,7 @@ func (tester *ServiceTester) Volumes(t *testing.T) {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.Available, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.Available, temporal.BigDelay())
 	assert.Nil(t, err)
 
 	lst, err = tester.Service.ListVolumes()
@@ -685,7 +685,7 @@ func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
 	defer func() {
 		_ = tester.Service.DeleteVolume(v1.ID)
 	}()
-	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.Available, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v1.ID, volumestate.Available, temporal.BigDelay())
 	assert.Nil(t, err)
 
 	v2, err := tester.Service.CreateVolume(abstract.VolumeRequest{
@@ -698,7 +698,7 @@ func (tester *ServiceTester) VolumeAttachments(t *testing.T) {
 		_ = tester.Service.DeleteVolume(v2.ID)
 	}()
 
-	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.Available, temporal.GetBigDelay())
+	_, err = tester.Service.WaitVolumeState(v2.ID, volumestate.Available, temporal.BigDelay())
 	assert.Nil(t, err)
 
 	va1ID, err := tester.Service.CreateVolumeAttachment(abstract.VolumeAttachmentRequest{

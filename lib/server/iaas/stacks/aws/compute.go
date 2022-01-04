@@ -453,7 +453,7 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
+		temporal.DefaultDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -524,7 +524,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, ""); xerr != nil {
+	if xerr = userData.Prepare(*s.Config, request, defaultSubnet.CIDR, "", s.Timings()); xerr != nil {
 		logrus.Debugf(strprocess.Capitalize(fmt.Sprintf("failed to prepare user data content: %+v", xerr)))
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -635,7 +635,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			ahf.Core.Name = server.Name
 
 			// Wait until Host is ready, not just until the build is started
-			if _, innerXErr = s.WaitHostReady(ahf, temporal.GetLongOperationTimeout()); innerXErr != nil {
+			if _, innerXErr = s.WaitHostReady(ahf, s.Timings().HostLongOperationTimeout()); innerXErr != nil {
 				if derr := s.DeleteHost(ahf.Core.ID); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Host"))
 				}
@@ -644,8 +644,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetLongOperationTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostLongOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1121,8 +1121,8 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostCleanupTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1131,7 +1131,7 @@ func (s stack) StopHost(hostParam stacks.HostParameter, gracefully bool) (xerr f
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef,
-				temporal.GetHostCleanupTimeout(),
+				s.Timings().HostCleanupTimeout(),
 			)
 		default:
 			return retryErr
@@ -1171,8 +1171,8 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostCleanupTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1181,7 +1181,7 @@ func (s stack) StartHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get information of host '%s' after %v", hostRef,
-				temporal.GetHostCleanupTimeout(),
+				s.Timings().HostCleanupTimeout(),
 			)
 		default:
 			return retryErr
@@ -1220,8 +1220,8 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		2*temporal.GetHostCleanupTimeout(),
+		s.Timings().NormalDelay(),
+		2*s.Timings().HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1230,7 +1230,7 @@ func (s stack) RebootHost(hostParam stacks.HostParameter) (xerr fail.Error) {
 		case *retry.ErrTimeout:
 			return fail.Wrap(
 				fail.Cause(retryErr), "timeout waiting to get host '%s' information after %v", hostRef,
-				temporal.GetHostCleanupTimeout(),
+				s.Timings().HostCleanupTimeout(),
 			)
 		default:
 			return retryErr

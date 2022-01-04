@@ -38,6 +38,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Content is the structure to apply to userdata.sh template
@@ -103,7 +104,10 @@ func (ud Content) OK() bool { // FIXME: Complete function, mark struct fields as
 }
 
 // Prepare prepares the initial configuration script executed by cloud compute resource
-func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string) fail.Error {
+func (ud *Content) Prepare(
+	options stacks.ConfigurationOptions, request abstract.HostRequest, cidr string, defaultNetworkCIDR string,
+	timings temporal.Timings,
+) fail.Error {
 	if ud == nil {
 		return fail.InvalidInstanceError()
 	}
@@ -139,7 +143,7 @@ func (ud *Content) Prepare(options stacks.ConfigurationOptions, request abstract
 		dnsList = []string{"1.1.1.1"}
 	}
 
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	if xerr != nil {
 		return xerr
 	}

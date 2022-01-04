@@ -31,7 +31,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Item is a helper struct to ease the copy of local files to remote
@@ -89,7 +88,7 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			iterations++
-			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, temporal.GetExecutionTimeout())
+			retcode, iout, ierr, xerr := host.Push(ctx, rfc.Local, rfc.Remote, rfc.RemoteOwner, rfc.RemoteRights, host.Service().Timings().ExecutionTimeout())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				xerr.Annotate("iterations", iterations)
@@ -113,8 +112,8 @@ func (rfc Item) Upload(ctx context.Context, host resources.Host) (xerr fail.Erro
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetConnectionTimeout()+2*temporal.GetExecutionTimeout(),
+		host.Service().Timings().NormalDelay(),
+		host.Service().Timings().ConnectionTimeout()+2*host.Service().Timings().ExecutionTimeout(),
 	)
 	if retryErr != nil {
 		switch realErr := retryErr.(type) { // nolint
@@ -151,8 +150,12 @@ func (rfc Item) UploadString(ctx context.Context, content string, host resources
 
 // RemoveRemote deletes the remote file from host
 func (rfc Item) RemoveRemote(ctx context.Context, host resources.Host) fail.Error {
+	if host == nil {
+		return fail.InvalidParameterCannotBeNilError("host")
+	}
+
 	cmd := "rm -rf " + rfc.Remote
-	retcode, _, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _, _, xerr := host.Run(ctx, cmd, outputs.COLLECT, host.Service().Timings().ConnectionTimeout(), host.Service().Timings().ExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil || retcode != 0 {
 		return fail.NewError("failed to remove file '%s:%s'", host.GetName(), rfc.Remote)

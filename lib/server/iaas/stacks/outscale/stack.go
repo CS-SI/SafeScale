@@ -28,6 +28,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Credentials outscale credentials
@@ -82,7 +83,7 @@ type ConfigurationOptions struct {
 	Metadata      MetadataConfiguration `json:"metadata,omitempty"`
 }
 
-// stack Outscale stack to adapt outscale IaaS API
+// stack implements Outscale IaaS API
 type stack struct {
 	Options              ConfigurationOptions
 	client               *osc.APIClient
@@ -93,6 +94,8 @@ type stack struct {
 	deviceNames          []string
 	templates            []abstract.HostTemplate
 	vpc                  *abstract.Network
+
+	*temporal.MutableTimings
 }
 
 // NullStack returns a null value of the stack
@@ -158,6 +161,9 @@ func New(options *ConfigurationOptions) (_ *stack, xerr fail.Error) { // nolint
 		auth: auth,
 	}
 	s.buildTemplateList()
+
+	s.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
 
 	return &s, s.initDefaultNetwork()
 }
@@ -246,4 +252,15 @@ func (s stack) ListAvailabilityZones() (az map[string]bool, xerr fail.Error) {
 		az[r.SubregionName] = true
 	}
 	return az, nil
+}
+
+// Timings returns the instance containing current timeout settings
+func (s *stack) Timings() temporal.Timings {
+	if s == nil {
+		return temporal.NewTimings()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings
 }

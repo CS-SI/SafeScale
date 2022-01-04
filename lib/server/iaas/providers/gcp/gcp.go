@@ -187,9 +187,11 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return nil, xerr
 	}
 
+	// Note: if timings have to be tuned, update gcpStack.MutableTimings
+
 	wrapped := api.StackProxy{
-		InnerStack: gcpStack,
-		Name:       "google",
+		FullStack: gcpStack,
+		Name:      "google",
 	}
 
 	newP := &provider{
@@ -198,8 +200,8 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	wp := providers.ProviderProxy{
-		InnerProvider: newP,
-		Name:          wrapped.Name,
+		Provider: newP,
+		Name:     wrapped.Name,
 	}
 
 	return wp, nil

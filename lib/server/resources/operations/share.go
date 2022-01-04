@@ -24,7 +24,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 
@@ -164,7 +163,7 @@ func LoadShare(svc iaas.Service, ref string) (rs resources.Share, ferr fail.Erro
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onShareCacheMiss(svc, ref) },
-		temporal.GetMetadataTimeout(),
+		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := shareCache.Get(ref, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -243,13 +242,13 @@ func (instance *Share) carry(clonable data.Clonable) (ferr fail.Error) {
 		return fail.InvalidParameterError("clonable", "must also satisfy interface 'data.Identifiable'")
 	}
 
-	kindCache, xerr := instance.GetService().GetCache(instance.MetadataCore.GetKind())
+	kindCache, xerr := instance.Service().GetCache(instance.MetadataCore.GetKind())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -451,7 +450,7 @@ func (instance *Share) Create(
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	nfsServer, xerr := nfs.NewServer(sshConfig)
+	nfsServer, xerr := nfs.NewServer(instance.Service(), sshConfig)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -625,7 +624,7 @@ func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 		return nil, xerr
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	server, xerr := LoadHost(svc, hostID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -641,7 +640,9 @@ func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
 
 // Mount mounts a Share on a local directory of a host
 // returns a clone of the propertiesv1.HostRemoteMount created on success
-func (instance *Share) Mount(ctx context.Context, target resources.Host, path string, withCache bool) (_ *propertiesv1.HostRemoteMount, ferr fail.Error) {
+func (instance *Share) Mount(
+	ctx context.Context, target resources.Host, path string, withCache bool,
+) (_ *propertiesv1.HostRemoteMount, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -821,13 +822,13 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 				return xerr
 			}
 
-			xerr = nfsClient.Install(ctx)
+			xerr = nfsClient.Install(ctx, instance.Service())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
 
-			xerr = nfsClient.Mount(ctx, export, mountPath, withCache)
+			xerr = nfsClient.Mount(ctx, instance.Service(), export, mountPath, withCache)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -870,7 +871,7 @@ func (instance *Share) Mount(ctx context.Context, target resources.Host, path st
 			if derr == nil {
 				var nfsClient *nfs.Client
 				if nfsClient, derr = nfs.NewNFSClient(targetSSHConfig); derr == nil {
-					derr = nfsClient.Unmount(ctx, export)
+					derr = nfsClient.Unmount(ctx, instance.Service(), export)
 				}
 			}
 			if derr != nil {
@@ -1022,7 +1023,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr
 				return inErr
 			}
 
-			inErr = nfsClient.Unmount(ctx, serverPrivateIP+":"+hostShare.Path)
+			inErr = nfsClient.Unmount(ctx, instance.Service(), serverPrivateIP+":"+hostShare.Path)
 			if inErr != nil {
 				return inErr
 			}
@@ -1154,7 +1155,7 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 				return xerr
 			}
 
-			nfsServer, xerr := nfs.NewServer(sshConfig)
+			nfsServer, xerr := nfs.NewServer(instance.Service(), sshConfig)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -1177,8 +1178,6 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 	if xerr != nil {
 		return xerr
 	}
-
-	// FIXME: we should have a defer statement to restore Share in case of failure...
 
 	defer task.DisarmAbortSignal()()
 
@@ -1230,8 +1229,9 @@ func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 			// SecurityModes: Share.ShareAcls,
 		},
 	}
+	svc := instance.Service()
 	for k := range share.ClientsByName {
-		h, xerr := LoadHost(instance.GetService(), k)
+		h, xerr := LoadHost(svc, k)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			logrus.Errorf(xerr.Error())

@@ -34,7 +34,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // toVolumeState converts a Volume status returned by the OpenStack driver into VolumeState enum
@@ -268,7 +267,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.volume"), "("+id+")").WithStopwatch().Entering().Exiting()
 
-	var timeout = temporal.GetOperationTimeout()
+	var timeout = s.Timings().OperationTimeout()
 	xerr = retry.WhileUnsuccessful(
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
@@ -285,7 +284,7 @@ func (s stack) DeleteVolume(id string) (xerr fail.Error) {
 			}
 			return innerXErr
 		},
-		temporal.GetDefaultDelay(),
+		s.Timings().NormalDelay(),
 		timeout,
 	)
 	if xerr != nil {

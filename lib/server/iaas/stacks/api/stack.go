@@ -24,6 +24,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate minimock -o ../mocks/mock_stack.go -i github.com/CS-SI/SafeScale/lib/server/iaas/stacks/api.Stack
@@ -162,6 +163,9 @@ type Stack interface {
 
 	// Migrate runs custom code without breaking Interfaces
 	Migrate(operation string, params map[string]interface{}) fail.Error
+
+	// Timings ...
+	Timings() temporal.Timings
 }
 
 // ReservedForProviderUse is an interface about the methods only available to providers internally
@@ -172,7 +176,7 @@ type ReservedForProviderUse interface {
 	GetRawAuthenticationOptions() (stacks.AuthenticationOptions, fail.Error) // Returns a read-only struct containing authentication options
 }
 
-// FullStack is the interface that MUST actually implement all the providers, don't do it, and we can encounter runtime panics
+// FullStack is the interface that MUST actually implement all the providers; don't do it, and we can encounter runtime panics
 type FullStack interface {
 	Stack
 	ReservedForProviderUse

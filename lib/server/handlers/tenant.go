@@ -507,7 +507,7 @@ func (handler *tenantHandler) analyzeTemplate(template abstract.HostTemplate) (f
 		}
 	}()
 
-	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), 5*temporal.GetContextTimeout())
+	_, cout, _, xerr := host.Run(task.Context(), cmd, outputs.COLLECT, temporal.ConnectionTimeout(), 5*temporal.ContextTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "template [%s] host '%s': failed to run collection script", template.Name, hostName)
 	}

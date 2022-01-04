@@ -71,8 +71,9 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	if connectionTimeout < temporal.GetConnectSSHTimeout() {
-		connectionTimeout = temporal.GetConnectSSHTimeout()
+	// connectionTimeout = Max(connectionTimeout, instance.Service().Timings.SSHConnectionTimeout())
+	if connectionTimeout < instance.Service().Timings().SSHConnectionTimeout() {
+		connectionTimeout = instance.Service().Timings().SSHConnectionTimeout()
 	}
 
 	var (
@@ -111,7 +112,7 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
 	// no timeout is unsafe, we set an upper limit
 	if timeout == 0 {
-		timeout = temporal.GetLongOperationTimeout()
+		timeout = temporal.HostLongOperationTimeout()
 	}
 
 	var (
@@ -155,7 +156,7 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
+		temporal.DefaultDelay(),
 		timeout+time.Minute,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -212,8 +213,9 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	if timeout < temporal.GetHostTimeout() {
-		timeout = temporal.GetHostTimeout()
+	// timeout = Max(timeout, instance.Service().Timings().HostOperationTimeout())
+	if timeout < instance.Service().Timings().HostOperationTimeout() {
+		timeout = instance.Service().Timings().HostOperationTimeout()
 	}
 
 	md5hash := ""
@@ -292,7 +294,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
+		instance.Service().Timings().NormalDelay(),
 		2*timeout,
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -443,7 +445,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	to := fmt.Sprintf("%s:%s", hostName, filename)
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, temporal.GetExecutionTimeout())
+			retcode, stdout, stderr, innerXErr := instance.unsafePush(ctx, f.Name(), filename, owner, mode, instance.Service().Timings().ExecutionTimeout())
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -460,8 +462,8 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 			}
 			return nil
 		},
-		temporal.GetMinDelay(),
-		2*temporal.MaxTimeout(temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout()),
+		instance.Service().Timings().SmallDelay(),
+		2*temporal.MaxTimeout(instance.Service().Timings().ConnectionTimeout(), instance.Service().Timings().ExecutionTimeout()),
 	)
 	_ = os.Remove(f.Name())
 	if retryErr != nil {
@@ -489,7 +491,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 	if cmd != "" {
 		retryErr = retry.WhileUnsuccessful(
 			func() error {
-				retcode, stdout, stderr, innerXErr := instance.unsafeRun(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+				retcode, stdout, stderr, innerXErr := instance.unsafeRun(ctx, cmd, outputs.COLLECT, instance.Service().Timings().ConnectionTimeout(), instance.Service().Timings().ExecutionTimeout())
 				if innerXErr != nil {
 					switch innerXErr.(type) {
 					case *fail.ErrAborted:
@@ -506,8 +508,8 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 				}
 				return nil
 			},
-			temporal.GetMinDelay(),
-			2*temporal.MaxTimeout(temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout()),
+			instance.Service().Timings().SmallDelay(),
+			2*temporal.MaxTimeout(instance.Service().Timings().ConnectionTimeout(), instance.Service().Timings().ExecutionTimeout()),
 		)
 		if retryErr != nil {
 			switch retryErr.(type) {
@@ -527,6 +529,7 @@ func (instance *Host) unsafePushStringToFileWithOwnership(ctx context.Context, c
 func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
+	svc := instance.Service()
 	xerr = instance.Review(func(_ data.Clonable, props *serialize.JSONProperties) (innerXErr fail.Error) {
 		if props.Lookup(hostproperty.NetworkV2) {
 			return props.Inspect(hostproperty.NetworkV2, func(clonable data.Clonable) fail.Error {
@@ -534,7 +537,7 @@ func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, xerr fail.E
 				if !ok {
 					return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 				}
-				rs, innerXErr = LoadSubnet(instance.GetService(), "", networkV2.DefaultSubnetID)
+				rs, innerXErr = LoadSubnet(svc, "", networkV2.DefaultSubnetID)
 				if innerXErr != nil {
 					return innerXErr
 				}
@@ -546,7 +549,7 @@ func (instance *Host) unsafeGetDefaultSubnet() (rs resources.Subnet, xerr fail.E
 			if !ok {
 				return fail.InconsistentError("'*propertiesv2.HostNetworking' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			rs, innerXErr = LoadSubnet(instance.GetService(), "", hostNetworkV2.DefaultSubnetID)
+			rs, innerXErr = LoadSubnet(svc, "", hostNetworkV2.DefaultSubnetID)
 			if innerXErr != nil {
 				return innerXErr
 			}

@@ -216,7 +216,7 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 			}
 			return f.service.ReadObject(bucket.Name, f.absolutePath(path, name), &buffer, 0, 0)
 		},
-		temporal.GetCommunicationTimeout(),
+		f.service.Timings().CommunicationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -309,7 +309,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 
 	bucketName := bucket.Name
 	absolutePath := f.absolutePath(path, name)
-	timeout := temporal.GetMetadataReadAfterWriteTimeout()
+	timeout := f.service.Timings().MetadataReadAfterWriteTimeout()
 
 	// Outer retry will write the metadata at most 3 times
 	xerr = retry.Action(
@@ -339,7 +339,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 					return nil
 				},
 				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
-				retry.Fibonacci(temporal.GetMinDelay()),
+				retry.Fibonacci(f.service.Timings().SmallDelay()),
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
@@ -362,7 +362,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 			return nil
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
-		retry.Constant(temporal.GetMinDelay()),
+		retry.Constant(f.service.Timings().SmallDelay()),
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {

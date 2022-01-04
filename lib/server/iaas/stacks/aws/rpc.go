@@ -24,7 +24,6 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -1821,8 +1820,8 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostCleanupTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostCleanupTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -1830,8 +1829,7 @@ func (s stack) rpcTerminateInstance(instance *ec2.Instance) fail.Error {
 			return fail.Wrap(fail.Cause(retryErr), "stopping retries")
 		case *retry.ErrTimeout:
 			return fail.Wrap(
-				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId,
-				temporal.GetHostCleanupTimeout(),
+				fail.Cause(retryErr), "timeout waiting to get host %s information after %v", instance.InstanceId, s.Timings().HostCleanupTimeout(),
 			)
 		default:
 			return retryErr

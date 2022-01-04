@@ -18,9 +18,6 @@
 package aws
 
 import (
-	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/aws/aws-sdk-go/service/s3"
-
 	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -29,9 +26,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/pricing"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/ssm"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 type stack struct {
@@ -43,6 +43,8 @@ type stack struct {
 	EC2Service     *ec2.EC2
 	SSMService     *ssm.SSM
 	PricingService *pricing.Pricing
+
+	*temporal.MutableTimings
 }
 
 // NullStack is not exposed through API, is needed essentially by tests
@@ -126,5 +128,19 @@ func New(auth stacks.AuthenticationOptions, localCfg stacks.AWSConfiguration, cf
 	stack.SSMService = ssm.New(sssm, &aws.Config{})
 	stack.PricingService = pricing.New(spricing, &aws.Config{})
 
+	stack.MutableTimings = temporal.NewTimings()
+	// Note: If timeouts and/or delays have to be adjusted, do it here in stack.timeouts and/or stack.delays
+
 	return stack, nil
+}
+
+// Timings returns the instance containing current timeout/delay settings
+func (s *stack) Timings() temporal.Timings {
+	if s == nil {
+		return temporal.NewTimings()
+	}
+	if s.MutableTimings == nil {
+		s.MutableTimings = temporal.NewTimings()
+	}
+	return s.MutableTimings
 }

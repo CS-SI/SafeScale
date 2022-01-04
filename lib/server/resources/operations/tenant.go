@@ -26,7 +26,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
-// Tenant structure to handle name and GetService for a tenant
+// Tenant structure to handle name and Service for a tenant
 type Tenant struct {
 	Name       string
 	BucketName string

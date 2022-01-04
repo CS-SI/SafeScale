@@ -25,7 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // Description contains the configuration for bucket mount
@@ -55,7 +54,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 		_ = os.Remove(f.Name())
 	}()
 
-	svc := host.GetService()
+	svc := host.Service()
 	svcConf, xerr := svc.GetConfigurationOptions()
 	if xerr != nil {
 		return xerr
@@ -71,7 +70,7 @@ func (desc *Description) upload(ctx context.Context, host resources.Host) fail.E
 	}
 	owner := desc.OperatorUsername + ":" + desc.OperatorUsername
 	target := desc.FilePath()
-	retcode, stdout, stderr, xerr := host.Push(ctx, f.Name(), target, owner, "0600", temporal.GetExecutionTimeout())
+	retcode, stdout, stderr, xerr := host.Push(ctx, f.Name(), target, owner, "0600", svc.Timings().ExecutionTimeout())
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to upload rclone configuration file")
 	}

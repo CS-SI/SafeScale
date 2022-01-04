@@ -64,7 +64,7 @@ func extractHostArgument(c *cli.Context, hostnamePos int) error {
 	}
 
 	var err error
-	hostInstance, err = clientSession.Host.Inspect(hostName, temporal.GetExecutionTimeout())
+	hostInstance, err = clientSession.Host.Inspect(hostName, temporal.ExecutionTimeout())
 	if err != nil {
 		// fmt.Printf("%s\n", err.Error()
 		return clitools.ExitOnRPC(err.Error())

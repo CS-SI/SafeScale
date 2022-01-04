@@ -456,7 +456,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("stack.openstack") || tracing.ShouldTrace("stacks.compute"), "(%s)", hostLabel).WithStopwatch().Entering().Exiting()
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, s.Timings().OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -681,7 +681,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
+	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", s.Timings())
 	if xerr != nil {
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -821,7 +821,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 
 			// Wait that host is ready, not just that the build is started
-			timeout := temporal.GetHostTimeout()
+			timeout := s.Timings().HostOperationTimeout()
 			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, timeout)
 			if innerXErr != nil {
 				logrus.Errorf(
@@ -838,8 +838,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetLongOperationTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostLongOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1195,7 +1195,7 @@ func (s stack) WaitHostState(hostParam stacks.HostParameter, state hoststate.Enu
 				)
 			}
 		},
-		temporal.GetMinDelay(),
+		s.Timings().SmallDelay(),
 		timeout,
 	)
 	if retryErr != nil {
@@ -1408,8 +1408,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 					}
 					return fail.NewError("host %s state is '%s'", hostRef, server.Status)
 				},
-				temporal.GetDefaultDelay(),
-				temporal.GetContextTimeout(),
+				s.Timings().NormalDelay(),
+				s.Timings().ContextTimeout(),
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {
@@ -1427,7 +1427,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return nil
 		},
 		0,
-		temporal.GetHostCleanupTimeout(),
+		s.Timings().HostCleanupTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) { // FIXME: Look at that

@@ -74,7 +74,7 @@ func (instance *Host) AddFeature(ctx context.Context, name string, vars data.Map
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(instance.GetService(), name)
+	feat, xerr := NewFeature(instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -148,7 +148,7 @@ func (instance *Host) CheckFeature(ctx context.Context, name string, vars data.M
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.host"), "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(instance.GetService(), name)
+	feat, xerr := NewFeature(instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -192,7 +192,7 @@ func (instance *Host) DeleteFeature(ctx context.Context, name string, vars data.
 	tracer := debug.NewTracer(task, false /*tracing.ShouldTrace("resources.host") || tracing.ShouldTrace("resources.feature"), */, "(%s)", name).Entering()
 	defer tracer.Exiting()
 
-	feat, xerr := NewFeature(instance.GetService(), name)
+	feat, xerr := NewFeature(instance.Service(), name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -385,7 +385,7 @@ func (instance *Host) ComplementFeatureParameters(_ context.Context, v data.Map)
 	v["PublicIP"] = instance.publicIP
 
 	if _, ok := v["Username"]; !ok {
-		config, xerr := instance.GetService().GetConfigurationOptions()
+		config, xerr := instance.Service().GetConfigurationOptions()
 		if xerr != nil {
 			return xerr
 		}

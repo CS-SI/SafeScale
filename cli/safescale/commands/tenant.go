@@ -58,7 +58,7 @@ var tenantListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		tenants, err := clientSession.Tenant.List(temporal.GetExecutionTimeout())
+		tenants, err := clientSession.Tenant.List(temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of tenants", false).Error())))
@@ -80,7 +80,7 @@ var tenantGetCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		tenant, err := clientSession.Tenant.Get(temporal.GetExecutionTimeout())
+		tenant, err := clientSession.Tenant.Get(temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "get tenant", false).Error())))
@@ -106,7 +106,7 @@ var tenantSetCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Tenant.Set(c.Args().First(), temporal.GetExecutionTimeout())
+		err := clientSession.Tenant.Set(c.Args().First(), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))
@@ -133,7 +133,7 @@ var tenantInspectCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		resp, err := clientSession.Tenant.Inspect(c.Args().First(), temporal.GetExecutionTimeout())
+		resp, err := clientSession.Tenant.Inspect(c.Args().First(), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -163,7 +163,7 @@ var tenantScanCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		results, err := clientSession.Tenant.Scan(c.Args().First(), c.Bool("dry-run"), c.StringSlice("template"), temporal.GetExecutionTimeout())
+		results, err := clientSession.Tenant.Scan(c.Args().First(), c.Bool("dry-run"), c.StringSlice("template"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "scan tenant", false).Error())))
@@ -213,7 +213,7 @@ var tenantMetadataUpgradeCommand = &cli.Command{
 		}
 
 		// dryRun := c.Bool("dry-run")
-		results, err := clientSession.Tenant.Upgrade(c.Args().First(), false /*dryRun*/, temporal.GetExecutionTimeout())
+		results, err := clientSession.Tenant.Upgrade(c.Args().First(), false /*dryRun*/, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "metadata upgrade", false).Error())))
@@ -241,7 +241,7 @@ var tenantMetadataDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err := clientSession.Tenant.Cleanup(c.Args().First(), temporal.GetExecutionTimeout())
+		err := clientSession.Tenant.Cleanup(c.Args().First(), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "set tenant", false).Error())))

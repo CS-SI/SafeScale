@@ -38,7 +38,9 @@ type taskCreateGatewayParameters struct {
 	sizing  abstract.HostSizingRequirements
 }
 
-func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Subnet) taskCreateGateway(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -68,7 +70,7 @@ func (instance *Subnet) taskCreateGateway(task concurrency.Task, params concurre
 	hostSizing := castedParams.sizing
 
 	logrus.Infof("Requesting the creation of gateway '%s' using template '%s' with image '%s'", hostReq.ResourceName, hostReq.TemplateID, hostReq.ImageID)
-	svc := instance.GetService()
+	svc := instance.Service()
 	hostReq.PublicIP = true
 	hostReq.IsGateway = true
 
@@ -165,7 +167,9 @@ type taskFinalizeGatewayConfigurationParameters struct {
 	userdata *userdata.Content
 }
 
-func (instance *Subnet) taskFinalizeGatewayConfiguration(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, xerr fail.Error) {
+func (instance *Subnet) taskFinalizeGatewayConfiguration(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (result concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {

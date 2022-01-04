@@ -36,7 +36,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/template"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 //go:generate rice embed-go
@@ -79,7 +78,7 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(host.Service().Timings())
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		return xerr
@@ -135,15 +134,15 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 
 	xerr = retry.Action(
 		func() (innerXErr error) {
-			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, temporal.GetConnectionTimeout(), temporal.GetBigDelay())
+			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, host.Service().Timings().ConnectionTimeout(), host.Service().Timings().BigDelay())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetContextTimeout())),
-		retry.Constant(temporal.GetDefaultDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(host.Service().Timings().ContextTimeout())),
+		retry.Constant(host.Service().Timings().NormalDelay()),
 		nil, nil, nil,
 	)
 	if xerr != nil {
@@ -201,7 +200,9 @@ func realizeTemplate(name string, data interface{}) (string, fail.Error) {
 	return content, nil
 }
 
-func uploadContentToFile(ctx context.Context, content, name, owner, rights string, host resources.Host) (string, fail.Error) {
+func uploadContentToFile(
+	ctx context.Context, content, name, owner, rights string, host resources.Host,
+) (string, fail.Error) {
 	// Copy script to remote host with retries if needed
 	f, xerr := system.CreateTempFileFromString(content, 0666) // nolint
 	if xerr != nil {
@@ -215,10 +216,11 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 	}()
 
 	// TODO: This is not Windows friendly
+	svc := host.Service()
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, temporal.GetOperationTimeout())
+			retcode, stdout, stderr, innerXErr := host.Push(ctx, f.Name(), filename, owner, rights, svc.Timings().OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "failed to upload content to remote")
 			}
@@ -230,8 +232,8 @@ func uploadContentToFile(ctx context.Context, content, name, owner, rights strin
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostTimeout(),
+		svc.Timings().NormalDelay(),
+		svc.Timings().HostOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {

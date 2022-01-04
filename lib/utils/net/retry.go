@@ -27,13 +27,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/CS-SI/SafeScale/lib/utils/debug"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/sirupsen/logrus"
 
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // WhileUnsuccessfulButRetryable executes callback inside a retry loop with tolerance for communication errors (relative to net package),
@@ -85,7 +85,7 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 // WhileCommunicationUnsuccessfulDelay1Second executes callback inside a retry loop with tolerance for communication errors (relative to net package),
 // waiting 1 second between each try, with a limit of 'timeout'
 func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout time.Duration) fail.Error {
-	return WhileUnsuccessfulButRetryable(callback, retry.Constant(temporal.GetMinDelay()), timeout)
+	return WhileUnsuccessfulButRetryable(callback, retry.Constant(temporal.MinDelay()), timeout)
 }
 
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit

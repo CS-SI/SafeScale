@@ -562,26 +562,26 @@ func ShareError(t *testing.T, provider providers.Enum) {
 	_ = out
 	require.Nil(t, err)
 
-	time.Sleep(temporal.GetDefaultDelay())
+	time.Sleep(temporal.DefaultDelay())
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	_ = out
 	require.NotNil(t, err)
 	require.True(t, strings.Contains(out, "still attached"))
 
-	time.Sleep(temporal.GetDefaultDelay())
+	time.Sleep(temporal.DefaultDelay())
 
 	out, err = GetOutput("safescale volume detach " + names.Volumes[0] + " " + names.Hosts[0])
 	_ = out
 	require.Nil(t, err)
 
-	time.Sleep(temporal.GetDefaultDelay())
+	time.Sleep(temporal.DefaultDelay())
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	_ = out
 	require.Nil(t, err)
 
-	time.Sleep(temporal.GetDefaultDelay())
+	time.Sleep(temporal.DefaultDelay())
 
 	out, err = GetOutput("safescale volume list")
 	_ = out
@@ -649,13 +649,13 @@ func VolumeError(t *testing.T, provider providers.Enum) {
 	_ = out
 	require.Nil(t, err)
 
-	time.Sleep(temporal.GetDefaultDelay())
+	time.Sleep(temporal.DefaultDelay())
 
 	out, err = GetOutput("safescale volume  attach " + names.Volumes[0] + " " + names.Hosts[0])
 	require.Nil(t, err)
 	_ = out
 
-	time.Sleep(temporal.GetDefaultDelay())
+	time.Sleep(temporal.DefaultDelay())
 
 	out, err = GetOutput("safescale volume delete " + names.Volumes[0])
 	_ = out
@@ -705,7 +705,7 @@ func StopStart(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 	_ = out
 
-	time.Sleep(temporal.GetDefaultDelay())
+	time.Sleep(temporal.DefaultDelay())
 
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)
@@ -716,7 +716,7 @@ func StopStart(t *testing.T, provider providers.Enum) {
 	require.Nil(t, err)
 	_ = out
 
-	time.Sleep(temporal.GetDefaultDelay())
+	time.Sleep(temporal.DefaultDelay())
 
 	out, err = GetOutput("safescale ssh run " + names.Hosts[0] + " -c \"uptime\"")
 	require.Nil(t, err)

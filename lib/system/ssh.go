@@ -532,7 +532,9 @@ func (scmd *SSHCommand) Start() fail.Error {
 // Note: if you want to RunWithTimeout in a loop, you MUST create the scmd inside the loop, otherwise
 //       you risk to call twice os/exec.Wait, which may panic
 // FIXME: maybe we should move this method inside sshconfig directly with systematically created scmd...
-func (scmd *SSHCommand) RunWithTimeout(ctx context.Context, outs outputs.Enum, timeout time.Duration) (int, string, string, fail.Error) {
+func (scmd *SSHCommand) RunWithTimeout(
+	ctx context.Context, outs outputs.Enum, timeout time.Duration,
+) (int, string, string, fail.Error) {
 	const invalid = -1
 	if scmd == nil {
 		return invalid, "", "", fail.InvalidInstanceError()
@@ -614,7 +616,9 @@ type taskExecuteParameters struct {
 	collectOutputs bool
 }
 
-func (scmd *SSHCommand) taskExecute(task concurrency.Task, p concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+func (scmd *SSHCommand) taskExecute(
+	task concurrency.Task, p concurrency.TaskParameters,
+) (concurrency.TaskResult, fail.Error) {
 	if scmd == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -820,8 +824,8 @@ func createConsecutiveTunnels(sc *SSHConfig, tunnels *SSHTunnels) (*SSHTunnel, f
 					*tunnels = append(SSHTunnels{tunnel}, *tunnels...)
 					return nil
 				},
-				temporal.GetDefaultDelay(),
-				temporal.GetOperationTimeout(),
+				temporal.DefaultDelay(),
+				temporal.OperationTimeout(),
 			)
 			if xerr != nil {
 				switch xerr.(type) { // nolint
@@ -869,7 +873,9 @@ func (sconf *SSHConfig) CreateTunneling() (_ SSHTunnels, _ *SSHConfig, ferr fail
 	return tunnels, &sshConfig, nil
 }
 
-func createSSHCommand(sconf *SSHConfig, cmdString, username, shell string, withTty, withSudo bool) (string, *os.File, fail.Error) {
+func createSSHCommand(
+	sconf *SSHConfig, cmdString, username, shell string, withTty, withSudo bool,
+) (string, *os.File, fail.Error) {
 	f, err := CreateTempFileFromString(sconf.PrivateKey, 0400)
 	if err != nil {
 		return "", nil, fail.Wrap(err, "unable to create temporary key file")
@@ -928,7 +934,9 @@ func (sconf *SSHConfig) NewSudoCommand(ctx context.Context, cmdString string) (*
 	return sconf.newCommand(ctx, cmdString, false, true)
 }
 
-func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTty, withSudo bool) (*SSHCommand, fail.Error) {
+func (sconf *SSHConfig) newCommand(
+	ctx context.Context, cmdString string, withTty, withSudo bool,
+) (*SSHCommand, fail.Error) {
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -981,7 +989,9 @@ func (sconf *SSHConfig) newCommand(ctx context.Context, cmdString string, withTt
 }
 
 // newCopyCommand does the same thing as newCommand for SCP actions
-func (sconf *SSHConfig) newCopyCommand(ctx context.Context, localPath, remotePath string, isUpload bool) (*SSHCommand, fail.Error) {
+func (sconf *SSHConfig) newCopyCommand(
+	ctx context.Context, localPath, remotePath string, isUpload bool,
+) (*SSHCommand, fail.Error) {
 	if sconf == nil {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -1056,7 +1066,9 @@ func createSCPCommand(sconf *SSHConfig, localPath, remotePath string, isUpload b
 }
 
 // WaitServerReady waits until the SSH server is ready
-func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeout time.Duration) (out string, ferr fail.Error) {
+func (sconf *SSHConfig) WaitServerReady(
+	ctx context.Context, phase string, timeout time.Duration,
+) (out string, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if sconf == nil {
@@ -1170,7 +1182,7 @@ func (sconf *SSHConfig) WaitServerReady(ctx context.Context, phase string, timeo
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
+		temporal.DefaultDelay(),
 		timeout+time.Minute,
 	)
 	if retryErr != nil {

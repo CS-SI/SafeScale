@@ -56,7 +56,7 @@ var imageList = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		images, err := clientSession.Image.List(c.Bool("all"), temporal.GetExecutionTimeout())
+		images, err := clientSession.Image.List(c.Bool("all"), temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "list of images", false).Error())))

@@ -48,7 +48,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 type blockDevice struct {
@@ -467,7 +466,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 
 	// Constructs userdata content
 	userData = userdata.NewContent()
-	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "")
+	xerr = userData.Prepare(s.cfgOpts, request, defaultSubnet.CIDR, "", s.Timings())
 	if xerr != nil {
 		return nullAhf, nullUdc, fail.Wrap(xerr, "failed to prepare user data content")
 	}
@@ -628,7 +627,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			ahc.Name = server.Name
 
 			// Wait that host is ready, not just that the build is started
-			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, temporal.GetHostTimeout())
+			server, innerXErr = s.WaitHostState(ahc, hoststate.Started, s.Timings().HostOperationTimeout())
 			if innerXErr != nil {
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
@@ -645,8 +644,8 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetLongOperationTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().HostLongOperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {
@@ -801,7 +800,7 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (host *abstract.HostF
 		return nullAHF, xerr
 	}
 
-	server, xerr := s.WaitHostState(ahf, hoststate.Any, temporal.GetOperationTimeout())
+	server, xerr := s.WaitHostState(ahf, hoststate.Any, s.Timings().OperationTimeout())
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
@@ -1243,8 +1242,8 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 						}
 						return commRetryErr
 					},
-					temporal.GetDefaultDelay(),
-					temporal.GetHostCleanupTimeout(),
+					s.Timings().NormalDelay(),
+					s.Timings().HostCleanupTimeout(),
 				)
 				if innerRetryErr != nil {
 					switch innerRetryErr.(type) {
@@ -1263,7 +1262,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return fail.NewError("host '%s' in state 'Error', retrying to delete", hostRef)
 		},
 		0,
-		temporal.GetHostCleanupTimeout(),
+		s.Timings().HostCleanupTimeout(), // FIXME: is it a sufficient timeout?
 	)
 	if outerRetryErr != nil {
 		switch outerRetryErr.(type) {
@@ -1311,9 +1310,7 @@ func (s stack) getFloatingIPOfHost(hostID string) (*floatingips.FloatingIP, fail
 	}
 	// VPL: fip not found is not an abnormal situation, do not log or raise error
 	if len(fips) > 1 {
-		return nil, fail.InconsistentError(
-			"configuration error, more than one Floating IP associated to host '%s'", hostID,
-		)
+		return nil, fail.InconsistentError("configuration error, more than one Floating IP associated to host '%s'", hostID)
 	}
 	if len(fips) == 0 {
 		return nil, nil
@@ -1360,8 +1357,8 @@ func (s stack) enableHostRouterMode(host *abstract.HostFull) fail.Error {
 			}
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetOperationTimeout(),
+		s.Timings().NormalDelay(),
+		s.Timings().OperationTimeout(),
 	)
 	if retryErr != nil {
 		switch retryErr.(type) {

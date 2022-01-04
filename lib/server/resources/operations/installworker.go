@@ -98,6 +98,7 @@ var featureScriptTemplate atomic.Value
 type alterCommandCB func(string) string
 
 type worker struct {
+	service   iaas.Service
 	feature   *Feature
 	target    resources.Targetable
 	method    installmethod.Enum
@@ -143,13 +144,13 @@ func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum
 		var ok bool
 		w.cluster, ok = t.(*Cluster)
 		if !ok {
-			return nil, fail.NewError("t should be a *Cluster")
+			return nil, fail.InconsistentError("t should be a *Cluster")
 		}
 	case featuretargettype.Host:
 		var ok bool
 		w.host, ok = t.(*Host)
 		if !ok {
-			return nil, fail.NewError("t should be a *Host")
+			return nil, fail.InconsistentError("t should be a *Host")
 		}
 	}
 
@@ -304,7 +305,7 @@ func (w *worker) identifyAllMasters(ctx context.Context) ([]resources.Host, fail
 			return nil, xerr
 		}
 		for _, i := range masters {
-			hostInstance, xerr := LoadHost(w.cluster.GetService(), i)
+			hostInstance, xerr := LoadHost(w.cluster.Service(), i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -356,7 +357,7 @@ func (w *worker) identifyAllNodes(ctx context.Context) ([]resources.Host, fail.E
 			return nil, xerr
 		}
 		for _, i := range list {
-			hostInstance, xerr := LoadHost(w.cluster.GetService(), i)
+			hostInstance, xerr := LoadHost(w.cluster.Service(), i)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return nil, xerr
@@ -387,13 +388,13 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		gw, xerr := subnetInstance.InspectGateway(true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr == nil {
-			_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+			_, xerr = gw.WaitSSHReady(ctx, gw.Service().Timings().SSHConnectionTimeout())
 		}
 
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			if gw, xerr = subnetInstance.InspectGateway(false); xerr == nil {
-				_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+				_, xerr = gw.WaitSSHReady(ctx, gw.Service().Timings().SSHConnectionTimeout())
 			}
 		}
 
@@ -410,14 +411,18 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 		if xerr != nil {
 			return nil, xerr
 		}
+
 		var gw resources.Host
-		if gw, xerr = LoadHost(w.cluster.GetService(), netCfg.GatewayID); xerr == nil {
-			_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+		svc := w.cluster.Service()
+		gw, xerr = LoadHost(svc, netCfg.GatewayID)
+		if xerr == nil {
+			_, xerr = gw.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
 		}
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			if gw, xerr = LoadHost(w.cluster.GetService(), netCfg.SecondaryGatewayID); xerr == nil {
-				_, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout())
+			gw, xerr = LoadHost(svc, netCfg.SecondaryGatewayID)
+			if xerr == nil {
+				_, xerr = gw.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
 			}
 		}
 		xerr = debug.InjectPlannedFail(xerr)
@@ -466,7 +471,7 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 	if w.cluster != nil {
 		var netCfg *propertiesv3.ClusterNetwork
 		if netCfg, xerr = w.cluster.GetNetworkConfig(); xerr == nil {
-			rs, xerr = LoadSubnet(w.cluster.GetService(), "", netCfg.SubnetID)
+			rs, xerr = LoadSubnet(w.service, "", netCfg.SubnetID)
 		}
 	} else {
 		rs, xerr = w.host.GetDefaultSubnet()
@@ -480,12 +485,12 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 	gw, xerr := rs.InspectGateway(true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr == nil {
-		if _, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout()); xerr == nil {
+		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
 	}
 	if gw, xerr = rs.InspectGateway(false); xerr == nil {
-		if _, xerr = gw.WaitSSHReady(ctx, temporal.GetConnectSSHTimeout()); xerr == nil {
+		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr == nil {
 			list = append(list, gw)
 		}
 	}
@@ -807,7 +812,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		return nil, fail.SyntaxError(msg, w.feature.GetName(), w.feature.GetDisplayFilename(), p.stepKey, yamlRunKeyword)
 	}
 
-	wallTime := temporal.GetLongOperationTimeout()
+	wallTime := w.service.Timings().HostLongOperationTimeout()
 	if anon, ok = p.stepMap[yamlTimeoutKeyword]; ok {
 		if _, ok := anon.(int); ok {
 			wallTime = time.Duration(anon.(int)) * time.Minute
@@ -821,7 +826,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 		}
 	}
 
-	templateCommand, xerr := normalizeScript(&p.variables, data.Map{
+	templateCommand, xerr := normalizeScript(w.service.Timings(), &p.variables, data.Map{
 		"reserved_Name":    w.feature.GetName(),
 		"reserved_Content": runContent,
 		"reserved_Action":  strings.ToLower(w.action.String()),
@@ -1050,22 +1055,20 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 		return nil
 	}
 
-	svc := w.cluster.GetService()
-
 	netprops, xerr := w.cluster.GetNetworkConfig()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 
-	subnetInstance, xerr := LoadSubnet(svc, "", netprops.SubnetID)
+	subnetInstance, xerr := LoadSubnet(w.service, "", netprops.SubnetID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
 	}
 	defer subnetInstance.Released() // mark instance as released at the end of the function, for cache considerations
 
-	primaryKongController, xerr := NewKongController(ctx, svc, subnetInstance, true)
+	primaryKongController, xerr := NewKongController(ctx, w.service, subnetInstance, true)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to apply reverse proxy rules")
@@ -1073,7 +1076,7 @@ func (w *worker) setReverseProxy(ctx context.Context) (ferr fail.Error) {
 
 	var secondaryKongController *KongController
 	if ok, _ := subnetInstance.HasVirtualIP(); ok {
-		secondaryKongController, xerr = NewKongController(ctx, svc, subnetInstance, false)
+		secondaryKongController, xerr = NewKongController(ctx, w.service, subnetInstance, false)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to apply reverse proxy rules")
@@ -1367,14 +1370,14 @@ func (w *worker) identifyHosts(ctx context.Context, targets stepTargets) ([]reso
 
 // normalizeScript envelops the script with log redirection to /opt/safescale/var/log/feature.<name>.<action>.log
 // and ensures BashLibrary are there
-func normalizeScript(params *data.Map, reserved data.Map) (string, fail.Error) {
+func normalizeScript(timings temporal.Timings, params *data.Map, reserved data.Map) (string, fail.Error) {
 	var (
 		err         error
 		tmplContent string
 	)
 
 	// Configures BashLibrary template var
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return "", xerr
@@ -1458,15 +1461,11 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 		return nil
 	}
 
-	var (
-		svc iaas.Service
-		rs  resources.Subnet
-	)
+	var rs resources.Subnet
 	if w.cluster != nil {
-		svc = w.cluster.GetService()
 		var netprops *propertiesv3.ClusterNetwork
 		if netprops, xerr = w.cluster.GetNetworkConfig(); xerr == nil {
-			rs, xerr = LoadSubnet(svc, netprops.NetworkID, netprops.SubnetID)
+			rs, xerr = LoadSubnet(w.service, netprops.NetworkID, netprops.SubnetID)
 		}
 	} else if w.host != nil {
 		rs, xerr = w.host.GetDefaultSubnet()
@@ -1496,7 +1495,6 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 
 		// If security rules concerns gateways, update subnet Security Group for gateways
 		if _, ok := targets["gateways"]; ok {
-
 			description, ok := r["name"].(string)
 			if !ok {
 				return fail.SyntaxError("missing field 'name' from rule '%s' in '%s'", k, yamlKey)

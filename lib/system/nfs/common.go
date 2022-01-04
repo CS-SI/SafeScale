@@ -58,7 +58,10 @@ func getTemplateBox() (*rice.Box, fail.Error) {
 // Returns retcode, stdout, stderr, error
 // If error == nil && retcode != 0, the script ran but failed.
 // func executeScript(task concurrency.Task, sshconfig system.SSHConfig, name string, data map[string]interface{}) (int, string, string, fail.Error) {
-func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string, data map[string]interface{}) (string, fail.Error) {
+func executeScript(
+	ctx context.Context, timings temporal.Timings, sshconfig system.SSHConfig, name string,
+	data map[string]interface{},
+) (string, fail.Error) {
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -77,7 +80,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 		return "", fail.AbortedError(nil, "aborted")
 	}
 
-	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition()
+	bashLibraryDefinition, xerr := system.BuildBashLibraryDefinition(timings)
 	if xerr != nil {
 		xerr = fail.ExecutionError(xerr)
 		return "", xerr
@@ -151,7 +154,7 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(ctx, filename, f.Name(), true, temporal.GetOperationTimeout())
+			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(ctx, filename, f.Name(), true, timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
@@ -163,8 +166,8 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 
 			return nil
 		},
-		temporal.GetDefaultDelay(),
-		temporal.GetHostTimeout(),
+		timings.NormalDelay(),
+		timings.HostOperationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -200,14 +203,14 @@ func executeScript(ctx context.Context, sshconfig system.SSHConfig, name string,
 			}
 			defer func() { _ = sshCmd.Close() }()
 
-			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, temporal.GetBigDelay()); innerXErr != nil {
+			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timings.BigDelay()); innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetContextTimeout())),
-		retry.Constant(temporal.GetDefaultDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timings.ContextTimeout())),
+		retry.Constant(timings.NormalDelay()),
 		nil, nil, nil,
 	)
 	if xerr != nil {

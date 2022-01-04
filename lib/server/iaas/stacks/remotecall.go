@@ -56,8 +56,8 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 			}
 			return nil
 		},
-		retry.Fibonacci(temporal.GetMinDelay()), // waiting time between retries follows Fibonacci numbers x 1s
-		temporal.GetCommunicationTimeout(),
+		retry.Fibonacci(temporal.MinDelay()), // waiting time between retries follows Fibonacci numbers x MinDelay()
+		temporal.CommunicationTimeout(),
 	)
 	if xerr != nil {
 		switch xerr.(type) {

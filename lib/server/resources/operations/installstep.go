@@ -530,11 +530,15 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 
 	// If retcode is 126, iterate a few times...
 	rounds := 10
-	var retcode int
-	var outrun string
-	var outerr string
+	var (
+		retcode int
+		outrun  string
+		outerr  string
+	)
+	svc := p.Host.Service()
+	connTimeout := svc.Timings().ConnectionTimeout()
 	for {
-		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, temporal.GetConnectionTimeout(), is.WallTime)
+		retcode, outrun, outerr, xerr = p.Host.Run(task.Context(), command, outputs.COLLECT, connTimeout, is.WallTime)
 		if retcode == 126 {
 			logrus.Debugf("Text busy happened")
 		}
@@ -555,6 +559,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		}
 
 		if !(strings.Contains(outrun, "bad interpreter") || strings.Contains(outerr, "bad interpreter")) {
+			// FIXME: really? xerr == nil?
 			if xerr == nil {
 				xerr = debug.InjectPlannedFail(xerr)
 				if xerr != nil {
@@ -579,7 +584,7 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		}
 
 		rounds--
-		time.Sleep(temporal.GetMinDelay())
+		time.Sleep(svc.Timings().SmallDelay())
 	}
 
 	return stepResult{success: retcode == 0, completed: true, err: nil, retcode: retcode, output: outrun}, nil

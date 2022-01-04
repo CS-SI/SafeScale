@@ -43,7 +43,6 @@ import (
 	netretry "github.com/CS-SI/SafeScale/lib/utils/net"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	"github.com/CS-SI/SafeScale/lib/utils/retry/enums/verdict"
-	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 )
 
 // VPCRequest defines a request to create a VPC
@@ -691,18 +690,18 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 				normalizeError,
 			)
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(temporal.GetHostCleanupTimeout())),
-		retry.Constant(temporal.GetDefaultDelay()),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(s.Timings().HostCleanupTimeout())),
+		retry.Constant(s.Timings().NormalDelay()),
 		nil,
 		nil,
 		func(t retry.Try, verdict verdict.Enum) {
 			if t.Err != nil {
 				switch t.Err.Error() {
 				case "409":
-					logrus.Debugf("Subnet still owns host(s), retrying in %s...", temporal.GetDefaultDelay())
+					logrus.Debugf("Subnet still owns host(s), retrying in %s...", s.Timings().NormalDelay())
 				default:
 					logrus.Warnf("unexpected error: %s", spew.Sdump(t.Err))
-					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), temporal.GetDefaultDelay())
+					logrus.Debugf("error submitting Subnet deletion (status=%s), retrying in %s...", t.Err.Error(), s.Timings().NormalDelay())
 				}
 			}
 		},
@@ -834,8 +833,8 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 			}
 			return normalizeError(err)
 		},
-		temporal.GetMinDelay(),
-		temporal.GetContextTimeout(),
+		s.Timings().SmallDelay(),
+		s.Timings().ContextTimeout(),
 		func(try retry.Try, v verdict.Enum) {
 			if v != verdict.Done {
 				logrus.Debugf("Network '%s' is not in 'ACTIVE' state, retrying...", req.Name)

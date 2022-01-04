@@ -34,7 +34,9 @@ import (
 
 // taskUnbindFromHost unbinds a Host from the security group
 // params is intended to receive a '*host'
-func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *SecurityGroup) taskUnbindFromHost(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -59,7 +61,7 @@ func (instance *SecurityGroup) taskUnbindFromHost(task concurrency.Task, params 
 	sgID := instance.GetID()
 
 	// Unbind Security Group from Host on provider side
-	xerr = instance.GetService().UnbindSecurityGroupFromHost(sgID, hostInstance.GetID())
+	xerr = instance.Service().UnbindSecurityGroupFromHost(sgID, hostInstance.GetID())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -94,7 +96,9 @@ type taskUnbindFromHostsAttachedToSubnetParams struct {
 
 // taskUnbindFromHostsAttachedToSubnet unbinds security group from hosts attached to a Subnet
 // 'params' expects to be a *propertiesv1.SubnetHosts
-func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	if instance == nil || instance.IsNull() {
@@ -119,7 +123,7 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 			return nil, fail.Wrap(xerr, "failed to start new task group to remove Security Group '%s' from Hosts attached to the Subnet '%s'", instance.GetName(), p.subnetName)
 		}
 
-		svc := instance.GetService()
+		svc := instance.Service()
 		for k, v := range p.subnetHosts.ByID {
 			hostInstance, xerr := LoadHost(svc, k)
 			if xerr != nil {
@@ -166,7 +170,9 @@ func (instance *SecurityGroup) taskUnbindFromHostsAttachedToSubnet(task concurre
 // - nil, *fail.ErrInvalidParameter: some parameters are invalid
 // - nil, *fail.ErrAborted: received abortion signal
 // - nil, *fail.ErrNotFound: Host identified by params not found
-func (instance *SecurityGroup) taskBindEnabledOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *SecurityGroup) taskBindEnabledOnHost(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -185,7 +191,7 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(task concurrency.Task, para
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
 	}
 
-	hostInstance, innerXErr := LoadHost(instance.GetService(), hostID)
+	hostInstance, innerXErr := LoadHost(instance.Service(), hostID)
 	if innerXErr != nil {
 		switch innerXErr.(type) {
 		case *fail.ErrNotFound:
@@ -213,7 +219,9 @@ func (instance *SecurityGroup) taskBindEnabledOnHost(task concurrency.Task, para
 
 // taskBindDisabledOnHost removes rules of security group from host
 // params is intended to receive a non-empty string corresponding to host ID
-func (instance *SecurityGroup) taskBindDisabledOnHost(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, xerr fail.Error) {
+func (instance *SecurityGroup) taskBindDisabledOnHost(
+	task concurrency.Task, params concurrency.TaskParameters,
+) (_ concurrency.TaskResult, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if instance == nil || instance.IsNull() {
@@ -232,7 +240,7 @@ func (instance *SecurityGroup) taskBindDisabledOnHost(task concurrency.Task, par
 		return nil, fail.InvalidParameterError("params", "must be a non-empty string")
 	}
 
-	svc := instance.GetService()
+	svc := instance.Service()
 	hostInstance, innerXErr := LoadHost(svc, hostID)
 	if innerXErr != nil {
 		switch innerXErr.(type) {

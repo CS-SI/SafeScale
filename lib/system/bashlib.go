@@ -53,7 +53,9 @@ type BashLibraryDefinition struct {
 }
 
 // BuildBashLibraryDefinition generates the content of {{.reserved_BashLibrary}} and other reserved template variables
-func BuildBashLibraryDefinition() (*BashLibraryDefinition, fail.Error) {
+func BuildBashLibraryDefinition(
+	timings temporal.Timings,
+) (*BashLibraryDefinition, fail.Error) {
 	anon := bashLibraryContent.Load()
 	if anon == nil {
 		box, err := rice.FindBox("../system/scripts")
@@ -73,15 +75,16 @@ func BuildBashLibraryDefinition() (*BashLibraryDefinition, fail.Error) {
 	out := &BashLibraryDefinition{
 		Content: anon.(string),
 		// Sets delays and timeouts for script
-		DefaultDelay:           uint(math.Ceil(2 * temporal.GetDefaultDelay().Seconds())),
-		DefaultTimeout:         strings.ReplaceAll((temporal.GetHostTimeout() / 2).Truncate(time.Minute).String(), "0s", ""),
-		LongTimeout:            strings.ReplaceAll(temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", ""),
-		ClusterJoinTimeout:     strings.ReplaceAll(temporal.GetLongOperationTimeout().Truncate(time.Minute).String(), "0s", ""),
-		DockerImagePullTimeout: strings.ReplaceAll((2 * temporal.GetHostTimeout()).Truncate(time.Minute).String(), "0s", ""),
+		DefaultDelay:           uint(math.Ceil(2 * timings.NormalDelay().Seconds())),
+		DefaultTimeout:         strings.ReplaceAll((timings.HostOperationTimeout() / 2).Truncate(time.Minute).String(), "0s", ""),
+		LongTimeout:            strings.ReplaceAll(timings.HostLongOperationTimeout().Truncate(time.Minute).String(), "0s", ""),
+		ClusterJoinTimeout:     strings.ReplaceAll(timings.HostLongOperationTimeout().Truncate(time.Minute).String(), "0s", ""),
+		DockerImagePullTimeout: strings.ReplaceAll((2 * timings.HostOperationTimeout()).Truncate(time.Minute).String(), "0s", ""),
 	}
 	return out, nil
 }
 
+// ToMap transforms bld to a map
 func (bld *BashLibraryDefinition) ToMap() (map[string]interface{}, fail.Error) {
 	empty := map[string]interface{}{}
 	if bld == nil {

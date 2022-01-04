@@ -95,7 +95,7 @@ var clusterListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		list, err := clientSession.Cluster.List(temporal.DefaultExecutionTimeout)
+		list, err := clientSession.Cluster.List(temporal.ExecutionTimeout())
 		if err != nil {
 			err := fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "failed to get cluster list", false).Error())))
@@ -192,7 +192,7 @@ var clusterInspectCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		cluster, err := clientSession.Cluster.Inspect(clusterName, temporal.GetExecutionTimeout())
+		cluster, err := clientSession.Cluster.Inspect(clusterName, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
@@ -482,7 +482,7 @@ var clusterCreateCommand = &cli.Command{
 			Force:         force,
 			// NodeCount:     uint32(c.Int("initial-node-count")),
 		}
-		res, err := clientSession.Cluster.Create(&req, temporal.GetLongOperationTimeout())
+		res, err := clientSession.Cluster.Create(&req, temporal.HostLongOperationTimeout())
 
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
@@ -544,7 +544,7 @@ var clusterDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.Delete(clusterName, force, temporal.GetLongOperationTimeout())
+		err = clientSession.Cluster.Delete(clusterName, force, temporal.HostLongOperationTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -572,7 +572,7 @@ var clusterStopCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		err = clientSession.Cluster.Stop(clusterName, temporal.GetExecutionTimeout())
+		err = clientSession.Cluster.Stop(clusterName, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -600,7 +600,7 @@ var clusterStartCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		if err = clientSession.Cluster.Start(clusterRef, temporal.GetExecutionTimeout()); err != nil {
+		if err = clientSession.Cluster.Start(clusterRef, temporal.ExecutionTimeout()); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(strprocess.Capitalize(client.DecorateTimeoutError(err, "start of cluster", false).Error())))
 		}
@@ -626,7 +626,7 @@ var clusterStateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		state, err := clientSession.Cluster.GetState(clusterName, temporal.GetExecutionTimeout())
+		state, err := clientSession.Cluster.GetState(clusterName, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			msg := fmt.Sprintf("failed to get cluster state: %s", err.Error())
@@ -709,7 +709,7 @@ var clusterExpandCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		hosts, err := clientSession.Cluster.Expand(&req, temporal.GetLongOperationTimeout())
+		hosts, err := clientSession.Cluster.Expand(&req, temporal.HostLongOperationTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -770,7 +770,7 @@ var clusterShrinkCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		if _, err = clientSession.Cluster.Shrink(&req, temporal.GetLongOperationTimeout()); err != nil {
+		if _, err = clientSession.Cluster.Shrink(&req, temporal.HostLongOperationTimeout()); err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 		}
@@ -1007,7 +1007,7 @@ func executeCommand(clientSession *client.Session, command string, files *client
 		}
 	}
 
-	retcode, _ /*stdout*/, _ /*stderr*/, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+	retcode, _ /*stdout*/, _ /*stderr*/, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 	if xerr != nil {
 		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -1134,7 +1134,7 @@ var clusterNodeListCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		list, err := clientSession.Cluster.ListNodes(clusterName, temporal.GetExecutionTimeout())
+		list, err := clientSession.Cluster.ListNodes(clusterName, temporal.ExecutionTimeout())
 		if err != nil {
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
 		}
@@ -1172,7 +1172,7 @@ var clusterNodeInspectCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		host, err := clientSession.Cluster.InspectNode(clusterName, hostName, temporal.GetExecutionTimeout())
+		host, err := clientSession.Cluster.InspectNode(clusterName, hostName, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1215,7 +1215,7 @@ var clusterNodeDeleteCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		_, err = clientSession.Cluster.Inspect(clusterName, temporal.GetExecutionTimeout())
+		_, err = clientSession.Cluster.Inspect(clusterName, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.RPC, err.Error()))
@@ -1416,7 +1416,7 @@ var clusterMasterInspectCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
 		}
 
-		host, err := clientSession.Cluster.InspectNode(clusterName, hostName, temporal.GetExecutionTimeout())
+		host, err := clientSession.Cluster.InspectNode(clusterName, hostName, temporal.ExecutionTimeout())
 		if err != nil {
 			err = fail.FromGRPCStatus(err)
 			return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
@@ -1838,7 +1838,7 @@ var clusterAnsibleInventoryCommands = &cli.Command{
 		// Make command line
 		cmdStr := `sudo -u cladm -i ansible-inventory -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
 		logrus.Tracef(cmdStr)
-		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 		if xerr != nil {
 			msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -1930,7 +1930,7 @@ var clusterAnsibleRunCommands = &cli.Command{
 		// Make command line
 		cmdStr := `sudo -u cladm -i ansible -i ` + inventoryPath + ` ` + strings.Join(filteredArgs, " ") // + useTLS
 		logrus.Tracef(cmdStr)
-		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.GetConnectionTimeout(), temporal.GetExecutionTimeout())
+		retcode, _ /*stdout*/, stderr, xerr := clientSession.SSH.Run(master.GetId(), cmdStr, outputs.DISPLAY, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 		if xerr != nil {
 			msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
