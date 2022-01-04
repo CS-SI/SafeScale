@@ -21,68 +21,67 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestObjectStorageBucket_NewObjectStorageBucket(t *testing.T) {
+func TestNetwork_NewNetwork(t *testing.T) {
 
-	n := NewObjectStorageBucket()
+	n := NewNetwork()
 	if !n.IsNull() {
-		t.Error("ObjectStorageBucket is null !")
-		t.Fail()
-	}
-	if n.IsConsistent() {
-		t.Error("ObjectStorageBucket is not consistent !")
+		t.Error("Network is null !")
 		t.Fail()
 	}
 	if n.OK() {
-		t.Error("ObjectStorageBucket is not ok !")
+		t.Error("Network is not ok !")
 		t.Fail()
 	}
-	n.ID = "ObjectStorageBucket ID"
-	n.Name = "ObjectStorageBucket Name"
+	n.ID = "Network ID"
+	n.Name = "Network Name"
+	n.CIDR = "Network CIDR"
 	if n.IsNull() {
-		t.Error("ObjectStorageBucket is not null !")
-		t.Fail()
-	}
-	if !n.IsConsistent() {
-		t.Error("ObjectStorageBucket is consistent !")
+		t.Error("Network is not null !")
 		t.Fail()
 	}
 	if !n.OK() {
-		t.Error("ObjectStorageBucket is ok !")
+		t.Error("Network is ok !")
 		t.Fail()
 	}
 }
 
-func TestObjectStorageBucket_Clone(t *testing.T) {
-	b := NewObjectStorageBucket()
-	b.Name = "host"
+func TestNetwork_Clone(t *testing.T) {
+	n := NewNetwork()
+	n.ID = "Network ID"
+	n.Name = "Network Name"
+	n.CIDR = "Network CIDR"
+	n.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
+	n.Imported = false
 
-	bc, ok := b.Clone().(*ObjectStorageBucket)
+	n2, ok := n.Clone().(*Network)
 	if !ok {
 		t.Fail()
 	}
+	assert.Equal(t, n, n2)
+	areEqual := reflect.DeepEqual(n, n2)
+	if !areEqual {
+		t.Error("Clone not restitute values")
+		t.Fail()
+	}
 
-	assert.Equal(t, b, bc)
-	require.EqualValues(t, b, bc)
-	bc.MountPoint = "/mountpoint"
-
-	areEqual := reflect.DeepEqual(b, bc)
+	n2.CIDR = "CIDR Changed"
+	areEqual = reflect.DeepEqual(n, n2)
 	if areEqual {
 		t.Error("It's a shallow clone !")
 		t.Fail()
 	}
-	require.NotEqualValues(t, b, bc)
 }
 
-func TestObjectStorageBucket_Serialize(t *testing.T) {
+func TestNetwork_Serialize(t *testing.T) {
 
-	n := NewObjectStorageBucket()
-	n.ID = "ObjectStorageBucket ID"
-	n.Name = "ObjectStorageBucket Name"
-	n.Host = "ObjectStorageBucket Host"
-	n.MountPoint = "ObjectStorageBucket MountPoint"
+	n := NewNetwork()
+	n.ID = "Network ID"
+	n.Name = "Network Name"
+	n.CIDR = "Network CIDR"
+	n.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
+	n.Imported = false
 
 	serial, err := n.Serialize()
 	if err != nil {
@@ -90,7 +89,7 @@ func TestObjectStorageBucket_Serialize(t *testing.T) {
 		t.Fail()
 	}
 
-	n2 := NewObjectStorageBucket()
+	n2 := NewNetwork()
 	err = n2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)

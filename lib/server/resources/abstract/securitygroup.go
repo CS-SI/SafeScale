@@ -73,21 +73,46 @@ func (sgr *SecurityGroupRule) EqualTo(in *SecurityGroupRule) bool {
 	if len(sgr.IDs) != len(in.IDs) {
 		return false
 	}
+
+	var found bool = false
+
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range sgr.IDs {
-		if in.IDs[k] != v {
+	for _, v1 := range sgr.IDs {
+		found = false
+		for _, v2 := range in.IDs {
+			if v1 == v2 {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
+	for _, v1 := range sgr.Sources {
+		found = false
+		for _, v2 := range in.Sources {
+			if v1 == v2 {
+				found = true
+				break
+			}
+		}
+		if !found {
 			return false
 		}
 	}
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range sgr.Sources {
-		if v != in.Sources[k] {
-			return false
+	for _, v1 := range sgr.Targets {
+		found = false
+		for _, v2 := range in.Targets {
+			if v1 == v2 {
+				found = true
+				break
+			}
 		}
-	}
-	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
-	for k, v := range sgr.Targets {
-		if v != in.Targets[k] {
+		if !found {
 			return false
 		}
 	}
@@ -116,9 +141,11 @@ func (sgr *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 		return false
 	}
 
+	var found bool = false
+
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range sgr.Sources {
-		found := false
+		found = false
 		for _, w := range in.Sources {
 			if v == w {
 				found = true
@@ -132,7 +159,7 @@ func (sgr *SecurityGroupRule) EquivalentTo(in *SecurityGroupRule) bool {
 
 	// TODO: study the opportunity to use binary search (but slices have to be ascending sorted...)
 	for _, v := range sgr.Targets {
-		found := false
+		found = false
 		for _, w := range in.Targets {
 			if v == w {
 				found = true

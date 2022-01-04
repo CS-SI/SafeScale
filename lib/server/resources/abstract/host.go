@@ -256,6 +256,14 @@ func (hc *HostCore) IsConsistent() bool {
 	return hc.ID != "" || hc.Name != ""
 }
 
+// SetID is used to set ID field
+func (hc *HostCore) SetID(id string) *HostCore {
+	if hc != nil {
+		hc.ID = id
+	}
+	return hc
+}
+
 // SetName is used to set Name field
 func (hc *HostCore) SetName(name string) *HostCore {
 	if hc != nil {
