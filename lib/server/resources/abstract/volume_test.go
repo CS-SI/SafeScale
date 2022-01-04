@@ -20,14 +20,44 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumestate"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func TestVolume_NewVolume(t *testing.T) {
+	v := NewVolume()
+	if !v.IsNull() {
+		t.Error("Volume is null !")
+		t.Fail()
+	}
+	if v.OK() {
+		t.Error("Volume is not ok !")
+		t.Fail()
+	}
+	v.ID = "Volume ID"
+	v.Name = "Volume Name"
+	v.Size = 42
+	if v.IsNull() {
+		t.Error("Volume is notnull !")
+		t.Fail()
+	}
+	if !v.OK() {
+		t.Error("Volume is ok !")
+		t.Fail()
+	}
+
+}
+
 func TestVolume_Clone(t *testing.T) {
 	v := NewVolume()
-	v.Name = "volume"
-	v.Size = 10
+	v.ID = "Volume ID"
+	v.Name = "Volume Name"
+	v.Size = 42
+	v.Speed = volumespeed.Cold
+	v.State = volumestate.Unknown
 
 	vc, ok := v.Clone().(*Volume)
 	if !ok {
@@ -45,4 +75,32 @@ func TestVolume_Clone(t *testing.T) {
 		t.Fail()
 	}
 	require.NotEqualValues(t, v, vc)
+}
+
+func TestVolume_Serialize(t *testing.T) {
+	v := NewVolume()
+	v.ID = "Volume ID"
+	v.Name = "Volume Name"
+	v.Size = 42
+	v.Speed = volumespeed.Cold
+	v.State = volumestate.Unknown
+
+	serial, err := v.Serialize()
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+
+	v2 := NewVolume()
+	err = v2.Deserialize(serial)
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+	areEqual := reflect.DeepEqual(v, v2)
+	if !areEqual {
+		t.Error("Serialize/Deserialize does not restitute values")
+		t.Fail()
+	}
+
 }
