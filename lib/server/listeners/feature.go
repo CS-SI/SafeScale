@@ -105,7 +105,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		//
 		// return converters.FeatureSliceFromResourceToProtocol(list), nil
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -198,7 +198,7 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 		return empty, fail.NotFoundError("feature '%s' not found on Host '%s'", featureName, hostInstance.GetName())
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -294,7 +294,7 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 		return empty, fail.ExecutionError(nil, "failed to add feature '%s' to Host '%s' (%s)", featureName, targetRefLabel, results.AllErrorMessages())
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
@@ -375,7 +375,7 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 		return empty, fail.ExecutionError(nil, "failed to remove feature '%s' from Host '%s' (%s)", featureName, targetRefLabel, results.AllErrorMessages())
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return empty, xerr
 		}
