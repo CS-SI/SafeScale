@@ -62,7 +62,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	ctx := task.Context()
 
 	// Check if Cluster exists in metadata; if yes, error
-	existing, xerr := LoadCluster(instance.Service(), req.Name)
+	existing, xerr := LoadCluster(ctx, instance.Service(), req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -1742,7 +1742,7 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")
 	}
 
-	sleepTime := <-instance.generator
+	sleepTime := <-instance.randomDelayCh
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}
@@ -2308,7 +2308,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
 
-	sleepTime := <-instance.generator
+	sleepTime := <-instance.randomDelayCh
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}

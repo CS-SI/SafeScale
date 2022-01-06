@@ -754,14 +754,14 @@ func (tv toV21_05_0) upgradeHostMetadataIfNeeded(instance *operations.Host) fail
 }
 
 func (tv toV21_05_0) upgradeClusters(svc iaas.Service) fail.Error {
-	browseInstance, xerr := operations.NewCluster(svc)
+	browseInstance, xerr := operations.NewCluster(context.Background(), svc)
 	if xerr != nil {
 		return xerr
 	}
 
 	logrus.Infof("Upgrading metadata of Clusters...")
 	return browseInstance.Browse(context.Background(), func(aci *abstract.ClusterIdentity) fail.Error {
-		clusterInstance, xerr := operations.LoadCluster(svc, aci.Name)
+		clusterInstance, xerr := operations.LoadCluster(context.Background(), svc, aci.Name)
 		if xerr != nil {
 			return xerr
 		}
@@ -1409,14 +1409,14 @@ func (tv toV21_05_0) cleanupDeprecatedHostMetadata(svc iaas.Service) fail.Error 
 }
 
 func (tv toV21_05_0) cleanupDeprecatedClusterMetadata(svc iaas.Service) fail.Error {
-	instance, xerr := operations.NewCluster(svc)
+	instance, xerr := operations.NewCluster(context.Background(), svc)
 	if xerr != nil {
 		return xerr
 	}
 
 	logrus.Infof("Cleaning up deprecated metadata of Clusters...")
 	return instance.Browse(context.Background(), func(aci *abstract.ClusterIdentity) fail.Error {
-		clusterInstance, innerXErr := operations.LoadCluster(svc, aci.Name)
+		clusterInstance, innerXErr := operations.LoadCluster(context.Background(), svc, aci.Name)
 		innerXErr = debug.InjectPlannedFail(innerXErr)
 		if innerXErr != nil {
 			return innerXErr

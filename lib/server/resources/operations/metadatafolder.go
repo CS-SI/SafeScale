@@ -81,8 +81,8 @@ func (f *MetadataFolder) IsNull() bool {
 	return f == nil || f.service == nil
 }
 
-// GetService returns the service used by the MetadataFolder
-func (f MetadataFolder) GetService() iaas.Service {
+// Service returns the service used by the MetadataFolder
+func (f MetadataFolder) Service() iaas.Service {
 	if f.IsNull() {
 		return iaas.NullService()
 	}
