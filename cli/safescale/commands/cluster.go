@@ -1539,13 +1539,15 @@ var clusterFeatureCommands = &cli.Command{
 	ArgsUsage: "COMMAND",
 	Subcommands: []*cli.Command{
 		clusterFeatureListCommand,
+		clusterFeatureInspectCommand,
+		clusterFeatureExportCommand,
 		clusterFeatureCheckCommand,
 		clusterFeatureAddCommand,
 		clusterFeatureRemoveCommand,
 	},
 }
 
-// clusterFeatureListCommand handles 'safescale cluster <cluster name or id> list-features'
+// clusterFeatureListCommand handles 'safescale cluster feature list <cluster name or id>'
 var clusterFeatureListCommand = &cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
@@ -1559,11 +1561,6 @@ var clusterFeatureListCommand = &cli.Command{
 			Value:   false,
 			Usage:   "if used, list all features that are eligible to be installed on the cluster",
 		},
-		// &cli.StringSliceFlag{
-		// 	Name:    "param",
-		// 	Aliases: []string{"p"},
-		// 	Usage:   "Allow to define content of feature parameters",
-		// },
 	},
 
 	Action: clusterFeatureListAction,
@@ -1581,13 +1578,113 @@ func clusterFeatureListAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	features, err := clientSession.Cluster.ListInstalledFeatures(clusterName, c.Bool("all"), 0) // FIXME: set timeout
+	features, err := clientSession.Cluster.ListFeatures(clusterName, c.Bool("all"), 0) // FIXME: set timeout
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 	}
 
 	return clitools.SuccessResponse(features)
+}
+
+// clusterFeatureInspectCommand handles 'safescale cluster feature inspect <cluster name or id> <feature name>'
+// Displays information about the feature (parameters, if eligible on cluster, if installed, ...)
+var clusterFeatureInspectCommand = &cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "Inspects the feature",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "embedded",
+			Value: false,
+			Usage: "if used, tells to show details of embedded feature (if it exists)",
+		},
+	},
+
+	Action: clusterFeatureInspectAction,
+}
+
+func clusterFeatureInspectAction(c *cli.Context) error {
+	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+	}
+
+	if err := extractClusterName(c); err != nil {
+		return clitools.FailureResponse(err)
+	}
+
+	featureName = c.Args().Get(1)
+	if featureName == "" {
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME.")
+	}
+
+	details, err := clientSession.Cluster.InspectFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	if err != nil {
+		err = fail.FromGRPCStatus(err)
+		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+	}
+
+	return clitools.SuccessResponse(details)
+}
+
+// clusterFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
+var clusterFeatureExportCommand = &cli.Command{
+	Name:      "list",
+	Aliases:   []string{"ls"},
+	Usage:     "List features installed on the cluster",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "embedded",
+			Value: false,
+			Usage: "if used, tells to export embedded feature (if it exists)",
+		},
+		&cli.BoolFlag{
+			Name:  "raw",
+			Value: false,
+			Usage: "outputs only the feature content, without json",
+		},
+	},
+
+	Action: clusterFeatureExportAction,
+}
+
+func clusterFeatureExportAction(c *cli.Context) error {
+	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+	}
+
+	if err := extractClusterName(c); err != nil {
+		return clitools.FailureResponse(err)
+	}
+
+	featureName = c.Args().Get(1)
+	if featureName == "" {
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME.")
+	}
+
+	export, err := clientSession.Cluster.ExportFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	if err != nil {
+		err = fail.FromGRPCStatus(err)
+		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+	}
+
+	if c.Bool("raw") {
+		return clitools.SuccessResponse(export.Export)
+	}
+
+	return clitools.SuccessResponse(export)
 }
 
 // clusterFeatureAddCommand handles 'safescale cluster feature add CLUSTERNAME FEATURENAME'
@@ -1601,7 +1698,7 @@ var clusterFeatureAddCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameters, in format <name>=<value>",
+			Usage:   "Define value of feature parameters, in format [<feature name>):]<param name>=<value>",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",

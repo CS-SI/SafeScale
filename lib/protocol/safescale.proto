@@ -912,12 +912,6 @@ enum FeatureTargetType {
 	FT_CLUSTER = 2;
 }
 
-message FeatureListRequest {
-	FeatureTargetType target_type = 1;
-	Reference target_ref = 2;
-	bool installed_only = 3;
-}
-
 message FeatureResponse {
 	string name = 1;
 	string file_name = 3;
@@ -925,8 +919,32 @@ message FeatureResponse {
 	repeated string requires = 5;
 }
 
+message FeatureListRequest {
+	FeatureTargetType target_type = 1;
+	Reference target_ref = 2;
+	bool installed_only = 3;
+}
+
 message FeatureListResponse {
 	repeated FeatureResponse features = 1;
+}
+
+message FeatureDetailRequest {
+	FeatureTargetType target_type = 1;
+	Reference target_ref = 2;
+	string name = 3;
+	bool embedded = 4;
+}
+
+message FeatureDetailResponse {
+	bool eligible = 1;
+	bool installed = 2;
+	repeated string dependencies = 3;
+	repeated string parameters = 4;
+}
+
+message FeatureExportResponse {
+	repeated string export = 1;
 }
 
 message FeatureSettings {
@@ -948,6 +966,8 @@ message FeatureActionRequest {
 
 service FeatureService {
 	rpc List(FeatureListRequest) returns (FeatureListResponse){}
+	rpc Inspect(FeatureDetailRequest) returns (FeatureDetailResponse){}
+	rpc Export(FeatureDetailRequest) returns (FeatureExportResponse){}
 	rpc Check(FeatureActionRequest) returns (google.protobuf.Empty){}
 	rpc Add(FeatureActionRequest) returns (google.protobuf.Empty){}
 	rpc Remove(FeatureActionRequest) returns (google.protobuf.Empty){}

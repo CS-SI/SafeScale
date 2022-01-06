@@ -90,7 +90,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
-		// FIXME: Host.ListInstalledFeatures() not implemented
+		// FIXME: Host.ListFeatures() not implemented
 		// hostInstance, xerr := hostfactory.Load(job.Service(), targetRef)
 		// if xerr != nil {
 		// 	return empty, xerr
@@ -98,7 +98,7 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		//
 		// defer hostInstance.Released()
 		//
-		// list, xerr := hostInstance.ListInstalledFeatures(job.Context())
+		// list, xerr := hostInstance.ListFeatures(job.Context())
 		// if xerr != nil {
 		// 	return empty, xerr
 		// }
