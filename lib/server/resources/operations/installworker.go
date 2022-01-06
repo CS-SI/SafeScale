@@ -507,9 +507,9 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
-	w.variables = v
-	w.settings = s
+func (w *worker) Proceed(ctx context.Context, params data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
+	w.variables = params
+	w.settings = settings
 
 	outcomes = &results{}
 
@@ -545,7 +545,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 	// Applies reverseproxy rules and security to make Feature functional (Feature may need it during the install)
 	switch w.action {
 	case installaction.Add:
-		if !s.SkipProxy {
+		if !settings.SkipProxy {
 			xerr = w.setReverseProxy(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -559,8 +559,8 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			return nil, fail.Wrap(xerr, "failed to set security rules on Subnet")
 		}
 	case installaction.Remove:
-		// FIXME: Uncomplete ??
-		// if !s.SkipProxy {
+		// FIXME: currently removing feature does not clear proxy rules...
+		// if !settings.SkipProxy {
 		// 	rgw, xerr := w.identifyAvailableGateway()
 		// 	if xerr == nil {
 		// 		var found bool
@@ -578,11 +578,12 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		// }
 	}
 
-	// add target specific variables
-	xerr = w.target.ComplementFeatureParameters(ctx, v)
+	xerr = w.target.ComplementFeatureParameters(ctx, params)
 	if xerr != nil {
 		return nil, xerr
 	}
+
+	w.cleanupFeatureParameters(&params)
 
 	// Now enumerate steps and execute each of them
 	for _, k := range order {
@@ -648,7 +649,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			stepName:  k,
 			stepKey:   stepKey,
 			stepMap:   stepMap,
-			variables: v,
+			variables: params,
 			hosts:     hostsList,
 		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action.String()), strings.ToLower(w.target.TargetType().String()), k)))
 		xerr = debug.InjectPlannedFail(xerr)
@@ -683,6 +684,32 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 	}
 
 	return outcomes, nil
+}
+
+// cleanupFeatureParameters cleans up the params corresponding to the current context. Does:
+// - every parameter that is not prefixed by feature name are kept
+// - every parameter that is prefixed by current feature name sees it's prefix removed
+// - every parameter that is not prefixed by current feature name is removed
+//
+// Example:
+//   if current feature is docker, and we have these params:
+//     - Version=21.03
+//     - kubernetes:Version=18.1
+//     - docker:HubLogin=toto
+//   the call to this method will leave this:
+//     - Version=21.03
+//     - HubLogin=toto
+
+func (w *worker) cleanupFeatureParameters(params *data.Map) {
+	for k, v := range *params {
+		splitted := strings.Split(k, ":")
+		if len(splitted) > 1 {
+			if splitted[0] == w.feature.GetName() {
+				(*params)[splitted[2]] = v
+			}
+			delete(*params, k)
+		}
+	}
 }
 
 type taskLaunchStepParameters struct {
