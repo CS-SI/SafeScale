@@ -1056,7 +1056,7 @@ var clusterAddFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -1077,7 +1077,7 @@ var clusterCheckFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureCheckAction,
@@ -1093,7 +1093,7 @@ var clusterRemoveFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureRemoveAction,
@@ -1698,7 +1698,7 @@ var clusterFeatureAddCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameters, in format [<feature name>):]<param name>=<value>",
+			Usage:   "Define value of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -1719,15 +1719,7 @@ func clusterFeatureAddAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
-
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
@@ -1744,17 +1736,29 @@ func clusterFeatureAddAction(c *cli.Context) error {
 	return clitools.SuccessResponse(nil)
 }
 
+// parametersToMap transforms parameters slice to map
+func parametersToMap(params []string) map[string]string {
+	values := map[string]string{}
+	for _, k := range params {
+		res := strings.Split(k, "=")
+		if len(res[0]) > 0 {
+			values[res[0]] = strings.Join(res[1:], "=")
+		}
+	}
+	return values
+}
+
 // clusterFeatureCheckCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
 var clusterFeatureCheckCommand = &cli.Command{
 	Name:      "check",
 	Aliases:   []string{"verify"},
-	Usage:     "Checks if a eature is already installed on cluster",
+	Usage:     "Checks if a Feature is already installed on cluster",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureCheckAction,
@@ -1771,15 +1775,7 @@ func clusterFeatureCheckAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
-
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -1807,7 +1803,7 @@ var clusterFeatureRemoveCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureRemoveAction,
@@ -1823,15 +1819,7 @@ func clusterFeatureRemoveAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
-
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 	// TODO: Reverse proxy rules are not yet purged when feature is removed, but current code
 	// will try to apply them... Quick fix: Setting SkipProxy to true prevent this

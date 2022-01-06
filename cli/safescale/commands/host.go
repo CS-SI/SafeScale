@@ -522,7 +522,7 @@ var hostAddFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow defining content of feature parameters",
+			Usage:   "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -544,7 +544,7 @@ var hostCheckFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow defining content of feature parameters",
+			Usage:   "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -562,7 +562,7 @@ var hostRemoveFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameter (can be used multiple times)",
+			Usage:   "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -822,7 +822,7 @@ var hostFeatureAddCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -845,15 +845,7 @@ func hostFeatureAddAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
-
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
@@ -889,7 +881,7 @@ var hostFeatureCheckCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -908,14 +900,7 @@ func hostFeatureCheckAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -951,7 +936,7 @@ var hostFeatureRemoveCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameter (can be used multiple times)",
+			Usage:   "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -970,14 +955,7 @@ func hostFeatureRemoveAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
 	clientSession, xerr := client.New(c.String("server"))
