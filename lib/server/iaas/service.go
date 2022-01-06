@@ -938,6 +938,7 @@ func (svc service) InspectSecurityGroupByName(networkID, name string) (*abstract
 	return svc.InspectSecurityGroup(abstract.NewSecurityGroup().SetName(name).SetNetworkID(networkID))
 }
 
+// ObjectStorageConfiguration returns the configuration of Object Storage location
 func (svc service) ObjectStorageConfiguration() objectstorage.Config {
 	return svc.Location.Configuration()
 }

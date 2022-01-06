@@ -131,31 +131,39 @@ type worker struct {
 // newWorker ...
 // alterCmdCB is used to change the content of keys 'run' or 'package' before executing
 // the requested action. If not used, must be nil
-func newWorker(f resources.Feature, t resources.Targetable, m installmethod.Enum, a installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
+func newWorker(f resources.Feature, target resources.Targetable, method installmethod.Enum, action installaction.Enum, cb alterCommandCB) (*worker, fail.Error) {
 	w := worker{
 		feature:   f.(*Feature),
-		target:    t,
-		method:    m,
-		action:    a,
+		target:    target,
+		method:    method,
+		action:    action,
 		commandCB: cb,
 	}
-	switch t.TargetType() {
+	switch target.TargetType() {
 	case featuretargettype.Cluster:
 		var ok bool
-		w.cluster, ok = t.(*Cluster)
+		w.cluster, ok = target.(*Cluster)
 		if !ok {
 			return nil, fail.InconsistentError("t should be a *Cluster")
 		}
+
+		w.service = w.cluster.Service()
+
 	case featuretargettype.Host:
 		var ok bool
-		w.host, ok = t.(*Host)
+		w.host, ok = target.(*Host)
 		if !ok {
 			return nil, fail.InconsistentError("t should be a *Host")
 		}
+
+		w.service = w.host.Service()
+
+	default:
+		return nil, fail.InconsistentError("type '%s' of 't' is unsupported", reflect.TypeOf(target).String())
 	}
 
-	if m != installmethod.None {
-		w.rootKey = "feature.install." + strings.ToLower(m.String()) + "." + strings.ToLower(a.String())
+	if method != installmethod.None {
+		w.rootKey = "feature.install." + strings.ToLower(method.String()) + "." + strings.ToLower(action.String())
 		if !f.(*Feature).Specs().IsSet(w.rootKey) {
 			msg := `syntax error in Feature '%s' specification file (%s):
 				no key '%s' found`
