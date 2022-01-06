@@ -22,9 +22,14 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clustercomplexity"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterflavor"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/hoststate"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/subnetstate"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
+	"github.com/CS-SI/SafeScale/lib/system"
 	"github.com/stretchr/testify/require"
 )
 
@@ -346,5 +351,219 @@ func Test_HostCoreToHostFull(t *testing.T) {
 	ahf := HostCoreToHostFull(ahc)
 
 	require.EqualValues(t, ahf.Core, &ahc)
+
+}
+
+func Test_HostDescriptionFromAbstractToPropertyV1(t *testing.T) {
+
+	ahd := abstract.HostDescription{
+		Created: time.Now(),
+		Creator: "HostDescription Creator",
+		Updated: time.Now(),
+		Purpose: "HostDescription Purpose",
+		Tenant:  "HostDescription Tenant",
+	}
+
+	phd := HostDescriptionFromAbstractToPropertyV1(ahd)
+
+	require.EqualValues(t, ahd.Created, phd.Created)
+	require.EqualValues(t, ahd.Creator, phd.Creator)
+	require.EqualValues(t, ahd.Updated, phd.Updated)
+	require.EqualValues(t, ahd.Purpose, phd.Purpose)
+	require.EqualValues(t, ahd.Tenant, phd.Tenant)
+
+}
+
+func Test_HostNetworkingFromAbstractToPropertyV2(t *testing.T) {
+
+	ahn := abstract.HostNetworking{
+		IsGateway:               false,
+		DefaultGatewayID:        "HostNetworking DefaultGatewayID",
+		DefaultGatewayPrivateIP: "HostNetworking DefaultGatewayPrivateIP",
+		DefaultSubnetID:         "HostNetworking DefaultSubnetID",
+		SubnetsByID:             map[string]string{"ID1": "Subnet1", "ID2": "Subnet2", "ID3": "Subnet3"},
+		SubnetsByName:           map[string]string{"Name1": "Subnet1", "Name2": "Subnet2", "Name3": "Subnet3"},
+		PublicIPv4:              "HostNetworking PublicIPv4",
+		PublicIPv6:              "HostNetworking PublicIPv6",
+		IPv4Addresses:           map[string]string{"ID1": "ipv4_1", "ID2": "ipv4_2"},
+		IPv6Addresses:           map[string]string{"ID1": "ipv6_1", "ID2": "ipv6_2"},
+	}
+
+	phn := HostNetworkingFromAbstractToPropertyV2(ahn)
+
+	require.EqualValues(t, ahn.IsGateway, phn.IsGateway)
+	require.EqualValues(t, ahn.DefaultSubnetID, phn.DefaultSubnetID)
+	require.EqualValues(t, ahn.SubnetsByID, phn.SubnetsByID)
+	require.EqualValues(t, ahn.SubnetsByName, phn.SubnetsByName)
+	require.EqualValues(t, ahn.PublicIPv4, phn.PublicIPv4)
+	require.EqualValues(t, ahn.PublicIPv6, phn.PublicIPv6)
+	require.EqualValues(t, ahn.IPv4Addresses, phn.IPv4Addresses)
+	require.EqualValues(t, ahn.IPv6Addresses, phn.IPv6Addresses)
+
+}
+
+func Test_HostStateFromAbstractToProtocol(t *testing.T) {
+
+	var list []hoststate.Enum = []hoststate.Enum{
+		hoststate.Any,
+		hoststate.Deleted,
+		hoststate.Failed,
+		hoststate.Started,
+		hoststate.Starting,
+		hoststate.Stopped,
+		hoststate.Stopping,
+		hoststate.Terminated,
+		hoststate.Error,
+		hoststate.Unknown,
+	}
+	var p protocol.HostState
+	var q protocol.HostState
+
+	for _, value := range list {
+		p = HostStateFromAbstractToProtocol(value)
+		q = protocol.HostState(value)
+		require.EqualValues(t, p, q)
+	}
+
+}
+
+func Test_BucketListFromAbstractToProtocol(t *testing.T) {
+
+	in := []string{"A", "B", "C"}
+	blr := BucketListFromAbstractToProtocol(in)
+	for i := range blr.Buckets {
+		require.EqualValues(t, blr.Buckets[i].Name, in[i])
+	}
+
+}
+
+func Test_SSHConfigFromAbstractToProtocol(t *testing.T) {
+
+	gw_scfg := system.SSHConfig{
+		Hostname:               "SSHConfig GW Hostname",
+		IPAddress:              "SSHConfig GW Hostname",
+		Port:                   42,
+		User:                   "SSHConfig GW Hostname",
+		PrivateKey:             "SSHConfig GW Hostname",
+		LocalPort:              43,
+		GatewayConfig:          nil,
+		SecondaryGatewayConfig: nil,
+	}
+	gw2_scfg := system.SSHConfig{
+		Hostname:               "SSHConfig GW2 Hostname",
+		IPAddress:              "SSHConfig GW2 Hostname",
+		Port:                   44,
+		User:                   "SSHConfig GW2 Hostname",
+		PrivateKey:             "SSHConfig GW2 Hostname",
+		LocalPort:              45,
+		GatewayConfig:          nil,
+		SecondaryGatewayConfig: nil,
+	}
+	scfg := system.SSHConfig{
+		Hostname:               "SSHConfig Hostname",
+		IPAddress:              "SSHConfig Hostname",
+		Port:                   46,
+		User:                   "SSHConfig Hostname",
+		PrivateKey:             "SSHConfig Hostname",
+		LocalPort:              47,
+		GatewayConfig:          &gw_scfg,
+		SecondaryGatewayConfig: &gw2_scfg,
+	}
+	pcfg := SSHConfigFromAbstractToProtocol(scfg)
+	require.EqualValues(t, scfg.Hostname, pcfg.HostName)
+	require.EqualValues(t, scfg.User, pcfg.User)
+	require.EqualValues(t, scfg.IPAddress, pcfg.Host)
+	require.EqualValues(t, scfg.Port, pcfg.Port)
+	require.EqualValues(t, scfg.PrivateKey, pcfg.PrivateKey)
+	require.EqualValues(t, SSHConfigFromAbstractToProtocol(*scfg.GatewayConfig), pcfg.Gateway)
+	require.EqualValues(t, SSHConfigFromAbstractToProtocol(*scfg.SecondaryGatewayConfig), pcfg.SecondaryGateway)
+
+}
+
+func Test_HostStatusFromAbstractToProtocol(t *testing.T) {
+
+	var Name string = "HostName"
+	var Status hoststate.Enum = hoststate.Any
+
+	phs := HostStatusFromAbstractToProtocol(Name, Status)
+	require.EqualValues(t, phs.Name, Name)
+	require.EqualValues(t, phs.Status, Status)
+
+}
+
+func Test_VolumeSpeedFromAbstractToProtocol(t *testing.T) {
+	in := []volumespeed.Enum{
+		volumespeed.Cold,
+		volumespeed.Ssd,
+		volumespeed.Hdd,
+	}
+	expect := []protocol.VolumeSpeed{
+		protocol.VolumeSpeed_VS_COLD,
+		protocol.VolumeSpeed_VS_SSD,
+		protocol.VolumeSpeed_VS_HDD,
+	}
+	for i := range in {
+		require.EqualValues(t, VolumeSpeedFromAbstractToProtocol(in[i]), expect[i])
+	}
+}
+
+func Test_ClusterIdentityFromAbstractToProtocol(t *testing.T) {
+
+	kpName := "cluster_cladm_key"
+	kp, innerXErr := abstract.NewKeyPair(kpName)
+	if innerXErr != nil {
+		t.Error(innerXErr)
+		t.Fail()
+	}
+	aci := abstract.ClusterIdentity{
+		Name:          "ClusterIdentity Name",
+		Flavor:        clusterflavor.K8S,
+		Complexity:    clustercomplexity.Small,
+		Keypair:       kp,
+		AdminPassword: "Password",
+		Tags: map[string]string{
+			"CreationDate": time.Now().Format(time.RFC3339),
+			"ManagedBy":    "safescale",
+		},
+	}
+	pclr := ClusterListFromAbstractToProtocol([]abstract.ClusterIdentity{aci})
+
+	require.EqualValues(t, pclr.Clusters[0].Identity, ClusterIdentityFromAbstractToProtocol(aci))
+}
+
+func Test_SecurityGroupRulesFromAbstractToProtocol(t *testing.T) {
+
+	asg := abstract.SecurityGroup{
+		ID:          "SecurityGroup ID",
+		Name:        "SecurityGroup Name",
+		Network:     "SecurityGroup Network",
+		Description: "SecurityGroup Description",
+		Rules: abstract.SecurityGroupRules{
+			{
+				IDs:         []string{"ID1", "ID2", "ID3"},
+				Description: "SecurityGroupRune Description",
+				EtherType:   ipversion.IPv4,
+				Direction:   securitygroupruledirection.Ingress,
+				Protocol:    "tcp",
+				PortFrom:    42,
+				PortTo:      43,
+				Sources:     []string{"Source1", "Source2", "Source3"},
+				Targets:     []string{"Target1", "Target2", "Target3"},
+			},
+		},
+		DefaultForSubnet: "SecurityGroup DefaultForSubnet",
+		DefaultForHost:   "SecurityGroup DefaultForHost",
+	}
+
+	psgr := SecurityGroupFromAbstractToProtocol(asg)
+
+	require.EqualValues(t, asg.ID, psgr.Id)
+	require.EqualValues(t, asg.Name, psgr.Name)
+	require.EqualValues(t, asg.Description, psgr.Description)
+	require.EqualValues(t, SecurityGroupRulesFromAbstractToProtocol(asg.Rules), psgr.Rules)
+
+}
+
+func Test_ClusterStateFromAbstractToProtocol(t *testing.T) {
 
 }
