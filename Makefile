@@ -327,11 +327,11 @@ mintest: begin
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp || true
 	@$(MV) ./cover.tmp ./cover.out || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
@@ -343,11 +343,11 @@ precommittest: begin
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/concurrency/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/retry/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 480s -v ./lib/utils/data/... -p 2 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp || true
 	@PCT=1 $(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp || true
 	@$(MV) ./cover.tmp ./cover.out || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log 2>&1 > /dev/null; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) minimal tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then exit 1;else $(RM) ./test_results.log;fi;
@@ -359,7 +359,7 @@ test: begin coverdeps # Run unit tests
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/utils/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 > test_results.log || true
 	@$(CP) ./cover.out ./cover.tmp || true
 	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./lib/server/resources/... -p 1 $(TEST_COVERAGE_ARGS) 2>&1 >> test_results.log || true
-	@$(CAT) ./cover.out >> ./cover.tmp || true
+	@$(TAIL) -n +2 ./cover.out >> ./cover.tmp || true
 	@$(MV) ./cover.tmp ./cover.out || true
 	@go2xunit -input test_results.log -output xunit_tests.xml || true
 	@if [ -s ./test_results.log ] && grep FAIL ./test_results.log; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) tests FAILED ! Take a look at ./test_results.log $(NO_COLOR)\n";else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. TESTS PASSED ! $(NO_COLOR)\n";fi;
@@ -416,13 +416,8 @@ warnings: begin
 	@golangci-lint --color never --timeout=10m run ./... 2>&1 | tr '\n' '\0' | xargs -0 -n3 | grep -v nolint | grep -v _test.go | grep -v .pb. | awk 'NF' | $(TEE) warnings_results.log
 	@if [ -s ./warnings_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) warnings FAILED, look at warnings_results.log !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi
 
-coverage: begin generate with-coverage
-	@printf "%b" "$(OK_COLOR)$(INFO_STRING) Collecting coverage data, $(NO_COLOR)target $(OBJ_COLOR)$(@)$(NO_COLOR)\n";
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -p 1 $(TEST_COVERAGE_ARGS) > coverage_results.log 2>&1 || true
-	@$(GO) tool cover -html=cover.out -o cover.html || true
-
 show-cov: begin
-	@command -v firefox >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) You don't have firefox on PATH.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
+	@command -v $(BROWSER) >/dev/null 2>&1 || { printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) You don't have $(BROWSER) on PATH.  Aborting.$(NO_COLOR)\n" >&2; exit 1; }
 	@if [ ! -s ./cover.out ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) show-cov FAILED, You have to run coverage first !$(NO_COLOR)\n";exit 1;fi
 	@if [ -s ./cover.out ]; then $(GO) tool cover -html=cover.out -o cover.html || true;fi
 	@if [ -s ./cover.html ]; then $(BROWSER) ./cover.html || true;fi
@@ -455,7 +450,6 @@ help: with_git
 	@echo '  err          - Looks for unhandled errors'
 	@echo '  test         - Runs all unit tests'
 	@echo '  convey       - Runs goconvey in lib/utils dir'
-	@echo '  coverage     - Collects coverage info from unit tests'
 	@echo '  show-cov     - Displays coverage info in firefox'
 	@echo ''
 	@printf "%b" "$(OK_COLOR)DEV TARGETS:$(NO_COLOR)\n";
