@@ -104,6 +104,8 @@ func NewCluster(svc iaas.Service) (_ *Cluster, xerr fail.Error) {
 		MetadataCore: coreInstance,
 	}
 
+	instance.generator = randomGeneratorWithReseed(0, 2000)
+
 	return instance, nil
 }
 
@@ -111,6 +113,9 @@ func randomGeneratorWithReseed(min, max int) <-chan int {
 	chint := make(chan int)
 	mrand.Seed(time.Now().UnixNano())
 	go func() { // feed it
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		for {
 			if min == max {
 				chint <- min
@@ -289,8 +294,6 @@ func (instance *Cluster) Create(ctx context.Context, req abstract.ClusterRequest
 	if ctx == nil {
 		return fail.InvalidParameterCannotBeNilError("ctx")
 	}
-
-	instance.generator = randomGeneratorWithReseed(0, 2000)
 
 	task, xerr := concurrency.TaskFromContext(ctx)
 	xerr = debug.InjectPlannedFail(xerr)

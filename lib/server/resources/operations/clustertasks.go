@@ -1742,6 +1742,9 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")
 	}
 
+	if instance.generator == nil {
+		instance.generator = randomGeneratorWithReseed(0, 2000)
+	}
 	sleepTime := <-instance.generator
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
@@ -2308,6 +2311,9 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
 
+	if instance.generator == nil {
+		instance.generator = randomGeneratorWithReseed(0, 2000)
+	}
 	sleepTime := <-instance.generator
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
@@ -2365,7 +2371,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	// Starting from here, if exiting with error, remove entry from node of the metadata
 	defer func() {
 		if ferr != nil && !p.keepOnFailure {
-			// Disable abort signal during the clean up
+			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
