@@ -62,7 +62,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	ctx := task.Context()
 
 	// Check if Cluster exists in metadata; if yes, error
-	existing, xerr := LoadCluster(instance.Service(), req.Name)
+	existing, xerr := LoadCluster(ctx, instance.GetService(), req.Name)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -276,7 +276,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 				}
 
 				// FIXME: WaitGroupFor NEEDS more UT
-				_, _, tgerr = tg.WaitGroupFor(instance.Service().Timings().HostLongOperationTimeout())
+				_, _, tgerr = tg.WaitGroupFor(temporal.GetLongOperationTimeout())
 				tgerr = debug.InjectPlannedFail(tgerr)
 				if tgerr != nil {
 					cleanFailure = true
@@ -476,7 +476,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	// Determine default image
 	imageQuery = req.NodesDef.Image
 	if imageQuery == "" {
-		if cfg, xerr := instance.Service().GetConfigurationOptions(); xerr == nil {
+		if cfg, xerr := instance.GetService().GetConfigurationOptions(); xerr == nil {
 			if anon, ok := cfg.Get("DefaultImage"); ok {
 				imageQuery, ok = anon.(string)
 				if !ok {
@@ -491,7 +491,7 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	if imageQuery == "" {
 		imageQuery = consts.DEFAULTOS
 	}
-	svc := instance.Service()
+	svc := instance.GetService()
 	_, imageID, xerr = determineImageID(svc, imageQuery)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -653,8 +653,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	ctx := context.WithValue(task.Context(), concurrency.KeyForTaskInContext, task) // nolint
 
 	// Determine if getGateway Failover must be set
-	svc := instance.Service()
-	caps, xerr := svc.GetCapabilities()
+	caps, xerr := instance.GetService().GetCapabilities()
 	if xerr != nil {
 		return nil, nil, xerr
 	}
@@ -671,7 +670,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 	// Creates Network
 	var networkInstance resources.Network
 	if req.NetworkID != "" {
-		networkInstance, xerr = LoadNetwork(svc, req.NetworkID)
+		networkInstance, xerr = LoadNetwork(instance.GetService(), req.NetworkID)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to use network %s to contain Cluster Subnet", req.NetworkID)
@@ -684,7 +683,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 			KeepOnFailure: req.KeepOnFailure,
 		}
 
-		networkInstance, xerr = NewNetwork(svc)
+		networkInstance, xerr = NewNetwork(instance.GetService())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return nil, nil, fail.Wrap(xerr, "failed to instantiate new Network")
@@ -754,7 +753,7 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 		KeepOnFailure: false, // We consider subnet and its gateways as a whole; if any error occurs during the creation of the whole, do keep nothing
 	}
 
-	subnetInstance, xerr := NewSubnet(svc)
+	subnetInstance, xerr := NewSubnet(instance.GetService())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, nil, xerr
@@ -936,9 +935,8 @@ func (instance *Cluster) createHostResources(
 			}
 
 			// we have to wait for completion of aborted Tasks/TaskGroups, not get out before
-			timeout := instance.Service().Timings().HostLongOperationTimeout()
 			for _, v := range startedTasks {
-				_, _, werr := v.WaitFor(timeout)
+				_, _, werr := v.WaitFor(temporal.GetLongOperationTimeout())
 				if werr != nil {
 					werr = fail.Wrap(
 						werr, "cleaning up on failure, failed to wait for %s %s", reflect.TypeOf(v).String(), taskID(v),
@@ -976,14 +974,14 @@ func (instance *Cluster) createHostResources(
 		}
 	}
 
-	_, xerr = primaryGateway.WaitSSHReady(ctx, instance.Service().Timings().ExecutionTimeout())
+	_, xerr = primaryGateway.WaitSSHReady(ctx, temporal.GetExecutionTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "wait for remote ssh service to be ready")
 	}
 
 	if haveSecondaryGateway {
-		_, xerr = secondaryGateway.WaitSSHReady(ctx, instance.Service().Timings().ExecutionTimeout())
+		_, xerr = secondaryGateway.WaitSSHReady(ctx, temporal.GetExecutionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "failed to wait for remote ssh service to become ready")
@@ -1103,7 +1101,7 @@ func (instance *Cluster) createHostResources(
 						}
 					}
 				}
-				_, _, derr := tg.WaitGroupFor(instance.Service().Timings().HostLongOperationTimeout())
+				_, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout())
 				derr = debug.InjectPlannedFail(derr)
 				if derr != nil {
 					_ = ferr.AddConsequence(
@@ -1189,16 +1187,22 @@ func (instance *Cluster) createHostResources(
 						}
 					}
 				}
-				_, _, derr := tg.WaitGroupFor(instance.Service().Timings().HostLongOperationTimeout())
+				_, _, derr := tg.WaitGroupFor(temporal.GetLongOperationTimeout())
 				derr = debug.InjectPlannedFail(derr)
 				if derr != nil {
-					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to wait for node deletions"))
+					_ = ferr.AddConsequence(
+						fail.Wrap(
+							derr, "cleaning up on failure, failed to wait for node deletions",
+						),
+					)
 				}
 			}
 		}
 	}()
 
-	privateNodesCreateTasks, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID("/nodes"))
+	privateNodesCreateTasks, xerr := concurrency.NewTaskGroupWithParent(
+		task, concurrency.InheritParentIDOption, concurrency.AmendID("/nodes"),
+	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1419,8 +1423,7 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	svc := instance.Service()
-	xerr = svc.StartHost(id)
+	xerr = instance.GetService().StartHost(id)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
@@ -1436,12 +1439,12 @@ func (instance *Cluster) taskStartHost(task concurrency.Task, params concurrency
 	}
 
 	// -- refresh state of host --
-	hostInstance, xerr := LoadHost(svc, id)
+	hostInstance, xerr := LoadHost(instance.GetService(), id)
 	if xerr != nil {
 		return nil, xerr
 	}
 
-	_, xerr = hostInstance.WaitSSHReady(task.Context(), svc.Timings().HostOperationTimeout())
+	_, xerr = hostInstance.WaitSSHReady(task.Context(), temporal.GetHostTimeout())
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1473,8 +1476,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("params")
 	}
 
-	svc := instance.Service()
-	xerr = svc.StopHost(id, false)
+	xerr = instance.GetService().StopHost(id, false)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		switch xerr.(type) { // nolint
@@ -1488,7 +1490,7 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 	}
 
 	// -- refresh state of host --
-	hostInstance, xerr := LoadHost(svc, id)
+	hostInstance, xerr := LoadHost(instance.GetService(), id)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -1536,7 +1538,7 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 
 	logrus.Debugf("[%s] starting installation...", hostLabel)
 
-	_, xerr = p.Host.WaitSSHReady(task.Context(), instance.Service().Timings().HostOperationTimeout())
+	_, xerr = p.Host.WaitSSHReady(task.Context(), temporal.GetHostTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1663,7 +1665,7 @@ func (instance *Cluster) taskCreateMasters(task concurrency.Task, params concurr
 
 	logrus.Debugf("[Cluster %s] creating %d master%s...", clusterName, p.count, strprocess.Plural(p.count))
 
-	timeout := 2 * instance.Service().Timings().HostCreationTimeout()
+	timeout := 2 * temporal.GetHostCreationTimeout()
 	var collectedErs []error
 
 	for i := uint(1); i <= p.count; i++ {
@@ -1742,10 +1744,10 @@ func (instance *Cluster) taskCreateMaster(task concurrency.Task, params concurre
 		return nil, fail.InvalidParameterError("params.index", "must be an integer greater than 0")
 	}
 
-	if instance.generator == nil {
-		instance.generator = randomGeneratorWithReseed(0, 2000)
+	if instance.randomDelayCh == nil {
+		instance.randomDelayCh = randomGeneratorWithReseed(0, 2000)
 	}
-	sleepTime := <-instance.generator
+	sleepTime := <-instance.randomDelayCh
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}
@@ -2311,10 +2313,10 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
 
-	if instance.generator == nil {
-		instance.generator = randomGeneratorWithReseed(0, 2000)
+	if instance.randomDelayCh == nil {
+		instance.randomDelayCh = randomGeneratorWithReseed(0, 2000)
 	}
-	sleepTime := <-instance.generator
+	sleepTime := <-instance.randomDelayCh
 	time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 
 	hostReq := abstract.HostRequest{}

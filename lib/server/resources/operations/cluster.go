@@ -83,11 +83,13 @@ type Cluster struct {
 	installMethods      sync.Map
 	lastStateCollection time.Time
 	makers              clusterflavors.Makers
-	generator           <-chan int
+
+	randomDelayTask concurrency.Task
+	randomDelayCh   <-chan int
 }
 
 // NewCluster ...
-func NewCluster(svc iaas.Service) (_ *Cluster, xerr fail.Error) {
+func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	if svc == nil {
@@ -104,32 +106,51 @@ func NewCluster(svc iaas.Service) (_ *Cluster, xerr fail.Error) {
 		MetadataCore: coreInstance,
 	}
 
-	instance.generator = randomGeneratorWithReseed(0, 2000)
+	xerr = instance.startRandomDelayGenerator(ctx, 0, 2000)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	return instance, nil
 }
 
-func randomGeneratorWithReseed(min, max int) <-chan int {
+// StartRandomDelayGenerator starts a Task to generate random delays, read from instance.randomDelayCh
+func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max int) fail.Error {
 	chint := make(chan int)
 	mrand.Seed(time.Now().UnixNano())
-	go func() { // feed it
-		var crash error
-		defer fail.OnPanic(&crash)
 
-		for {
-			if min == max {
+	var xerr fail.Error
+	instance.randomDelayTask, xerr = concurrency.NewTaskWithContext(ctx)
+	if xerr != nil {
+		return xerr
+	}
+
+	_, xerr = instance.randomDelayTask.Start(func(t concurrency.Task, _ concurrency.TaskParameters) (concurrency.TaskResult, fail.Error) {
+		if min == max {
+			for !t.Aborted() {
 				chint <- min
 			}
-			chint <- mrand.Intn(max-min) + min
+		} else {
+			value := max - min
+			for !t.Aborted() {
+				chint <- mrand.Intn(value) + min
+			}
 		}
-	}()
 
-	return chint
+		close(chint)
+		return nil, nil
+	}, nil)
+	if xerr != nil {
+		return xerr
+	}
+
+	instance.randomDelayCh = chint
+	return nil
 }
 
-// LoadCluster ...
-func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Cluster, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+// LoadCluster loads cluster information from metadata
+func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resources.Cluster, outerr fail.Error) {
+	defer fail.OnPanic(&outerr)
 
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
@@ -161,8 +182,11 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 		}
 	}
 
-	var ok bool
-	if clusterInstance, ok = cacheEntry.Content().(resources.Cluster); !ok {
+	var (
+		clusterInstance *Cluster
+		ok              bool
+	)
+	if clusterInstance, ok = cacheEntry.Content().(*Cluster); !ok {
 		return nil, fail.InconsistentError("value found in Cluster cache for key '%s' is not a Cluster", name)
 	}
 	if clusterInstance == nil {
@@ -175,28 +199,28 @@ func LoadCluster(svc iaas.Service, name string) (clusterInstance resources.Clust
 }
 
 // onClusterCacheMiss is called when cluster cache does not contain an instance of cluster 'name'
-func onClusterCacheMiss(svc iaas.Service, name string) (cache.Cacheable, fail.Error) {
-	clusterInstance, innerXErr := NewCluster(svc)
-	if innerXErr != nil {
-		return nil, innerXErr
+func onClusterCacheMiss(ctx context.Context, svc iaas.Service, name string) (cache.Cacheable, fail.Error) {
+	clusterInstance, xerr := NewCluster(ctx, svc)
+	if xerr != nil {
+		return nil, xerr
 	}
 
 	// TODO: core.Read() does not check communication failure, side effect of limitations of Stow (waiting for stow replacement)
-	if innerXErr = clusterInstance.Read(name); innerXErr != nil {
-		return nil, innerXErr
+	if xerr = clusterInstance.Read(name); xerr != nil {
+		return nil, xerr
 	}
 
-	flavor, innerXErr := clusterInstance.GetFlavor()
-	if innerXErr != nil {
-		return nil, innerXErr
+	flavor, xerr := clusterInstance.GetFlavor()
+	if xerr != nil {
+		return nil, xerr
 	}
 
-	innerXErr = clusterInstance.bootstrap(flavor)
-	if innerXErr != nil {
-		return nil, innerXErr
+	xerr = clusterInstance.bootstrap(flavor)
+	if xerr != nil {
+		return nil, xerr
 	}
+
 	clusterInstance.updateCachedInformation()
-
 	return clusterInstance, nil
 }
 
@@ -220,6 +244,14 @@ func (instance *Cluster) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
 }
 
+//
+func (instance *Cluster) Released() {
+	// Stops task generating random delays
+	instance.randomDelayTask.Abort()
+
+	instance.MetadataCore.Released()
+}
+
 // carry ...
 func (instance *Cluster) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
@@ -239,7 +271,7 @@ func (instance *Cluster) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1160,7 +1192,9 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	timeout := 2 * svc.Timings().HostCreationTimeout() // More than enough
 
-	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)))
+	tg, xerr := concurrency.NewTaskGroupWithParent(
+		task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)),
+	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
