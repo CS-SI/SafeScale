@@ -133,6 +133,10 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		disabledFeatures, ok := config["disabled_features"].(*protocol.FeatureListResponse)
 		if ok {
 			for _, v := range disabledFeatures.Features {
+				if v.Name == "docker" {
+					remotedesktopInstalled = false
+					break
+				}
 				if v.Name == "remotedesktop" {
 					remotedesktopInstalled = false
 					break
