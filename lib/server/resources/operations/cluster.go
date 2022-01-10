@@ -166,7 +166,7 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resource
 	}
 
 	options := iaas.CacheMissOption(
-		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(svc, name) },
+		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) },
 		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := clusterCache.Get(name, options...)
@@ -194,6 +194,13 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resource
 	}
 
 	cacheEntry.LockContent()
+
+	if clusterInstance.randomDelayCh == nil {
+		xerr = clusterInstance.startRandomDelayGenerator(ctx, 0, 2000)
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
 
 	return clusterInstance, nil
 }
@@ -271,7 +278,7 @@ func (instance *Cluster) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.GetMetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
