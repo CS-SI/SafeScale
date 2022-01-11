@@ -176,7 +176,7 @@ linters-settings:
 
   gocognit:
     # minimal code complexity to report, 30 by default (but we recommend 10-20)
-    min-complexity: 50
+    min-complexity: 100
 
   goconst:
     # minimal length of string constant, 3 by default
@@ -646,10 +646,6 @@ linters-settings:
       - name: confusing-naming
         severity: warning
         disable: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#confusing-results
-      - name: confusing-results
-        severity: warning
-        disable: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#constant-logical-expr
       - name: constant-logical-expr
         severity: warning
@@ -678,10 +674,6 @@ linters-settings:
         disable: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#duplicated-imports
       - name: duplicated-imports
-        severity: warning
-        disable: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
-      - name: early-return
         severity: warning
         disable: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-block
@@ -755,10 +747,6 @@ linters-settings:
         disable: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#modifies-value-receiver
       - name: modifies-value-receiver
-        severity: warning
-        disable: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#nested-structs
-      - name: nested-structs
         severity: warning
         disable: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#package-comments
@@ -836,10 +824,6 @@ linters-settings:
         disable: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-return
       - name: unexported-return
-        severity: warning
-        disable: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unnecessary-stmt
-      - name: unnecessary-stmt
         severity: warning
         disable: false
       # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unreachable-code
@@ -1013,6 +997,9 @@ linters:
     - forbidigo
     - golint
     - gofumpt
+    - nlreturn
+    - tparallel
+    - varnamelen
   fast: false
 
 
@@ -1041,6 +1028,12 @@ issues:
         - forbidigo
         - golint
         - gofumpt
+        - gocognit
+        - goconst
+        - nestif
+        - nlreturn
+        - tparallel
+        - varnamelen
 
     # Exclude known linters from partially hard-vendored code,
     # which is impossible to exclude via "nolint" comments.
