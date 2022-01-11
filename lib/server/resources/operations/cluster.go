@@ -88,7 +88,7 @@ type Cluster struct {
 	randomDelayCh   <-chan int
 }
 
-// NewCluster ...
+// NewCluster is the constructor of resources.Cluster struct
 func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -133,7 +133,7 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 		} else {
 			value := max - min
 			for !t.Aborted() {
-				chint <- mrand.Intn(value) + min
+				chint <- mrand.Intn(value) + min // nolint
 			}
 		}
 
@@ -251,10 +251,12 @@ func (instance *Cluster) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
 }
 
-//
+// Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
 func (instance *Cluster) Released() {
 	// Stops task generating random delays
-	instance.randomDelayTask.Abort()
+	if err := instance.randomDelayTask.Abort(); err != nil {
+		logrus.Debugf("there was a problem stopping random delay generator: %v", err)
+	}
 
 	instance.MetadataCore.Released()
 }
