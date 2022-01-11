@@ -265,6 +265,29 @@ func TestOneWaitingForGameWithFuncGen(t *testing.T) {
 	require.NotNil(t, err)
 }
 
+func TestOneWaitingForGameWithFuncGenThatPanics(t *testing.T) {
+	got, err := NewUnbreakableTask()
+	require.NotNil(t, got)
+	require.Nil(t, err)
+
+	theID, err := got.ID()
+	require.Nil(t, err)
+	require.NotEmpty(t, theID)
+
+	_, err = got.Start(taskgen(50, 250, 2, 2, 0, 1, false), nil)
+	if err != nil {
+		t.Errorf("Shouldn't happen: %v", err)
+	}
+
+	good, res, err := got.WaitFor(4 * time.Second)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.True(t, good)
+
+	err = got.SetID("small changes")
+	require.NotNil(t, err)
+}
+
 func TestChangeIdAtMidFlight(t *testing.T) {
 	got, err := NewUnbreakableTask()
 	require.NotNil(t, got)
@@ -1210,6 +1233,58 @@ func TestStartWithTimeoutTask(t *testing.T) {
 
 	// timeouts by design
 	single, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
+	require.Nil(t, xerr)
+
+	// wait for it
+	time.Sleep(65 * time.Millisecond)
+
+	stat, err := single.Status()
+	if err != nil {
+		t.Errorf("Problem retrieving status ?")
+	}
+
+	if stat != TIMEOUT {
+		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+	}
+
+	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
+	require.NotNil(t, xerr)
+}
+
+func TestStartWithTimeoutTaskAndPanic(t *testing.T) {
+	bg := context.Background()
+	single, xerr := NewTaskWithContext(bg)
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	// timeouts by design
+	single, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 1, false), nil, 20*time.Millisecond)
+	require.Nil(t, xerr)
+
+	// wait for it
+	time.Sleep(65 * time.Millisecond)
+
+	stat, err := single.Status()
+	if err != nil {
+		t.Errorf("Problem retrieving status ?")
+	}
+
+	if stat != TIMEOUT {
+		t.Errorf("Where is the timeout ?? (%s), that's the textbook definition", stat)
+	}
+
+	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
+	require.NotNil(t, xerr)
+}
+
+func TestStartWithTimeoutTaskAndHandledPanic(t *testing.T) {
+	bg := context.Background()
+	single, xerr := NewTaskWithContext(bg)
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	// timeouts by design
+	single, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 1, true), nil, 20*time.Millisecond)
 	require.Nil(t, xerr)
 
 	// wait for it

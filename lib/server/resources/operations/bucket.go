@@ -55,7 +55,7 @@ type bucket struct {
 	lock sync.RWMutex
 }
 
-// NewBucket intanciates bucket struct
+// NewBucket instantiates bucket struct
 func NewBucket(svc iaas.Service) (resources.Bucket, fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")

@@ -73,14 +73,20 @@ type object struct {
 
 // NewObject ...
 func newObject(bucket *bucket, objectName string) (object, fail.Error) {
+	if bucket == nil {
+		return object{}, fail.InvalidInstanceError()
+	}
+
 	o := object{
 		bucket: bucket,
 		name:   objectName,
 	}
 	item, err := bucket.stowContainer.Item(objectName)
-	if err == nil {
-		o.item = item
+	if err != nil {
+		return o, nil
 	}
+
+	o.item = item
 	return o, nil
 }
 

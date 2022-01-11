@@ -146,7 +146,7 @@ func (b bucket) estimateSize(path, prefix string) (int, error) {
 				}
 
 				if itemSet[item.Name()] {
-					return fail.DuplicateError(fmt.Sprintf("we found a duplicate: %s, we had %d items by then", item.Name(), len(itemSet)))
+					return fail.DuplicateError(fmt.Sprintf("we found a duplicate (prefix %s): %s, we had %d items by then", prefix, item.Name(), len(itemSet)))
 				}
 				itemSet[item.Name()] = true
 
