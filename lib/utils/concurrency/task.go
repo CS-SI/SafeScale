@@ -827,8 +827,6 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 			fallthrough
 		case DONE:
 			// do nothing
-			break
-
 		case READY: // abnormal status if controller is running
 			fallthrough
 		case UNKNOWN: // by definition, this status is invalid
@@ -1233,8 +1231,8 @@ func (instance *task) WaitFor(duration time.Duration) (_ bool, _ TaskResult, xer
 
 			select {
 			case <-doneWaitingCh:
-				result, xerr := instance.Wait()
-				return true, result, xerr
+				result, iwerr := instance.Wait()
+				return true, result, iwerr
 
 			case <-time.After(duration):
 				// signal waiterTask to abort (and do not wait for it, it will terminate)
@@ -1355,7 +1353,6 @@ func (instance *task) forceAbort() {
 	case UNKNOWN:
 		fallthrough
 	default:
-		break
 	}
 }
 

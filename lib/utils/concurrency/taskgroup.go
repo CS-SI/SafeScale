@@ -382,7 +382,7 @@ func (instance *taskGroup) WaitGroup() (TaskGroupResult, fail.Error) {
 		case DONE:
 			instance.task.lock.RLock()
 			//goland:noinspection GoDeferInLoop
-			defer instance.task.lock.RUnlock()
+			defer instance.task.lock.RUnlock() // nolint
 
 			if fail.Cause(instance.task.err) == context.Canceled {
 				return instance.result, fail.AbortedError(instance.task.err)
