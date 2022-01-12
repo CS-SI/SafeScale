@@ -123,7 +123,7 @@ func (c *MetadataCore) Service() iaas.Service {
 		return nil
 	}
 
-	return c.folder.GetService()
+	return c.folder.Service()
 }
 
 // GetID returns the id of the data protected

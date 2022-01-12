@@ -105,6 +105,10 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, xerr fail.Er
 	instance := &Cluster{
 		MetadataCore: coreInstance,
 	}
+	xerr = instance.startRandomDelayGenerator(ctx, 0, 2000)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	xerr = instance.startRandomDelayGenerator(ctx, 0, 2000)
 	if xerr != nil {
