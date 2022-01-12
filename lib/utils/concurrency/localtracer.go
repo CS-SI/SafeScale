@@ -114,14 +114,14 @@ func (t *tracer) buildMessage() string {
 }
 
 // Trace traces a message
-func (t *tracer) trace(msg ...interface{}) *tracer {
+func (t *tracer) trace(msg ...interface{}) *tracer { // nolint
 	if !t.isNull() && t.enabled {
 		fmt.Println(messagePrefix + t.buildMessage() + ": " + strprocess.FormatStrings(msg...))
 	}
 	return t
 }
 
-// removePart contains the basedir to remove from file pathes
+// removePart contains the basedir to remove from file paths
 var removePart atomic.Value
 
 func getPartToRemove() string {

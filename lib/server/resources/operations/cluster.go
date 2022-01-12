@@ -88,7 +88,7 @@ type Cluster struct {
 	randomDelayCh   <-chan int
 }
 
-// NewCluster ...
+// NewCluster is the constructor of resources.Cluster struct
 func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
@@ -105,6 +105,11 @@ func NewCluster(ctx context.Context, svc iaas.Service) (_ *Cluster, xerr fail.Er
 	instance := &Cluster{
 		MetadataCore: coreInstance,
 	}
+	xerr = instance.startRandomDelayGenerator(ctx, 0, 2000)
+	if xerr != nil {
+		return nil, xerr
+	}
+
 	xerr = instance.startRandomDelayGenerator(ctx, 0, 2000)
 	if xerr != nil {
 		return nil, xerr
@@ -132,7 +137,7 @@ func (instance *Cluster) startRandomDelayGenerator(ctx context.Context, min, max
 		} else {
 			value := max - min
 			for !t.Aborted() {
-				chint <- mrand.Intn(value) + min
+				chint <- mrand.Intn(value) + min // nolint
 			}
 		}
 
@@ -166,7 +171,7 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resource
 
 	options := iaas.CacheMissOption(
 		func() (cache.Cacheable, fail.Error) { return onClusterCacheMiss(ctx, svc, name) },
-		temporal.MetadataTimeout(),
+		svc.Timings().MetadataTimeout(),
 	)
 	cacheEntry, xerr := clusterCache.Get(name, options...)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -193,6 +198,13 @@ func LoadCluster(ctx context.Context, svc iaas.Service, name string) (_ resource
 	}
 
 	cacheEntry.LockContent()
+
+	if clusterInstance.randomDelayCh == nil {
+		xerr = clusterInstance.startRandomDelayGenerator(ctx, 0, 2000)
+		if xerr != nil {
+			return nil, xerr
+		}
+	}
 
 	return clusterInstance, nil
 }
@@ -243,6 +255,16 @@ func (instance *Cluster) IsNull() bool {
 	return instance == nil || instance.MetadataCore == nil || instance.MetadataCore.IsNull()
 }
 
+// Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
+func (instance *Cluster) Released() {
+	// Stops task generating random delays
+	if err := instance.randomDelayTask.Abort(); err != nil {
+		logrus.Debugf("there was a problem stopping random delay generator: %v", err)
+	}
+
+	instance.MetadataCore.Released()
+}
+
 // carry ...
 func (instance *Cluster) carry(clonable data.Clonable) (ferr fail.Error) {
 	if instance == nil {
@@ -262,7 +284,7 @@ func (instance *Cluster) carry(clonable data.Clonable) (ferr fail.Error) {
 		return xerr
 	}
 
-	xerr = kindCache.ReserveEntry(identifiable.GetID(), temporal.MetadataTimeout())
+	xerr = kindCache.ReserveEntry(identifiable.GetID(), instance.Service().Timings().MetadataTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1183,7 +1205,9 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	timeout := 2 * svc.Timings().HostCreationTimeout() // More than enough
 
-	tg, xerr := concurrency.NewTaskGroupWithParent(task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)))
+	tg, xerr := concurrency.NewTaskGroupWithParent(
+		task, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/%d", count)),
+	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr

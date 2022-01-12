@@ -458,7 +458,7 @@ func (instance *task) Start(action TaskAction, params TaskParameters, options ..
 
 // StartWithTimeout runs in goroutine the TaskAction with TaskParameters, and stops after timeout (if > 0)
 // If timeout happens, error returned will be '*fail.ErrTimeout'
-func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, options ...data.ImmutableKeyValue) (Task, fail.Error) {
+func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters, timeout time.Duration, _ ...data.ImmutableKeyValue) (Task, fail.Error) {
 	if instance.IsNull() {
 		return nil, fail.InvalidInstanceError()
 	}
@@ -833,7 +833,7 @@ func (instance *task) processCancel(traceR *tracer) fail.Error {
 }
 
 // processTerminated operates when go routine terminates
-func (instance *task) processTerminated(traceR *tracer) {
+func (instance *task) processTerminated(_ *tracer) {
 	instance.lock.Lock()
 	instance.stats.controllerDuration = time.Since(instance.stats.controllerBegin)
 	instance.controllerTerminated = true
@@ -844,7 +844,7 @@ func (instance *task) processTerminated(traceR *tracer) {
 }
 
 // processAbort operates when Abort has been requested
-func (instance *task) processAbort(traceR *tracer) fail.Error {
+func (instance *task) processAbort(_ *tracer) fail.Error {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 

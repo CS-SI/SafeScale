@@ -48,8 +48,7 @@ func randomInt(min, max int) int {
 	if min == max {
 		return min
 	}
-	// mrand.Seed(time.Now().UnixNano())
-	return mrand.Intn(max-min) + min
+	return mrand.Intn(max-min) + min // nolint
 }
 
 // randomIntWithReseed restarts pseudorandom seed then returns a random integer between a specified range.
@@ -58,7 +57,7 @@ func randomIntWithReseed(min, max int) int { // nolint
 		return min
 	}
 	mrand.Seed(time.Now().UnixNano())
-	return mrand.Intn(max-min) + min
+	return mrand.Intn(max-min) + min // nolint
 }
 
 func validTest(st int, latency int) bool { // nolint
@@ -100,6 +99,15 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 
 		resch := make(chan internalRes)
 		go func() {
+			var crash error
+			defer func() {
+				resch <- internalRes{
+					ir:  "Internal error",
+					err: fail.ConvertError(crash),
+				}
+			}()
+			defer fail.OnPanic(&crash)
+
 			iterations := int64(math.Ceil(float64(rd) / float64(latency)))
 			tempo := time.Duration(math.Min(float64(latency), float64(rd))) * time.Millisecond
 			count := int64(0)

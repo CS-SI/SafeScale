@@ -58,9 +58,7 @@ func (g *genericPackager) Check(ctx context.Context, f resources.Feature, t reso
 
 	yamlKey := "feature.install." + g.keyword + ".check"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
-		msg := `syntax error in Feature '%s' specification file (%s):
-				no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(), yamlKey)
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Check, g.checkCommand)
@@ -102,9 +100,7 @@ func (g *genericPackager) Add(ctx context.Context, f resources.Feature, t resour
 
 	yamlKey := "feature.install." + g.keyword + ".add"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
-		msg := `syntax error in Feature '%s' specification file (%s):
-				no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(), yamlKey)
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Add, g.addCommand)
@@ -147,9 +143,7 @@ func (g *genericPackager) Remove(ctx context.Context, f resources.Feature, t res
 
 	yamlKey := "feature.install." + g.keyword + ".remove"
 	if !f.(*Feature).Specs().IsSet(yamlKey) {
-		msg := `syntax error in Feature '%s' specification file (%s):
-				no key '%s' found`
-		return nil, fail.SyntaxError(msg, f.GetName(), f.GetDisplayFilename(), yamlKey)
+		return nil, fail.SyntaxError("syntax error in Feature '%s' specification file (%s): no key '%s' found", f.GetName(), f.GetDisplayFilename(), yamlKey)
 	}
 
 	worker, xerr := newWorker(f, t, g.method, installaction.Remove, g.removeCommand)

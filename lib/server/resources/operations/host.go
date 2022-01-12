@@ -1645,7 +1645,7 @@ func (instance *Host) thePhaseDoesSomething(ctx context.Context, phase userdata.
 	return result
 }
 
-func (instance *Host) thePhaseReboots(ctx context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
+func (instance *Host) thePhaseReboots(_ context.Context, phase userdata.Phase, userdataContent *userdata.Content) bool {
 	// render content
 	content, xerr := userdataContent.Generate(phase)
 	xerr = debug.InjectPlannedFail(xerr)

@@ -1149,7 +1149,7 @@ func (instance *Cluster) createHostResources(
 	// Starting from here, if exiting with error, delete nodes
 	defer func() {
 		if ferr != nil && !keepOnFailure {
-			// Disable abort signal during the clean up
+			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
 			list, merr := instance.unsafeListNodes()
@@ -2365,7 +2365,7 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	// Starting from here, if exiting with error, remove entry from node of the metadata
 	defer func() {
 		if ferr != nil && !p.keepOnFailure {
-			// Disable abort signal during the clean up
+			// Disable abort signal during the cleanup
 			defer task.DisarmAbortSignal()()
 
 			derr := instance.Alter(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {

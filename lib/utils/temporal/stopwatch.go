@@ -25,8 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/commonlog"
 )
 
-const outputStopwatchTemplate = "%s (elapsed: %s)"
-
 // Stopwatch interface to expose methods available for a stopwatch
 type Stopwatch interface {
 	// Start starts the stopwatch, either for the first time or after a Pause()
@@ -122,7 +120,7 @@ func (sw *stopwatch) OnExitLogWithLevel(in, out string, level logrus.Level) func
 	sw.Start()
 	return func() {
 		sw.Stop()
-		logLevelFn(fmt.Sprintf(outputStopwatchTemplate, out, FormatDuration(sw.GetDuration())))
+		logLevelFn(fmt.Sprintf("%s (elapsed: %s)", out, FormatDuration(sw.GetDuration()))) // nolint
 	}
 }
 

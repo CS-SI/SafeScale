@@ -141,7 +141,7 @@ func Fibonacci(base time.Duration) *Officer {
 
 func randomInt(min, max int) int {
 	mrand.Seed(time.Now().Unix())
-	return mrand.Intn(max-min) + min
+	return mrand.Intn(max-min) + min // nolint
 }
 
 func Randomized(bottom time.Duration, top time.Duration) *Officer { // FIXME: Use this

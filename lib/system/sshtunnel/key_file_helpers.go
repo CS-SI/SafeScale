@@ -40,9 +40,11 @@ func convertToSSHClientConfig(toConvert *SSHJump, timeout time.Duration) (_ *ssh
 		return nil, fmt.Errorf("toConvert parameter cannot be nil")
 	}
 
+	// FIXME: Remove InsecureIgnoreHostKey later
+
 	config := &ssh.ClientConfig{
 		User:            toConvert.user,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // nolint
 		Timeout:         timeout,
 	}
 

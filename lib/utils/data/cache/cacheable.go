@@ -26,6 +26,6 @@ import (
 type Cacheable interface {
 	observer.Observable
 
-	Released()  // Tells cache handler the instance is no more used, giving a chance to free this instance from cache
-	Destroyed() // tells cache handler the instance has been deleted and MUST be removed from cache
+	Released()  // Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
+	Destroyed() // Destroyed tells cache handler the instance has been deleted and MUST be removed from cache
 }

@@ -719,7 +719,7 @@ func NewSSHTunnelWithLocalBinding(
 	return sshTunnel, nil
 }
 
-func setConnectionDeadlines(in net.Conn, read time.Duration, write time.Duration) (net.Conn, bool) {
+func setConnectionDeadlines(in net.Conn, read time.Duration, write time.Duration) (net.Conn, bool) { // nolint
 	var err error
 	if tcpConn, ok := in.(*net.TCPConn); ok {
 		failures := 0
