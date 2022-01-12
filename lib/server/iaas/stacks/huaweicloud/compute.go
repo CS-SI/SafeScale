@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
+	"net/http"
 	"time"
 
 	"github.com/asaskevich/govalidator"
@@ -259,7 +260,7 @@ func (opts serverCreateOpts) ToServerCreateMap() (map[string]interface{}, error)
 	return map[string]interface{}{"server": b}, nil
 }
 
-// getFlavorIDFromName is a convienience function that returns a flavor's ID given its name.
+// getFlavorIDFromName is a convenience function that returns a flavor's ID given its name.
 func getFlavorIDFromName(client *gophercloud.ServiceClient, name string) (string, error) {
 	count := 0
 	id := ""
@@ -567,11 +568,13 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() (innerErr error) {
-					_, r.Err = s.ComputeClient.Post(
+					var hr *http.Response
+					hr, r.Err = s.ComputeClient.Post( // nolint
 						s.ComputeClient.ServiceURL("servers"), b, &r.Body, &gophercloud.RequestOpts{
 							OkCodes: []int{200, 202},
 						},
 					)
+					defer closer(hr)
 					server, innerErr = r.Extract()
 					xerr := normalizeError(innerErr)
 					if xerr != nil {

@@ -136,7 +136,9 @@ func (s stack) CreateNetwork(req abstract.NetworkRequest) (*abstract.Network, fa
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("POST", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
+			defer closer(hr)
 			return innerErr
 		},
 		normalizeError,
@@ -244,9 +246,13 @@ func (s stack) InspectNetwork(id string) (*abstract.Network, fail.Error) {
 	var vpc *VPC
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			if _, innerErr = s.Driver.Request("GET", url, &opts); innerErr == nil {
-				vpc, innerErr = r.Extract()
+			var hr *http.Response
+			hr, innerErr = s.Driver.Request("GET", url, &opts) // nolint
+			defer closer(hr)
+			if innerErr != nil {
+				return innerErr
 			}
+			vpc, innerErr = r.Extract()
 			return innerErr
 		},
 		normalizeError,
@@ -315,7 +321,9 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 	}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("GET", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("GET", url, &opts) // nolint
+			defer closer(hr)
 			return innerErr
 		},
 		normalizeError,
@@ -373,8 +381,8 @@ func (s stack) DeleteNetwork(id string) fail.Error {
 	return stacks.RetryableRemoteCall(
 		func() (innerErr error) {
 			var r *http.Response
-			r, innerErr = s.Driver.Request("DELETE", url, &opts)
-			_ = r
+			r, innerErr = s.Driver.Request("DELETE", url, &opts) // nolint
+			defer closer(r)
 			return innerErr
 		},
 		normalizeError,
@@ -492,9 +500,11 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 	r := networks.GetResult{}
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, r.Err = s.NetworkClient.Get(s.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{
+			var hr *http.Response
+			hr, r.Err = s.NetworkClient.Get(s.NetworkClient.ServiceURL("subnets?name="+name), &r.Body, &gophercloud.RequestOpts{ // nolint
 				OkCodes: []int{200, 203},
 			})
+			defer closer(hr)
 			return r.Err
 		},
 		normalizeError,
@@ -551,7 +561,9 @@ func (s stack) InspectSubnet(id string) (*abstract.Subnet, fail.Error) {
 	var resp *subnetEx
 	xerr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("GET", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("GET", url, &opts) // nolint
+			defer closer(hr)
 			r.Err = innerErr
 			resp, innerErr = r.Extract()
 			return innerErr
@@ -684,7 +696,9 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 		func() error {
 			return stacks.RetryableRemoteCall(
 				func() error {
-					_, innerErr := s.Driver.Request("DELETE", url, &opts)
+					var hr *http.Response
+					hr, innerErr := s.Driver.Request("DELETE", url, &opts) // nolint
+					defer closer(hr)
 					return innerErr
 				},
 				normalizeError,
@@ -797,7 +811,9 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("POST", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
+			defer closer(hr)
 			return innerErr
 		},
 		normalizeError,
@@ -820,7 +836,9 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 		func() error {
 			innerXErr := stacks.RetryableRemoteCall(
 				func() error {
-					_, innerErr := s.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts)
+					var hr *http.Response
+					hr, innerErr := s.Driver.Request("GET", fmt.Sprintf("%s/%s", url, subnet.ID), &opts) // nolint
+					defer closer(hr)
 					return innerErr
 				},
 				normalizeError,

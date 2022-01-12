@@ -17,6 +17,8 @@
 package huaweicloud
 
 import (
+	"net/http"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/pagination"
@@ -153,8 +155,10 @@ func (s stack) GetFloatingIP(id string) (*FloatingIP, fail.Error) {
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, err := s.Driver.Request("GET", url, &opts)
+			var hr *http.Response
+			hr, err := s.Driver.Request("GET", url, &opts) // nolint
 			r.Err = err
+			defer closer(hr)
 			return normalizeError(err)
 		},
 		normalizeError,
@@ -248,7 +252,9 @@ func (s stack) CreateFloatingIP(host *abstract.HostFull) (*FloatingIP, fail.Erro
 	}
 	commRetryErr := stacks.RetryableRemoteCall(
 		func() error {
-			_, innerErr := s.Driver.Request("POST", url, &opts)
+			var hr *http.Response
+			hr, innerErr := s.Driver.Request("POST", url, &opts) // nolint
+			defer closer(hr)
 			return normalizeError(innerErr)
 		},
 		normalizeError,
@@ -278,8 +284,10 @@ func (s stack) DeleteFloatingIP(id string) fail.Error {
 	}
 	return stacks.RetryableRemoteCall(
 		func() error {
-			_, r.Err = s.Driver.Request("DELETE", url, &opts)
+			var hr *http.Response
+			hr, r.Err = s.Driver.Request("DELETE", url, &opts) // nolint
 			err := r.ExtractErr()
+			defer closer(hr)
 			return normalizeError(err)
 		},
 		normalizeError,
@@ -305,8 +313,10 @@ func (s stack) AssociateFloatingIP(host *abstract.HostCore, id string) fail.Erro
 
 	return stacks.RetryableRemoteCall(
 		func() error {
+			var hr *http.Response
 			r := servers.ActionResult{}
-			_, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
+			hr, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil) // nolint
+			defer closer(hr)
 			return normalizeError(r.ExtractErr())
 		},
 		normalizeError,
@@ -332,8 +342,10 @@ func (s stack) DissociateFloatingIP(host *abstract.HostCore, id string) fail.Err
 
 	return stacks.RetryableRemoteCall(
 		func() error {
+			var hr *http.Response
 			r := servers.ActionResult{}
-			_, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil)
+			hr, r.Err = s.ComputeClient.Post(s.ComputeClient.ServiceURL("servers", host.ID, "action"), b, nil, nil) // nolint
+			defer closer(hr)
 			return normalizeError(r.ExtractErr())
 		},
 		normalizeError,
