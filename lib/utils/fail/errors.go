@@ -302,7 +302,7 @@ func (e *errorCore) SetAnnotationFormatter(formatter func(data.Annotations) stri
 
 // AddConsequence adds an error 'err' to the list of consequences
 func (e *errorCore) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -421,7 +421,7 @@ func (e *ErrWarning) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrWarning) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -479,7 +479,7 @@ func (e *ErrTimeout) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrTimeout) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) { // do nothing
 		return e
 	}
 	if e.IsNull() {
@@ -530,7 +530,7 @@ func (e *ErrNotFound) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrNotFound) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -581,7 +581,7 @@ func (e *ErrNotAvailable) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrNotAvailable) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -632,7 +632,7 @@ func (e *ErrDuplicate) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrDuplicate) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -678,7 +678,7 @@ func (e *ErrInvalidRequest) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidRequest) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -730,7 +730,7 @@ func (e *ErrSyntax) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrSyntax) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -775,7 +775,7 @@ func (e *ErrNotAuthenticated) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -820,7 +820,7 @@ func (e *ErrForbidden) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrForbidden) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -872,7 +872,7 @@ func (e *ErrAborted) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrAborted) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -929,7 +929,7 @@ func (e *ErrOverflow) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrOverflow) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -974,7 +974,7 @@ func (e *ErrOverload) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrOverload) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -1026,7 +1026,7 @@ func NotImplementedErrorWithReason(what string, why string) Error {
 
 // AddConsequence ...
 func (e *ErrNotImplemented) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -1073,7 +1073,7 @@ func (e *ErrRuntimePanic) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrRuntimePanic) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -1120,7 +1120,7 @@ func (e *ErrInvalidInstance) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidInstance) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -1181,7 +1181,7 @@ func (e *ErrInvalidParameter) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidParameter) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -1228,7 +1228,7 @@ func (e *ErrInvalidInstanceContent) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -1273,7 +1273,7 @@ func (e *ErrInconsistent) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrInconsistent) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -1335,7 +1335,7 @@ func (e *ErrExecution) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrExecution) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -1380,7 +1380,7 @@ func (e *ErrAlteredNothing) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrAlteredNothing) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {
@@ -1425,7 +1425,7 @@ func (e *ErrUnknown) IsNull() bool {
 
 // AddConsequence ...
 func (e *ErrUnknown) AddConsequence(err error) Error {
-	if e == err { // do nothing
+	if e == err || e == Cause(err) {
 		return e
 	}
 	if e.IsNull() {

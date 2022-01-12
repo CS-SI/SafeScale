@@ -212,6 +212,18 @@ func Cause(err error) (resp error) {
 
 		return err
 	}
+
+	if u, ok := err.(interface {
+		Unwrap() error
+	}); ok {
+		cau := u.Unwrap()
+		if cau != nil {
+			return cau
+		}
+
+		return err
+	}
+
 	return err
 }
 

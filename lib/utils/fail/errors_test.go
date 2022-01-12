@@ -617,6 +617,35 @@ func TestPrettyPrintChainOfWrappedErrors(t *testing.T) {
 	}
 }
 
+func TestAddSelf(t *testing.T) {
+	origin := NewError("It was DNS")
+	toe := TimeoutError(origin, 100*time.Millisecond, "we tried to connect to google and we failed")
+	tob := toe.AddConsequence(toe)
+
+	assert.EqualValues(t, toe, tob)
+	assert.True(t, len(toe.Consequences()) == 0)
+}
+
+func TestAddWrappedSelf(t *testing.T) {
+	origin := NewError("It was DNS")
+	toe := TimeoutError(origin, 100*time.Millisecond, "we tried to connect to google and we failed")
+	tob := toe.AddConsequence(Wrap(toe, "meaningless info"))
+
+	assert.EqualValues(t, toe, tob)
+	assert.True(t, len(toe.Consequences()) == 0)
+	assert.True(t, len(tob.Consequences()) == 0)
+}
+
+func TestAddWrappedCustomSelf(t *testing.T) {
+	origin := NewError("It was DNS")
+	toe := TimeoutError(origin, 100*time.Millisecond, "we tried to connect to google and we failed")
+	tob := toe.AddConsequence(fmt.Errorf("meaningless info: %w", toe))
+
+	assert.EqualValues(t, toe, tob)
+	assert.True(t, len(toe.Consequences()) == 0)
+	assert.True(t, len(tob.Consequences()) == 0)
+}
+
 func TestPrettyPrintErrorWithExtraInformation(t *testing.T) {
 	origin := NewError("It was DNS")
 	toe := TimeoutError(origin, 100*time.Millisecond, "we tried to connect to google and we failed")
@@ -644,7 +673,7 @@ type checkable interface {
 func TestNotNilCheckCast(t *testing.T) {
 	defer func() {
 		if a := recover(); a != nil {
-			t.Errorf("We panicked, this is a serious problem, it means that when we check for nil in our errors, we might be wrong")
+			t.Logf("We panicked, this is a serious problem, it means that when we check for nil in our errors, we might be wrong")
 		}
 	}()
 
@@ -652,22 +681,16 @@ func TestNotNilCheckCast(t *testing.T) {
 	origin = generateErrNilTimeout()
 
 	var nilErrTimeout *ErrTimeout = nil
-	if origin != nil {
-		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same
+	if origin != nil { // working with pointers to interfaces is dangerous, here we misinterpret origin as not nil (but it is)
+		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same, the type matters, here we detect that actually is a nil, and we force the panic to prove the point
 			t.Logf("a nil that is not interpreted as a nil, calling origin.whatever actually panics, put it to the test")
 			_ = origin.GRPCCode()
+			t.FailNow() // we won't reach this line
 		}
+		t.FailNow()
+	} else {
+		t.FailNow()
 	}
-
-	/*
-		if origin != nil {
-			if _, ok := origin.(*ErrTimeout); !ok || origin.IsNull() {
-				t.Log("So far so good")
-			} else {
-				t.Errorf("Should not happen")
-			}
-		}
-	*/
 }
 
 func TestNotNilCheckCastNoProblems(t *testing.T) {
@@ -681,20 +704,11 @@ func TestNotNilCheckCastNoProblems(t *testing.T) {
 	origin = noProblems()
 
 	var nilErrTimeout *ErrTimeout = nil
-	if origin != nil {
+	if origin != nil { // this test work well, when we return something that is NOT a pointer to an interface, no problems...
 		if origin == nilErrTimeout { // nil and nilErrTimeout, are not the same
 			t.Logf("a nil that is not interpreted as a nil, calling origin.whatever actually panics, put it to the test")
 			_ = origin.GRPCCode()
 		}
+		t.FailNow()
 	}
-
-	/*
-		if origin != nil {
-			if _, ok := origin.(*ErrTimeout); !ok || origin.IsNull() {
-				t.Log("So far so good")
-			} else {
-				t.Errorf("Should not happen")
-			}
-		}
-	*/
 }
