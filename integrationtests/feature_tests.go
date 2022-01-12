@@ -245,27 +245,7 @@ func ReverseProxy(t *testing.T, provider providers.Enum) {
 	require.NotNil(t, err)
 }
 
-func Metricbeat(t *testing.T, provider providers.Enum) {
-	// TODO: Implement integration test
-}
-
-func Filebeat(t *testing.T, provider providers.Enum) {
-	// TODO: Implement integration test
-}
-
 func NvidiaDocker(t *testing.T, provider providers.Enum) {
-	// TODO: Implement integration test
-}
-
-func ProxyCacheClient(t *testing.T, provider providers.Enum) {
-	// TODO: Implement integration test
-}
-
-func ProxyCacheServer(t *testing.T, provider providers.Enum) {
-	// TODO: Implement integration test
-}
-
-func ApacheIgnite(t *testing.T, provider providers.Enum) {
 	// TODO: Implement integration test
 }
 
@@ -274,9 +254,5 @@ func Helm(t *testing.T, provider providers.Enum) {
 }
 
 func Kubernetes(t *testing.T, provider providers.Enum) {
-	// TODO: Implement integration test
-}
-
-func Spark(t *testing.T, provider providers.Enum) {
 	// TODO: Implement integration test
 }

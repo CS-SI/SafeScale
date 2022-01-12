@@ -16,8 +16,6 @@ import (
 
 func keyFromProvider(provider providers.Enum) string {
 	switch provider {
-	case providers.LOCAL:
-		return "TEST_LOCAL"
 	case providers.OVH:
 		return "TEST_OVH"
 	case providers.CLOUDFERRO:
@@ -30,8 +28,6 @@ func keyFromProvider(provider providers.Enum) string {
 
 func nameFromProvider(provider providers.Enum) string {
 	switch provider {
-	case providers.LOCAL:
-		return "local"
 	case providers.OVH:
 		return "ovh"
 	case providers.CLOUDFERRO:

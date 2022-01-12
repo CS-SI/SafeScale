@@ -27,22 +27,6 @@ func Test_ReverseProxy(t *testing.T) {
 	integrationtests.ReverseProxy(t, providers.OVH)
 }
 
-func Test_Metricbeat(t *testing.T) {
-	integrationtests.Metricbeat(t, providers.OVH)
-}
-
-func Test_Filebeat(t *testing.T) {
-	integrationtests.Filebeat(t, providers.OVH)
-}
-
 func Test_NvidiaDocker(t *testing.T) {
 	integrationtests.NvidiaDocker(t, providers.OVH)
-}
-
-func Test_ProxyCacheClient(t *testing.T) {
-	integrationtests.ProxyCacheClient(t, providers.OVH)
-}
-
-func Test_ProxyCacheServer(t *testing.T) {
-	integrationtests.ProxyCacheServer(t, providers.OVH)
 }
