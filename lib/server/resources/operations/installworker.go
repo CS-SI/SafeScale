@@ -144,18 +144,18 @@ func newWorker(f resources.Feature, target resources.Targetable, method installm
 		var ok bool
 		w.cluster, ok = target.(*Cluster)
 		if !ok {
-			return nil, fail.InconsistentError("t should be a *Cluster")
+			return nil, fail.InconsistentError("target should be a *Cluster")
 		}
 		w.service = w.cluster.Service()
 	case featuretargettype.Host:
 		var ok bool
 		w.host, ok = target.(*Host)
 		if !ok {
-			return nil, fail.InconsistentError("t should be a *Host")
+			return nil, fail.InconsistentError("target should be a *Host")
 		}
 		w.service = w.host.Service()
 	default:
-		return nil, fail.InconsistentError("t should be either a *Cluster or a *Host, it's not: %v", target.TargetType())
+		return nil, fail.InconsistentError("target should be either a *Cluster or a *Host, it's not: %v", target.TargetType())
 	}
 
 	if method != installmethod.None {
