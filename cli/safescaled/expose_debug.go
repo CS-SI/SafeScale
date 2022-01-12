@@ -57,6 +57,9 @@ func expose() {
 	// Debug using fgprof
 	http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
 	go func() {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		err := http.ListenAndServe(fmt.Sprintf(":%d", expvarPort), http.DefaultServeMux)
 		if err != nil {
 			logrus.Fatalf("Failed to start expvar: %v", err)

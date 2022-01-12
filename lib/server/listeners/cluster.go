@@ -263,7 +263,7 @@ func (s *ClusterListener) Start(ctx context.Context, in *protocol.Reference) (em
 	return empty, instance.Start(job.Context())
 }
 
-// Stop shutdowns a entire cluster (including the gateways)
+// Stop shutdowns an entire cluster (including the gateways)
 func (s *ClusterListener) Stop(ctx context.Context, in *protocol.Reference) (empty *googleprotobuf.Empty, err error) {
 	defer fail.OnExitConvertToGRPCStatus(&err)
 	defer fail.OnExitWrapError(&err, "cannot stop cluster")

@@ -27,6 +27,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/CS-SI/SafeScale/lib/utils/heartbeat"
 	"github.com/makholm/covertool/pkg/exit"
 	"github.com/sirupsen/logrus"
@@ -63,6 +64,9 @@ func work(c *cli.Context) {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
 	go func() {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		<-signalCh
 		cleanup(true)
 	}()

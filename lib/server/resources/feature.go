@@ -33,7 +33,7 @@ type Targetable interface {
 	ComplementFeatureParameters(ctx context.Context, v data.Map) fail.Error        // adds parameters corresponding to the Target in preparation of feature installation
 	UnregisterFeature(f string) fail.Error                                         // unregisters a Feature from Target in metadata
 	InstalledFeatures() []string                                                   // returns a list of installed features
-	InstallMethods() map[uint8]installmethod.Enum                                  // returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+	InstallMethods() map[uint8]installmethod.Enum                                  // returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 	RegisterFeature(f Feature, requiredBy Feature, clusterContext bool) fail.Error // registers a feature on target in metadata
 	TargetType() featuretargettype.Enum                                            // returns the type of the target
 }

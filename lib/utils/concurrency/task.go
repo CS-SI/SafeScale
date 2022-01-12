@@ -482,6 +482,14 @@ func (instance *task) StartWithTimeout(action TaskAction, params TaskParameters,
 			instance.lock.Unlock() // nolint
 
 			go func() {
+				var crash error
+				defer func() {
+					if crash != nil { // if instance.controller panics
+						instance.err = fail.Wrap(crash, "panic running controller method")
+					}
+				}()
+				defer fail.OnPanic(&crash)
+
 				ctrlErr := instance.controller(action, params, timeout)
 
 				instance.lock.Lock()
@@ -527,7 +535,7 @@ func (instance *task) controller(action TaskAction, params TaskParameters, timeo
 	instance.stats.controllerBegin = time.Now()
 	instance.lock.Unlock() // nolint
 
-	go func() { // FIXME: this goroutine is isolated from the rest, what happens if run PANICS ?
+	go func() {
 		var failure error
 		defer fail.OnPanic(&failure) // this prevents the os.Exit, but we lack communication outside the func -> the task will be unaware
 

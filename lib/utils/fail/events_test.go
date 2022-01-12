@@ -49,6 +49,39 @@ func liveDangerously(panicflag bool) (err error) {
 	return nil
 }
 
+func liveDangerouslyInGoroutine(panicflag bool) (err error) {
+	dudu := make(chan error)
+	go func() {
+		var crash error
+		defer func() {
+			if crash != nil {
+				dudu <- crash
+			}
+		}()
+		defer OnPanic(&crash)
+
+		if panicflag {
+			doPanic()
+		}
+
+		dudu <- crash
+	}()
+
+	return <-dudu
+}
+
+func TestLogErrorWithPanicInGoroutine(t *testing.T) {
+	err := liveDangerouslyInGoroutine(true)
+	if err == nil {
+		t.Errorf("Panic error shouldn't go unnoticed")
+	} else {
+		message := err.Error()
+		if !strings.Contains(message, "Ouch") {
+			t.Errorf("Panic should contain panic info...")
+		}
+	}
+}
+
 func TestLogErrorWithPanic(t *testing.T) {
 	err := liveDangerously(true)
 	if err == nil {

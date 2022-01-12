@@ -231,6 +231,15 @@ func (svc service) WaitHostState(hostID string, state hoststate.Enum, timeout ti
 	defer close(errCh)
 
 	go func() {
+		var crash error
+		defer func() {
+			if crash != nil {
+				errCh <- fail.ConvertError(crash)
+				return
+			}
+		}()
+		defer fail.OnPanic(&crash)
+
 		for {
 			select {
 			case <-done: // only when it's closed

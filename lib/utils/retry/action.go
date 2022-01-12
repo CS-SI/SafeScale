@@ -673,6 +673,14 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 		// Perform action
 		ch := make(chan error)
 		go func() {
+			var crash error
+			defer func() {
+				if crash != nil {
+					ch <- crash
+				}
+			}()
+			defer fail.OnPanic(&crash)
+
 			ch <- a.Run()
 		}()
 
@@ -710,6 +718,14 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 			// Retry is wanted, so blocks the loop the amount of time needed
 			if a.Officer != nil {
 				go func() {
+					var crash error
+					defer func() {
+						if crash != nil {
+							ch <- crash
+						}
+					}()
+					defer fail.OnPanic(&crash)
+
 					a.Officer.Block(try)
 					ch <- nil
 				}()

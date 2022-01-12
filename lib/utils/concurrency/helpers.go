@@ -32,12 +32,15 @@ import (
 func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	c := make(chan struct{})
 	go func() {
+		var crash error
+		defer fail.OnPanic(&crash)
+
 		defer close(c)
 		wg.Wait()
 	}()
 	select {
 	case <-c:
-		return false // completed normally
+		return false // completed normally or panic in Wait
 	case <-time.After(timeout):
 		return true // timed out
 	}
@@ -101,9 +104,11 @@ func taskgenWithCustomFunc(low int, high int, latency int, cleanfactor int, prob
 		go func() {
 			var crash error
 			defer func() {
-				resch <- internalRes{
-					ir:  "Internal error",
-					err: fail.ConvertError(crash),
+				if crash != nil {
+					resch <- internalRes{
+						ir:  "InternalPanic",
+						err: fail.ConvertError(crash),
+					}
 				}
 			}()
 			defer fail.OnPanic(&crash)
