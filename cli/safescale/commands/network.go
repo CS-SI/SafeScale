@@ -1078,7 +1078,7 @@ var subnetList = &cli.Command{
 					),
 				)
 			}
-			if err != json.Unmarshal(jsoned, &result) {
+			if err := json.Unmarshal(jsoned, &result); err != nil {
 				return clitools.FailureResponse(
 					clitools.ExitOnRPC(
 						strprocess.Capitalize(

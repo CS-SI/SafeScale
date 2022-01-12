@@ -72,7 +72,7 @@ func NewResourceCache(name string) (*ResourceCache, fail.Error) {
 
 	cacheInstance, xerr := cache.NewCache(name)
 	if xerr != nil {
-		return &ResourceCache{}, nil
+		return &ResourceCache{}, xerr
 	}
 
 	rc := &ResourceCache{

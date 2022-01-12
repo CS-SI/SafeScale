@@ -49,7 +49,7 @@ func lastUnwrap(in error) (err error) {
 
 func convertErrorToTunnelError(inErr error) (err error) {
 	if inErr == nil {
-		return inErr
+		return nil
 	}
 
 	if _, ok := inErr.(tunnelError); ok {

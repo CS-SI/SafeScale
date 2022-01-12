@@ -83,7 +83,7 @@ func newObject(bucket *bucket, objectName string) (object, fail.Error) {
 	}
 	item, err := bucket.stowContainer.Item(objectName)
 	if err != nil {
-		return o, nil
+		return o, fail.ConvertError(err)
 	}
 
 	o.item = item
