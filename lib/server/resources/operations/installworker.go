@@ -155,7 +155,7 @@ func newWorker(f resources.Feature, target resources.Targetable, method installm
 		}
 		w.service = w.host.Service()
 	default:
-		return nil, fail.InconsistentError("t should be either a *Cluster or a *Host, it's not: %v", t.TargetType())
+		return nil, fail.InconsistentError("t should be either a *Cluster or a *Host, it's not: %v", target.TargetType())
 	}
 
 	if method != installmethod.None {
