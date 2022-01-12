@@ -257,9 +257,11 @@ func (instance *Cluster) IsNull() bool {
 
 // Released tells cache handler the instance is no more used, giving a chance to free this instance from cache
 func (instance *Cluster) Released() {
-	// Stops task generating random delays
-	if err := instance.randomDelayTask.Abort(); err != nil {
-		logrus.Debugf("there was a problem stopping random delay generator: %v", err)
+	if instance.randomDelayTask != nil {
+		// Stops task generating random delays
+		if err := instance.randomDelayTask.Abort(); err != nil {
+			logrus.Debugf("there was a problem stopping random delay generator: %v", err)
+		}
 	}
 
 	instance.MetadataCore.Released()
