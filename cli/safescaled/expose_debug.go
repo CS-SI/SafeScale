@@ -27,6 +27,7 @@ import (
 	"strconv"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug/exportstats"
+	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/felixge/fgprof"
 	"github.com/sirupsen/logrus"
 	"github.com/zserge/metric"
