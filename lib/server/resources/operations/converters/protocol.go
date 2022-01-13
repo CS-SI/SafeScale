@@ -178,6 +178,7 @@ func ClusterRequestFromProtocolToAbstract(in *protocol.ClusterCreateRequest) (_ 
 		Force:                   in.Force,
 		DisabledDefaultFeatures: disabled,
 		InitialNodeCount:        uint(nodeCount),
+		FeatureParameters:       in.GetParameters(),
 	}
 	return out, nil
 }
