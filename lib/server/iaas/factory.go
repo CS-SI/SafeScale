@@ -90,6 +90,9 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 	for _, tenant := range tenants {
 		name, found = tenant["name"].(string)
 		if !found {
+			name, found = tenant["Name"].(string)
+		}
+		if !found {
 			logrus.Error("tenant found without 'name'")
 			continue
 		}
@@ -100,11 +103,17 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		tenantInCfg = true
 		provider, found = tenant["provider"].(string)
 		if !found {
+			provider, found = tenant["Provider"].(string)
+		}
+		if !found {
 			provider, found = tenant["client"].(string)
-			if !found {
-				logrus.Error("Missing field 'provider' in tenant")
-				continue
-			}
+		}
+		if !found {
+			provider, found = tenant["Client"].(string)
+		}
+		if !found {
+			logrus.Error("Missing field 'provider' or 'client' in tenant")
+			continue
 		}
 
 		svcProvider = provider
@@ -678,8 +687,16 @@ func loadConfig() fail.Error {
 		return err
 	}
 	for _, tenant := range tenantsCfg {
-		if name, ok := tenant["name"].(string); ok {
-			if provider, ok := tenant["client"].(string); ok {
+		name, ok := tenant["name"].(string)
+		if !ok {
+			name, ok = tenant["Name"].(string)
+		}
+		if ok {
+			provider, ok := tenant["client"].(string)
+			if !ok {
+				provider, ok = tenant["Client"].(string)
+			}
+			if ok {
 				allTenants[name] = provider
 			} else {
 				return fail.SyntaxError("invalid configuration file '%s'. Tenant '%s' has no client type", v.ConfigFileUsed(), name)
