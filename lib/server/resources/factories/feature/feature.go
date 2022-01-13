@@ -52,6 +52,6 @@ func New(svc iaas.Service, name string) (resources.Feature, fail.Error) {
 
 // NewEmbedded searches for an embedded feature called 'name' and initializes a new Feature object
 // with its content
-func NewEmbedded(svc iaas.Service, name string) (resources.Feature, error) {
+func NewEmbedded(svc iaas.Service, name string) (resources.Feature, fail.Error) {
 	return operations.NewEmbeddedFeature(svc, name)
 }

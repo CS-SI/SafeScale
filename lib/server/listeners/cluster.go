@@ -19,8 +19,13 @@ package listeners
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterproperty"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
+	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -398,7 +403,40 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	}
 	defer instance.Released()
 
-	resp, xerr := instance.AddNodes(job.Context(), uint(in.Count), *sizing, in.GetKeepOnFailure())
+	// build parameters to pass to AddNodes, merging in.FeatureParameters in ClusterDefaults.FeatureParameters
+	parameters := data.Map{}
+	xerr = instance.Review(func(clonable data.Clonable, props *serialize.JSONProperties) fail.Error {
+		return props.Inspect(clusterproperty.DefaultsV3, func(clonable data.Clonable) fail.Error {
+			defaultsV3, ok := clonable.(*propertiesv3.ClusterDefaults)
+			if !ok {
+				return fail.InconsistentError("'*propertiesv2.ClusterDefaults' expected, '%s' provided", reflect.TypeOf(clonable).String())
+			}
+
+			for _, v := range defaultsV3.FeatureParameters {
+				splitted := strings.Split(v, "=")
+				if len(splitted) > 1 {
+					parameters[splitted[0]] = splitted[1]
+				} else {
+					parameters[splitted[0]] = ""
+				}
+			}
+			return nil
+		})
+	})
+	if xerr != nil {
+		return nil, xerr
+	}
+	for _, v := range in.GetParameters() {
+		splitted := strings.Split(v, "=")
+		if len(splitted) > 1 {
+			parameters[splitted[0]] = splitted[1]
+		} else {
+			parameters[splitted[0]] = ""
+		}
+	}
+
+	// Instructs to add nodes
+	resp, xerr := instance.AddNodes(job.Context(), uint(in.Count), *sizing, parameters, in.GetKeepOnFailure())
 	if xerr != nil {
 		return nil, xerr
 	}

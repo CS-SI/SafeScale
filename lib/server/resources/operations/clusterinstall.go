@@ -329,10 +329,9 @@ func (instance *Cluster) UnregisterFeature(feat string) (ferr fail.Error) {
 	})
 }
 
-// ListInstalledFeatures returns a slice of installed features
-func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+// ListEligibleFeatures returns a slice of features eligible to Cluster
+func (instance *Cluster) ListEligibleFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	var xerr fail.Error
 
 	var emptySlice []resources.Feature
 	if instance == nil || instance.IsNull() {
@@ -342,26 +341,70 @@ func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resourc
 	instance.lock.RLock()
 	defer instance.lock.RUnlock()
 
-	var list map[string]*propertiesv1.ClusterInstalledFeature
-	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-		return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
-			featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
-			if !ok {
-				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
-			}
+	// var list map[string]*propertiesv1.ClusterInstalledFeature
+	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	//
+	// 		list = featuresV1.Installed
+	// 		return nil
+	// 	})
+	// })
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return emptySlice, xerr
+	// }
+	//
+	// out := make([]resources.Feature, 0, len(list))
+	// for k := range list {
+	// 	item, xerr := NewFeature(instance.Service(), k)
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		return emptySlice, xerr
+	// 	}
+	//
+	// 	out = append(out, item)
+	// }
+	// return out, nil
+	return nil, fail.NotImplementedError()
+}
 
-			list = featuresV1.Installed
-			return nil
-		})
-	})
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return emptySlice, xerr
+// ListInstalledFeatures returns a slice of installed features
+func (instance *Cluster) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	var emptySlice []resources.Feature
+	if instance == nil || instance.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
 	}
 
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	list := instance.InstalledFeatures()
+	// var list map[string]*propertiesv1.ClusterInstalledFeature
+	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	//
+	// 		list = featuresV1.Installed
+	// 		return nil
+	// 	})
+	// })
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return emptySlice, xerr
+	// }
+
 	out := make([]resources.Feature, 0, len(list))
-	for k := range list {
-		item, xerr := NewFeature(instance.Service(), k)
+	for _, v := range list {
+		item, xerr := NewFeature(instance.Service(), v)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return emptySlice, xerr
@@ -715,8 +758,8 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 	return nil
 }
 
-// Installs reverseproxy
-func (instance *Cluster) installReverseProxy(ctx context.Context) (ferr fail.Error) {
+// installReverseProxy installs reverseproxy
+func (instance *Cluster) installReverseProxy(ctx context.Context, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	identity, xerr := instance.unsafeGetIdentity()
@@ -769,7 +812,10 @@ func (instance *Cluster) installReverseProxy(ctx context.Context) (ferr fail.Err
 			return xerr
 		}
 
-		results, xerr := feat.Add(ctx, instance, data.Map{}, resources.FeatureSettings{})
+		if params == nil {
+			params = data.Map{}
+		}
+		results, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -788,7 +834,7 @@ func (instance *Cluster) installReverseProxy(ctx context.Context) (ferr fail.Err
 }
 
 // installRemoteDesktop installs feature remotedesktop on all masters of the Cluster
-func (instance *Cluster) installRemoteDesktop(ctx context.Context) (ferr fail.Error) {
+func (instance *Cluster) installRemoteDesktop(ctx context.Context, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	identity, xerr := instance.unsafeGetIdentity()
@@ -804,6 +850,7 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context) (ferr fail.Er
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			_, dockerDisabled = featuresV1.Disabled["docker"]
 			return nil
 		})
@@ -843,11 +890,12 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context) (ferr fail.Er
 		}
 
 		// Adds remotedesktop feature on Cluster (ie masters)
-		vars := data.Map{
-			"Username": "cladm",
-			"Password": identity.AdminPassword,
+		if params == nil {
+			params = data.Map{}
 		}
-		r, xerr := feat.Add(ctx, instance, vars, resources.FeatureSettings{})
+		params["Username"] = "cladm"
+		params["Password"] = identity.AdminPassword
+		r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -863,7 +911,7 @@ func (instance *Cluster) installRemoteDesktop(ctx context.Context) (ferr fail.Er
 }
 
 // installAnsible installs feature ansible on all masters of the Cluster
-func (instance *Cluster) installAnsible(ctx context.Context) (xerr fail.Error) {
+func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
 	identity, xerr := instance.unsafeGetIdentity()
@@ -899,11 +947,12 @@ func (instance *Cluster) installAnsible(ctx context.Context) (xerr fail.Error) {
 		}
 
 		// Adds ansible feature on Cluster (ie masters)
-		vars := data.Map{
-			"Username": "cladm",
-			"Password": identity.AdminPassword,
+		if params == nil {
+			params = data.Map{}
 		}
-		r, xerr := feat.Add(ctx, instance, vars, resources.FeatureSettings{})
+		params["Username"] = "cladm"
+		params["Password"] = identity.AdminPassword
+		r, xerr := feat.Add(ctx, instance, params, resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -919,7 +968,7 @@ func (instance *Cluster) installAnsible(ctx context.Context) (xerr fail.Error) {
 }
 
 // install proxycache-client feature if not disabled
-func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
+func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resources.Host, hostLabel string, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -937,6 +986,7 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			_, dockerDisabled = featuresV1.Disabled["docker"]
 			return nil
 		})
@@ -955,6 +1005,7 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			_, disabled = featuresV1.Disabled["proxycache"]
 			return nil
 		})
@@ -970,7 +1021,10 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 			return xerr
 		}
 
-		r, xerr := feat.Add(ctx, host, data.Map{}, resources.FeatureSettings{})
+		if params == nil {
+			params = data.Map{}
+		}
+		r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -985,7 +1039,7 @@ func (instance *Cluster) installProxyCacheClient(ctx context.Context, host resou
 }
 
 // install proxycache-server feature if not disabled
-func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
+func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resources.Host, hostLabel string, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -1003,6 +1057,7 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			_, dockerDisabled = featuresV1.Disabled["docker"]
 			return nil
 		})
@@ -1038,7 +1093,10 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 			return xerr
 		}
 
-		r, xerr := feat.Add(ctx, host, data.Map{}, resources.FeatureSettings{})
+		if params == nil {
+			params = data.Map{}
+		}
+		r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -1053,7 +1111,7 @@ func (instance *Cluster) installProxyCacheServer(ctx context.Context, host resou
 }
 
 // installDocker installs docker and docker-compose
-func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string) (ferr fail.Error) {
+func (instance *Cluster) installDocker(ctx context.Context, host resources.Host, hostLabel string, params data.Map) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 
 	dockerDisabled := false
@@ -1082,7 +1140,10 @@ func (instance *Cluster) installDocker(ctx context.Context, host resources.Host,
 		return xerr
 	}
 
-	r, xerr := feat.Add(ctx, host, data.Map{}, resources.FeatureSettings{})
+	if params == nil {
+		params = data.Map{}
+	}
+	r, xerr := feat.Add(ctx, host, params, resources.FeatureSettings{})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr

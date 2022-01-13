@@ -317,8 +317,94 @@ func (instance *Host) UnregisterFeature(feat string) (xerr fail.Error) {
 	})
 }
 
-// InstalledFeatures returns a list of installed features
-// satisfies interface install.Targetable
+// ListEligibleFeatures returns a slice of features eligible to Cluster
+func (instance *Host) ListEligibleFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	var emptySlice []resources.Feature
+	if instance == nil || instance.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	// var list map[string]*propertiesv1.ClusterInstalledFeature
+	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	//
+	// 		list = featuresV1.Installed
+	// 		return nil
+	// 	})
+	// })
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return emptySlice, xerr
+	// }
+	//
+	// out := make([]resources.Feature, 0, len(list))
+	// for k := range list {
+	// 	item, xerr := NewFeature(instance.Service(), k)
+	// 	xerr = debug.InjectPlannedFail(xerr)
+	// 	if xerr != nil {
+	// 		return emptySlice, xerr
+	// 	}
+	//
+	// 	out = append(out, item)
+	// }
+	// return out, nil
+	return nil, fail.NotImplementedError()
+}
+
+// ListInstalledFeatures returns a slice of installed features
+func (instance *Host) ListInstalledFeatures(ctx context.Context) (_ []resources.Feature, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
+
+	var emptySlice []resources.Feature
+	if instance == nil || instance.IsNull() {
+		return emptySlice, fail.InvalidInstanceError()
+	}
+
+	instance.lock.RLock()
+	defer instance.lock.RUnlock()
+
+	list := instance.InstalledFeatures()
+	// var list map[string]*propertiesv1.ClusterInstalledFeature
+	// xerr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+	// 	return props.Inspect(clusterproperty.FeaturesV1, func(clonable data.Clonable) fail.Error {
+	// 		featuresV1, ok := clonable.(*propertiesv1.ClusterFeatures)
+	// 		if !ok {
+	// 			return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
+	// 		}
+	//
+	// 		list = featuresV1.Installed
+	// 		return nil
+	// 	})
+	// })
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return emptySlice, xerr
+	// }
+
+	out := make([]resources.Feature, 0, len(list))
+	for _, v := range list {
+		item, xerr := NewFeature(instance.Service(), v)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return emptySlice, xerr
+		}
+
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+// InstalledFeatures returns a slice of installed features
+// satisfies interface resources.Targetable
 func (instance *Host) InstalledFeatures() []string {
 	if instance == nil {
 		return []string{}
@@ -343,7 +429,6 @@ func (instance *Host) InstalledFeatures() []string {
 		return []string{}
 	}
 	return out
-
 }
 
 // ComplementFeatureParameters configures parameters that are appropriate for the target

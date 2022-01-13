@@ -406,6 +406,11 @@ var clusterCreateCommand = &cli.Command{
 	example:
 		--node-sizing "cpu~4, ram~15, count=8" will create 8 nodes`,
 		},
+		&cli.StringSliceFlag{
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		},
 	},
 
 	Action: func(c *cli.Context) (err error) {
@@ -485,6 +490,7 @@ var clusterCreateCommand = &cli.Command{
 			NodeSizing:    nodesDef,
 			Force:         force,
 			// NodeCount:     uint32(c.Int("initial-node-count")),
+			Parameters: c.StringSlice("param"),
 		}
 		res, err := clientSession.Cluster.Create(&req, temporal.HostLongOperationTimeout())
 
@@ -1056,7 +1062,7 @@ var clusterAddFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+			Usage:   "Allow to define content of Feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -1166,7 +1172,7 @@ var clusterNodeInspectCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1258,7 +1264,7 @@ var clusterNodeStopCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1290,7 +1296,7 @@ var clusterNodeStartCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1321,7 +1327,7 @@ var clusterNodeStateCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1410,7 +1416,7 @@ var clusterMasterInspectCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1442,7 +1448,7 @@ var clusterMasterStopCommand = &cli.Command{ // nolint
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1474,7 +1480,7 @@ var clusterMasterStartCommand = &cli.Command{ // nolint
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1505,7 +1511,7 @@ var clusterMasterStateCommand = &cli.Command{ // nolint
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1618,10 +1624,9 @@ func clusterFeatureInspectAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	featureName = c.Args().Get(1)
-	if featureName == "" {
-		_ = cli.ShowSubcommandHelp(c)
-		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME.")
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
+		return clitools.FailureResponse(err)
 	}
 
 	details, err := clientSession.Cluster.InspectFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
@@ -1668,7 +1673,7 @@ func clusterFeatureExportAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	featureName = c.Args().Get(1)
+	featureName := c.Args().Get(1)
 	if featureName == "" {
 		_ = cli.ShowSubcommandHelp(c)
 		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME.")
@@ -1715,7 +1720,8 @@ func clusterFeatureAddAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	if err := extractFeatureArgument(c); err != nil {
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
@@ -1771,7 +1777,8 @@ func clusterFeatureCheckAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	if err := extractFeatureArgument(c); err != nil {
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
@@ -1815,7 +1822,8 @@ func clusterFeatureRemoveAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	if err := extractFeatureArgument(c); err != nil {
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
