@@ -786,10 +786,11 @@ message ClusterCreateRequest {
 	string node_sizing = 11;
 	string domain = 12;
 	string tenant_id = 13;
-	string gateway_options = 14;    // to store options for gateways than does not concern sizing (like ssh port for example)
-	string master_options = 15;     // same as gateway_options for masters
-	string node_options = 16;       // same as gateway_options for nodes
-	bool force = 17; // ignore cluster sizing recommendations
+	string gateway_options = 14;     // to store options for gateways than does not concern sizing (like ssh port for example)
+	string master_options = 15;      // same as gateway_options for masters
+	string node_options = 16;        // same as gateway_options for nodes
+	bool force = 17;                 // ignore cluster sizing recommendations
+	repeated string parameters = 18; // contains optional parameters for automatically installed Features
 }
 
 message ClusterResizeRequest {
@@ -800,6 +801,7 @@ message ClusterResizeRequest {
 	bool dry_run = 5;
 	string tenant_id = 6;
 	bool keep_on_failure = 7;
+	repeated string parameters = 8;
 }
 
 message ClusterDeleteRequest  {
@@ -819,8 +821,8 @@ message ClusterIdentity {
 
 message ClusterHostOptions {
 	uint32 ssh_port = 1;
-	string host_name_pattern = 2; // contains the string pattern used to define the host name (where mandatory %d
-								  // corresponds to host index in cluster) [Not used yet]
+	string host_name_pattern = 2; // contains the string pattern used to define the host name (where mandatory
+	                              // corresponds to host index in cluster) [Not used yet]
 }
 
 message ClusterDefaults {
@@ -831,6 +833,7 @@ message ClusterDefaults {
 	ClusterHostOptions gateway_options = 5;
 	ClusterHostOptions master_options = 6;
 	ClusterHostOptions node_options = 7;
+	repeated string feature_parameters = 8;
 }
 
 message ClusterControlplane {
