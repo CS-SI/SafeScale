@@ -625,9 +625,8 @@ func (instance *Host) unsafeReload() (xerr fail.Error) {
 			}
 
 			allocated := converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
-			// FIXME: how to compare the 2 structs ?
-			if allocated != hostSizingV2.AllocatedSize {
-				hostSizingV2.AllocatedSize = allocated
+			if !reflect.DeepEqual(*allocated, *hostSizingV2.AllocatedSize) {
+				*hostSizingV2.AllocatedSize = *allocated
 				changed = true
 			}
 			return nil
@@ -727,9 +726,8 @@ func (instance *Host) Reload() (xerr fail.Error) {
 			}
 
 			allocated := converters.HostEffectiveSizingFromAbstractToPropertyV2(ahf.Sizing)
-			// FIXME: how to compare the 2 structs ?
-			if allocated != hostSizingV2.AllocatedSize {
-				hostSizingV2.AllocatedSize = allocated
+			if !reflect.DeepEqual(*allocated, *hostSizingV2.AllocatedSize) {
+				*hostSizingV2.AllocatedSize = *allocated
 				changed = true
 			}
 			return nil
@@ -1881,7 +1879,7 @@ func (instance *Host) updateSubnets(task concurrency.Task, req abstract.HostRequ
 // undoUpdateSubnets removes what updateSubnets have done
 func (instance *Host) undoUpdateSubnets(req abstract.HostRequest, errorPtr *fail.Error) {
 	if errorPtr != nil && *errorPtr != nil && !req.IsGateway && !req.Single && !req.KeepOnFailure {
-		// // Without this,the undo will not be able to complete in case it's called on an abort...
+		// Without this, 'undo' won't be able to complete in case it's called on an abort...
 		// defer task.DisarmAbortSignal()()
 
 		xerr := instance.Alter(
@@ -3811,7 +3809,7 @@ func (instance *Host) UnbindSecurityGroup(ctx context.Context, sgInstance resour
 	})
 }
 
-// ListSecurityGroups returns a slice of security groups binded to Host
+// ListSecurityGroups returns a slice of security groups bound to Host
 func (instance *Host) ListSecurityGroups(state securitygroupstate.Enum) (list []*propertiesv1.SecurityGroupBond, xerr fail.Error) {
 	defer fail.OnPanic(&xerr)
 
