@@ -805,6 +805,7 @@ func (instance *Subnet) unsafeCreateGateways(ctx context.Context, req abstract.S
 		KeepOnFailure:    req.KeepOnFailure,
 		SecurityGroupIDs: sgs,
 		IsGateway:        true,
+		DiskSize:         gwSizing.MinDiskSize,
 	}
 
 	var (

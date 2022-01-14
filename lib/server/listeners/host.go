@@ -390,6 +390,7 @@ func (s *HostListener) Create(ctx context.Context, in *protocol.HostDefinition) 
 		KeepOnFailure: in.GetKeepOnFailure(),
 		Subnets:       subnets,
 		ImageRef:      in.GetImageId(),
+		DiskSize:      int(in.GetDisk()),
 	}
 
 	hostInstance, xerr := hostfactory.New(job.Service())

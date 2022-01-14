@@ -873,6 +873,7 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 		PublicIP:       request.PublicIP,
 		Subnets:        request.Subnets,
 		DefaultRouteIP: request.DefaultRouteIP,
+		DiskSize:       request.DiskSize,
 		// DefaultGateway: request.DefaultGateway,
 		TemplateID: request.TemplateID,
 	}
