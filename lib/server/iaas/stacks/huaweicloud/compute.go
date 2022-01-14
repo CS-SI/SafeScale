@@ -482,23 +482,33 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		return nullAhf, nullUdc, xerr
 	}
 
-	if request.DiskSize > template.DiskSize {
-		template.DiskSize = request.DiskSize
+	diskSize := request.DiskSize
+	if diskSize > template.DiskSize {
+		diskSize = request.DiskSize
 	}
 
-	if int(rim.DiskSize) > template.DiskSize {
-		template.DiskSize = int(rim.DiskSize)
+	if int(rim.DiskSize) > diskSize {
+		diskSize = int(rim.DiskSize)
 	}
 
-	if template.DiskSize == 0 {
+	if diskSize == 0 {
 		// Determines appropriate disk size
-		if template.Cores < 16 { // nolint
-			template.DiskSize = 100
-		} else if template.Cores < 32 {
-			template.DiskSize = 200
+		// if still zero here, we take template.DiskSize
+		if template.DiskSize != 0 {
+			diskSize = template.DiskSize
 		} else {
-			template.DiskSize = 400
+			if template.Cores < 16 { // nolint
+				template.DiskSize = 100
+			} else if template.Cores < 32 {
+				template.DiskSize = 200
+			} else {
+				template.DiskSize = 400
+			}
 		}
+	}
+
+	if diskSize < 10 {
+		diskSize = 10
 	}
 
 	// Select usable availability zone
@@ -515,7 +525,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		DeleteOnTermination: true,
 		UUID:                request.ImageID,
 		VolumeType:          "SSD",
-		VolumeSize:          template.DiskSize,
+		VolumeSize:          diskSize,
 	}
 	// Defines server
 	userDataPhase1, xerr := userData.Generate(userdata.PHASE1_INIT)

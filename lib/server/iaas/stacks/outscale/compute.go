@@ -895,15 +895,41 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		KeypairName: creationKeyPair.Name,
 	}
 
-	tpl, xerr := s.InspectTemplate(request.TemplateID)
+	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
 		return nil, nil, xerr
 	}
 
-	var diskSize = tpl.DiskSize
-	if request.DiskSize > diskSize {
+	rim, xerr := s.InspectImage(request.ImageID)
+	if xerr != nil {
+		return nil, nil, xerr
+	}
+
+	diskSize := request.DiskSize
+	if diskSize > template.DiskSize {
 		diskSize = request.DiskSize
 	}
+
+	if int(rim.DiskSize) > diskSize {
+		diskSize = int(rim.DiskSize)
+	}
+
+	if diskSize == 0 {
+		// Determines appropriate disk size
+		// if still zero here, we take template.DiskSize
+		if template.DiskSize != 0 {
+			diskSize = template.DiskSize
+		} else {
+			if template.Cores < 16 { // nolint
+				template.DiskSize = 100
+			} else if template.Cores < 32 {
+				template.DiskSize = 200
+			} else {
+				template.DiskSize = 400
+			}
+		}
+	}
+
 	if diskSize < 10 {
 		diskSize = 10
 	}
@@ -995,7 +1021,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	}
 
 	// -- add GPU if asked for --
-	if xerr = s.addGPUs(&request, tpl, vm.VmId); xerr != nil {
+	if xerr = s.addGPUs(&request, template, vm.VmId); xerr != nil {
 		return nullAHF, nullUDC, xerr
 	}
 	_, xerr = s.rpcCreateTags(

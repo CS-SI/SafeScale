@@ -595,12 +595,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 				innerXErr fail.Error
 			)
 			if request.Preemptible {
-				server, innerXErr = s.buildAwsSpotMachine(
+				server, innerXErr = s.buildAwsSpotMachine( // FIXME: Disk size
 					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID,
 					string(userDataPhase1), publicIP, template,
 				)
 			} else {
-				server, innerXErr = s.buildAwsMachine(
+				server, innerXErr = s.buildAwsMachine( // FIXME: Disk size
 					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID,
 					string(userDataPhase1), publicIP, template,
 				)

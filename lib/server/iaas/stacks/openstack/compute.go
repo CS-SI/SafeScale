@@ -404,27 +404,36 @@ func (s stack) DeleteKeyPair(id string) fail.Error {
 }
 
 // toHostSize converts flavor attributes returned by OpenStack driver into abstract.HostEffectiveSizing
-func (s stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing) {
+func (s stack) toHostSize(flavor map[string]interface{}) (ahes *abstract.HostEffectiveSizing, ferr fail.Error) {
 	hostSizing := abstract.NewHostEffectiveSizing()
 	if i, ok := flavor["id"]; ok {
 		fid, ok := i.(string)
 		if !ok {
-			return hostSizing
+			return hostSizing, fail.NewError("flavor is not a string: %v", i)
 		}
 		tpl, xerr := s.InspectTemplate(fid)
 		if xerr != nil {
-			return hostSizing // FIXME: Missing error handling, this function should also return an error
+			return hostSizing, xerr
 		}
 		hostSizing.Cores = tpl.Cores
 		hostSizing.DiskSize = tpl.DiskSize
 		hostSizing.RAMSize = tpl.RAMSize
 	} else if _, ok := flavor["vcpus"]; ok {
-		hostSizing.Cores, _ = flavor["vcpus"].(int)     // nolint // FIXME: Missing error handling, this function should also return an error
-		hostSizing.DiskSize, _ = flavor["disk"].(int)   // nolint // FIXME: Missing error handling, this function should also return an error
-		hostSizing.RAMSize, _ = flavor["ram"].(float32) // nolint // FIXME: Missing error handling, this function should also return an error
+		hostSizing.Cores, ok = flavor["vcpus"].(int)
+		if !ok {
+			return hostSizing, fail.NewError("flavor[vcpus] is not an int: %v", flavor["vcpus"])
+		}
+		hostSizing.DiskSize, ok = flavor["disk"].(int)
+		if !ok {
+			return hostSizing, fail.NewError("flavor[disk] is not an int: %v", flavor["disk"])
+		}
+		hostSizing.RAMSize, ok = flavor["ram"].(float32)
+		if !ok {
+			return hostSizing, fail.NewError("flavor[ram] is not a float32: %v", flavor["ram"])
+		}
 		hostSizing.RAMSize /= 1000.0
 	}
-	return hostSizing
+	return hostSizing, nil
 }
 
 // toHostState converts host status returned by OpenStack driver into HostState enum
@@ -494,8 +503,8 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 }
 
 // complementHost complements Host data with content of server parameter
-func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server, hostNets []servers.Network, hostPorts []ports.Port) (host *abstract.HostFull, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	// Updates intrinsic data of host if needed
 	if hostCore.ID == "" {
@@ -531,7 +540,11 @@ func (s stack) complementHost(hostCore *abstract.HostCore, server servers.Server
 		host.Core.Tags["CreationDate"] = server.Created.Format(time.RFC3339)
 	}
 
-	host.Sizing = s.toHostSize(server.Flavor)
+	var xerr fail.Error
+	host.Sizing, xerr = s.toHostSize(server.Flavor)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	if len(hostNets) > 0 {
 		if len(hostPorts) != len(hostNets) {
@@ -660,7 +673,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 		request.ResourceName).WithStopwatch().Entering().Exiting()
 	defer fail.OnPanic(&ferr)
 
-	// msgFail := "failed to create Host resource: %s"
 	msgSuccess := fmt.Sprintf("Host resource '%s' created successfully", request.ResourceName)
 
 	if len(request.Subnets) == 0 && !request.PublicIP {
@@ -689,6 +701,40 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 	template, xerr := s.InspectTemplate(request.TemplateID)
 	if xerr != nil {
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image")
+	}
+
+	rim, xerr := s.InspectImage(request.ImageID)
+	if xerr != nil {
+		return nullAHF, nullUDC, xerr
+	}
+
+	diskSize := request.DiskSize
+	if diskSize > template.DiskSize {
+		diskSize = request.DiskSize
+	}
+
+	if int(rim.DiskSize) > diskSize {
+		diskSize = int(rim.DiskSize)
+	}
+
+	if diskSize == 0 {
+		// Determines appropriate disk size
+		// if still zero here, we take template.DiskSize
+		if template.DiskSize != 0 {
+			diskSize = template.DiskSize
+		} else {
+			if template.Cores < 16 { // nolint
+				template.DiskSize = 100
+			} else if template.Cores < 32 {
+				template.DiskSize = 200
+			} else {
+				template.DiskSize = 400
+			}
+		}
+	}
+
+	if diskSize < 10 {
+		diskSize = 10
 	}
 
 	// Sets provider parameters to create host
@@ -762,7 +808,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 			}()
 
 			server, innerXErr = s.rpcCreateServer(
-				request.ResourceName, hostNets, request.TemplateID, request.ImageID, userDataPhase1, azone,
+				request.ResourceName, hostNets, request.TemplateID, request.ImageID, diskSize, userDataPhase1, azone,
 			)
 			if innerXErr != nil {
 				switch innerXErr.(type) {

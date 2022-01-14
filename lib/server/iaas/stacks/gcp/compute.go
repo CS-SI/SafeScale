@@ -243,23 +243,38 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUD, fail.Wrap(xerr, "failed to get image")
 	}
 
-	if request.DiskSize > template.DiskSize {
-		template.DiskSize = request.DiskSize
-	} else if template.DiskSize == 0 {
-		// Determines appropriate disk size
-		switch {
-		case template.Cores < 16:
-			template.DiskSize = 100
-		case template.Cores < 32:
-			template.DiskSize = 200
-		default:
-			template.DiskSize = 400
-		}
-	}
-
 	rim, xerr := s.InspectImage(request.ImageID)
 	if xerr != nil {
 		return nullAHF, nullUD, xerr
+	}
+
+	diskSize := request.DiskSize
+	if diskSize > template.DiskSize {
+		diskSize = request.DiskSize
+	}
+
+	if int(rim.DiskSize) > diskSize {
+		diskSize = int(rim.DiskSize)
+	}
+
+	if diskSize == 0 {
+		// Determines appropriate disk size
+		// if still zero here, we take template.DiskSize
+		if template.DiskSize != 0 {
+			diskSize = template.DiskSize
+		} else {
+			if template.Cores < 16 { // nolint
+				template.DiskSize = 100
+			} else if template.Cores < 32 {
+				template.DiskSize = 200
+			} else {
+				template.DiskSize = 400
+			}
+		}
+	}
+
+	if diskSize < 10 {
+		diskSize = 10
 	}
 
 	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
@@ -292,7 +307,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 	retryErr := retry.WhileUnsuccessful(
 		func() error {
 			var innerXErr fail.Error
-			ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs)
+			ahf, innerXErr = s.buildGcpMachine(request.ResourceName, an, defaultSubnet, template, rim.URL, diskSize, string(userDataPhase1), hostMustHavePublicIP, request.SecurityGroupIDs)
 			if innerXErr != nil {
 				captured := normalizeError(innerXErr)
 				switch captured.(type) {
@@ -409,13 +424,14 @@ func (s stack) buildGcpMachine(
 	subnet *abstract.Subnet,
 	template abstract.HostTemplate,
 	imageURL string,
+	diskSize int,
 	userdata string,
 	isPublic bool,
 	securityGroups map[string]struct{},
 ) (*abstract.HostFull, fail.Error) {
 
 	nullAHF := abstract.NewHostFull()
-	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(template.DiskSize), userdata, isPublic, securityGroups)
+	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(diskSize), userdata, isPublic, securityGroups)
 	if xerr != nil {
 		return nullAHF, xerr
 	}

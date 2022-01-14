@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/bootfromvolume"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/floatingips"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/servers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
@@ -163,7 +164,7 @@ func (s stack) rpcListServers() ([]*servers.Server, fail.Error) {
 }
 
 // rpcCreateServer calls openstack to create a server
-func (s stack) rpcCreateServer(name string, networks []servers.Network, templateID, imageID string, userdata []byte, az string) (*servers.Server, fail.Error) {
+func (s stack) rpcCreateServer(name string, networks []servers.Network, templateID, imageID string, diskSize int, userdata []byte, az string) (*servers.Server, fail.Error) {
 	nullServer := &servers.Server{}
 	if name = strings.TrimSpace(name); name == "" {
 		return nullServer, fail.InvalidParameterCannotBeEmptyStringError("name")
@@ -195,10 +196,21 @@ func (s stack) rpcCreateServer(name string, networks []servers.Network, template
 		Metadata:         metadata,
 	}
 
+	bd := []bootfromvolume.BlockDevice{
+		{
+			UUID:       srvOpts.ImageRef,
+			SourceType: bootfromvolume.SourceImage,
+			VolumeSize: diskSize,
+		},
+	}
+
 	var server *servers.Server
 	xerr := stacks.RetryableRemoteCall(
 		func() (innerErr error) {
-			server, innerErr = servers.Create(s.ComputeClient, srvOpts).Extract()
+			server, innerErr = bootfromvolume.Create(s.ComputeClient, bootfromvolume.CreateOptsExt{
+				CreateOptsBuilder: srvOpts,
+				BlockDevice:       bd,
+			}).Extract()
 			return innerErr
 		},
 		NormalizeError,
