@@ -253,7 +253,7 @@ func (instance *Subnet) taskFinalizeGatewayConfiguration(
 		return nil, xerr
 	}
 
-	// By design, phsse 5 doesn't  touch network cfg, so no reboot needed
+	// By design, phase 5 doesn't  touch network cfg, so no reboot needed
 	_, xerr = objgw.waitInstallPhase(task.Context(), userdata.PHASE5_FINAL, time.Duration(0))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

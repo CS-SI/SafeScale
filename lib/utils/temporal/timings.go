@@ -43,7 +43,7 @@ const (
 	defaultMetadataTimeout = 150 * time.Second
 
 	// defaultOperationTimeout default timeout to handle operations
-	defaultOperationTimeout = 120 * time.Second
+	defaultOperationTimeout = 150 * time.Second
 
 	// defaultSSHConnectionTimeout is the default ssh timeout connection
 	defaultSSHConnectionTimeout = 3 * time.Minute
@@ -187,7 +187,7 @@ func (t *MutableTimings) ExecutionTimeout() time.Duration {
 		return ExecutionTimeout()
 	}
 
-	return t.Timeouts.Connection
+	return t.Timeouts.Operation
 }
 
 // OperationTimeout returns the configured timeout for operation (optionally overloaded from ENV)
