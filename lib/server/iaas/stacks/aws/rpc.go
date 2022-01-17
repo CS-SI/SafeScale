@@ -1543,7 +1543,7 @@ func (s stack) rpcRequestSpotInstance(price, zone, subnetID *string, publicIP *b
 	return resp.SpotInstanceRequests[0], nil
 }
 
-func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
+func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID *string, diskSize int, keypairName *string, publicIP *bool, userdata []byte) (_ *ec2.Instance, ferr fail.Error) {
 	nullInstance := &ec2.Instance{}
 	if xerr := validateAWSString(name, "name", true); xerr != nil {
 		return nullInstance, xerr
@@ -1677,6 +1677,17 @@ func (s stack) rpcRunInstance(name, zone, subnetID, templateID, imageID, keypair
 		},
 		UserData: aws.String(base64.StdEncoding.EncodeToString(userdata)),
 	}
+
+	if diskSize != 0 {
+		request.BlockDeviceMappings = []*ec2.BlockDeviceMapping{
+			{
+				DeviceName: aws.String("/dev/sda1"),
+				Ebs: &ec2.EbsBlockDevice{
+					VolumeSize: aws.Int64(int64(diskSize)),
+				},
+			}}
+	}
+
 	var resp *ec2.Reservation
 	xerr = stacks.RetryableRemoteCall(
 		func() (err error) {

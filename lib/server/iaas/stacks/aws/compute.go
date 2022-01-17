@@ -539,6 +539,35 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 		return nullAHF, nullUDC, fail.Wrap(xerr, "failed to get image '%s'", request.ImageID)
 	}
 
+	diskSize := request.DiskSize
+	if diskSize > template.DiskSize {
+		diskSize = request.DiskSize
+	}
+
+	if int(rim.DiskSize) > diskSize {
+		diskSize = int(rim.DiskSize)
+	}
+
+	if diskSize == 0 {
+		// Determines appropriate disk size
+		// if still zero here, we take template.DiskSize
+		if template.DiskSize != 0 {
+			diskSize = template.DiskSize
+		} else {
+			if template.Cores < 16 { // nolint
+				template.DiskSize = 100
+			} else if template.Cores < 32 {
+				template.DiskSize = 200
+			} else {
+				template.DiskSize = 400
+			}
+		}
+	}
+
+	if diskSize < 10 {
+		diskSize = 10
+	}
+
 	logrus.Debugf("Selected template: '%s', '%s'", template.ID, template.Name)
 
 	// Select usable availability zone, the first one in the list
@@ -596,12 +625,12 @@ func (s stack) CreateHost(request abstract.HostRequest) (ahf *abstract.HostFull,
 			)
 			if request.Preemptible {
 				server, innerXErr = s.buildAwsSpotMachine( // FIXME: Disk size
-					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID,
+					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
 					string(userDataPhase1), publicIP, template,
 				)
 			} else {
 				server, innerXErr = s.buildAwsMachine( // FIXME: Disk size
-					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID,
+					keyPairName, request.ResourceName, rim.ID, s.AwsConfig.Zone, defaultSubnet.ID, diskSize,
 					string(userDataPhase1), publicIP, template,
 				)
 			}
@@ -682,6 +711,7 @@ func (s stack) buildAwsSpotMachine(
 	imageID string,
 	zone string,
 	netID string,
+	diskSize int,
 	data string,
 	publicIP bool,
 	template abstract.HostTemplate,
@@ -718,13 +748,14 @@ func (s stack) buildAwsMachine(
 	imageID string,
 	zone string,
 	subnetID string,
+	diskSize int,
 	data string,
 	publicIP bool,
 	template abstract.HostTemplate,
 ) (*abstract.HostCore, fail.Error) {
 
 	instance, xerr := s.rpcRunInstance(
-		aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID),
+		aws.String(name), aws.String(zone), aws.String(subnetID), aws.String(template.ID), aws.String(imageID), diskSize,
 		aws.String(keypairName), aws.Bool(publicIP), []byte(data),
 	)
 	if xerr != nil {
