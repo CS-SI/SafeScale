@@ -187,7 +187,7 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 		return nil, fail.NotImplementedError()
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -268,7 +268,7 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 		return nil, fail.NotImplementedError()
 
 	case protocol.FeatureTargetType_FT_CLUSTER:
-		clusterInstance, xerr := clusterfactory.Load(job.Service(), targetRef)
+		clusterInstance, xerr := clusterfactory.Load(job.Context(), job.Service(), targetRef)
 		if xerr != nil {
 			return nil, xerr
 		}

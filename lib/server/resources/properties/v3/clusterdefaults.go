@@ -61,7 +61,7 @@ func (cd *ClusterDefaults) Replace(p data.Clonable) data.Clonable {
 		return cd
 	}
 
-	src := p.(*ClusterDefaults)
+	src, _ := p.(*ClusterDefaults) //nolint
 	*cd = *src
 	length := len(src.FeatureParameters)
 	if length > 0 {
@@ -72,5 +72,5 @@ func (cd *ClusterDefaults) Replace(p data.Clonable) data.Clonable {
 }
 
 func init() {
-	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.DefaultsV2, newClusterDefaults())
+	serialize.PropertyTypeRegistry.Register("resources.cluster", clusterproperty.DefaultsV3, newClusterDefaults())
 }

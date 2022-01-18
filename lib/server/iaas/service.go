@@ -471,22 +471,13 @@ func (svc service) ListTemplatesBySizing(
 		db, err := scribble.New(utils.AbsPathify("$HOME/.safescale/scanner/db"), nil)
 		if err != nil {
 			if force {
-				logrus.Warnf(
-					"Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v",
-					err,
-				)
+				logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 			} else {
 				var noHostError string
 				if sizing.MinCPUFreq <= 0 {
-					noHostError = fmt.Sprintf(
-						"unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU,
-						err,
-					)
+					noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
 				} else {
-					noHostError = fmt.Sprintf(
-						"unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v",
-						sizing.MinGPU, sizing.MinCPUFreq, err,
-					)
+					noHostError = fmt.Sprintf("unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 				}
 				return nil, fail.NewError(noHostError)
 			}
@@ -511,22 +502,13 @@ func (svc service) ListTemplatesBySizing(
 			imageList, err := db.ReadAll(folder)
 			if err != nil {
 				if force {
-					logrus.Warnf(
-						"Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v",
-						err,
-					)
+					logrus.Warnf("Problem creating / accessing Scanner database, ignoring GPU and Freq parameters for now...: %v", err)
 				} else {
 					var noHostError string
 					if sizing.MinCPUFreq <= 0 {
-						noHostError = fmt.Sprintf(
-							"Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v",
-							sizing.MinGPU, err,
-						)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs, problem accessing Scanner database: %v", sizing.MinGPU, err)
 					} else {
-						noHostError = fmt.Sprintf(
-							"Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v",
-							sizing.MinGPU, sizing.MinCPUFreq, err,
-						)
+						noHostError = fmt.Sprintf("Unable to create a host with '%d' GPUs and '%.01f' MHz clock frequency, problem accessing Scanner database: %v", sizing.MinGPU, sizing.MinCPUFreq, err)
 					}
 					logrus.Error(noHostError)
 					return nil, fail.NewError(noHostError)

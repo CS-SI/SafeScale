@@ -91,10 +91,10 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		name, found = tenant["name"].(string)
 		if !found {
 			name, found = tenant["Name"].(string)
-		}
-		if !found {
-			logrus.Error("tenant found without 'name'")
-			continue
+			if !found {
+				logrus.Error("tenant found without 'name'")
+				continue
+			}
 		}
 		if name != tenantName {
 			continue
@@ -104,16 +104,16 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 		provider, found = tenant["provider"].(string)
 		if !found {
 			provider, found = tenant["Provider"].(string)
-		}
-		if !found {
-			provider, found = tenant["client"].(string)
-		}
-		if !found {
-			provider, found = tenant["Client"].(string)
-		}
-		if !found {
-			logrus.Error("Missing field 'provider' or 'client' in tenant")
-			continue
+			if !found {
+				provider, found = tenant["client"].(string)
+				if !found {
+					provider, found = tenant["Client"].(string)
+					if !found {
+						logrus.Error("Missing field 'provider' or 'client' in tenant")
+						continue
+					}
+				}
+			}
 		}
 
 		svcProvider = provider

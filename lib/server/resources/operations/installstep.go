@@ -398,8 +398,6 @@ func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results co
 			}
 
 			outcomes.AddOne(k, oko)
-
-			logrus.Warningf("step outcome: output '%s' and err '%v'", oko.output, oko.err)
 			if oko.err != nil || !strings.Contains(oko.output, "exit 0") {
 				wrongs++
 			}

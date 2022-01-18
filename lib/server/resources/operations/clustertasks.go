@@ -161,25 +161,15 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 					debug.IgnoreError(derr)
 				default:
 					cleanFailure = true
-					logrus.Errorf(
-						"Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
-						subnetInstance.GetName(),
-					)
-					_ = ferr.AddConsequence(
-						fail.Wrap(
-							derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr),
-						),
-					)
+					logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
+						subnetInstance.GetName())
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 				}
 			} else {
-				logrus.Debugf(
-					"Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
-					subnetInstance.GetName(),
-				)
+				logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
+					subnetInstance.GetName())
 				if req.NetworkID == "" {
-					logrus.Debugf(
-						"Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName(),
-					)
+					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
 					if derr := networkInstance.Delete(context.Background()); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
@@ -187,21 +177,13 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 							debug.IgnoreError(derr)
 						default:
 							cleanFailure = true
-							logrus.Errorf(
-								"cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
-								networkInstance.GetName(),
-							)
-							_ = ferr.AddConsequence(
-								fail.Wrap(
-									derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr),
-								),
-							)
+							logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
+								networkInstance.GetName())
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr)))
 						}
 					} else {
-						logrus.Debugf(
-							"Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
-							networkInstance.GetName(),
-						)
+						logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
+							networkInstance.GetName())
 					}
 				}
 			}

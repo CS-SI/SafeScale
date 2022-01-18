@@ -775,6 +775,7 @@ func (instance *Cluster) installReverseProxy(ctx context.Context, params data.Ma
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			_, dockerDisabled = featuresV1.Disabled["docker"]
 			return nil
 		})
@@ -795,6 +796,7 @@ func (instance *Cluster) installReverseProxy(ctx context.Context, params data.Ma
 			if !ok {
 				return fail.InconsistentError("'*propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
+
 			_, disabled = featuresV1.Disabled["reverseproxy"]
 			return nil
 		})

@@ -583,7 +583,14 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 		return nil, xerr
 	}
 
-	w.cleanupFeatureParameters(&params)
+	w.reduceFeatureParameters(&params)
+
+	// Checks required parameters have their values
+	xerr = checkRequiredParameters(*w.feature, params)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
 
 	// Now enumerate steps and execute each of them
 	for _, k := range order {
@@ -686,26 +693,25 @@ func (w *worker) Proceed(ctx context.Context, params data.Map, settings resource
 	return outcomes, nil
 }
 
-// cleanupFeatureParameters cleans up the params corresponding to the current context. Does:
+// reduceFeatureParameters cleans up params accordingly to the current context. Ensures that:
 // - every parameter that is not prefixed by feature name are kept
 // - every parameter that is prefixed by current feature name sees it's prefix removed
 // - every parameter that is not prefixed by current feature name is removed
 //
 // Example:
 //   if current feature is docker, and we have these params:
-//     - Version=21.03
-//     - kubernetes:Version=18.1
-//     - docker:HubLogin=toto
+//     - Version -> 21.03
+//     - kubernetes:Version -> 18.1
+//     - docker:HubLogin -> toto
 //   the call to this method will leave this:
-//     - Version=21.03
-//     - HubLogin=toto
-
-func (w *worker) cleanupFeatureParameters(params *data.Map) {
+//     - Version -> 21.03
+//     - HubLogin -> toto
+func (w *worker) reduceFeatureParameters(params *data.Map) {
 	for k, v := range *params {
 		splitted := strings.Split(k, ":")
 		if len(splitted) > 1 {
 			if splitted[0] == w.feature.GetName() {
-				(*params)[splitted[2]] = v
+				(*params)[splitted[1]] = v
 			}
 			delete(*params, k)
 		}

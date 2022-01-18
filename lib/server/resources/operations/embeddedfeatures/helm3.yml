@@ -23,7 +23,7 @@ feature:
             - kubernetes
 
     parameters:
-        - Version=3.6.3
+        - Version=3.6.3 # helm version to install
 
     install:
         bash:

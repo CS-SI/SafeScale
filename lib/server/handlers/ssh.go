@@ -559,10 +559,7 @@ func (handler *sshHandler) Copy(from, to string) (retCode int, stdOut string, st
 					return fail.WarningError(finnerXerr, "unexpected return code of md5 command")
 				}
 				if !strings.Contains(fstdout, md5hash) {
-					logrus.Warnf(
-						"WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath,
-						fstdout, fstderr, md5hash,
-					)
+					logrus.Warnf("WRONG MD5, Tried 'md5sum %s' We got '%s' and '%s', the original was '%s'", remotePath, fstdout, fstderr, md5hash)
 					return fail.NewError("wrong md5 of '%s'", remotePath)
 				}
 				return nil
