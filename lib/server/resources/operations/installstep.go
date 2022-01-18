@@ -333,77 +333,79 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 		return nil, xerr
 	}
 
+	var startErr fail.Error
 	subtasks := map[string]concurrency.Task{}
 	for _, h := range hosts {
-		clonedV, xerr = is.initLoopTurnForHost(h, v)
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			abErr := tg.AbortWithCause(xerr)
+		clonedV, startErr = is.initLoopTurnForHost(h, v)
+		startErr = debug.InjectPlannedFail(startErr)
+		if startErr == nil {
+			subtask, startErr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
+			startErr = debug.InjectPlannedFail(startErr)
+			if startErr == nil {
+				subtasks[h.GetName()] = subtask
+			}
+		}
+		if startErr != nil {
+			abErr := tg.AbortWithCause(startErr)
 			if abErr != nil {
 				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 			break
 		}
-
-		subtask, xerr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			abErr := tg.AbortWithCause(xerr)
-			if abErr != nil {
-				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
-			}
-			break
-		}
-
-		subtasks[h.GetName()] = subtask
 	}
 
 	tgr, xerr := tg.WaitGroup()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if len(subtasks) != len(hosts) {
-			logrus.Warningf("Not all tasks were started, there should be one subtask per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
+			logrus.Warningf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
 		}
-		logrus.Warningf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
-		wrongs := 0
-		for _, s := range subtasks {
-			sid, _ := s.ID()
-			outcome := tgr[sid]
-			if outcome != nil {
-				var ok bool
-				oko, ok := outcome.(stepResult)
-				if !ok {
-					return nil, fail.NewError("outcome should be a stepResult")
-				}
-				logrus.Warningf("step outcome: output '%s' and err '%v'", oko.output, oko.err)
-				if oko.err != nil {
-					wrongs++
-					continue
-				}
-				if !strings.Contains(oko.output, "exit 0") {
-					wrongs++
-					continue
-				}
-			}
-		}
-		if wrongs == 0 && (len(subtasks) == len(hosts)) {
-			logrus.Warningf("CRITICAL problem: there is a discrepancy between WaitGroup and its individual results")
+		logrus.Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
+		if startErr != nil {
+			_ = startErr.AddConsequence(xerr)
+		} else {
+			startErr = xerr
 		}
 	}
 
+	wrongs, outcomes, cerr := is.collectOutcomes(subtasks, tgr)
+	if cerr != nil {
+		if wrongs == 0 && len(subtasks) == len(hosts) {
+			logrus.Errorf("CRITICAL problem: there is a discrepancy between WaitGroup and its individual results")
+		}
+
+		if startErr != nil {
+			_ = startErr.AddConsequence(cerr)
+			return nil, startErr
+		}
+		return nil, cerr
+	}
+
+	return outcomes, startErr
+}
+
+// collectOutcomes collects results from subtasks
+func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results concurrency.TaskGroupResult) (int, resources.UnitResults, fail.Error) {
+	outcomes := &unitResults{}
+	wrongs := 0
 	for k, s := range subtasks {
 		sid, _ := s.ID()
-		outcome := tgr[sid]
+		outcome := results[sid]
 		if outcome != nil {
-			oko, ok := outcome.(resources.UnitResult)
+			oko, ok := outcome.(stepResult)
 			if !ok {
-				return nil, fail.NewError("outcome should be a resources.UnitResult")
+				return wrongs, nil, fail.NewError("outcome should be a resources.UnitResult")
 			}
+
 			outcomes.AddOne(k, oko)
+
+			logrus.Warningf("step outcome: output '%s' and err '%v'", oko.output, oko.err)
+			if oko.err != nil || !strings.Contains(oko.output, "exit 0") {
+				wrongs++
+			}
 		}
 	}
-
-	return outcomes, xerr
+	return wrongs, outcomes, nil
 }
 
 // initLoopTurnForHost inits the coming loop turn for a specific Host
@@ -415,7 +417,7 @@ func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV da
 	clonedV["HostIP"], xerr = host.GetPrivateIP()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Warnf("aborting because of %s", xerr.Error())
+		logrus.Errorf("aborting because of %s", xerr.Error())
 		return nil, xerr
 	}
 
@@ -437,7 +439,7 @@ func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV da
 	})
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Warnf("aborting because of %s", xerr.Error())
+		logrus.Errorf("aborting because of %s", xerr.Error())
 		return nil, xerr
 	}
 
@@ -445,8 +447,8 @@ func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV da
 	clonedV, xerr = realizeVariables(clonedV)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		logrus.Warnf("aborting because of %s", xerr.Error())
-		return nil, xerr
+		//		logrus.Errorf("aborting because of %s", xerr.Error())
+		return nil, fail.Wrap(xerr, "failed to realize variables")
 	}
 
 	return clonedV, nil
