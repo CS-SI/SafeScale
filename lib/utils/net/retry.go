@@ -27,6 +27,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
@@ -37,10 +38,10 @@ import (
 )
 
 // WhileUnsuccessfulButRetryable executes callback inside a retry loop with tolerance for communication errors (relative to net package),
-// or some fail.Error that are considered retryable: asking "waitor" to wait between each try, with a duration limit of 'timeout'.
-func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer, timeout time.Duration) fail.Error {
-	if waitor == nil {
-		return fail.InvalidParameterCannotBeNilError("waitor")
+// or some fail.Error that are considered retryable: asking "waiter" to wait between each try, with a duration limit of 'timeout'.
+func WhileUnsuccessfulButRetryable(callback func() error, waiter *retry.Officer, timeout time.Duration) fail.Error {
+	if waiter == nil {
+		return fail.InvalidParameterCannotBeNilError("waiter")
 	}
 
 	var arbiter retry.Arbiter
@@ -58,7 +59,7 @@ func WhileUnsuccessfulButRetryable(callback func() error, waitor *retry.Officer,
 			return actionErr
 		},
 		arbiter,
-		waitor,
+		waiter,
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
@@ -147,8 +148,8 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
 			switch str {
-			case "not found": // stow may return that error message if it does not find something
-				return fail.NotFoundError("not found")
+			case objectstorage.NotFound: // stow may return that error message if it does not find something
+				return fail.NotFoundError(objectstorage.NotFound)
 			default: // stow may return an error containing "dial tcp:" for some HTTP errors
 				if strings.Contains(str, "dial tcp:") {
 					return fail.NotAvailableError(str)
@@ -220,8 +221,8 @@ func oldNormalizeErrorAndCheckIfRetriable(in error) (err error) {
 			// VPL: this part is here to workaround limitations of Stow in error handling... Should be replaced/removed when Stow will be replaced... one day...
 			str := in.Error()
 			switch str {
-			case "not found": // stow may return that error message if it does not find something
-				return fail.NotFoundError("not found")
+			case objectstorage.NotFound: // stow may return that error message if it does not find something
+				return fail.NotFoundError(objectstorage.NotFound)
 			default: // stow may return an error containing "dial tcp:" for some HTTP errors
 				if strings.Contains(str, "dial tcp:") {
 					logrus.Tracef("encountered 'dial tcp' error")

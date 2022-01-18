@@ -26,6 +26,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/iaas"
+	"github.com/CS-SI/SafeScale/lib/server/iaas/objectstorage"
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/bucketproperty"
@@ -417,7 +418,7 @@ func (instance *bucket) Create(ctx context.Context, name string) (xerr fail.Erro
 		case *fail.ErrNotFound:
 			debug.IgnoreError(xerr)
 		default:
-			if strings.Contains(xerr.Error(), "not found") {
+			if strings.Contains(xerr.Error(), objectstorage.NotFound) {
 				debug.IgnoreError(xerr)
 				break
 			}
@@ -488,7 +489,7 @@ func (instance *bucket) Delete(ctx context.Context) (xerr fail.Error) {
 	// -- delete Bucket
 	xerr = instance.Service().DeleteBucket(instance.GetName())
 	if xerr != nil {
-		if strings.Contains(xerr.Error(), "not found") {
+		if strings.Contains(xerr.Error(), objectstorage.NotFound) {
 			return fail.NotFoundError("failed to find Bucket '%s'", instance.GetName())
 		}
 		return xerr

@@ -27,7 +27,6 @@ import (
 	"gomodules.xyz/stow"
 
 	// necessary for connect
-	// _ "gomodules.xyz/stow/azure"
 	_ "gomodules.xyz/stow/google"
 	_ "gomodules.xyz/stow/s3"
 	_ "gomodules.xyz/stow/swift"
@@ -71,7 +70,7 @@ type object struct {
 	metadata abstract.ObjectStorageItemMetadata
 }
 
-// NewObject ...
+// NewObject gets the object 'objectName' if it's in the bucket, if not, it creates a new empty object, it's like a GetOrCreate function
 func newObject(bucket *bucket, objectName string) (object, fail.Error) {
 	if bucket == nil {
 		return object{}, fail.InvalidInstanceError()
@@ -83,10 +82,15 @@ func newObject(bucket *bucket, objectName string) (object, fail.Error) {
 	}
 	item, err := bucket.stowContainer.Item(objectName)
 	if err != nil {
-		debug.IgnoreError(err)
-		return o, nil // nolint
+		switch err.Error() {
+		case NotFound: // this is an implementation detail of stow
+			return o, nil // nolint, we get an empty object
+		default:
+			return o, fail.ConvertError(err)
+		}
 	}
 
+	// if the object exists, we get its content
 	o.item = item
 	return o, nil
 }
@@ -132,7 +136,7 @@ func (o *object) Reload() fail.Error {
 	item, err := o.bucket.stowContainer.Item(o.name)
 	if err != nil {
 		switch err.Error() {
-		case "not found":
+		case NotFound: // this is an implementation detail of stow
 			return fail.NotFoundError("failed to reload '%s:%s' from Object Storage", o.bucket.name, o.name)
 		default:
 			return fail.ConvertError(err)

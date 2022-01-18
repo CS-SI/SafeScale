@@ -36,6 +36,8 @@ const (
 	RootPath = ""
 	// NoPrefix corresponds to ... no prefix...
 	NoPrefix = ""
+	// NotFound is the 'Not found' error according to stow internals
+	NotFound = "not found"
 )
 
 // Bucket interface
@@ -77,7 +79,6 @@ type bucket struct {
 	stowContainer stow.Container
 
 	name string
-	// // NbItems int `json:"nbitems,omitempty"`
 }
 
 // newBucket ...
@@ -128,7 +129,7 @@ func (b bucket) InspectObject(objectName string) (_ Object, xerr fail.Error) {
 		return nil, err
 	}
 	if o.item == nil {
-		return nil, fail.NotFoundError("not found")
+		return nil, fail.NotFoundError(NotFound)
 	}
 	return &o, nil
 }
@@ -262,10 +263,8 @@ func (b bucket) Clear(path, prefix string) (xerr fail.Error) {
 			if strings.Index(item.Name(), fullPath) == 0 {
 				err = b.stowContainer.RemoveItem(item.Name())
 				if err != nil {
-					// log.Println("erreur RemoveItem => : ", err)
 					return err
 				}
-				// l.NbItem = 0
 			}
 			return nil
 		},

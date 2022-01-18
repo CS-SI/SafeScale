@@ -569,7 +569,7 @@ func (l location) WriteObject(
 
 	b, err := l.inspectBucket(bucketName)
 	if err != nil {
-		if err.Error() == "not found" {
+		if err.Error() == NotFound {
 			return aosi, fail.NotFoundError("failed to find bucket '%s'", bucketName)
 		}
 		return aosi, err
