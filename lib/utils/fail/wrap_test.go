@@ -76,3 +76,21 @@ func TestCauseFmt(t *testing.T) {
 
 	assert.EqualValues(t, root, recovered)
 }
+
+func TestCauseConvert(t *testing.T) {
+	root := fmt.Errorf("to be both free and safe")
+	leaf := Wrap(root, "it's beautiful")
+
+	recovered := Cause(ConvertError(leaf))
+
+	assert.EqualValues(t, root, recovered)
+}
+
+func TestCauseFmtConvert(t *testing.T) {
+	root := fmt.Errorf("to be both free and safe")
+	leaf := fmt.Errorf("it's beautiful: %w", root)
+
+	recovered := Cause(ConvertError(leaf))
+
+	assert.EqualValues(t, root, recovered)
+}
