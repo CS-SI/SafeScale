@@ -13,7 +13,7 @@ vet:
 	@$(GO) vet ./...
 
 test:
-	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) ./...
+	@$(GO) test $(RACE_CHECK_TEST) $(GO_TEST_TAGS) -timeout 900s -v ./... -p 1 $(TEST_COVERAGE_ARGS) 2>&1
 
 clean:
 	@(find . | grep _string | xargs rm 2>/dev/null || true)
