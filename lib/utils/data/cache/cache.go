@@ -192,6 +192,9 @@ func (instance *cache) Commit(key string, content Cacheable) (ce *Entry, xerr fa
 	if key = strings.TrimSpace(key); key == "" {
 		return nil, fail.InvalidParameterCannotBeEmptyStringError("key")
 	}
+	if content == nil {
+		return nil, fail.InvalidParameterCannotBeNilError("content")
+	}
 
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
