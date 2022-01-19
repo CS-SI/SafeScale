@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/sirupsen/logrus"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
@@ -93,11 +94,11 @@ func defaultImage(_ resources.Cluster) string {
 	return consts.DEFAULTOS
 }
 
-func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
+func configureCluster(ctx context.Context, c resources.Cluster, params data.Map) fail.Error {
 	clusterName := c.GetName()
 	logrus.Println(fmt.Sprintf("[cluster %s] adding feature 'kubernetes'...", clusterName))
 
-	results, xerr := c.AddFeature(ctx, "kubernetes", map[string]interface{}{}, resources.FeatureSettings{})
+	results, xerr := c.AddFeature(ctx, "kubernetes", params, resources.FeatureSettings{})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'kubernetes'", clusterName)
 	}
@@ -108,7 +109,7 @@ func configureCluster(ctx context.Context, c resources.Cluster) fail.Error {
 		return xerr
 	}
 
-	results, xerr = c.AddFeature(ctx, "helm3", map[string]interface{}{}, resources.FeatureSettings{})
+	results, xerr = c.AddFeature(ctx, "helm3", params, resources.FeatureSettings{})
 	if xerr != nil {
 		return fail.Wrap(xerr, "[cluster %s] failed to add feature 'helm3'", clusterName)
 	}

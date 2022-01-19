@@ -397,20 +397,18 @@ func (instance *Cluster) firstLight(req abstract.ClusterRequest) fail.Error {
 			}
 
 			// FUTURE: sets the Cluster composition (when we will be able to manage Cluster spread on several tenants...)
-			innerXErr = props.Alter(
-				clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
-					compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterComposite' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
+			innerXErr = props.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
+				compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv1.ClusterComposite' expected, '%s' provided",
+						reflect.TypeOf(clonable).String(),
+					)
+				}
 
-					compositeV1.Tenants = []string{req.Tenant}
-					return nil
-				},
-			)
+				compositeV1.Tenants = []string{req.Tenant}
+				return nil
+			})
 			if innerXErr != nil {
 				return innerXErr
 			}

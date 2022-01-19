@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/app"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -910,7 +911,12 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 				cuk := r.ResultOfKey(key)
 				if cuk != nil {
 					if !cuk.Successful() && !cuk.Completed() {
-						msg := fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v with [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
+						var msg error
+						if app.Verbose && app.Debug { // log more details if in trace mode
+							msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v with result: [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
+						} else {
+							msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v", w.action.String(), p.stepName, cuk.Error())
+						}
 						logrus.Warnf(msg.Error())
 						errpack = append(errpack, msg)
 					}
@@ -932,8 +938,14 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			cuk := r.ResultOfKey(key)
 			if cuk != nil {
 				if !cuk.Successful() && cuk.Completed() {
-					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))
-					logrus.Warnf(msg.Error())
+					var msg error
+					if app.Verbose && app.Debug { // log more details if in trace mode
+						msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with result: [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))
+					} else {
+						msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s", w.action.String(), p.stepName, key)
+					}
+
+					logrus.Errorf(msg.Error())
 					newerrpack = append(newerrpack, msg)
 				}
 			}

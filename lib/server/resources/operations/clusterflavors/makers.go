@@ -22,6 +22,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/clusterstate"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -47,7 +48,7 @@ type Makers struct {
 	CreateNode             func(c resources.Cluster, index uint, host resources.Host) fail.Error
 	ConfigureNode          func(c resources.Cluster, index uint, host resources.Host) fail.Error
 	UnconfigureNode        func(c resources.Cluster, host resources.Host, selectedMaster resources.Host) fail.Error
-	ConfigureCluster       func(ctx context.Context, c resources.Cluster) fail.Error
+	ConfigureCluster       func(ctx context.Context, c resources.Cluster, params data.Map) fail.Error
 	UnconfigureCluster     func(c resources.Cluster) fail.Error
 	JoinMasterToCluster    func(c resources.Cluster, host resources.Host) fail.Error
 	JoinNodeToCluster      func(c resources.Cluster, host resources.Host) fail.Error

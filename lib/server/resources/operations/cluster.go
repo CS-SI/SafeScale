@@ -1167,6 +1167,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	var (
 		hostImage             string
 		nodeDefaultDefinition *propertiesv2.HostSizingRequirements
+		featureParams         data.Map
 	)
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.DefaultsV3) {
@@ -1178,6 +1179,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 				nodeDefaultDefinition = &defaultsV3.NodeSizing
 				hostImage = defaultsV3.Image
+				featureParams = extractFeatureParameters(defaultsV3.FeatureParameters)
 				return nil
 			})
 		}
@@ -1294,7 +1296,7 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 	// configure what has to be done Cluster-wide
 	if instance.makers.ConfigureCluster != nil {
-		xerr = instance.makers.ConfigureCluster(ctx, instance)
+		xerr = instance.makers.ConfigureCluster(ctx, instance, featureParams)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -2908,7 +2910,7 @@ func (instance *Cluster) configureCluster(ctx context.Context, req abstract.Clus
 
 	// configure what has to be done Cluster-wide
 	if instance.makers.ConfigureCluster != nil {
-		return instance.makers.ConfigureCluster(ctx, instance)
+		return instance.makers.ConfigureCluster(ctx, instance, parameters)
 	}
 
 	// Not finding a callback isn't an error, so return nil in this case
@@ -3312,24 +3314,21 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 		return fail.AbortedError(nil, "aborted")
 	}
 
-	if instance.makers.JoinNodeToCluster == nil {
-		// configure what has to be done Cluster-wide
-		if instance.makers.ConfigureCluster != nil {
-			return instance.makers.ConfigureCluster(ctx, instance)
-		}
-	}
-
 	logrus.Debugf("Joining nodes to Cluster...")
 
 	// Joins to Cluster is done sequentially, experience shows too many join at the same time
 	// may fail (depending of the Cluster Flavor)
-	if instance.makers.JoinMasterToCluster != nil {
+	if instance.makers.JoinNodeToCluster != nil {
 		for _, v := range nodes {
 			hostInstance, xerr := LoadHost(instance.Service(), v.ID)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
 			}
+
+			defer func(i resources.Host) { // nolint
+				i.Released()
+			}(hostInstance)
 
 			xerr = instance.makers.JoinNodeToCluster(instance, hostInstance)
 			xerr = debug.InjectPlannedFail(xerr)
@@ -3346,7 +3345,7 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 func (instance *Cluster) leaveNodesFromList(ctx context.Context, hosts []resources.Host, selectedMaster resources.Host) (xerr fail.Error) {
 	logrus.Debugf("Instructing nodes to leave Cluster...")
 
-	// Unjoins from Cluster are done sequentially, experience shows too many join at the same time
+	// Unjoins from Cluster are done sequentially, experience shows too many (un)join at the same time
 	// may fail (depending of the Cluster Flavor)
 	for _, node := range hosts {
 		if instance.makers.LeaveNodeFromCluster != nil {
