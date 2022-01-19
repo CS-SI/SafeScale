@@ -46,7 +46,7 @@ export TEST_COVERAGE_ARGS
 
 all: logclean ground getdevdeps mod sdk generate lib mintest cli minimock err vet semgrep style metalint
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 
@@ -60,7 +60,7 @@ ci: logclean ground getdevdeps mod sdk generate lib cli minimock err vet with-so
 allcover: logclean ground getdevdeps mod sdk generate lib cli minimock err vet semgrep style metalint
 	@(cd cli/safescale && $(MAKE) $(@))
 	@(cd cli/safescaled && $(MAKE) $(@))
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 	@md5sum cli/safescaled/safescaled-cover 2>/dev/null >> sums.log || true
@@ -71,13 +71,13 @@ version:
 
 release: logclean ground getdevdeps mod releasetags sdk generate lib cli test minimock err vet semgrep style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for release, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 
 releaserc: logclean ground getdevdeps mod releasetags sdk generate lib cli minimock err vet style metalint releasearchive
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Build for rc, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 
@@ -109,7 +109,7 @@ ifeq ($(shell md5sum --status -c sums.log 2>/dev/null && echo 0 || echo 1 ),1)
 	@$(GO) list ./... 2>&1 | grep -v mock | grep -v rules | grep -v cli | grep -v .pb. | grep -v nolint | grep -v _test.go | xargs errcheck | grep -v test | awk 'NF' | $(TEE) err_results.log
 	@if [ -s ./err_results.log ]; then printf "%b" "$(ERROR_COLOR)$(ERROR_STRING) errcheck FAILED !$(NO_COLOR)\n";exit 1;else printf "%b" "$(OK_COLOR)$(OK_STRING) CONGRATS. NO PROBLEMS DETECTED ! $(NO_COLOR)\n";fi;
 	@printf "%b" "$(OK_COLOR)$(OK_STRING) Fast Build, branch $$(git rev-parse --abbrev-ref HEAD) SUCCESSFUL $(NO_COLOR)\n";
-	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log
+	@git ls-tree --full-tree --name-only -r HEAD | grep \.go | xargs md5sum 2>/dev/null > sums.log || true
 	@md5sum cli/safescaled/safescaled 2>/dev/null >> sums.log || true
 	@md5sum cli/safescale/safescale 2>/dev/null >> sums.log || true
 else

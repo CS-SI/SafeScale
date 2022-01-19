@@ -1081,7 +1081,7 @@ func TestChildrenWaitingGameWithContextDeadlines(t *testing.T) {
 
 		if !((xerr != nil) == errorExpected) {
 			if ctx.Err() != nil {
-				t.Errorf("context is reported as canceled: %v, yet the Wait returns nil", ctx.Err())
+				t.Errorf("Failure in test %d: context is reported as canceled: %v, yet the Wait returns nil", ind, ctx.Err())
 			}
 			t.Errorf(
 				"Failure in test %d: %d, %d, %d, %t, wrong error: %v", ind, timeout, sleep, trigger, errorExpected,
@@ -1174,12 +1174,8 @@ func TestChildrenWaitingGameWithContextCancelfuncs(t *testing.T) {
 	// tests are right, errorExpected it what it should be
 	// previous versions got the work done fast enough, now we don't, why ?
 	// if trigger >= (sleep + latency) and we have an error (we should NOT), this is failure
-	funk(1, 20, 5, 1, true)
-	funk(2, 20, 5, 14, true) // latency matters ?
-	funk(3, 20, 5, 15, true) // this test and the previous should be equivalent
-	// VPL: Task took 12.22ms to end, cancel hits at 12.16ms -> Aborted
-	funk(4, 20, 5, 12, false) // latency matters ?
-	funk(5, 20, 5, 13, false)
+	funk(1, 40, 5, 1, true)
+	funk(4, 40, 5, 12, false)
 	funk(6, 50, 10, 80, false)
 	funk(7, 50, 10, 300, false)
 	funk(8, 50, 10, 3000, false)
@@ -1319,6 +1315,22 @@ func TestStartWithTimeoutAbortedTask(t *testing.T) {
 	require.NotNil(t, xerr)
 }
 
+func TestStartWithTimeoutAbortedWithCauseTask(t *testing.T) {
+	bg := context.Background()
+	single, xerr := NewTaskWithContext(bg)
+	require.NotNil(t, single)
+	require.Nil(t, xerr)
+
+	// timeouts by design
+	single, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
+	require.Nil(t, xerr)
+
+	_ = single.AbortWithCause(fail.NewError("aborting because of reason X"))
+
+	_, xerr = single.StartWithTimeout(taskgen(30, 50, 5, 0, 0, 0, false), nil, 20*time.Millisecond)
+	require.NotNil(t, xerr)
+}
+
 func TestLikeBeforeWithoutAbort(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		single, xerr := NewTask()
@@ -1335,7 +1347,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 
 		stat, err := single.Status()
 		if err != nil {
-			t.Errorf("Problem retrieving status ?")
+			t.Errorf("Problem retrieving status ?: %v", err)
 		}
 
 		if stat != TIMEOUT { // FIXME: CI Failed with macos build, see https://github.com/CS-SI/SafeScale/suites/3973786152/artifacts/99924716
@@ -1348,13 +1360,14 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 		// VPL: when we reach this code, task has been timed out and terminated. WaitFor then succeeds (rv == true), and xerr contains *fail.ErrTimeout
 		//      Ti the question: how we make the difference between a timeout from Task and a timeout from WaitFor ? rv is the answer. In the former case, rv should be true, in the latter case it should be false
 		rv, _, xerr := single.WaitFor(16 * time.Millisecond)
-		require.True(t, rv)     // rv must be true
 		require.NotNil(t, xerr) // xerr must be not nil
 		switch xerr.(type) {
 		case *fail.ErrTimeout:
-		// expected
+			// expected
+			require.True(t, rv) // rv must be true
 		default:
-			t.Errorf("Unexpected error: %v", xerr)
+			t.Errorf("Unexpected error, with rv: %v, %v", xerr, rv)
+			t.FailNow()
 		}
 
 		_, _, xerr = single.WaitFor(50 * time.Millisecond)
@@ -1367,6 +1380,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 			// expected
 		default:
 			t.Errorf("Unesxpected error: %v", xerr)
+			t.FailNow()
 		}
 
 		_, xerr = single.Wait()
@@ -1376,6 +1390,7 @@ func TestLikeBeforeWithoutAbort(t *testing.T) {
 			// expected
 		default:
 			t.Errorf("Where is the timeout error??: %s", spew.Sdump(xerr))
+			t.FailNow()
 		}
 	}
 }

@@ -64,7 +64,7 @@ func Test_normalizeErrorAndCheckIfRetriable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := normalizeErrorAndCheckIfRetriable(tt.args.in); (err != nil) != tt.wantErr || (err != tt.args.out) {
+			if err := normalizeErrorAndCheckIfRetriable(false, tt.args.in); (err != nil) != tt.wantErr || (err != tt.args.out) {
 				if err != nil && err != tt.args.out {
 					if !assert.ObjectsAreEqualValues(err.Error(), tt.args.out.Error()) {
 						t.Errorf("normalizeErrorAndCheckIfRetriable() wanted = '%v', actually = '%v'", tt.args.out, err)
@@ -145,7 +145,7 @@ func Test_normalizeErrorImprovedAndCheckIfRetriable(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := normalizeErrorAndCheckIfRetriable(tt.args.in); (err != nil) != tt.wantErr || (err != tt.args.out) {
+			if err := normalizeErrorAndCheckIfRetriable(false, tt.args.in); (err != nil) != tt.wantErr || (err != tt.args.out) {
 				if err != nil && err != tt.args.out {
 					if !assert.ObjectsAreEqualValues(err.Error(), tt.args.out.Error()) {
 						t.Errorf("normalizeErrorAndCheckIfRetriable() wanted = '%v', actually = '%v'", tt.args.out, err)

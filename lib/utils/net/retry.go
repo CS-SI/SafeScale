@@ -55,7 +55,7 @@ func WhileUnsuccessfulButRetryable(callback func() error, waiter *retry.Officer,
 		func() (nested error) {
 			defer fail.OnPanic(&nested)
 			callbackErr := callback()
-			actionErr := normalizeErrorAndCheckIfRetriable(callbackErr)
+			actionErr := normalizeErrorAndCheckIfRetriable(false, callbackErr)
 			return actionErr
 		},
 		arbiter,
@@ -92,7 +92,7 @@ func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout t
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
 // If the error is not a communication error, we return a *retry.ErrAborted error
 // containing the causing error in it
-func normalizeErrorAndCheckIfRetriable(in error) (err error) {
+func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) {
 	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
 	defer func() {
 		if err != nil {
@@ -131,12 +131,21 @@ func normalizeErrorAndCheckIfRetriable(in error) (err error) {
 			cause := fail.Cause(realErr)
 			switch thecause := cause.(type) {
 			case *url.Error:
-				return normalizeURLError(thecause)
+				if thecause.Temporary() {
+					return realErr
+				}
+				if strict {
+					return normalizeURLError(thecause)
+				}
+				return realErr
 			case net.Error:
 				if thecause.Temporary() {
 					return realErr
 				}
-				return retry.StopRetryError(realErr)
+				if strict {
+					return retry.StopRetryError(realErr)
+				}
+				return realErr
 			case *fail.ErrNotAvailable, fail.ErrNotAvailable, *fail.ErrOverflow, fail.ErrOverflow, *fail.ErrOverload, fail.ErrOverload:
 				return realErr
 			default:
