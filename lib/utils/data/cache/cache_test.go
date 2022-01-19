@@ -28,6 +28,86 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func Test_NewCache(t *testing.T) {
+
+	_, err := NewCache("")
+	require.Error(t, err)
+
+}
+func TestCache_Entry(t *testing.T) {
+
+	// Empty cache
+	var nilCache *cache = nil
+	_, err := nilCache.Entry("What")
+	if err == nil {
+		t.Error("Should throw a fail.InvalidInstanceError")
+		t.FailNow()
+	}
+
+	// Filled cache, empty key
+	nukaCola, err := NewCache("nuka")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	_, err = nukaCola.Entry("")
+	if err == nil {
+		t.Error("Should throw a fail.InvalidParameterCannotBeEmptyStringError")
+		t.FailNow()
+	}
+
+	// Filled cache, filled key
+	nukaCola, err = NewCache("nuka")
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	_, err = nukaCola.Entry("key1")
+	if err == nil {
+		t.Error("Should throw a fail.NotFoundError")
+		t.FailNow()
+	}
+
+	err = nukaCola.Reserve("key1", 1*time.Second)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	// Cache never created on commited
+	_, err = nukaCola.Entry("key1")
+	if err == nil {
+		t.Error("Should throw a *expired cache* error")
+		t.FailNow()
+	}
+
+	// Special broken reservation
+	err = nukaCola.Reserve("key1", 1*time.Second)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	_, err = nukaCola.Commit("key1", nil)
+	if err == nil {
+		t.Error("Should throw a fail.InvalidParameterCannotBeNilError(content)")
+		t.FailNow()
+	}
+	r := &reservation{
+		key:     "content",
+		timeout: 1000,
+	}
+	_, err = nukaCola.Commit("key1", r)
+	if err != nil {
+		t.Error(err)
+		t.FailNow()
+	}
+	_, err = nukaCola.Entry("key1")
+	if err == nil {
+		t.Error("Should throw a fail.NotFoundError (fail to found entry...broken one)")
+		t.FailNow()
+	}
+
+}
+
 func TestLockContent(t *testing.T) {
 	content := newReservation("content" /*, time.Minute*/)
 	cacheEntry := newEntry(content)
