@@ -596,6 +596,45 @@ func (instance *Share) Create(
 	return instance.carry(&si)
 }
 
+// unsafeGetServer returns the Host acting as Share server, with error handling
+// Note: do not forget to call .Released() on returned host when you do not use it anymore
+func (instance *Share) unsafeGetServer() (_ resources.Host, xerr fail.Error) {
+	defer fail.OnPanic(&xerr)
+
+	if instance == nil || instance.IsNull() {
+		return nil, fail.InvalidInstanceError()
+	}
+
+	var hostID, hostName string
+	xerr = instance.Review(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
+		share, ok := clonable.(*ShareIdentity)
+		if !ok {
+			return fail.InconsistentError("'*shareItem' expected, '%s' provided", reflect.TypeOf(clonable).String())
+		}
+
+		hostID = share.HostID
+		hostName = share.HostName
+		return nil
+	})
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	svc := instance.Service()
+	server, xerr := LoadHost(svc, hostID)
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		server, xerr = LoadHost(svc, hostName)
+	}
+	xerr = debug.InjectPlannedFail(xerr)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return server, nil
+}
+
 // GetServer returns the Host acting as Share server, with error handling
 // Note: do not forget to call .Released() on returned host when you do not use it anymore
 func (instance *Share) GetServer() (_ resources.Host, xerr fail.Error) {
@@ -701,7 +740,7 @@ func (instance *Share) Mount(
 		return nil, xerr
 	}
 
-	rhServer, xerr := instance.GetServer()
+	rhServer, xerr := instance.unsafeGetServer()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -963,7 +1002,7 @@ func (instance *Share) Unmount(ctx context.Context, target resources.Host) (xerr
 		return nil
 	})
 
-	rhServer, xerr := instance.GetServer()
+	rhServer, xerr := instance.unsafeGetServer()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1115,7 +1154,7 @@ func (instance *Share) Delete(ctx context.Context) (xerr fail.Error) {
 		return xerr
 	}
 
-	objserver, xerr := instance.GetServer()
+	objserver, xerr := instance.unsafeGetServer()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -1206,7 +1245,7 @@ func (instance *Share) ToProtocol() (_ *protocol.ShareMountList, xerr fail.Error
 
 	shareID := instance.GetID()
 	shareName := instance.GetName()
-	server, xerr := instance.GetServer()
+	server, xerr := instance.unsafeGetServer()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
