@@ -816,3 +816,17 @@ func (f Feature) ToProtocol() *protocol.FeatureResponse {
 	}
 	return out
 }
+
+// ExtractFeatureParameters convert a slice of string in format a=b into a map index on 'a' with value 'b'
+func ExtractFeatureParameters(params []string) data.Map {
+	out := data.Map{}
+	for _, v := range params {
+		splitted := strings.Split(v, "=")
+		if len(splitted) > 1 {
+			out[splitted[0]] = splitted[1]
+		} else {
+			out[splitted[0]] = ""
+		}
+	}
+	return out
+}

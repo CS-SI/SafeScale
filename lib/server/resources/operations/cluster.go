@@ -1167,7 +1167,6 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	var (
 		hostImage             string
 		nodeDefaultDefinition *propertiesv2.HostSizingRequirements
-		featureParams         data.Map
 	)
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		if props.Lookup(clusterproperty.DefaultsV3) {
@@ -1179,7 +1178,14 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 
 				nodeDefaultDefinition = &defaultsV3.NodeSizing
 				hostImage = defaultsV3.Image
-				featureParams = extractFeatureParameters(defaultsV3.FeatureParameters)
+
+				// merge FeatureParameters in parameters, the latter keeping precedence over the former
+				for k, v := range ExtractFeatureParameters(defaultsV3.FeatureParameters) {
+					if _, ok := parameters[k]; !ok {
+						parameters[k] = v
+					}
+				}
+
 				return nil
 			})
 		}
@@ -1289,14 +1295,12 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 		}
 	}
 	if xerr != nil {
-		return nil, fail.NewErrorWithCause(
-			xerr, "errors occurred on node%s addition", strprocess.Plural(uint(len(errors))),
-		)
+		return nil, fail.NewErrorWithCause(xerr, "errors occurred on node%s addition", strprocess.Plural(uint(len(errors))))
 	}
 
 	// configure what has to be done Cluster-wide
 	if instance.makers.ConfigureCluster != nil {
-		xerr = instance.makers.ConfigureCluster(ctx, instance, featureParams)
+		xerr = instance.makers.ConfigureCluster(ctx, instance, parameters)
 		if xerr != nil {
 			return nil, xerr
 		}
@@ -2887,7 +2891,7 @@ func (instance *Cluster) configureCluster(ctx context.Context, req abstract.Clus
 	}()
 
 	// Install reverse-proxy feature on Cluster (gateways)
-	parameters := extractFeatureParameters(req.FeatureParameters)
+	parameters := ExtractFeatureParameters(req.FeatureParameters)
 	xerr = instance.installReverseProxy(ctx, parameters)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -2915,20 +2919,6 @@ func (instance *Cluster) configureCluster(ctx context.Context, req abstract.Clus
 
 	// Not finding a callback isn't an error, so return nil in this case
 	return nil
-}
-
-// extractFeatureParameters convert a slice of string in format a=b into a map index on 'a' with value 'b'
-func extractFeatureParameters(params []string) data.Map {
-	out := data.Map{}
-	for _, v := range params {
-		splitted := strings.Split(v, "=")
-		if len(splitted) > 1 {
-			out[splitted[0]] = splitted[1]
-		} else {
-			out[splitted[0]] = ""
-		}
-	}
-	return out
 }
 
 func (instance *Cluster) determineRequiredNodes() (uint, uint, uint, fail.Error) {

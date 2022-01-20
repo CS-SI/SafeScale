@@ -679,6 +679,11 @@ var clusterExpandCommand = &cli.Command{
 			Aliases: []string{"k"},
 			Usage:   `do not delete resources on failure`,
 		},
+		&cli.StringSliceFlag{
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
@@ -712,6 +717,7 @@ var clusterExpandCommand = &cli.Command{
 			NodeSizing:    nodesDef,
 			ImageId:       los,
 			KeepOnFailure: keepOnFailure,
+			Parameters:    c.StringSlice("param"),
 		}
 
 		clientSession, xerr := client.New(c.String("server"))

@@ -193,7 +193,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	// FIXME: At some point clusterIdentity has to change...
 
 	// Creates and configures hosts
-	xerr = instance.createHostResources(task, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, extractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
+	xerr = instance.createHostResources(task, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
