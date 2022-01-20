@@ -96,13 +96,24 @@ func ClusterCompositeFromPropertyToProtocol(in propertiesv1.ClusterComposite) *p
 	return &out
 }
 
-// ClusterDefaultsFromPropertyToProtocol does what the name says
-func ClusterDefaultsFromPropertyToProtocol(in propertiesv2.ClusterDefaults) *protocol.ClusterDefaults {
+// ClusterDefaultsFromPropertyV2ToProtocol does what the name says
+func ClusterDefaultsFromPropertyV2ToProtocol(in propertiesv2.ClusterDefaults) *protocol.ClusterDefaults {
 	return &protocol.ClusterDefaults{
 		GatewaySizing: HostSizingRequirementsFromPropertyToProtocol(in.GatewaySizing),
 		MasterSizing:  HostSizingRequirementsFromPropertyToProtocol(in.MasterSizing),
 		NodeSizing:    HostSizingRequirementsFromPropertyToProtocol(in.NodeSizing),
 		Image:         in.Image,
+	}
+}
+
+// ClusterDefaultsFromPropertyV3ToProtocol does what the name says
+func ClusterDefaultsFromPropertyV3ToProtocol(in propertiesv3.ClusterDefaults) *protocol.ClusterDefaults {
+	return &protocol.ClusterDefaults{
+		GatewaySizing:     HostSizingRequirementsFromPropertyToProtocol(in.GatewaySizing),
+		MasterSizing:      HostSizingRequirementsFromPropertyToProtocol(in.MasterSizing),
+		NodeSizing:        HostSizingRequirementsFromPropertyToProtocol(in.NodeSizing),
+		Image:             in.Image,
+		FeatureParameters: in.FeatureParameters,
 	}
 }
 

@@ -244,6 +244,7 @@ func (instance *Cluster) unsafeListMasterIPs() (list data.IndexedListOfStrings, 
 	if xerr != nil {
 		return emptyList, xerr
 	}
+
 	return list, nil
 }
 

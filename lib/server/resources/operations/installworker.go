@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/CS-SI/SafeScale/lib/system"
+	"github.com/CS-SI/SafeScale/lib/utils/app"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
 
@@ -507,9 +508,9 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 }
 
 // Proceed executes the action
-func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
-	w.variables = v
-	w.settings = s
+func (w *worker) Proceed(ctx context.Context, params data.Map, settings resources.FeatureSettings) (outcomes resources.Results, xerr fail.Error) {
+	w.variables = params
+	w.settings = settings
 
 	outcomes = &results{}
 
@@ -545,7 +546,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 	// Applies reverseproxy rules and security to make Feature functional (Feature may need it during the install)
 	switch w.action {
 	case installaction.Add:
-		if !s.SkipProxy {
+		if !settings.SkipProxy {
 			xerr = w.setReverseProxy(ctx)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
@@ -559,8 +560,8 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			return nil, fail.Wrap(xerr, "failed to set security rules on Subnet")
 		}
 	case installaction.Remove:
-		// FIXME: Uncomplete ??
-		// if !s.SkipProxy {
+		// FIXME: currently removing feature does not clear proxy rules...
+		// if !settings.SkipProxy {
 		// 	rgw, xerr := w.identifyAvailableGateway()
 		// 	if xerr == nil {
 		// 		var found bool
@@ -578,8 +579,16 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 		// }
 	}
 
-	// add target specific variables
-	xerr = w.target.ComplementFeatureParameters(ctx, v)
+	xerr = w.target.ComplementFeatureParameters(ctx, params)
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	w.reduceFeatureParameters(&params)
+
+	// Checks required parameters have their values
+	xerr = checkRequiredParameters(*w.feature, params)
+	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
@@ -648,7 +657,7 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 			stepName:  k,
 			stepKey:   stepKey,
 			stepMap:   stepMap,
-			variables: v,
+			variables: params,
 			hosts:     hostsList,
 		}, concurrency.InheritParentIDOption, concurrency.AmendID(fmt.Sprintf("/feature/%s/%s/target/%s/step/%s", w.feature.GetName(), strings.ToLower(w.action.String()), strings.ToLower(w.target.TargetType().String()), k)))
 		xerr = debug.InjectPlannedFail(xerr)
@@ -683,6 +692,31 @@ func (w *worker) Proceed(ctx context.Context, v data.Map, s resources.FeatureSet
 	}
 
 	return outcomes, nil
+}
+
+// reduceFeatureParameters cleans up params accordingly to the current context. Ensures that:
+// - every parameter that is not prefixed by feature name are kept
+// - every parameter that is prefixed by current feature name sees it's prefix removed
+// - every parameter that is not prefixed by current feature name is removed
+//
+// Example:
+//   if current feature is docker, and we have these params:
+//     - Version -> 21.03
+//     - kubernetes:Version -> 18.1
+//     - docker:HubLogin -> toto
+//   the call to this method will leave this:
+//     - Version -> 21.03
+//     - HubLogin -> toto
+func (w *worker) reduceFeatureParameters(params *data.Map) {
+	for k, v := range *params {
+		splitted := strings.Split(k, ":")
+		if len(splitted) > 1 {
+			if splitted[0] == w.feature.GetName() {
+				(*params)[splitted[1]] = v
+			}
+			delete(*params, k)
+		}
+	}
 }
 
 type taskLaunchStepParameters struct {
@@ -877,7 +911,12 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 				cuk := r.ResultOfKey(key)
 				if cuk != nil {
 					if !cuk.Successful() && !cuk.Completed() {
-						msg := fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v with [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
+						var msg error
+						if app.Verbose && app.Debug { // log more details if in trace mode
+							msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v with result: [%s]", w.action.String(), p.stepName, cuk.Error(), spew.Sdump(cuk))
+						} else {
+							msg = fmt.Errorf("execution unsuccessful and incomplete of step '%s::%s' failed on: %v", w.action.String(), p.stepName, cuk.Error())
+						}
 						logrus.Warnf(msg.Error())
 						errpack = append(errpack, msg)
 					}
@@ -899,8 +938,14 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 			cuk := r.ResultOfKey(key)
 			if cuk != nil {
 				if !cuk.Successful() && cuk.Completed() {
-					msg := fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))
-					logrus.Warnf(msg.Error())
+					var msg error
+					if app.Verbose && app.Debug { // log more details if in trace mode
+						msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s with result: [%v]", w.action.String(), p.stepName, key /*cuk.Error()*/, spew.Sdump(cuk))
+					} else {
+						msg = fmt.Errorf("execution unsuccessful of step '%s::%s' failed on: %s", w.action.String(), p.stepName, key)
+					}
+
+					logrus.Errorf(msg.Error())
 					newerrpack = append(newerrpack, msg)
 				}
 			}

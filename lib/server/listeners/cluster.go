@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/server/resources/operations"
 	"github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 	"github.com/sirupsen/logrus"
@@ -398,7 +399,8 @@ func (s *ClusterListener) Expand(ctx context.Context, in *protocol.ClusterResize
 	}
 	defer instance.Released()
 
-	resp, xerr := instance.AddNodes(job.Context(), uint(in.Count), *sizing, in.GetKeepOnFailure())
+	// Instructs to add nodes
+	resp, xerr := instance.AddNodes(job.Context(), uint(in.Count), *sizing, operations.ExtractFeatureParameters(in.GetParameters()), in.GetKeepOnFailure())
 	if xerr != nil {
 		return nil, xerr
 	}

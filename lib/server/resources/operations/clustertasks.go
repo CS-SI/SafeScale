@@ -161,25 +161,15 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 					debug.IgnoreError(derr)
 				default:
 					cleanFailure = true
-					logrus.Errorf(
-						"Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
-						subnetInstance.GetName(),
-					)
-					_ = ferr.AddConsequence(
-						fail.Wrap(
-							derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr),
-						),
-					)
+					logrus.Errorf("Cleaning up on %s, failed to delete Subnet '%s'", ActionFromError(ferr),
+						subnetInstance.GetName())
+					_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Subnet", ActionFromError(ferr)))
 				}
 			} else {
-				logrus.Debugf(
-					"Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
-					subnetInstance.GetName(),
-				)
+				logrus.Debugf("Cleaning up on %s, successfully deleted Subnet '%s'", ActionFromError(ferr),
+					subnetInstance.GetName())
 				if req.NetworkID == "" {
-					logrus.Debugf(
-						"Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName(),
-					)
+					logrus.Debugf("Cleaning up on %s, deleting Network '%s'...", ActionFromError(ferr), networkInstance.GetName())
 					if derr := networkInstance.Delete(context.Background()); derr != nil {
 						switch derr.(type) {
 						case *fail.ErrNotFound:
@@ -187,21 +177,13 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 							debug.IgnoreError(derr)
 						default:
 							cleanFailure = true
-							logrus.Errorf(
-								"cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
-								networkInstance.GetName(),
-							)
-							_ = ferr.AddConsequence(
-								fail.Wrap(
-									derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr),
-								),
-							)
+							logrus.Errorf("cleaning up on %s, failed to delete Network '%s'", ActionFromError(ferr),
+								networkInstance.GetName())
+							_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on %s, failed to delete Network", ActionFromError(ferr)))
 						}
 					} else {
-						logrus.Debugf(
-							"Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
-							networkInstance.GetName(),
-						)
+						logrus.Debugf("Cleaning up on %s, successfully deleted Network '%s'", ActionFromError(ferr),
+							networkInstance.GetName())
 					}
 				}
 			}
@@ -211,7 +193,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	// FIXME: At some point clusterIdentity has to change...
 
 	// Creates and configures hosts
-	xerr = instance.createHostResources(task, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, req.KeepOnFailure)
+	xerr = instance.createHostResources(task, subnetInstance, *mastersDef, *nodesDef, req.InitialNodeCount, ExtractFeatureParameters(req.FeatureParameters), req.KeepOnFailure)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -225,20 +207,17 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 
 			logrus.Debugf("Cleaning up on failure, deleting Hosts...")
 			var list map[uint]*propertiesv3.ClusterNode
-			derr := instance.Inspect(
-				func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
-					return props.Inspect(
-						clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
-							nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
-							if !ok {
-								return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
-							}
-							list = nodesV3.ByNumericalID
-							return nil
-						},
-					)
-				},
-			)
+			derr := instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
+				return props.Inspect(clusterproperty.NodesV3, func(clonable data.Clonable) fail.Error {
+					nodesV3, ok := clonable.(*propertiesv3.ClusterNodes)
+					if !ok {
+						return fail.InconsistentError("'*propertiesv3.ClusterNodes' expected, '%s' provided", reflect.TypeOf(clonable).String())
+					}
+
+					list = nodesV3.ByNumericalID
+					return nil
+				})
+			})
 			if derr != nil {
 				cleanFailure = true
 				_ = ferr.AddConsequence(derr)
@@ -287,7 +266,7 @@ func (instance *Cluster) taskCreateCluster(task concurrency.Task, params concurr
 	}()
 
 	// configure Cluster as a whole
-	xerr = instance.configureCluster(ctx)
+	xerr = instance.configureCluster(ctx, req)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -395,44 +374,41 @@ func (instance *Cluster) firstLight(req abstract.ClusterRequest) fail.Error {
 			}
 
 			// sets default sizing from req
-			innerXErr = props.Alter(
-				clusterproperty.DefaultsV2, func(clonable data.Clonable) fail.Error {
-					defaultsV2, ok := clonable.(*propertiesv2.ClusterDefaults)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv2.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String(),
-						)
-					}
+			innerXErr = props.Alter(clusterproperty.DefaultsV3, func(clonable data.Clonable) fail.Error {
+				defaultsV3, ok := clonable.(*propertiesv3.ClusterDefaults)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv3.Defaults' expected, '%s' provided", reflect.TypeOf(clonable).String(),
+					)
+				}
 
-					defaultsV2.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.GatewaysDef)
-					defaultsV2.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
-					defaultsV2.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
-					defaultsV2.Image = req.NodesDef.Image
-					defaultsV2.GatewayTemplateID = req.GatewaysDef.Template
-					defaultsV2.NodeTemplateID = req.NodesDef.Template
-					defaultsV2.MasterTemplateID = req.MastersDef.Template
-					return nil
-				},
-			)
+				defaultsV3.GatewaySizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.GatewaysDef)
+				defaultsV3.MasterSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.MastersDef)
+				defaultsV3.NodeSizing = *converters.HostSizingRequirementsFromAbstractToPropertyV2(req.NodesDef)
+				defaultsV3.Image = req.NodesDef.Image
+				defaultsV3.GatewayTemplateID = req.GatewaysDef.Template
+				defaultsV3.NodeTemplateID = req.NodesDef.Template
+				defaultsV3.MasterTemplateID = req.MastersDef.Template
+				defaultsV3.FeatureParameters = req.FeatureParameters
+				return nil
+			})
 			if innerXErr != nil {
 				return innerXErr
 			}
 
 			// FUTURE: sets the Cluster composition (when we will be able to manage Cluster spread on several tenants...)
-			innerXErr = props.Alter(
-				clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
-					compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
-					if !ok {
-						return fail.InconsistentError(
-							"'*propertiesv1.ClusterComposite' expected, '%s' provided",
-							reflect.TypeOf(clonable).String(),
-						)
-					}
+			innerXErr = props.Alter(clusterproperty.CompositeV1, func(clonable data.Clonable) fail.Error {
+				compositeV1, ok := clonable.(*propertiesv1.ClusterComposite)
+				if !ok {
+					return fail.InconsistentError(
+						"'*propertiesv1.ClusterComposite' expected, '%s' provided",
+						reflect.TypeOf(clonable).String(),
+					)
+				}
 
-					compositeV1.Tenants = []string{req.Tenant}
-					return nil
-				},
-			)
+				compositeV1.Tenants = []string{req.Tenant}
+				return nil
+			})
 			if innerXErr != nil {
 				return innerXErr
 			}
@@ -889,6 +865,7 @@ func (instance *Cluster) createHostResources(
 	mastersDef abstract.HostSizingRequirements,
 	nodesDef abstract.HostSizingRequirements,
 	initialNodeCount uint,
+	parameters data.Map,
 	keepOnFailure bool,
 ) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
@@ -1022,7 +999,7 @@ func (instance *Cluster) createHostResources(
 
 	// Step 1: starts gateway installation plus masters creation plus nodes creation
 	_, xerr = gwInstallTasks.Start(
-		instance.taskInstallGateway, taskInstallGatewayParameters{primaryGateway}, concurrency.InheritParentIDOption,
+		instance.taskInstallGateway, taskInstallGatewayParameters{host: primaryGateway, variables: parameters}, concurrency.InheritParentIDOption,
 		concurrency.AmendID(fmt.Sprintf("/%s/install", primaryGateway.GetName())),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -1042,7 +1019,7 @@ func (instance *Cluster) createHostResources(
 
 	if haveSecondaryGateway {
 		_, xerr = gwInstallTasks.Start(
-			instance.taskInstallGateway, taskInstallGatewayParameters{secondaryGateway},
+			instance.taskInstallGateway, taskInstallGatewayParameters{host: secondaryGateway, variables: parameters},
 			concurrency.InheritParentIDOption,
 			concurrency.AmendID(fmt.Sprintf("/%s/install", secondaryGateway.GetName())),
 		)
@@ -1304,7 +1281,8 @@ func (instance *Cluster) createHostResources(
 	}
 
 	_, mastersStatus = mastersCfgTask.Run(
-		instance.taskConfigureMasters, nil, concurrency.InheritParentIDOption, concurrency.AmendID("/configure"),
+		instance.taskConfigureMasters, taskConfigureMastersParameters{parameters},
+		concurrency.InheritParentIDOption, concurrency.AmendID("/configure"),
 	)
 	if mastersStatus != nil {
 		return mastersStatus
@@ -1336,7 +1314,7 @@ func (instance *Cluster) createHostResources(
 	}
 
 	_, privateNodesStatus = privateNodesCfgTask.Run(
-		instance.taskConfigureNodes, nil, concurrency.InheritParentIDOption, concurrency.AmendID("/configure"),
+		instance.taskConfigureNodes, taskConfigureNodesParameters{variables: parameters}, concurrency.InheritParentIDOption, concurrency.AmendID("/configure"),
 	)
 	if privateNodesStatus != nil {
 		return privateNodesStatus
@@ -1498,7 +1476,8 @@ func (instance *Cluster) taskStopHost(task concurrency.Task, params concurrency.
 }
 
 type taskInstallGatewayParameters struct {
-	Host resources.Host
+	host      resources.Host
+	variables data.Map
 }
 
 // taskInstallGateway installs necessary components on one gateway
@@ -1517,11 +1496,14 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 	if !ok {
 		return result, fail.InvalidParameterError("params", "must be a 'taskInstallGatewayParameters'")
 	}
-	if p.Host == nil {
+	if p.host == nil {
 		return result, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
-
-	hostLabel := p.Host.GetName()
+	variables := p.variables
+	if variables == nil {
+		variables = data.Map{}
+	}
+	hostLabel := p.host.GetName()
 
 	if task.Aborted() {
 		lerr, err := task.LastError()
@@ -1536,21 +1518,21 @@ func (instance *Cluster) taskInstallGateway(task concurrency.Task, params concur
 
 	logrus.Debugf("[%s] starting installation...", hostLabel)
 
-	_, xerr = p.Host.WaitSSHReady(task.Context(), instance.Service().Timings().HostOperationTimeout())
+	_, xerr = p.host.WaitSSHReady(task.Context(), instance.Service().Timings().HostOperationTimeout())
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Installs docker and docker-compose on gateway
-	xerr = instance.installDocker(task.Context(), p.Host, hostLabel)
+	xerr = instance.installDocker(task.Context(), p.host, hostLabel, variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
 	}
 
 	// Installs requirements as defined by Cluster Flavor (if it exists)
-	xerr = instance.installNodeRequirements(task.Context(), clusternodetype.Gateway, p.Host, hostLabel)
+	xerr = instance.installNodeRequirements(task.Context(), clusternodetype.Gateway, p.host, hostLabel)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -1991,8 +1973,12 @@ func withTimeout(xerr fail.Error) bool {
 	return result
 }
 
+type taskConfigureMastersParameters struct {
+	variables data.Map
+}
+
 // taskConfigureMasters configure masters
-func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureMasters(task concurrency.Task, params concurrency.TaskParameters) (result concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -2002,7 +1988,14 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 	if task == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
-
+	p, ok := params.(taskConfigureMastersParameters)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast 'params' to 'taskConfiguraMastersParameters'")
+	}
+	variables := p.variables
+	if variables != nil {
+		variables = data.Map{}
+	}
 	started := time.Now()
 
 	defer func() {
@@ -2079,8 +2072,9 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 
 		_, xerr = tg.Start(
 			instance.taskConfigureMaster, taskConfigureMasterParameters{
-				Index: captured + 1,
-				Host:  host,
+				Index:     captured + 1,
+				Host:      host,
+				variables: variables,
 			}, concurrency.InheritParentIDOption,
 			concurrency.AmendID(fmt.Sprintf("/host/%s/configure", host.GetName())),
 		)
@@ -2125,8 +2119,9 @@ func (instance *Cluster) taskConfigureMasters(task concurrency.Task, _ concurren
 }
 
 type taskConfigureMasterParameters struct {
-	Index uint
-	Host  resources.Host
+	Index     uint
+	Host      resources.Host
+	variables data.Map
 }
 
 // taskConfigureMaster configures one master
@@ -2153,6 +2148,11 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 		return nil, fail.InvalidParameterCannotBeNilError("params.Host")
 	}
 
+	variables := p.variables
+	if variables == nil {
+		variables = data.Map{}
+	}
+
 	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%v)", params).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
@@ -2170,7 +2170,7 @@ func (instance *Cluster) taskConfigureMaster(task concurrency.Task, params concu
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
 	// install docker feature (including docker-compose)
-	xerr = instance.installDocker(task.Context(), p.Host, hostLabel)
+	xerr = instance.installDocker(task.Context(), p.Host, hostLabel, variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2567,8 +2567,12 @@ func (instance *Cluster) taskCreateNode(task concurrency.Task, params concurrenc
 	return node, nil
 }
 
+type taskConfigureNodesParameters struct {
+	variables data.Map
+}
+
 // taskConfigureNodes configures nodes
-func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
+func (instance *Cluster) taskConfigureNodes(task concurrency.Task, params concurrency.TaskParameters) (_ concurrency.TaskResult, ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
 	var xerr fail.Error
 
@@ -2579,6 +2583,14 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 		return nil, fail.InvalidParameterCannotBeNilError("task")
 	}
 
+	p, ok := params.(taskConfigureNodesParameters)
+	if !ok {
+		return nil, fail.InconsistentError("failed to cast 'params' to 'taskConfigureNodesParameters'")
+	}
+	variables := p.variables
+	if variables == nil {
+		variables = data.Map{}
+	}
 	started := time.Now()
 
 	defer func() {
@@ -2640,8 +2652,9 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 		capturedNode := node
 		_, xerr = tg.Start(
 			instance.taskConfigureNode, taskConfigureNodeParameters{
-				Index: captured + 1,
-				Node:  capturedNode,
+				index:     captured + 1,
+				node:      capturedNode,
+				variables: variables,
 			}, concurrency.InheritParentIDOption,
 			concurrency.AmendID(fmt.Sprintf("/host/%s/configure", capturedNode.Name)),
 		)
@@ -2684,8 +2697,9 @@ func (instance *Cluster) taskConfigureNodes(task concurrency.Task, _ concurrency
 }
 
 type taskConfigureNodeParameters struct {
-	Index uint
-	Node  *propertiesv3.ClusterNode
+	index     uint
+	node      *propertiesv3.ClusterNode
+	variables data.Map
 }
 
 // taskConfigureNode configure one node
@@ -2704,11 +2718,15 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	if !ok {
 		return nil, fail.InvalidParameterError("params", "must be a 'taskConfigureNodeParameters'")
 	}
-	if p.Index < 1 {
+	if p.index < 1 {
 		return nil, fail.InvalidParameterError("params.indexindex", "cannot be an integer less than 1")
 	}
-	if p.Node == nil {
+	if p.node == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("params.Node")
+	}
+	variables := p.variables
+	if variables == nil {
+		variables = data.Map{}
 	}
 
 	if task.Aborted() {
@@ -2719,16 +2737,16 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 		return nil, fail.AbortedError(lerr, "parent task killed")
 	}
 
-	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.Index, p.Node.Name).WithStopwatch().Entering()
+	tracer := debug.NewTracer(task, tracing.ShouldTrace("resources.cluster"), "(%d, %s)", p.index, p.node.Name).WithStopwatch().Entering()
 	defer tracer.Exiting()
 
-	hostLabel := fmt.Sprintf("node #%d (%s)", p.Index, p.Node.Name)
+	hostLabel := fmt.Sprintf("node #%d (%s)", p.index, p.node.Name)
 	logrus.Debugf("[%s] starting configuration...", hostLabel)
 
-	hostInstance, xerr := LoadHost(instance.Service(), p.Node.ID)
+	hostInstance, xerr := LoadHost(instance.Service(), p.node.ID)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		return nil, fail.Wrap(xerr, "failed to get metadata of node '%s'", p.Node.Name)
+		return nil, fail.Wrap(xerr, "failed to get metadata of node '%s'", p.node.Name)
 	}
 
 	//goland:noinspection ALL
@@ -2737,7 +2755,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	}(hostInstance)
 
 	// Docker and docker-compose installation is mandatory on all nodes
-	xerr = instance.installDocker(task.Context(), hostInstance, hostLabel)
+	xerr = instance.installDocker(task.Context(), hostInstance, hostLabel, variables)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return nil, xerr
@@ -2747,7 +2765,7 @@ func (instance *Cluster) taskConfigureNode(task concurrency.Task, params concurr
 	if instance.makers.ConfigureNode == nil {
 		return nil, nil
 	}
-	xerr = instance.makers.ConfigureNode(instance, p.Index, hostInstance)
+	xerr = instance.makers.ConfigureNode(instance, p.index, hostInstance)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		logrus.Error(xerr.Error())

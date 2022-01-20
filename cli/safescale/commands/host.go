@@ -522,7 +522,7 @@ var hostAddFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow defining content of feature parameters",
+			Usage:   "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -544,7 +544,7 @@ var hostCheckFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow defining content of feature parameters",
+			Usage:   "Allow defining content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -562,7 +562,7 @@ var hostRemoveFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameter (can be used multiple times)",
+			Usage:   "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -705,10 +705,12 @@ func reformatHostGroups(in []*protocol.SecurityGroupBond) ([]interface{}, fail.E
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
+
 	err = json.Unmarshal(jsoned, &out)
 	if err != nil {
 		return nil, fail.ConvertError(err)
 	}
+
 	return out, nil
 }
 
@@ -772,6 +774,8 @@ var hostFeatureCommands = &cli.Command{
 	Usage: hostFeatureCmdLabel + " COMMAND",
 	Subcommands: []*cli.Command{
 		hostFeatureCheckCommand,
+		hostFeatureInspectCommand,
+		hostFeatureExportCommand,
 		hostFeatureAddCommand,
 		hostFeatureRemoveCommand,
 		hostFeatureListCommand,
@@ -811,6 +815,106 @@ func hostFeatureListAction(c *cli.Context) error {
 	return clitools.SuccessResponse(features)
 }
 
+// hostFeatureInspectCommand handles 'safescale host feature inspect <cluster name or id> <feature name>'
+// Displays information about the feature (parameters, if eligible on host, if installed, ...)
+var hostFeatureInspectCommand = &cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "Inspects the feature",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "embedded",
+			Value: false,
+			Usage: "if used, tells to show details of embedded feature (if it exists)",
+		},
+	},
+
+	Action: hostFeatureInspectAction,
+}
+
+func hostFeatureInspectAction(c *cli.Context) error {
+	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+	}
+
+	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
+	details, err := clientSession.Host.InspectFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	if err != nil {
+		err = fail.FromGRPCStatus(err)
+		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+	}
+
+	return clitools.SuccessResponse(details)
+}
+
+// hostFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
+var hostFeatureExportCommand = &cli.Command{
+	Name:      "list",
+	Aliases:   []string{"ls"},
+	Usage:     "Export feature file content",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "embedded",
+			Value: false,
+			Usage: "if used, tells to export embedded feature (if it exists)",
+		},
+		&cli.BoolFlag{
+			Name:  "raw",
+			Value: false,
+			Usage: "outputs only the feature content, without json",
+		},
+	},
+
+	Action: hostFeatureExportAction,
+}
+
+func hostFeatureExportAction(c *cli.Context) error {
+	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+	}
+
+	hostName, _, err := extractHostArgument(c, 0, DoNotInstanciate)
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
+	export, err := clientSession.Host.ExportFeature(hostName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	if err != nil {
+		err = fail.FromGRPCStatus(err)
+		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+	}
+
+	if c.Bool("raw") {
+		return clitools.SuccessResponse(export.Export)
+	}
+
+	return clitools.SuccessResponse(export)
+}
+
 // hostAddFeatureCommand handles 'deploy host <host name or id> package <pkgname> add'
 var hostFeatureAddCommand = &cli.Command{
 	Name:      "add",
@@ -822,7 +926,7 @@ var hostFeatureAddCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -835,25 +939,18 @@ var hostFeatureAddCommand = &cli.Command{
 
 func hostFeatureAddAction(c *cli.Context) error {
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
-	err := extractHostArgument(c, 0)
+
+	hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	err = extractFeatureArgument(c)
+	featureName, err := extractFeatureArgument(c)
 	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
-
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
@@ -869,12 +966,14 @@ func hostFeatureAddAction(c *cli.Context) error {
 		msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
+
 	err = clientSession.Host.AddFeature(hostInstance.Id, featureName, values, &settings, 0)
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		msg := fmt.Sprintf("error adding feature '%s' on host '%s': %s", featureName, hostName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
+
 	return clitools.SuccessResponse(nil)
 }
 
@@ -889,7 +988,7 @@ var hostFeatureCheckCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -898,24 +997,17 @@ var hostFeatureCheckCommand = &cli.Command{
 
 func hostFeatureCheckAction(c *cli.Context) error {
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
-	err := extractHostArgument(c, 0)
+	hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	err = extractFeatureArgument(c)
+	featureName, err := extractFeatureArgument(c)
 	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -929,6 +1021,7 @@ func hostFeatureCheckAction(c *cli.Context) error {
 		msg := fmt.Sprintf("failed to reach '%s': %s", hostName, client.DecorateTimeoutError(err, "waiting ssh on host", false))
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
+
 	if err = clientSession.Host.CheckFeature(hostInstance.Id, featureName, values, &settings, 0); err != nil {
 		switch grpcstatus.Code(err) {
 		case codes.NotFound:
@@ -937,6 +1030,7 @@ func hostFeatureCheckAction(c *cli.Context) error {
 			return clitools.FailureResponse(clitools.ExitOnRPC(fail.FromGRPCStatus(err).Error()))
 		}
 	}
+
 	return clitools.SuccessResponse(nil)
 }
 
@@ -951,7 +1045,7 @@ var hostFeatureRemoveCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameter (can be used multiple times)",
+			Usage:   "Define value of feature parameter (can be used multiple times) (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 
@@ -960,24 +1054,17 @@ var hostFeatureRemoveCommand = &cli.Command{
 
 func hostFeatureRemoveAction(c *cli.Context) error {
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
-	err := extractHostArgument(c, 0)
+	hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	err = extractFeatureArgument(c)
+	featureName, err := extractFeatureArgument(c)
 	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -999,5 +1086,6 @@ func hostFeatureRemoveAction(c *cli.Context) error {
 		msg := fmt.Sprintf("failed to remove Feature '%s' on Host '%s': %s", featureName, hostName, err.Error())
 		return clitools.FailureResponse(clitools.ExitOnRPC(msg))
 	}
+
 	return clitools.SuccessResponse(nil)
 }

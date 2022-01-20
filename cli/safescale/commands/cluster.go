@@ -406,6 +406,11 @@ var clusterCreateCommand = &cli.Command{
 	example:
 		--node-sizing "cpu~4, ram~15, count=8" will create 8 nodes`,
 		},
+		&cli.StringSliceFlag{
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		},
 	},
 
 	Action: func(c *cli.Context) (err error) {
@@ -485,6 +490,7 @@ var clusterCreateCommand = &cli.Command{
 			NodeSizing:    nodesDef,
 			Force:         force,
 			// NodeCount:     uint32(c.Int("initial-node-count")),
+			Parameters: c.StringSlice("param"),
 		}
 		res, err := clientSession.Cluster.Create(&req, temporal.HostLongOperationTimeout())
 
@@ -673,6 +679,11 @@ var clusterExpandCommand = &cli.Command{
 			Aliases: []string{"k"},
 			Usage:   `do not delete resources on failure`,
 		},
+		&cli.StringSliceFlag{
+			Name:    "param",
+			Aliases: []string{"p"},
+			Usage:   "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
@@ -706,6 +717,7 @@ var clusterExpandCommand = &cli.Command{
 			NodeSizing:    nodesDef,
 			ImageId:       los,
 			KeepOnFailure: keepOnFailure,
+			Parameters:    c.StringSlice("param"),
 		}
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -1056,7 +1068,7 @@ var clusterAddFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of Feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -1077,7 +1089,7 @@ var clusterCheckFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureCheckAction,
@@ -1093,7 +1105,7 @@ var clusterRemoveFeatureCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureRemoveAction,
@@ -1166,7 +1178,7 @@ var clusterNodeInspectCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1258,7 +1270,7 @@ var clusterNodeStopCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1290,7 +1302,7 @@ var clusterNodeStartCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1321,7 +1333,7 @@ var clusterNodeStateCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1410,7 +1422,7 @@ var clusterMasterInspectCommand = &cli.Command{
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1442,7 +1454,7 @@ var clusterMasterStopCommand = &cli.Command{ // nolint
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1474,7 +1486,7 @@ var clusterMasterStartCommand = &cli.Command{ // nolint
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1505,7 +1517,7 @@ var clusterMasterStateCommand = &cli.Command{ // nolint
 			return clitools.FailureResponse(err)
 		}
 
-		err = extractNodeArgument(c, 1)
+		hostName, err := extractNodeArgument(c, 1)
 		if err != nil {
 			return clitools.FailureResponse(err)
 		}
@@ -1539,13 +1551,15 @@ var clusterFeatureCommands = &cli.Command{
 	ArgsUsage: "COMMAND",
 	Subcommands: []*cli.Command{
 		clusterFeatureListCommand,
+		clusterFeatureInspectCommand,
+		clusterFeatureExportCommand,
 		clusterFeatureCheckCommand,
 		clusterFeatureAddCommand,
 		clusterFeatureRemoveCommand,
 	},
 }
 
-// clusterFeatureListCommand handles 'safescale cluster <cluster name or id> list-features'
+// clusterFeatureListCommand handles 'safescale cluster feature list <cluster name or id>'
 var clusterFeatureListCommand = &cli.Command{
 	Name:      "list",
 	Aliases:   []string{"ls"},
@@ -1559,11 +1573,6 @@ var clusterFeatureListCommand = &cli.Command{
 			Value:   false,
 			Usage:   "if used, list all features that are eligible to be installed on the cluster",
 		},
-		// &cli.StringSliceFlag{
-		// 	Name:    "param",
-		// 	Aliases: []string{"p"},
-		// 	Usage:   "Allow to define content of feature parameters",
-		// },
 	},
 
 	Action: clusterFeatureListAction,
@@ -1581,13 +1590,112 @@ func clusterFeatureListAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	features, err := clientSession.Cluster.ListInstalledFeatures(clusterName, c.Bool("all"), 0) // FIXME: set timeout
+	features, err := clientSession.Cluster.ListFeatures(clusterName, c.Bool("all"), 0) // FIXME: set timeout
 	if err != nil {
 		err = fail.FromGRPCStatus(err)
 		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
 	}
 
 	return clitools.SuccessResponse(features)
+}
+
+// clusterFeatureInspectCommand handles 'safescale cluster feature inspect <cluster name or id> <feature name>'
+// Displays information about the feature (parameters, if eligible on cluster, if installed, ...)
+var clusterFeatureInspectCommand = &cli.Command{
+	Name:      "inspect",
+	Aliases:   []string{"show"},
+	Usage:     "Inspects the feature",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "embedded",
+			Value: false,
+			Usage: "if used, tells to show details of embedded feature (if it exists)",
+		},
+	},
+
+	Action: clusterFeatureInspectAction,
+}
+
+func clusterFeatureInspectAction(c *cli.Context) error {
+	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+	}
+
+	if err := extractClusterName(c); err != nil {
+		return clitools.FailureResponse(err)
+	}
+
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
+		return clitools.FailureResponse(err)
+	}
+
+	details, err := clientSession.Cluster.InspectFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	if err != nil {
+		err = fail.FromGRPCStatus(err)
+		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+	}
+
+	return clitools.SuccessResponse(details)
+}
+
+// clusterFeatureExportCommand handles 'safescale cluster feature export <cluster name or id> <feature name>'
+var clusterFeatureExportCommand = &cli.Command{
+	Name:      "list",
+	Aliases:   []string{"ls"},
+	Usage:     "List features installed on the cluster",
+	ArgsUsage: "",
+
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "embedded",
+			Value: false,
+			Usage: "if used, tells to export embedded feature (if it exists)",
+		},
+		&cli.BoolFlag{
+			Name:  "raw",
+			Value: false,
+			Usage: "outputs only the feature content, without json",
+		},
+	},
+
+	Action: clusterFeatureExportAction,
+}
+
+func clusterFeatureExportAction(c *cli.Context) error {
+	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
+
+	clientSession, xerr := client.New(c.String("server"))
+	if xerr != nil {
+		return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, xerr.Error()))
+	}
+
+	if err := extractClusterName(c); err != nil {
+		return clitools.FailureResponse(err)
+	}
+
+	featureName := c.Args().Get(1)
+	if featureName == "" {
+		_ = cli.ShowSubcommandHelp(c)
+		return clitools.ExitOnInvalidArgument("Invalid argument FEATURENAME.")
+	}
+
+	export, err := clientSession.Cluster.ExportFeature(clusterName, featureName, c.Bool("embedded"), 0) // FIXME: set timeout
+	if err != nil {
+		err = fail.FromGRPCStatus(err)
+		return clitools.FailureResponse(clitools.ExitOnRPC(err.Error()))
+	}
+
+	if c.Bool("raw") {
+		return clitools.SuccessResponse(export.Export)
+	}
+
+	return clitools.SuccessResponse(export)
 }
 
 // clusterFeatureAddCommand handles 'safescale cluster feature add CLUSTERNAME FEATURENAME'
@@ -1601,7 +1709,7 @@ var clusterFeatureAddCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Define value of feature parameters, in format <name>=<value>",
+			Usage:   "Define value of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 		&cli.BoolFlag{
 			Name:  "skip-proxy",
@@ -1618,19 +1726,12 @@ func clusterFeatureAddAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	if err := extractFeatureArgument(c); err != nil {
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
-
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 	settings.SkipProxy = c.Bool("skip-proxy")
 
@@ -1647,17 +1748,29 @@ func clusterFeatureAddAction(c *cli.Context) error {
 	return clitools.SuccessResponse(nil)
 }
 
+// parametersToMap transforms parameters slice to map
+func parametersToMap(params []string) map[string]string {
+	values := map[string]string{}
+	for _, k := range params {
+		res := strings.Split(k, "=")
+		if len(res[0]) > 0 {
+			values[res[0]] = strings.Join(res[1:], "=")
+		}
+	}
+	return values
+}
+
 // clusterFeatureCheckCommand handles 'deploy cluster check-feature CLUSTERNAME FEATURENAME'
 var clusterFeatureCheckCommand = &cli.Command{
 	Name:      "check",
 	Aliases:   []string{"verify"},
-	Usage:     "Checks if a eature is already installed on cluster",
+	Usage:     "Checks if a Feature is already installed on cluster",
 	ArgsUsage: "CLUSTERNAME FEATURENAME",
 	Flags: []cli.Flag{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureCheckAction,
@@ -1670,19 +1783,12 @@ func clusterFeatureCheckAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	if err := extractFeatureArgument(c); err != nil {
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
-
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -1710,7 +1816,7 @@ var clusterFeatureRemoveCommand = &cli.Command{
 		&cli.StringSliceFlag{
 			Name:    "param",
 			Aliases: []string{"p"},
-			Usage:   "Allow to define content of feature parameters",
+			Usage:   "Allow to define content of feature parameters (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
 	Action: clusterFeatureRemoveAction,
@@ -1722,19 +1828,12 @@ func clusterFeatureRemoveAction(c *cli.Context) error {
 		return clitools.FailureResponse(err)
 	}
 
-	if err := extractFeatureArgument(c); err != nil {
+	featureName, err := extractFeatureArgument(c)
+	if err != nil {
 		return clitools.FailureResponse(err)
 	}
 
-	values := map[string]string{}
-	params := c.StringSlice("param")
-	for _, k := range params {
-		res := strings.Split(k, "=")
-		if len(res[0]) > 0 {
-			values[res[0]] = strings.Join(res[1:], "=")
-		}
-	}
-
+	values := parametersToMap(c.StringSlice("param"))
 	settings := protocol.FeatureSettings{}
 	// TODO: Reverse proxy rules are not yet purged when feature is removed, but current code
 	// will try to apply them... Quick fix: Setting SkipProxy to true prevent this

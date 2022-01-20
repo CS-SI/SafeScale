@@ -436,13 +436,13 @@ func (f *Feature) Check(ctx context.Context, target resources.Targetable, v data
 		return nil, xerr
 	}
 
-	// Checks required parameters have their values
-	xerr = checkParameters(*f, myV)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
-
+	// // Checks required parameters have their values
+	// xerr = checkRequiredParameters(*f, myV)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
+	//
 	r, xerr := installer.Check(ctx, f, target, myV, s)
 	if xerr != nil {
 		return nil, xerr
@@ -471,17 +471,22 @@ func (f *Feature) findInstallerForTarget(target resources.Targetable, action str
 	return installer, nil
 }
 
-// Check if required parameters defined in specification file have been set in 'v'
-func checkParameters(f Feature, v data.Map) fail.Error {
+// checkRequiredParameters Check if required parameters defined in specification file have been set in 'v'
+func checkRequiredParameters(f Feature, v data.Map) fail.Error {
 	if f.specs.IsSet("feature.parameters") {
 		params := f.specs.GetStringSlice("feature.parameters")
-		for _, k := range params {
-			splitted := strings.Split(k, "=")
+		for _, p := range params {
+			if p == "" {
+				continue
+			}
+
+			splitted := strings.Split(p, "=")
 			if _, ok := v[splitted[0]]; !ok {
 				if len(splitted) == 1 {
-					return fail.InvalidRequestError("missing value for parameter '%s'", k)
+					return fail.InvalidRequestError("missing value for parameter '%s'", p)
 				}
-				v[splitted[0]] = strings.Join(splitted[1:], "=")
+
+				v[splitted[0]] = splitted[1]
 			}
 		}
 	}
@@ -545,12 +550,12 @@ func (f *Feature) Add(ctx context.Context, target resources.Targetable, v data.M
 		return nil, xerr
 	}
 
-	// Checks required parameters have value
-	xerr = checkParameters(*f, myV)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
+	// // Checks required parameters have value
+	// xerr = checkRequiredParameters(*f, myV)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	if !s.AddUnconditionally {
 		results, xerr := f.Check(ctx, target, v, s)
@@ -650,12 +655,12 @@ func (f *Feature) Remove(ctx context.Context, target resources.Targetable, v dat
 		return nil, xerr
 	}
 
-	// Checks required parameters have value
-	xerr = checkParameters(*f, myV)
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
+	// // Checks required parameters have value
+	// xerr = checkRequiredParameters(*f, myV)
+	// xerr = debug.InjectPlannedFail(xerr)
+	// if xerr != nil {
+	// 	return nil, xerr
+	// }
 
 	results, xerr = installer.Remove(ctx, f, target, myV, s)
 	xerr = debug.InjectPlannedFail(xerr)
@@ -808,6 +813,20 @@ func (f Feature) ToProtocol() *protocol.FeatureResponse {
 	out := &protocol.FeatureResponse{
 		Name:     f.GetName(),
 		FileName: f.GetDisplayFilename(),
+	}
+	return out
+}
+
+// ExtractFeatureParameters convert a slice of string in format a=b into a map index on 'a' with value 'b'
+func ExtractFeatureParameters(params []string) data.Map {
+	out := data.Map{}
+	for _, v := range params {
+		splitted := strings.Split(v, "=")
+		if len(splitted) > 1 {
+			out[splitted[0]] = splitted[1]
+		} else {
+			out[splitted[0]] = ""
+		}
 	}
 	return out
 }
