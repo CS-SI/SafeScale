@@ -17,6 +17,7 @@
 package abstract
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -45,6 +46,18 @@ func TestNetwork_NewNetwork(t *testing.T) {
 		t.Error("Network is ok !")
 		t.Fail()
 	}
+}
+
+func TestNetwork_Replace(t *testing.T) {
+
+	var n1 *Network = nil
+	var n2 *Network = nil
+	result := n1.Replace(n2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("Can't replace nil pointer")
+		t.Fail()
+	}
+
 }
 
 func TestNetwork_Clone(t *testing.T) {
@@ -76,14 +89,21 @@ func TestNetwork_Clone(t *testing.T) {
 
 func TestNetwork_Serialize(t *testing.T) {
 
-	n := NewNetwork()
+	var n *Network = nil
+	serial, err := n.Serialize()
+	if err == nil {
+		t.Error("Can't serialize nil pointer")
+		t.Fail()
+	}
+
+	n = NewNetwork()
 	n.ID = "Network ID"
 	n.Name = "Network Name"
 	n.CIDR = "Network CIDR"
 	n.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
 	n.Imported = false
 
-	serial, err := n.Serialize()
+	serial, err = n.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -99,6 +119,66 @@ func TestNetwork_Serialize(t *testing.T) {
 	areEqual := reflect.DeepEqual(n, n2)
 	if !areEqual {
 		t.Error("Serialize/Deserialize does not restitute values")
+		t.Fail()
+	}
+
+}
+
+func TestNetwork_Deserialize(t *testing.T) {
+
+	n := NewNetwork()
+	n.ID = "Network ID"
+	n.Name = "Network Name"
+	n.CIDR = "Network CIDR"
+	n.DNSServers = []string{"DNS1", "DNS2", "DNS3"}
+	n.Imported = false
+
+	serial, err := n.Serialize()
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+
+	var n2 *Network = nil
+	err = n2.Deserialize(serial)
+	if err == nil {
+		t.Error("Can't deserialize nil pointer")
+		t.Fail()
+	}
+
+}
+
+func TestNetwork_GetName(t *testing.T) {
+
+	var n *Network = nil
+	name := n.GetName()
+	if name != "" {
+		t.Error("Can't get name from nil pointer")
+		t.Fail()
+	}
+	n = NewNetwork()
+	n.Name = "Network Name"
+	name = n.GetName()
+	if name != n.Name {
+		t.Error("Wrong value restitution")
+		t.Fail()
+	}
+
+}
+
+func TestNetwork_GetID(t *testing.T) {
+
+	var n *Network = nil
+	id := n.GetID()
+	if id != "" {
+		t.Error("Can't get id from nil pointer")
+		t.Fail()
+	}
+	n = NewNetwork()
+	n.ID = "Network Name"
+	id = n.GetID()
+	if id != n.ID {
+		t.Error("Wrong value restitution")
 		t.Fail()
 	}
 
