@@ -19,8 +19,6 @@ package abstract
 import (
 	"reflect"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestConfigMap_GetString(t *testing.T) {
@@ -28,6 +26,12 @@ func TestConfigMap_GetString(t *testing.T) {
 	c := ConfigMap{}
 	c.Set("value1", 42)
 	c.Set("value2", "string")
+
+	result := c.GetString("value3")
+	if result != "" {
+		t.Error("Wrong GetString value restitution when no key")
+		t.Fail()
+	}
 
 	defer func() {
 		if q := recover(); q == nil {
@@ -37,7 +41,7 @@ func TestConfigMap_GetString(t *testing.T) {
 	}()
 	_ = c.GetString("value1")
 
-	result := c.GetString("value2")
+	result = c.GetString("value2")
 	if result != "string" {
 		t.Error("Wrong GetString value restitution")
 		t.Fail()
@@ -52,6 +56,14 @@ func TestConfigMap_GetSliceOfStrings(t *testing.T) {
 	c.Set("value1", "string")
 	c.Set("value2", v)
 
+	result := c.GetSliceOfStrings("value3")
+	emptySliceOfString := []string{}
+	areEqual := reflect.DeepEqual(result, emptySliceOfString)
+	if !areEqual {
+		t.Error("Wrong GetString value restitution when no key")
+		t.Fail()
+	}
+
 	defer func() {
 		if q := recover(); q == nil {
 			t.Error("GetSliceOfStrings on non map[string]string value expect panic")
@@ -60,8 +72,8 @@ func TestConfigMap_GetSliceOfStrings(t *testing.T) {
 	}()
 	_ = c.GetSliceOfStrings("value1")
 
-	result := c.GetSliceOfStrings("value2")
-	areEqual := reflect.DeepEqual(result, v)
+	result = c.GetSliceOfStrings("value2")
+	areEqual = reflect.DeepEqual(result, v)
 	if !areEqual {
 		t.Error("Wrong GetSliceOfStrings value restitution")
 		t.Fail()
@@ -76,6 +88,14 @@ func TestConfigMap_GetMapOfStrings(t *testing.T) {
 	c.Set("value1", "string")
 	c.Set("value2", v)
 
+	result := c.GetMapOfStrings("value3")
+	emptyMapString := map[string]string{}
+	areEqual := reflect.DeepEqual(result, emptyMapString)
+	if !areEqual {
+		t.Error("Wrong GetString value restitution when no key")
+		t.Fail()
+	}
+
 	defer func() {
 		if q := recover(); q == nil {
 			t.Error("GetMapOfStrings on non map[string]string value expect panic")
@@ -84,8 +104,8 @@ func TestConfigMap_GetMapOfStrings(t *testing.T) {
 	}()
 	_ = c.GetMapOfStrings("value1")
 
-	result := c.GetMapOfStrings("value2")
-	areEqual := reflect.DeepEqual(result, v)
+	result = c.GetMapOfStrings("value2")
+	areEqual = reflect.DeepEqual(result, v)
 	if !areEqual {
 		t.Error("Wrong GetMapOfStrings value restitution")
 		t.Fail()
@@ -99,6 +119,12 @@ func TestConfigMap_GetInteger(t *testing.T) {
 	c.Set("value1", "string")
 	c.Set("value2", 42)
 
+	result := c.GetInteger("value3")
+	if result != 0 {
+		t.Error("Wrong GetString value restitution when no key")
+		t.Fail()
+	}
+
 	defer func() {
 		if q := recover(); q == nil {
 			t.Error("GetInteger on non integer value expect panic")
@@ -107,8 +133,7 @@ func TestConfigMap_GetInteger(t *testing.T) {
 	}()
 	_ = c.GetInteger("value1")
 
-	result := c.GetInteger("value2")
-	assert.Equal(t, result, 42)
+	result = c.GetInteger("value2")
 	if result != 42 {
 		t.Error("Wrong GetInteger value restitution")
 		t.Fail()
