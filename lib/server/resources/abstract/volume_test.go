@@ -17,6 +17,7 @@
 package abstract
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -51,6 +52,17 @@ func TestVolume_NewVolume(t *testing.T) {
 
 }
 
+func TestVolume_Replace(t *testing.T) {
+
+	var v *Volume = nil
+	replaced := v.Replace(NewVolume())
+	if fmt.Sprintf("%p", replaced) != "0x0" {
+		t.Error("Can't replace to nil pointer")
+		t.Fail()
+	}
+
+}
+
 func TestVolume_Clone(t *testing.T) {
 	v := NewVolume()
 	v.ID = "Volume ID"
@@ -78,6 +90,14 @@ func TestVolume_Clone(t *testing.T) {
 }
 
 func TestVolume_Serialize(t *testing.T) {
+
+	var v2 *Volume = nil
+	serial, err := v2.Serialize()
+	if err == nil {
+		t.Error("Can't serialize nil pointer")
+		t.Fail()
+	}
+
 	v := NewVolume()
 	v.ID = "Volume ID"
 	v.Name = "Volume Name"
@@ -85,13 +105,13 @@ func TestVolume_Serialize(t *testing.T) {
 	v.Speed = volumespeed.Cold
 	v.State = volumestate.Unknown
 
-	serial, err := v.Serialize()
+	serial, err = v.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 	}
 
-	v2 := NewVolume()
+	v2 = NewVolume()
 	err = v2.Deserialize(serial)
 	if err != nil {
 		t.Error(err)
@@ -100,6 +120,134 @@ func TestVolume_Serialize(t *testing.T) {
 	areEqual := reflect.DeepEqual(v, v2)
 	if !areEqual {
 		t.Error("Serialize/Deserialize does not restitute values")
+		t.Fail()
+	}
+
+}
+
+func TestVolume_Deserialize(t *testing.T) {
+
+	serial := []byte("{\"id\":\"Volume ID\",\"name\":\"Volume Name\",\"size\":42,\"state\":7,\"tags\":{\"CreationDate\":\"2022-01-21T17:07:34+01:00\",\"ManagedBy\":\"safescale\"}}")
+	var v *Volume = nil
+	err := v.Deserialize(serial)
+	if err == nil {
+		t.Error("Can't deserialize nil pointer")
+		t.Fail()
+	}
+
+}
+
+func TestVolume_GetName(t *testing.T) {
+
+	var v *Volume = nil
+	name := v.GetName()
+	if name != "" {
+		t.Error("Can't get name from nil pointer")
+		t.Fail()
+	}
+	v = NewVolume()
+	v.Name = "Volume Name"
+	name = v.GetName()
+	if name != v.Name {
+		t.Error("Wrong value restitution")
+		t.Fail()
+	}
+
+}
+
+func TestVolume_GetID(t *testing.T) {
+
+	var v *Volume = nil
+	id := v.GetID()
+	if id != "" {
+		t.Error("Can't get id from nil pointer")
+		t.Fail()
+	}
+	v = NewVolume()
+	v.ID = "Volume ID"
+	id = v.GetID()
+	if id != v.ID {
+		t.Error("Wrong value restitution")
+		t.Fail()
+	}
+
+}
+
+func Test_NewVolumeAttachment(t *testing.T) {
+
+	va := NewVolumeAttachment()
+	if reflect.TypeOf(va).String() != "*abstract.VolumeAttachment" {
+		t.Error("Expect *abstract.VolumeAttachment")
+		t.Fail()
+	}
+
+}
+
+func TestVolumeAttachment_IsNull(t *testing.T) {
+
+	var va *VolumeAttachment = nil
+	if !va.IsNull() {
+		t.Error("nil pointer is null")
+		t.Fail()
+	}
+	va = NewVolumeAttachment()
+	if !va.IsNull() {
+		t.Error("VolumeAttachment require ID/name to not null")
+		t.Fail()
+	}
+	va.ID = "VolumeAttachement ID"
+	if va.IsNull() {
+		t.Error("No, is not null")
+		t.Fail()
+	}
+
+}
+
+func TestVolumeAttachment_OK(t *testing.T) {
+
+	var va *VolumeAttachment = nil
+	if va.OK() {
+		t.Error("nil pointer can't be ok")
+		t.Fail()
+	}
+	va = NewVolumeAttachment()
+	if va.OK() {
+		t.Error("VolumeAttachment require being filled to be ok")
+		t.Fail()
+	}
+	va.ID = "VolumeAttachment ID"
+	if va.OK() {
+		t.Error("VolumeAttachment require being filled to be ok")
+		t.Fail()
+	}
+	va.Name = "VolumeAttachment Name"
+	if va.OK() {
+		t.Error("VolumeAttachment require being filled to be ok")
+		t.Fail()
+	}
+	va.VolumeID = "VolumeAttachment VolumeID"
+	if va.OK() {
+		t.Error("VolumeAttachment require being filled to be ok")
+		t.Fail()
+	}
+	va.ServerID = "VolumeAttachment ServerID"
+	if va.OK() {
+		t.Error("VolumeAttachment require being filled to be ok")
+		t.Fail()
+	}
+	va.Device = "VolumeAttachment Device"
+	if va.OK() {
+		t.Error("VolumeAttachment require being filled to be ok")
+		t.Fail()
+	}
+	va.MountPoint = "VolumeAttachment MountPoint"
+	if va.OK() {
+		t.Error("VolumeAttachment require being filled to be ok")
+		t.Fail()
+	}
+	va.Format = "VolumeAttachment Format"
+	if !va.OK() {
+		t.Error("No, is ok")
 		t.Fail()
 	}
 

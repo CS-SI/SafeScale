@@ -155,7 +155,10 @@ func (va *VolumeAttachment) IsNull() bool {
 }
 
 // OK ...
-func (va VolumeAttachment) OK() bool {
+func (va *VolumeAttachment) OK() bool {
+	if va == nil {
+		return false
+	}
 	result := true
 	result = result && va.ID != ""
 	result = result && va.Name != ""
