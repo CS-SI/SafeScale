@@ -17,6 +17,7 @@
 package abstract
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -47,6 +48,17 @@ func TestSubnet_NewSubnet(t *testing.T) {
 	}
 	if !s.OK() {
 		t.Error("Subnet is ok !")
+		t.Fail()
+	}
+
+}
+
+func TestSubnet_Replace(t *testing.T) {
+
+	var s *Subnet = nil
+	replaced := s.Replace(NewSubnet())
+	if fmt.Sprintf("%p", replaced) != "0x0" {
+		t.Error("Can't replace nil pointer")
 		t.Fail()
 	}
 
@@ -88,7 +100,14 @@ func TestSubnet_Clone(t *testing.T) {
 
 func TestSubnet_Serialize(t *testing.T) {
 
-	s := NewSubnet()
+	var s *Subnet = nil
+	serial, err := s.Serialize()
+	if err == nil {
+		t.Error("Can't serialize nil pointer")
+		t.Fail()
+	}
+
+	s = NewSubnet()
 	s.ID = "Subnet ID"
 	s.Name = "Subnet Name"
 	s.Network = "Subnet Network"
@@ -104,7 +123,7 @@ func TestSubnet_Serialize(t *testing.T) {
 	s.DefaultSSHPort = 42
 	s.SingleHostCIDRIndex = 14
 
-	serial, err := s.Serialize()
+	serial, err = s.Serialize()
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -119,6 +138,18 @@ func TestSubnet_Serialize(t *testing.T) {
 	areEqual := reflect.DeepEqual(s, s2)
 	if !areEqual {
 		t.Error("Serialize/Deserialize does not restitute values")
+		t.Fail()
+	}
+
+}
+
+func TestSubnet_Deserialize(t *testing.T) {
+
+	serial := []byte("{\"id\":\"Subnet ID\",\"name\":\"Subnet Name\",\"network\":\"Subnet Network\",\"mask\":\"Subnet CIDR\",\"domain\":\"Subnet Domain\",\"dns_servers\":[\"DNS1\",\"DNS2\",\"DNS3\"], \"gateway_id\":[\"GatewayID1\",\"GatewayID2\",\"GatewayID3\"],\"ip_version\":4,\"gw_security_group_id\":\"Subnet GWSecurityGroupID\",\"publicip_security_group_id\":\"Subnet PublicIPSecurityGroupID\",\"internal_security_group_id\":\"Subnet InternalSecurityGroupID\",\"default_ssh_port\":42,\"single_host_cidr_index\":14,\"tags\":{\"CreationDate\":\"2022-01-21T16:46:55+01:00\",\"ManagedBy\":\"safescale\"}}\"")
+	var s *Subnet = nil
+	err := s.Deserialize(serial)
+	if err == nil {
+		t.Error("Can't deserialize to nil pointer")
 		t.Fail()
 	}
 
@@ -154,5 +185,79 @@ func TestVirtualIP_Clone(t *testing.T) {
 	}
 
 	require.NotEqualValues(t, v, v2)
+
+}
+
+func TestSubnet_GetName(t *testing.T) {
+
+	var s *Subnet = nil
+	name := s.GetName()
+	if name != "" {
+		t.Error("Can't get name from nil pointer")
+		t.Fail()
+	}
+	s = NewSubnet()
+	s.Name = "Subnet Name"
+	name = s.GetName()
+	if name != s.Name {
+		t.Error("Wrong value restitution")
+		t.Fail()
+	}
+
+}
+
+func TestSubnet_GetID(t *testing.T) {
+
+	var s *Subnet = nil
+	id := s.GetID()
+	if id != "" {
+		t.Error("Can't get id from nil pointer")
+		t.Fail()
+	}
+	s = NewSubnet()
+	s.ID = "Subnet ID"
+	id = s.GetID()
+	if id != s.ID {
+		t.Error("Wrong value restitution")
+		t.Fail()
+	}
+
+}
+
+func TestVirtualIP_IsNull(t *testing.T) {
+
+	var v *VirtualIP = nil
+	if !v.IsNull() {
+		t.Error("Nil pointer virtual ip is null")
+		t.Fail()
+	}
+	v = NewVirtualIP()
+	if !v.IsNull() {
+		t.Error("Virtual ip without ID or Name is null")
+		t.Fail()
+	}
+	v.ID = "VirtualIP ID"
+	if v.IsNull() {
+		t.Error("No, is not null")
+		t.Fail()
+	}
+	v.ID = ""
+	v.Name = "VirtualIP Name"
+	if v.IsNull() {
+		t.Error("No, is not null")
+		t.Fail()
+	}
+
+}
+
+func TestVirtualIP_Replace(t *testing.T) {
+
+	var v *VirtualIP = nil
+	v2 := NewVirtualIP()
+	replaced := v.Replace(v2)
+	if fmt.Sprintf("%p", replaced) != "0x0" {
+		t.Error("Can't replace to nil pointer")
+		t.Fail()
+	}
 
 }

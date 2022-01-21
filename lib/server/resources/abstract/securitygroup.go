@@ -298,11 +298,15 @@ type SecurityGroupRules []*SecurityGroupRule
 
 // IndexOfEquivalentRule returns the index of the rule equivalent to the one provided
 func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (int, fail.Error) {
-	if sgrs == nil {
-		return -1, fail.InvalidInstanceError()
-	}
+	// Current instance not a pointer, can't happens
+	//if sgrs == nil {
+	//	return -1, fail.InvalidInstanceError()
+	//}
 	if rule == nil {
 		return -1, fail.InvalidParameterCannotBeNilError("rule")
+	}
+	if len(sgrs) == 0 {
+		return -1, fail.NotFoundError("no corresponding rule found")
 	}
 
 	found := false
@@ -325,6 +329,9 @@ func (sgrs SecurityGroupRules) Clone() SecurityGroupRules {
 	var asgr = make(SecurityGroupRules, 0)
 	var cloneRule *SecurityGroupRule
 	for _, v := range sgrs {
+		if v == nil {
+			continue
+		}
 		var ok bool
 		cloneRule, ok = v.Clone().(*SecurityGroupRule)
 		if !ok {
@@ -338,13 +345,16 @@ func (sgrs SecurityGroupRules) Clone() SecurityGroupRules {
 
 // IndexOfRuleByID returns the index of the rule containing the provider rule ID provided
 func (sgrs SecurityGroupRules) IndexOfRuleByID(id string) (int, fail.Error) {
-	if sgrs == nil {
-		return -1, fail.InvalidInstanceError()
-	}
-
+	// --- Can't happens
+	//if sgrs == nil {
+	//	return -1, fail.InvalidInstanceError()
+	//}
 	found := false
 	index := -1
 	for k, v := range sgrs {
+		if v == nil {
+			continue
+		}
 		for _, item := range v.IDs {
 			if item == id {
 				found = true
@@ -500,7 +510,15 @@ func (sg *SecurityGroup) Deserialize(buf []byte) (xerr fail.Error) {
 	return nil
 }
 
-// GetName returns the name of the volume
+// GetNetworkID returns the networkId of the securitygroup
+func (sg *SecurityGroup) GetNetworkID() string {
+	if sg == nil {
+		return ""
+	}
+	return sg.Network
+}
+
+// GetName returns the name of the securitygroup
 // Satisfies interface data.Identifiable
 func (sg *SecurityGroup) GetName() string {
 	if sg == nil {
@@ -509,7 +527,7 @@ func (sg *SecurityGroup) GetName() string {
 	return sg.Name
 }
 
-// GetID returns the ID of the volume
+// GetID returns the ID of the securitygroup
 // Satisfies interface data.Identifiable
 func (sg *SecurityGroup) GetID() string {
 	if sg == nil {
