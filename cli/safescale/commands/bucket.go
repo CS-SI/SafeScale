@@ -55,7 +55,8 @@ var bucketList = &cli.Command{
 			Usage:   "List all Buckets on tenant (not only those created by SafeScale)",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -77,7 +78,8 @@ var bucketCreate = &cli.Command{
 	Aliases:   []string{"new"},
 	Usage:     "Creates a bucket",
 	ArgsUsage: "BUCKET_NAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -103,7 +105,8 @@ var bucketDelete = &cli.Command{
 	Aliases:   []string{"remove", "rm"},
 	Usage:     "Remove a bucket",
 	ArgsUsage: "BUCKET_NAME [BUCKET_NAME...]",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -133,7 +136,8 @@ var bucketInspect = &cli.Command{
 	Aliases:   []string{"show", "detail"},
 	Usage:     "Inspect a bucket",
 	ArgsUsage: "BUCKET_NAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -165,7 +169,8 @@ var bucketMount = &cli.Command{
 			Usage: "Mount point of the bucket",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		switch c.NArg() {
 		case 0:
@@ -196,7 +201,8 @@ var bucketUnmount = &cli.Command{
 	Aliases:   []string{"unmount"},
 	Usage:     "Unmount a Bucket from the filesystem of a host",
 	ArgsUsage: "BUCKET_NAME HOST_REF",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", bucketCmdLabel, c.Command.Name, c.Args())
 		switch c.NArg() {
 		case 0:

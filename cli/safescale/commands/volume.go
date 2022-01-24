@@ -61,7 +61,8 @@ var volumeList = &cli.Command{
 			Aliases: []string{"a"},
 			Usage:   "List all Volumes on tenant (not only those created by SafeScale)",
 		}},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -83,7 +84,8 @@ var volumeInspect = &cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "Inspect volume",
 	ArgsUsage: "<Volume_name|Volume_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -109,7 +111,8 @@ var volumeDelete = &cli.Command{
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove volume",
 	ArgsUsage: "<Volume_name|Volume_ID> [<Volume_name|Volume_ID>...]",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -151,7 +154,8 @@ var volumeCreate = &cli.Command{
 			Usage: fmt.Sprintf("Allowed values: %s", getAllowedSpeeds()),
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -212,7 +216,8 @@ var volumeAttach = &cli.Command{
 			Usage: "Prevent the volume to be mounted",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -246,7 +251,8 @@ var volumeDetach = &cli.Command{
 	Aliases:   []string{"unbind"},
 	Usage:     "Detach a volume from a host",
 	ArgsUsage: "<Volume_name|Volume_ID> <Host_name|Host_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", volumeCmdName, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)

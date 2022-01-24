@@ -65,7 +65,8 @@ var networkList = &cli.Command{
 			Usage:   "Lists all Networks available on tenant (not only those created by SafeScale)",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -95,7 +96,8 @@ var networkDelete = &cli.Command{
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "delete NETWORKREF",
 	ArgsUsage: "NETWORKREF [NETWORKREF ...]",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
@@ -135,7 +137,8 @@ var networkInspect = &cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "Show details of a network",
 	ArgsUsage: "NETWORKREF",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -350,7 +353,8 @@ var networkCreate = &cli.Command{
 			Meaningful only if --empty is not used`,
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", networkCmdLabel, c.Command.Name, c.Args())
 
 		switch c.NArg() {
@@ -434,7 +438,8 @@ var networkSecurityGroupList = &cli.Command{
 			Usage:   "List all Security Groups on tenant (not only those created by SafeScale)",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
 			c.Command.Name, c.Args(),
@@ -484,7 +489,8 @@ var networkSecurityGroupInspect = &cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "Shows details of Security Group",
 	ArgsUsage: "NETWORKREF GROUPREF",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
 			c.Command.Name, c.Args(),
@@ -574,7 +580,8 @@ var networkSecurityGroupCreate = &cli.Command{
 			Usage:   "Describe the group",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
 			c.Command.Name, c.Args(),
@@ -621,7 +628,8 @@ var networkSecurityGroupClear = &cli.Command{
 	Aliases:   []string{"reset"},
 	Usage:     "deletes all rules of a Security Group",
 	ArgsUsage: "NETWORKREF GROUPREF",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
 			c.Command.Name, c.Args(),
@@ -670,7 +678,8 @@ var networkSecurityGroupDelete = &cli.Command{
 			Value: false,
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%v'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
 			c.Command.Name, c.Args(),
@@ -719,7 +728,8 @@ var networkSecurityGroupBonds = &cli.Command{
 			Usage: "Narrow to the kind of resource specified; can be 'hosts', 'subnets' or 'all' (default: 'all')",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
 			c.Command.Name, c.Args(),
@@ -837,7 +847,8 @@ var networkSecurityGroupRuleAdd = &cli.Command{
 			Usage: "source/target of the rule; may be used multiple times",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
 			c.Command.Name, c.Args(),
@@ -941,7 +952,8 @@ var networkSecurityGroupRuleDelete = &cli.Command{
 			Usage: "source/target of the rule",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, securityCmdLabel, groupCmdLabel,
 			c.Command.Name, c.Args(),
@@ -1030,7 +1042,8 @@ var subnetList = &cli.Command{
 			Usage:   "List all Subnets on tenant (not only those created by SafeScale)",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s with args %q", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
 		)
@@ -1110,7 +1123,8 @@ var subnetDelete = &cli.Command{
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
 		)
@@ -1158,7 +1172,8 @@ var subnetInspect = &cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "Show details of a subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
 		)
@@ -1274,7 +1289,8 @@ var subnetCreate = &cli.Command{
 `,
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, c.Command.Name, c.Args(),
 		)
@@ -1348,7 +1364,8 @@ var subnetVIPCreateCommand = &cli.Command{
 	Usage: `creates a VIP in a Subnet of a Network.
 		If NETWORKREF == -, SUBNETREF must be a Subnet ID`,
 	ArgsUsage: "NETWORKREF|- SUBNETREF VIPNAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
 			c.Command.Name, c.Args(),
@@ -1386,7 +1403,8 @@ var subnetVIPInspectCommand = &cli.Command{
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
 			c.Command.Name, c.Args(),
@@ -1425,7 +1443,8 @@ var subnetVIPDeleteCommand = &cli.Command{
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
 			c.Command.Name, c.Args(),
@@ -1463,7 +1482,8 @@ var subnetVIPBindCommand = &cli.Command{
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
 			c.Command.Name, c.Args(),
@@ -1504,7 +1524,8 @@ var subnetVIPUnbindCommand = &cli.Command{
 			Usage: "defines the network where to search for the subnet, when a same subnet name is used in several networks",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, vipCmdLabel,
 			c.Command.Name, c.Args(),
@@ -1572,7 +1593,8 @@ var subnetSecurityGroupAddCommand = &cli.Command{
 			Usage: "adds the security group to the network without applying its rules",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
 			groupCmdLabel, c.Command.Name, c.Args(),
@@ -1623,7 +1645,8 @@ var subnetSecurityGroupRemoveCommand = &cli.Command{
 	Aliases:   []string{"rm", "detach", "unbind"},
 	Usage:     "removes a security group from a subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
 			groupCmdLabel, c.Command.Name, c.Args(),
@@ -1687,7 +1710,8 @@ var subnetSecurityGroupListCommand = &cli.Command{
 			Usage: "Narrows to the security groups in defined state; can be 'enabled', 'disabled' or 'all' (default: 'all')",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s %s with args '%v'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
 			groupCmdLabel, c.Command.Name, c.Args(),
@@ -1742,7 +1766,8 @@ var subnetSecurityGroupEnableCommand = &cli.Command{
 	Aliases:   []string{"activate"},
 	Usage:     "Enables a security group on a subnet",
 	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s %s with args '%s'", networkCmdLabel, subnetCmdLabel, securityCmdLabel,
 			groupCmdLabel, c.Command.Name, c.Args(),
@@ -1793,7 +1818,8 @@ var subnetSecurityGroupDisableCommand = &cli.Command{
 	Aliases:   []string{"deactivate"},
 	Usage:     "disable SUBNETREF GROUPREF",
 	ArgsUsage: "NETWORKREF SUBNETREF GROUPREF",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef(
 			"SafeScale command: %s %s %s %s %s with args '%s'", hostCmdLabel, subnetCmdLabel, securityCmdLabel,
 			groupCmdLabel, c.Command.Name, c.Args(),

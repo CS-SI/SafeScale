@@ -239,7 +239,8 @@ func main() {
 		},
 	}
 
-	app.Before = func(c *cli.Context) error {
+	app.Before = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		// Sets profiling
 		if c.IsSet("profile") {
 			what := c.String("profile")
@@ -268,7 +269,8 @@ func main() {
 		return nil
 	}
 
-	app.Action = func(c *cli.Context) error {
+	app.Action = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		work(c)
 		return nil
 	}

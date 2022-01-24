@@ -48,7 +48,8 @@ var imageList = &cli.Command{
 			Name:  "all",
 			Usage: "List all available images in tenant (without any filter)",
 		}},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", imageCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))

@@ -87,7 +87,8 @@ var clusterListCommand = &cli.Command{
 	Aliases: []string{"ls"},
 	Usage:   "List available clusters",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -184,7 +185,8 @@ var clusterInspectCommand = &cli.Command{
 	Usage:     "inspect CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 		if err := extractClusterName(c); err != nil {
@@ -210,7 +212,8 @@ var clusterInspectCommand = &cli.Command{
 	},
 }
 
-func extractClusterName(c *cli.Context) error {
+func extractClusterName(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	if c.NArg() < 1 {
 		_ = cli.ShowSubcommandHelp(c)
 		return clitools.ExitOnInvalidArgument("Missing mandatory argument CLUSTERNAME.")
@@ -533,7 +536,8 @@ var clusterDeleteCommand = &cli.Command{
 		},
 	},
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -570,7 +574,8 @@ var clusterStopCommand = &cli.Command{
 	Usage:     "stop CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -597,7 +602,8 @@ var clusterStartCommand = &cli.Command{
 	Usage:     "start CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -624,7 +630,8 @@ var clusterStateCommand = &cli.Command{
 	Usage:     "state CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -685,7 +692,8 @@ var clusterExpandCommand = &cli.Command{
 			Usage:   "Allow to define parameter values for automatically installed Features (format: [FEATURENAME:]PARAMNAME=PARAMVALUE)",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -754,7 +762,8 @@ var clusterShrinkCommand = &cli.Command{
 		},
 	},
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -800,7 +809,8 @@ var clusterKubectlCommand = &cli.Command{
 	Usage:     "kubectl CLUSTERNAME [KUBECTL_COMMAND]... [-- [KUBECTL_OPTIONS]...]",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -893,7 +903,8 @@ var clusterHelmCommand = &cli.Command{
 	Usage:     "helm CLUSTERNAME COMMAND [[--][PARAMS ...]]",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -994,7 +1005,8 @@ var clusterRunCommand = &cli.Command{
 	Usage:     "run CLUSTERNAME COMMAND",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1023,7 +1035,7 @@ func executeCommand(clientSession *client.Session, command string, files *client
 		}
 	}
 
-	retcode, _ /*stdout*/, _ /*stderr*/, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
+	retcode, _, _, xerr := clientSession.SSH.Run(master.GetId(), command, outs, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 	if xerr != nil {
 		msg := fmt.Sprintf("failed to execute command on master '%s' of cluster '%s': %s", master.GetName(), clusterName, xerr.Error())
 		return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
@@ -1136,7 +1148,8 @@ var clusterNodeListCommand = &cli.Command{
 	Usage:     "Lists the nodes of a cluster",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1171,7 +1184,8 @@ var clusterNodeInspectCommand = &cli.Command{
 	Usage:     "Show details about a cluster node",
 	ArgsUsage: "CLUSTERNAME HOSTNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1215,7 +1229,8 @@ var clusterNodeDeleteCommand = &cli.Command{
 		},
 	},
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1263,7 +1278,8 @@ var clusterNodeStopCommand = &cli.Command{
 	Aliases:   []string{"freeze"},
 	Usage:     "node stop CLUSTERNAME HOSTNAME",
 	ArgsUsage: "CLUSTERNAME HOSTNAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1295,7 +1311,8 @@ var clusterNodeStartCommand = &cli.Command{
 	Aliases:   []string{"unfreeze"},
 	Usage:     "node start CLUSTERNAME HOSTNAME",
 	ArgsUsage: "CLUSTERNAME NODENAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1326,7 +1343,8 @@ var clusterNodeStateCommand = &cli.Command{
 	Name:      "state",
 	Usage:     "node state CLUSTERNAME HOSTNAME",
 	ArgsUsage: "CLUSTERNAME NODENAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterNodeCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1379,7 +1397,8 @@ var clusterMasterListCommand = &cli.Command{
 	Usage:     "list CLUSTERNAME",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1415,7 +1434,8 @@ var clusterMasterInspectCommand = &cli.Command{
 	Usage:     "Show details about a Cluster master",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1447,7 +1467,8 @@ var clusterMasterStopCommand = &cli.Command{ // nolint
 	Aliases:   []string{"freeze"},
 	Usage:     "master stop CLUSTERNAME MASTERNAME",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1479,7 +1500,8 @@ var clusterMasterStartCommand = &cli.Command{ // nolint
 	Aliases:   []string{"unfreeze"},
 	Usage:     "master start CLUSTERNAME MASTERNAME",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1510,7 +1532,8 @@ var clusterMasterStateCommand = &cli.Command{ // nolint
 	Name:      "state",
 	Usage:     "master state CLUSTERNAME MASTERNAME",
 	ArgsUsage: "CLUSTERNAME MASTERNAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterMasterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1578,7 +1601,8 @@ var clusterFeatureListCommand = &cli.Command{
 	Action: clusterFeatureListAction,
 }
 
-func clusterFeatureListAction(c *cli.Context) error {
+func clusterFeatureListAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -1618,7 +1642,8 @@ var clusterFeatureInspectCommand = &cli.Command{
 	Action: clusterFeatureInspectAction,
 }
 
-func clusterFeatureInspectAction(c *cli.Context) error {
+func clusterFeatureInspectAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -1667,7 +1692,8 @@ var clusterFeatureExportCommand = &cli.Command{
 	Action: clusterFeatureExportAction,
 }
 
-func clusterFeatureExportAction(c *cli.Context) error {
+func clusterFeatureExportAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -1720,7 +1746,8 @@ var clusterFeatureAddCommand = &cli.Command{
 	Action: clusterFeatureAddAction,
 }
 
-func clusterFeatureAddAction(c *cli.Context) error {
+func clusterFeatureAddAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, c.Command.Name, c.Args())
 	if err := extractClusterName(c); err != nil {
 		return clitools.FailureResponse(err)
@@ -1776,7 +1803,8 @@ var clusterFeatureCheckCommand = &cli.Command{
 	Action: clusterFeatureCheckAction,
 }
 
-func clusterFeatureCheckAction(c *cli.Context) error {
+func clusterFeatureCheckAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, c.Command.Name, c.Args())
 
 	if err := extractClusterName(c); err != nil {
@@ -1822,7 +1850,8 @@ var clusterFeatureRemoveCommand = &cli.Command{
 	Action: clusterFeatureRemoveAction,
 }
 
-func clusterFeatureRemoveAction(c *cli.Context) error {
+func clusterFeatureRemoveAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", clusterCmdLabel, clusterFeatureCmdLabel, c.Command.Name, c.Args())
 	if err := extractClusterName(c); err != nil {
 		return clitools.FailureResponse(err)
@@ -1870,7 +1899,8 @@ var clusterAnsibleInventoryCommands = &cli.Command{
 	Usage:     "inventory CLUSTERNAME COMMAND [[--][PARAMS ...]]",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -1959,7 +1989,8 @@ var clusterAnsibleRunCommands = &cli.Command{
 	Usage:     "run CLUSTERNAME COMMAND [[--][PARAMS ...]]",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {
@@ -2051,7 +2082,9 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 	Usage:     "playbook CLUSTERNAME COMMAND [[--][PARAMS ...]]",
 	ArgsUsage: "CLUSTERNAME",
 
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
+
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", clusterCmdLabel, c.Command.Name, c.Args())
 		err := extractClusterName(c)
 		if err != nil {

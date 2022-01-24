@@ -67,7 +67,8 @@ var hostStart = &cli.Command{
 	Name:      "start",
 	Usage:     "start Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -93,7 +94,8 @@ var hostStop = &cli.Command{
 	Name:      "stop",
 	Usage:     "stop Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -119,7 +121,8 @@ var hostReboot = &cli.Command{
 	Name:      "reboot",
 	Usage:     "reboot Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -152,7 +155,8 @@ var hostList = &cli.Command{
 			Usage:   "List all hosts on tenant (not only those created by SafeScale)",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -191,7 +195,8 @@ var hostInspect = &cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "inspect Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -218,7 +223,8 @@ var hostStatus = &cli.Command{
 	Aliases:   []string{"status"},
 	Usage:     "status Host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -312,7 +318,8 @@ May be used multiple times, the first occurrence becoming the default subnet by 
 				--sizing "cpu <= 8, ram ~ 16"`,
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%v", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -380,7 +387,8 @@ var hostResize = &cli.Command{ // nolint
 			Usage: "Minimum cpu frequency required for the host (GHz)",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -419,7 +427,8 @@ var hostDelete = &cli.Command{
 	Aliases:   []string{"rm", "remove"},
 	Usage:     "Remove host",
 	ArgsUsage: "<Host_name|Host_ID> [<Host_name|Host_ID>...]",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -446,7 +455,8 @@ var hostSSH = &cli.Command{
 	Name:      "ssh",
 	Usage:     "Get ssh config to connect to host",
 	ArgsUsage: "<Host_name|Host_ID>",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() < 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -603,7 +613,8 @@ var hostSecurityGroupAddCommand = &cli.Command{
 			Usage: "adds the security group to the host but does not activate it",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -629,7 +640,8 @@ var hostSecurityGroupRemoveCommand = &cli.Command{
 	Aliases:   []string{"rm", "detach", "unbind"},
 	Usage:     "remove HOSTNAME GROUPNAME",
 	ArgsUsage: "HOSTNAME GROUPNAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -668,7 +680,8 @@ var hostSecurityGroupListCommand = &cli.Command{
 			Usage: "Narrow to the security groups in asked status; can be 'enabled', 'disabled' or 'all' (default: 'all')",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -719,7 +732,8 @@ var hostSecurityGroupEnableCommand = &cli.Command{
 	Aliases:   []string{"activate"},
 	Usage:     "enable NETWORKNAME GROUPNAME",
 	ArgsUsage: "NETWORKNAME GROUPNAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -745,7 +759,8 @@ var hostSecurityGroupDisableCommand = &cli.Command{
 	Aliases:   []string{"deactivate"},
 	Usage:     "disable HOSTNAME GROUPNAME",
 	ArgsUsage: "HOSTNAME GROUPNAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s %s %s with args '%s'", hostCmdLabel, securityCmdLabel, groupCmdLabel, c.Command.Name, c.Args())
 		if c.NArg() != 2 {
 			_ = cli.ShowSubcommandHelp(c)
@@ -799,7 +814,8 @@ var hostFeatureListCommand = &cli.Command{
 	Action: hostFeatureListAction,
 }
 
-func hostFeatureListAction(c *cli.Context) error {
+func hostFeatureListAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -834,7 +850,8 @@ var hostFeatureInspectCommand = &cli.Command{
 	Action: hostFeatureInspectAction,
 }
 
-func hostFeatureInspectAction(c *cli.Context) error {
+func hostFeatureInspectAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -884,7 +901,8 @@ var hostFeatureExportCommand = &cli.Command{
 	Action: hostFeatureExportAction,
 }
 
-func hostFeatureExportAction(c *cli.Context) error {
+func hostFeatureExportAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s with args '%s'", hostCmdLabel, c.Command.Name, c.Args())
 
 	clientSession, xerr := client.New(c.String("server"))
@@ -937,7 +955,8 @@ var hostFeatureAddCommand = &cli.Command{
 	Action: hostFeatureAddAction,
 }
 
-func hostFeatureAddAction(c *cli.Context) error {
+func hostFeatureAddAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 
 	hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
@@ -995,7 +1014,8 @@ var hostFeatureCheckCommand = &cli.Command{
 	Action: hostFeatureCheckAction,
 }
 
-func hostFeatureCheckAction(c *cli.Context) error {
+func hostFeatureCheckAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 	hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {
@@ -1052,7 +1072,8 @@ var hostFeatureRemoveCommand = &cli.Command{
 	Action: hostFeatureRemoveAction,
 }
 
-func hostFeatureRemoveAction(c *cli.Context) error {
+func hostFeatureRemoveAction(c *cli.Context) (ferr error) {
+	defer fail.OnPanic(&ferr)
 	logrus.Tracef("SafeScale command: %s %s %s with args '%s'", hostCmdLabel, hostFeatureCmdLabel, c.Command.Name, c.Args())
 	hostName, hostInstance, err := extractHostArgument(c, 0, DoInstanciate)
 	if err != nil {

@@ -50,7 +50,8 @@ var tenantListCommand = &cli.Command{
 	Name:    "list",
 	Aliases: []string{"ls"},
 	Usage:   "List available tenants",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -72,7 +73,8 @@ var tenantGetCommand = &cli.Command{
 	Name:    "get",
 	Aliases: []string{"current"},
 	Usage:   "Get current tenant",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", tenantCmdLabel, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -93,7 +95,8 @@ var tenantGetCommand = &cli.Command{
 var tenantSetCommand = &cli.Command{
 	Name:  "set",
 	Usage: "Set tenant to work with",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
@@ -120,7 +123,8 @@ var tenantInspectCommand = &cli.Command{
 	Name:    "inspect",
 	Aliases: []string{"show"},
 	Usage:   "Inspect tenant",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
@@ -150,7 +154,8 @@ var tenantScanCommand = &cli.Command{
 		&cli.BoolFlag{Name: "dry-run", Aliases: []string{"n"}},
 		&cli.StringSliceFlag{Name: "template", Aliases: []string{"t"}},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
@@ -199,7 +204,8 @@ var tenantMetadataUpgradeCommand = &cli.Command{
 	// 		Aliases: []string{"n"},
 	// 	},
 	// },
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))
@@ -228,7 +234,8 @@ var tenantMetadataDeleteCommand = &cli.Command{
 	Name:    tenantMetadataDeleteCmdLabel,
 	Aliases: []string{"remove", "rm", "destroy", "cleanup"},
 	Usage:   "Remove SafeScale metadata (making SafeScale unable to manage resources anymore); use with caution",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		if c.NArg() != 1 {
 			_ = cli.ShowSubcommandHelp(c)
 			return clitools.FailureResponse(clitools.ExitOnInvalidArgument("Missing mandatory argument <tenant_name>."))

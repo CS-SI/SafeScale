@@ -58,7 +58,8 @@ var templateList = &cli.Command{
 			Usage:   "Display only templates with scanned information",
 		},
 	},
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -79,7 +80,8 @@ var templateMatch = &cli.Command{
 	Name:      "match",
 	Usage:     "List templates that match the SIZING",
 	ArgsUsage: "SIZING",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))
@@ -104,7 +106,8 @@ var templateInspect = &cli.Command{
 	Aliases:   []string{"show"},
 	Usage:     "Display available template information",
 	ArgsUsage: "NAME",
-	Action: func(c *cli.Context) error {
+	Action: func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		logrus.Tracef("SafeScale command: %s %s with args '%s'", templateCmdName, c.Command.Name, c.Args())
 
 		clientSession, xerr := client.New(c.String("server"))

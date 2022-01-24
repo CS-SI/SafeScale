@@ -48,9 +48,12 @@ import (
 var profileCloseFunc = func() {}
 
 func cleanup(clientSession *client.Session, onAbort *uint32) {
+	var crash error
+	defer fail.OnPanic(&crash) // nolint
+
 	if atomic.CompareAndSwapUint32(onAbort, 0, 0) {
 		profileCloseFunc()
-		os.Exit(0)
+		os.Exit(0) // nolint
 	}
 
 	fmt.Println("\nBe careful: stopping safescale will not stop the job on safescaled, but will try to go back to the previous state as much as possible.")
@@ -140,7 +143,8 @@ func main() {
 		},
 	}
 
-	app.Before = func(c *cli.Context) error {
+	app.Before = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		// Define trace settings of the application (what to trace if trace is wanted)
 		// TODO: is it the good behavior ? Shouldn't we fail ?
 		// If trace settings cannot be registered, report it but do not fail
@@ -197,7 +201,8 @@ func main() {
 		return nil
 	}
 
-	app.After = func(c *cli.Context) error {
+	app.After = func(c *cli.Context) (ferr error) {
+		defer fail.OnPanic(&ferr)
 		cleanup(clientSession, &onAbort)
 		return nil
 	}
