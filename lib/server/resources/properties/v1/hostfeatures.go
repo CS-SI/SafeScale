@@ -48,8 +48,8 @@ func (hif *HostInstalledFeature) IsNull() bool {
 
 // Clone ...
 // satisfies interface data.Clonable
-func (hif HostInstalledFeature) Clone() data.Clonable {
-	return NewClusterInstalledFeature().Replace(&hif)
+func (hif *HostInstalledFeature) Clone() data.Clonable {
+	return NewHostInstalledFeature().Replace(hif)
 }
 
 // Replace ...
