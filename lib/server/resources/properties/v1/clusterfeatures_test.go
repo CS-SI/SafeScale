@@ -17,12 +17,76 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestClusterInstalledFeature_IsNull(t *testing.T) {
+
+	var cif *ClusterInstalledFeature = nil
+	if !cif.IsNull() {
+		t.Error("Nil pointer ClusterInstalledFeature is null")
+		t.Fail()
+	}
+	cif = &ClusterInstalledFeature{
+		Name: "",
+	}
+	if !cif.IsNull() {
+		t.Error("ClusterInstalledFeature without name is null")
+		t.Fail()
+	}
+	cif = &ClusterInstalledFeature{
+		Name: "Feature Name",
+	}
+	if cif.IsNull() {
+		t.Error("ClusterInstalledFeature is not null")
+		t.Fail()
+	}
+}
+
+func TestClusterInstalledFeature_Replace(t *testing.T) {
+
+	var cif *ClusterInstalledFeature = nil
+	cif2 := &ClusterInstalledFeature{
+		Name: "Feature Name",
+	}
+	result := cif.Replace(cif2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("Nil pointer can't be replaced")
+		t.Fail()
+	}
+	cif = &ClusterInstalledFeature{
+		Name: "Feature Name 2",
+		RequiredBy: map[string]struct{}{
+			"ParentFeature1": {},
+			"ParentFeature2": {},
+		},
+	}
+	result = cif2.Replace(cif)
+	areEqual := reflect.DeepEqual(cif.RequiredBy, result.(*ClusterInstalledFeature).RequiredBy)
+	if !areEqual {
+		t.Error("Replace does not restitute RequiredBy values")
+		t.Fail()
+	}
+	cif = &ClusterInstalledFeature{
+		Name: "Feature Name 2",
+		Requires: map[string]struct{}{
+			"ParentFeature3": {},
+			"ParentFeature4": {},
+		},
+	}
+	result = cif2.Replace(cif)
+	areEqual = reflect.DeepEqual(cif.Requires, result.(*ClusterInstalledFeature).Requires)
+	if !areEqual {
+		t.Error("Replace does not restitute Requires values")
+		t.Fail()
+	}
+
+}
 
 func TestClusterInstalledFeature_Clone(t *testing.T) {
 	ct := NewClusterInstalledFeature()
@@ -46,7 +110,50 @@ func TestClusterInstalledFeature_Clone(t *testing.T) {
 	require.NotEqualValues(t, ct, clonedCt)
 }
 
-func TestFeatures_Clone(t *testing.T) {
+func TestClusterFeatures_IsNull(t *testing.T) {
+
+	var cf *ClusterFeatures = nil
+	if !cf.IsNull() {
+		t.Error("Nil pointer ClusterFeatures is null")
+		t.Fail()
+	}
+	cf = &ClusterFeatures{
+		Installed: make(map[string]*ClusterInstalledFeature, 0),
+		Disabled:  make(map[string]struct{}, 0),
+	}
+	if !cf.IsNull() {
+		t.Error("ClusterFeatures without Installed or Disabledis null")
+		t.Fail()
+	}
+	cf = &ClusterFeatures{
+		Installed: map[string]*ClusterInstalledFeature{
+			"Feature": {
+				Name: "Feature",
+			},
+		},
+		Disabled: make(map[string]struct{}, 0),
+	}
+	if cf.IsNull() {
+		t.Error("ClusterFeatures is not null")
+		t.Fail()
+	}
+
+}
+
+func TestClusterFeatures_Replace(t *testing.T) {
+
+	var cif *ClusterFeatures = nil
+	cif2 := newClusterFeatures()
+
+	result := cif.Replace(cif2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("Nil pointer can't be replaced")
+		t.Fail()
+	}
+
+}
+
+func TestClusterFeatures_Clone(t *testing.T) {
 	ct := newClusterFeatures()
 	ct.Installed["fair"] = NewClusterInstalledFeature()
 	ct.Installed["fair"].Requires["something"] = struct{}{}

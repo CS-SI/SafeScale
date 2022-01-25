@@ -39,7 +39,7 @@ func newClusterState() *ClusterState {
 // IsNull ...
 // satisfies interface data.Clonable
 func (s *ClusterState) IsNull() bool {
-	return s == nil || s.StateCollectInterval == 0
+	return s == nil || (s.StateCollectInterval <= 0)
 }
 
 // Clone ...
