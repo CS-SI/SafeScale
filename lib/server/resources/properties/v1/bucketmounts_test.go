@@ -17,12 +17,54 @@
 package propertiesv1
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBucketMounts_IsNull(t *testing.T) {
+
+	var bm *BucketMounts = nil
+	if !bm.IsNull() {
+		t.Error("BucketMounts Nil pointer is null")
+		t.Fail()
+	}
+
+	bm = &BucketMounts{
+		ByHostID:   map[string]string{},
+		ByHostName: map[string]string{},
+	}
+	if !bm.IsNull() {
+		t.Error("BucketMounts with empty ByHostID is null")
+		t.Fail()
+	}
+	bm = &BucketMounts{
+		ByHostID: map[string]string{
+			"HostID": "HostData",
+		},
+		ByHostName: map[string]string{},
+	}
+	if bm.IsNull() {
+		t.Error("No, BucketMounts is not null")
+		t.Fail()
+	}
+
+}
+
+func TestBucketMounts_Replace(t *testing.T) {
+
+	var bm *BucketMounts = nil
+	bm2 := NewBucketMounts()
+	result := bm.Replace(bm2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("Nil pointer can't be replaced")
+		t.Fail()
+	}
+
+}
 
 func TestBucketMounts_Clone(t *testing.T) {
 	mounts := NewBucketMounts()

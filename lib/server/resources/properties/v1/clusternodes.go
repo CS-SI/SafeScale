@@ -55,8 +55,8 @@ func (n *ClusterNodes) IsNull() bool {
 }
 
 // Clone ... (data.Clonable interface)
-func (n ClusterNodes) Clone() data.Clonable {
-	return newClusterNodes().Replace(&n)
+func (n *ClusterNodes) Clone() data.Clonable {
+	return newClusterNodes().Replace(n)
 }
 
 // Replace ... (data.Clonable interface)
