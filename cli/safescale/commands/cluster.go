@@ -2174,9 +2174,11 @@ var clusterAnsiblePlaybookCommands = &cli.Command{
 		}
 
 		// Check local file exists
-		if _, err := os.Stat(playbookFile); os.IsNotExist(err) {
-			msg := fmt.Sprintf("Playbook file not found for cluster '%s'", clusterName)
-			return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+		if _, err := os.Stat(playbookFile); err != nil {
+			if os.IsNotExist(err) {
+				msg := fmt.Sprintf("Playbook file not found for cluster '%s'", clusterName)
+				return clitools.ExitOnErrorWithMessage(exitcode.RPC, msg)
+			}
 		}
 
 		// Prepare remote playbook

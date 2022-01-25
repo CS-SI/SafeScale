@@ -421,8 +421,10 @@ func (handler *tenantHandler) Scan(tenantName string, isDryRun bool, templateNam
 		localTarget := targetTemplate
 
 		fileCandidate := utils.AbsPathify("$HOME/.safescale/scanner/" + tenantName + "#" + localTarget.Name + ".json")
-		if _, err := os.Stat(fileCandidate); !os.IsNotExist(err) {
-			break
+		if _, err := os.Stat(fileCandidate); err != nil {
+			if !os.IsNotExist(err) {
+				break
+			}
 		}
 
 		go func(innerTemplate abstract.HostTemplate) {
