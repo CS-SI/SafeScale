@@ -331,10 +331,8 @@ func DefaultNotifier() func(t Try, v verdict.Enum) {
 					"no more retries, operation had an error %v [%s] but it's considered OK", t.Err,
 					spew.Sdump(fail.RootCause(t.Err)),
 				)
-			} else {
-				if t.Count > 1 {
-					logrus.Tracef("no more retries, operation was OK")
-				}
+			} else if t.Count > 1 {
+				logrus.Tracef("no more retries, operation was OK")
 			}
 		case verdict.Undecided:
 			logrus.Tracef("nothing to do")
@@ -359,10 +357,8 @@ func DefaultMetadataNotifier(metaID string) func(t Try, v verdict.Enum) {
 					"no more retries metadata [%s], operation had an error %v [%s] but it's considered OK", metaID,
 					t.Err, spew.Sdump(fail.RootCause(t.Err)),
 				)
-			} else {
-				if t.Count > 1 {
-					logrus.Tracef("no more retries metadata [%s], operation was OK", metaID)
-				}
+			} else if t.Count > 1 {
+				logrus.Tracef("no more retries metadata [%s], operation was OK", metaID)
 			}
 		case verdict.Undecided:
 			logrus.Tracef("nothing to do, metadata [%s]", metaID)
@@ -423,10 +419,8 @@ func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum
 		case verdict.Done:
 			if t.Err != nil {
 				ctxLog.Tracef("no more retries, operation had an error %v but it's considered OK", t.Err)
-			} else {
-				if t.Count > 1 {
-					ctxLog.Tracef("no more retries, operation was OK")
-				}
+			} else if t.Count > 1 {
+				ctxLog.Tracef("no more retries, operation was OK")
 			}
 		case verdict.Undecided:
 			ctxLog.Tracef("nothing to do")

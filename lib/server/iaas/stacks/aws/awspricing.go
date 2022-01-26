@@ -204,9 +204,9 @@ func (p Price) parseStorage(str string) float64 {
 
 // parseNumber ...
 func (p Price) parseInt(str string, failureValue int) int {
-	if okValue, err := strconv.Atoi(str); err != nil {
+	okValue, err := strconv.Atoi(str)
+	if err != nil {
 		return failureValue
-	} else {
-		return okValue
 	}
+	return okValue
 }

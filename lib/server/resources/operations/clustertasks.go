@@ -452,14 +452,14 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	// Determine default image
 	imageQuery = req.NodesDef.Image
 	if imageQuery == "" {
-		if cfg, xerr := instance.Service().GetConfigurationOptions(); xerr != nil {
+		cfg, xerr := instance.Service().GetConfigurationOptions()
+		if xerr != nil {
 			return nil, nil, nil, fail.Wrap(xerr, "failed to get configuration options")
-		} else {
-			if anon, ok := cfg.Get("DefaultImage"); ok {
-				imageQuery, ok = anon.(string)
-				if !ok {
-					return nil, nil, nil, fail.InconsistentError("failed to convert anon to 'string'")
-				}
+		}
+		if anon, ok := cfg.Get("DefaultImage"); ok {
+			imageQuery, ok = anon.(string)
+			if !ok {
+				return nil, nil, nil, fail.InconsistentError("failed to convert anon to 'string'")
 			}
 		}
 	}
@@ -752,12 +752,12 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 				return nil, nil, xerr
 			}
 
-			if subIPNet, subXErr := netutils.FirstIncludedSubnet(*ipNet, 1); subXErr != nil {
+			subIPNet, subXErr := netutils.FirstIncludedSubnet(*ipNet, 1)
+			if subXErr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(subXErr, "failed to compute subset of CIDR '%s'", req.CIDR))
 				return nil, nil, xerr
-			} else {
-				subnetReq.CIDR = subIPNet.String()
 			}
+			subnetReq.CIDR = subIPNet.String()
 
 			if subXErr := subnetInstance.Create(ctx, subnetReq, "", gatewaysDef); subXErr != nil {
 				return nil, nil, fail.Wrap(

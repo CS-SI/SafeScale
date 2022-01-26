@@ -491,14 +491,14 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 
 	if w.cluster != nil {
 		var netCfg *propertiesv3.ClusterNetwork
-		if netCfg, xerr = w.cluster.GetNetworkConfig(); xerr != nil {
+		netCfg, xerr = w.cluster.GetNetworkConfig()
+		if xerr != nil {
 			return nil, xerr
-		} else {
-			rs, xerr = LoadSubnet(w.service, "", netCfg.SubnetID)
-			xerr = debug.InjectPlannedFail(xerr)
-			if xerr != nil {
-				return nil, xerr
-			}
+		}
+		rs, xerr = LoadSubnet(w.service, "", netCfg.SubnetID)
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
 		}
 	} else {
 		rs, xerr = w.host.GetDefaultSubnet()
