@@ -681,7 +681,7 @@ func TestChildrenWaitingGameWithPanic(t *testing.T) {
 	require.NotNil(t, err)
 	require.NotEmpty(t, res)
 
-	cause := fail.RootCause(err) // FIXME: DATA RACE
+	cause := fail.RootCause(err)
 	if cause == nil {
 		t.FailNow()
 	}

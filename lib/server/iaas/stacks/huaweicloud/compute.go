@@ -1278,7 +1278,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 			return fail.NewError("host '%s' in state 'Error', retrying to delete", hostRef)
 		},
 		0,
-		s.Timings().HostCleanupTimeout(), // FIXME: is it a sufficient timeout?
+		2*s.Timings().HostCleanupTimeout(), // inner retry already has HostCleanupTimeout, so here we need more
 	)
 	if outerRetryErr != nil {
 		switch outerRetryErr.(type) {

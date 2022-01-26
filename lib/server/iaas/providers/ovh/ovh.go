@@ -159,11 +159,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
 		operatorUsername, ok = operatorUsernameIf.(string)
-		if ok { // FIXME: Validation
-			if operatorUsername == "" {
-				logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
-				operatorUsername = abstract.DefaultUser
-			}
+		if !ok {
+			return nil, fail.InconsistentError("'OperatorUsername' should be a string")
+		}
+		if operatorUsername == "" {
+			logrus.Warnf("OperatorUsername is empty ! Check your tenants.toml file ! Using 'safescale' user instead.")
+			operatorUsername = abstract.DefaultUser
 		}
 	}
 

@@ -469,14 +469,13 @@ func (s stack) InspectHost(hostParam stacks.HostParameter) (*abstract.HostFull, 
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-			// FIXME: Wrong, we need name, status and ID at least here
 			if server != nil {
 				ahf.Core.ID = server.ID
 				ahf.Core.Name = server.Name
 				ahf.Core.LastState = hoststate.Error
-				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong
+				return ahf, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong, it is not a ErrNotAvailable, it's a 404
 			}
-			return nullAHF, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong
+			return nullAHF, fail.Wrap(xerr, "host '%s' is in Error state", hostLabel) // FIXME, This is wrong, it is not a ErrNotAvailable, it's a 404
 		default:
 			return nullAHF, xerr
 		}
@@ -828,7 +827,7 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				}
 				return innerXErr
 			}
-			if server == nil || server.ID == "" {
+			if server == nil || server.ID == "" { // TODO: this should be a validation method
 				innerXErr = fail.NewError("failed to create server")
 				return innerXErr
 			}
@@ -876,7 +875,6 @@ func (s stack) CreateHost(request abstract.HostRequest) (host *abstract.HostFull
 				)
 				switch innerXErr.(type) {
 				case *fail.ErrNotAvailable:
-					// FIXME: Wrong, we need name, status and ID at least here
 					return fail.Wrap(innerXErr, "host '%s' is in Error state", request.ResourceName)
 				default:
 					return innerXErr
@@ -1147,7 +1145,6 @@ func (s stack) WaitHostReady(hostParam stacks.HostParameter, timeout time.Durati
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrNotAvailable:
-			// FIXME: Wrong, we need name, status and ID at least here
 			if server != nil {
 				ahf.Core.ID = server.ID
 				ahf.Core.Name = server.Name
@@ -1476,7 +1473,7 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 		s.Timings().HostCleanupTimeout(),
 	)
 	if xerr != nil {
-		switch xerr.(type) { // FIXME: Look at that
+		switch xerr.(type) {
 		case *retry.ErrTimeout:
 			cause := fail.Cause(xerr)
 			if _, ok := cause.(*fail.ErrNotFound); ok {

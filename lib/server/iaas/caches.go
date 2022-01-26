@@ -24,7 +24,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -114,13 +113,13 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 				var ok bool
 				onMissFunc, ok = v.Value().(func() (cache.Cacheable, fail.Error))
 				if !ok {
-					logrus.Warnf("unable to set onMissFunc because of wrong cast: %v", v.Value()) // FIXME: Error hiding
+					return nil, fail.InconsistentError("unable to set onMissFunc because of wrong cast: %v", v.Value())
 				}
 			case cacheOptionOnMissTimeoutKeyword:
 				var ok bool
 				onMissTimeout, ok = v.Value().(time.Duration)
 				if !ok {
-					logrus.Warnf("unable to set onMissTimeout because of wrong cast: %v", v.Value()) // FIXME: Error hiding
+					return nil, fail.InconsistentError("unable to set onMissTimeout because of wrong cast: %v", v.Value())
 				}
 			default:
 			}

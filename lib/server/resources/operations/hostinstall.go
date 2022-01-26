@@ -234,7 +234,7 @@ func (instance *Host) TargetType() featuretargettype.Enum {
 	return featuretargettype.Host
 }
 
-// InstallMethods returns a list of installation methods useable on the target, ordered from upper to lower preference (1 = highest preference)
+// InstallMethods returns a list of installation methods usable on the target, ordered from upper to lower preference (1 = highest preference)
 // satisfies interface install.Targetable
 func (instance *Host) InstallMethods() map[uint8]installmethod.Enum {
 	// FIXME: Return error

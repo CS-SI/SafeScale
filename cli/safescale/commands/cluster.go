@@ -109,14 +109,19 @@ var clusterListCommand = &cli.Command{
 			if err != nil {
 				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
 			}
-			formatted = append(formatted, formatClusterConfig(converted, false))
+
+			fconfig, err := formatClusterConfig(converted, false)
+			if err != nil {
+				return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, fmt.Sprintf("failed to extract data about cluster '%s'", clusterName)))
+			}
+			formatted = append(formatted, fconfig)
 		}
 		return clitools.SuccessResponse(formatted)
 	},
 }
 
 // formatClusterConfig removes unneeded entry from config
-func formatClusterConfig(config map[string]interface{}, detailed bool) map[string]interface{} {
+func formatClusterConfig(config map[string]interface{}, detailed bool) (map[string]interface{}, fail.Error) {
 	if !detailed {
 		delete(config, "admin_login")
 		delete(config, "admin_password")
@@ -147,12 +152,13 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 		if !remotedesktopInstalled {
 			remotedesktopInstalled = false
 			installedFeatures, ok := config["installed_features"].(*protocol.FeatureListResponse)
-			if ok { // FIXME: What if it fails ?, we should return an error too
-				for _, v := range installedFeatures.Features {
-					if v.Name == "remotedesktop" {
-						remotedesktopInstalled = true
-						break
-					}
+			if !ok {
+				return nil, fail.InconsistentError("'installed_features' should be a *protocol.FeatureListResponse")
+			}
+			for _, v := range installedFeatures.Features {
+				if v.Name == "remotedesktop" {
+					remotedesktopInstalled = true
+					break
 				}
 			}
 		}
@@ -175,7 +181,7 @@ func formatClusterConfig(config map[string]interface{}, detailed bool) map[strin
 			config["remote_desktop"] = fmt.Sprintf("no remote desktop available; to install on all masters, run 'safescale cluster feature add %s remotedesktop'", config["name"].(string))
 		}
 	}
-	return config
+	return config, nil
 }
 
 // clusterInspectCmd handles 'deploy cluster <clustername> inspect'
@@ -233,8 +239,11 @@ func outputClusterConfig(cluster *protocol.ClusterResponse) (map[string]interfac
 		return nil, xerr
 	}
 
-	formatted := formatClusterConfig(toFormat, true)
-	return formatted, nil
+	formatted, err := formatClusterConfig(toFormat, true)
+	if err != nil {
+		return nil, err
+	}
+	return formatted, err
 }
 
 // convertToMap converts clusterInstance to its equivalent in map[string]interface{},
@@ -505,12 +514,16 @@ var clusterCreateCommand = &cli.Command{
 			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, "failed to create cluster: unknown reason"))
 		}
 
-		toFormat, err := convertToMap(res)
-		if err != nil {
-			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, err.Error()))
+		toFormat, cerr := convertToMap(res)
+		if cerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, cerr.Error()))
 		}
 
-		formatted := formatClusterConfig(toFormat, true)
+		formatted, cerr := formatClusterConfig(toFormat, true)
+		if cerr != nil {
+			return clitools.FailureResponse(clitools.ExitOnErrorWithMessage(exitcode.Run, cerr.Error()))
+		}
+
 		if !Debug {
 			delete(formatted, "defaults")
 		}

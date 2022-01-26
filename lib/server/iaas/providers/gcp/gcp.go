@@ -129,7 +129,9 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
-		operatorUsername, _ = operatorUsernameIf.(string) // FIXME: Validation // nolint
+		if operatorUsername, ok = operatorUsernameIf.(string); !ok {
+			return nil, fail.NewError("'OperatorUsername' should be a string")
+		}
 	}
 
 	authOptions := stacks.AuthenticationOptions{
