@@ -77,23 +77,25 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 
 	for _, path := range paths {
 		files, err := ioutil.ReadDir(path)
-		if err == nil {
-			for _, f := range files {
-				if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
-					feat, xerr := NewFeature(svc, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
-					xerr = debug.InjectPlannedFail(xerr)
-					if xerr != nil {
-						logrus.Warn(xerr) // Don't hide errors
-						continue
-					}
-					casted, ok := feat.(*Feature)
-					if !ok {
-						logrus.Warnf("feat should be a *Feature")
-						continue
-					}
-					if _, ok := allEmbeddedFeaturesMap[casted.displayName]; !ok {
-						allEmbeddedFeaturesMap[casted.displayName] = casted
-					}
+		if err != nil {
+			debug.IgnoreError(err)
+			continue
+		}
+		for _, f := range files {
+			if strings.HasSuffix(strings.ToLower(f.Name()), ".yml") {
+				feat, xerr := NewFeature(svc, strings.Replace(strings.ToLower(f.Name()), ".yml", "", 1))
+				xerr = debug.InjectPlannedFail(xerr)
+				if xerr != nil {
+					debug.IgnoreError(xerr) // Don't hide errors
+					continue
+				}
+				casted, ok := feat.(*Feature)
+				if !ok {
+					logrus.Warnf("feat should be a *Feature") // FIXME: This should be an error
+					continue
+				}
+				if _, ok := allEmbeddedFeaturesMap[casted.displayName]; !ok {
+					allEmbeddedFeaturesMap[casted.displayName] = casted
 				}
 			}
 		}
@@ -137,7 +139,7 @@ func ListFeatures(svc iaas.Service, suitableFor string) (_ []interface{}, xerr f
 // error contains :
 //    - fail.ErrNotFound if no Feature is found by its name
 //    - fail.ErrSyntax if Feature found contains syntax error
-func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.Error) {
+func NewFeature(svc iaas.Service, name string) (_ resources.Feature, ferr fail.Error) {
 	if svc == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("svc")
 	}
@@ -161,7 +163,6 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 		switch err.(type) {
 		case viper.ConfigFileNotFoundError:
 			// Failed to find a spec file on filesystem, trying with embedded ones
-			xerr = nil
 			var ok bool
 			if _, ok = allEmbeddedFeaturesMap[name]; !ok {
 				return nil, fail.NotFoundError("failed to find a Feature named '%s'", name)
@@ -172,10 +173,9 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 				return nil, fail.NewError("embedded feature should be a *Feature")
 			}
 			casted.displayFileName = name + ".yml [embedded]"
-			xerr = nil // FIXME: This function uses a bad error handling practice, when we have an error, return the error, don't reassign it
 
 		default:
-			xerr = fail.SyntaxError("failed to read the specification file of Feature called '%s': %s", name, err.Error())
+			return nil, fail.SyntaxError("failed to read the specification file of Feature called '%s': %s", name, err.Error())
 		}
 	} else if v.IsSet("feature") {
 		casted = &Feature{
@@ -184,7 +184,6 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 			displayName:     name,
 			specs:           v,
 		}
-		xerr = nil
 	}
 
 	logrus.Tracef("loaded feature '%s' (%s)", casted.GetDisplayFilename(), casted.GetFilename())
@@ -201,7 +200,7 @@ func NewFeature(svc iaas.Service, name string) (_ resources.Feature, xerr fail.E
 
 	casted.svc = svc
 
-	return casted, xerr
+	return casted, nil
 }
 
 // NewEmbeddedFeature searches for an embedded featured named 'name' and initializes a new Feature object
@@ -767,9 +766,12 @@ func registerOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Targe
 		}
 		for k := range successfulHosts {
 			host, xerr := LoadHost(svc, k)
-			if xerr == nil {
-				xerr = host.RegisterFeature(installed, requiredBy, true)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
 			}
+
+			xerr = host.RegisterFeature(installed, requiredBy, true)
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr
@@ -796,9 +798,12 @@ func unregisterOnSuccessfulHostsInCluster(svc iaas.Service, target resources.Tar
 		}
 		for k := range successfulHosts {
 			host, xerr := LoadHost(svc, k)
-			if xerr == nil {
-				xerr = host.UnregisterFeature(installed.GetName())
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
 			}
+
+			xerr = host.UnregisterFeature(installed.GetName())
 			xerr = debug.InjectPlannedFail(xerr)
 			if xerr != nil {
 				return xerr

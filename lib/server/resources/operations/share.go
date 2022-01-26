@@ -907,14 +907,21 @@ func (instance *Share) Mount(
 					return nil
 				})
 			})
-			if derr == nil {
-				var nfsClient *nfs.Client
-				if nfsClient, derr = nfs.NewNFSClient(targetSSHConfig); derr == nil {
-					derr = nfsClient.Unmount(ctx, instance.Service(), export)
-				}
-			}
 			if derr != nil {
-				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to delete Share"))
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to alter metadata trying to delete Share"))
+				return
+			}
+
+			var nfsClient *nfs.Client
+			if nfsClient, derr = nfs.NewNFSClient(targetSSHConfig); derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to get nfs client trying to delete Share"))
+				return
+			}
+
+			derr = nfsClient.Unmount(ctx, instance.Service(), export)
+			if derr != nil {
+				_ = ferr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unmount trying to delete Share"))
+				return
 			}
 		}
 	}()

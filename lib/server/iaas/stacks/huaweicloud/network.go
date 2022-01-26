@@ -843,13 +843,17 @@ func (s stack) createSubnet(req abstract.SubnetRequest) (*subnets.Subnet, fail.E
 				},
 				normalizeError,
 			)
-			if innerXErr == nil {
-				subnet, err = respGet.Extract()
-				if err == nil && subnet.Status == "ACTIVE" {
-					return nil
-				}
+			if innerXErr != nil {
+				return normalizeError(err)
 			}
-			return normalizeError(err)
+			subnet, err = respGet.Extract()
+			if err != nil {
+				return normalizeError(err)
+			}
+			if subnet.Status != "ACTIVE" {
+				return fmt.Errorf("not active yet")
+			}
+			return nil
 		},
 		s.Timings().SmallDelay(),
 		s.Timings().ContextTimeout(),

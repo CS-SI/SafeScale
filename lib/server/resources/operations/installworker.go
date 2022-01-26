@@ -390,22 +390,29 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 			return nil, xerr
 		}
 
+		// look 1st for primary gateway, if not found then for the secondary gateway
+		found := true
 		gw, xerr := subnetInstance.InspectGateway(true)
 		xerr = debug.InjectPlannedFail(xerr)
-		if xerr == nil {
-			_, xerr = gw.WaitSSHReady(ctx, gw.Service().Timings().SSHConnectionTimeout())
+		if xerr != nil {
+			if _, ok := xerr.(*fail.ErrNotFound); !ok {
+				return nil, xerr
+			}
+			found = false
+			debug.IgnoreError(xerr)
 		}
 
-		xerr = debug.InjectPlannedFail(xerr)
-		if xerr != nil {
-			if gw, xerr = subnetInstance.InspectGateway(false); xerr == nil {
-				_, xerr = gw.WaitSSHReady(ctx, gw.Service().Timings().SSHConnectionTimeout())
+		if !found {
+			if gw, xerr = subnetInstance.InspectGateway(false); xerr != nil {
+				return nil, fail.NotAvailableError("no gateway available")
 			}
 		}
 
+		// if either primary o 2ary found, then wait for ssh to be ready
+		_, xerr = gw.WaitSSHReady(ctx, gw.Service().Timings().SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return nil, fail.NotAvailableError("no gateway available")
+			return nil, fail.Wrap(xerr, "unable to connect to gateway")
 		}
 
 		w.availableGateway = gw
@@ -417,22 +424,31 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 			return nil, xerr
 		}
 
+		found := true
 		var gw resources.Host
 		svc := w.cluster.Service()
 		gw, xerr = LoadHost(svc, netCfg.GatewayID)
-		if xerr == nil {
-			_, xerr = gw.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
-		}
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
+			if _, ok := xerr.(*fail.ErrNotFound); !ok {
+				return nil, xerr
+			}
+			found = false
+			debug.IgnoreError(xerr)
+		}
+
+		if !found {
 			gw, xerr = LoadHost(svc, netCfg.SecondaryGatewayID)
-			if xerr == nil {
-				_, xerr = gw.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, fail.Wrap(xerr, "failed to find an available gateway")
 			}
 		}
+
+		_, xerr = gw.WaitSSHReady(ctx, svc.Timings().SSHConnectionTimeout())
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
-			return nil, fail.Wrap(xerr, "failed to find an available gateway")
+			return nil, fail.Wrap(xerr, "unable to connect to gateway")
 		}
 
 		w.availableGateway = gw
@@ -441,7 +457,7 @@ func (w *worker) identifyAvailableGateway(ctx context.Context) (resources.Host, 
 }
 
 // identifyConcernedGateways returns a list of all the hosts acting as gateway that can accept the action
-// and keep this list during all the install session
+// and keep this list during all the installation session
 func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.Host, xerr fail.Error) {
 	var hosts []resources.Host
 
@@ -462,7 +478,7 @@ func (w *worker) identifyConcernedGateways(ctx context.Context) (_ []resources.H
 }
 
 // identifyAllGateways returns a list of all the hosts acting as gateways and keep this list
-// during all the install session
+// during all the installation session
 func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, xerr fail.Error) {
 	if w.allGateways != nil {
 		return w.allGateways, nil
@@ -475,30 +491,47 @@ func (w *worker) identifyAllGateways(ctx context.Context) (_ []resources.Host, x
 
 	if w.cluster != nil {
 		var netCfg *propertiesv3.ClusterNetwork
-		if netCfg, xerr = w.cluster.GetNetworkConfig(); xerr == nil {
+		if netCfg, xerr = w.cluster.GetNetworkConfig(); xerr != nil {
+			return nil, xerr
+		} else {
 			rs, xerr = LoadSubnet(w.service, "", netCfg.SubnetID)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, xerr
+			}
 		}
 	} else {
 		rs, xerr = w.host.GetDefaultSubnet()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, xerr
+		}
 	}
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, xerr
-	}
+
 	defer rs.Released() // mark the instance as released at the end of the function, for cache considerations
 
 	gw, xerr := rs.InspectGateway(true)
 	xerr = debug.InjectPlannedFail(xerr)
-	if xerr == nil {
-		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr == nil {
+	if xerr != nil {
+		debug.IgnoreError(xerr)
+	} else {
+		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr != nil {
+			debug.IgnoreError(xerr)
+		} else {
 			list = append(list, gw)
 		}
 	}
-	if gw, xerr = rs.InspectGateway(false); xerr == nil {
-		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr == nil {
+
+	if gw, xerr = rs.InspectGateway(false); xerr != nil {
+		debug.IgnoreError(xerr)
+	} else {
+		if _, xerr = gw.WaitSSHReady(ctx, w.service.Timings().SSHConnectionTimeout()); xerr != nil {
+			debug.IgnoreError(xerr)
+		} else {
 			list = append(list, gw)
 		}
 	}
+
 	if len(list) == 0 {
 		return nil, fail.NotAvailableError("no gateways currently available")
 	}
@@ -1513,16 +1546,26 @@ func (w *worker) setNetworkingSecurity(ctx context.Context) (xerr fail.Error) {
 	var rs resources.Subnet
 	if w.cluster != nil {
 		var netprops *propertiesv3.ClusterNetwork
-		if netprops, xerr = w.cluster.GetNetworkConfig(); xerr == nil {
+		if netprops, xerr = w.cluster.GetNetworkConfig(); xerr != nil {
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
+		} else {
 			rs, xerr = LoadSubnet(w.service, netprops.NetworkID, netprops.SubnetID)
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return xerr
+			}
 		}
 	} else if w.host != nil {
 		rs, xerr = w.host.GetDefaultSubnet()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
 	}
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return xerr
-	}
+
 	defer rs.Released() // mark instance as released at the end of the function, for cache considerations
 
 	forFeature := " for Feature '" + w.feature.GetName() + "'"

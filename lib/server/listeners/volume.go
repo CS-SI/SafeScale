@@ -22,16 +22,14 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 
-	"github.com/asaskevich/govalidator"
-	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
-	"github.com/sirupsen/logrus"
-
 	"github.com/CS-SI/SafeScale/lib/protocol"
 	"github.com/CS-SI/SafeScale/lib/server/handlers"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/volumespeed"
 	srvutils "github.com/CS-SI/SafeScale/lib/server/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
+	"github.com/asaskevich/govalidator"
+	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 )
 
 // safescale volume create v1 --speed="Ssd" --size=2000 (par default Hdd, possible Ssd, Hdd, Cold)
@@ -64,9 +62,12 @@ func (s *VolumeListener) List(ctx context.Context, in *protocol.VolumeListReques
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, err := PrepareJob(ctx, in.GetTenantId(), "/volumes/list")
@@ -115,9 +116,12 @@ func (s *VolumeListener) Create(ctx context.Context, in *protocol.VolumeCreateRe
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	name := in.GetName()
@@ -158,9 +162,12 @@ func (s *VolumeListener) Attach(ctx context.Context, in *protocol.VolumeAttachme
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
@@ -219,9 +226,12 @@ func (s *VolumeListener) Detach(ctx context.Context, in *protocol.VolumeDetachme
 		return empty, fail.InvalidParameterCannotBeNilError("ctx")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	volumeRef, volumeRefLabel := srvutils.GetReference(in.GetVolume())
@@ -272,8 +282,12 @@ func (s *VolumeListener) Delete(ctx context.Context, in *protocol.Reference) (em
 		return empty, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/delete", ref))
@@ -314,8 +328,12 @@ func (s *VolumeListener) Inspect(ctx context.Context, in *protocol.Reference) (_
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), fmt.Sprintf("/volume/%s/inspect", ref))

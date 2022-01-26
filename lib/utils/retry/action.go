@@ -326,15 +326,15 @@ func DefaultNotifier() func(t Try, v verdict.Enum) {
 				"retrying (#%d), previous error was: %v [%s]", t.Count, t.Err, spew.Sdump(fail.RootCause(t.Err)),
 			)
 		case verdict.Done:
-			if t.Err == nil {
-				if t.Count > 1 {
-					logrus.Tracef("no more retries, operation was OK")
-				}
-			} else {
+			if t.Err != nil {
 				logrus.Tracef(
 					"no more retries, operation had an error %v [%s] but it's considered OK", t.Err,
 					spew.Sdump(fail.RootCause(t.Err)),
 				)
+			} else {
+				if t.Count > 1 {
+					logrus.Tracef("no more retries, operation was OK")
+				}
 			}
 		case verdict.Undecided:
 			logrus.Tracef("nothing to do")
@@ -354,15 +354,15 @@ func DefaultMetadataNotifier(metaID string) func(t Try, v verdict.Enum) {
 				spew.Sdump(fail.RootCause(t.Err)),
 			)
 		case verdict.Done:
-			if t.Err == nil {
-				if t.Count > 1 {
-					logrus.Tracef("no more retries metadata [%s], operation was OK", metaID)
-				}
-			} else {
+			if t.Err != nil {
 				logrus.Tracef(
 					"no more retries metadata [%s], operation had an error %v [%s] but it's considered OK", metaID,
 					t.Err, spew.Sdump(fail.RootCause(t.Err)),
 				)
+			} else {
+				if t.Count > 1 {
+					logrus.Tracef("no more retries metadata [%s], operation was OK", metaID)
+				}
 			}
 		case verdict.Undecided:
 			logrus.Tracef("nothing to do, metadata [%s]", metaID)
@@ -375,17 +375,23 @@ func DefaultMetadataNotifier(metaID string) func(t Try, v verdict.Enum) {
 }
 
 // DefaultNotifierWithContext Provides a notified based on context 'ctx'
-func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum) { // nolint
+func DefaultNotifierWithContext(ctx context.Context) (func(t Try, v verdict.Enum), error) { // nolint
 	if forensics := os.Getenv("SAFESCALE_FORENSICS"); forensics == "" {
 		return func(t Try, v verdict.Enum) {
-		}
+		}, nil
 	}
 
 	ctxID := ""
 
 	task, xerr := concurrency.TaskFromContext(ctx)
-	if xerr == nil {
-		ctxID, _ = task.ID()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	var err fail.Error
+	ctxID, err = task.ID()
+	if err != nil {
+		return nil, err
 	}
 
 	if ctxID == "" {
@@ -394,17 +400,17 @@ func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum)
 			case verdict.Retry:
 				logrus.Tracef("retrying (#%d), previous error was: %v", t.Count, t.Err)
 			case verdict.Done:
-				if t.Err == nil {
-					logrus.Tracef("no more retries, operation was OK")
-				} else {
+				if t.Err != nil {
 					logrus.Tracef("no more retries, operation had an error %v but it's considered OK", t.Err)
+				} else {
+					logrus.Tracef("no more retries, operation was OK")
 				}
 			case verdict.Undecided:
 				logrus.Tracef("nothing to do")
 			case verdict.Abort:
 				logrus.Tracef("aborting, previous error was: %v", t.Err)
 			}
-		}
+		}, nil
 	}
 
 	ctxID = fmt.Sprintf("[%s]", ctxID)
@@ -415,19 +421,19 @@ func DefaultNotifierWithContext(ctx context.Context) func(t Try, v verdict.Enum)
 		case verdict.Retry:
 			ctxLog.Tracef("retrying (#%d), previous error was: %v", t.Count, t.Err)
 		case verdict.Done:
-			if t.Err == nil {
+			if t.Err != nil {
+				ctxLog.Tracef("no more retries, operation had an error %v but it's considered OK", t.Err)
+			} else {
 				if t.Count > 1 {
 					ctxLog.Tracef("no more retries, operation was OK")
 				}
-			} else {
-				ctxLog.Tracef("no more retries, operation had an error %v but it's considered OK", t.Err)
 			}
 		case verdict.Undecided:
 			ctxLog.Tracef("nothing to do")
 		case verdict.Abort:
 			ctxLog.Tracef("aborting, previous error was: %v", t.Err)
 		}
-	}
+	}, nil
 }
 
 // WhileSuccessful retries while 'run' is successful (ie 'run' returns an error == nil),

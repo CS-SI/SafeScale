@@ -21,14 +21,14 @@ import (
 )
 
 func normalizeError(err error) fail.Error { // nolint
-	if err == nil {
-		return nil
+	if err != nil {
+		switch realErr := err.(type) {
+		case fail.Error:
+			return realErr
+		default:
+			return fail.ConvertError(err)
+		}
 	}
 
-	switch realErr := err.(type) {
-	case fail.Error:
-		return realErr
-	default:
-		return fail.ConvertError(err)
-	}
+	return nil
 }

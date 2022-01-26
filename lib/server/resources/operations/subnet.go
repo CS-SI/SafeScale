@@ -547,13 +547,17 @@ func (instance *Subnet) undoBindInternalSecurityGroupToGateway(
 			}
 
 			sg, derr := LoadSecurityGroup(instance.Service(), as.InternalSecurityGroupID)
-			if derr == nil {
-				derr = sg.UnbindFromHost(context.Background(), host)
-				sg.Released()
-			}
 			if derr != nil {
 				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
+				return derr
 			}
+
+			derr = sg.UnbindFromHost(context.Background(), host)
+			if derr != nil {
+				_ = (*xerr).AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to unbind Internal Security Group of Subnet '%s' from Host '%s'", as.Name, host.GetName()))
+				return derr
+			}
+			sg.Released()
 			return nil
 		})
 	}
@@ -697,7 +701,25 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 	var an *abstract.Network
 	svc := instance.Service()
 	rn, xerr := LoadNetwork(svc, req.NetworkID)
-	if xerr == nil {
+	if xerr != nil {
+		switch xerr.(type) { // nolint
+		case *fail.ErrNotFound:
+			withDefaultSubnetwork, err := svc.HasDefaultNetwork()
+			if err != nil {
+				return nil, nil, err
+			}
+
+			if !withDefaultSubnetwork {
+				return nil, nil, xerr
+			}
+
+			an, xerr = svc.GetDefaultNetwork()
+			xerr = debug.InjectPlannedFail(xerr)
+			if xerr != nil {
+				return nil, nil, xerr
+			}
+		}
+	} else {
 		xerr = rn.Inspect(func(clonable data.Clonable, _ *serialize.JSONProperties) fail.Error {
 			var ok bool
 			an, ok = clonable.(*abstract.Network)
@@ -717,24 +739,10 @@ func (instance *Subnet) validateNetwork(req *abstract.SubnetRequest) (resources.
 			}
 			return nil
 		})
-	} else {
-		rn = nil
-		switch xerr.(type) { // nolint
-		case *fail.ErrNotFound:
-			withDefaultSubnetwork, err := svc.HasDefaultNetwork()
-			if err != nil {
-				return nil, nil, err
-			}
-
-			if !withDefaultSubnetwork {
-				return nil, nil, xerr
-			}
-			an, xerr = svc.GetDefaultNetwork()
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return nil, nil, xerr
 		}
-	}
-	xerr = debug.InjectPlannedFail(xerr)
-	if xerr != nil {
-		return nil, nil, xerr
 	}
 
 	req.NetworkID = an.ID
@@ -1242,7 +1250,9 @@ func (instance *Subnet) Delete(ctx context.Context) (xerr fail.Error) {
 			if hostsLen > 0 {
 				for k := range shV1.ByName {
 					// Check if Host still has metadata and count it if yes
-					if hostInstance, innerXErr := LoadHost(svc, k, HostLightOption); innerXErr == nil {
+					if hostInstance, innerXErr := LoadHost(svc, k, HostLightOption); innerXErr != nil {
+						debug.IgnoreError(innerXErr)
+					} else {
 						hostInstance.Released()
 						hostList = append(hostList, k)
 					}

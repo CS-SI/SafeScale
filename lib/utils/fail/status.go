@@ -25,14 +25,14 @@ type ErrorLike interface {
 
 // IsError ...
 func IsError(err error) bool {
-	if err == nil {
-		return false
+	if err != nil {
+		ei, ok := err.(ErrorLike)
+		if !ok {
+			return true
+		}
+		return ei.IsError()
 	}
-	ei, ok := err.(ErrorLike)
-	if !ok {
-		return true
-	}
-	return ei.IsError()
+	return false
 }
 
 // Status interface

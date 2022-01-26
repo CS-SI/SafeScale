@@ -160,15 +160,31 @@ func (stun *SSHTunnel) Close() fail.Error {
 
 	// Kills remaining processes if there are some
 	bytesCmd, err := exec.Command("pgrep", "-f", stun.cmdString).Output()
-	if err == nil {
-		portStr := strings.Trim(string(bytesCmd), "\n")
-		if _, err = strconv.Atoi(portStr); err == nil {
-			if err = exec.Command("kill", "-9", portStr).Run(); err != nil {
-				logrus.Errorf("kill -9 failed: %s", reflect.TypeOf(err).String())
-				return fail.Wrap(err, "unable to close tunnel")
-			}
+	if err != nil {
+		_, code, problem := utils.ExtractRetCode(err)
+		if problem != nil {
+			return fail.Wrap(err, "unable to close tunnel, running pgrep")
 		}
+		if code == 1 { // no process found
+			debug.IgnoreError(err)
+			return nil
+		}
+		if code == 127 { // pgrep not installed
+			debug.IgnoreError(fmt.Errorf("pgrep not installed"))
+			return nil
+		}
+		return fail.Wrap(err, "unable to close tunnel, unexpected errorcode running pgrep: %d", code)
 	}
+
+	portStr := strings.Trim(string(bytesCmd), "\n")
+	if _, err = strconv.Atoi(portStr); err != nil {
+		return fail.Wrap(err, "unable to close tunnel")
+	}
+
+	if err = exec.Command("kill", "-9", portStr).Run(); err != nil {
+		return fail.Wrap(err, "unable to close tunnel: %s", fmt.Sprintf("kill -9 failed: %s", reflect.TypeOf(err).String()))
+	}
+
 	return nil
 }
 
@@ -704,15 +720,7 @@ func (scmd *SSHCommand) taskExecute(
 	_ = stdoutPipe.Close()
 	_ = stderrPipe.Close()
 
-	if runErr == nil {
-		result["retcode"] = 0
-		if params.collectOutputs {
-			result["stdout"] = string(msgOut)
-			result["stderr"] = string(msgErr)
-		} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
-			logrus.Error(pbcErr.Error())
-		}
-	} else {
+	if runErr != nil {
 		xerr = fail.ExecutionError(runErr)
 		// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
 		var (
@@ -756,6 +764,14 @@ func (scmd *SSHCommand) taskExecute(
 		} else {
 			result["stdout"] = string(msgOut)
 			result["stderr"] = fmt.Sprint(string(msgErr), stderr)
+		}
+	} else {
+		result["retcode"] = 0
+		if params.collectOutputs {
+			result["stdout"] = string(msgOut)
+			result["stderr"] = string(msgErr)
+		} else if pbcErr = pipeBridgeCtrl.Wait(); pbcErr != nil {
+			logrus.Error(pbcErr.Error())
 		}
 	}
 
@@ -1121,11 +1137,11 @@ func (sconf *SSHConfig) WaitServerReady(
 		derr := cmd.Close()
 		if derr != nil {
 			if deferErr != nil {
-				if *deferErr == nil {
-					*deferErr = derr
-				} else {
+				if *deferErr != nil {
 					*deferErr = fail.ConvertError(*deferErr)
 					_ = (*deferErr).AddConsequence(derr)
+				} else {
+					*deferErr = derr
 				}
 			}
 		}
@@ -1247,10 +1263,10 @@ func (sconf *SSHConfig) copy(
 	defer func() {
 		derr := sshCommand.Close()
 		if derr != nil {
-			if ferr == nil {
-				ferr = derr
-			} else {
+			if ferr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+			} else {
+				ferr = derr
 			}
 		}
 	}()
@@ -1277,10 +1293,10 @@ func (sconf *SSHConfig) Enter(username, shell string) (ferr fail.Error) {
 	defer func() {
 		derr := tunnels.Close()
 		if derr != nil {
-			if ferr == nil {
-				ferr = derr
-			} else {
+			if ferr != nil {
 				_ = ferr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnels"))
+			} else {
+				ferr = derr
 			}
 		}
 	}()

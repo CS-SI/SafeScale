@@ -168,10 +168,10 @@ func (sgr *SecurityGroupRule) TargetsConcernGroups() (bool, fail.Error) {
 func concernsGroups(in []string) (bool, fail.Error) {
 	var cidrFound, idFound int
 	for _, v := range in {
-		if _, _, err := net.ParseCIDR(v); err == nil {
-			cidrFound++
-		} else {
+		if _, _, err := net.ParseCIDR(v); err != nil {
 			idFound++
+		} else {
+			cidrFound++
 		}
 	}
 	if cidrFound > 0 && idFound > 0 {
@@ -288,7 +288,7 @@ func (sgrs SecurityGroupRules) IndexOfEquivalentRule(rule *SecurityGroupRule) (i
 		}
 	}
 	if !found {
-		return -1, fail.NotFoundError("no corresponding rule found")
+		return -1, fail.NotFoundError("no corresponding rule found: %s", rule.Description)
 	}
 	return index, nil
 }

@@ -67,18 +67,19 @@ func Annotate(err error, key string, content interface{}) Error {
 	return nil
 }
 
-// IsGRPCTimeout tells if the err is a ImplTimeout kind
+// IsGRPCTimeout tells if 'err' is a ImplTimeout kind
 func IsGRPCTimeout(err error) bool {
 	return grpcstatus.Code(err) == codes.DeadlineExceeded
 }
 
-// IsGRPCError tells if the err is of GRPC kind
+// IsGRPCError tells if 'err' is of GRPC kind
 func IsGRPCError(err error) bool {
-	if err == nil {
-		return false
+	if err != nil {
+		_, ok := grpcstatus.FromError(err)
+		return ok
 	}
-	_, ok := grpcstatus.FromError(err)
-	return ok
+
+	return false
 }
 
 // FromGRPCStatus translates GRPC status to error

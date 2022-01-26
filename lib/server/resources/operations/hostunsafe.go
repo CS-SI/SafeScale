@@ -133,10 +133,10 @@ func run(ctx context.Context, ssh *system.SSHConfig, cmd string, outs outputs.En
 			defer func(cmd *system.SSHCommand) {
 				derr := cmd.Close()
 				if derr != nil {
-					if innerXErr == nil {
-						innerXErr = derr
-					} else {
+					if innerXErr != nil {
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
+					} else {
+						innerXErr = derr
 					}
 				}
 			}(sshCmd)

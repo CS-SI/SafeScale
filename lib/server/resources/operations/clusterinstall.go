@@ -587,12 +587,12 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 		}
 
 		if !(strings.Contains(stdout, "bad interpreter") || strings.Contains(stderr, "bad interpreter")) {
-			if err == nil {
+			if err != nil {
+				if !strings.Contains(err.Error(), "bad interpreter") {
+					return rc, stdout, stderr, err
+				}
+			} else {
 				return rc, stdout, stderr, nil
-			}
-
-			if !strings.Contains(err.Error(), "bad interpreter") {
-				return rc, stdout, stderr, err
 			}
 		}
 
@@ -718,9 +718,11 @@ func (instance *Cluster) installNodeRequirements(ctx context.Context, nodeType c
 	var dnsServers []string
 	cfg, xerr := instance.Service().GetConfigurationOptions()
 	xerr = debug.InjectPlannedFail(xerr)
-	if xerr == nil {
-		dnsServers = cfg.GetSliceOfStrings("DNSList")
+	if xerr != nil {
+		return xerr
 	}
+
+	dnsServers = cfg.GetSliceOfStrings("DNSList")
 	identity, xerr := instance.unsafeGetIdentity()
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {

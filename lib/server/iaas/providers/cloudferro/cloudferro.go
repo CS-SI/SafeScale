@@ -124,8 +124,12 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 		return rxp.Match([]byte(str))
 	}
 
-	if _, err := govalidator.ValidateStruct(authOptions); err != nil {
-		return nil, fail.ConvertError(err)
+	ok, verr := govalidator.ValidateStruct(authOptions)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", authOptions)
 	}
 
 	providerName := "openstack"

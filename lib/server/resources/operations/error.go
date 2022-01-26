@@ -21,14 +21,14 @@ import (
 )
 
 func ActionFromError(err error) string {
-	if err == nil {
-		return ""
+	if err != nil {
+		switch err.(type) {
+		case *fail.ErrAborted:
+			return "abort"
+		default:
+			return "failure"
+		}
 	}
 
-	switch err.(type) {
-	case *fail.ErrAborted:
-		return "abort"
-	default:
-		return "failure"
-	}
+	return ""
 }

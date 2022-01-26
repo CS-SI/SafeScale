@@ -112,42 +112,41 @@ func normalizeOpenAPIError(realErr osc.GenericOpenAPIError) fail.Error {
 }
 
 func normalizeError(err error) fail.Error {
-	if err == nil {
-		return nil
-	}
-
-	switch realErr := err.(type) {
-	case outscaleError:
-		normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
-		if normalized != nil {
-			if _, ok := normalized.(*fail.ErrUnknown); ok {
-				errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
-				if xerr != nil { // we failed using the http return code, so send the normalized error
-					return normalized
+	if err != nil {
+		switch realErr := err.(type) {
+		case outscaleError:
+			normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
+			if normalized != nil {
+				if _, ok := normalized.(*fail.ErrUnknown); ok {
+					errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
+					if xerr != nil { // we failed using the http return code, so send the normalized error
+						return normalized
+					}
+					return errFromHTTP // we got something
 				}
-				return errFromHTTP // we got something
+				return normalized
 			}
-			return normalized
-		}
-		return nil
-	case *outscaleError:
-		normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
-		if normalized != nil {
-			if _, ok := normalized.(*fail.ErrUnknown); ok {
-				errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
-				if xerr != nil { // we failed using the http return code, so send the normalized error
-					return normalized
+			return nil
+		case *outscaleError:
+			normalized := normalizeOpenAPIError(realErr.operationError.(osc.GenericOpenAPIError))
+			if normalized != nil {
+				if _, ok := normalized.(*fail.ErrUnknown); ok {
+					errFromHTTP, xerr := normalizeFromHTTPReturnCode(realErr.httpResponse)
+					if xerr != nil { // we failed using the http return code, so send the normalized error
+						return normalized
+					}
+					return errFromHTTP // we got something
 				}
-				return errFromHTTP // we got something
+				return normalized
 			}
-			return normalized
+			return nil
+		case osc.GenericOpenAPIError:
+			return normalizeOpenAPIError(realErr)
+		default:
+			return fail.ConvertError(err)
 		}
-		return nil
-	case osc.GenericOpenAPIError:
-		return normalizeOpenAPIError(realErr)
-	default:
-		return fail.ConvertError(err)
 	}
+	return nil
 }
 
 func qualifyFromCode(code, details string) fail.Error {

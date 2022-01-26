@@ -2883,10 +2883,10 @@ func (instance *Cluster) configureCluster(ctx context.Context, req abstract.Clus
 
 	logrus.Infof("[Cluster %s] configuring Cluster...", instance.GetName())
 	defer func() {
-		if ferr == nil {
-			logrus.Infof("[Cluster %s] configuration successful.", instance.GetName())
-		} else {
+		if ferr != nil {
 			logrus.Errorf("[Cluster %s] configuration failed: %s", instance.GetName(), ferr.Error())
+		} else {
+			logrus.Infof("[Cluster %s] configuration successful.", instance.GetName())
 		}
 	}()
 

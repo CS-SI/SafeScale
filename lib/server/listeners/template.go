@@ -52,9 +52,12 @@ func (s *TemplateListener) List(ctx context.Context, in *protocol.TemplateListRe
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/templates/list")
@@ -158,8 +161,12 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	job, xerr := PrepareJob(ctx, in.GetTenantId(), "/template/match")
@@ -192,9 +199,9 @@ func (s *TemplateListener) Match(ctx context.Context, in *protocol.TemplateMatch
 }
 
 // Inspect returns information about a tenant
-func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateInspectRequest) (_ *protocol.HostTemplate, xerr error) {
-	defer fail.OnExitConvertToGRPCStatus(&xerr)
-	defer fail.OnExitWrapError(&xerr, "cannot inspect tenant")
+func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateInspectRequest) (_ *protocol.HostTemplate, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitWrapError(&ferr, "cannot inspect tenant")
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -206,9 +213,12 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 		return nil, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	ok, err := govalidator.ValidateStruct(in)
-	if err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	ref, _ := srvutils.GetReference(in.GetTemplate())
@@ -220,7 +230,7 @@ func (s *TemplateListener) Inspect(ctx context.Context, in *protocol.TemplateIns
 
 	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.template"), "('%s')", ref).WithStopwatch().Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	svc := job.Service()
 	authOpts, xerr := svc.GetAuthenticationOptions()

@@ -25,8 +25,6 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
 	"github.com/asaskevich/govalidator"
-	"github.com/sirupsen/logrus"
-
 	// "github.com/asaskevich/govalidator"
 	googleprotobuf "github.com/golang/protobuf/ptypes/empty"
 
@@ -63,8 +61,12 @@ func (s *FeatureListener) List(ctx context.Context, in *protocol.FeatureListRequ
 		return empty, fail.InvalidParameterError("in", "cannot be nil")
 	}
 
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
 	targetType := in.GetTargetType()
@@ -135,8 +137,12 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 	targetType := in.GetTargetType()
 	switch targetType {
@@ -211,8 +217,12 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 	if ctx == nil {
 		return nil, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 	targetType := in.GetTargetType()
 	switch targetType {
@@ -293,8 +303,12 @@ func (s *FeatureListener) Check(ctx context.Context, in *protocol.FeatureActionR
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 	targetType := in.GetTargetType()
 	switch targetType {
@@ -403,8 +417,12 @@ func (s *FeatureListener) Add(ctx context.Context, in *protocol.FeatureActionReq
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())
@@ -484,8 +502,12 @@ func (s *FeatureListener) Remove(ctx context.Context, in *protocol.FeatureAction
 	if ctx == nil {
 		return empty, fail.InvalidParameterError("ctx", "cannot be nil")
 	}
-	if ok, err := govalidator.ValidateStruct(in); err != nil || !ok {
-		logrus.Warnf("Structure validation failure: %v", in)
+	ok, verr := govalidator.ValidateStruct(in)
+	if verr != nil {
+		return nil, fail.ConvertError(verr)
+	}
+	if !ok {
+		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 	targetType := in.GetTargetType()
 	targetRef, targetRefLabel := srvutils.GetReference(in.GetTargetRef())

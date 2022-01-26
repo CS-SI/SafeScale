@@ -114,9 +114,10 @@ func (tv toV21_05_0) upgradeNetworks(svc iaas.Service) (xerr fail.Error) {
 			switch xerr.(type) {
 			case *fail.ErrNotFound:
 				owningInstance, xerr = operations.NewNetwork(svc)
-				if xerr == nil {
-					xerr = owningInstance.Import(context.Background(), abstractOwningNetwork.ID)
+				if xerr != nil {
+					return xerr
 				}
+				xerr = owningInstance.Import(context.Background(), abstractOwningNetwork.ID)
 			default:
 			}
 		}
@@ -1293,7 +1294,7 @@ func (tv toV21_05_0) upgradeClusterDefaultsPropertyIfNeeded(instance *operations
 	if xerr != nil {
 		switch xerr.(type) {
 		case *fail.ErrAlteredNothing:
-			xerr = nil
+			return nil
 		default:
 			debug.IgnoreError(xerr)
 		}

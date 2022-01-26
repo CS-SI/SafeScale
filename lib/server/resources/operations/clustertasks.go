@@ -452,7 +452,9 @@ func (instance *Cluster) determineSizingRequirements(req abstract.ClusterRequest
 	// Determine default image
 	imageQuery = req.NodesDef.Image
 	if imageQuery == "" {
-		if cfg, xerr := instance.Service().GetConfigurationOptions(); xerr == nil {
+		if cfg, xerr := instance.Service().GetConfigurationOptions(); xerr != nil {
+			return nil, nil, nil, fail.Wrap(xerr, "failed to get configuration options")
+		} else {
 			if anon, ok := cfg.Get("DefaultImage"); ok {
 				imageQuery, ok = anon.(string)
 				if !ok {
@@ -750,12 +752,13 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 				return nil, nil, xerr
 			}
 
-			if subIPNet, subXErr := netutils.FirstIncludedSubnet(*ipNet, 1); subXErr == nil {
-				subnetReq.CIDR = subIPNet.String()
-			} else {
+			if subIPNet, subXErr := netutils.FirstIncludedSubnet(*ipNet, 1); subXErr != nil {
 				_ = xerr.AddConsequence(fail.Wrap(subXErr, "failed to compute subset of CIDR '%s'", req.CIDR))
 				return nil, nil, xerr
+			} else {
+				subnetReq.CIDR = subIPNet.String()
 			}
+
 			if subXErr := subnetInstance.Create(ctx, subnetReq, "", gatewaysDef); subXErr != nil {
 				return nil, nil, fail.Wrap(
 					subXErr, "failed to create Subnet '%s' (with CIDR %s) in Network '%s' (with CIDR %s)",
@@ -766,7 +769,6 @@ func (instance *Cluster) createNetworkingResources(task concurrency.Task, req ab
 				"CIDR '%s' used successfully for Subnet, there will be less available private IP Addresses than expected.",
 				subnetReq.CIDR,
 			)
-			xerr = nil
 		default:
 			return nil, nil, fail.Wrap(
 				xerr, "failed to create Subnet '%s' in Network '%s'", req.Name, networkInstance.GetName(),

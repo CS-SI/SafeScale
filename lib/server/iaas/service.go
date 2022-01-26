@@ -826,10 +826,19 @@ func (svc service) CreateHostWithKeyPair(request abstract.HostRequest) (*abstrac
 		return nil, nil, nil, fail.InvalidInstanceError()
 	}
 
+	found := true
 	ah := abstract.NewHostCore()
 	ah.Name = request.ResourceName
 	_, rerr := svc.InspectHost(ah)
-	if rerr == nil {
+	if rerr != nil {
+		if _, ok := rerr.(*fail.ErrNotFound); !ok {
+			return nil, nil, nil, fail.ConvertError(rerr)
+		}
+		found = false
+		debug.IgnoreError(rerr)
+	}
+
+	if found {
 		return nil, nil, nil, abstract.ResourceDuplicateError("host", request.ResourceName)
 	}
 

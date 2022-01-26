@@ -60,11 +60,11 @@ func AbsPathify(inPath string) string {
 	}
 
 	p, err := filepath.Abs(inPath)
-	if err == nil {
-		return filepath.Clean(p)
+	if err != nil {
+		return ""
 	}
 
-	return ""
+	return filepath.Clean(p)
 }
 
 func userHomeDir() string {

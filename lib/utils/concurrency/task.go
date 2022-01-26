@@ -1085,8 +1085,10 @@ func (instance *task) Wait() (TaskResult, fail.Error) {
 				//goland:noinspection GoDeferInLoop
 				defer instance.lock.Unlock() // Note: we can defer here, we will abort the loop
 
-				if instance.ctx.Err() != nil && instance.err == nil {
-					instance.err = fail.AbortedError(instance.ctx.Err())
+				if instance.ctx.Err() != nil {
+					if instance.err == nil {
+						instance.err = fail.AbortedError(instance.ctx.Err())
+					}
 				}
 				return instance.result, instance.err
 			}

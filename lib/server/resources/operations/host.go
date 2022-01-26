@@ -1090,7 +1090,9 @@ func (instance *Host) Create(
 			_ = hostDescriptionV1.Replace(converters.HostDescriptionFromAbstractToPropertyV1(*ahf.Description))
 			creator := ""
 			hostname, _ := os.Hostname()
-			if curUser, err := user.Current(); err == nil {
+			if curUser, err := user.Current(); err != nil {
+				creator = "unknown@" + hostname
+			} else {
 				creator = curUser.Username
 				if hostname != "" {
 					creator += "@" + hostname
@@ -1098,8 +1100,6 @@ func (instance *Host) Create(
 				if curUser.Name != "" {
 					creator += " (" + curUser.Name + ")"
 				}
-			} else {
-				creator = "unknown@" + hostname
 			}
 			hostDescriptionV1.Creator = creator
 			return nil
@@ -1424,12 +1424,14 @@ func (instance *Host) setSecurityGroups(
 
 							if abstractSubnet.InternalSecurityGroupID != "" {
 								sg, derr = LoadSecurityGroup(svc, abstractSubnet.InternalSecurityGroupID)
-								if derr == nil {
-									derr = sg.UnbindFromHost(context.Background(), instance)
-									sg.Released()
-								}
 								if derr != nil {
 									errors = append(errors, derr)
+								} else {
+									derr = sg.UnbindFromHost(context.Background(), instance)
+									sg.Released()
+									if derr != nil {
+										errors = append(errors, derr)
+									}
 								}
 							}
 							return nil
@@ -1537,11 +1539,13 @@ func (instance *Host) undoSetSecurityGroups(errorPtr *fail.Error, keepOnFailure 
 
 						// unbind security groups
 						for _, v := range hsgV1.ByName {
-							if sg, opXErr = LoadSecurityGroup(svc, v); opXErr == nil {
-								opXErr = sg.UnbindFromHost(context.Background(), instance)
-							}
-							if opXErr != nil {
+							if sg, opXErr = LoadSecurityGroup(svc, v); opXErr != nil {
 								errors = append(errors, opXErr)
+							} else {
+								opXErr = sg.UnbindFromHost(context.Background(), instance)
+								if opXErr != nil {
+									errors = append(errors, opXErr)
+								}
 							}
 						}
 						if len(errors) > 0 {
@@ -1750,7 +1754,9 @@ func (instance *Host) waitInstallPhase(ctx context.Context, phase userdata.Phase
 	// FIXME: rework this using instance.Service().Timings() (add new .SSHTimeout() if needed)
 	// this overrides the default timeout of max(GetHostTimeout, timeout)
 	if sshDefaultTimeoutCandidate := os.Getenv("SAFESCALE_SSH_TIMEOUT"); sshDefaultTimeoutCandidate != "" {
-		if num, err := strconv.Atoi(sshDefaultTimeoutCandidate); err == nil {
+		if num, err := strconv.Atoi(sshDefaultTimeoutCandidate); err != nil {
+			logrus.Debugf("error parsing timeout: %v", err)
+		} else {
 			logrus.Debugf("Using custom timeout of %d minutes", num)
 			sshDefaultTimeout = num
 		}
@@ -2390,10 +2396,12 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 					// clients found, checks if these clients already exists...
 					for _, hostID := range hostShare.ClientsByID {
 						instance, inErr := LoadHost(svc, hostID, HostLightOption)
-						if inErr == nil {
-							instance.Released()
-							return fail.NotAvailableError("Host '%s' exports %d share%s and at least one share is mounted", instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
+						if inErr != nil {
+							debug.IgnoreError(inErr)
+							continue
 						}
+						instance.Released()
+						return fail.NotAvailableError("Host '%s' exports %d share%s and at least one share is mounted", instance.GetName(), shareCount, strprocess.Plural(uint(shareCount)))
 					}
 				}
 			}
@@ -2552,14 +2560,17 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				for k := range hostNetworkV2.SubnetsByID {
 					if !hostNetworkV2.IsGateway && k != hostNetworkV2.DefaultSubnetID {
 						subnetInstance, loopErr := LoadSubnet(svc, "", k)
-						if loopErr == nil {
-							//goland:noinspection ALL
-							defer func(item resources.Subnet) {
-								item.Released()
-							}(subnetInstance)
-
-							loopErr = subnetInstance.DetachHost(ctx, hostID)
+						if loopErr != nil {
+							logrus.Errorf(loopErr.Error())
+							errors = append(errors, loopErr)
+							continue
 						}
+						//goland:noinspection ALL
+						defer func(item resources.Subnet) {
+							item.Released()
+						}(subnetInstance)
+
+						loopErr = subnetInstance.DetachHost(ctx, hostID)
 						if loopErr != nil {
 							logrus.Errorf(loopErr.Error())
 							errors = append(errors, loopErr)
@@ -2588,14 +2599,23 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 			var errors []error
 			for _, v := range hsgV1.ByID {
 				sgInstance, derr := LoadSecurityGroup(svc, v.ID)
-				if derr == nil {
-					//goland:noinspection ALL
-					defer func(sgInstance resources.SecurityGroup) {
-						sgInstance.Released()
-					}(sgInstance)
-
-					derr = sgInstance.UnbindFromHost(ctx, instance)
+				if derr != nil {
+					switch derr.(type) {
+					case *fail.ErrNotFound:
+						// Consider that a Security Group that cannot be loaded or is not bound as a success
+						debug.IgnoreError(derr)
+						continue
+					default:
+						errors = append(errors, derr)
+					}
 				}
+
+				//goland:noinspection ALL
+				defer func(sgInstance resources.SecurityGroup) {
+					sgInstance.Released()
+				}(sgInstance)
+
+				derr = sgInstance.UnbindFromHost(ctx, instance)
 				if derr != nil {
 					switch derr.(type) {
 					case *fail.ErrNotFound:

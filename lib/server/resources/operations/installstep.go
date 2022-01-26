@@ -338,13 +338,6 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 	for _, h := range hosts {
 		clonedV, startErr = is.initLoopTurnForHost(h, v)
 		startErr = debug.InjectPlannedFail(startErr)
-		if startErr == nil {
-			subtask, startErr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
-			startErr = debug.InjectPlannedFail(startErr)
-			if startErr == nil {
-				subtasks[h.GetName()] = subtask
-			}
-		}
 		if startErr != nil {
 			abErr := tg.AbortWithCause(startErr)
 			if abErr != nil {
@@ -352,6 +345,17 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 			}
 			break
 		}
+
+		subtask, startErr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
+		startErr = debug.InjectPlannedFail(startErr)
+		if startErr != nil {
+			abErr := tg.AbortWithCause(startErr)
+			if abErr != nil {
+				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
+			}
+			break
+		}
+		subtasks[h.GetName()] = subtask
 	}
 
 	tgr, xerr := tg.WaitGroup()
@@ -559,26 +563,18 @@ func (is *step) taskRunOnHost(task concurrency.Task, params concurrency.TaskPara
 		}
 
 		if !(strings.Contains(outrun, "bad interpreter") || strings.Contains(outerr, "bad interpreter")) {
-			// FIXME: really? xerr == nil?
-			if xerr == nil {
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					xerr.Annotate("retcode", retcode)
-					xerr.Annotate("stdout", outrun)
-					xerr.Annotate("stderr", outerr)
-					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
+			if xerr != nil {
+				if !strings.Contains(xerr.Error(), "bad interpreter") {
+					xerr = debug.InjectPlannedFail(xerr)
+					if xerr != nil {
+						xerr.Annotate("retcode", retcode)
+						xerr.Annotate("stdout", outrun)
+						xerr.Annotate("stderr", outerr)
+						return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
+					}
+					break
 				}
-				break
-			}
-
-			if !strings.Contains(xerr.Error(), "bad interpreter") {
-				xerr = debug.InjectPlannedFail(xerr)
-				if xerr != nil {
-					xerr.Annotate("retcode", retcode)
-					xerr.Annotate("stdout", outrun)
-					xerr.Annotate("stderr", outerr)
-					return stepResult{err: xerr, retcode: retcode, output: outrun}, xerr
-				}
+			} else {
 				break
 			}
 		}

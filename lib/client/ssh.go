@@ -28,6 +28,7 @@ import (
 	"strings"
 	"time"
 
+	utils2 "github.com/CS-SI/SafeScale/lib/utils"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/sirupsen/logrus"
 
@@ -84,13 +85,13 @@ func (s ssh) Run(hostName, command string, outs outputs.Enum, connectionTimeout,
 			defer func(cmd *system.SSHCommand) {
 				derr := cmd.Close()
 				if derr != nil {
-					if innerErr == nil {
-						innerErr = derr
-					} else {
+					if innerErr != nil {
 						innerXErr = fail.ConvertError(innerErr)
 						_ = innerXErr.AddConsequence(fail.Wrap(derr, "failed to close SSH tunnel"))
 						innerErr = innerXErr
+						return
 					}
+					innerErr = derr
 				}
 			}(sshCmd)
 
@@ -519,19 +520,31 @@ func (s ssh) CloseTunnels(name string, localPort string, remotePort string, time
 	)
 
 	bytes, err := exec.Command("pgrep", "-f", cmdString).Output()
-	if err == nil {
-		portStrs := strings.Split(strings.Trim(string(bytes), "\n"), "\n")
-		for _, portStr := range portStrs {
-			_, err = strconv.Atoi(portStr)
-			if err != nil {
-				logrus.Errorf("atoi failed on pid: %s", reflect.TypeOf(err).String())
-				return fail.Wrap(err, "unable to close tunnel")
-			}
-			err = exec.Command("kill", "-9", portStr).Run()
-			if err != nil {
-				logrus.Errorf("kill -9 failed: %s\n", reflect.TypeOf(err).String())
-				return fail.Wrap(err, "unable to close tunnel")
-			}
+	if err != nil {
+		_, code, problem := utils2.ExtractRetCode(err)
+		if problem != nil {
+			return fail.Wrap(err, "unable to close tunnel, running pgrep")
+		}
+		if code == 1 { // no process found
+			debug.IgnoreError(err)
+			return nil
+		}
+		if code == 127 { // pgrep not installed
+			debug.IgnoreError(fmt.Errorf("pgrep not installed"))
+			return nil
+		}
+		return fail.Wrap(err, "unable to close tunnel, unexpected errorcode running pgrep: %d", code)
+	}
+
+	portStrs := strings.Split(strings.Trim(string(bytes), "\n"), "\n")
+	for _, portStr := range portStrs {
+		_, err = strconv.Atoi(portStr)
+		if err != nil {
+			return fail.Wrap(err, "unable to close tunnel: %s", fmt.Sprintf("atoi failed on pid: %s", reflect.TypeOf(err).String()))
+		}
+		err = exec.Command("kill", "-9", portStr).Run()
+		if err != nil {
+			return fail.Wrap(err, "unable to close tunnel: %s", fmt.Sprintf("kill -9 failed: %s\n", reflect.TypeOf(err).String()))
 		}
 	}
 

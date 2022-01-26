@@ -22,6 +22,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/cache"
+	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 	"github.com/sirupsen/logrus"
 )
@@ -135,7 +136,11 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 				switch xerr.(type) {
 				case *fail.ErrDuplicate:
 					// Search in the cache by ID
-					if ce, xerr = instance.byID.Entry(key); xerr == nil {
+					if ce, xerr = instance.byID.Entry(key); xerr != nil {
+						if _, ok := xerr.(*fail.ErrNotFound); !ok {
+							return nil, xerr
+						}
+					} else {
 						return ce, nil
 					}
 
@@ -145,10 +150,12 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 
 					if id, ok := instance.byName[key]; ok {
 						ce, xerr = instance.byID.Entry(id)
-						if xerr == nil {
-							return ce, nil
+						if xerr != nil {
+							return nil, xerr
 						}
+						return ce, nil
 					}
+
 					return nil, xerr
 				default:
 					return nil, xerr
@@ -156,15 +163,22 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 			}
 
 			var content cache.Cacheable
-			if content, xerr = onMissFunc(); xerr == nil {
-				ce, xerr = instance.CommitEntry(key, content)
-			}
+			content, xerr = onMissFunc()
 			if xerr != nil {
 				if derr := instance.FreeEntry(key); derr != nil {
 					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
 				}
 				return nil, xerr
 			}
+
+			ce, xerr = instance.CommitEntry(key, content)
+			if xerr != nil {
+				if derr := instance.FreeEntry(key); derr != nil {
+					_ = xerr.AddConsequence(fail.Wrap(derr, "cleaning up on failure, failed to free cache entry"))
+				}
+				return nil, xerr
+			}
+
 			return ce, nil
 		}
 	}
@@ -180,12 +194,16 @@ func (instance *ResourceCache) loadEntry(key string) (*cache.Entry, bool) {
 	instance.lock.Lock()
 	defer instance.lock.Unlock()
 
-	if ce, xerr := instance.byID.Entry(key); xerr == nil {
+	if ce, xerr := instance.byID.Entry(key); xerr != nil {
+		debug.IgnoreError(xerr)
+	} else {
 		return ce, true
 	}
 
 	if id, ok := instance.byName[key]; ok {
-		if ce, xerr := instance.byID.Entry(id); xerr == nil {
+		if ce, xerr := instance.byID.Entry(id); xerr != nil {
+			debug.IgnoreError(xerr)
+		} else {
 			return ce, true
 		}
 	}

@@ -863,13 +863,18 @@ func (instance *taskGroup) GroupStatus() (map[TaskStatus][]string, fail.Error) {
 
 	status := make(map[TaskStatus][]string)
 	for _, sub := range instance.children.tasks {
-		if tid, err := sub.task.ID(); err == nil {
-			st, _ := sub.task.Status()
-			if len(status[st]) == 0 {
-				status[st] = []string{}
-			}
-			status[st] = append(status[st], tid)
+		tid, err := sub.task.ID()
+		if err != nil {
+			continue
 		}
+		st, err := sub.task.Status()
+		if err != nil {
+			continue
+		}
+		if len(status[st]) == 0 {
+			status[st] = []string{}
+		}
+		status[st] = append(status[st], tid)
 	}
 	return status, nil
 }

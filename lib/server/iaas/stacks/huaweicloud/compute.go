@@ -1173,37 +1173,40 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 
 	if s.cfgOpts.UseFloatingIP {
 		fip, xerr := s.getFloatingIPOfHost(ahf.Core.ID)
-		if xerr == nil {
-			if fip != nil {
-				// Floating IP found, first dissociate it from the host...
-				retryErr := stacks.RetryableRemoteCall(
-					func() error {
-						err := floatingips.DisassociateInstance(
-							s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
-								FloatingIP: fip.IP,
-							},
-						).ExtractErr()
-						return normalizeError(err)
-					},
-					normalizeError,
-				)
-				if retryErr != nil {
-					return retryErr
-				}
+		if xerr != nil {
+			return xerr
+		}
 
-				// then delete it.
-				retryErr = stacks.RetryableRemoteCall(
-					func() error {
-						err := floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
-						return normalizeError(err)
-					},
-					normalizeError,
-				)
-				if retryErr != nil {
-					return retryErr
-				}
+		if fip != nil {
+			// Floating IP found, first dissociate it from the host...
+			retryErr := stacks.RetryableRemoteCall(
+				func() error {
+					err := floatingips.DisassociateInstance(
+						s.ComputeClient, ahf.Core.ID, floatingips.DisassociateOpts{
+							FloatingIP: fip.IP,
+						},
+					).ExtractErr()
+					return normalizeError(err)
+				},
+				normalizeError,
+			)
+			if retryErr != nil {
+				return retryErr
+			}
+
+			// then delete it.
+			retryErr = stacks.RetryableRemoteCall(
+				func() error {
+					err := floatingips.Delete(s.ComputeClient, fip.ID).ExtractErr()
+					return normalizeError(err)
+				},
+				normalizeError,
+			)
+			if retryErr != nil {
+				return retryErr
 			}
 		}
+
 	}
 
 	// Try to remove host for 3 minutes
@@ -1240,20 +1243,20 @@ func (s stack) DeleteHost(hostParam stacks.HostParameter) fail.Error {
 							},
 							normalizeError,
 						)
-						if commRetryErr == nil {
-							if toHostState(host.Status) == hoststate.Error {
+						if commRetryErr != nil {
+							// FIXME: capture more error types
+							switch commRetryErr.(type) {
+							case *fail.ErrNotFound:
+								resourcePresent = false
 								return nil
+							default:
 							}
-							return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
+							return commRetryErr
 						}
-						// FIXME: capture more error types
-						switch commRetryErr.(type) {
-						case *fail.ErrNotFound:
-							resourcePresent = false
+						if toHostState(host.Status) == hoststate.Error {
 							return nil
-						default:
 						}
-						return commRetryErr
+						return fail.NewError("host '%s' state is '%s'", host.Name, host.Status)
 					},
 					s.Timings().NormalDelay(),
 					s.Timings().HostCleanupTimeout(),
