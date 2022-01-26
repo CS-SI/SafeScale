@@ -337,24 +337,20 @@ func (s stack) ListNetworks() ([]*abstract.Network, fail.Error) {
 		for _, v := range vpcs {
 			item, ok := v.(map[string]interface{})
 			if !ok {
-				logrus.Warnf("vpc should be a map[string]interface{}")
-				continue
+				return emptySlice, fail.InconsistentError("vpc should be a map[string]interface{}")
 			}
 			an := abstract.NewNetwork()
 			an.Name, ok = item["name"].(string)
 			if !ok {
-				logrus.Warnf("name should NOT be empty")
-				continue
+				return emptySlice, fail.InconsistentError("name should NOT be empty")
 			}
 			an.ID, ok = item["id"].(string)
 			if !ok {
-				logrus.Warnf("id should NOT be empty")
-				continue
+				return emptySlice, fail.InconsistentError("id should NOT be empty")
 			}
 			an.CIDR, ok = item["cidr"].(string)
 			if !ok {
-				logrus.Warnf("cidr should NOT be empty")
-				continue
+				return emptySlice, fail.InconsistentError("cidr should NOT be empty")
 			}
 			// FIXME: Missing validation, all previous fields should be NOT empty
 			list = append(list, an)
@@ -528,13 +524,11 @@ func (s stack) InspectSubnetByName(networkRef, name string) (*abstract.Subnet, f
 			var ok bool
 			entry, ok = s.(map[string]interface{})
 			if !ok {
-				logrus.Warnf("subnet should be a map[string]interface{}")
-				continue
+				return nullAS, fail.InconsistentError("subnet should be a map[string]interface{}")
 			}
 			id, ok = entry["id"].(string)
 			if !ok {
-				logrus.Warnf("id should be a string")
-				continue
+				return nullAS, fail.InconsistentError("id should be a string")
 			}
 		}
 		return s.inspectOpenstackSubnet(id)

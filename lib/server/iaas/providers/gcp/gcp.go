@@ -130,7 +130,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	operatorUsername := abstract.DefaultUser
 	if operatorUsernameIf, ok := computeCfg["OperatorUsername"]; ok {
 		if operatorUsername, ok = operatorUsernameIf.(string); !ok {
-			return nil, fail.NewError("'OperatorUsername' should be a string")
+			return nil, fail.InconsistentError("'OperatorUsername' should be a string")
 		}
 	}
 
