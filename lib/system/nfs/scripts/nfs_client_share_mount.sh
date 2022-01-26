@@ -29,5 +29,5 @@ trap print_error ERR
 
 mkdir -p "{{.MountPoint}}" && \
 mount.nfs -o {{ .cacheOption }} "{{.Export}}" "{{.MountPoint}}" && \
-echo "{{.Export}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >> /etc/fstab
-sftp1:subdir /mnt/data rclone rw,noauto,nofail,_netdev,x-systemd.automount,args2env,vfs_cache_mode=writes,config=/etc/rclone.conf,cache_dir=/var/cache/rclone 0 0
+echo "{{.Export}} {{.MountPoint}}   nfs defaults,user,auto,noatime,intr,{{ .cacheOption }} 0   0" >> /etc/fstab && \
+echo "sftp1:subdir /mnt/data rclone rw,noauto,nofail,_netdev,x-systemd.automount,args2env,vfs_cache_mode=writes,config=/etc/rclone.conf,cache_dir=/var/cache/rclone 0 0" >> /etc/fstab
