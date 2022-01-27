@@ -118,7 +118,7 @@ func (rfc RemoteFileItem) RemoveRemote(clientSession *Session, hostname string) 
 		return fail.InvalidParameterCannotBeNilError("clientSession")
 	}
 
-	cmd := "rm -rf " + rfc.Remote
+	cmd := "sudo rm -rf " + rfc.Remote
 	retcode, _, _, err := clientSession.SSH.Run(hostname, cmd, outputs.COLLECT, temporal.ConnectionTimeout(), temporal.ExecutionTimeout())
 	if err != nil || retcode != 0 {
 		return fail.NewError("failed to remove file '%s:%s'", hostname, rfc.Remote)
