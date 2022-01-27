@@ -409,12 +409,12 @@ func (s stack) CreateSubnet(req abstract.SubnetRequest) (res *abstract.Subnet, f
 	if IsOperation(resp, "State", reflect.TypeOf("")) {
 		retryErr := retry.WhileUnsuccessful(
 			func() error {
-				resp, innerXErr := s.rpcDescribeSubnetByID(resp.SubnetId)
+				descr, innerXErr := s.rpcDescribeSubnetByID(resp.SubnetId)
 				if innerXErr != nil {
 					return innerXErr
 				}
-				if aws.StringValue(resp.State) != "available" {
-					return fail.NewError("not ready (state = '%s')", resp.State)
+				if aws.StringValue(descr.State) != "available" {
+					return fail.NewError("not ready (state = '%s')", descr.State)
 				}
 				return nil
 			},

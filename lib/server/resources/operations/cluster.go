@@ -1256,28 +1256,28 @@ func (instance *Cluster) AddNodes(ctx context.Context, count uint, def abstract.
 	defer func() {
 		if ferr != nil && !keepOnFailure && len(nodes) > 0 {
 			// Note: using context.Background() disable cancellation mechanism for a workload that needs to go to the end
-			tg, derr := concurrency.NewTaskGroupWithContext(context.Background())
+			dtg, derr := concurrency.NewTaskGroupWithContext(context.Background())
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
 			}
-			derr = tg.SetID("/onfailure")
+			derr = dtg.SetID("/onfailure")
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
 			}
 
 			for _, v := range nodes {
-				_, derr = tg.Start(
+				_, derr = dtg.Start(
 					instance.taskDeleteNode, taskDeleteNodeParameters{node: v, nodeLoadMethod: HostLightOption},
 				)
 				if derr != nil {
-					abErr := tg.AbortWithCause(derr)
+					abErr := dtg.AbortWithCause(derr)
 					if abErr != nil {
 						logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 					}
 					break
 				}
 			}
-			_, derr = tg.WaitGroup()
+			_, derr = dtg.WaitGroup()
 			derr = debug.InjectPlannedFail(derr)
 			if derr != nil {
 				_ = ferr.AddConsequence(derr)
@@ -2935,7 +2935,7 @@ func (instance *Cluster) determineRequiredNodes() (uint, uint, uint, fail.Error)
 }
 
 // realizeTemplate generates a file from box template with variables updated
-func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}, fileName string) (string, string, fail.Error) {
+func realizeTemplate(box *rice.Box, tmplName string, adata map[string]interface{}, fileName string) (string, string, fail.Error) {
 	if box == nil {
 		return "", "", fail.InvalidParameterError("box", "cannot be nil!")
 	}
@@ -2953,7 +2953,7 @@ func realizeTemplate(box *rice.Box, tmplName string, data map[string]interface{}
 	}
 
 	dataBuffer := bytes.NewBufferString("")
-	err = tmplCmd.Option("missingkey=error").Execute(dataBuffer, data)
+	err = tmplCmd.Option("missingkey=error").Execute(dataBuffer, adata)
 	err = debug.InjectPlannedError(err)
 	if err != nil {
 		return "", "", fail.Wrap(err, "failed to execute  template")
@@ -3139,12 +3139,12 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 
 	// Feature ansible found ?
 	if !featureAnsibleInstalled {
-		logrus.Infof("%snothing to update (feature not installed)", prerr)
+		logrus.Infof("%s nothing to update (feature not installed)", prerr)
 		return nil
 	}
 	// Has at least one master ?
 	if len(masters) == 0 {
-		logrus.Infof("%snothing to update (no masters in cluster)", prerr)
+		logrus.Infof("%s nothing to update (no masters in cluster)", prerr)
 		return nil
 	}
 
@@ -3154,35 +3154,35 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 		// Note: path MUST be literal for rice to work
 		b, err := rice.FindBox("../operations/scripts/")
 		if err != nil {
-			return fail.Wrap(err, "%sfailed to load template directory", prerr)
+			return fail.Wrap(err, "%s failed to load template directory", prerr)
 		}
 
 		ansibleTemplateBox.Store(b)
-		logrus.Tracef("%sloaded feature \"ansible\" inventory.py template", prerr)
+		logrus.Tracef("%s loaded feature \"ansible\" inventory.py template", prerr)
 		anon = ansibleTemplateBox.Load()
 		if anon == nil {
-			return fail.InconsistentError("%sansible inventory template is nil", prerr)
+			return fail.InconsistentError("%s ansible inventory template is nil", prerr)
 		}
 	}
 	box, ok := anon.(*rice.Box)
 	if !ok {
-		return fail.InconsistentError("%sfail to load template directory", prerr)
+		return fail.InconsistentError("%s fail to load template directory", prerr)
 	}
 	tmplString, err := box.String("ansible_inventory.py")
 	if err != nil {
-		return fail.Wrap(err, "%sfailed to load template 'ansible_inventory.py'", prerr)
+		return fail.Wrap(err, "%s failed to load template 'ansible_inventory.py'", prerr)
 	}
 
 	// --------- Build ansible inventory --------------
 	fileName := fmt.Sprintf("cluster-inventory-%s.py", params["Clustername"])
 	tmplCmd, err := template.Parse(fileName, tmplString)
 	if err != nil {
-		return fail.Wrap(err, "%sfailed to parse template 'ansible_inventory.py'", prerr)
+		return fail.Wrap(err, "%s failed to parse template 'ansible_inventory.py'", prerr)
 	}
 	dataBuffer := bytes.NewBufferString("")
 	ferr := tmplCmd.Execute(dataBuffer, params)
 	if ferr != nil {
-		return fail.Wrap(ferr, "%sfailed to execute template 'ansible_inventory.py'", prerr)
+		return fail.Wrap(ferr, "%s failed to execute template 'ansible_inventory.py'", prerr)
 	}
 
 	// --------- Upload file for each master and test it (parallelized) --------------
@@ -3198,7 +3198,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 
 	var errors []error
 	for master := range masters {
-		logrus.Infof("%sUpdate master %s", prerr, masters[master].GetName())
+		logrus.Infof("%s Update master %s", prerr, masters[master].GetName())
 
 		_, xerr = tg.Start(
 			instance.taskUpdateClusterInventoryMaster,
@@ -3215,7 +3215,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 			errors = append(errors, xerr)
 			abErr := tg.AbortWithCause(xerr)
 			if abErr != nil {
-				logrus.Warnf("%sthere was an error trying to abort TaskGroup: %s", prerr, spew.Sdump(abErr))
+				logrus.Warnf("%s there was an error trying to abort TaskGroup: %s", prerr, spew.Sdump(abErr))
 			}
 			break
 		}
@@ -3227,13 +3227,13 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		if withTimeout(xerr) {
-			logrus.Warningf("%sTimeouts ansible update inventory", prerr)
+			logrus.Warningf("%s Timeouts ansible update inventory", prerr)
 		}
 	}
 	if len(errors) != 0 {
-		return fail.NewError("%sfailed to update inventory: %s", prerr, fail.NewErrorList(errors))
+		return fail.NewError("%s failed to update inventory: %s", prerr, fail.NewErrorList(errors))
 	}
-	logrus.Debugf("%supdate inventory successful: %v", prerr, tgr)
+	logrus.Debugf("%s update inventory successful: %v", prerr, tgr)
 
 	return nil
 
@@ -3316,6 +3316,7 @@ func (instance *Cluster) joinNodesFromList(ctx context.Context, nodes []*propert
 				return xerr
 			}
 
+			//goland:noinspection ALL
 			defer func(i resources.Host) { // nolint
 				i.Released()
 			}(hostInstance)

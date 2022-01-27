@@ -270,7 +270,8 @@ func (ud *Content) Generate(phase Phase) ([]byte, fail.Error) {
 			return nil, fail.ConvertError(err)
 		}
 
-		tmplString, err := box.String(fmt.Sprintf("userdata%s.%s.sh", provider, string(phase)))
+		var tmplString string
+		tmplString, err = box.String(fmt.Sprintf("userdata%s.%s.sh", provider, string(phase)))
 		if err != nil {
 			return nil, fail.Wrap(err, "error loading script template for phase 'init'")
 		}

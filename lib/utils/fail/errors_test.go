@@ -671,6 +671,7 @@ type checkable interface {
 }
 
 func TestNotNilCheckCast(t *testing.T) {
+	// typed nil issues
 	defer func() {
 		if a := recover(); a != nil {
 			t.Logf("We panicked, this is a serious problem, it means that when we check for nil in our errors, we might be wrong")
@@ -694,6 +695,7 @@ func TestNotNilCheckCast(t *testing.T) {
 }
 
 func TestNotNilCheckCastNoProblems(t *testing.T) {
+	// typed nil issues
 	defer func() {
 		if a := recover(); a != nil {
 			t.Errorf("We panicked, this is a serious problem, it means that when we check for nil in our errors, we might be wrong")

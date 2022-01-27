@@ -42,7 +42,7 @@ var (
 )
 
 // Register a Client referenced by the provider name. Ex: "ovh", ovh.New()
-// This function shoud be called by the init function of each provider to be registered in SafeScale
+// This function should be called by the init function of each provider to be registered in SafeScale
 func Register(name string, provider providers.Provider) {
 	// if already registered, leave
 	if _, ok := allProviders[name]; ok {
@@ -214,9 +214,9 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 			// 	return nil, fail.Wrap(xerr, "invalid region in section 'metadata'")
 			// }
 
-			metadataLocation, err := objectstorage.NewLocation(metadataLocationConfig)
-			if err != nil {
-				return NullService(), fail.Wrap(err, "error connecting to Object Storage location to store metadata")
+			metadataLocation, xerr := objectstorage.NewLocation(metadataLocationConfig)
+			if xerr != nil {
+				return NullService(), fail.Wrap(xerr, "error connecting to Object Storage location to store metadata")
 			}
 
 			if metadataLocationConfig.BucketName == "" {
@@ -225,10 +225,11 @@ func UseService(tenantName, metadataVersion string) (newService Service, xerr fa
 					return NullService(), xerr
 				}
 
-				anon, found := serviceCfg.Get("MetadataBucketName")
-				if !found {
+				anon, there := serviceCfg.Get("MetadataBucketName")
+				if !there {
 					return NullService(), fail.SyntaxError("missing configuration option 'MetadataBucketName'")
 				}
+
 				var ok bool
 				metadataLocationConfig.BucketName, ok = anon.(string)
 				if !ok {
@@ -463,6 +464,22 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 		config.AvailabilityZone, _ = compute["AvailabilityZone"].(string) // nolint
 	}
 
+	for k, v := range identity {
+		if _, ok = v.(string); !ok {
+			return config, fail.InconsistentError("'identity' it's a map[string]string, and the key %s is not a string: %v", k, v)
+		}
+	}
+	for k, v := range compute {
+		if _, ok = v.(string); !ok {
+			return config, fail.InconsistentError("'compute' it's a map[string]string, and the key %s is not a string: %v", k, v)
+		}
+	}
+	for k, v := range ostorage {
+		if _, ok = v.(string); !ok {
+			return config, fail.InconsistentError("'ostorage' it's a map[string]string, and the key %s is not a string: %v", k, v)
+		}
+	}
+
 	// FIXME: Remove google custom code
 	if config.Type == "google" {
 		keys := []string{"project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"}
@@ -474,7 +491,7 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 
 		config.ProjectID, ok = identity["project_id"].(string)
 		if !ok {
-			return config, fail.NewError("'project_id' MUST be a string in tenants.toml: %v", identity["project_id"])
+			return config, fail.InconsistentError("'project_id' MUST be a string in tenants.toml: %v", identity["project_id"])
 		}
 
 		googleCfg := stacks.GCPConfiguration{

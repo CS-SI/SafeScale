@@ -241,7 +241,7 @@ type step struct {
 }
 
 // Run executes the step on all the concerned hosts
-func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, xerr fail.Error) {
+func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s resources.FeatureSettings) (outcomes resources.UnitResults, ferr fail.Error) {
 	outcomes = &unitResults{}
 
 	if task.Aborted() {
@@ -259,10 +259,10 @@ func (is *step) Run(task concurrency.Task, hosts []resources.Host, v data.Map, s
 	return is.loopConcurrentlyOnHosts(task, hosts, v)
 }
 
-func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, xerr fail.Error) {
+func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, ferr fail.Error) {
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	outcomes = &unitResults{}
 
@@ -273,6 +273,7 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 	)
 
 	for _, h := range hosts {
+		var xerr fail.Error
 		tracer.Trace("%s(%s):step(%s)@%s: starting", is.Worker.action.String(), is.Worker.feature.GetName(), is.Name, h.GetName())
 		clonedV, xerr = is.initLoopTurnForHost(h, v)
 		xerr = debug.InjectPlannedFail(xerr)
@@ -316,10 +317,10 @@ func (is *step) loopSeriallyOnHosts(task concurrency.Task, hosts []resources.Hos
 	return outcomes, nil
 }
 
-func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, xerr fail.Error) {
+func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources.Host, v data.Map) (outcomes resources.UnitResults, ferr fail.Error) {
 	tracer := debug.NewTracer(task, true, "").Entering()
 	defer tracer.Exiting()
-	defer fail.OnExitLogError(&xerr, tracer.TraceMessage())
+	defer fail.OnExitLogError(&ferr, tracer.TraceMessage())
 
 	outcomes = &unitResults{}
 
@@ -333,23 +334,23 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 		return nil, xerr
 	}
 
-	var startErr fail.Error
+	var taskErr fail.Error
 	subtasks := map[string]concurrency.Task{}
 	for _, h := range hosts {
-		clonedV, startErr = is.initLoopTurnForHost(h, v)
-		startErr = debug.InjectPlannedFail(startErr)
-		if startErr != nil {
-			abErr := tg.AbortWithCause(startErr)
+		clonedV, taskErr = is.initLoopTurnForHost(h, v)
+		taskErr = debug.InjectPlannedFail(taskErr)
+		if taskErr != nil {
+			abErr := tg.AbortWithCause(taskErr)
 			if abErr != nil {
 				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
 			break
 		}
 
-		subtask, startErr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
-		startErr = debug.InjectPlannedFail(startErr)
-		if startErr != nil {
-			abErr := tg.AbortWithCause(startErr)
+		subtask, taskErr = tg.Start(is.taskRunOnHost, runOnHostParameters{Host: h, Variables: clonedV})
+		taskErr = debug.InjectPlannedFail(taskErr)
+		if taskErr != nil {
+			abErr := tg.AbortWithCause(taskErr)
 			if abErr != nil {
 				logrus.Warnf("there was an error trying to abort TaskGroup: %s", spew.Sdump(abErr))
 			}
@@ -365,27 +366,29 @@ func (is *step) loopConcurrentlyOnHosts(task concurrency.Task, hosts []resources
 			logrus.Warningf("Not all tasks were started, there should be one task per host, is not the case: %d tasks and %d hosts", len(subtasks), len(hosts))
 		}
 		logrus.Errorf("Critical error: [%s], also look at step outcomes below for more information", spew.Sdump(xerr))
-		if startErr != nil {
-			_ = startErr.AddConsequence(xerr)
+		if taskErr != nil {
+			_ = taskErr.AddConsequence(xerr)
 		} else {
-			startErr = xerr
+			taskErr = xerr
 		}
 	}
 
 	wrongs, outcomes, cerr := is.collectOutcomes(subtasks, tgr)
 	if cerr != nil {
 		if wrongs == 0 && len(subtasks) == len(hosts) {
-			logrus.Errorf("CRITICAL problem: there is a discrepancy between WaitGroup and its individual results")
+			inconsistency := fail.InconsistentError("CRITICAL problem: there is a discrepancy between WaitGroup and its individual results: %w", cerr)
+			inconsistency.Annotate("wrongs", wrongs).Annotate("outcomes", outcomes)
+			return nil, inconsistency
 		}
 
-		if startErr != nil {
-			_ = startErr.AddConsequence(cerr)
-			return nil, startErr
+		if taskErr != nil {
+			_ = taskErr.AddConsequence(cerr)
+			return nil, taskErr
 		}
 		return nil, cerr
 	}
 
-	return outcomes, startErr
+	return outcomes, taskErr
 }
 
 // collectOutcomes collects results from subtasks
@@ -393,12 +396,15 @@ func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results co
 	outcomes := &unitResults{}
 	wrongs := 0
 	for k, s := range subtasks {
-		sid, _ := s.ID()
+		sid, err := s.ID()
+		if err != nil {
+			return 0, nil, err
+		}
 		outcome := results[sid]
 		if outcome != nil {
 			oko, ok := outcome.(stepResult)
 			if !ok {
-				return wrongs, nil, fail.NewError("outcome should be a resources.UnitResult")
+				return wrongs, nil, fail.InconsistentError("outcome should be a stepResult (implements resources.UnitResult)")
 			}
 
 			outcomes.AddOne(k, oko)
@@ -411,10 +417,10 @@ func (is *step) collectOutcomes(subtasks map[string]concurrency.Task, results co
 }
 
 // initLoopTurnForHost inits the coming loop turn for a specific Host
-func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV data.Map, xerr fail.Error) {
-	// FIXME: why here ? It seems too frequent if the goal is to time the overall worker duration...
+func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV data.Map, ferr fail.Error) {
 	is.Worker.startTime = time.Now()
 
+	var xerr fail.Error
 	clonedV = v.Clone()
 	clonedV["HostIP"], xerr = host.GetPrivateIP()
 	xerr = debug.InjectPlannedFail(xerr)
@@ -446,10 +452,11 @@ func (is *step) initLoopTurnForHost(host resources.Host, v data.Map) (clonedV da
 	}
 
 	clonedV["Hostname"] = host.GetName() + domain
+	// logrus.Warningf("Checking variable substitution for: %s", spew.Sdump(clonedV))
+
 	clonedV, xerr = realizeVariables(clonedV)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
-		//		logrus.Errorf("aborting because of %s", xerr.Error())
 		return nil, fail.Wrap(xerr, "failed to realize variables")
 	}
 

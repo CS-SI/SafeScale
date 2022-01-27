@@ -25,7 +25,6 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -272,10 +271,7 @@ func getFreePort() (int, fail.Error) {
 
 // CreateTempFileFromString creates a temporary file containing 'content'
 func CreateTempFileFromString(content string, filemode os.FileMode) (*os.File, fail.Error) {
-	defaultTmpDir := "/tmp"
-	if runtime.GOOS == "windows" {
-		defaultTmpDir = ""
-	}
+	defaultTmpDir := os.TempDir()
 
 	f, err := ioutil.TempFile(defaultTmpDir, "")
 	if err != nil {
@@ -724,6 +720,7 @@ func (scmd *SSHCommand) taskExecute(
 		xerr = fail.ExecutionError(runErr)
 		// If error doesn't contain outputs and return code of the process, stop the pipe bridges and return error
 		var (
+			rc     int
 			note   data.Annotation
 			stderr string
 			ok     bool
@@ -735,7 +732,7 @@ func (scmd *SSHCommand) taskExecute(
 				}
 			}
 			return result, xerr
-		} else if rc, ok := note.(int); ok && rc == -1 {
+		} else if rc, ok = note.(int); ok && rc == -1 {
 			if !params.collectOutputs {
 				if derr := pipeBridgeCtrl.Stop(); derr != nil {
 					_ = xerr.AddConsequence(derr)

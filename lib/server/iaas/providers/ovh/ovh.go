@@ -157,7 +157,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	operatorUsername := abstract.DefaultUser
-	if operatorUsernameIf, ok := compute["OperatorUsername"]; ok {
+	if operatorUsernameIf, there := compute["OperatorUsername"]; there {
 		operatorUsername, ok = operatorUsernameIf.(string)
 		if !ok {
 			return nil, fail.InconsistentError("'OperatorUsername' should be a string")
@@ -174,7 +174,7 @@ func (p *provider) Build(params map[string]interface{}) (providers.Provider, fai
 	}
 
 	maxLifeTime := 0
-	if _, ok := compute["MaxLifetimeInHours"].(string); ok {
+	if _, ok = compute["MaxLifetimeInHours"].(string); ok {
 		maxLifeTime, _ = strconv.Atoi(compute["MaxLifetimeInHours"].(string))
 	}
 

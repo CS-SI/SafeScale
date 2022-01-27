@@ -53,7 +53,7 @@ type TaskResult interface{}
 // TaskAction defines the type of the function that can be started by a Task.
 // NOTE: you have to check if task is aborted inside this function using method t.ErrAborted(),
 //       to be able to stop the process when task is aborted (no matter what
-//       the abort reason is), and permit to end properly. Otherwise this may lead to goroutine leak
+//       the abort reason is), and permit ending properly. Otherwise, this may lead to goroutine leak
 //       (there is no good way to stop forcibly a goroutine).
 // Example:
 // task.Start(func(task concurrency.Task, p TaskParameters) (concurrency.TaskResult, fail.Error) {
@@ -311,7 +311,7 @@ func newTask(ctx context.Context, parentTask Task, options ...data.ImmutableKeyV
 	return instance, nil
 }
 
-// IsNull ...
+// IsNull checks if task is not initialized
 func (instance *task) IsNull() bool {
 	if instance == nil {
 		return true

@@ -26,6 +26,6 @@ import (
 type Notify func(Try, verdict.Enum)
 
 // NotifyByLog logs the status of each try
-func NotifyByLog(try Try, verdict verdict.Enum) {
-	logrus.Debugf("try #%d: verdict=%s, err=%v", try.Count, verdict.String(), try.Err)
+func NotifyByLog(try Try, ver verdict.Enum) {
+	logrus.Debugf("try #%d: verdict=%s, err=%v", try.Count, ver.String(), try.Err)
 }

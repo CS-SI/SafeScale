@@ -29,7 +29,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/data/json"
 	"github.com/CS-SI/SafeScale/lib/utils/data/observer"
-	"github.com/CS-SI/SafeScale/lib/utils/data/serialize"
+	serializer "github.com/CS-SI/SafeScale/lib/utils/data/serialize"
 	"github.com/CS-SI/SafeScale/lib/utils/data/shielded"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/callstack"
@@ -56,7 +56,7 @@ type MetadataCore struct {
 
 	lock       sync.RWMutex
 	shielded   *shielded.Shielded
-	properties *serialize.JSONProperties
+	properties *serializer.JSONProperties
 	observers  map[string]observer.Observer
 
 	kind              string
@@ -90,7 +90,7 @@ func NewCore(svc iaas.Service, kind string, path string, instance data.Clonable)
 		return NullCore(), xerr
 	}
 
-	props, err := serialize.NewJSONProperties("resources." + kind)
+	props, err := serializer.NewJSONProperties("resources." + kind)
 	err = debug.InjectPlannedFail(err)
 	if err != nil {
 		return NullCore(), err
@@ -248,7 +248,7 @@ func (c *MetadataCore) Alter(callback resources.Callback, options ...data.Immuta
 
 	// Make sure c.properties is populated
 	if c.properties == nil {
-		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
+		c.properties, xerr = serializer.NewJSONProperties("resources." + c.kind)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr
@@ -923,7 +923,7 @@ func (c *MetadataCore) Deserialize(buf []byte) (xerr fail.Error) {
 // Note: must be called after locking the instance
 func (c *MetadataCore) deserialize(buf []byte) (xerr fail.Error) {
 	if c.properties == nil {
-		c.properties, xerr = serialize.NewJSONProperties("resources." + c.kind)
+		c.properties, xerr = serializer.NewJSONProperties("resources." + c.kind)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return xerr

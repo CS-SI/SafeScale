@@ -583,10 +583,10 @@ func (s *HostListener) Status(ctx context.Context, in *protocol.Reference) (ht *
 }
 
 // Inspect a host
-func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, err error) {
-	defer fail.OnExitConvertToGRPCStatus(&err)
-	defer fail.OnExitWrapError(&err, "cannot inspect host")
-	defer fail.OnPanic(&err)
+func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *protocol.Host, ferr error) {
+	defer fail.OnExitConvertToGRPCStatus(&ferr)
+	defer fail.OnExitWrapError(&ferr, "cannot inspect host")
+	defer fail.OnPanic(&ferr)
 
 	if s == nil {
 		return nil, fail.InvalidInstanceError()
@@ -606,7 +606,7 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, fail.NewError("Structure validation failure: %v", in)
 	}
 
-	ref, refLabel := srvutils.GetReference(in)
+	ref, _ := srvutils.GetReference(in)
 	if ref == "" {
 		return nil, fail.InvalidRequestError("neither name nor id given as reference")
 	}
@@ -616,10 +616,6 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 		return nil, xerr
 	}
 	defer job.Close()
-
-	tracer := debug.NewTracer(job.Task(), tracing.ShouldTrace("listeners.host"), "(%s)", refLabel).WithStopwatch().Entering()
-	defer tracer.Exiting()
-	defer fail.OnExitLogError(&err, tracer.TraceMessage())
 
 	hostInstance, xerr := hostfactory.Load(job.Service(), ref)
 	if xerr != nil {
@@ -637,7 +633,14 @@ func (s *HostListener) Inspect(ctx context.Context, in *protocol.Reference) (h *
 	if xerr != nil {
 		return nil, xerr
 	}
-	return hostInstance.ToProtocol()
+
+	var ph *protocol.Host
+	ph, xerr = hostInstance.ToProtocol()
+	if xerr != nil {
+		return nil, xerr
+	}
+
+	return ph, nil
 }
 
 // Delete a host

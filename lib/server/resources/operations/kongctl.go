@@ -229,15 +229,16 @@ func (k *KongController) Apply(ctx context.Context, rule map[interface{}]interfa
 		if err != nil {
 			return "", fail.Wrap(err, "failed to marshal service rule")
 		}
-		content := string(jsoned)
+
+		jsonContent := string(jsoned)
 
 		url := "services/" + ruleName
-		response, _, xerr := k.put(ctx, ruleName, url, content, values, true)
+		response, _, xerr := k.put(ctx, ruleName, url, jsonContent, values, true)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return ruleName, fail.Wrap(xerr, "failed to apply proxy rule '%s'", ruleName)
 		}
-		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, content)
+		logrus.Debugf("successfully applied proxy rule '%s': %v", ruleName, jsonContent)
 		return ruleName, k.addSourceControl(ctx, ruleName, url, ruleType, response["id"].(string), sourceControl, values)
 
 	case "route":

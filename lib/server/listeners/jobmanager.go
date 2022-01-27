@@ -32,8 +32,8 @@ import (
 )
 
 // PrepareJob creates a new job
-func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ server.Job, xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func PrepareJob(ctx context.Context, tenantID string, jobDescription string) (_ server.Job, ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if ctx == nil {
 		return nil, fail.InvalidParameterCannotBeNilError("ctx")

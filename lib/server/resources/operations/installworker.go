@@ -885,7 +885,7 @@ func (w *worker) taskLaunchStep(task concurrency.Task, params concurrency.TaskPa
 
 	wallTime := w.service.Timings().HostLongOperationTimeout()
 	if anon, ok = p.stepMap[yamlTimeoutKeyword]; ok {
-		if _, ok := anon.(int); ok {
+		if _, ok = anon.(int); ok {
 			wallTime = time.Duration(anon.(int)) * time.Minute
 		} else {
 			wallTimeConv, inner := strconv.Atoi(anon.(string))

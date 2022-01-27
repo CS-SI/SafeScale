@@ -425,13 +425,13 @@ func (s stack) buildGcpMachine(
 	template abstract.HostTemplate,
 	imageURL string,
 	diskSize int,
-	userdata string,
+	userData string,
 	isPublic bool,
 	securityGroups map[string]struct{},
 ) (*abstract.HostFull, fail.Error) {
 
 	nullAHF := abstract.NewHostFull()
-	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(diskSize), userdata, isPublic, securityGroups)
+	resp, xerr := s.rpcCreateInstance(instanceName, network.Name, subnet.ID, subnet.Name, template.Name, imageURL, int64(diskSize), userData, isPublic, securityGroups)
 	if xerr != nil {
 		return nullAHF, xerr
 	}

@@ -530,6 +530,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 		return invalid, "", "", xerr
 	}
 
+	variables["Revision"] = system.REV
 	finalVariables := make(data.Map, len(variables)+len(bashLibraryVariables))
 	for k, v := range variables {
 		finalVariables[k] = v
@@ -537,7 +538,7 @@ func (instance *Cluster) ExecuteScript(ctx context.Context, tmplName string, var
 	for k, v := range bashLibraryVariables {
 		finalVariables[k] = v
 	}
-	variables["Revision"] = system.REV
+
 	script, path, xerr := realizeTemplate(box, tmplName, finalVariables, tmplName)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
