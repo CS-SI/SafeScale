@@ -118,11 +118,22 @@ feature:
 
                             cat >${SF_ETCDIR}/ansible/ansible.cfg <<-EOF
                             [defaults]
-                            inventory = ${SF_ETCDIR}/ansible/inventory/inventory.py
+                            inventory = ${SF_ETCDIR}/ansible/inventory/_static.yml
                             remote_tmp = ${SF_TMPDIR}/ansible-\${USER}
                             log_path = ${SF_LOGDIR}/ansible.log
                             EOF
 
+                            cat >${SF_ETCDIR}/ansible/inventory/_static.yml <<-EOF
+                            ...
+                            all:
+                                hosts:
+                                    {{ .Hostname }}:
+                                        ansible_host: {{ .HostIP }}
+                            
+                                vars:
+                                    ansible_user: {{ .OperatorUsername }}
+                            EOF
+                            
                             cat >${SF_ETCDIR}/ansible/pathes.cfg <<-EOF
                             sf_base_dir: "/opt/safescale"
                             sf_etc_dir: "{{ "{{ sf_base_dir }}/etc" }}"
