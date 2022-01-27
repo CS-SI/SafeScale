@@ -32,6 +32,7 @@ func init() {
 		ntpServerFeature(),
 		ntpClientFeature(),
 		ansibleFeature(),
+		ansibleForClusterFeature(),
 		certificateAuthorityFeature(),
 		// postgresql4platformFeature(),
 		nVidiaDockerFeature(),

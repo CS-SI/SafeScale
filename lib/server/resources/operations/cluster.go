@@ -2978,7 +2978,7 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 	}
 
 	// Collect data
-	featureAnsibleInstalled := false
+	featureAnsibleInventoryInstalled := false
 	var masters []resources.Host
 	var params = map[string]interface{}{
 		"ClusterName":          "",
@@ -3001,13 +3001,13 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 			if !ok {
 				return fail.InconsistentError("`propertiesv1.ClusterFeatures' expected, '%s' provided", reflect.TypeOf(clonable).String())
 			}
-			_, featureAnsibleInstalled = featuresV1.Installed["ansible"]
+			_, featureAnsibleInventoryInstalled = featuresV1.Installed["ansible-for-cluster"]
 			return nil
 		})
 		if innerXErr != nil {
 			return innerXErr
 		}
-		if !featureAnsibleInstalled {
+		if !featureAnsibleInventoryInstalled {
 			return nil
 		}
 
@@ -3138,8 +3138,8 @@ func (instance *Cluster) unsafeUpdateClusterInventory(ctx context.Context) fail.
 	prerr := fmt.Sprintf("[Cluster %s] Update ansible inventory: ", instance.GetName())
 
 	// Feature ansible found ?
-	if !featureAnsibleInstalled {
-		logrus.Infof("%s nothing to update (feature not installed)", prerr)
+	if !featureAnsibleInventoryInstalled {
+		logrus.Infof("%snothing to update (feature not installed)", prerr)
 		return nil
 	}
 	// Has at least one master ?

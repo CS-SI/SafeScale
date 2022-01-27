@@ -945,6 +945,7 @@ func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (x
 	if !disabled {
 		logrus.Debugf("[Cluster %s] adding feature 'ansible'", identity.Name)
 
+		// 1st, Feature 'ansible'
 		feat, xerr := NewFeature(instance.Service(), "ansible")
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
@@ -965,9 +966,28 @@ func (instance *Cluster) installAnsible(ctx context.Context, params data.Map) (x
 
 		if !r.Successful() {
 			msg := r.AllErrorMessages()
-			return fail.NewError("[Cluster %s] failed to add 'ansible' failed: %s", identity.Name, msg)
+			return fail.NewError("[Cluster %s] failed to add 'ansible': %s", identity.Name, msg)
 		}
 		logrus.Debugf("[Cluster %s] feature 'ansible' added successfully", identity.Name)
+
+		// 2nd, Feature 'ansible-for-cluster' (which does the necessary for a dynamic inventory)
+		feat, xerr = NewFeature(instance.Service(), "ansible-for-cluster")
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		r, xerr = feat.Add(ctx, instance, params, resources.FeatureSettings{})
+		xerr = debug.InjectPlannedFail(xerr)
+		if xerr != nil {
+			return xerr
+		}
+
+		if !r.Successful() {
+			msg := r.AllErrorMessages()
+			return fail.NewError("[Cluster %s] failed to add 'ansible-for-cluster': %s", identity.Name, msg)
+		}
+		logrus.Debugf("[Cluster %s] feature 'ansible-for-cluster' added successfully", identity.Name)
 	}
 	return nil
 }
