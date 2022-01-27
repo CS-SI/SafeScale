@@ -136,13 +136,22 @@ func (nsh *NetworkSingleHosts) FreeSlot(index uint) {
 		nsh.FreeSlots = append(nsh.FreeSlots, FreeCIDRSlot{First: index, Last: index})
 	}
 
-	// merge adjacent slots
-	for i := 0; i < len(nsh.FreeSlots)-1; i++ {
-		if nsh.FreeSlots[i].Last == nsh.FreeSlots[i+1].First {
-			nsh.FreeSlots[i].Last = nsh.FreeSlots[i+1].Last
-			nsh.FreeSlots = append(nsh.FreeSlots[:i], nsh.FreeSlots[:i+1]...)
+	if len(nsh.FreeSlots) > 1 {
+		// merge adjacent slots
+		merged := []FreeCIDRSlot{nsh.FreeSlots[0]}
+		current := 0
+		for i := 1; i < len(nsh.FreeSlots); i++ {
+			// if has partial cover
+			if merged[current].Last >= nsh.FreeSlots[i].First {
+				merged[current].Last = nsh.FreeSlots[i].Last
+			} else {
+				merged = append(merged, nsh.FreeSlots[i])
+				current++
+			}
 		}
+		nsh.FreeSlots = merged
 	}
+
 }
 
 func init() {
