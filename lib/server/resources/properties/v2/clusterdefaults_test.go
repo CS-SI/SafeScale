@@ -17,6 +17,7 @@
 package propertiesv2
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -24,7 +25,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDefaults_Clone(t *testing.T) {
+func TestClusterDefault_IsNull(t *testing.T) {
+
+	var sd *ClusterDefaults = nil
+	if !sd.IsNull() {
+		t.Error("ClusterDefaults nil pointer is null")
+		t.Fail()
+	}
+	sd = newClusterDefaults()
+	if !sd.IsNull() {
+		t.Error("Empty ClusterDefaults is null")
+		t.Fail()
+	}
+	sd.GatewaySizing.MinCores = 1
+	if sd.IsNull() {
+		t.Error("ClusterDefaults is not null")
+		t.Fail()
+	}
+}
+
+func TestClusterDefault_Replace(t *testing.T) {
+	var sgs *ClusterDefaults = nil
+	sgs2 := newClusterDefaults()
+	result := sgs.Replace(sgs2)
+	if fmt.Sprintf("%p", result) != "0x0" {
+		t.Error("ClusterDefaults nil pointer can't be replace")
+		t.Fail()
+	}
+}
+
+func TestClusterDefault_Clone(t *testing.T) {
 	ct := newClusterDefaults()
 	ct.Image = "something"
 	ct.GatewaySizing = HostSizingRequirements{
