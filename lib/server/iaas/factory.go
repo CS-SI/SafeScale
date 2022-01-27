@@ -471,6 +471,9 @@ func initObjectStorageLocationConfig(authOpts providers.Config, tenant map[strin
 	}
 	for k, v := range compute {
 		if _, ok = v.(string); !ok {
+			if _, ok = v.(bool); ok {
+				continue
+			}
 			return config, fail.InconsistentError("'compute' it's a map[string]string, and the key %s is not a string: %v", k, v)
 		}
 	}
