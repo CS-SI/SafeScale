@@ -74,6 +74,7 @@ type HostSizingRequirements struct {
 	MinRAMSize  float32
 	MaxRAMSize  float32
 	MinDiskSize int
+	MaxDiskSize int
 	MinGPU      int
 	MinCPUFreq  float32
 	Replaceable bool // Tells if we accept server that could be removed without notice (AWS proposes such kind of server with SPOT

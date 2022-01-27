@@ -634,6 +634,10 @@ func (svc service) ListTemplatesBySizing(
 			logrus.Tracef(msg, "not enough disk")
 			continue
 		}
+		if t.DiskSize > 0 && sizing.MaxDiskSize > 0 && t.DiskSize > sizing.MaxDiskSize {
+			logrus.Tracef(msg, "too many disk")
+			continue
+		}
 		if (sizing.MinGPU <= 0 && t.GPUNumber > 0) || (sizing.MinGPU > 0 && t.GPUNumber > sizing.MinGPU) {
 			logrus.Tracef(msg, "too many GPU")
 			continue

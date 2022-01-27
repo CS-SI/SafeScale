@@ -343,6 +343,7 @@ message HostSizing {
 	int32 min_disk_size = 5;
 	int32 gpu_count = 6;
 	float min_cpu_freq = 7;
+	int32 max_disk_size = 8;
 }
 
 message HostDefinition {
