@@ -32,7 +32,7 @@ require (
 	github.com/magiconair/properties v1.8.1
 	github.com/makholm/covertool v0.0.0-20210624102319-bb1c7c716204
 	github.com/mitchellh/copystructure v1.0.0 // indirect
-	github.com/mitchellh/mapstructure v1.2.2
+	github.com/mitchellh/mapstructure v1.4.3
 	github.com/mjibson/go-dsp v0.0.0-20180508042940-11479a337f12
 	github.com/nakabonne/gosivy v0.2.0
 	github.com/nanobox-io/golang-scribble v0.0.0-20190309225732-aa3e7c118975
