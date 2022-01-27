@@ -2472,7 +2472,11 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 				// Retrieve Share data
 				shareInstance, loopErr := LoadShare(svc, i.ShareID)
 				if loopErr != nil {
-					return loopErr
+					if _, ok := loopErr.(*fail.ErrNotFound); !ok { // nolint
+						return loopErr
+					}
+					debug.IgnoreError(loopErr)
+					continue
 				}
 
 				//goland:noinspection ALL
@@ -2510,7 +2514,11 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 
 			shareInstance, loopErr := LoadShare(svc, v.ID)
 			if loopErr != nil {
-				return loopErr
+				if _, ok := loopErr.(*fail.ErrNotFound); !ok { // nolint
+					return loopErr
+				}
+				debug.IgnoreError(loopErr)
+				continue
 			}
 
 			//goland:noinspection ALL
@@ -2532,7 +2540,11 @@ func (instance *Host) RelaxedDeleteHost(ctx context.Context) (xerr fail.Error) {
 
 			shareInstance, loopErr := LoadShare(svc, v.Name)
 			if loopErr != nil {
-				return loopErr
+				if _, ok := loopErr.(*fail.ErrNotFound); !ok { // nolint
+					return loopErr
+				}
+				debug.IgnoreError(loopErr)
+				continue
 			}
 
 			loopErr = shareInstance.Delete(ctx)
