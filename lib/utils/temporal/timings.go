@@ -28,7 +28,7 @@ const (
 	defaultHostOperationTimeout = 120 * time.Second
 
 	// defaultHostCreationTimeout timeout for grpc command relative to host creation
-	defaultHostCreationTimeout = 6 * time.Minute
+	defaultHostCreationTimeout = 8 * time.Minute
 
 	// defaultHostLongOperationTimeout is a Long timeout
 	defaultHostLongOperationTimeout = 14 * time.Minute
@@ -52,7 +52,7 @@ const (
 	defaultConnectionTimeout = 1 * time.Minute
 
 	// defaultExecutionTimeout is the default linux command operation timeout
-	defaultExecutionTimeout = 6 * time.Minute
+	defaultExecutionTimeout = 8 * time.Minute
 
 	// DefaultMetadataReadAfterWriteTimeout is the default timeout applied to validate metadata write is effective
 	defaultMetadataReadAfterWriteTimeout = 90 * time.Second

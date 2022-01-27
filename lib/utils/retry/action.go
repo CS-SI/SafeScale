@@ -44,6 +44,8 @@ type Try struct {
 	Err   error
 }
 
+type Option func(thing *action) error // to set Officer and timeout
+
 type action struct {
 	// Officer is used to apply needed delay between 2 tries. If nil, no delay will be used.
 	Officer *Officer
@@ -55,6 +57,13 @@ type action struct {
 	Notify Notify
 	// Timeout if any
 	Timeout time.Duration
+	// Other configuration options (optional)
+	Other map[string]interface{}
+}
+
+// NewAction is a constructor for action
+func NewAction(officer *Officer, arbiter Arbiter, run func() error, notify Notify, timeout time.Duration) *action { // nolint
+	return &action{Officer: officer, Arbiter: arbiter, Run: run, Notify: notify, Timeout: timeout, Other: make(map[string]interface{})}
 }
 
 // Action tries to execute 'run' following verdicts from arbiter, with delay decided by 'officer'.
@@ -86,6 +95,7 @@ func Action(
 			Arbiter: arbiter,
 			Run:     run,
 			Notify:  notify,
+			Other:   make(map[string]interface{}),
 		},
 	)
 }
@@ -160,6 +170,7 @@ func WhileUnsuccessful(run func() error, delay time.Duration, timeout time.Durat
 			Run:     run,
 			Notify:  nil,
 			Timeout: timeout,
+			Other:   make(map[string]interface{}),
 		},
 	)
 }
@@ -195,6 +206,7 @@ func WhileUnsuccessfulWithLimitedRetries(run func() error, delay time.Duration, 
 			Run:     run,
 			Notify:  nil,
 			Timeout: timeout,
+			Other:   make(map[string]interface{}),
 		},
 	)
 }
@@ -220,6 +232,7 @@ func WhileUnsuccessfulWithHardTimeout(run func() error, delay time.Duration, tim
 		Run:     run,
 		Notify:  DefaultNotifier(),
 		Timeout: timeout,
+		Other:   make(map[string]interface{}),
 	}.loopWithHardTimeout()
 }
 
@@ -244,6 +257,7 @@ func WhileUnsuccessfulWithHardTimeoutWithNotifier(run func() error, delay time.D
 		Run:     run,
 		Notify:  notify,
 		Timeout: timeout,
+		Other:   make(map[string]interface{}),
 	}.loopWithHardTimeout()
 }
 
@@ -276,6 +290,7 @@ func WhileUnsuccessfulWithNotify(run func() error, delay time.Duration, timeout 
 			Run:     run,
 			Notify:  notify,
 			Timeout: timeout,
+			Other:   make(map[string]interface{}),
 		},
 	)
 }
@@ -308,6 +323,7 @@ func WhileUnsuccessfulWithAggregator(run func() error, delay time.Duration, time
 			Run:     run,
 			Notify:  notify,
 			Timeout: timeout,
+			Other:   make(map[string]interface{}),
 		},
 	)
 }
@@ -456,6 +472,7 @@ func WhileSuccessful(run func() error, delay time.Duration, timeout time.Duratio
 			Run:     run,
 			Notify:  nil,
 			Timeout: timeout,
+			Other:   make(map[string]interface{}),
 		},
 	)
 }
@@ -490,6 +507,7 @@ func WhileSuccessfulWithNotify(run func() error, delay time.Duration, timeout ti
 			Run:     run,
 			Notify:  notify,
 			Timeout: timeout,
+			Other:   make(map[string]interface{}),
 		},
 	)
 }

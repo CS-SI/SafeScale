@@ -24,6 +24,7 @@ import (
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks/openstack"
 	"github.com/CS-SI/SafeScale/lib/utils/debug/tracing"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/pengux/check"
 	"github.com/sirupsen/logrus"
@@ -698,7 +699,7 @@ func (s stack) DeleteSubnet(id string) fail.Error {
 				normalizeError,
 			)
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(s.Timings().HostCleanupTimeout())),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(s.Timings().HostCleanupTimeout(), s.Timings().CommunicationTimeout()))),
 		retry.Constant(s.Timings().NormalDelay()),
 		nil,
 		nil,

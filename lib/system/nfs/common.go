@@ -154,7 +154,7 @@ func executeScript(
 	filename := utils.TempFolder + "/" + name
 	xerr = retry.WhileUnsuccessful(
 		func() error {
-			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(ctx, filename, f.Name(), true, timings.OperationTimeout())
+			retcode, stdout, stderr, innerXErr := sshconfig.CopyWithTimeout(ctx, filename, f.Name(), true, timings.ConnectionTimeout()+timings.OperationTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
@@ -167,7 +167,7 @@ func executeScript(
 			return nil
 		},
 		timings.NormalDelay(),
-		timings.HostOperationTimeout(),
+		2*temporal.MaxTimeout(timings.HostOperationTimeout(), timings.ConnectionTimeout()+timings.OperationTimeout()),
 	)
 	if xerr != nil {
 		switch xerr.(type) {
@@ -203,13 +203,13 @@ func executeScript(
 			}
 			defer func() { _ = sshCmd.Close() }()
 
-			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timings.BigDelay()); innerXErr != nil {
+			if retcode, stdout, stderr, innerXErr = sshCmd.RunWithTimeout(ctx, outputs.COLLECT, timings.ConnectionTimeout()+timings.HostOperationTimeout()); innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timings.ContextTimeout())),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(timings.ContextTimeout(), timings.ConnectionTimeout()+timings.HostOperationTimeout()))),
 		retry.Constant(timings.NormalDelay()),
 		nil, nil, nil,
 	)

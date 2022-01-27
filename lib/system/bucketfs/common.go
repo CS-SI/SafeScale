@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/CS-SI/SafeScale/lib/server/resources"
+	"github.com/CS-SI/SafeScale/lib/utils/temporal"
 	rice "github.com/GeertJohan/go.rice"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/sirupsen/logrus"
@@ -134,14 +135,14 @@ func executeScript(ctx context.Context, host resources.Host, name string, data m
 
 	xerr = retry.Action(
 		func() (innerXErr error) {
-			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, host.Service().Timings().ConnectionTimeout(), host.Service().Timings().BigDelay())
+			retcode, stdout, stderr, innerXErr = host.Run(ctx, cmd, outputs.COLLECT, host.Service().Timings().ConnectionTimeout(), host.Service().Timings().ExecutionTimeout())
 			if innerXErr != nil {
 				return fail.Wrap(innerXErr, "ssh operation failed")
 			}
 
 			return nil
 		},
-		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(host.Service().Timings().ContextTimeout())),
+		retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(2*temporal.MaxTimeout(host.Service().Timings().ContextTimeout(), host.Service().Timings().ConnectionTimeout()+host.Service().Timings().ExecutionTimeout()))),
 		retry.Constant(host.Service().Timings().NormalDelay()),
 		nil, nil, nil,
 	)

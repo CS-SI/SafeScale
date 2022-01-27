@@ -71,10 +71,8 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	// connectionTimeout = Max(connectionTimeout, instance.Service().Timings.SSHConnectionTimeout())
-	if connectionTimeout < instance.Service().Timings().SSHConnectionTimeout() {
-		connectionTimeout = instance.Service().Timings().SSHConnectionTimeout()
-	}
+	connTimeout := temporal.MaxTimeout(connectionTimeout, instance.Service().Timings().SSHConnectionTimeout())
+	execTimeout := temporal.MaxTimeout(executionTimeout, instance.Service().Timings().ExecutionTimeout())
 
 	var (
 		stdOut, stdErr string
@@ -82,7 +80,7 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 	)
 
 	hostName := instance.GetName()
-	retCode, stdOut, stdErr, xerr = run(ctx, instance.sshProfile, cmd, outs, executionTimeout)
+	retCode, stdOut, stdErr, xerr = run(ctx, instance.sshProfile, cmd, outs, connTimeout+execTimeout)
 	if xerr != nil {
 		switch xerr.(type) {
 		case *retry.ErrStopRetry: // == *fail.ErrAborted
@@ -91,9 +89,9 @@ func (instance *Host) unsafeRun(ctx context.Context, cmd string, outs outputs.En
 			if cerr := fail.Cause(xerr); cerr != nil {
 				switch cerr.(type) {
 				case *fail.ErrTimeout:
-					xerr = fail.Wrap(cerr, "failed to execute command on Host '%s' in %s", hostName, temporal.FormatDuration(executionTimeout))
+					xerr = fail.Wrap(cerr, "failed to execute command on Host '%s' in %s", hostName, temporal.FormatDuration(connTimeout+execTimeout))
 				default:
-					xerr = fail.Wrap(cerr, "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connectionTimeout))
+					xerr = fail.Wrap(cerr, "failed to connect by SSH to Host '%s' after %s", hostName, temporal.FormatDuration(connTimeout+execTimeout))
 				}
 			}
 		}
@@ -213,10 +211,7 @@ func (instance *Host) unsafePush(ctx context.Context, source, target, owner, mod
 		return invalid, "", "", fail.AbortedError(nil, "aborted")
 	}
 
-	// timeout = Max(timeout, instance.Service().Timings().HostOperationTimeout())
-	if timeout < instance.Service().Timings().HostOperationTimeout() {
-		timeout = instance.Service().Timings().HostOperationTimeout()
-	}
+	timeout = temporal.MaxTimeout(timeout, instance.Service().Timings().HostOperationTimeout())
 
 	md5hash := ""
 	if source != "" {
@@ -375,7 +370,7 @@ func (instance *Host) unsafeGetVolumes() (*propertiesv1.HostVolumes, fail.Error)
 }
 
 // unsafeGetMounts returns the information about the mounts of the host
-// Intended to be used when objh is notoriously not nil (because previously checked)
+// Intended to be used when instance is notoriously not nil (because previously checked)
 func (instance *Host) unsafeGetMounts() (mounts *propertiesv1.HostMounts, xerr fail.Error) {
 	xerr = instance.Inspect(func(_ data.Clonable, props *serialize.JSONProperties) fail.Error {
 		return props.Inspect(hostproperty.MountsV1, func(clonable data.Clonable) fail.Error {

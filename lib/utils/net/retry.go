@@ -39,7 +39,7 @@ import (
 
 // WhileUnsuccessfulButRetryable executes callback inside a retry loop with tolerance for communication errors (relative to net package),
 // or some fail.Error that are considered retryable: asking "waiter" to wait between each try, with a duration limit of 'timeout'.
-func WhileUnsuccessfulButRetryable(callback func() error, waiter *retry.Officer, timeout time.Duration) fail.Error {
+func WhileUnsuccessfulButRetryable(callback func() error, waiter *retry.Officer, timeout time.Duration, options ...retry.Option) fail.Error {
 	if waiter == nil {
 		return fail.InvalidParameterCannotBeNilError("waiter")
 	}
@@ -51,16 +51,9 @@ func WhileUnsuccessfulButRetryable(callback func() error, waiter *retry.Officer,
 		arbiter = retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout))
 	}
 
-	xerr := retry.Action(
-		func() (nested error) {
-			defer fail.OnPanic(&nested)
-			callbackErr := callback()
-			actionErr := normalizeErrorAndCheckIfRetriable(false, callbackErr)
-			return actionErr
-		},
-		arbiter,
+	preparedAction := retry.NewAction(
 		waiter,
-		nil,
+		arbiter,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
 			switch v {
@@ -69,6 +62,37 @@ func WhileUnsuccessfulButRetryable(callback func() error, waiter *retry.Officer,
 			default:
 			}
 		},
+		0,
+	)
+
+	for _, opt := range options { // this should change preparedAction.Other if needed
+		err := opt(preparedAction)
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+	}
+
+	strict := false
+	if val, ok := preparedAction.Other["strict"]; ok {
+		if itis, ok := val.(bool); ok {
+			strict = itis
+		}
+	}
+
+	preparedAction.Run = func() (nested error) {
+		defer fail.OnPanic(&nested)
+		callbackErr := callback()
+		actionErr := normalizeErrorAndCheckIfRetriable(strict, callbackErr)
+		return actionErr
+	}
+
+	xerr := retry.Action(
+		preparedAction.Run,
+		preparedAction.Arbiter,
+		preparedAction.Officer,
+		nil,
+		nil,
+		preparedAction.Notify,
 	)
 	if xerr != nil {
 		switch realErr := xerr.(type) {
@@ -92,7 +116,7 @@ func WhileCommunicationUnsuccessfulDelay1Second(callback func() error, timeout t
 // normalizeErrorAndCheckIfRetriable analyzes the error passed as parameter and rewrite it to be more explicit
 // If the error is not a communication error, we return a *retry.ErrAborted error
 // containing the causing error in it
-func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) {
+func normalizeErrorAndCheckIfRetriable(strict bool, in error) (err error) { // nolint
 	// VPL: see if we could replace this defer with retry notification ability in retryOnCommunicationFailure
 	defer func() {
 		if err != nil {
@@ -286,14 +310,14 @@ func erz(v error) uintptr {
 // IsConnectionReset returns true if given err is a "reset by peer" error
 func IsConnectionReset(err error) bool {
 	if runtime.GOOS == "windows" {
-		const WSAECONNABORTED = 10053
-		const WSAECONNRESET = 10054
+		const cWSAECONNABORTED = 10053
+		const cWSAECONNRESET = 10054
 
 		if oe, ok := err.(*net.OpError); ok {
 			if oe.Op == "read" {
 				if se, ok := oe.Err.(*os.SyscallError); ok {
 					if se.Syscall == "wsarecv" {
-						if n := erz(se.Err); n == WSAECONNRESET || n == WSAECONNABORTED {
+						if n := erz(se.Err); n == cWSAECONNRESET || n == cWSAECONNABORTED {
 							return true
 						}
 					}

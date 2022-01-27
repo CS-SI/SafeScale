@@ -25,8 +25,8 @@ import (
 
 // RetryableRemoteCall calls a remote API with tolerance to communication failures
 // Remote API is done inside 'callback' parameter and returns remote error if necessary that 'convertError' function convert to SafeScale error
-func RetryableRemoteCall(callback func() error, convertError func(error) fail.Error) (xerr fail.Error) {
-	defer fail.OnPanic(&xerr)
+func RetryableRemoteCall(callback func() error, convertError func(error) fail.Error, options ...retry.Option) (ferr fail.Error) {
+	defer fail.OnPanic(&ferr)
 
 	if callback == nil {
 		return fail.InvalidParameterCannotBeNilError("callback")
@@ -39,8 +39,9 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 		normalizeError = fail.ConvertError
 	}
 
-	// Execute the remote call with tolerance for transient communication failure
-	xerr = netutils.WhileUnsuccessfulButRetryable(
+	plannedAction := retry.NewAction(
+		retry.Fibonacci(temporal.MinDelay()), // waiting time between retries follows Fibonacci numbers x MinDelay()
+		nil,
 		func() (nested error) {
 			defer fail.OnPanic(&nested)
 			if innerErr := callback(); innerErr != nil {
@@ -56,8 +57,22 @@ func RetryableRemoteCall(callback func() error, convertError func(error) fail.Er
 			}
 			return nil
 		},
-		retry.Fibonacci(temporal.MinDelay()), // waiting time between retries follows Fibonacci numbers x MinDelay()
+		nil,
 		temporal.CommunicationTimeout(),
+	)
+
+	for _, opt := range options { // now we can override the actions without changing every function that invokes RetryableRemoteCall, only callers interested in such thing will add options parameters in their invocation
+		err := opt(plannedAction)
+		if err != nil {
+			return fail.ConvertError(err)
+		}
+	}
+
+	// Execute the remote call with tolerance for transient communication failure
+	xerr := netutils.WhileUnsuccessfulButRetryable(
+		plannedAction.Run,
+		plannedAction.Officer,
+		plannedAction.Timeout,
 	)
 	if xerr != nil {
 		switch xerr.(type) {
