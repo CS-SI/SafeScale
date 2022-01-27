@@ -16,7 +16,7 @@
 feature:
     suitableFor:
         host: no
-        cluster: k8s,dcos
+        cluster: k8s
 
     requirements:
         features:
