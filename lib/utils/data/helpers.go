@@ -16,9 +16,26 @@
 
 package data
 
-//go:generate mockgen -destination=../mocks/mock_clonable.go -package=mocks github.com/CS-SI/SafeScale/lib/utils/data NullValue
+func IsNull(something interface{}) bool {
+	if something == nil {
+		return true
+	}
 
-// NullValue ...
-type NullValue interface {
-	IsNull() bool // Tells if the underlying instance is a Null Value
+	if casted, ok := something.(NullValue); ok {
+		return casted.IsNull()
+	}
+
+	return something == nil
+}
+
+func IsNil(something interface{}) bool {
+	if something == nil {
+		return true
+	}
+
+	if casted, ok := something.(NullValue); ok {
+		return casted.IsNull()
+	}
+
+	return something == nil
 }

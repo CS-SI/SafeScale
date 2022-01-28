@@ -17,6 +17,8 @@
 package data
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -40,4 +42,96 @@ func TestIsNull(t *testing.T) {
 	v = nil
 	//goland:noinspection GoNilness
 	require.True(t, v.IsNull())
+}
+
+// This test shows how the new IsNil or IsNull method handles correctly nil values
+func TestIsNilIsGoodEnough(t *testing.T) {
+	// what changes is the forget function, how we test the validity of thing, here is with the new IsNil method
+	forget := func(thing NullValue) error {
+		if !IsNil(thing) {
+			if _, ok := thing.(NullValue); ok {
+				return nil
+			}
+			return nil
+		}
+
+		return fmt.Errorf("It was a nil!")
+	}
+
+	// this code is the same for everyone
+	var buried NullValue
+	err := forget(buried)
+	if err == nil {
+		t.Error(err)
+	}
+	if !strings.Contains(err.Error(), "was a nil") {
+		t.FailNow()
+	}
+}
+
+// This test shows how the .IsNull method might panic, so it's not safe enough to protect us against nilness
+func TestIsNullMethodIsNotGoodEnough(t *testing.T) {
+	// what changes is the forget function, how we test the validity of thing, here is with the old .IsNull struct member function
+	forget := func(thing NullValue) (crash error) {
+		defer func(in *error) {
+			harder := recover()
+			if harder != nil {
+				*in = fmt.Errorf("bad things happened")
+			}
+		}(&crash)
+
+		if !thing.IsNull() {
+			if _, ok := thing.(NullValue); ok {
+				return nil
+			}
+			return nil
+		}
+
+		return fmt.Errorf("It was a nil!")
+	}
+
+	// this code is the same for everyone
+	var buried NullValue
+	err := forget(buried)
+	if err == nil {
+		t.Error(err)
+	}
+	if !strings.Contains(err.Error(), "bad things") {
+		t.FailNow()
+	}
+}
+
+// This test shows how == nil first, then the .IsNull works, but remember that .IsNull was born because we didn't want to do the == nil, so .IsNull can be considered a failure in this regard
+func TestEqualNilAndIsNullMethodIsGoodEnough(t *testing.T) {
+	// what changes is the forget function, how we test the validity of thing, here is with != first, then with the old .IsNull struct member function
+	// and remember that in order to work, we have been forced to use == nil -> .IsNull cannot be trusted
+	forget := func(thing NullValue) (crash error) {
+		defer func(in *error) {
+			harder := recover()
+			if harder != nil {
+				*in = fmt.Errorf("bad things happened")
+			}
+		}(&crash)
+
+		if thing != nil {
+			if !thing.IsNull() {
+				if _, ok := thing.(NullValue); ok {
+					return nil
+				}
+				return nil
+			}
+		}
+
+		return fmt.Errorf("It was a nil!")
+	}
+
+	// this code is the same for everyone
+	var buried NullValue
+	err := forget(buried)
+	if err == nil {
+		t.Error(err)
+	}
+	if !strings.Contains(err.Error(), "was a nil") {
+		t.FailNow()
+	}
 }
