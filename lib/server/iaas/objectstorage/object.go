@@ -101,8 +101,8 @@ func nullObject() object {
 }
 
 // IsNull tells if the instance correspond to null value
-func (o *object) IsNull() bool {
-	return o == nil || o.name == ""
+func (self *object) IsNull() bool {
+	return self == nil || self.name == ""
 }
 
 // newObjectFromStow ...
@@ -118,48 +118,48 @@ func newObjectFromStow(b *bucket, item stow.Item) object {
 }
 
 // Stored return true if the object exists in Object Storage
-func (o object) Stored() bool {
-	if o.IsNull() {
+func (self object) Stored() bool {
+	if self.IsNull() {
 		return false
 	}
-	return o.item != nil
+	return self.item != nil
 }
 
 // Reload reloads the data of the Object from the Object Storage
-func (o *object) Reload() fail.Error {
-	if o.IsNull() {
+func (self *object) Reload() fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
-	item, err := o.bucket.stowContainer.Item(o.name)
+	item, err := self.bucket.stowContainer.Item(self.name)
 	if err != nil {
 		switch err.Error() {
 		case NotFound: // this is an implementation detail of stow
-			return fail.NotFoundError("failed to reload '%s:%s' from Object Storage", o.bucket.name, o.name)
+			return fail.NotFoundError("failed to reload '%s:%s' from Object Storage", self.bucket.name, self.name)
 		default:
 			return fail.ConvertError(err)
 		}
 	}
-	return o.reloadFromItem(item)
+	return self.reloadFromItem(item)
 }
 
 // reloadFromItem reloads object instance with stow.Item
-func (o *object) reloadFromItem(item stow.Item) fail.Error {
-	o.item = item
+func (self *object) reloadFromItem(item stow.Item) fail.Error {
+	self.item = item
 	newMetadata, err := item.Metadata()
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-	o.metadata = newMetadata
+	self.metadata = newMetadata
 	return nil
 }
 
 // Read reads the content of the object from Object Storage and writes it in 'target'
-func (o *object) Read(target io.Writer, from, to int64) (ferr fail.Error) {
+func (self *object) Read(target io.Writer, from, to int64) (ferr fail.Error) {
 	defer fail.OnPanic(&ferr)
-	if o.IsNull() {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
@@ -176,11 +176,11 @@ func (o *object) Read(target io.Writer, from, to int64) (ferr fail.Error) {
 	var length int64
 
 	// 1st reload information about object, to be sure to have the last
-	if err := o.Reload(); err != nil {
+	if err := self.Reload(); err != nil {
 		return err
 	}
 
-	size, err := o.GetSize()
+	size, err := self.GetSize()
 	if err != nil {
 		return fail.Wrap(err, "failed to get bucket size")
 	}
@@ -196,7 +196,7 @@ func (o *object) Read(target io.Writer, from, to int64) (ferr fail.Error) {
 		length = to - from
 	}
 
-	source, serr := o.item.Open()
+	source, serr := self.item.Open()
 	if serr != nil {
 		return fail.ConvertError(err)
 	}
@@ -246,30 +246,30 @@ func (o *object) Read(target io.Writer, from, to int64) (ferr fail.Error) {
 }
 
 // Write the source to the object in Object Storage
-func (o *object) Write(source io.Reader, sourceSize int64) fail.Error {
-	if o.IsNull() {
+func (self *object) Write(source io.Reader, sourceSize int64) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if source == nil {
 		return fail.InvalidParameterCannotBeNilError("source")
 	}
-	if o.bucket == nil {
-		return fail.InvalidInstanceContentError("o.bucket", "cannot be nil")
+	if self.bucket == nil {
+		return fail.InvalidInstanceContentError("self.bucket", "cannot be nil")
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%d)", sourceSize).Entering().Exiting()
 
-	item, err := o.bucket.stowContainer.Put(o.name, source, sourceSize, o.metadata)
+	item, err := self.bucket.stowContainer.Put(self.name, source, sourceSize, self.metadata)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-	return o.reloadFromItem(item)
+	return self.reloadFromItem(item)
 }
 
 // WriteMultiPart writes big data to Object, by parts (also called chunks)
 // Note: nothing to do with multi-chunk abilities of various object storage technologies
-func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) fail.Error {
-	if o.IsNull() {
+func (self *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize int) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if source == nil { // If source is nil, do nothing and don't trigger an error
@@ -278,7 +278,7 @@ func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize in
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "(%d, %d)", sourceSize, chunkSize).Entering().Exiting()
 
-	metadataCopy := o.metadata.Clone()
+	metadataCopy := self.metadata.Clone()
 
 	var chunkIndex int
 	remaining := sourceSize
@@ -286,7 +286,7 @@ func (o *object) WriteMultiPart(source io.Reader, sourceSize int64, chunkSize in
 		if remaining < int64(chunkSize) {
 			chunkSize = int(remaining)
 		}
-		err := writeChunk(o.bucket.stowContainer, o.name, source, chunkSize, metadataCopy, chunkIndex)
+		err := writeChunk(self.bucket.stowContainer, self.name, source, chunkSize, metadataCopy, chunkIndex)
 		if err != nil {
 			return err
 		}
@@ -321,76 +321,76 @@ func writeChunk(container stow.Container, objectName string, source io.Reader, n
 }
 
 // Delete deletes the object from Object Storage
-func (o *object) Delete() fail.Error {
-	if o.IsNull() {
+func (self *object) Delete() fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if o.item == nil {
+	if self.item == nil {
 		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
-	err := o.bucket.stowContainer.RemoveItem(o.name)
+	err := self.bucket.stowContainer.RemoveItem(self.name)
 	if err != nil {
 		return fail.ConvertError(err)
 	}
-	o.item = nil
+	self.item = nil
 	return nil
 }
 
 // ForceAddMetadata overwrites the metadata entries of the object by the ones provided in parameter
-func (o *object) ForceAddMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
-	if o.IsNull() {
+func (self *object) ForceAddMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	for k, v := range newMetadata {
-		o.metadata[k] = v
+		self.metadata[k] = v
 	}
 	return nil
 }
 
 // AddMetadata adds missing entries in object metadata
-func (o *object) AddMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
-	if o.IsNull() {
+func (self *object) AddMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
 	for k, v := range newMetadata {
-		_, found := o.metadata[k]
+		_, found := self.metadata[k]
 		if !found {
-			o.metadata[k] = v
+			self.metadata[k] = v
 		}
 	}
 	return nil
 }
 
 // ReplaceMetadata replaces object metadata with the ones provided in parameter
-func (o *object) ReplaceMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
-	if o.IsNull() {
+func (self *object) ReplaceMetadata(newMetadata abstract.ObjectStorageItemMetadata) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
 	defer debug.NewTracer(nil, tracing.ShouldTrace("objectstorage"), "").Entering().Exiting()
 
-	o.metadata = newMetadata
+	self.metadata = newMetadata
 	return nil
 }
 
 // GetLastUpdate returns the date of last update
-func (o object) GetLastUpdate() (time.Time, fail.Error) {
-	if o.IsNull() {
+func (self object) GetLastUpdate() (time.Time, fail.Error) {
+	if self.IsNull() {
 		return time.Time{}, fail.InvalidInstanceError()
 	}
-	if o.item == nil {
-		return time.Time{}, fail.InvalidInstanceContentError("o.item", "cannot be nil")
+	if self.item == nil {
+		return time.Time{}, fail.InvalidInstanceContentError("self.item", "cannot be nil")
 	}
-	t, err := o.item.LastMod()
+	t, err := self.item.LastMod()
 	if err != nil {
 		return time.Time{}, fail.NewError(err, nil, "")
 	}
@@ -398,22 +398,22 @@ func (o object) GetLastUpdate() (time.Time, fail.Error) {
 }
 
 // GetMetadata returns the metadata of the object in Object Storage
-func (o object) GetMetadata() (abstract.ObjectStorageItemMetadata, fail.Error) {
-	if o.IsNull() {
+func (self object) GetMetadata() (abstract.ObjectStorageItemMetadata, fail.Error) {
+	if self.IsNull() {
 		return abstract.ObjectStorageItemMetadata{}, fail.InvalidInstanceError()
 	}
-	return o.metadata.Clone(), nil
+	return self.metadata.Clone(), nil
 }
 
 // GetSize returns the size of the content of the object
-func (o object) GetSize() (int64, fail.Error) {
-	if o.IsNull() {
+func (self object) GetSize() (int64, fail.Error) {
+	if self.IsNull() {
 		return 0, fail.InvalidInstanceError()
 	}
-	if o.item == nil {
-		return -1, fail.InvalidInstanceContentError("o.item", "cannot be nil")
+	if self.item == nil {
+		return -1, fail.InvalidInstanceContentError("self.item", "cannot be nil")
 	}
-	size, err := o.item.Size()
+	size, err := self.item.Size()
 	if err != nil {
 		return -1, fail.ConvertError(err)
 	}
@@ -421,14 +421,14 @@ func (o object) GetSize() (int64, fail.Error) {
 }
 
 // GetETag returns the value of the ETag (+/- md5sum of the content...)
-func (o object) GetETag() (string, fail.Error) {
-	if o.IsNull() {
+func (self object) GetETag() (string, fail.Error) {
+	if self.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if o.item == nil {
-		return "", fail.InvalidInstanceContentError("o.item", "cannot be nil")
+	if self.item == nil {
+		return "", fail.InvalidInstanceContentError("self.item", "cannot be nil")
 	}
-	etag, err := o.item.ETag()
+	etag, err := self.item.ETag()
 	if err != nil {
 		return "", fail.ConvertError(err)
 	}
@@ -436,20 +436,20 @@ func (o object) GetETag() (string, fail.Error) {
 }
 
 // GetID returns the ID of the object
-func (o object) GetID() (string, fail.Error) {
-	if o.IsNull() {
+func (self object) GetID() (string, fail.Error) {
+	if self.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	if o.item == nil {
-		return "", fail.InvalidInstanceContentError("o.item", "cannot be nil")
+	if self.item == nil {
+		return "", fail.InvalidInstanceContentError("self.item", "cannot be nil")
 	}
-	return o.item.ID(), nil
+	return self.item.ID(), nil
 }
 
 // GetName returns the name of the object
-func (o object) GetName() (string, fail.Error) {
-	if o.IsNull() {
+func (self object) GetName() (string, fail.Error) {
+	if self.IsNull() {
 		return "", fail.InvalidInstanceError()
 	}
-	return o.name, nil
+	return self.name, nil
 }

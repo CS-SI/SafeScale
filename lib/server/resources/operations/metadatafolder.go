@@ -77,25 +77,25 @@ func NewMetadataFolder(svc iaas.Service, path string) (MetadataFolder, fail.Erro
 }
 
 // IsNull tells if the MetadataFolder instance should be considered as a null value
-func (f *MetadataFolder) IsNull() bool {
-	return f == nil || f.service == nil
+func (self *MetadataFolder) IsNull() bool {
+	return self == nil || self.service == nil
 }
 
 // Service returns the service used by the MetadataFolder
-func (f MetadataFolder) Service() iaas.Service {
-	if f.IsNull() {
+func (self MetadataFolder) Service() iaas.Service {
+	if self.IsNull() {
 		return iaas.NullService()
 	}
-	return f.service
+	return self.service
 }
 
 // GetBucket returns the bucket used by the MetadataFolder to store Object Storage
-func (f MetadataFolder) GetBucket() (abstract.ObjectStorageBucket, fail.Error) {
-	if f.IsNull() {
+func (self MetadataFolder) GetBucket() (abstract.ObjectStorageBucket, fail.Error) {
+	if self.IsNull() {
 		return abstract.ObjectStorageBucket{}, nil
 	}
 
-	bucket, xerr := f.service.GetMetadataBucket()
+	bucket, xerr := self.service.GetMetadataBucket()
 	if xerr != nil {
 		return abstract.ObjectStorageBucket{}, xerr
 	}
@@ -104,8 +104,8 @@ func (f MetadataFolder) GetBucket() (abstract.ObjectStorageBucket, fail.Error) {
 }
 
 // getBucket is the same as GetBucket without instance validation (for internal use)
-func (f MetadataFolder) getBucket() (abstract.ObjectStorageBucket, fail.Error) {
-	bucket, xerr := f.service.GetMetadataBucket()
+func (self MetadataFolder) getBucket() (abstract.ObjectStorageBucket, fail.Error) {
+	bucket, xerr := self.service.GetMetadataBucket()
 	if xerr != nil {
 		return abstract.ObjectStorageBucket{}, xerr
 	}
@@ -113,15 +113,15 @@ func (f MetadataFolder) getBucket() (abstract.ObjectStorageBucket, fail.Error) {
 }
 
 // Path returns the base path of the MetadataFolder
-func (f MetadataFolder) Path() string {
-	if f.IsNull() {
+func (self MetadataFolder) Path() string {
+	if self.IsNull() {
 		return ""
 	}
-	return f.path
+	return self.path
 }
 
 // absolutePath returns the full path to reach the 'path'+'name' starting from the MetadataFolder path
-func (f MetadataFolder) absolutePath(path ...string) string {
+func (self MetadataFolder) absolutePath(path ...string) string {
 	for len(path) > 0 && (path[0] == "" || path[0] == ".") {
 		path = path[1:]
 	}
@@ -134,28 +134,28 @@ func (f MetadataFolder) absolutePath(path ...string) string {
 	relativePath = strings.Trim(relativePath, "/")
 	if relativePath != "" {
 		absolutePath := strings.ReplaceAll(relativePath, "//", "/")
-		if f.path != "" {
-			absolutePath = f.path + "/" + relativePath
+		if self.path != "" {
+			absolutePath = self.path + "/" + relativePath
 			absolutePath = strings.ReplaceAll(absolutePath, "//", "/")
 		}
 		return absolutePath
 	}
-	return f.path
+	return self.path
 }
 
 // Lookup tells if the object named 'name' is inside the ObjectStorage MetadataFolder
-func (f MetadataFolder) Lookup(path string, name string) fail.Error {
-	if f.IsNull() {
+func (self MetadataFolder) Lookup(path string, name string) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
-	absPath := strings.Trim(f.absolutePath(path), "/")
-	bucket, xerr := f.getBucket()
+	absPath := strings.Trim(self.absolutePath(path), "/")
+	bucket, xerr := self.getBucket()
 	if xerr != nil {
 		return xerr
 	}
 
-	list, xerr := f.service.ListObjects(bucket.Name, absPath, objectstorage.NoPrefix)
+	list, xerr := self.service.ListObjects(bucket.Name, absPath, objectstorage.NoPrefix)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return xerr
@@ -174,17 +174,17 @@ func (f MetadataFolder) Lookup(path string, name string) fail.Error {
 }
 
 // Delete removes metadata passed as parameter
-func (f MetadataFolder) Delete(path string, name string) fail.Error {
-	if f.IsNull() {
+func (self MetadataFolder) Delete(path string, name string) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
-	bucket, xerr := f.getBucket()
+	bucket, xerr := self.getBucket()
 	if xerr != nil {
 		return xerr
 	}
 
-	xerr = f.service.DeleteObject(bucket.Name, f.absolutePath(path, name))
+	xerr = self.service.DeleteObject(bucket.Name, self.absolutePath(path, name))
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "failed to remove metadata in Object Storage")
@@ -196,8 +196,8 @@ func (f MetadataFolder) Delete(path string, name string) fail.Error {
 // returns true, nil if the object has been found
 // returns false, fail.Error if an error occurred (including object not found)
 // The callback function has to know how to decode it and where to store the result
-func (f MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue) fail.Error {
-	if f.IsNull() {
+func (self MetadataFolder) Read(path string, name string, callback func([]byte) fail.Error, options ...datadef.ImmutableKeyValue) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if name = strings.TrimSpace(name); name == "" {
@@ -210,13 +210,13 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 	var buffer bytes.Buffer
 	xerr := netretry.WhileCommunicationUnsuccessfulDelay1Second(
 		func() error {
-			bucket, iErr := f.getBucket()
+			bucket, iErr := self.getBucket()
 			if iErr != nil {
 				return iErr
 			}
-			return f.service.ReadObject(bucket.Name, f.absolutePath(path, name), &buffer, 0, 0)
+			return self.service.ReadObject(bucket.Name, self.absolutePath(path, name), &buffer, 0, 0)
 		},
-		f.service.Timings().CommunicationTimeout(),
+		self.service.Timings().CommunicationTimeout(),
 	)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
@@ -230,7 +230,7 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 		}
 	}
 
-	doCrypt := f.crypt
+	doCrypt := self.crypt
 	for _, v := range options {
 		switch v.Key() {
 		case "doNotCrypt":
@@ -254,7 +254,7 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 	datas := buffer.Bytes()
 	if doCrypt {
 		var err error
-		datas, err = crypt.Decrypt(datas, f.cryptKey)
+		datas, err = crypt.Decrypt(datas, self.cryptKey)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return fail.NotFoundError("failed to decrypt metadata '%s/%s': %v", path, name, err)
@@ -274,15 +274,15 @@ func (f MetadataFolder) Read(path string, name string, callback func([]byte) fai
 // Returns nil on success (with assurance the write has been committed on remote side)
 // May return fail.ErrTimeout if the read-after-write operation timed out.
 // Return any other errors that can occur from the remote side
-func (f MetadataFolder) Write(path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
-	if f.IsNull() {
+func (self MetadataFolder) Write(path string, name string, content []byte, options ...datadef.ImmutableKeyValue) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 	if name == "" {
 		return fail.InvalidParameterError("name", "cannot be empty string")
 	}
 
-	doCrypt := f.crypt
+	doCrypt := self.crypt
 	for _, v := range options {
 		switch v.Key() {
 		case "doNotCrypt":
@@ -293,7 +293,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 	var data []byte
 	if doCrypt {
 		var err error
-		data, err = crypt.Encrypt(content, f.cryptKey)
+		data, err = crypt.Encrypt(content, self.cryptKey)
 		err = debug.InjectPlannedError(err)
 		if err != nil {
 			return fail.ConvertError(err)
@@ -302,14 +302,14 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 		data = content
 	}
 
-	bucket, xerr := f.getBucket()
+	bucket, xerr := self.getBucket()
 	if xerr != nil {
 		return xerr
 	}
 
 	bucketName := bucket.Name
-	absolutePath := f.absolutePath(path, name)
-	timeout := f.service.Timings().MetadataReadAfterWriteTimeout()
+	absolutePath := self.absolutePath(path, name)
+	timeout := self.service.Timings().MetadataReadAfterWriteTimeout()
 
 	// Outer retry will write the metadata at most 3 times
 	xerr = retry.Action(
@@ -319,7 +319,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 			// sourceHash := md5.New()
 			// _, _ = sourceHash.Write(source.Bytes())
 			// srcHex := hex.EncodeToString(sourceHash.Sum(nil))
-			if _, innerXErr = f.service.WriteObject(bucketName, absolutePath, source, int64(source.Len()), nil); innerXErr != nil {
+			if _, innerXErr = self.service.WriteObject(bucketName, absolutePath, source, int64(source.Len()), nil); innerXErr != nil {
 				return innerXErr
 			}
 
@@ -328,7 +328,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 			innerXErr = retry.Action(
 				func() error {
 					// Read after write until the data is up-to-date (or timeout reached, considering the write as failed)
-					if innerErr := f.service.ReadObject(bucketName, absolutePath, &target, 0, 0); innerErr != nil {
+					if innerErr := self.service.ReadObject(bucketName, absolutePath, &target, 0, 0); innerErr != nil {
 						return innerErr
 					}
 
@@ -339,7 +339,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 					return nil
 				},
 				retry.PrevailDone(retry.Unsuccessful(), retry.Timeout(timeout)),
-				retry.Fibonacci(f.service.Timings().SmallDelay()),
+				retry.Fibonacci(self.service.Timings().SmallDelay()),
 				nil,
 				nil,
 				func(t retry.Try, v verdict.Enum) {
@@ -362,7 +362,7 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 			return nil
 		},
 		retry.PrevailDone(retry.Unsuccessful(), retry.Max(5)),
-		retry.Constant(f.service.Timings().SmallDelay()),
+		retry.Constant(self.service.Timings().SmallDelay()),
 		nil,
 		nil,
 		func(t retry.Try, v verdict.Enum) {
@@ -387,18 +387,18 @@ func (f MetadataFolder) Write(path string, name string, content []byte, options 
 }
 
 // Browse browses the content of a specific path in Metadata and executes 'callback' on each entry
-func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail.Error {
-	if f.IsNull() {
+func (self MetadataFolder) Browse(path string, callback folderDecoderCallback) fail.Error {
+	if self.IsNull() {
 		return fail.InvalidInstanceError()
 	}
 
-	absPath := f.absolutePath(path)
-	metadataBucket, xerr := f.getBucket()
+	absPath := self.absolutePath(path)
+	metadataBucket, xerr := self.getBucket()
 	if xerr != nil {
 		return xerr
 	}
 
-	list, xerr := f.service.ListObjects(metadataBucket.Name, absPath, objectstorage.NoPrefix)
+	list, xerr := self.service.ListObjects(metadataBucket.Name, absPath, objectstorage.NoPrefix)
 	xerr = debug.InjectPlannedFail(xerr)
 	if xerr != nil {
 		return fail.Wrap(xerr, "Error browsing metadata: listing objects")
@@ -416,15 +416,15 @@ func (f MetadataFolder) Browse(path string, callback folderDecoderCallback) fail
 			continue
 		}
 		var buffer bytes.Buffer
-		xerr = f.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
+		xerr = self.service.ReadObject(metadataBucket.Name, i, &buffer, 0, 0)
 		xerr = debug.InjectPlannedFail(xerr)
 		if xerr != nil {
 			return fail.Wrap(xerr, "Error browsing metadata: reading from buffer")
 		}
 
 		data := buffer.Bytes()
-		if f.crypt {
-			data, err = crypt.Decrypt(data, f.cryptKey)
+		if self.crypt {
+			data, err = crypt.Decrypt(data, self.cryptKey)
 			err = debug.InjectPlannedError(err)
 			if err != nil {
 				return fail.Wrap(fail.ConvertError(err), "Error browsing metadata: decrypting data")

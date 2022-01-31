@@ -105,75 +105,75 @@ func NewTracer(task concurrency.Task, enable bool, msg ...interface{}) Tracer {
 }
 
 // IsNull returns true if the instance is a null value of tracer
-func (t *tracer) IsNull() bool {
-	return t == nil || (t.callerParams == "" && (t.funcName == unknownFunction || t.fileName == unknownFile))
+func (self *tracer) IsNull() bool {
+	return self == nil || (self.callerParams == "" && (self.funcName == unknownFunction || self.fileName == unknownFile))
 }
 
 // EnteringMessage returns the content of the message when entering the function
-func (t *tracer) EnteringMessage() string {
-	if t.IsNull() {
+func (self *tracer) EnteringMessage() string {
+	if self.IsNull() {
 		return ""
 	}
-	return goingInPrefix + t.buildMessage()
+	return goingInPrefix + self.buildMessage()
 }
 
 // WithStopwatch will add a measure of duration between GoingIn and Exiting.
 // Exiting will add the elapsed time in the log message (if it has to be logged...).
-func (t *tracer) WithStopwatch() Tracer {
-	if t.sw == nil {
-		t.sw = temporal.NewStopwatch()
+func (self *tracer) WithStopwatch() Tracer {
+	if self.sw == nil {
+		self.sw = temporal.NewStopwatch()
 	}
-	return t
+	return self
 }
 
 // Entering logs the input message (signifying we are going in) using TRACE level
-func (t *tracer) Entering() Tracer {
-	if !t.IsNull() && !t.inDone {
-		if t.sw != nil {
-			t.sw.Start()
+func (self *tracer) Entering() Tracer {
+	if !self.IsNull() && !self.inDone {
+		if self.sw != nil {
+			self.sw.Start()
 		}
-		if t.enabled {
-			t.inDone = true
-			msg := goingInPrefix + t.buildMessage()
+		if self.enabled {
+			self.inDone = true
+			msg := goingInPrefix + self.buildMessage()
 			if msg != "" {
 				logrus.Tracef(msg)
 			}
 		}
 	}
-	return t
+	return self
 }
 
 // ExitingMessage returns the content of the message when exiting the function
-func (t *tracer) ExitingMessage() string {
-	if t.IsNull() {
+func (self *tracer) ExitingMessage() string {
+	if self.IsNull() {
 		return ""
 	}
-	return goingOutPrefix + t.buildMessage()
+	return goingOutPrefix + self.buildMessage()
 }
 
 // Exiting logs the output message (signifying we are going out) using TRACE level and adds duration if WithStopwatch() has been called.
-func (t *tracer) Exiting() Tracer {
-	if !t.IsNull() && !t.outDone {
-		if t.sw != nil {
-			t.sw.Stop()
+func (self *tracer) Exiting() Tracer {
+	if !self.IsNull() && !self.outDone {
+		if self.sw != nil {
+			self.sw.Stop()
 		}
-		if t.enabled {
-			t.outDone = true
-			msg := goingOutPrefix + t.buildMessage()
-			if t.sw != nil {
-				msg += " (duration: " + t.sw.String() + ")"
+		if self.enabled {
+			self.outDone = true
+			msg := goingOutPrefix + self.buildMessage()
+			if self.sw != nil {
+				msg += " (duration: " + self.sw.String() + ")"
 			}
 			if msg != "" {
 				logrus.Tracef(msg)
 			}
 		}
 	}
-	return t
+	return self
 }
 
 // buildMessage builds the message with available information from stack trace
-func (t *tracer) buildMessage() string {
-	if t.IsNull() {
+func (self *tracer) buildMessage() string {
+	if self.IsNull() {
 		return ""
 	}
 
@@ -181,49 +181,49 @@ func (t *tracer) buildMessage() string {
 	//       badly set and you will get a line number that does not match with the one corresponding to the call
 	const skipCallers int = 2
 
-	message := t.taskSig
+	message := self.taskSig
 	if _, _, line, ok := runtime.Caller(skipCallers); ok {
-		message += " " + t.funcName + t.callerParams + " [" + t.fileName + ":" + strconv.Itoa(line) + "]"
+		message += " " + self.funcName + self.callerParams + " [" + self.fileName + ":" + strconv.Itoa(line) + "]"
 	}
 	return message
 }
 
 // TraceMessage returns a string containing a trace message
-func (t *tracer) TraceMessage(msg ...interface{}) string {
-	return "--- " + t.buildMessage() + ": " + strprocess.FormatStrings(msg...)
+func (self *tracer) TraceMessage(msg ...interface{}) string {
+	return "--- " + self.buildMessage() + ": " + strprocess.FormatStrings(msg...)
 }
 
 // Trace traces a message
-func (t *tracer) Trace(msg ...interface{}) Tracer {
-	if !t.IsNull() && t.enabled {
-		message := t.TraceMessage(msg...)
+func (self *tracer) Trace(msg ...interface{}) Tracer {
+	if !self.IsNull() && self.enabled {
+		message := self.TraceMessage(msg...)
 		if message != "" {
 			logrus.Tracef(message)
 		}
 	}
-	return t
+	return self
 }
 
 // TraceAsError traces a message with error level
-func (t *tracer) TraceAsError(msg ...interface{}) Tracer {
-	if !t.IsNull() && t.enabled {
-		message := t.TraceMessage(msg...)
+func (self *tracer) TraceAsError(msg ...interface{}) Tracer {
+	if !self.IsNull() && self.enabled {
+		message := self.TraceMessage(msg...)
 		if message != "" {
 			logrus.Errorf(message)
 		}
 	}
-	return t
+	return self
 }
 
 // TraceCallStack logs the call stack as a trace (displayed only if tracing is enabled)
-func (t *tracer) TraceCallStack() Tracer {
-	return t.Trace("%s", string(godebug.Stack()))
+func (self *tracer) TraceCallStack() Tracer {
+	return self.Trace("%s", string(godebug.Stack()))
 }
 
 // Stopwatch returns the stopwatch used (if a stopwatch has been asked with WithStopwatch() )
-func (t *tracer) Stopwatch() temporal.Stopwatch {
-	if t.IsNull() {
+func (self *tracer) Stopwatch() temporal.Stopwatch {
+	if self.IsNull() {
 		return temporal.NewStopwatch()
 	}
-	return t.sw
+	return self.sw
 }

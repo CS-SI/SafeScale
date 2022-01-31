@@ -17,6 +17,7 @@
 package outscale
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/outscale/osc-sdk-go/osc"
 
 	"github.com/CS-SI/SafeScale/lib/server/iaas/stacks"
@@ -133,7 +134,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if data.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {

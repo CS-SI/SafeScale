@@ -179,7 +179,9 @@ func (s *FeatureListener) Inspect(ctx context.Context, in *protocol.FeatureDetai
 	if xerr != nil {
 		return nil, xerr
 	}
-	_ = feat
+	if data.IsNil(feat) {
+		return nil, fail.InconsistentError("invalid feature %s", featureName)
+	}
 
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:
@@ -264,7 +266,9 @@ func (s *FeatureListener) Export(ctx context.Context, in *protocol.FeatureDetail
 	if xerr != nil {
 		return nil, xerr
 	}
-	_ = feat
+	if data.IsNil(feat) {
+		return nil, fail.InconsistentError("invalid feature: %s", featureName)
+	}
 
 	switch targetType {
 	case protocol.FeatureTargetType_FT_HOST:

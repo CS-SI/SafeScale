@@ -135,8 +135,10 @@ func (instance *ResourceCache) Get(key string, options ...data.ImmutableKeyValue
 				switch xerr.(type) {
 				case *fail.ErrDuplicate:
 					// Search in the cache by ID
-					if ce, xerr = instance.byID.Entry(key); xerr != nil {
-						if _, ok := xerr.(*fail.ErrNotFound); !ok {
+					var nilErrNotFound *fail.ErrNotFound = nil
+					ce, xerr = instance.byID.Entry(key)
+					if xerr != nil && xerr != nilErrNotFound {
+						if _, ok := xerr.(*fail.ErrNotFound); !ok { // nolint, typed nil already taken care in previous line
 							return nil, xerr
 						}
 					} else {

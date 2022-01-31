@@ -35,21 +35,21 @@ type HostInstalledFeature struct {
 // NewHostInstalledFeature ...
 func NewHostInstalledFeature() *HostInstalledFeature {
 	return &HostInstalledFeature{
-		RequiredBy: map[string]struct{}{},
-		Requires:   map[string]struct{}{},
+		RequiredBy: make(map[string]struct{}),
+		Requires:   make(map[string]struct{}),
 	}
 }
 
 // IsNull ...
 // satisfies interface data.Clonable
 func (hif *HostInstalledFeature) IsNull() bool {
-	return hif == nil || (len(hif.RequiredBy) == 0 && len(hif.Requires) == 0)
+	return hif == nil || (len(hif.RequiredBy) == 0 && len(hif.Requires) == 0) || hif.RequiredBy == nil || hif.Requires == nil
 }
 
 // Clone ...
 // satisfies interface data.Clonable
-func (hif HostInstalledFeature) Clone() data.Clonable {
-	return NewClusterInstalledFeature().Replace(&hif)
+func (hif *HostInstalledFeature) Clone() data.Clonable {
+	return NewHostInstalledFeature().Replace(hif)
 }
 
 // Replace ...

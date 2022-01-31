@@ -17,6 +17,7 @@
 package aws
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
@@ -212,7 +213,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if data.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {

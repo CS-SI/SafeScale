@@ -194,7 +194,7 @@ func defaultCauseFormatter(e Error) string {
 	return msgFinal
 }
 
-// CauseFormatter defines the func uses to format cause to string
+// CauseFormatter defines the func uses to format cause into a string
 func (e *errorCore) CauseFormatter(formatter func(Error) string) {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "errorCore.CauseFormatter", "from null value", 0))

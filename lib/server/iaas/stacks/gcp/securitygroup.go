@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	uuid "github.com/satori/go.uuid"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/compute/v1"
@@ -177,7 +178,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if data.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsComplete() {
@@ -330,7 +331,7 @@ func (s stack) DisableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if data.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup")
 	}
 	if !asg.IsComplete() {
@@ -365,7 +366,7 @@ func (s stack) EnableSecurityGroup(asg *abstract.SecurityGroup) fail.Error {
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if data.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup")
 	}
 	if !asg.IsComplete() {

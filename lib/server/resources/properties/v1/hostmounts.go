@@ -86,8 +86,8 @@ func (hrm *HostRemoteMount) IsNull() bool {
 }
 
 // Clone ...
-func (hrm HostRemoteMount) Clone() data.Clonable {
-	return NewHostRemoteMount().Replace(&hrm)
+func (hrm *HostRemoteMount) Clone() data.Clonable {
+	return NewHostRemoteMount().Replace(hrm)
 }
 
 // Replace ...
@@ -135,8 +135,8 @@ func (hm *HostMounts) IsNull() bool {
 }
 
 // Clone ...  (data.Clonable interface)
-func (hm HostMounts) Clone() data.Clonable {
-	return NewHostMounts().Replace(&hm)
+func (hm *HostMounts) Clone() data.Clonable {
+	return NewHostMounts().Replace(hm)
 }
 
 // Replace ...  (data.Clonable interface)

@@ -133,9 +133,17 @@ func wrongxerrcall(m dsl.Matcher) {
 }
 
 func isNullIsDeprecated(m dsl.Matcher) {
-	m.Match(`if $x.isNull() { return $*_ }`).Where(m["x"].Text != "instance").
+	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Match(`if $x.isNull() { return $*_ }`, `if $x.IsNull() { return $*_ }`, `if !$x.isNull() { return $*_ }`, `if !$x.IsNull() { return $*_ }`).Where(m["x"].Text != "instance" && m["x"].Text != "e" && m["x"].Text != "el" && m["x"].Text != "s" && m["x"].Text != "p" && m["x"].Text != "self").
 		Report("isNull is DANGEROUS when called upon something that is NOT a struct, if the code is valid rename the acceptor to 'instance' to disable this warning, if not, consider using instead 'if $x == nil || $x.isNull() {'").
 		Suggest("if $x == nil || $x.isNull() {")
+}
+
+func isNullIsToxic(m dsl.Matcher) {
+	// Would be easier to check for all err identifiers instead, but then how do we get the type from m[] ?
+	m.Import("github.com/CS-SI/SafeScale/lib/utils/fail")
+	m.Match(`if !$x.isNull() { $*_ }`, `if $x.isNull() { $*_ }`, `if !$x.IsNull() { $*_ }`, `if $x.IsNull() { $*_ }`).Where(m["x"].Text != "instance" && m["x"].Text != "e" && m["x"].Text != "el" && m["x"].Text != "s" && m["x"].Text != "p" && m["x"].Text != "self").
+		Report("isNull is DANGEROUS when called upon something that is NOT a struct, if the code is valid rename the acceptor to 'instance' to disable this warning, if not, consider using instead 'if $x == nil || $x.isNull() {'")
 }
 
 func falsePositives(m dsl.Matcher) {

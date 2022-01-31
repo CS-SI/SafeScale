@@ -17,6 +17,7 @@
 package openstack
 
 import (
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/debug"
 	"github.com/CS-SI/SafeScale/lib/utils/retry"
 	secgroups "github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
@@ -147,7 +148,7 @@ func (s stack) DeleteSecurityGroup(asg *abstract.SecurityGroup) (xerr fail.Error
 	if s.IsNull() {
 		return fail.InvalidInstanceError()
 	}
-	if asg.IsNull() {
+	if data.IsNil(asg) {
 		return fail.InvalidParameterError("asg", "cannot be null value of '*abstract.SecurityGroup'")
 	}
 	if !asg.IsConsistent() {

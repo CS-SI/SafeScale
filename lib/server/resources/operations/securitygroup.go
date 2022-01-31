@@ -950,7 +950,7 @@ func (instance *SecurityGroup) AddRules(ctx context.Context, rules abstract.Secu
 
 		// newAsg := asg.Clone().(*abstract.SecurityGroup)
 		for k, v := range rules {
-			if v.IsNull() {
+			if data.IsNil(v) {
 				return fail.InvalidParameterError("rules", "entry #%d cannot be null value of 'abstract.SecurityGroupRule'", k)
 			}
 			innerXErr = v.Validate()

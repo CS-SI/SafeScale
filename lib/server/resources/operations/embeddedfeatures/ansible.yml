@@ -53,7 +53,7 @@ feature:
                             nodes: no
                         run: |
                             [[ ! -d ${SF_ETCDIR}/ansible ]] && sfFail 1
-                            [[ ! -d ${SF_ETCDIR}/ansible/ansible.cfg ]] && sfFail 2
+                            [[ ! -f ${SF_ETCDIR}/ansible/ansible.cfg ]] && sfFail 2
                             sfExit
 
             add:

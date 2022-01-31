@@ -20,6 +20,7 @@ import (
 	"github.com/CS-SI/SafeScale/lib/server/resources/abstract"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/ipversion"
 	"github.com/CS-SI/SafeScale/lib/server/resources/enums/securitygroupruledirection"
+	"github.com/CS-SI/SafeScale/lib/utils/data"
 	"github.com/CS-SI/SafeScale/lib/utils/fail"
 )
 
@@ -42,7 +43,7 @@ func ValidateSecurityGroupParameter(sgParam SecurityGroupParameter) (asg *abstra
 		asg.ID = sgParam
 		sgLabel = asg.ID
 	case *abstract.SecurityGroup:
-		if sgParam.IsNull() {
+		if data.IsNil(sgParam) {
 			return asg, "", fail.InvalidParameterError("sgParam", "cannot be *abstract.ScurityGroup null value")
 		}
 		asg = sgParam
