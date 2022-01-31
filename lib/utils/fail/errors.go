@@ -77,7 +77,7 @@ type errorCore struct {
 	lock                *sync.RWMutex
 }
 
-// ErrUnqualified is a generic Error type that has no particulaur signification
+// ErrUnqualified is a generic Error type that has no particular signification
 type ErrUnqualified struct {
 	*errorCore
 }
@@ -264,7 +264,7 @@ func (e errorCore) Annotation(key string) (data.Annotation, bool) {
 	return r, ok
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 // satisfies interface data.Annotatable
 func (e *errorCore) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -400,7 +400,7 @@ func (e *errorCore) prependToMessage(msg string) {
 	e.message = msg + ": " + e.message
 }
 
-// ErrWarning defines a ErrWarning error
+// ErrWarning defines an ErrWarning error
 type ErrWarning struct {
 	*errorCore
 }
@@ -419,7 +419,7 @@ func (e *ErrWarning) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrWarning) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -432,7 +432,7 @@ func (e *ErrWarning) AddConsequence(err error) Error {
 	return e
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrWarning) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrWarning.Annotate()", "from null instance", 0))
@@ -447,7 +447,7 @@ func (e *ErrWarning) UnformattedError() string {
 	return e.Error()
 }
 
-// ErrTimeout defines a ErrTimeout error
+// ErrTimeout defines an ErrTimeout error
 type ErrTimeout struct {
 	*errorCore
 	dur time.Duration
@@ -477,7 +477,7 @@ func (e *ErrTimeout) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrTimeout) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) { // do nothing
 		return e
@@ -490,7 +490,7 @@ func (e *ErrTimeout) AddConsequence(err error) Error {
 	return e
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrTimeout) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrTimeout.Annotate()", "from null instance", 0))
@@ -510,13 +510,14 @@ type ErrNotFound struct {
 	*errorCore
 }
 
-// NotFoundError creates a ErrNotFound error
+// NotFoundError creates an ErrNotFound error
 func NotFoundError(msg ...interface{}) *ErrNotFound {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.NotFound
 	return &ErrNotFound{r}
 }
 
+// NotFoundErrorWithCause creates an ErrNotFound error initialized with cause 'cause'
 func NotFoundErrorWithCause(cause error, msg ...interface{}) *ErrNotFound {
 	r := newError(cause, nil, msg...)
 	r.grpcCode = codes.NotFound
@@ -528,7 +529,7 @@ func (e *ErrNotFound) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrNotFound) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -541,7 +542,7 @@ func (e *ErrNotFound) AddConsequence(err error) Error {
 	return e
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrNotFound) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotFound.Annotate()", "from null instance", 0))
@@ -561,13 +562,14 @@ type ErrNotAvailable struct {
 	*errorCore
 }
 
-// NotAvailableError creates a ErrNotAvailable error
+// NotAvailableError creates an ErrNotAvailable error
 func NotAvailableError(msg ...interface{}) *ErrNotAvailable {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.Unavailable
 	return &ErrNotAvailable{r}
 }
 
+// NotAvailableErrorWithCause creates an ErrNotAvailable error initialized with a cause 'cause'
 func NotAvailableErrorWithCause(cause error, msg ...interface{}) *ErrNotAvailable {
 	r := newError(cause, nil, msg...)
 	r.grpcCode = codes.Unavailable
@@ -579,7 +581,7 @@ func (e *ErrNotAvailable) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrNotAvailable) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -592,7 +594,7 @@ func (e *ErrNotAvailable) AddConsequence(err error) Error {
 	return e
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrNotAvailable) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAvailable.Annotate()", "from null instance", 0))
@@ -612,13 +614,14 @@ type ErrDuplicate struct {
 	*errorCore
 }
 
-// DuplicateError creates a ErrDuplicate error
+// DuplicateError creates an ErrDuplicate error
 func DuplicateError(msg ...interface{}) *ErrDuplicate {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.AlreadyExists
 	return &ErrDuplicate{r}
 }
 
+// DuplicateErrorWithCause creates an ErrDuplicate error initialized with cause 'cause'
 func DuplicateErrorWithCause(cause error, msg ...interface{}) *ErrDuplicate {
 	r := newError(cause, nil, msg...)
 	r.grpcCode = codes.AlreadyExists
@@ -630,7 +633,7 @@ func (e *ErrDuplicate) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrDuplicate) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -648,7 +651,7 @@ func (e *ErrDuplicate) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 // satisfies interface data.Annotatable
 func (e *ErrDuplicate) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
@@ -664,7 +667,7 @@ type ErrInvalidRequest struct {
 	*errorCore
 }
 
-// InvalidRequestError creates a ErrInvalidRequest error
+// InvalidRequestError creates an ErrInvalidRequest error
 func InvalidRequestError(msg ...interface{}) Error {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.InvalidArgument
@@ -676,7 +679,7 @@ func (e *ErrInvalidRequest) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrInvalidRequest) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -710,13 +713,14 @@ type ErrSyntax struct {
 	*errorCore
 }
 
-// SyntaxError creates a ErrSyntax error
+// SyntaxError creates an ErrSyntax error
 func SyntaxError(msg ...interface{}) *ErrSyntax {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.Internal
 	return &ErrSyntax{r}
 }
 
+// SyntaxErrorWithCause creates an ErrSyntax error initialized with cause 'cause'
 func SyntaxErrorWithCause(cause error, msg ...interface{}) *ErrSyntax {
 	r := newError(cause, nil, msg...)
 	r.grpcCode = codes.Internal
@@ -728,7 +732,7 @@ func (e *ErrSyntax) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrSyntax) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -746,7 +750,7 @@ func (e *ErrSyntax) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrSyntax) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrSyntax.Annotate()", "from null instance", 0))
@@ -761,7 +765,7 @@ type ErrNotAuthenticated struct {
 	*errorCore
 }
 
-// NotAuthenticatedError creates a ErrNotAuthenticated error
+// NotAuthenticatedError creates an ErrNotAuthenticated error
 func NotAuthenticatedError(msg ...interface{}) *ErrNotAuthenticated {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.Unauthenticated
@@ -773,7 +777,7 @@ func (e *ErrNotAuthenticated) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrNotAuthenticated) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -791,7 +795,7 @@ func (e *ErrNotAuthenticated) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrNotAuthenticated) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotAuthenticated.Annotate()", "from null instance", 0))
@@ -806,7 +810,7 @@ type ErrForbidden struct {
 	*errorCore
 }
 
-// ForbiddenError creates a ErrForbidden error
+// ForbiddenError creates an ErrForbidden error
 func ForbiddenError(msg ...interface{}) *ErrForbidden {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.PermissionDenied
@@ -818,7 +822,7 @@ func (e *ErrForbidden) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrForbidden) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -836,7 +840,7 @@ func (e *ErrForbidden) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrForbidden) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrForbidden.Annotate()", "from null instance", 0))
@@ -851,8 +855,8 @@ type ErrAborted struct {
 	*errorCore
 }
 
-// AbortedError creates a ErrAborted error
-// If err != nil, this err will become the cause of the abortion that can be retrieved using Error.Cause()
+// AbortedError creates an ErrAborted error
+// If err != nil, 'err' will become the cause of the abortion that can be retrieved using Error.Cause()
 func AbortedError(err error, msg ...interface{}) *ErrAborted {
 	var message string
 	if len(msg) == 0 {
@@ -870,7 +874,7 @@ func (e *ErrAborted) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrAborted) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -888,7 +892,7 @@ func (e *ErrAborted) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrAborted) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAborted.Annotate()", "from null instance", 0))
@@ -904,7 +908,7 @@ type ErrOverflow struct {
 	limit uint
 }
 
-// OverflowError creates a ErrOverflow error
+// OverflowError creates an ErrOverflow error
 func OverflowError(err error, limit uint, msg ...interface{}) *ErrOverflow {
 	message := strprocess.FormatStrings(msg...)
 	if limit > 0 {
@@ -927,7 +931,7 @@ func (e *ErrOverflow) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrOverflow) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -945,7 +949,7 @@ func (e *ErrOverflow) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrOverflow) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverflow.Annotate()", "from null instance", 0))
@@ -960,7 +964,7 @@ type ErrOverload struct {
 	*errorCore
 }
 
-// OverloadError creates a ErrOverload error
+// OverloadError creates an ErrOverload error
 func OverloadError(msg ...interface{}) *ErrOverload {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.ResourceExhausted
@@ -972,7 +976,7 @@ func (e *ErrOverload) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrOverload) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -990,7 +994,7 @@ func (e *ErrOverload) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrOverload) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrOverload.Annotate()", "from null instance", 0))
@@ -1005,7 +1009,7 @@ type ErrNotImplemented struct {
 	*errorCore
 }
 
-// NotImplementedError creates a ErrNotImplemented report
+// NotImplementedError creates an ErrNotImplemented report
 func NotImplementedError(msg ...interface{}) *ErrNotImplemented {
 	r := newError(nil, nil, callstack.DecorateWith("not implemented yet: ", strprocess.FormatStrings(msg...), "", 0))
 	r.grpcCode = codes.Unimplemented
@@ -1017,14 +1021,14 @@ func (e *ErrNotImplemented) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// NotImplementedErrorWithReason creates a ErrNotImplemented report
+// NotImplementedErrorWithReason creates an ErrNotImplemented report
 func NotImplementedErrorWithReason(what string, why string) Error {
 	r := newError(nil, nil, callstack.DecorateWith("not implemented yet:", what, why, 0))
 	r.grpcCode = codes.Unimplemented
 	return &ErrNotImplemented{r}
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrNotImplemented) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -1042,7 +1046,7 @@ func (e *ErrNotImplemented) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrNotImplemented) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrNotImplemented.Annotate()", "from null instance", 0))
@@ -1057,7 +1061,7 @@ type ErrRuntimePanic struct {
 	*errorCore
 }
 
-// RuntimePanicError creates a ErrRuntimePanic error
+// RuntimePanicError creates an ErrRuntimePanic error
 func RuntimePanicError(pattern string, msg ...interface{}) *ErrRuntimePanic {
 	r := newError(fmt.Errorf(pattern, msg...), nil, callstack.DecorateWith(strprocess.FormatStrings(msg...), "", "", 0))
 	r.grpcCode = codes.Internal
@@ -1071,7 +1075,7 @@ func (e *ErrRuntimePanic) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrRuntimePanic) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -1089,7 +1093,7 @@ func (e *ErrRuntimePanic) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrRuntimePanic) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrRuntimePanic.Annotate()", "from null instance", 0))
@@ -1104,7 +1108,7 @@ type ErrInvalidInstance struct {
 	*errorCore
 }
 
-// InvalidInstanceError creates a ErrInvalidInstance error
+// InvalidInstanceError creates an ErrInvalidInstance error
 func InvalidInstanceError() *ErrInvalidInstance {
 	r := newError(nil, nil, callstack.DecorateWith("invalid instance:", "", "calling method from a nil pointer", 0))
 	r.grpcCode = codes.FailedPrecondition
@@ -1118,7 +1122,7 @@ func (e *ErrInvalidInstance) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrInvalidInstance) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -1136,7 +1140,7 @@ func (e *ErrInvalidInstance) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrInvalidInstance) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstance.Annotate()", "from null instance", 0))
@@ -1179,7 +1183,7 @@ func (e *ErrInvalidParameter) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrInvalidParameter) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -1197,7 +1201,7 @@ func (e *ErrInvalidParameter) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrInvalidParameter) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidParameter.Annotate()", "from null instance", 0))
@@ -1226,7 +1230,7 @@ func (e *ErrInvalidInstanceContent) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrInvalidInstanceContent) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -1244,7 +1248,7 @@ func (e *ErrInvalidInstanceContent) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrInvalidInstanceContent) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInvalidInstanceContent.Annotate()", "from null instance", 0))
@@ -1259,7 +1263,7 @@ type ErrInconsistent struct {
 	*errorCore
 }
 
-// InconsistentError creates a ErrInconsistent error
+// InconsistentError creates an ErrInconsistent error
 func InconsistentError(msg ...interface{}) *ErrInconsistent {
 	r := newError(nil, nil, callstack.DecorateWith(strprocess.FormatStrings(msg...), "", "", 0))
 	r.grpcCode = codes.DataLoss
@@ -1271,7 +1275,7 @@ func (e *ErrInconsistent) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrInconsistent) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -1289,7 +1293,7 @@ func (e *ErrInconsistent) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrInconsistent) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrInconsistent.Annotate()", "from null instance", 0))
@@ -1304,7 +1308,7 @@ type ErrExecution struct {
 	*errorCore
 }
 
-// ExecutionError creates a ErrExecution error
+// ExecutionError creates an ErrExecution error
 func ExecutionError(exitError error, msg ...interface{}) *ErrExecution {
 	r := newError(exitError, nil, msg...)
 	r.grpcCode = codes.Internal
@@ -1333,7 +1337,7 @@ func (e *ErrExecution) IsNull() bool {
 	return e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrExecution) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -1351,7 +1355,7 @@ func (e *ErrExecution) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrExecution) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrExecution.Annotate()", "from null instance", 0))
@@ -1378,7 +1382,7 @@ func (e *ErrAlteredNothing) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrAlteredNothing) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -1396,7 +1400,7 @@ func (e *ErrAlteredNothing) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrAlteredNothing) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrAlteredNothing.Annotate()", "from null instance", 0))
@@ -1411,7 +1415,7 @@ type ErrUnknown struct {
 	*errorCore
 }
 
-// UnknownError creates a ErrForbidden error
+// UnknownError creates an ErrForbidden error
 func UnknownError(msg ...interface{}) *ErrForbidden {
 	r := newError(nil, nil, msg...)
 	r.grpcCode = codes.PermissionDenied
@@ -1423,7 +1427,7 @@ func (e *ErrUnknown) IsNull() bool {
 	return e == nil || e.errorCore.IsNull()
 }
 
-// AddConsequence ...
+// AddConsequence adds a consequence 'err' to current error 'e'
 func (e *ErrUnknown) AddConsequence(err error) Error {
 	if e == err || e == Cause(err) {
 		return e
@@ -1441,7 +1445,7 @@ func (e *ErrUnknown) UnformattedError() string {
 	return e.Error()
 }
 
-// Annotate ...
+// Annotate adds an Annotation (key-value) pair to current error 'e', using the key 'key' and the value 'value'
 func (e *ErrUnknown) Annotate(key string, value data.Annotation) data.Annotatable {
 	if e.IsNull() {
 		logrus.Errorf(callstack.DecorateWith("invalid call:", "ErrUnknown.Annotate()", "from null instance", 0))

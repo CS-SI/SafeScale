@@ -46,7 +46,7 @@ func noProblems() Error {
 	return nil
 }
 
-func TestAFailErrorisAnError(t *testing.T) {
+func TestAFailErrorIsAnError(t *testing.T) {
 	var what error
 	tfe := NewError("ouch")
 	what = tfe
@@ -68,6 +68,25 @@ func TestNormalUsage(t *testing.T) {
 func TestAWellBuiltErrorIsNotNil(t *testing.T) {
 	ha := newError(nil, nil, nil)
 	if ha.IsNull() {
+		t.Fail()
+	}
+}
+
+func TestConstructors(t *testing.T) {
+	ha := fmt.Errorf("too late")
+
+	hab := NewErrorWithCause(ha, "surprise")
+	if hab.IsNull() {
+		t.Fail()
+	}
+
+	hac := NewErrorWithCauseAndConsequences(ha, []error{ha}, "unexpected")
+	if hac.IsNull() {
+		t.Fail()
+	}
+
+	had := NotFoundErrorWithCause(ha, "horror")
+	if had.IsNull() {
 		t.Fail()
 	}
 }
