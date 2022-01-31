@@ -24,29 +24,33 @@ import (
 
 func Test_NewEncryptionKey(t *testing.T) {
 
-	chars := []byte("0123456789")
-	key, err := NewEncryptionKey(chars)
+	key, err := NewEncryptionKey([]byte(""))
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 	}
-
-	match := false
-	for a := range key {
-		match = false
-		for b := range chars {
-			if key[a] == chars[b] || key[a] == 32 {
-				match = true
-				break
-			}
-		}
-		if !match {
-			break
-		}
+	if len(key) != 32 {
+		t.Error("Invalid cyphered key length")
+		t.Fail()
 	}
 
-	if !match {
-		t.Error("Key is not compsed by given chars")
+	key, err = NewEncryptionKey([]byte("this is one of"))
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+	if len(key) != 32 {
+		t.Error("Invalid cyphered key length")
+		t.Fail()
+	}
+
+	key, err = NewEncryptionKey([]byte("this is a really too long one to be valid"))
+	if err != nil {
+		t.Error(err)
+		t.Fail()
+	}
+	if len(key) != 32 {
+		t.Error("Invalid cyphered key length")
 		t.Fail()
 	}
 
@@ -54,14 +58,20 @@ func Test_NewEncryptionKey(t *testing.T) {
 
 func Test_Encrypt(t *testing.T) {
 
+	var key *Key = nil
 	var source []byte = []byte("This is my entering data")
+	encoded, err := Encrypt(source, key)
+	if err == nil {
+		t.Error("Can't cypher nil Key")
+		t.Fail()
+	}
 
-	key, err := NewEncryptionKey([]byte("0123456789"))
+	key, err = NewEncryptionKey([]byte("0123456789"))
 	if err != nil {
 		t.Error(err)
 		t.Fail()
 	}
-	encoded, err := Encrypt(source, key)
+	encoded, err = Encrypt(source, key)
 	if err != nil {
 		t.Error(err)
 		t.Fail()
@@ -73,5 +83,18 @@ func Test_Encrypt(t *testing.T) {
 	}
 
 	require.EqualValues(t, source, decoded)
+
+}
+
+func Test_Decrypt(t *testing.T) {
+
+	var key *Key = nil
+	var source []byte = []byte("")
+
+	_, err := Decrypt(source, key)
+	if err == nil {
+		t.Error("Can't uncypher nil Key")
+		t.Fail()
+	}
 
 }
