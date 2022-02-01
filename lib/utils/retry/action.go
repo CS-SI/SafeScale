@@ -750,9 +750,9 @@ func (a action) loopWithHardTimeout() (ferr fail.Error) {
 
 				select {
 				case response := <-ch:
-					err = response
+					try.Err = response
 				case <-desist:
-					err = fail.TimeoutError(nil, timeout, "desist timeout")
+					try.Err = fail.TimeoutError(nil, timeout, "desist timeout")
 				}
 			}
 		}
